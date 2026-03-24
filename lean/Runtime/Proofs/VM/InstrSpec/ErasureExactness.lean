@@ -270,7 +270,7 @@ def VMErasureBasisIsomorphic
       (∃ c : InstrClass, c ∈ declared₂ ∧ classRealizesErasure c e)
 
 /-- Any two bases with full erasure coverage are isomorphic in erasure expressivity. -/
-theorem vm_erasure_basis_isomorphic_of_coverages
+theorem protocol_machine_erasure_basis_isomorphic_of_coverages
     {declared₁ declared₂ : List InstrClass}
     (hCov₁ : VMErasureCoverage declared₁)
     (hCov₂ : VMErasureCoverage declared₂) :
@@ -290,7 +290,7 @@ theorem canonical_instr_basis_unique_up_to_erasure_isomorphism
     {declared : List InstrClass}
     (hExact : VMErasureExactCorrespondence declared) :
     VMErasureBasisIsomorphic declared canonicalInstrBasis := by
-  exact vm_erasure_basis_isomorphic_of_coverages hExact.1 canonical_instr_basis_erasure_coverage
+  exact protocol_machine_erasure_basis_isomorphic_of_coverages hExact.1 canonical_instr_basis_erasure_coverage
 
 /-! ## Canonical Morphism Generation -/
 

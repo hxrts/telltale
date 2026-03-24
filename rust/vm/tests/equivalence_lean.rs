@@ -15,7 +15,7 @@ use std::path::PathBuf;
 
 use telltale_lean_bridge::export::global_to_json;
 use telltale_lean_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
-use telltale_lean_bridge::{default_schema_version, partition_by_session, NormalizedEvent};
+use telltale_lean_bridge::{canonical_schema_version, partition_by_session, NormalizedEvent};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{ObsEvent, VMConfig, VMError, VM};
 use test_support::{
@@ -147,7 +147,7 @@ fn build_choreos(images: &[CodeImage]) -> Vec<ChoreographyJson> {
     images
         .iter()
         .map(|img| ChoreographyJson {
-            schema_version: default_schema_version(),
+            schema_version: canonical_schema_version(),
             global_type: global_to_json(&img.global_type),
             roles: img.roles(),
         })

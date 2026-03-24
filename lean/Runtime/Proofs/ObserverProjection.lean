@@ -1,10 +1,10 @@
-import Runtime.Proofs.VMPotential
+import Runtime.Proofs.ProtocolMachinePotential
 import Runtime.Resources.Arena
 import ClassicalAnalysisAPI
 
-/-! # VM Observer/Projection Bridge
+/-! # Protocol-Machine Observer/Projection Bridge
 
-VM-level observer projection plus noninterference and information-theoretic
+Protocol-machine observer projection plus noninterference and information-theoretic
 bridge lemmas for coroutine-local views. -/
 
 /-
@@ -12,7 +12,7 @@ The Problem. Individual coroutines should only observe session state relevant to
 their owned endpoints, enabling noninterference arguments and information-theoretic
 bounds on what each participant can learn.
 
-Solution Structure. Defines `CoroutineView` as the projection of VM state visible
+Solution Structure. Defines `CoroutineView` as the projection of protocol-machine state visible
 to a single coroutine: local types, incoming traces, incoming buffers, progress
 tokens, and knowledge set. Provides `coroutineProjection` and `coroutineView`
 functions with noninterference lemmas showing unrelated operations don't affect
@@ -25,7 +25,7 @@ section
 
 universe u
 
-/-- Coroutine-local observable projection from VM state. -/
+/-- Coroutine-local observable projection from protocol-machine state. -/
 structure CoroutineView where
   localTypes : List (Endpoint × Option LocalType)
   incomingTraces : List (Edge × List ValType)
@@ -57,7 +57,7 @@ def coroutineProjection {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     progressTokens := coro.progressTokens
     knowledgeSet := coro.knowledgeSet }
 
-/-- Public observer view of a coroutine id in VM state. -/
+/-- Public observer view of a coroutine id in protocol-machine state. -/
 def coroutineView {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -91,8 +91,8 @@ theorem coroutine_view_eq_projection {ι γ π ε ν : Type u} [IdentityModel ι
 
 /-! ## Observer Equivalence -/
 
-/-- VM observational equivalence for one coroutine id. -/
-def VMCEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- Protocol-machine observational equivalence for one coroutine id. -/
+def CoroutineViewEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -101,34 +101,34 @@ def VMCEquiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     (st₁ st₂ : VMState ι γ π ε ν) (cid : CoroutineId) : Prop :=
   coroutineView st₁ cid = coroutineView st₂ cid
 
-theorem vm_c_equiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem coroutine_view_equiv_refl {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (cid : CoroutineId) :
-    VMCEquiv st st cid := rfl
+    CoroutineViewEquiv st st cid := rfl
 
-theorem vm_c_equiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem coroutine_view_equiv_symm {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     {st₁ st₂ : VMState ι γ π ε ν} {cid : CoroutineId}
-    (h : VMCEquiv st₁ st₂ cid) :
-    VMCEquiv st₂ st₁ cid := Eq.symm h
+    (h : CoroutineViewEquiv st₁ st₂ cid) :
+    CoroutineViewEquiv st₂ st₁ cid := Eq.symm h
 
-theorem vm_c_equiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem coroutine_view_equiv_trans {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     {st₁ st₂ st₃ : VMState ι γ π ε ν} {cid : CoroutineId}
-    (h₁₂ : VMCEquiv st₁ st₂ cid) (h₂₃ : VMCEquiv st₂ st₃ cid) :
-    VMCEquiv st₁ st₃ cid := Eq.trans h₁₂ h₂₃
+    (h₁₂ : CoroutineViewEquiv st₁ st₂ cid) (h₂₃ : CoroutineViewEquiv st₂ st₃ cid) :
+    CoroutineViewEquiv st₁ st₃ cid := Eq.trans h₁₂ h₂₃
 
 /-! ## Topology-Change Noninterference -/
 
@@ -162,21 +162,21 @@ theorem topology_change_preserves_coroutine_view {ι γ π ε ν : Type u} [Iden
       | heal edges =>
           simp [applyTopologyChange, reconnectEdges, hco, coroutineProjection]
 
-/-- VM-level noninterference: topology changes preserve observer equivalence. -/
-theorem topology_change_preserves_vmc_equiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- Protocol-machine noninterference: topology changes preserve observer equivalence. -/
+theorem topology_change_preserves_coroutine_view_equiv {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : VMState ι γ π ε ν) (tc : TopologyChange (ι := ι)) (cid : CoroutineId) :
-    VMCEquiv (applyTopologyChange st tc) st cid := by
+    CoroutineViewEquiv (applyTopologyChange st tc) st cid := by
   exact topology_change_preserves_coroutine_view st tc cid
 
-/-! ## Information-Theoretic VM Bridge -/
+/-! ## Information-Theoretic Protocol-Machine Bridge -/
 
-/-- Joint label/observation distribution induced by VM observer projection. -/
-def vmViewJoint (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- Joint label/observation distribution induced by protocol-machine observer projection. -/
+def coroutineViewJoint (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -187,7 +187,7 @@ def vmViewJoint (L : Type*) {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
     (labelDist : L → ℝ) : L × Option CoroutineView → ℝ :=
   fun lo => if coroutineView (states lo.1) cid = lo.2 then labelDist lo.1 else 0
 
-theorem vm_mutual_info_zero_of_erasure
+theorem coroutine_view_mutual_info_zero_of_erasure
     {L : Type} [Fintype L] [Fintype (Option CoroutineView)] [DecidableEq (Option CoroutineView)]
     [EntropyAPI.Laws]
     {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
@@ -198,9 +198,9 @@ theorem vm_mutual_info_zero_of_erasure
     [IdentityVerificationBridge ι ν]
     (states : L → VMState ι γ π ε ν) (cid : CoroutineId)
     (labelDist : L → ℝ) (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1) :
-    EntropyAPI.IsErasureKernel labelDist (vmViewJoint L states cid labelDist) →
-    EntropyAPI.mutualInfo (vmViewJoint L states cid labelDist) = 0 := by
+    EntropyAPI.IsErasureKernel labelDist (coroutineViewJoint L states cid labelDist) →
+    EntropyAPI.mutualInfo (coroutineViewJoint L states cid labelDist) = 0 := by
   intro hErase
   exact EntropyAPI.Laws.mutual_info_zero_of_erasure
     (self := inferInstance) (L := L) (O := Option CoroutineView)
-    labelDist h_nn h_sum (vmViewJoint L states cid labelDist) hErase
+    labelDist h_nn h_sum (coroutineViewJoint L states cid labelDist) hErase

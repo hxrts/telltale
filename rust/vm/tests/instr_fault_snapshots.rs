@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 use telltale_vm::coroutine::Fault;
-use telltale_vm::instr::{ImmValue, Instr, InvokeAction};
+use telltale_vm::instr::{ImmValue, Instr};
 use telltale_vm::loader::CodeImage;
 use telltale_vm::vm::{VMConfig, VMError, VM};
 
@@ -103,14 +103,6 @@ fn case_close_non_endpoint() -> (&'static str, CodeImage) {
         Instr::Close { session: 0 },
     ]);
     ("close/non_endpoint", image)
-}
-
-fn case_invoke_dst_oob() -> (&'static str, CodeImage) {
-    let image = single_role_end_image(vec![Instr::Invoke {
-        action: InvokeAction::Reg(0),
-        dst: Some(99),
-    }]);
-    ("invoke/dst_oob", image)
 }
 
 fn case_transfer_non_nat_target() -> (&'static str, CodeImage) {
@@ -250,7 +242,6 @@ fn snapshot_fault_tags_for_core_instruction_families() {
     let default_cases = [
         case_send_type_mismatch(),
         case_close_non_endpoint(),
-        case_invoke_dst_oob(),
         case_transfer_non_nat_target(),
         case_check_malformed_knowledge(),
         case_fork_speculation_disabled(),
@@ -281,21 +272,19 @@ fn snapshot_fault_tags_for_core_instruction_families() {
     observed.sort_by_key(|(name, _)| match *name {
         "send/type_mismatch" => 0,
         "close/non_endpoint" => 1,
-        "invoke/dst_oob" => 2,
-        "transfer/non_nat_target" => 3,
-        "check/malformed_knowledge" => 4,
-        "fork/non_nat_ghost" => 5,
-        "fork/speculation_disabled" => 6,
-        "join/without_speculation" => 7,
-        "abort/without_speculation" => 8,
-        "choose/unknown_label" => 9,
+        "transfer/non_nat_target" => 2,
+        "check/malformed_knowledge" => 3,
+        "fork/non_nat_ghost" => 4,
+        "fork/speculation_disabled" => 5,
+        "join/without_speculation" => 6,
+        "abort/without_speculation" => 7,
+        "choose/unknown_label" => 8,
         _ => 99,
     });
 
     let expected = vec![
         ("send/type_mismatch", "type_violation"),
         ("close/non_endpoint", "type_violation"),
-        ("invoke/dst_oob", "out_of_registers"),
         ("transfer/non_nat_target", "transfer_fault"),
         ("check/malformed_knowledge", "transfer_fault"),
         ("fork/non_nat_ghost", "type_violation"),
@@ -310,10 +299,7 @@ fn snapshot_fault_tags_for_core_instruction_families() {
 #[test]
 fn snapshot_fault_api_shape_is_vm_fault_wrapper() {
     use assert_matches::assert_matches;
-    let image = single_role_end_image(vec![Instr::Invoke {
-        action: InvokeAction::Reg(0),
-        dst: Some(99),
-    }]);
+    let image = single_role_end_image(vec![Instr::Close { session: 0 }]);
     let mut vm = VM::new(VMConfig::default());
     vm.load_choreography(&image).expect("load");
     let result = vm.run(&PassthroughHandler, 8);

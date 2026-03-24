@@ -33,53 +33,53 @@ variable {ν : Type u} [VerificationModel ν]
 /-- API alias: build theorem-pack artifacts from a profile space. -/
 abbrev mk
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State} :
-    VMTheoremPack (space := space) :=
-  buildVMTheoremPack (space := space)
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State} :
+    ProtocolMachineTheoremPack (space := space) :=
+  buildProtocolMachineTheoremPack (space := space)
 
 /-- API alias: compact capability inventory. -/
 abbrev capabilities
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
   theoremInventory (space := space) pack
 
 /-- API alias: capability inventory augmented with determinism flags. -/
 abbrev capabilitiesWithDeterminism
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space))
-    (determinism : VMDeterminismArtifacts) : List (String × Bool) :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (determinism : ProtocolMachineDeterminismArtifacts) : List (String × Bool) :=
   theoremInventoryWithDeterminism (space := space) pack determinism
 
 /-- API alias: theorem-pack projection of semantic-object proof-family artifacts. -/
 abbrev semanticObjectArtifacts
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Option SemanticObjectArtifacts :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Option SemanticObjectArtifacts :=
   pack.semanticObjects?
 
 /-- API alias: semantic-object proof-family inventory extracted from the theorem pack. -/
 abbrev semanticObjectInventory
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) :
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) :
     List (String × Bool) :=
   Runtime.Proofs.semanticObjectInventory (pack := pack)
 
 /-- Compact list of enabled semantic-object theorem attachment points. -/
 def semanticObjectCapabilities
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List String :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List String :=
   SemanticObjectArtifacts.attachmentPoints (semanticObjectArtifacts pack)
 
 /-- Deterministic minimal capability inventory:
 retain only capability names with proved evidence. -/
 def minimalCapabilities
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List String :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List String :=
   (capabilities (space := space) pack).foldr
     (fun entry acc => if entry.2 then entry.1 :: acc else acc) []
 
@@ -170,52 +170,52 @@ abbrev abortRestoresScopedCheckpoint :=
 /-- Attach liveness bundle evidence to a combined proof space. -/
 def withLivenessBundle
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
-    (bundle : VMLivenessBundle store₀) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (bundle : ProtocolMachineLivenessBundle store₀) :
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with
-      toVMInvariantSpace := VMInvariantSpace.withLiveness space.toVMInvariantSpace bundle }
+      toProtocolMachineInvariantSpace := ProtocolMachineInvariantSpace.withLiveness space.toProtocolMachineInvariantSpace bundle }
 
 /-- Attach output-condition witness evidence to a combined proof space. -/
 def withOutputCondition
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (w : OutputConditionWitness) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with
-      toVMInvariantSpace :=
-        VMInvariantSpace.withOutputConditionWitness space.toVMInvariantSpace w }
+      toProtocolMachineInvariantSpace :=
+        ProtocolMachineInvariantSpace.withOutputConditionWitness space.toProtocolMachineInvariantSpace w }
 
 /-- Attach semantic-object theorem attachment points to a combined proof space. -/
 def withSemanticObjectWitnesses
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (w : SemanticObjectWitnessBundle) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with
-      toVMInvariantSpace :=
-        VMInvariantSpace.withSemanticObjectWitnesses space.toVMInvariantSpace w }
+      toProtocolMachineInvariantSpace :=
+        ProtocolMachineInvariantSpace.withSemanticObjectWitnesses space.toProtocolMachineInvariantSpace w }
 
 /-- Composer API for liveness/distributed/classical/output-condition spaces. -/
 def composeProofSpaces
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
-    (liveness? : Option (VMLivenessBundle store₀))
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (liveness? : Option (ProtocolMachineLivenessBundle store₀))
     (distributed? : Option Adapters.DistributedProfiles)
     (classical? : Option (Adapters.ClassicalProfiles State))
     (output? : Option OutputConditionWitness) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   let s₁ :=
     match liveness? with
     | some b => withLivenessBundle (space := space) b
     | none => space
   let s₂ :=
     match distributed? with
-    | some d => VMInvariantSpaceWithProfiles.withDistributedProfiles s₁ d
+    | some d => ProtocolMachineInvariantSpaceWithProfiles.withDistributedProfiles s₁ d
     | none => s₁
   let s₃ :=
     match classical? with
-    | some c => VMInvariantSpaceWithProfiles.withClassicalProfiles s₂ c
+    | some c => ProtocolMachineInvariantSpaceWithProfiles.withClassicalProfiles s₂ c
     | none => s₂
   match output? with
   | some w => withOutputCondition (space := s₃) w
@@ -224,13 +224,13 @@ def composeProofSpaces
 /-- Composer API that additionally attaches semantic-object theorem surfaces. -/
 def composeProofSpacesWithSemanticObjects
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
-    (liveness? : Option (VMLivenessBundle store₀))
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (liveness? : Option (ProtocolMachineLivenessBundle store₀))
     (distributed? : Option Adapters.DistributedProfiles)
     (classical? : Option (Adapters.ClassicalProfiles State))
     (output? : Option OutputConditionWitness)
     (semanticObjects? : Option SemanticObjectWitnessBundle) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   let composed := composeProofSpaces
     (space := space)
     (liveness? := liveness?)
@@ -246,50 +246,50 @@ def composeProofSpacesWithSemanticObjects
 /-- Runtime gate: shard-placement admission requires protocol-envelope bridge evidence. -/
 def canAdmitShardPlacement
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.protocolEnvelopeBridge?.isSome
 
 /-- Runtime gate: live migration requires delegation-preserves-envelope evidence. -/
 def canLiveMigrate
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.protocolEnvelopeBridge?.isSome
 
 /-- Runtime gate: placement/refinement updates require spatial monotonicity evidence. -/
 def canRefinePlacement
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.protocolEnvelopeBridge?.isSome
 
 /-- Runtime gate: relaxed reordering requires exchange-normalization capability evidence. -/
 def canRelaxReordering
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.protocolEnvelopeBridge?.isSome
 
 /-- Runtime gate: mixed determinism profiles require adherence + admission capabilities. -/
 def canUseMixedDeterminismProfiles
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.vmEnvelopeAdherence?.isSome && pack.vmEnvelopeAdmission?.isSome
 
 /-- Runtime gate: Byzantine-safe operation requires Byzantine + VM adherence artifacts. -/
 def canOperateUnderByzantineEnvelope
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.byzantineSafety?.isSome && pack.vmEnvelopeAdherence?.isSome
 
 /-- Runtime gate: autoscaling/repartitioning requires compositional-envelope evidence. -/
 def canAutoscaleOrRepartition
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.protocolEnvelopeBridge?.isSome
 
 /-! ## Inventory Conformance Helpers -/
@@ -297,8 +297,8 @@ def canAutoscaleOrRepartition
 /-- CI helper: claimed capability tags must be supported by theorem-pack inventory. -/
 def claimedCapabilitiesWithinInventory
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space))
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space))
     (claimed : List String) : Bool :=
   let inv := capabilities (space := space) pack
   claimed.all (fun name => (inv.find? (fun p => p.1 = name)).map Prod.snd |>.getD false)
@@ -306,13 +306,13 @@ def claimedCapabilitiesWithinInventory
 /-- Artifact-level snapshot for envelope capability conformance checks. -/
 def envelopeCapabilitySnapshot
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
   (capabilities (space := space) pack).filter (fun p =>
     p.1 = "byzantine_safety_characterization" ||
     p.1 = "protocol_envelope_bridge" ||
-    p.1 = "vm_envelope_adherence" ||
-    p.1 = "vm_envelope_admission")
+    p.1 = "protocol_machine_envelope_adherence" ||
+    p.1 = "protocol_machine_envelope_admission")
 
 end TheoremPackAPI
 end Proofs

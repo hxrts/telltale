@@ -95,16 +95,16 @@ pub use invariants::{
     SchedulerKind, TimingModel, PROTOCOL_BUNDLE_SCHEMA_VERSION,
 };
 pub use schema::{
-    default_schema_version, ensure_supported_schema_version, is_supported_schema_version,
-    LEAN_BRIDGE_SCHEMA_VERSION,
+    canonical_schema_version, deserialize_schema_version, ensure_supported_schema_version,
+    is_supported_schema_version, LEAN_BRIDGE_SCHEMA_VERSION,
 };
 pub use semantic_objects::{
-    default_semantic_objects_schema_version, semantic_objects_from_json, semantic_objects_to_json,
-    AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-    CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead, OperationInstance,
-    OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
-    ProgressState, ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent,
-    PublicationObserverClass, PublicationStatus, SemanticHandoff, TickedObsEvent,
+    canonical_semantic_objects_schema_version, semantic_objects_from_json,
+    semantic_objects_to_json, AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle,
+    CanonicalHandle, CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead,
+    OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope,
+    ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
+    PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff, TickedObsEvent,
     TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use vm_trace::{

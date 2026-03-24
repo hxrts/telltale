@@ -19,16 +19,16 @@ variable [IdentityVerificationBridge ι ν]
 /-- Round-robin scheduler bundle gates the round-robin artifact on. -/
 example (st₀ : VMState ι γ π ε ν)
     (hpol : st₀.sched.policy = .roundRobin) :
-    (buildVMSchedulerArtifact
-      ({ policy := .roundRobin, policyPinned := hpol } : VMSchedulerBundle st₀)
+    (buildProtocolMachineSchedulerArtifact
+      ({ policy := .roundRobin, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)
     ).roundRobin?.isSome = true := by
   rfl
 
 /-- Cooperative scheduler bundle gates cooperative normalization on. -/
 example (st₀ : VMState ι γ π ε ν)
     (hpol : st₀.sched.policy = .cooperative) :
-    (buildVMSchedulerArtifact
-      ({ policy := .cooperative, policyPinned := hpol } : VMSchedulerBundle st₀)
+    (buildProtocolMachineSchedulerArtifact
+      ({ policy := .cooperative, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)
     ).cooperative?.isSome = true := by
   rfl
 
@@ -36,16 +36,16 @@ example (st₀ : VMState ι γ π ε ν)
 example (st₀ : VMState ι γ π ε ν)
     (f : CoroutineId → Nat)
     (hpol : st₀.sched.policy = .priority f) :
-    (buildVMSchedulerArtifact
-      ({ policy := .priority f, policyPinned := hpol } : VMSchedulerBundle st₀)
+    (buildProtocolMachineSchedulerArtifact
+      ({ policy := .priority f, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)
     ).priority?.isSome = true := by
   rfl
 
 /-- Progress-aware scheduler bundle gates the progress-aware artifact on. -/
 example (st₀ : VMState ι γ π ε ν)
     (hpol : st₀.sched.policy = .progressAware) :
-    (buildVMSchedulerArtifact
-      ({ policy := .progressAware, policyPinned := hpol } : VMSchedulerBundle st₀)
+    (buildProtocolMachineSchedulerArtifact
+      ({ policy := .progressAware, policyPinned := hpol } : ProtocolMachineSchedulerBundle st₀)
     ).progressAware?.isSome = true := by
   rfl
 

@@ -1,13 +1,13 @@
 
 import Runtime.Adequacy.EnvelopeCore.ReconfigurationBridge
 
-/-! # VM Envelope Adherence
+/-! # Protocol-Machine Envelope Adherence
 
 Determinism profiles, certified envelope capabilities, and admission
-checking infrastructure for VM-to-envelope correspondence. -/
+checking infrastructure for protocol-machine-to-envelope correspondence. -/
 
 /-
-The Problem. The VM must adhere to declared envelope bounds. We need
+The Problem. The protocol machine must adhere to declared envelope bounds. We need
 to classify determinism guarantees (full, trace-modulo, commutativity-
 modulo) and check that user-requested capabilities (`D_user`) are
 contained within certified program capabilities (`D_prog`).
@@ -68,10 +68,10 @@ def ShardedExchangeNormalization {State : Type u} {Obs : Type v}
     exchange impl₁ impl₂ →
       EqEnvShard E ref₁ impl₁ → EqEnvShard E ref₂ impl₂
 
--- VM Local/Sharded Hypothesis Bundles
+-- Protocol-Machine Local/Sharded Hypothesis Bundles
 
-/-- E3: VM-side local determinism/envelope hypothesis bundle. -/
-structure VMLocalEnvelopeHypotheses (State : Type u) (Obs : Type v) where
+/-- E3: protocol-machine local determinism/envelope hypothesis bundle. -/
+structure ProtocolMachineLocalEnvelopeHypotheses (State : Type u) (Obs : Type v) where
   localEnvelope : LocalEnvelope State Obs
   refRun : Run State → Prop
   vmRun : Run State → Prop
@@ -81,8 +81,8 @@ structure VMLocalEnvelopeHypotheses (State : Type u) (Obs : Type v) where
   schedulerDeterminismWitness :
     ExchangeNormalization localEnvelope certifiedExchange
 
-/-- E3: VM-side sharded determinism/envelope hypothesis bundle. -/
-structure VMShardedEnvelopeHypotheses (State : Type u) (Obs : Type v) where
+/-- E3: protocol-machine sharded determinism/envelope hypothesis bundle. -/
+structure ProtocolMachineShardedEnvelopeHypotheses (State : Type u) (Obs : Type v) where
   shardedEnvelope : ShardedEnvelope State Obs
   refRun : Run State → Prop
   vmRun : Run State → Prop
@@ -93,38 +93,38 @@ structure VMShardedEnvelopeHypotheses (State : Type u) (Obs : Type v) where
 /- ## Structured Block 2 -/
     ShardedExchangeNormalization shardedEnvelope certifiedExchange
 
-/-- E3: extract VM local adherence from local hypothesis bundle assumptions. -/
-theorem vm_local_adherence_of_hypotheses
+/-- E3: extract protocol-machine local adherence from local hypothesis bundle assumptions. -/
+theorem protocol_machine_local_adherence_of_hypotheses
     {State : Type u} {Obs : Type v}
-    (h : VMLocalEnvelopeHypotheses State Obs) :
+    (h : ProtocolMachineLocalEnvelopeHypotheses State Obs) :
     LocalEnvelopeSoundness h.localEnvelope h.refRun h.vmRun :=
   h.adherenceWitness
 
-/-- E3: extract VM sharded adherence from sharded hypothesis bundle assumptions. -/
-theorem vm_sharded_adherence_of_hypotheses
+/-- E3: extract protocol-machine sharded adherence from sharded hypothesis bundle assumptions. -/
+theorem protocol_machine_sharded_adherence_of_hypotheses
     {State : Type u} {Obs : Type v}
-    (h : VMShardedEnvelopeHypotheses State Obs) :
+    (h : ProtocolMachineShardedEnvelopeHypotheses State Obs) :
     ShardedEnvelopeSoundness h.shardedEnvelope h.refRun h.vmRun :=
   h.adherenceWitness
 
 /-- E3: extract scheduler determinism modulo certified exchange (local). -/
 theorem scheduler_determinism_local_of_hypotheses
     {State : Type u} {Obs : Type v}
-    (h : VMLocalEnvelopeHypotheses State Obs) :
+    (h : ProtocolMachineLocalEnvelopeHypotheses State Obs) :
     ExchangeNormalization h.localEnvelope h.certifiedExchange :=
   h.schedulerDeterminismWitness
 
 /-- E3: extract scheduler determinism modulo certified exchange (sharded). -/
 theorem scheduler_determinism_sharded_of_hypotheses
     {State : Type u} {Obs : Type v}
-    (h : VMShardedEnvelopeHypotheses State Obs) :
+    (h : ProtocolMachineShardedEnvelopeHypotheses State Obs) :
     ShardedExchangeNormalization h.shardedEnvelope h.certifiedExchange :=
   h.schedulerDeterminismWitness
 
 -- Adequacy and Capability Relations
 
-/-- E3: adequacy statement form between reference and VM semantics modulo envelope. -/
-def VMObservationalAdequacyModuloEnvelope {State : Type u}
+/-- E3: adequacy statement form between reference and protocol-machine semantics modulo envelope. -/
+def ProtocolMachineObservationalAdequacyModuloEnvelope {State : Type u}
     (R : Run State → Run State → Prop)
     (refRun vmRun : Run State → Prop) : Prop :=
   ∀ ref vm, refRun ref → vmRun vm → R ref vm
@@ -151,24 +151,24 @@ def CapabilityMonotonicity
     guarantee weak →
     guarantee strong
 
--- VM Adherence Premises
+-- Protocol-Machine Adherence Premises
 
-/-- E3: VM adherence + adequacy premise bundle for theorem extraction. -/
-structure VMEnvelopeAdherencePremises
+/-- E3: protocol-machine adherence + adequacy premise bundle for theorem extraction. -/
+structure ProtocolMachineEnvelopeAdherencePremises
     (State : Type u) (Obs : Type v) (Placement : Type (max u v)) where
-  localHypotheses : VMLocalEnvelopeHypotheses State Obs
-  shardedHypotheses : VMShardedEnvelopeHypotheses State Obs
+  localHypotheses : ProtocolMachineLocalEnvelopeHypotheses State Obs
+  shardedHypotheses : ProtocolMachineShardedEnvelopeHypotheses State Obs
   subtype : SpatialSubtype Placement
   obligation : Placement → Run State → Run State → Prop
   monotonicityWitness :
     SpatialSubtypingMonotonicity subtype obligation
   localAdequacyWitness :
 /- ## Structured Block 3 -/
-    VMObservationalAdequacyModuloEnvelope
+    ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvLocal localHypotheses.localEnvelope)
       localHypotheses.refRun localHypotheses.vmRun
   shardedAdequacyWitness :
-    VMObservationalAdequacyModuloEnvelope
+    ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvShard shardedHypotheses.shardedEnvelope)
       shardedHypotheses.refRun shardedHypotheses.vmRun
   localFullAbstractionWitness :
@@ -188,81 +188,81 @@ structure VMEnvelopeAdherencePremises
 
 -- Premise Projections
 
-/-- E3: extract local observational adequacy modulo envelope from VM premises. -/
-theorem vm_local_adequacy_of_premises
+/-- E3: extract local observational adequacy modulo envelope from protocol-machine premises. -/
+theorem protocol_machine_local_adequacy_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : VMEnvelopeAdherencePremises State Obs Placement) :
-    VMObservationalAdequacyModuloEnvelope
+    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
+    ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvLocal p.localHypotheses.localEnvelope)
       p.localHypotheses.refRun p.localHypotheses.vmRun :=
   p.localAdequacyWitness
 
-/-- E3: extract sharded observational adequacy modulo envelope from VM premises. -/
-theorem vm_sharded_adequacy_of_premises
+/-- E3: extract sharded observational adequacy modulo envelope from protocol-machine premises. -/
+theorem protocol_machine_sharded_adequacy_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : VMEnvelopeAdherencePremises State Obs Placement) :
-    VMObservationalAdequacyModuloEnvelope
+    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
+    ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvShard p.shardedHypotheses.shardedEnvelope)
       p.shardedHypotheses.refRun p.shardedHypotheses.vmRun :=
   p.shardedAdequacyWitness
 
-/-- E3: extract local full-abstraction/adequacy witness from VM premises. -/
-theorem vm_local_full_abstraction_of_premises
+/-- E3: extract local full-abstraction/adequacy witness from protocol-machine premises. -/
+theorem protocol_machine_local_full_abstraction_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : VMEnvelopeAdherencePremises State Obs Placement) :
+    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
     EnvelopeFullAbstraction
       p.localHypotheses.localEnvelope.toEnvelope.observe
       (EqEnvLocal p.localHypotheses.localEnvelope) :=
   p.localFullAbstractionWitness
 
-/-- E3: extract sharded full-abstraction/adequacy witness from VM premises. -/
-theorem vm_sharded_full_abstraction_of_premises
+/-- E3: extract sharded full-abstraction/adequacy witness from protocol-machine premises. -/
+theorem protocol_machine_sharded_full_abstraction_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : VMEnvelopeAdherencePremises State Obs Placement) :
+    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
     EnvelopeFullAbstraction
       p.shardedHypotheses.shardedEnvelope.toEnvelope.observe
       (EqEnvShard p.shardedHypotheses.shardedEnvelope) :=
   p.shardedFullAbstractionWitness
 
-/-- E3: extract VM adherence monotonicity under spatial refinement. -/
-theorem vm_adherence_monotonicity_of_premises
+/-- E3: extract protocol-machine adherence monotonicity under spatial refinement. -/
+theorem protocol_machine_adherence_monotonicity_of_premises
 /- ## Structured Block 4 -/
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : VMEnvelopeAdherencePremises State Obs Placement) :
+    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
     SpatialSubtypingMonotonicity p.subtype p.obligation :=
   p.monotonicityWitness
 
 -- Capability-Monotonicity Projection
 
-/-- E3: extract capability monotonicity theorem from VM premises. -/
-theorem vm_capability_monotonicity_of_premises
+/-- E3: extract capability monotonicity theorem from protocol-machine premises. -/
+theorem protocol_machine_capability_monotonicity_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : VMEnvelopeAdherencePremises State Obs Placement) :
+    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
     p.guarantee p.weakCapability → p.guarantee p.strongCapability := by
   intro hWeak
   exact p.capabilityMonotonicityWitness
     p.weakCapability p.strongCapability p.strongStrengthensWeak hWeak
 
--- Packaged VM Adherence Protocol
+-- Packaged Protocol-Machine Adherence Protocol
 
-/-- E3: packaged VM adherence/adequacy protocol-level theorem family. -/
-structure VMEnvelopeAdherenceProtocol where
+/-- E3: packaged protocol-machine adherence/adequacy protocol-level theorem family. -/
+structure ProtocolMachineEnvelopeAdherenceProtocol where
   State : Type u
   Obs : Type v
   Placement : Type (max u v)
-  premises : VMEnvelopeAdherencePremises State Obs Placement
+  premises : ProtocolMachineEnvelopeAdherencePremises State Obs Placement
   localAdherence :
     LocalEnvelopeSoundness
       premises.localHypotheses.localEnvelope
       premises.localHypotheses.refRun
       premises.localHypotheses.vmRun :=
-        vm_local_adherence_of_hypotheses premises.localHypotheses
+        protocol_machine_local_adherence_of_hypotheses premises.localHypotheses
   shardedAdherence :
     ShardedEnvelopeSoundness
       premises.shardedHypotheses.shardedEnvelope
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
-        vm_sharded_adherence_of_hypotheses premises.shardedHypotheses
+        protocol_machine_sharded_adherence_of_hypotheses premises.shardedHypotheses
   schedulerDeterminismLocal :
     ExchangeNormalization
       premises.localHypotheses.localEnvelope
@@ -274,41 +274,41 @@ structure VMEnvelopeAdherenceProtocol where
       premises.shardedHypotheses.certifiedExchange :=
         scheduler_determinism_sharded_of_hypotheses premises.shardedHypotheses
 
-  -- Packaged VM Adherence Protocol: Adequacy Fields
+  -- Packaged Protocol-Machine Adherence Protocol: Adequacy Fields
 
   monotonicity :
     SpatialSubtypingMonotonicity premises.subtype premises.obligation :=
-      vm_adherence_monotonicity_of_premises premises
+      protocol_machine_adherence_monotonicity_of_premises premises
   localAdequacy :
-    VMObservationalAdequacyModuloEnvelope
+    ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvLocal premises.localHypotheses.localEnvelope)
       premises.localHypotheses.refRun
       premises.localHypotheses.vmRun :=
-        vm_local_adequacy_of_premises premises
+        protocol_machine_local_adequacy_of_premises premises
   shardedAdequacy :
-    VMObservationalAdequacyModuloEnvelope
+    ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope)
 /- ## Structured Block 5 -/
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
-        vm_sharded_adequacy_of_premises premises
+        protocol_machine_sharded_adequacy_of_premises premises
 
-  -- Packaged VM Adherence Protocol: Full-Abstraction Fields
+  -- Packaged Protocol-Machine Adherence Protocol: Full-Abstraction Fields
 
   localFullAbstraction :
     EnvelopeFullAbstraction
       premises.localHypotheses.localEnvelope.toEnvelope.observe
       (EqEnvLocal premises.localHypotheses.localEnvelope) :=
-        vm_local_full_abstraction_of_premises premises
+        protocol_machine_local_full_abstraction_of_premises premises
   shardedFullAbstraction :
     EnvelopeFullAbstraction
       premises.shardedHypotheses.shardedEnvelope.toEnvelope.observe
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope) :=
-        vm_sharded_full_abstraction_of_premises premises
+        protocol_machine_sharded_full_abstraction_of_premises premises
   capabilityMonotonicity :
     premises.guarantee premises.weakCapability →
     premises.guarantee premises.strongCapability :=
-      vm_capability_monotonicity_of_premises premises
+      protocol_machine_capability_monotonicity_of_premises premises
 
 end Adequacy
 end Runtime

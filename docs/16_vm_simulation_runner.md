@@ -32,7 +32,7 @@ pub struct ScenarioResult {
 `step` is a simulator sampling index.
 `state` is extracted from protocol-machine registers as fixed-point values.
 `ScenarioResult` bundles the trace with property violations, replay artifacts, and run statistics.
-`ScenarioReplayArtifact` contains canonical semantic objects, semantic audit records, effect traces, and output-condition checks.
+`ScenarioReplayArtifact` contains `ProtocolMachineSemanticObjects`, semantic audit records, effect traces, and output-condition checks.
 
 ## Runner Entry Points
 
@@ -64,7 +64,7 @@ pub fn run_with_scenario(
 
 `run` returns one sampled trace.
 `run_concurrent` returns one trace per input choreography in deterministic input order.
-`run_with_scenario` adds middleware, property checks, replay artifacts, run statistics, and canonical semantic objects.
+`run_with_scenario` adds middleware, property checks, replay artifacts, run statistics, and `ProtocolMachineSemanticObjects`.
 
 ## Harness API
 

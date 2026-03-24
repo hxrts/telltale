@@ -69,7 +69,7 @@ impl EquivalenceChecker {
         }
 
         Ok(GoldenBundle {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             input,
             projections,
             coherence: None,
@@ -121,7 +121,7 @@ impl EquivalenceChecker {
         let projections = Self::parse_projections_map(&lean_output)?;
 
         Ok(GoldenBundle {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             input: global_json,
             projections,
             coherence: None,

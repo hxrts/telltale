@@ -1,4 +1,4 @@
-//! Persistence model aligned with Lean VM typeclasses.
+//! Persistence model for protocol-machine state deltas.
 
 use serde::{Deserialize, Serialize};
 
@@ -37,27 +37,6 @@ pub trait PersistenceModel {
     #[must_use]
     fn invoke_delta(_session: SessionId, _action: &str) -> Option<Self::Delta> {
         None
-    }
-
-    /// Lean-name compatibility wrapper.
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn openDelta(session: SessionId) -> Self::Delta {
-        Self::open_delta(session)
-    }
-
-    /// Lean-name compatibility wrapper.
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn closeDelta(session: SessionId) -> Self::Delta {
-        Self::close_delta(session)
-    }
-
-    /// Lean-name compatibility wrapper.
-    #[must_use]
-    #[allow(non_snake_case)]
-    fn invokeDelta(session: SessionId, action: &str) -> Option<Self::Delta> {
-        Self::invoke_delta(session, action)
     }
 }
 

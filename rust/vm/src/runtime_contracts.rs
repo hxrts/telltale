@@ -1,5 +1,7 @@
 //! Runtime admission and profile-gate contracts aligned with Lean surfaces.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::determinism::DeterminismMode;
@@ -50,6 +52,38 @@ impl Default for DeterminismArtifacts {
     }
 }
 
+/// Runtime capability admitted by theorem-pack/runtime contracts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeCapability {
+    /// Live migration/runtime handoff support.
+    LiveMigration,
+    /// Autoscale repartition support.
+    AutoscaleRepartition,
+    /// Placement refinement support.
+    PlacementRefinement,
+    /// Relaxed reordering support.
+    RelaxedReordering,
+}
+
+impl RuntimeCapability {
+    const ALL: [Self; 4] = [
+        Self::LiveMigration,
+        Self::AutoscaleRepartition,
+        Self::PlacementRefinement,
+        Self::RelaxedReordering,
+    ];
+
+    const fn key(self) -> &'static str {
+        match self {
+            Self::LiveMigration => "live_migration",
+            Self::AutoscaleRepartition => "autoscale_repartition",
+            Self::PlacementRefinement => "placement_refinement",
+            Self::RelaxedReordering => "relaxed_reordering",
+        }
+    }
+}
+
 /// Runtime contracts used for advanced-mode admission and capability gates.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeContracts {
@@ -57,16 +91,8 @@ pub struct RuntimeContracts {
     pub determinism_artifacts: DeterminismArtifacts,
     /// Whether mixed (non-full) determinism profiles are theorem-pack admitted.
     pub can_use_mixed_determinism_profiles: bool,
-    /// Capability-gated runtime switches mirrored from theorem-pack API.
-    pub live_migration: bool,
-    /// Capability-gated runtime switches mirrored from theorem-pack API.
-    pub autoscale_repartition: bool,
-    /// Capability-gated runtime switches mirrored from theorem-pack API.
-    pub placement_refinement: bool,
-    /// Capability-gated runtime switches mirrored from theorem-pack API.
-    pub relaxed_reordering: bool,
-    /// Deterministic capability inventory emitted at startup.
-    pub capability_inventory: Vec<(String, bool)>,
+    /// Canonical capability set admitted by theorem-pack/runtime state.
+    pub capabilities: BTreeSet<RuntimeCapability>,
 }
 
 impl RuntimeContracts {
@@ -76,16 +102,7 @@ impl RuntimeContracts {
         Self {
             determinism_artifacts: DeterminismArtifacts::default(),
             can_use_mixed_determinism_profiles: true,
-            live_migration: true,
-            autoscale_repartition: true,
-            placement_refinement: true,
-            relaxed_reordering: true,
-            capability_inventory: vec![
-                ("live_migration".to_string(), true),
-                ("autoscale_repartition".to_string(), true),
-                ("placement_refinement".to_string(), true),
-                ("relaxed_reordering".to_string(), true),
-            ],
+            capabilities: RuntimeCapability::ALL.into_iter().collect(),
         }
     }
 }
@@ -179,21 +196,15 @@ pub fn enforce_vm_runtime_gates(
 /// Runtime capability snapshot emitted at startup.
 #[must_use]
 pub fn runtime_capability_snapshot(contracts: &RuntimeContracts) -> Vec<(String, bool)> {
-    let mut snapshot = contracts.capability_inventory.clone();
-    snapshot.push(("live_migration".to_string(), contracts.live_migration));
-    snapshot.push((
-        "autoscale_repartition".to_string(),
-        contracts.autoscale_repartition,
-    ));
-    snapshot.push((
-        "placement_refinement".to_string(),
-        contracts.placement_refinement,
-    ));
-    snapshot.push((
-        "relaxed_reordering".to_string(),
-        contracts.relaxed_reordering,
-    ));
-    snapshot
+    RuntimeCapability::ALL
+        .into_iter()
+        .map(|capability| {
+            (
+                capability.key().to_string(),
+                contracts.capabilities.contains(&capability),
+            )
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -267,6 +278,25 @@ mod tests {
         assert_eq!(
             enforce_vm_runtime_gates(&cfg, Some(&contracts)),
             RuntimeGateResult::Admitted
+        );
+    }
+
+    #[test]
+    fn capability_snapshot_is_derived_from_canonical_capability_set() {
+        let mut contracts = RuntimeContracts::full();
+        contracts
+            .capabilities
+            .remove(&RuntimeCapability::RelaxedReordering);
+
+        let snapshot = runtime_capability_snapshot(&contracts);
+        assert_eq!(
+            snapshot,
+            vec![
+                ("live_migration".to_string(), true),
+                ("autoscale_repartition".to_string(), true),
+                ("placement_refinement".to_string(), true),
+                ("relaxed_reordering".to_string(), false),
+            ]
         );
     }
 }

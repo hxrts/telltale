@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use proptest::prelude::*;
 use telltale_lean_bridge::invariants::AtomicBroadcastConfig;
 use telltale_lean_bridge::{
-    default_schema_version, export_protocol_bundle, AccountableSafetyConfig, AvailabilityLevel,
+    canonical_schema_version, export_protocol_bundle, AccountableSafetyConfig, AvailabilityLevel,
     ByzantineSafetyConfig, CAPConfig, CRDTConfig, ClassicalClaims, ConcentrationConfig,
     ConsensusEnvelopeConfig, ConsistencyLevel, CoordinationConfig, DataAvailabilityConfig,
     DistributedClaims, FLPConfig, FailureDetectorsConfig, FailureEnvelopeConfig, FluidConfig,
@@ -34,7 +34,7 @@ fn protocol_fixture() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
 
 fn empty_claims() -> InvariantClaims {
     InvariantClaims {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         liveness: None,
         distributed: DistributedClaims::default(),
         classical: ClassicalClaims::default(),
@@ -130,13 +130,13 @@ fn ppm_to_fixed(ppm: u32) -> FixedQ32 {
 }
 
 fn assert_single_distributed_slot(claims: &InvariantClaims) {
-    assert_eq!(claims.schema_version, default_schema_version());
+    assert_eq!(claims.schema_version, canonical_schema_version());
     assert_eq!(distributed_slot_count(&claims.distributed), 1);
     assert_eq!(classical_slot_count(&claims.classical), 0);
 }
 
 fn assert_single_classical_slot(claims: &InvariantClaims) {
-    assert_eq!(claims.schema_version, default_schema_version());
+    assert_eq!(claims.schema_version, canonical_schema_version());
     assert_eq!(distributed_slot_count(&claims.distributed), 0);
     assert_eq!(classical_slot_count(&claims.classical), 1);
 }

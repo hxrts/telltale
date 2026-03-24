@@ -1,4 +1,4 @@
-//! Verification model primitives aligned with the Lean VM typeclass.
+//! Verification model primitives for protocol-machine signatures and commitments.
 //!
 //! This module provides domain-separated hashing, signing/verification helpers,
 //! and a Merkle authentication tree for commitment proofs.
@@ -214,20 +214,6 @@ pub fn verify_signed_value(payload: &Value, signature: &Signature, key: &Verifyi
     bytes.extend_from_slice(&encode_value(payload));
     let expected = hash_bytes_with_tag(HashTag::SignedValue, &bytes);
     expected == signature.digest
-}
-
-/// Compatibility alias requested in discrepancy tracking.
-#[allow(non_snake_case)]
-#[must_use]
-pub fn signValue(payload: &Value, key: &SigningKey) -> Signature {
-    sign_value(payload, key)
-}
-
-/// Compatibility alias requested in discrepancy tracking.
-#[allow(non_snake_case)]
-#[must_use]
-pub fn verifySignedValue(payload: &Value, signature: &Signature, key: &VerifyingKey) -> bool {
-    verify_signed_value(payload, signature, key)
 }
 
 fn merge_hash_pair(left: Hash, right: Hash) -> Hash {

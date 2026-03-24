@@ -23,7 +23,7 @@ variable [IdentityVerificationBridge ι ν]
 /-! ## Profiles And Hypothesis Bundles -/
 
 /-- Runtime determinism profiles used for policy/theorem gating. -/
-inductive VMDeterminismProfile where
+inductive ProtocolMachineDeterminismProfile where
   | full
   | moduloEffectTrace
   | moduloCommutativity
@@ -31,7 +31,7 @@ inductive VMDeterminismProfile where
   deriving Repr, DecidableEq, Inhabited
 
 /-- Reusable hypothesis bundle for determinism-oriented theorems. -/
-structure VMDeterminismHypotheses
+structure ProtocolMachineDeterminismHypotheses
     (st₀ : VMState ι γ π ε ν) where
   fullDeterminism : Prop
   fullDeterminismProof : fullDeterminism
@@ -43,7 +43,7 @@ structure VMDeterminismHypotheses
   replayDeterminismProof : replayDeterminism
 
 /-- Artifact inventory derived from determinism hypotheses. -/
-structure VMDeterminismArtifacts where
+structure ProtocolMachineDeterminismArtifacts where
   full : Bool
   moduloEffectTrace : Bool
   moduloCommutativity : Bool
@@ -54,9 +54,9 @@ structure VMDeterminismArtifacts where
 private def witnessToBool {P : Prop} (_h : P) : Bool := true
 
 /-- Build determinism artifacts from a hypothesis bundle. -/
-def buildVMDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
-    (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
-    VMDeterminismArtifacts :=
+def buildProtocolMachineDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
+    (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    ProtocolMachineDeterminismArtifacts :=
   { full := witnessToBool h.fullDeterminismProof
   , moduloEffectTrace := witnessToBool h.moduloEffectTraceProof
   , moduloCommutativity := witnessToBool h.moduloCommutativityProof
@@ -67,32 +67,32 @@ def buildVMDeterminismArtifacts {st₀ : VMState ι γ π ε ν}
 
 /-- Full determinism theorem from hypotheses. -/
 theorem full_determinism_from_hypotheses {st₀ : VMState ι γ π ε ν}
-    (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.fullDeterminism :=
   h.fullDeterminismProof
 
 /-- Determinism modulo fixed effect trace from hypotheses. -/
 theorem determinism_modulo_effect_trace_from_hypotheses {st₀ : VMState ι γ π ε ν}
-    (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.moduloEffectTrace :=
   h.moduloEffectTraceProof
 
 /-- Determinism modulo admissible commutativity from hypotheses. -/
 theorem determinism_modulo_commutativity_from_hypotheses {st₀ : VMState ι γ π ε ν}
-    (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.moduloCommutativity :=
   h.moduloCommutativityProof
 
 /-- Replay determinism theorem from hypotheses. -/
 theorem replay_determinism_from_hypotheses {st₀ : VMState ι γ π ε ν}
-    (h : VMDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     h.replayDeterminism :=
   h.replayDeterminismProof
 
 /-! ## Runtime Inventory View -/
 
 /-- Inventory projection for runtime capability gates. -/
-def determinismInventory (artifacts : VMDeterminismArtifacts) : List (String × Bool) :=
+def determinismInventory (artifacts : ProtocolMachineDeterminismArtifacts) : List (String × Bool) :=
   [ ("determinism_full", artifacts.full)
   , ("determinism_modulo_effect_trace", artifacts.moduloEffectTrace)
   , ("determinism_modulo_commutativity", artifacts.moduloCommutativity)

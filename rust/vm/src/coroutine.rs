@@ -85,7 +85,6 @@ pub enum CoroStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum BlockReason {
     /// Waiting to receive on an edge.
-    #[serde(alias = "RecvWait")]
     Recv {
         /// Edge scope for the receive wait.
         edge: Edge,
@@ -93,13 +92,11 @@ pub enum BlockReason {
         token: ProgressToken,
     },
     /// Waiting for buffer space to send.
-    #[serde(alias = "SendWait")]
     Send {
         /// Edge awaiting buffer space.
         edge: Edge,
     },
     /// Waiting for an effect handler response.
-    #[serde(alias = "InvokeWait")]
     Invoke {
         /// Effect handler identifier.
         handler: HandlerId,
@@ -110,16 +107,13 @@ pub enum BlockReason {
         layer: String,
     },
     /// Waiting for consensus-related condition to resolve.
-    #[serde(alias = "ConsensusWait")]
     Consensus {
         /// Consensus wait tag.
         tag: usize,
     },
     /// Waiting for spawn scheduling/activation.
-    #[serde(alias = "SpawnWait")]
     Spawn,
     /// Waiting for a session close to complete.
-    #[serde(alias = "CloseWait")]
     Close {
         /// The session being closed.
         sid: SessionId,
@@ -161,13 +155,11 @@ pub enum Fault {
         message: String,
     },
     /// Effect handler error.
-    #[serde(alias = "InvokeFault")]
     Invoke {
         /// Typed failure from the handler boundary.
         failure: crate::effect::EffectFailure,
     },
     /// Guard layer failure.
-    #[serde(alias = "AcquireFault")]
     Acquire {
         /// Guard layer identifier.
         layer: String,
@@ -175,19 +167,16 @@ pub enum Fault {
         failure: crate::effect::EffectFailure,
     },
     /// Ownership transfer failure.
-    #[serde(alias = "TransferFault")]
     Transfer {
         /// Error message.
         message: String,
     },
     /// Speculation failure.
-    #[serde(alias = "SpecFault")]
     Speculation {
         /// Error message.
         message: String,
     },
     /// Session close error.
-    #[serde(alias = "CloseFault")]
     Close {
         /// Error message from close.
         message: String,
@@ -203,7 +192,6 @@ pub enum Fault {
         edge: Edge,
     },
     /// Output-condition commit gate rejected emitted outputs.
-    #[serde(alias = "OutputConditionFault")]
     OutputCondition {
         /// Predicate reference that failed verification.
         predicate_ref: String,

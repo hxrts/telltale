@@ -440,7 +440,7 @@ theorem sched_step_some_of_schedule {ι γ π ε ν : Type} [IdentityModel ι] [
     strictly decreasing on communication). Scheduler liveness ensures
     runnable coroutines get scheduled. Together they give: if some coroutine
     is ready and in the queue, the VM can take a step. -/
-def vm_deadlock_free_via_progress : Prop :=
+def protocol_machine_deadlock_free_via_progress : Prop :=
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -456,7 +456,7 @@ def vm_deadlock_free_via_progress : Prop :=
     ∃ st', schedStep st = some st'
 
 /-- VM deadlock freedom holds: follows from scheduler liveness. -/
-theorem vm_deadlock_free_via_progress_holds : vm_deadlock_free_via_progress := by
+theorem protocol_machine_deadlock_free_via_progress_holds : protocol_machine_deadlock_free_via_progress := by
   intro ι γ π ε ν _ _ _ _ _ _ _ _ _ _ _ _ st _hwf ⟨cid, hmem, hstatus⟩
   have hsf := starvation_free_holds st
   have hcid := hsf cid hmem

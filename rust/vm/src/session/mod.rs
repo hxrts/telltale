@@ -8,8 +8,8 @@ use crate::buffer::{BoundedBuffer, BufferConfig, SignedBuffer, SignedValue};
 use crate::coroutine::Value;
 use crate::instr::Endpoint;
 use crate::verification::{
-    signValue, signing_key_for_endpoint, verifySignedValue, verifying_key_for_endpoint, AuthTree,
-    DefaultVerificationModel, Hash, HashTag, Signature, VerificationModel,
+    sign_value, signing_key_for_endpoint, verify_signed_value, verifying_key_for_endpoint,
+    AuthTree, DefaultVerificationModel, Hash, HashTag, Signature, VerificationModel,
 };
 
 include!("overview.rs");

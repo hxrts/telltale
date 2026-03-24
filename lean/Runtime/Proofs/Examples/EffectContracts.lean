@@ -1,4 +1,4 @@
-import Runtime.Proofs.VM.EffectContracts
+import Runtime.VM.Model
 
 set_option autoImplicit false
 
@@ -97,7 +97,7 @@ example : boundedAuthoritativeEffect.architecturallyLegal := by
 example :
     ¬ boundedAuthoritativeEffect.reentrancyAdmissible
       sameFootprintDomain sameFootprintDomain' := by
-  apply Runtime.Proofs.VM.same_footprint_nonreentrant
+  apply Runtime.VM.Model.same_footprint_nonreentrant
   · exact boundedAuthoritativeEffect_legal
   · rfl
   · rfl
@@ -105,7 +105,7 @@ example :
 example :
     reentrantObservationEffect.reentrancyAdmissible
       sameFootprintDomain sameFootprintDomain' := by
-  apply Runtime.Proofs.VM.explicit_same_footprint_reentrancy_admissible
+  apply Runtime.VM.Model.explicit_same_footprint_reentrancy_admissible
   · exact reentrantObservationEffect_legal
   · rfl
 

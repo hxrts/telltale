@@ -1,5 +1,5 @@
 import Runtime.Proofs.Adapters.Progress
-import Runtime.Proofs.Adapters.Distributed
+import Runtime.Proofs.Adapters.Distributed.ProfileWrappers
 import Runtime.Proofs.Adapters.Classical
 import Runtime.Proofs.Contracts.DeterminismApi
 
@@ -16,7 +16,7 @@ The Problem. Users need a single entry point to obtain all applicable runtime
 theorems for a given VM state, including optional distributed impossibility
 results and classical analysis bounds.
 
-Solution Structure. Defines `VMInvariantSpaceWithProfiles` combining distributed
+Solution Structure. Defines `ProtocolMachineInvariantSpaceWithProfiles` combining distributed
 and classical profiles. Provides projection functions to view the space as
 distributed-only or classical-only. The packaging functions generate theorem
 bundles from the combined invariant space in one shot.
@@ -34,251 +34,251 @@ section
 variable {ν : Type u} [VerificationModel ν]
 
 /-- Combined invariant space carrying distributed and classical profiles. -/
-structure VMInvariantSpaceWithProfiles
+structure ProtocolMachineInvariantSpaceWithProfiles
     (store₀ : SessionStore ν) (State : Type v)
-    extends Adapters.VMInvariantSpaceWithDistributed (ν := ν) store₀ State where
+    extends Adapters.ProtocolMachineInvariantSpaceWithDistributedProfiles (ν := ν) store₀ State where
   classical : Adapters.ClassicalProfiles State := {}
 
 /-! ## Space Views and Generic Updaters -/
 
 /-- Forget classical profiles and view the space as distributed-only. -/
-def VMInvariantSpaceWithProfiles.toDistributedSpace
+def ProtocolMachineInvariantSpaceWithProfiles.toDistributedSpace
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) :
-    Adapters.VMInvariantSpaceWithDistributed store₀ State :=
-  { toVMInvariantSpace := space.toVMInvariantSpace
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    Adapters.ProtocolMachineInvariantSpaceWithDistributedProfiles store₀ State :=
+  { toProtocolMachineInvariantSpace := space.toProtocolMachineInvariantSpace
   , distributed := space.distributed
   }
 
 /-- Forget distributed profiles and view the space as classical-only. -/
-def VMInvariantSpaceWithProfiles.toClassicalSpace
+def ProtocolMachineInvariantSpaceWithProfiles.toClassicalSpace
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) :
-    Adapters.VMInvariantSpaceWithClassical store₀ State :=
-  { toVMInvariantSpace := space.toVMInvariantSpace
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    Adapters.ProtocolMachineInvariantSpaceWithClassicalProfiles store₀ State :=
+  { toProtocolMachineInvariantSpace := space.toProtocolMachineInvariantSpace
   , classical := space.classical
   }
 
 /-- Attach distributed profiles to a combined space. -/
-def VMInvariantSpaceWithProfiles.withDistributedProfiles
+def ProtocolMachineInvariantSpaceWithProfiles.withDistributedProfiles
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (distributed : Adapters.DistributedProfiles) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with distributed := distributed }
 
 /-- Attach classical profiles to a combined space. -/
-def VMInvariantSpaceWithProfiles.withClassicalProfiles
+def ProtocolMachineInvariantSpaceWithProfiles.withClassicalProfiles
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (classical : Adapters.ClassicalProfiles State) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with classical := classical }
 
 /-- Generic distributed-profile updater used by profile-specific setters. -/
-def VMInvariantSpaceWithProfiles.updateDistributedProfiles
+def ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (update : Adapters.DistributedProfiles → Adapters.DistributedProfiles) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with distributed := update space.distributed }
 
 /-- Generic classical-profile updater used by profile-specific setters. -/
-def VMInvariantSpaceWithProfiles.updateClassicalProfiles
+def ProtocolMachineInvariantSpaceWithProfiles.updateClassicalProfiles
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (update : Adapters.ClassicalProfiles State → Adapters.ClassicalProfiles State) :
-    VMInvariantSpaceWithProfiles store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   { space with classical := update space.classical }
 
 /-! ## Distributed Profile Setters: Impossibility and Liveness -/
 
 /-- Attach an FLP distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withFLP
+def ProtocolMachineInvariantSpaceWithProfiles.withFLP
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FLPProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with flp? := some p })
 
 /-- Attach a CAP distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withCAP
+def ProtocolMachineInvariantSpaceWithProfiles.withCAP
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.CAPProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with cap? := some p })
 
 /-- Attach a quorum-geometry distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withQuorumGeometry
+def ProtocolMachineInvariantSpaceWithProfiles.withQuorumGeometry
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.QuorumGeometryProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with quorumGeometry? := some p })
 
 /-- Attach a partial-synchrony distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withPartialSynchrony
+def ProtocolMachineInvariantSpaceWithProfiles.withPartialSynchrony
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.PartialSynchronyProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with partialSynchrony? := some p })
 
 /-- Attach a responsiveness distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withResponsiveness
+def ProtocolMachineInvariantSpaceWithProfiles.withResponsiveness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ResponsivenessProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with responsiveness? := some p })
 
 /-! ## Distributed Profile Setters: Chain and Commit Safety -/
 
 /-- Attach a Nakamoto distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withNakamoto
+def ProtocolMachineInvariantSpaceWithProfiles.withNakamoto
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.NakamotoProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with nakamoto? := some p })
 
 /-- Attach a reconfiguration distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withReconfiguration
+def ProtocolMachineInvariantSpaceWithProfiles.withReconfiguration
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ReconfigurationProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with reconfiguration? := some p })
 
 /-- Attach an atomic-broadcast distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withAtomicBroadcast
+def ProtocolMachineInvariantSpaceWithProfiles.withAtomicBroadcast
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.AtomicBroadcastProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with atomicBroadcast? := some p })
 
 /-- Attach an accountable-safety distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withAccountableSafety
+def ProtocolMachineInvariantSpaceWithProfiles.withAccountableSafety
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.AccountableSafetyProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with accountableSafety? := some p })
 
 /-- Attach a failure-detector distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withFailureDetectors
+def ProtocolMachineInvariantSpaceWithProfiles.withFailureDetectors
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FailureDetectorsProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with failureDetectors? := some p })
 
 /-! ## Distributed Profile Setters: Data and Coordination -/
 
 /-- Attach a data-availability distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withDataAvailability
+def ProtocolMachineInvariantSpaceWithProfiles.withDataAvailability
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.DataAvailabilityProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with dataAvailability? := some p })
 
 /-- Attach a coordination distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withCoordination
+def ProtocolMachineInvariantSpaceWithProfiles.withCoordination
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.CoordinationProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with coordination? := some p })
 
 /-- Attach a CRDT distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withCRDT
+def ProtocolMachineInvariantSpaceWithProfiles.withCRDT
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.CRDTProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with crdt? := some p })
 
 /-- Attach a Byzantine-safety distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withByzantineSafety
+def ProtocolMachineInvariantSpaceWithProfiles.withByzantineSafety
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ByzantineSafetyProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with byzantineSafety? := some p })
 
 /-! ## Distributed Profile Setters: Envelope Families -/
 
 /-- Attach a consensus-envelope distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withConsensusEnvelope
+def ProtocolMachineInvariantSpaceWithProfiles.withConsensusEnvelope
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ConsensusEnvelopeProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with consensusEnvelope? := some p })
 
 /-- Attach a failure-envelope distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withFailureEnvelope
+def ProtocolMachineInvariantSpaceWithProfiles.withFailureEnvelope
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FailureEnvelopeProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with failureEnvelope? := some p })
 
 /-- Attach a VM-envelope-adherence distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withVMEnvelopeAdherence
+def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdherence
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
-    (p : Adapters.VMEnvelopeAdherenceProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.ProtocolMachineEnvelopeAdherenceProfile) :
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with vmEnvelopeAdherence? := some p })
 
 /-- Attach a VM-envelope-admission distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withVMEnvelopeAdmission
+def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdmission
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
-    (p : Adapters.VMEnvelopeAdmissionProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.ProtocolMachineEnvelopeAdmissionProfile) :
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with vmEnvelopeAdmission? := some p })
 
 /-- Attach a protocol-envelope-bridge distributed profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withProtocolEnvelopeBridge
+def ProtocolMachineInvariantSpaceWithProfiles.withProtocolEnvelopeBridge
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ProtocolEnvelopeBridgeProfile) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateDistributedProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with protocolEnvelopeBridge? := some p })
 
 /-! ## Classical Profile Setters -/
 
 /-- Attach a Foster profile to a combined space. -/
-def VMInvariantSpaceWithProfiles.withFoster
+def ProtocolMachineInvariantSpaceWithProfiles.withFoster
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.FosterProfile State) :
-    VMInvariantSpaceWithProfiles store₀ State :=
-  VMInvariantSpaceWithProfiles.updateClassicalProfiles space
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateClassicalProfiles space
     (fun classical => { classical with foster? := some p })
 
 end

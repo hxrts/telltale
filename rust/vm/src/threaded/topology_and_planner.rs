@@ -61,12 +61,6 @@ impl ThreadedVM {
         out
     }
 
-    /// Compatibility shim: migrate the global ready queue view into lane queues.
-    #[must_use]
-    pub fn migrate_ready_queue_to_lane_queues(&self) -> BTreeMap<LaneId, Vec<usize>> {
-        self.lane_queues()
-    }
-
     /// Lean-aligned cross-lane handoff trace accessor.
     #[must_use]
     pub fn cross_lane_handoff(&self) -> &[LaneHandoff] {

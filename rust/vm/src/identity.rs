@@ -1,4 +1,4 @@
-//! Identity model aligned with Lean VM domain interfaces.
+//! Identity model for topology and capability assignment.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -24,7 +24,7 @@ impl From<&str> for SiteId {
     }
 }
 
-/// Lean-style identity model for topology and capabilities.
+/// Identity model for topology and capabilities.
 pub trait IdentityModel {
     /// Participant type.
     type ParticipantId: Clone + Ord;
@@ -39,24 +39,6 @@ pub trait IdentityModel {
     fn site_capabilities(&self, site: &Self::SiteId) -> BTreeSet<String>;
     /// Set of reliable directed links.
     fn reliable_edges(&self) -> BTreeSet<(Self::SiteId, Self::SiteId)>;
-
-    /// Lean-name compatibility wrapper.
-    #[allow(non_snake_case)]
-    fn siteName(&self, site: &Self::SiteId) -> String {
-        self.site_name(site)
-    }
-
-    /// Lean-name compatibility wrapper.
-    #[allow(non_snake_case)]
-    fn siteCapabilities(&self, site: &Self::SiteId) -> BTreeSet<String> {
-        self.site_capabilities(site)
-    }
-
-    /// Lean-name compatibility wrapper.
-    #[allow(non_snake_case)]
-    fn reliableEdges(&self) -> BTreeSet<(Self::SiteId, Self::SiteId)> {
-        self.reliable_edges()
-    }
 }
 
 /// Simple static identity topology model.

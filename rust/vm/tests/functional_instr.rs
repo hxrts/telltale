@@ -76,7 +76,6 @@ fn test_send_type_mismatch() {
             Instr::Send { chan: 0, val: 1 },
             Instr::Invoke {
                 action: InvokeAction::Reg(0),
-                dst: Some(0),
             },
             Instr::Halt,
         ],
@@ -543,7 +542,6 @@ fn test_choose_type_not_send() {
             Instr::Send { chan: 0, val: 1 },
             Instr::Invoke {
                 action: InvokeAction::Reg(0),
-                dst: Some(0),
             },
             Instr::Halt,
         ],

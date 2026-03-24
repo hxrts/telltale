@@ -19,7 +19,7 @@ pub type PC = usize;
 pub enum InvokeAction {
     /// Named action descriptor (Lean-aligned shape).
     Named(String),
-    /// Legacy register-carried action descriptor.
+    /// Register-carried action descriptor.
     Reg(Reg),
 }
 
@@ -95,9 +95,6 @@ pub enum Instr {
     Invoke {
         /// Action descriptor.
         action: InvokeAction,
-        /// Legacy compatibility field for register-result encoding.
-        #[serde(default)]
-        dst: Option<Reg>,
     },
     /// Acquire a guard layer and store evidence in a register.
     Acquire {

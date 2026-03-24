@@ -91,7 +91,7 @@ pub enum EquivalenceError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EquivalenceResult {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Whether the Rust output matches the expected output.
     pub equivalent: bool,
@@ -113,7 +113,7 @@ impl EquivalenceResult {
     /// Create a successful (equivalent) result.
     pub fn success(role: impl Into<String>, output: Value) -> Self {
         Self {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             equivalent: true,
             rust_output: output.clone(),
             expected_output: output,
@@ -130,7 +130,7 @@ impl EquivalenceResult {
         diff: String,
     ) -> Self {
         Self {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             equivalent: false,
             rust_output,
             expected_output,
@@ -144,7 +144,7 @@ impl EquivalenceResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GoldenBundle {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// The input GlobalType.
     pub input: Value,
@@ -160,7 +160,7 @@ pub struct GoldenBundle {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CoherenceBundle {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     pub linear: bool,
     pub size: bool,

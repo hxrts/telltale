@@ -1,4 +1,4 @@
-import Runtime.Proofs.VM.CrossTargetProgressDependentWork
+import Runtime.VM.Model
 
 set_option autoImplicit false
 
@@ -125,7 +125,7 @@ theorem waiting_views_cross_target_compatible :
     nativeBlocked.crossTargetCompatible wasmNoProgress := by
   constructor
   · simp [RealizedProgressView.sameSubject, nativeBlocked, wasmNoProgress]
-  · exact Runtime.Proofs.VM.blocked_noProgress_crossTargetEquivalent
+  · exact Runtime.VM.Model.blocked_noProgress_crossTargetEquivalent
 
 theorem success_views_cross_target_preserved :
     dependentWorkObjects.crossTargetProgressPreserved nativeSucceeded wasmSucceeded := by
@@ -175,14 +175,14 @@ theorem parent_terminality_composed :
 
 example :
     parentOp.hasTerminalTruth := by
-  exact Runtime.Proofs.VM.parentTerminalityComposedFromDependents_terminal_truth
+  exact Runtime.VM.Model.parentTerminalityComposedFromDependents_terminal_truth
     parent_terminality_composed
     (by simp [ProgressContract.isTerminal, ProgressState.isTerminal, nativeSucceeded])
 
 example :
     dependentWorkObjects.hasCanonicalTerminalPublicationFor
       parentOp.operationId parentOp.session := by
-  exact Runtime.Proofs.VM.parentTerminalityComposedFromDependents_canonical_publication
+  exact Runtime.VM.Model.parentTerminalityComposedFromDependents_canonical_publication
     parent_terminality_composed
     (by simp [ProgressContract.isTerminal, ProgressState.isTerminal, nativeSucceeded])
 

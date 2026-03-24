@@ -557,8 +557,8 @@ def main : IO Unit := do
   -- Test 30: replay conformance checks pass against certified equivalence classes.
   let replayInventory : List (String × Bool) :=
     [ ("protocol_envelope_bridge", true)
-    , ("vm_envelope_adherence", true)
-    , ("vm_envelope_admission", true)
+    , ("protocol_machine_envelope_adherence", true)
+    , ("protocol_machine_envelope_admission", true)
     , ("failure_envelope", true)
     ]
   let replayClasses := Runtime.Proofs.TheoremPackAPI.defaultCertifiedReplayClasses

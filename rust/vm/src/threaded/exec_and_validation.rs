@@ -117,17 +117,9 @@ fn exec_instr(
             type_update: None,
             events: vec![],
         }),
-        Instr::Invoke { action, dst } => {
+        Instr::Invoke { action } => {
             let session_guard = session.lock().expect("threaded VM lock poisoned");
-            step_invoke(
-                &mut coro_guard,
-                &session_guard,
-                &role,
-                action,
-                dst,
-                ctx.step.handler,
-                ctx.step.tick,
-            )
+            step_invoke(&mut coro_guard, &session_guard, &role, action, ctx.step.handler, ctx.step.tick)
         }
         Instr::Acquire { layer, dst } => step_acquire(
             &mut coro_guard,

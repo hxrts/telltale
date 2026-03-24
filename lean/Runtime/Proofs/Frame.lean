@@ -119,7 +119,7 @@ theorem disjoint_sessions_independent {s₁ s₂ : SessionId}
     (hCoh : Coherent G D) :
     -- Coherence for s₁ is independent of changes to s₂ and vice versa
     SessionCoherent G D s₁ ∧ SessionCoherent G D s₂ := by
-  rw [vm_coherent_iff_forall_session_coherent] at hCoh
+  rw [protocol_machine_coherent_iff_forall_session_coherent] at hCoh
   exact ⟨hCoh s₁, hCoh s₂⟩
 
 /-! ## VM-Level Footprint and Frame Interfaces -/

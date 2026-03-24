@@ -62,7 +62,7 @@ pub enum ProtocolMachineRunnerError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolMachineRunInput {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Choreographies to load.
     pub choreographies: Vec<ChoreographyJson>,
@@ -76,7 +76,7 @@ pub struct ProtocolMachineRunInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolMachineSessionStatus {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Session id.
     pub sid: u64,
@@ -88,7 +88,7 @@ pub struct ProtocolMachineSessionStatus {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProtocolMachineTraceEvent {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     pub kind: String,
     pub tick: u64,
@@ -148,7 +148,7 @@ pub struct ProtocolMachineStepState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolMachineRunOutput {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Semantic audit emitted by the protocol machine.
     pub trace: Vec<ProtocolMachineTraceEvent>,
@@ -398,7 +398,7 @@ impl ProtocolMachineRunner {
         payload: &Value,
     ) -> Result<Value, ProtocolMachineRunnerError> {
         let input = serde_json::json!({
-            "schema_version": crate::schema::default_schema_version(),
+            "schema_version": crate::schema::canonical_schema_version(),
             "operation": operation,
             "payload": payload,
         });
@@ -488,7 +488,7 @@ impl ProtocolMachineRunner {
         rust_output: &ProtocolMachineRunOutput,
     ) -> Result<ComparisonResult, ProtocolMachineRunnerError> {
         let input = ProtocolMachineRunInput {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             choreographies: vec![choreography.clone()],
             concurrency: rust_output.concurrency,
             max_steps: rust_output.steps_executed.max(1),
@@ -630,7 +630,7 @@ pub fn vm_input_from_values(
         choreos.push(choreo);
     }
     Ok(ProtocolMachineRunInput {
-        schema_version: crate::schema::default_schema_version(),
+        schema_version: crate::schema::canonical_schema_version(),
         choreographies: choreos,
         concurrency,
         max_steps,
@@ -652,7 +652,7 @@ mod tests {
 
     fn trace_event(kind: &str, tick: u64, session: Option<u64>) -> ProtocolMachineTraceEvent {
         ProtocolMachineTraceEvent {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             kind: kind.to_string(),
             tick,
             session,
@@ -753,7 +753,7 @@ mod tests {
     #[test]
     fn parse_sim_run_output_checks_schema_version() {
         let payload = serde_json::json!({
-            "schema_version": crate::schema::default_schema_version(),
+            "schema_version": crate::schema::canonical_schema_version(),
             "trace": [],
             "violations": [],
             "artifacts": {}
@@ -761,7 +761,7 @@ mod tests {
         let parsed = parse_sim_run_output(payload).expect("parse sim run output");
         assert_eq!(
             parsed.schema_version,
-            crate::schema::default_schema_version()
+            crate::schema::canonical_schema_version()
         );
     }
 

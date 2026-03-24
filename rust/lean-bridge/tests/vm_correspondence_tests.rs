@@ -4,7 +4,7 @@
 mod test_choreographies;
 
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, semantic_objects_from_json, ChoreographyJson,
+    canonical_schema_version, global_to_json, semantic_objects_from_json, ChoreographyJson,
     EffectTraceEvent, OutputConditionTraceEvent, ProtocolMachineRunOutput, ProtocolMachineRunner,
     ProtocolMachineSessionStatus, ProtocolMachineTraceEvent,
 };
@@ -74,7 +74,7 @@ impl EffectHandler for PassthroughHandler {
 
 fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         kind: String::new(),
         tick: 0,
         session: None,
@@ -187,7 +187,7 @@ fn run_rust_vm(
         .session_ids()
         .into_iter()
         .map(|sid| ProtocolMachineSessionStatus {
-            schema_version: default_schema_version(),
+            schema_version: canonical_schema_version(),
             sid: sid as u64,
             terminal: vm
                 .sessions()
@@ -229,7 +229,7 @@ fn run_rust_vm(
     .expect("decode semantic objects into bridge schema");
 
     Ok(ProtocolMachineRunOutput {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         trace,
         sessions,
         steps_executed: max_steps as u64,
@@ -249,7 +249,7 @@ fn fixture_to_choreography_json(
     let mut roles: Vec<String> = fixture.local_types.keys().cloned().collect();
     roles.sort();
     ChoreographyJson {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         global_type: global_to_json(&fixture.global),
         roles,
     }

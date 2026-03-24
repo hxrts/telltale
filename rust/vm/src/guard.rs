@@ -16,7 +16,7 @@ impl From<&str> for LayerId {
     }
 }
 
-/// Lean-style guard layer API.
+/// Guard layer API.
 pub trait GuardLayer {
     /// Guard resource type.
     type Resource: Clone;
@@ -50,26 +50,6 @@ pub trait GuardLayer {
     ///
     /// Returns an error if decoding fails.
     fn decode_evidence(value: &Value) -> Result<Self::Evidence, String>;
-
-    /// Lean-name compatibility wrapper.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if encoding fails.
-    #[allow(non_snake_case)]
-    fn encodeEvidence(evidence: &Self::Evidence) -> Result<Value, String> {
-        Self::encode_evidence(evidence)
-    }
-
-    /// Lean-name compatibility wrapper.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if decoding fails.
-    #[allow(non_snake_case)]
-    fn decodeEvidence(value: &Value) -> Result<Self::Evidence, String> {
-        Self::decode_evidence(value)
-    }
 }
 
 /// Basic in-memory guard layer.

@@ -485,6 +485,6 @@ pub(crate) fn signing_fixture() -> (Value, telltale_vm::Signature) {
     };
     let payload = Value::Prod(Box::new(Value::Nat(7)), Box::new(Value::Bool(true)));
     let key = telltale_vm::verification::signing_key_for_endpoint(&endpoint);
-    let signature = telltale_vm::signValue(&payload, &key);
+    let signature = telltale_vm::sign_value(&payload, &key);
     (payload, signature)
 }

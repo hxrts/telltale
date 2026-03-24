@@ -223,7 +223,7 @@ impl LeanRunner {
         })?;
 
         let input = serde_json::json!({
-            "schema_version": crate::schema::default_schema_version(),
+            "schema_version": crate::schema::canonical_schema_version(),
             "choreographies": choreographies,
             "concurrency": concurrency,
             "max_steps": max_steps

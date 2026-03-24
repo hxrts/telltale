@@ -12,8 +12,22 @@ use crate::export::{global_to_json, local_to_json};
 pub const PROTOCOL_BUNDLE_SCHEMA_VERSION: &str = "protocol_bundle.v1";
 
 #[must_use]
-pub fn default_protocol_bundle_schema_version() -> String {
+pub fn canonical_protocol_bundle_schema_version() -> String {
     PROTOCOL_BUNDLE_SCHEMA_VERSION.to_string()
+}
+
+fn deserialize_protocol_bundle_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let version = String::deserialize(deserializer)?;
+    if version == PROTOCOL_BUNDLE_SCHEMA_VERSION {
+        Ok(version)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "unsupported schema_version '{version}'; expected '{PROTOCOL_BUNDLE_SCHEMA_VERSION}'"
+        )))
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -278,9 +292,9 @@ pub struct ClassicalClaims {
     pub functional_clt: Option<FunctionalCLTConfig>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InvariantClaims {
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     pub liveness: Option<LivenessConfig>,
     #[serde(default)]
@@ -289,9 +303,20 @@ pub struct InvariantClaims {
     pub classical: ClassicalClaims,
 }
 
+impl Default for InvariantClaims {
+    fn default() -> Self {
+        Self {
+            schema_version: crate::schema::canonical_schema_version(),
+            liveness: None,
+            distributed: DistributedClaims::default(),
+            classical: ClassicalClaims::default(),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProtocolBundle {
-    #[serde(default = "default_protocol_bundle_schema_version")]
+    #[serde(deserialize_with = "deserialize_protocol_bundle_schema_version")]
     pub schema_version: String,
     pub global_type: Value,
     pub local_types: BTreeMap<String, Value>,
@@ -311,7 +336,7 @@ pub fn export_protocol_bundle(
         .collect();
 
     ProtocolBundle {
-        schema_version: default_protocol_bundle_schema_version(),
+        schema_version: canonical_protocol_bundle_schema_version(),
         global_type: global_to_json(global),
         local_types,
         claims,
@@ -337,7 +362,7 @@ mod tests {
         );
 
         let claims = InvariantClaims {
-            schema_version: crate::schema::default_schema_version(),
+            schema_version: crate::schema::canonical_schema_version(),
             liveness: Some(LivenessConfig {
                 scheduler: SchedulerKind::RoundRobin,
                 fairness_k: Some(2),

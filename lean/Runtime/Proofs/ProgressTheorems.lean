@@ -3,11 +3,11 @@ import Runtime.Proofs.ProgressCore
 
 /-! # Runtime.Proofs.ProgressTheorems
 
-VM progress, fairness-based termination, and HeadCoherent frame preservation.
+Protocol-machine progress, fairness-based termination, and HeadCoherent frame preservation.
 -/
 
 /-
-The Problem. Derive executable progress and termination consequences from VM-level invariants.
+The Problem. Derive executable progress and termination consequences from protocol-machine invariants.
 
 Solution Structure. State enabled-frontier progress, fairness termination, and frame-preservation theorems.
 -/
@@ -42,7 +42,7 @@ def FrontierEnabled (store : SessionStore ν) : Prop :=
     SessionStore.lookupBuffer store { sid := ep.sid, sender := source, receiver := ep.role } = .string ℓ :: rest ∧
     bs.find? (fun b => b.1 == ℓ) = some (ℓ, L'))
 
-/-- VM-level progress conclusion: some concrete instruction form is enabled. -/
+/-- Protocol-machine progress conclusion: some concrete instruction form is enabled. -/
 def EnabledInstruction (store : SessionStore ν) : Prop :=
   (∃ ep target T, SendEnabled store ep target T) ∨
   (∃ ep source T, RecvEnabled store ep source T) ∨
@@ -51,14 +51,14 @@ def EnabledInstruction (store : SessionStore ν) : Prop :=
 
 /-- Progress: non-terminal well-formed state has an enabled communication.
 
-    This lifts Protocol.Typing.Progress.progress_typed to the VM level.
+    This lifts Protocol.Typing.Progress.progress_typed to the protocol-machine level.
     The Protocol theorem says: WellFormedComplete → (skip ∨ can step ∨ blocked).
-    Here we translate: well-formed VM state → has enabled instruction.
+    Here we translate: well-formed protocol-machine state → has enabled instruction.
 
     The key insight is that "blocked" at Protocol level means waiting for
     a receive, which will be enabled once a send happens. Under fair
     scheduling, the send will happen, so blocked is temporary. -/
-theorem vm_progress {store : SessionStore ν}
+theorem protocol_machine_progress {store : SessionStore ν}
     (hWF : WellFormedVMState store)
     (_hNonTerminal : ¬ AllSessionsComplete store) :
     (hFrontier : FrontierEnabled store) →
@@ -85,17 +85,17 @@ theorem vm_progress {store : SessionStore ν}
 -- Termination Under Fairness
 
 /-- Sum of per-endpoint communication work in a session store. -/
-def vmTypeMeasure (store : SessionStore ν) : Nat :=
+def protocolMachineTypeMeasure (store : SessionStore ν) : Nat :=
   ((SessionStore.toGEnv store).map (fun p => p.2.progressMeasure)).foldl (· + ·) 0
 
 /-- Sum of pending trace payload sizes in a session store. -/
 /- ## Structured Block 2 -/
-def vmTraceMeasure (store : SessionStore ν) : Nat :=
+def protocolMachineTraceMeasure (store : SessionStore ν) : Nat :=
   ((SessionStore.toDEnv store).list.map (fun p => p.2.length)).foldl (· + ·) 0
 
 /-- Lyapunov measure: endpoint communication work + pending trace load. -/
-def vmMeasure (store : SessionStore ν) : Nat :=
-  vmTypeMeasure store + vmTraceMeasure store
+def protocolMachineMeasure (store : SessionStore ν) : Nat :=
+  protocolMachineTypeMeasure store + protocolMachineTraceMeasure store
 
 /-- Execute `n` scheduler-indexed steps from an initial session store. -/
 def executeSchedule
@@ -110,7 +110,7 @@ def FairScheduler (numRoles k : Nat) (sched : Nat → Nat) : Prop :=
     ∃ j, blockStart ≤ j ∧ j < blockStart + k ∧ sched j = r
 
 /-- Minimal termination model needed to convert fair scheduling into completion. -/
-structure VMTerminationModel where
+structure ProtocolMachineTerminationModel where
   /-- Finite role universe used by the scheduler. -/
   numRoles : Nat
   /-- At least one role exists. -/
@@ -124,17 +124,17 @@ structure VMTerminationModel where
   /-- Quantitative termination bound under k-fair scheduling. -/
   termination_bound :
     ∀ store₀ sched k, k ≥ numRoles → FairScheduler numRoles k sched →
-      isTerminal (executeSchedule step store₀ sched (k * vmMeasure store₀)) = true
+      isTerminal (executeSchedule step store₀ sched (k * protocolMachineMeasure store₀)) = true
 
 /-- Under fair scheduling, well-typed programs terminate.
 
-    Combined with vm_progress, this gives termination:
-    1. vm_progress: non-terminal → some instruction enabled
+    Combined with protocol_machine_progress, this gives termination:
+    1. protocol_machine_progress: non-terminal → some instruction enabled
     2. Fair scheduler: enabled → eventually executed
     3. Lyapunov: each step decreases measure by ≥ 1
     4. Initial measure bounded → terminates in ≤ W₀ steps -/
-theorem vm_termination_under_fairness {store₀ : SessionStore ν}
-    (model : VMTerminationModel)
+theorem protocol_machine_termination_under_fairness {store₀ : SessionStore ν}
+    (model : ProtocolMachineTerminationModel)
     {sched : Nat → Nat} {k : Nat}
     (_hWF : WellFormedVMState store₀)
     (hk : k ≥ model.numRoles)
@@ -142,8 +142,8 @@ theorem vm_termination_under_fairness {store₀ : SessionStore ν}
     ∃ (n : Nat) (store_final : SessionStore ν),
       store_final = executeSchedule model.step store₀ sched n ∧
       AllSessionsComplete store_final ∧
-      n ≤ k * vmMeasure store₀ := by
-  let n := k * vmMeasure store₀
+      n ≤ k * protocolMachineMeasure store₀ := by
+  let n := k * protocolMachineMeasure store₀
   let store_final := executeSchedule model.step store₀ sched n
   have hterm : model.isTerminal store_final = true := by
     simpa [n, store_final] using model.termination_bound store₀ sched k hk hFair

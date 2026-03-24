@@ -23,10 +23,10 @@ variable {ν : Type u} [VerificationModel ν]
 variable {store₀ : SessionStore ν} {State : Type v}
 
 def baseComposedSpace :
-    VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
-  VMInvariantSpaceWithProfiles.mk
-    (Adapters.VMInvariantSpaceWithDistributed.mk
-      (VMInvariantSpace.mk none none none none)
+    ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.mk
+    (Adapters.ProtocolMachineInvariantSpaceWithDistributedProfiles.mk
+      (ProtocolMachineInvariantSpace.mk none none none none)
       {})
     {}
 
@@ -243,7 +243,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
   }
 
 def semanticComposedSpace :
-    VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
+    ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   Runtime.Proofs.TheoremPackAPI.composeProofSpacesWithSemanticObjects
     (space := baseComposedSpace (ν := ν) (store₀ := store₀) (State := State))
     (liveness? := none)
@@ -252,8 +252,8 @@ def semanticComposedSpace :
     (output? := none)
     (semanticObjects? := some semanticWitnessBundle)
 
-def composedSpace (bundle : VMLivenessBundle store₀) (ow : OutputConditionWitness) :
-    VMInvariantSpaceWithProfiles (ν := ν) store₀ State :=
+def composedSpace (bundle : ProtocolMachineLivenessBundle store₀) (ow : OutputConditionWitness) :
+    ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   Runtime.Proofs.TheoremPackAPI.composeProofSpaces
     (space := baseComposedSpace (ν := ν) (store₀ := store₀) (State := State))
     (liveness? := some bundle)
@@ -262,14 +262,14 @@ def composedSpace (bundle : VMLivenessBundle store₀) (ow : OutputConditionWitn
     (output? := some ow)
 
 /-- Composed spaces can be turned into theorem packs through the API facade. -/
-example (bundle : VMLivenessBundle store₀) (ow : OutputConditionWitness) :
+example (bundle : ProtocolMachineLivenessBundle store₀) (ow : OutputConditionWitness) :
     let space := composedSpace (ν := ν) (store₀ := store₀) (State := State) bundle ow
     True := by
   intro
   trivial
 
 /-- Minimal deterministic capability inventories can be extracted from composed packs. -/
-example (bundle : VMLivenessBundle store₀) (ow : OutputConditionWitness) :
+example (bundle : ProtocolMachineLivenessBundle store₀) (ow : OutputConditionWitness) :
     let space := composedSpace (ν := ν) (store₀ := store₀) (State := State) bundle ow
     let pack := Runtime.Proofs.TheoremPackAPI.mk (space := space)
     True := by

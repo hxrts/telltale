@@ -90,71 +90,6 @@ structure LittlesLawProfile where
 structure FunctionalCLTProfile where
   input : Classical.Transport.FunctionalCLTInput
 
-/-! ## Theorem Projections from Profiles -/
-
-/-- Foster theorem derived from a Foster profile. -/
-theorem foster_of_profile
-    {State : Type v}
-    (p : FosterProfile State) :
-    Classical.Transport.FosterConclusion p.input := by
-  exact Classical.Transport.transported_foster_lyapunov (input := p.input)
-
-/-- MaxWeight theorem derived from a MaxWeight profile. -/
-theorem max_weight_of_profile
-    (p : MaxWeightProfile) :
-    @Classical.Transport.MaxWeightConclusion p.ι p.instFintype p.input := by
-  letI : Fintype p.ι := p.instFintype
-  simpa using
-    (Classical.Transport.transported_max_weight (ι := p.ι) (input := p.input))
-
-/-- LDP theorem derived from an LDP profile. -/
-theorem ldp_of_profile
-    (p : LDPProfile) :
-    Classical.Transport.LDPConclusion p.input := by
-  exact Classical.Transport.transported_ldp p.input
-
-/-- Mean-field theorem derived from a mean-field profile. -/
-theorem mean_field_of_profile
-    (p : MeanFieldProfile) :
-    Classical.Transport.MeanFieldConclusion p.input := by
-  exact Classical.Transport.transported_mean_field p.input
-
-/-- Heavy-traffic theorem derived from a heavy-traffic profile. -/
-theorem heavy_traffic_of_profile
-    (p : HeavyTrafficProfile) :
-    Classical.Transport.HeavyTrafficConclusion p.input := by
-  exact Classical.Transport.transported_heavy_traffic p.input
-
-/-- Mixing-time theorem derived from a mixing profile. -/
-theorem mixing_of_profile
-    (p : MixingProfile) :
-    Classical.Transport.MixingConclusion p.input := by
-  exact Classical.Transport.transported_mixing p.input
-
-/-- Fluid-limit theorem derived from a fluid profile. -/
-theorem fluid_of_profile
-    (p : FluidProfile) :
-    Classical.Transport.FluidConclusion p.input := by
-  exact Classical.Transport.transported_fluid_limit p.input
-
-/-- Concentration theorem derived from a concentration profile. -/
-theorem concentration_of_profile
-    (p : ConcentrationProfile) :
-    Classical.Transport.ConcentrationConclusion p.input := by
-  exact Classical.Transport.transported_concentration p.input
-
-/-- Little's-law theorem derived from a Little's-law profile. -/
-theorem littles_law_of_profile
-    (p : LittlesLawProfile) :
-    Classical.Transport.LittlesLawConclusion p.input := by
-  exact Classical.Transport.transported_littles_law p.input
-
-/-- Functional CLT theorem derived from a functional-CLT profile. -/
-theorem functional_clt_of_profile
-    (p : FunctionalCLTProfile) :
-    Classical.Transport.FunctionalCLTConclusion p.input := by
-  exact Classical.Transport.transported_functional_clt p.input
-
 /-! ## Packaged Classical Artifacts -/
 
 /-- Packaged Foster transport artifact. -/
@@ -214,19 +149,22 @@ def fosterArtifactOfProfile
     {State : Type v}
     (p : FosterProfile State) : FosterArtifact State :=
   { profile := p
-  , proof := foster_of_profile p
+  , proof := Classical.Transport.transported_foster_lyapunov (input := p.input)
   }
 
 def maxWeightArtifactOfProfile
     (p : MaxWeightProfile) : MaxWeightArtifact :=
+  letI : Fintype p.ι := p.instFintype
   { profile := p
-  , proof := max_weight_of_profile p
+  , proof := by
+      simpa using
+        (Classical.Transport.transported_max_weight (ι := p.ι) (input := p.input))
   }
 
 def ldpArtifactOfProfile
     (p : LDPProfile) : LDPArtifact :=
   { profile := p
-  , proof := ldp_of_profile p
+  , proof := Classical.Transport.transported_ldp p.input
   }
 
 /-! ## Artifact Constructors: Extended Profiles -/
@@ -234,87 +172,44 @@ def ldpArtifactOfProfile
 def meanFieldArtifactOfProfile
     (p : MeanFieldProfile) : MeanFieldArtifact :=
   { profile := p
-  , proof := mean_field_of_profile p
+  , proof := Classical.Transport.transported_mean_field p.input
   }
 
 def heavyTrafficArtifactOfProfile
     (p : HeavyTrafficProfile) : HeavyTrafficArtifact :=
   { profile := p
-  , proof := heavy_traffic_of_profile p
+  , proof := Classical.Transport.transported_heavy_traffic p.input
   }
 
 def mixingArtifactOfProfile
     (p : MixingProfile) : MixingArtifact :=
   { profile := p
-  , proof := mixing_of_profile p
+  , proof := Classical.Transport.transported_mixing p.input
   }
 
 def fluidArtifactOfProfile
     (p : FluidProfile) : FluidArtifact :=
   { profile := p
-  , proof := fluid_of_profile p
+  , proof := Classical.Transport.transported_fluid_limit p.input
   }
 
 def concentrationArtifactOfProfile
     (p : ConcentrationProfile) : ConcentrationArtifact :=
   { profile := p
-  , proof := concentration_of_profile p
+  , proof := Classical.Transport.transported_concentration p.input
   }
 
 def littlesLawArtifactOfProfile
     (p : LittlesLawProfile) : LittlesLawArtifact :=
   { profile := p
-  , proof := littles_law_of_profile p
+  , proof := Classical.Transport.transported_littles_law p.input
   }
 
 def functionalCLTArtifactOfProfile
     (p : FunctionalCLTProfile) : FunctionalCLTArtifact :=
   { profile := p
-  , proof := functional_clt_of_profile p
+  , proof := Classical.Transport.transported_functional_clt p.input
   }
-
-/-! ## Optional Artifact Lifting -/
-
-def fosterArtifactOfProfile?
-    {State : Type v}
-    (p? : Option (FosterProfile State)) : Option (FosterArtifact State) :=
-  p?.map fosterArtifactOfProfile
-
-def maxWeightArtifactOfProfile?
-    (p? : Option MaxWeightProfile) : Option MaxWeightArtifact :=
-  p?.map maxWeightArtifactOfProfile
-
-def ldpArtifactOfProfile?
-    (p? : Option LDPProfile) : Option LDPArtifact :=
-  p?.map ldpArtifactOfProfile
-
-def meanFieldArtifactOfProfile?
-    (p? : Option MeanFieldProfile) : Option MeanFieldArtifact :=
-  p?.map meanFieldArtifactOfProfile
-
-def heavyTrafficArtifactOfProfile?
-    (p? : Option HeavyTrafficProfile) : Option HeavyTrafficArtifact :=
-  p?.map heavyTrafficArtifactOfProfile
-
-def mixingArtifactOfProfile?
-    (p? : Option MixingProfile) : Option MixingArtifact :=
-  p?.map mixingArtifactOfProfile
-
-def fluidArtifactOfProfile?
-    (p? : Option FluidProfile) : Option FluidArtifact :=
-  p?.map fluidArtifactOfProfile
-
-def concentrationArtifactOfProfile?
-    (p? : Option ConcentrationProfile) : Option ConcentrationArtifact :=
-  p?.map concentrationArtifactOfProfile
-
-def littlesLawArtifactOfProfile?
-    (p? : Option LittlesLawProfile) : Option LittlesLawArtifact :=
-  p?.map littlesLawArtifactOfProfile
-
-def functionalCLTArtifactOfProfile?
-    (p? : Option FunctionalCLTProfile) : Option FunctionalCLTArtifact :=
-  p?.map functionalCLTArtifactOfProfile
 
 /-! ## Classical Profile Bundles -/
 
@@ -332,88 +227,17 @@ structure ClassicalProfiles (State : Type v) where
   functionalCLT? : Option FunctionalCLTProfile := none
 
 /-- VM invariant space extended with optional classical profiles. -/
-structure VMInvariantSpaceWithClassical
+structure ProtocolMachineInvariantSpaceWithClassicalProfiles
     (store₀ : SessionStore ν) (State : Type v)
-    extends VMInvariantSpace (ν := ν) store₀ State where
+    extends ProtocolMachineInvariantSpace (ν := ν) store₀ State where
   classical : ClassicalProfiles State := {}
-
-/-! ## Classical Profile Updaters -/
-
-def VMInvariantSpaceWithClassical.withProfiles
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (profiles : ClassicalProfiles State) :
-    VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := profiles }
-
-def VMInvariantSpaceWithClassical.withFoster
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : FosterProfile State) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with foster? := some p } }
-
-def VMInvariantSpaceWithClassical.withMaxWeight
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : MaxWeightProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with maxWeight? := some p } }
-
-def VMInvariantSpaceWithClassical.withLDP
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : LDPProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with ldp? := some p } }
-
-/-! ## Classical Profile Updaters: Queueing and Limits -/
-
-def VMInvariantSpaceWithClassical.withMeanField
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : MeanFieldProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with meanField? := some p } }
-
-def VMInvariantSpaceWithClassical.withHeavyTraffic
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : HeavyTrafficProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with heavyTraffic? := some p } }
-
-def VMInvariantSpaceWithClassical.withMixing
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : MixingProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with mixing? := some p } }
-
-def VMInvariantSpaceWithClassical.withFluid
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : FluidProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with fluid? := some p } }
-
-def VMInvariantSpaceWithClassical.withConcentration
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : ConcentrationProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with concentration? := some p } }
-
-def VMInvariantSpaceWithClassical.withLittlesLaw
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : LittlesLawProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with littlesLaw? := some p } }
-
-def VMInvariantSpaceWithClassical.withFunctionalCLT
-    {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State)
-    (p : FunctionalCLTProfile) : VMInvariantSpaceWithClassical store₀ State :=
-  { space with classical := { space.classical with functionalCLT? := some p } }
 
 /-! ## Classical Theorem Pack Builder -/
 
 /-- Classical theorem pack produced from classical profile evidence. -/
-structure VMClassicalTheoremPack
+structure ProtocolMachineClassicalTheoremPack
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State) where
+    (space : ProtocolMachineInvariantSpaceWithClassicalProfiles (ν := ν) store₀ State) where
   foster? : Option (FosterArtifact State)
   maxWeight? : Option MaxWeightArtifact
   ldp? : Option LDPArtifact
@@ -426,20 +250,20 @@ structure VMClassicalTheoremPack
   functionalCLT? : Option FunctionalCLTArtifact
 
 /-- Build all classical theorem artifacts from one classical profile bundle. -/
-def buildVMClassicalTheoremPack
+def buildProtocolMachineClassicalTheoremPack
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithClassical (ν := ν) store₀ State) :
-    VMClassicalTheoremPack (space := space) :=
-  { foster? := fosterArtifactOfProfile? space.classical.foster?
-  , maxWeight? := maxWeightArtifactOfProfile? space.classical.maxWeight?
-  , ldp? := ldpArtifactOfProfile? space.classical.ldp?
-  , meanField? := meanFieldArtifactOfProfile? space.classical.meanField?
-  , heavyTraffic? := heavyTrafficArtifactOfProfile? space.classical.heavyTraffic?
-  , mixing? := mixingArtifactOfProfile? space.classical.mixing?
-  , fluid? := fluidArtifactOfProfile? space.classical.fluid?
-  , concentration? := concentrationArtifactOfProfile? space.classical.concentration?
-  , littlesLaw? := littlesLawArtifactOfProfile? space.classical.littlesLaw?
-  , functionalCLT? := functionalCLTArtifactOfProfile? space.classical.functionalCLT?
+    (space : ProtocolMachineInvariantSpaceWithClassicalProfiles (ν := ν) store₀ State) :
+    ProtocolMachineClassicalTheoremPack (space := space) :=
+  { foster? := space.classical.foster?.map fosterArtifactOfProfile
+  , maxWeight? := space.classical.maxWeight?.map maxWeightArtifactOfProfile
+  , ldp? := space.classical.ldp?.map ldpArtifactOfProfile
+  , meanField? := space.classical.meanField?.map meanFieldArtifactOfProfile
+  , heavyTraffic? := space.classical.heavyTraffic?.map heavyTrafficArtifactOfProfile
+  , mixing? := space.classical.mixing?.map mixingArtifactOfProfile
+  , fluid? := space.classical.fluid?.map fluidArtifactOfProfile
+  , concentration? := space.classical.concentration?.map concentrationArtifactOfProfile
+  , littlesLaw? := space.classical.littlesLaw?.map littlesLawArtifactOfProfile
+  , functionalCLT? := space.classical.functionalCLT?.map functionalCLTArtifactOfProfile
   }
 
 end

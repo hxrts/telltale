@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, normalize_semantic_audit, ChoreographyJson,
+    canonical_schema_version, global_to_json, normalize_semantic_audit, ChoreographyJson,
     ProtocolMachineRunInput, ProtocolMachineRunner, ProtocolMachineTraceEvent, TickedObsEvent,
 };
 use telltale_vm::coroutine::Value;
@@ -134,7 +134,7 @@ fn lean_trace_is_load_only(trace: &[ProtocolMachineTraceEvent]) -> bool {
 
 fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         kind: String::new(),
         tick: 0,
         session: None,
@@ -295,7 +295,7 @@ fn fixture_to_choreography_json(
     let mut roles: Vec<String> = fixture.local_types.keys().cloned().collect();
     roles.sort();
     ChoreographyJson {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         global_type: global_to_json(&fixture.global),
         roles,
     }
@@ -316,7 +316,7 @@ fn assert_step_indexed_equivalence(
 
     let choreo = fixture_to_choreography_json(fixture);
     let input = ProtocolMachineRunInput {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         choreographies: vec![choreo],
         concurrency: 1,
         max_steps: max_steps as u64,

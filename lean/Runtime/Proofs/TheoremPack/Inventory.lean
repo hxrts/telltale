@@ -14,14 +14,14 @@ variable {ν : Type u} [VerificationModel ν]
 
 def semanticObjectInventory
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
   SemanticObjectArtifacts.inventory pack.semanticObjects?
 
 def theoremInventory
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
   [ ("termination", pack.termination?.isSome)
   , ("output_condition_soundness", pack.outputCondition?.isSome)
   , ("flp_lower_bound", pack.flpLowerBound?.isSome)
@@ -41,8 +41,8 @@ def theoremInventory
   , ("byzantine_safety_characterization", pack.byzantineSafety?.isSome)
   , ("consensus_envelope", pack.consensusEnvelope?.isSome)
   , ("failure_envelope", pack.failureEnvelope?.isSome)
-  , ("vm_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)
-  , ("vm_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
+  , ("protocol_machine_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)
+  , ("protocol_machine_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   , ("effect_interface_bridge",
       pack.vmEnvelopeAdherence?.isSome && pack.protocolEnvelopeBridge?.isSome)
@@ -63,9 +63,9 @@ def theoremInventory
 /-- Theorem inventory extended with determinism artifacts. -/
 def theoremInventoryWithDeterminism
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space))
-    (determinism : VMDeterminismArtifacts) : List (String × Bool) :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (determinism : ProtocolMachineDeterminismArtifacts) : List (String × Bool) :=
   theoremInventory (space := space) pack ++
     determinismInventory determinism
 

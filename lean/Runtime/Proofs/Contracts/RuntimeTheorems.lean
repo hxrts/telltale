@@ -6,7 +6,7 @@ import Runtime.Proofs.VM.Scheduler
 import Runtime.Proofs.VM.ExecOwnership
 import Runtime.ProgramLogic.GhostState
 import Runtime.Proofs.Lyapunov
-import Runtime.Proofs.Delegation
+import Protocol.Coherence.Delegation
 import Runtime.Proofs.Diamond
 import ClassicalAnalysisAPI
 
@@ -99,15 +99,15 @@ Fundamental VM properties: deadlock freedom via progress measures,
 coherence preservation under endpoint transfer.
 -/
 
-def vm_deadlock_free : Prop :=
+def protocol_machine_deadlock_free : Prop :=
   -- Well-typed VM with a runnable coroutine can always step.
   -- Proved via progress measure framework in Lyapunov.lean:
   -- well-typed steps don't increase the measure, and scheduler
   -- liveness ensures runnable coroutines get scheduled.
-  vm_deadlock_free_via_progress
+  protocol_machine_deadlock_free_via_progress
 
-theorem vm_deadlock_free_holds : vm_deadlock_free :=
-  vm_deadlock_free_via_progress_holds
+theorem protocol_machine_deadlock_free_holds : protocol_machine_deadlock_free :=
+  protocol_machine_deadlock_free_via_progress_holds
 
 def transfer_preserves_coherent : Prop :=
   -- Endpoint transfer preserves session coherence: the session store

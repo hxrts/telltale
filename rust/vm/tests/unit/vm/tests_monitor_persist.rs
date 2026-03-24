@@ -27,7 +27,6 @@
     fn test_invoke_faults_when_no_default_handler_is_bound() {
         let image = open_test_image(Instr::Invoke {
             action: InvokeAction::Reg(0),
-            dst: Some(1),
         });
         let mut vm = VM::new(VMConfig::default());
         let sid = vm.load_choreography(&image).expect("load choreography");
@@ -91,7 +90,6 @@
     fn test_output_condition_digest_matches_lean_placeholder() {
         let image = open_test_image(Instr::Invoke {
             action: InvokeAction::Reg(0),
-            dst: Some(1),
         });
         let mut vm = VM::new(VMConfig::default());
         vm.load_choreography(&image).expect("load choreography");

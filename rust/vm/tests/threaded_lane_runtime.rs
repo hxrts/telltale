@@ -78,7 +78,6 @@ fn transfer_image() -> CodeImage {
         vec![
             Instr::Invoke {
                 action: InvokeAction::Reg(0),
-                dst: Some(0),
             },
             Instr::Set {
                 dst: 1,

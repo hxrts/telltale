@@ -370,9 +370,9 @@ Every Rust PR that changes type semantics must include this checklist in the PR 
 4. If divergent, add or update a Deviation Registry entry in this document.
 5. Link tests that cover new behavior and edge cases.
 
-## Naming Compatibility
+## Naming Surface
 
-Rust protocol-machine code includes explicit Lean-compatibility wrappers such as `openDelta`, `siteName`, and `signValue`. These wrappers intentionally keep Lean-facing casing and therefore retain focused `#[allow(non_snake_case)]` annotations in `guard.rs`, `identity.rs`, `persistence.rs`, and `verification.rs`.
+Rust protocol-machine code uses one canonical snake_case naming surface. Lean-specific casing remains on the Lean side; Rust APIs should not preserve parallel wrapper names such as `openDelta`, `siteName`, or `signValue`.
 
 ## Related Docs
 

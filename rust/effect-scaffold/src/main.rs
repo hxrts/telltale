@@ -71,21 +71,18 @@ fn parse_args(args: &[String]) -> Result<ParsedArgs, String> {
         with_simulator: DEFAULT_WITH_SIMULATOR,
         help: false,
     };
-    let mut positionals = Vec::new();
 
     let mut i = 0;
     while i < args.len() {
-        let consumed = parse_arg_token(&mut parsed, &mut positionals, args, i)?;
+        let consumed = parse_arg_token(&mut parsed, args, i)?;
         i += consumed;
     }
 
-    apply_positional_args(&mut parsed, &positionals)?;
     Ok(parsed)
 }
 
 fn parse_arg_token(
     parsed: &mut ParsedArgs,
-    positionals: &mut Vec<String>,
     args: &[String],
     idx: usize,
 ) -> Result<usize, String> {
@@ -111,20 +108,10 @@ fn parse_arg_token(
             parsed.with_simulator = false;
             Ok(1)
         }
-        _ if token.starts_with("out=") => {
-            parsed.out_dir = token.trim_start_matches("out=").to_string();
-            Ok(1)
-        }
-        _ if token.starts_with("simulator=") => {
-            let value = token.trim_start_matches("simulator=");
-            parsed.with_simulator = parse_bool_token(value)?;
-            Ok(1)
-        }
         _ if token.starts_with('-') => Err(format!("unknown flag: {token}")),
-        _ => {
-            positionals.push(token.to_string());
-            Ok(1)
-        }
+        _ => Err(format!(
+            "unexpected positional argument: {token}; use --out <dir> and --dsl <file>"
+        )),
     }
 }
 
@@ -134,36 +121,12 @@ fn required_flag_value<'a>(args: &'a [String], idx: usize, flag: &str) -> Result
         .ok_or_else(|| format!("missing value after {flag}"))
 }
 
-fn apply_positional_args(parsed: &mut ParsedArgs, positionals: &[String]) -> Result<(), String> {
-    if positionals.len() > 2 {
-        return Err(
-            "too many positional arguments; expected at most: <out_dir> <dsl_path>".to_string(),
-        );
-    }
-    if let Some(out_dir) = positionals.first() {
-        parsed.out_dir = out_dir.clone();
-    }
-    if let Some(dsl_path) = positionals.get(1) {
-        parsed.dsl_path = Some(dsl_path.clone());
-    }
-    Ok(())
-}
-
-fn parse_bool_token(input: &str) -> Result<bool, String> {
-    match input {
-        "true" | "1" | "yes" | "on" => Ok(true),
-        "false" | "0" | "no" | "off" => Ok(false),
-        _ => Err(format!("invalid boolean value: {input}")),
-    }
-}
-
 fn print_help() {
     println!("effect-scaffold");
     println!();
     println!("Generate Rust effect interfaces and simulator scaffolds from Telltale effect declarations.");
     println!();
     println!("USAGE:");
-    println!("  cargo run -p effect-scaffold -- OUT_DIR path/to/protocol.tell");
     println!("  cargo run -p effect-scaffold -- --out OUT_DIR --dsl path/to/protocol.tell");
     println!("  cargo run -p effect-scaffold -- --out OUT_DIR --dsl path/to/protocol.tell --no-simulator");
     println!();
@@ -595,7 +558,7 @@ protocol Flow uses Runtime =
     }
 
     #[test]
-    fn accepts_flag_and_positional_forms() {
+    fn accepts_flag_form() {
         let parsed = parse_args(&[
             "--out".to_string(),
             "tmp/out".to_string(),
@@ -605,36 +568,30 @@ protocol Flow uses Runtime =
         .expect("parse flag form");
         assert_eq!(parsed.out_dir, "tmp/out");
         assert_eq!(parsed.dsl_path.as_deref(), Some("fixtures/runtime.tell"));
-
-        let parsed = parse_args(&["tmp/pos".to_string(), "fixtures/pos.tell".to_string()])
-            .expect("parse positional form");
-        assert_eq!(parsed.out_dir, "tmp/pos");
-        assert_eq!(parsed.dsl_path.as_deref(), Some("fixtures/pos.tell"));
     }
 
     #[test]
-    fn accepts_assignment_tokens_for_just_compatibility() {
-        let parsed = parse_args(&[
+    fn rejects_positional_forms() {
+        let err = parse_args(&["tmp/pos".to_string(), "fixtures/pos.tell".to_string()])
+            .expect_err("positional form should fail");
+        assert!(err.contains("unexpected positional argument"));
+    }
+
+    #[test]
+    fn rejects_assignment_tokens() {
+        let err = parse_args(&[
             "out=tmp/assignment".to_string(),
             "--dsl".to_string(),
             "fixtures/assignment.tell".to_string(),
         ])
-        .expect("parse assignment form");
-        assert_eq!(parsed.out_dir, "tmp/assignment");
-        assert_eq!(parsed.dsl_path.as_deref(), Some("fixtures/assignment.tell"));
-        assert!(parsed.with_simulator);
+        .expect_err("assignment form should fail");
+        assert!(err.contains("unexpected positional argument"));
     }
 
     #[test]
     fn simulator_toggle_flags_are_supported() {
         let parsed = parse_args(&["--no-simulator".to_string()]).expect("parse no-simulator");
         assert!(!parsed.with_simulator);
-
-        let parsed = parse_args(&["simulator=false".to_string()]).expect("parse simulator=false");
-        assert!(!parsed.with_simulator);
-
-        let parsed = parse_args(&["simulator=yes".to_string()]).expect("parse simulator=yes");
-        assert!(parsed.with_simulator);
     }
 
     #[test]

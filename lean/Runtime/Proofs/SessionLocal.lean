@@ -1,4 +1,4 @@
-import Runtime.Proofs.Delegation
+import Protocol.Coherence.Delegation
 import Protocol.Coherence.EdgeCoherence
 import Protocol.Coherence.RoleSwap
 
@@ -15,7 +15,7 @@ the frame rule and cross-session diamond proofs at the VM level.
 
 ## Key Theorems
 
-- `vm_coherent_iff_forall_session_coherent`: Global coherence decomposes per-session
+- `protocol_machine_coherent_iff_forall_session_coherent`: Global coherence decomposes per-session
 - `footprint_grows_on_delegation`: Receiving delegated endpoint adds to footprint
 - `session_local_op_preserves_other`: Frame property for session-local operations
 
@@ -49,7 +49,7 @@ reasoning: operations on session s should not affect coherence of session s'.
 This requires decomposing coherence as a separating conjunction over sessions.
 
 Solution Structure. Defines `SessionCoherent s` restricting coherence to edges
-within session s. Proves `vm_coherent_iff_forall_session_coherent` showing global
+within session s. Proves `protocol_machine_coherent_iff_forall_session_coherent` showing global
 coherence = conjunction of per-session coherence. The key lemma
 `session_local_op_preserves_other` establishes the frame property.
 -/
@@ -84,7 +84,7 @@ theorem session_coherent_forall_implies_coherent {G : GEnv} {D : DEnv}
 
 /-- **Global coherence decomposes as conjunction over sessions.**
     This is the key structural lemma enabling the frame rule. -/
-theorem vm_coherent_iff_forall_session_coherent {G : GEnv} {D : DEnv} :
+theorem protocol_machine_coherent_iff_forall_session_coherent {G : GEnv} {D : DEnv} :
     Coherent G D ↔ ∀ s, SessionCoherent G D s := by
   constructor
   · intro hCoh s

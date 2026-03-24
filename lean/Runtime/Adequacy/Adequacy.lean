@@ -26,7 +26,7 @@ for VM execution.
 - `Violation`, `ViolationPolicy`
 - `CausallyConsistent`, `FIFOConsistent`
 - `session_state_interp`
-- `vm_adequacy` — WP proof ⊢ trace is valid linearization
+- `protocol_machine_adequacy` — WP proof ⊢ trace is valid linearization
 - `no_phantom_events`
 - `compile_refines`
 
@@ -214,7 +214,7 @@ def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer 
 
 /-! ### Adequacy Statement -/
 
-def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+def protocol_machine_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
@@ -223,7 +223,7 @@ def vm_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     let obs := obsTraceOf (ε:=ε) st.obsTrace;
     CausallyConsistent obs ∧ FIFOConsistent obs
 
-theorem vm_adequacy_of_trace_consistency
+theorem protocol_machine_adequacy_of_trace_consistency
     {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -232,7 +232,7 @@ theorem vm_adequacy_of_trace_consistency
       CausallyConsistent (obsTraceOf (ε:=ε) st.obsTrace))
     (hFIFO : ∀ st : VMState ι γ π ε ν, WFVMState st →
       FIFOConsistent (obsTraceOf (ε:=ε) st.obsTrace)) :
-    vm_adequacy (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
+    protocol_machine_adequacy (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
   intro st hWF
   exact ⟨hCausal st hWF, hFIFO st hWF⟩
 

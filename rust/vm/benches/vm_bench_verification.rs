@@ -87,7 +87,12 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         };
         let payload = Value::Prod(Box::new(Value::Nat(7)), Box::new(Value::Bool(true)));
         let key = signing_key_for_endpoint(&endpoint);
-        b.iter(|| black_box(telltale_vm::signValue(black_box(&payload), black_box(&key))));
+        b.iter(|| {
+            black_box(telltale_vm::sign_value(
+                black_box(&payload),
+                black_box(&key),
+            ))
+        });
     });
 
     c.bench_function("vm_verify_signed_value_only", |b| {
@@ -98,7 +103,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         let (payload, signature) = signing_fixture();
         let verifying = verifying_key_for_endpoint(&endpoint);
         b.iter(|| {
-            black_box(telltale_vm::verifySignedValue(
+            black_box(telltale_vm::verify_signed_value(
                 black_box(&payload),
                 black_box(&signature),
                 black_box(&verifying),

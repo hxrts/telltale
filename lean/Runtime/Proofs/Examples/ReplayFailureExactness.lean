@@ -1,4 +1,4 @@
-import Runtime.Proofs.VM.ReplayFailureExactness
+import Runtime.VM.Model
 
 set_option autoImplicit false
 
@@ -187,11 +187,11 @@ example :
 
 example :
     ProgressState.failureObservationallyEquivalent .blocked .noProgress := by
-  exact Runtime.Proofs.VM.blocked_and_noProgress_are_wait_equivalent
+  exact Runtime.VM.Model.blocked_and_noProgress_are_wait_equivalent
 
 example :
     ¬ ProgressState.failureObservationallyEquivalent .degraded .blocked := by
-  exact Runtime.Proofs.VM.degraded_is_not_wait_equivalent
+  exact Runtime.VM.Model.degraded_is_not_wait_equivalent
 
 end Examples
 end Proofs

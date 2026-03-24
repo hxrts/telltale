@@ -3,13 +3,13 @@ import Runtime.VM.Model.UnitModel
 import Runtime.Proofs.EffectBisim.Bridge
 import Runtime.Proofs.EffectBisim.ConfigEquivBridge
 
-/-! # Runtime.Proofs.VM.BridgeStrengthening
+/-! # Runtime.Proofs.BridgeStrengthening
 
-Strengthened VM bridge statements with explicit premise bundling.
+Strengthened protocol-machine bridge statements with explicit premise bundling.
 -/
 
 /-
-The Problem. VM bridge theorems rely on several monitor/typing obligations that
+The Problem. Protocol-machine bridge theorems rely on several monitor/typing obligations that
 are easy to scatter across files, making transport assumptions hard to audit.
 
 Solution Structure. Bundle bridge premises in one structure, derive local handler
@@ -29,13 +29,13 @@ variable {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε] [EffectSpec ε]
 
 /-! ## Bridge Premises and Local Obligations -/
 
-/-- Canonical handler-typing obligation at the VM boundary. -/
+/-- Canonical handler-typing obligation at the protocol-machine boundary. -/
 def handler_invoke_typed
     (action : EffectRuntime.EffectAction ε) (hsid : HandlerId) : Prop :=
   WellTypedInstr (γ:=γ) (ε:=ε)
     (.invoke action) (.handler hsid) (EffectSpec.handlerType action) .end_
 
-/-- Premise bundle for VM bridge theorems.
+/-- Premise bundle for protocol-machine bridge theorems.
 
 Premise inventory:
 1. `monitorSound` maps to `monitor_sound` in `Runtime/VM/Runtime/Monitor.lean`.
@@ -45,7 +45,7 @@ Premise inventory:
 Bridge transport used by end-to-end theorems:
 1. `config_equiv_iff_effect_bisim_silent` in `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean`.
 2. `effect_bisim_implies_observational_equivalence` in `Runtime/Proofs/EffectBisim/Bridge.lean`. -/
-structure VMBridgePremises (m : SessionMonitor γ) : Prop where
+structure ProtocolMachineBridgePremises (m : SessionMonitor γ) : Prop where
   monitorSound : monitor_sound (γ:=γ) (ε:=ε) m
   monitorPreserves : unified_monitor_preserves m
   handlerTyping :
@@ -53,11 +53,11 @@ structure VMBridgePremises (m : SessionMonitor γ) : Prop where
       handler_invoke_typed (γ:=γ) (ε:=ε) action hsid
 
 /-- Canonical constructor for bridge premises from monitor contracts. -/
-theorem vm_bridge_premises_of_monitor
+theorem protocol_machine_bridge_premises_of_monitor
     (m : SessionMonitor γ)
     (hSound : monitor_sound (γ:=γ) (ε:=ε) m)
     (hPres : unified_monitor_preserves m) :
-    VMBridgePremises (γ:=γ) (ε:=ε) m := by
+    ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m := by
   refine ⟨hSound, hPres, ?_⟩
   intro action hsid
   exact WellTypedInstr.wt_invoke action hsid
@@ -65,7 +65,7 @@ theorem vm_bridge_premises_of_monitor
 /-- Local handler-typing bridge obligation. -/
 theorem handler_obligation_local
     {m : SessionMonitor γ}
-    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (hPrem : ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m)
     (action : EffectRuntime.EffectAction ε) (hsid : HandlerId) :
     handler_invoke_typed (γ:=γ) (ε:=ε) action hsid :=
   hPrem.handlerTyping action hsid
@@ -79,7 +79,7 @@ def handler_fragment_typing
 /-- Any handler fragment is well typed under bridge premises. -/
 theorem handler_fragment_typing_of_premises
     {m : SessionMonitor γ}
-    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (hPrem : ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m)
     (hsid : HandlerId) (actions : List (EffectRuntime.EffectAction ε)) :
     handler_fragment_typing (γ:=γ) (ε:=ε) hsid actions := by
   intro action hMem
@@ -87,24 +87,24 @@ theorem handler_fragment_typing_of_premises
 
 /-! ## Nominal Effect-Interface Bridge -/
 
-/-- Nominal DSL effect interface declaration lowered through the VM `invoke`
+/-- Nominal DSL effect interface declaration lowered through the protocol-machine `invoke`
 boundary rather than a separate host channel. -/
 structure NominalEffectInterfaceDecl where
   name : String
   actions : List (EffectRuntime.EffectAction ε)
 
 /-- Every action named by the interface must satisfy the same handler typing
-obligation as a raw VM `invoke`. -/
+obligation as a raw protocol-machine `invoke`. -/
 def effect_interface_decl_typed
     (decl : NominalEffectInterfaceDecl (ε:=ε)) (hsid : HandlerId) : Prop :=
   ∀ action, action ∈ decl.actions →
     handler_invoke_typed (γ:=γ) (ε:=ε) action hsid
 
-/-- VM bridge premises are strong enough to justify one nominal DSL effect
+/-- Protocol-machine bridge premises are strong enough to justify one nominal DSL effect
 interface through the existing `invoke` boundary. -/
 theorem effect_interface_decl_typed_of_premises
     {m : SessionMonitor γ}
-    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (hPrem : ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m)
     (decl : NominalEffectInterfaceDecl (ε:=ε))
     (hsid : HandlerId) :
     effect_interface_decl_typed (γ:=γ) (ε:=ε) decl hsid := by
@@ -115,7 +115,7 @@ theorem effect_interface_decl_typed_of_premises
 typed boundary used by the runtime monitor. -/
 theorem effect_interface_invocation_preserves_boundary
     {m : SessionMonitor γ}
-    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (hPrem : ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m)
     (decl : NominalEffectInterfaceDecl (ε:=ε))
     (hsid : HandlerId)
     (action : EffectRuntime.EffectAction ε)
@@ -123,13 +123,13 @@ theorem effect_interface_invocation_preserves_boundary
     handler_invoke_typed (γ:=γ) (ε:=ε) action hsid := by
   exact effect_interface_decl_typed_of_premises (γ:=γ) (ε:=ε) hPrem decl hsid action hMem
 
-/-! ## VM-Step Typing Bridge -/
+/-! ## Protocol-Machine Step Typing Bridge -/
 
-/-- VM-step level bridge fact for handler steps.
+/-- Protocol-machine step-level bridge fact for handler steps.
     The theorem states explicit pre and post typing judgments and monitor sid preservation. -/
-theorem handler_vm_step_typing
+theorem handler_protocol_machine_step_typing
     {m : SessionMonitor γ}
-    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (hPrem : ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m)
     (action : EffectRuntime.EffectAction ε) (hsid : HandlerId)
     {sk sk' : SessionKind γ}
     (hStep : m.step sk = some sk')
@@ -144,9 +144,9 @@ theorem handler_vm_step_typing
 
 /-- End-to-end bridge theorem used by paper-level bridge statements.
     Handler typing obligations are transported together with observational equivalence. -/
-theorem vm_bridge_soundness_composed
+theorem protocol_machine_bridge_soundness_composed
     {m : SessionMonitor γ}
-    (hPrem : VMBridgePremises (γ:=γ) (ε:=ε) m)
+    (hPrem : ProtocolMachineBridgePremises (γ:=γ) (ε:=ε) m)
     (action : EffectRuntime.EffectAction ε) (hsid : HandlerId)
     {sk sk' : SessionKind γ}
     {C₁ C₂ : CoherenceConfig}
@@ -155,7 +155,7 @@ theorem vm_bridge_soundness_composed
     (hCfg : ConfigEquiv C₁ C₂) :
     handler_invoke_typed (γ:=γ) (ε:=ε) action hsid ∧
     ObservationalEq configErasureObs C₁ C₂ := by
-  have hLocal := handler_vm_step_typing (γ:=γ) (ε:=ε) hPrem action hsid hStep hHandler
+  have hLocal := handler_protocol_machine_step_typing (γ:=γ) (ε:=ε) hPrem action hsid hStep hHandler
   have hBisim : EffectBisim configErasureObs configSilentStep C₁ C₂ :=
     (config_equiv_iff_effect_bisim_silent C₁ C₂).1 hCfg
   have hObs : ObservationalEq configErasureObs C₁ C₂ :=
@@ -188,9 +188,9 @@ theorem sid_shifting_monitor_not_unified_preserves :
   cases hSidEq
 
 /-- Audit witness lifted to the bundled bridge premises. -/
-theorem sid_shifting_monitor_not_bridge_premises
+theorem sid_shifting_monitor_not_protocol_machine_bridge_premises
     {ε : Type} [EffectRuntime ε] [EffectSpec ε] :
-    ¬ VMBridgePremises (γ:=UnitGuard) (ε:=ε) sid_shifting_monitor := by
+    ¬ ProtocolMachineBridgePremises (γ:=UnitGuard) (ε:=ε) sid_shifting_monitor := by
   intro hPrem
   exact sid_shifting_monitor_not_unified_preserves hPrem.monitorPreserves
 

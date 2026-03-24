@@ -10,7 +10,7 @@ use crate::vm_runner::ProtocolMachineTraceEvent;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimRunInput {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Scenario configuration payload.
     pub scenario: Value,
@@ -27,7 +27,7 @@ pub struct SimRunInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimRunOutput {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Observable trace produced by the simulation.
     #[serde(default)]
@@ -70,7 +70,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sim_input_legacy_decode_defaults_schema_version() {
+    fn sim_input_missing_schema_version_is_rejected() {
         let legacy = serde_json::json!({
             "scenario": {"name": "s"},
             "global_type": {"kind": "end"},
@@ -78,25 +78,21 @@ mod tests {
             "initial_states": {}
         });
 
-        let input: SimRunInput = serde_json::from_value(legacy).expect("decode SimRunInput");
-        assert_eq!(
-            input.schema_version,
-            crate::schema::LEAN_BRIDGE_SCHEMA_VERSION
-        );
+        let err = serde_json::from_value::<SimRunInput>(legacy)
+            .expect_err("SimRunInput without schema_version should be rejected");
+        assert!(err.to_string().contains("missing field `schema_version`"));
     }
 
     #[test]
-    fn sim_output_legacy_decode_defaults_schema_version() {
+    fn sim_output_missing_schema_version_is_rejected() {
         let legacy = serde_json::json!({
             "trace": [],
             "violations": []
         });
 
-        let output: SimRunOutput = serde_json::from_value(legacy).expect("decode SimRunOutput");
-        assert_eq!(
-            output.schema_version,
-            crate::schema::LEAN_BRIDGE_SCHEMA_VERSION
-        );
+        let err = serde_json::from_value::<SimRunOutput>(legacy)
+            .expect_err("SimRunOutput without schema_version should be rejected");
+        assert!(err.to_string().contains("missing field `schema_version`"));
     }
 
     #[test]

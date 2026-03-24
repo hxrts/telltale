@@ -68,7 +68,7 @@ pub enum LeanRunnerError {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChoreographyJson {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     /// Global type JSON (Lean-compatible).
     pub global_type: Value,

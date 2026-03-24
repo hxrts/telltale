@@ -215,7 +215,6 @@ fn guard_effect_fixture_image() -> CodeImage {
     single_role_end_image(vec![
         Instr::Invoke {
             action: InvokeAction::Reg(0),
-            dst: Some(1),
         },
         Instr::Acquire {
             layer: "auth".to_string(),

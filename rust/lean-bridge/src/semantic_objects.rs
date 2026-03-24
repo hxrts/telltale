@@ -9,8 +9,22 @@ use serde_json::Value as Json;
 pub const SEMANTIC_OBJECTS_SCHEMA_VERSION: &str = "protocol_machine.semantic_objects.v1";
 
 #[must_use]
-pub fn default_semantic_objects_schema_version() -> String {
+pub fn canonical_semantic_objects_schema_version() -> String {
     SEMANTIC_OBJECTS_SCHEMA_VERSION.to_string()
+}
+
+fn deserialize_semantic_objects_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let version = String::deserialize(deserializer)?;
+    if version == SEMANTIC_OBJECTS_SCHEMA_VERSION {
+        Ok(version)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "unsupported schema_version '{version}'; expected '{SEMANTIC_OBJECTS_SCHEMA_VERSION}'"
+        )))
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -264,7 +278,7 @@ pub struct TickedObsEvent<E> {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct ProtocolMachineSemanticObjects {
-    #[serde(default = "default_semantic_objects_schema_version")]
+    #[serde(deserialize_with = "deserialize_semantic_objects_schema_version")]
     pub schema_version: String,
     pub operation_instances: Vec<OperationInstance>,
     pub outstanding_effects: Vec<OutstandingEffect>,
@@ -285,7 +299,7 @@ pub struct ProtocolMachineSemanticObjects {
 impl Default for ProtocolMachineSemanticObjects {
     fn default() -> Self {
         Self {
-            schema_version: default_semantic_objects_schema_version(),
+            schema_version: canonical_semantic_objects_schema_version(),
             operation_instances: Vec::new(),
             outstanding_effects: Vec::new(),
             semantic_handoffs: Vec::new(),
@@ -322,7 +336,7 @@ mod tests {
     #[test]
     fn semantic_object_payload_roundtrip_via_json_helpers() {
         let payload = ProtocolMachineSemanticObjects {
-            schema_version: default_semantic_objects_schema_version(),
+            schema_version: canonical_semantic_objects_schema_version(),
             operation_instances: vec![OperationInstance {
                 operation_id: "effect:1".to_string(),
                 session: Some(1),

@@ -65,7 +65,7 @@ pub struct OutputConditionTraceEvent {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ProtocolMachineReplayBundle {
     /// Schema version for this payload.
-    #[serde(default = "crate::schema::default_schema_version")]
+    #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
     pub schema_version: String,
     pub semantic_audit: Vec<NormalizedEvent>,
     #[serde(default)]

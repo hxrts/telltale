@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use telltale_lean_bridge::{
-    compute_trace_diff, default_schema_version, global_to_json, local_to_json,
+    canonical_schema_version, compute_trace_diff, global_to_json, local_to_json,
     normalize_semantic_audit, ProtocolMachineRunner, ProtocolMachineRunnerError,
     ProtocolMachineTraceEvent, SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent,
 };
@@ -249,7 +249,7 @@ fn validate_sim_trace_or_skip(
 #[allow(clippy::as_conversions)]
 fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         kind: String::new(),
         tick: 0,
         session: None,
@@ -386,7 +386,7 @@ fn to_sim_run_input(fixture: &SimFixture) -> SimRunInput {
         .collect();
 
     SimRunInput {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         scenario: serde_json::to_value(&fixture.scenario).expect("serialize scenario"),
         global_type: global_to_json(&fixture.global),
         local_types,

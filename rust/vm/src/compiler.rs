@@ -41,7 +41,6 @@ fn compile_inner(
                     instrs.push(Instr::Send { chan: 0, val: 1 });
                     instrs.push(Instr::Invoke {
                         action: InvokeAction::Named("runtime.step".to_string()),
-                        dst: None,
                     });
                     compile_inner(cont, instrs, loop_targets);
                 }
@@ -55,7 +54,6 @@ fn compile_inner(
                     instrs.push(Instr::Receive { chan: 0, dst: 1 });
                     instrs.push(Instr::Invoke {
                         action: InvokeAction::Named("runtime.step".to_string()),
-                        dst: None,
                     });
                     compile_inner(cont, instrs, loop_targets);
                 }
@@ -148,7 +146,6 @@ mod tests {
                 Instr::Send { chan: 0, val: 1 },
                 Instr::Invoke {
                     action: InvokeAction::Named("runtime.step".to_string()),
-                    dst: None,
                 },
                 Instr::Halt,
             ]
@@ -173,7 +170,6 @@ mod tests {
                 Instr::Send { chan: 0, val: 1 },
                 Instr::Invoke {
                     action: InvokeAction::Named("runtime.step".to_string()),
-                    dst: None,
                 },
                 Instr::Jump { target: 0 },
             ]
@@ -205,12 +201,10 @@ mod tests {
                 Instr::Send { chan: 0, val: 1 },
                 Instr::Invoke {
                     action: InvokeAction::Named("runtime.step".to_string()),
-                    dst: None,
                 },
                 Instr::Receive { chan: 0, dst: 1 },
                 Instr::Invoke {
                     action: InvokeAction::Named("runtime.step".to_string()),
-                    dst: None,
                 },
                 Instr::Jump { target: 0 },
             ]

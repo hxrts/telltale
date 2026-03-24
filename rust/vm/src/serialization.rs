@@ -22,16 +22,8 @@ use serde_json::Value as JsonValue;
 /// Canonical schema version identifier for VM replay/trace payloads.
 pub const SERIALIZATION_SCHEMA_VERSION: &str = "vm.serialization.v1";
 
-fn default_serialization_schema_version() -> String {
+fn canonical_serialization_schema_version() -> String {
     SERIALIZATION_SCHEMA_VERSION.to_string()
-}
-
-fn normalize_serialization_schema_version(raw: &str) -> String {
-    if raw == "1" {
-        SERIALIZATION_SCHEMA_VERSION.to_string()
-    } else {
-        raw.to_string()
-    }
 }
 
 /// Serialize one value through the canonical VM binary codec.
@@ -73,30 +65,21 @@ fn deserialize_serialization_schema_version<'de, D>(deserializer: D) -> Result<S
 where
     D: serde::Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum SchemaVersionValue {
-        String(String),
-        Integer(u64),
+    let version = String::deserialize(deserializer)?;
+    if version == SERIALIZATION_SCHEMA_VERSION {
+        Ok(version)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "unsupported schema_version '{version}'; expected '{SERIALIZATION_SCHEMA_VERSION}'"
+        )))
     }
-
-    let parsed = SchemaVersionValue::deserialize(deserializer)?;
-    Ok(match parsed {
-        SchemaVersionValue::String(version) => normalize_serialization_schema_version(&version),
-        SchemaVersionValue::Integer(version) => {
-            normalize_serialization_schema_version(&version.to_string())
-        }
-    })
 }
 
 /// Versioned canonical trace payload used for cross-target normalization.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CanonicalTraceV1 {
     /// Schema version for canonical trace serialization.
-    #[serde(
-        default = "default_serialization_schema_version",
-        deserialize_with = "deserialize_serialization_schema_version"
-    )]
+    #[serde(deserialize_with = "deserialize_serialization_schema_version")]
     pub schema_version: String,
     /// Canonically normalized observable events.
     pub events: Vec<ObsEvent>,
@@ -106,10 +89,7 @@ pub struct CanonicalTraceV1 {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CanonicalReplayFragmentV1 {
     /// Schema version for canonical replay serialization.
-    #[serde(
-        default = "default_serialization_schema_version",
-        deserialize_with = "deserialize_serialization_schema_version"
-    )]
+    #[serde(deserialize_with = "deserialize_serialization_schema_version")]
     pub schema_version: String,
     /// Canonically normalized observable trace.
     pub obs_trace: Vec<ObsEvent>,
@@ -283,7 +263,7 @@ pub enum SemanticAuditRecord {
 #[must_use]
 pub fn canonical_trace_v1(trace: &[ObsEvent]) -> CanonicalTraceV1 {
     CanonicalTraceV1 {
-        schema_version: default_serialization_schema_version(),
+        schema_version: canonical_serialization_schema_version(),
         events: normalize_trace(trace),
     }
 }
@@ -588,7 +568,7 @@ pub fn canonical_replay_fragment_v1(
     timed_out_sites.sort_unstable();
 
     CanonicalReplayFragmentV1 {
-        schema_version: default_serialization_schema_version(),
+        schema_version: canonical_serialization_schema_version(),
         obs_trace: canonical_trace_v1(obs_trace).events,
         effect_trace: canonical_effect_trace(effect_trace),
         crashed_sites,
@@ -675,13 +655,22 @@ mod tests {
     }
 
     #[test]
-    fn legacy_numeric_schema_version_deserializes_to_string_identifier() {
+    fn numeric_schema_version_is_rejected() {
         let payload = serde_json::json!({
             "schema_version": 1,
             "events": []
         });
-        let decoded: CanonicalTraceV1 =
-            serde_json::from_value(payload).expect("legacy schema version should deserialize");
-        assert_eq!(decoded.schema_version, SERIALIZATION_SCHEMA_VERSION);
+        serde_json::from_value::<CanonicalTraceV1>(payload)
+            .expect_err("numeric schema version should be rejected");
+    }
+
+    #[test]
+    fn missing_schema_version_is_rejected() {
+        let payload = serde_json::json!({
+            "events": []
+        });
+        let err = serde_json::from_value::<CanonicalTraceV1>(payload)
+            .expect_err("missing schema version should be rejected");
+        assert!(err.to_string().contains("missing field `schema_version`"));
     }
 }

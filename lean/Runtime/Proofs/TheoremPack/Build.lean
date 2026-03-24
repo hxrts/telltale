@@ -3,7 +3,7 @@ import Runtime.Proofs.TheoremPack.Artifacts
 
 /-! # Theorem Pack Building
 
-`VMTheoremPack` structure bundling all optional proof artifacts for
+`ProtocolMachineTheoremPack` structure bundling all optional proof artifacts for
 a VM invariant space, enabling certificate generation and validation. -/
 
 /-
@@ -11,8 +11,8 @@ The Problem. Protocol verification may prove various properties (FLP,
 CAP, termination, envelope adherence, etc.). We need a single structure
 bundling all available proof artifacts for a given VM configuration.
 
-Solution Structure. Define `VMTheoremPack` with optional fields for
-each artifact type. The pack is parameterized by a `VMInvariantSpace-
+Solution Structure. Define `ProtocolMachineTheoremPack` with optional fields for
+each artifact type. The pack is parameterized by a `ProtocolMachineInvariantSpace-
 WithProfiles` providing the base invariant and profile structure.
 -/
 
@@ -31,9 +31,9 @@ variable {ν : Type u} [VerificationModel ν]
 
 -- Theorem Pack Structure
 
-structure VMTheoremPack
+structure ProtocolMachineTheoremPack
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) where
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) where
   termination? : Option (TerminationArtifact (ν := ν) (store₀ := store₀))
   outputCondition? : Option OutputConditionArtifact
   semanticObjects? : Option SemanticObjectArtifacts
@@ -54,8 +54,8 @@ structure VMTheoremPack
   byzantineSafety? : Option ByzantineSafetyArtifact
   consensusEnvelope? : Option ConsensusEnvelopeArtifact
   failureEnvelope? : Option FailureEnvelopeArtifact
-  vmEnvelopeAdherence? : Option VMEnvelopeAdherenceArtifact
-  vmEnvelopeAdmission? : Option VMEnvelopeAdmissionArtifact
+  vmEnvelopeAdherence? : Option ProtocolMachineEnvelopeAdherenceArtifact
+  vmEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionArtifact
   protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeArtifact
   foster? : Option (Adapters.FosterArtifact State)
   maxWeight? : Option Adapters.MaxWeightArtifact
@@ -71,22 +71,22 @@ structure VMTheoremPack
 -- Builder
 
 /-- Build theorem artifacts from one invariant space. -/
-def buildVMTheoremPack
+def buildProtocolMachineTheoremPack
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) :
-    VMTheoremPack space :=
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    ProtocolMachineTheoremPack space :=
   let termination? :=
-    match space.toVMInvariantSpace.liveness? with
+    match space.toProtocolMachineInvariantSpace.liveness? with
     | none => none
     | some bundle =>
         some
 /- ## Structured Block 2 -/
           { bundle := bundle
           , proof := by
-              simpa using vm_termination_from_bundle (bundle := bundle)
+              simpa using protocol_machine_termination_from_bundle (bundle := bundle)
           }
   let outputCondition? :=
-    match space.toVMInvariantSpace.outputConditionWitness? with
+    match space.toProtocolMachineInvariantSpace.outputConditionWitness? with
     | none => none
     | some w =>
         some
@@ -94,7 +94,7 @@ def buildVMTheoremPack
           , soundness := w.sound
           }
   let semanticObjects? :=
-    space.toVMInvariantSpace.semanticObjectWitnesses?.map
+    space.toProtocolMachineInvariantSpace.semanticObjectWitnesses?.map
       SemanticObjectArtifacts.ofWitnessBundle
 
   -- Builder: Distributed Impossibility and Quorum
@@ -102,24 +102,24 @@ def buildVMTheoremPack
   let flpLowerBound? :=
     match space.distributed.flp? with
     | none => none
-    | some p => some { protocol := p.protocol, proof := p.protocol.lowerBound }
+    | some p => some { protocol := p, proof := p.lowerBound }
   let flpImpossibility? :=
     match space.distributed.flp? with
     | none => none
-    | some p => some { protocol := p.protocol, proof := p.protocol.impossibility }
+    | some p => some { protocol := p, proof := p.impossibility }
   let capImpossibility? :=
     match space.distributed.cap? with
     | none => none
-    | some p => some { protocol := p.protocol, proof := p.protocol.impossibility }
+    | some p => some { protocol := p, proof := p.impossibility }
   let quorumGeometry? :=
     match space.distributed.quorumGeometry? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , noConflictingCommits := p.protocol.noConflictingCommits
-          , forkExclusion := p.protocol.forkExclusion
-          , safeFinality := p.protocol.safeFinality
+          { protocol := p
+          , noConflictingCommits := p.noConflictingCommits
+          , forkExclusion := p.forkExclusion
+          , safeFinality := p.safeFinality
           }
 
   -- Builder: Liveness and Responsiveness
@@ -129,49 +129,49 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , eventualDecision := p.protocol.eventualDecision
-          , boundedPostGST := p.protocol.boundedPostGST
+          { protocol := p
+          , eventualDecision := p.eventualDecision
+          , boundedPostGST := p.boundedPostGST
           }
   let responsiveness? :=
     match space.distributed.responsiveness? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , eventualDecision := p.protocol.eventualDecision
+          { protocol := p
+          , eventualDecision := p.eventualDecision
 /- ## Structured Block 3 -/
-          , timeoutIndependentLatency := p.protocol.timeoutIndependentLatency
+          , timeoutIndependentLatency := p.timeoutIndependentLatency
           }
   let nakamoto? :=
     match space.distributed.nakamoto? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , probabilisticSafety := p.protocol.probabilisticSafety
-          , settlementFinality := p.protocol.settlementFinality
-          , livenessUnderChurn := p.protocol.livenessUnderChurn
+          { protocol := p
+          , probabilisticSafety := p.probabilisticSafety
+          , settlementFinality := p.settlementFinality
+          , livenessUnderChurn := p.livenessUnderChurn
           }
   let reconfiguration? :=
     match space.distributed.reconfiguration? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , noSplitBrain := p.protocol.noSplitBrain
-          , safeHandoff := p.protocol.safeHandoff
-          , livenessPreserved := p.protocol.livenessPreserved
+          { protocol := p
+          , noSplitBrain := p.noSplitBrain
+          , safeHandoff := p.safeHandoff
+          , livenessPreserved := p.livenessPreserved
           }
   let atomicBroadcast? :=
     match space.distributed.atomicBroadcast? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , totalOrderConsistency := p.protocol.totalOrderConsistency
-          , logPrefixCompatibility := p.protocol.logPrefixCompatibility
-          , consensusAtomicBroadcastBridge := p.protocol.consensusAtomicBroadcastBridge
+          { protocol := p
+          , totalOrderConsistency := p.totalOrderConsistency
+          , logPrefixCompatibility := p.logPrefixCompatibility
+          , consensusAtomicBroadcastBridge := p.consensusAtomicBroadcastBridge
           }
 
   -- Builder: Safety Boundaries and Availability
@@ -181,17 +181,17 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , accountableSafety := p.protocol.accountableSafety
+          { protocol := p
+          , accountableSafety := p.accountableSafety
           }
   let failureDetectors? :=
     match space.distributed.failureDetectors? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , solvabilityBoundary := p.protocol.solvabilityBoundary
-          , impossibilityBoundary := p.protocol.impossibilityBoundary
+          { protocol := p
+          , solvabilityBoundary := p.solvabilityBoundary
+          , impossibilityBoundary := p.impossibilityBoundary
           }
   let dataAvailability? :=
 /- ## Structured Block 4 -/
@@ -199,17 +199,17 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , availability := p.protocol.availability
-          , retrievability := p.protocol.retrievability
+          { protocol := p
+          , availability := p.availability
+          , retrievability := p.retrievability
           }
   let coordination? :=
     match space.distributed.coordination? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , characterization := p.protocol.characterization
+          { protocol := p
+          , characterization := p.characterization
           }
 
   -- Builder: CRDT and Consensus Envelope Families
@@ -219,22 +219,22 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , exactEnvelope := p.protocol.exactEnvelope
-          , adequacy := p.protocol.adequacy
-          , principalCapability := p.protocol.principalCapability
-          , admissionSoundness := p.protocol.admissionSoundness
-          , admissionCompleteness := p.protocol.admissionCompleteness
-          , opStateEquivalence := p.protocol.opStateEquivalence
-          , gcSafetyIff := p.protocol.gcSafetyIffCausalDominance
-          , boundedApproximation := p.protocol.boundedApproximation
-          , approximationMonotonicity := p.protocol.approximationMonotonicity
-          , exactSECAsLimit := p.protocol.exactSECAsLimit
-          , hcrdtCore := p.protocol.hcrdtCore
-          , hcrdtFoundation := p.protocol.hcrdtFoundation
-          , hcrdtDynamics := p.protocol.hcrdtDynamics
-          , hcrdtExtensions := p.protocol.hcrdtExtensions
-          , hcrdtLimits := p.protocol.hcrdtLimits
+          { protocol := p
+          , exactEnvelope := p.exactEnvelope
+          , adequacy := p.adequacy
+          , principalCapability := p.principalCapability
+          , admissionSoundness := p.admissionSoundness
+          , admissionCompleteness := p.admissionCompleteness
+          , opStateEquivalence := p.opStateEquivalence
+          , gcSafetyIff := p.gcSafetyIffCausalDominance
+          , boundedApproximation := p.boundedApproximation
+          , approximationMonotonicity := p.approximationMonotonicity
+          , exactSECAsLimit := p.exactSECAsLimit
+          , hcrdtCore := p.hcrdtCore
+          , hcrdtFoundation := p.hcrdtFoundation
+          , hcrdtDynamics := p.hcrdtDynamics
+          , hcrdtExtensions := p.hcrdtExtensions
+          , hcrdtLimits := p.hcrdtLimits
           }
 
   -- Builder: Byzantine and Consensus Envelope Families
@@ -244,11 +244,11 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , exactCharacterization := p.protocol.exactCharacterization
-          , byzantineSafety := Distributed.ByzantineSafety.byzantine_safety_of_protocol p.protocol
-          , characterization := Distributed.ByzantineSafety.characterization_of_protocol p.protocol
-          , assumptionsPassed := Distributed.ByzantineSafety.byzantine_assumptions_all_passed p.protocol
+          { protocol := p
+          , exactCharacterization := p.exactCharacterization
+          , byzantineSafety := Distributed.ByzantineSafety.byzantine_safety_of_protocol p
+          , characterization := Distributed.ByzantineSafety.characterization_of_protocol p
+          , assumptionsPassed := Distributed.ByzantineSafety.byzantine_assumptions_all_passed p
           }
   let consensusEnvelope? :=
 /- ## Structured Block 5 -/
@@ -256,26 +256,26 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , exactEnvelope := p.protocol.exactEnvelope
-          , adequacy := p.protocol.adequacy
-          , principalCapability := p.protocol.principalCapability
-          , admissionSoundness := p.protocol.admissionSoundness
-          , admissionCompleteness := p.protocol.admissionCompleteness
+          { protocol := p
+          , exactEnvelope := p.exactEnvelope
+          , adequacy := p.adequacy
+          , principalCapability := p.principalCapability
+          , admissionSoundness := p.admissionSoundness
+          , admissionCompleteness := p.admissionCompleteness
           }
   let failureEnvelope? :=
     match space.distributed.failureEnvelope? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , recoveryActionSafety := p.protocol.recoveryActionSafety
-          , noUnsafeReplay := p.protocol.noUnsafeReplay
-          , checkpointRestartRefinement := p.protocol.checkpointRestartRefinement
-          , crossTargetConformance := p.protocol.crossTargetConformance
-          , restartStructuredErrorAdequacy := p.protocol.restartStructuredErrorAdequacy
-          , failureEnvelopeSoundness := p.protocol.failureEnvelopeSoundness
-          , failureEnvelopeMaximality := p.protocol.failureEnvelopeMaximality
+          { protocol := p
+          , recoveryActionSafety := p.recoveryActionSafety
+          , noUnsafeReplay := p.noUnsafeReplay
+          , checkpointRestartRefinement := p.checkpointRestartRefinement
+          , crossTargetConformance := p.crossTargetConformance
+          , restartStructuredErrorAdequacy := p.restartStructuredErrorAdequacy
+          , failureEnvelopeSoundness := p.failureEnvelopeSoundness
+          , failureEnvelopeMaximality := p.failureEnvelopeMaximality
           }
 
   -- Builder: VM Envelope Families
@@ -285,37 +285,37 @@ def buildVMTheoremPack
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , localAdherence := p.protocol.localAdherence
-          , shardedAdherence := p.protocol.shardedAdherence
-          , schedulerDeterminismLocal := p.protocol.schedulerDeterminismLocal
-          , schedulerDeterminismSharded := p.protocol.schedulerDeterminismSharded
-          , monotonicity := p.protocol.monotonicity
-          , localAdequacy := p.protocol.localAdequacy
-          , shardedAdequacy := p.protocol.shardedAdequacy
-          , localFullAbstraction := p.protocol.localFullAbstraction
-          , shardedFullAbstraction := p.protocol.shardedFullAbstraction
-          , capabilityMonotonicity := p.protocol.capabilityMonotonicity
+          { protocol := p
+          , localAdherence := p.localAdherence
+          , shardedAdherence := p.shardedAdherence
+          , schedulerDeterminismLocal := p.schedulerDeterminismLocal
+          , schedulerDeterminismSharded := p.schedulerDeterminismSharded
+          , monotonicity := p.monotonicity
+          , localAdequacy := p.localAdequacy
+          , shardedAdequacy := p.shardedAdequacy
+          , localFullAbstraction := p.localFullAbstraction
+          , shardedFullAbstraction := p.shardedFullAbstraction
+          , capabilityMonotonicity := p.capabilityMonotonicity
           }
   let vmEnvelopeAdmission? :=
     match space.distributed.vmEnvelopeAdmission? with
     | none => none
     | some p =>
         some
-          { protocol := p.protocol
-          , localInferenceSoundness := p.protocol.localInferenceSoundness
-          , shardedInferenceSoundness := p.protocol.shardedInferenceSoundness
+          { protocol := p
+          , localInferenceSoundness := p.localInferenceSoundness
+          , shardedInferenceSoundness := p.shardedInferenceSoundness
 /- ## Structured Block 6 -/
-          , localPrincipalCapability := p.protocol.localPrincipalCapability
-          , shardedPrincipalCapability := p.protocol.shardedPrincipalCapability
-          , localAdmissionSoundness := p.protocol.localAdmissionSoundness
-          , localAdmissionCompleteness := p.protocol.localAdmissionCompleteness
-          , shardedAdmissionSoundness := p.protocol.shardedAdmissionSoundness
-          , shardedAdmissionCompleteness := p.protocol.shardedAdmissionCompleteness
-          , decidability := p.protocol.decidability
-          , complexity := p.protocol.complexity
-          , conservativeExtension := p.protocol.conservativeExtension
-          , necessityMinimality := p.protocol.necessityMinimality
+          , localPrincipalCapability := p.localPrincipalCapability
+          , shardedPrincipalCapability := p.shardedPrincipalCapability
+          , localAdmissionSoundness := p.localAdmissionSoundness
+          , localAdmissionCompleteness := p.localAdmissionCompleteness
+          , shardedAdmissionSoundness := p.shardedAdmissionSoundness
+          , shardedAdmissionCompleteness := p.shardedAdmissionCompleteness
+          , decidability := p.decidability
+          , complexity := p.complexity
+          , conservativeExtension := p.conservativeExtension
+          , necessityMinimality := p.necessityMinimality
           }
 
   -- Builder: Protocol Bridge and Classical Pack
@@ -333,7 +333,7 @@ def buildVMTheoremPack
           , exchangeNormalization := p.bundle.exchangeNormalization
           , shardCutPreservation := p.bundle.shardCutPreservation
           }
-  let classicalPack := Adapters.buildVMClassicalTheoremPack (space := space.toClassicalSpace)
+  let classicalPack := Adapters.buildProtocolMachineClassicalTheoremPack (space := space.toClassicalSpace)
   { termination? := termination?
   , outputCondition? := outputCondition?
   , semanticObjects? := semanticObjects?

@@ -1,6 +1,6 @@
 import Runtime.Adequacy.EnvelopeCore.CoreFoundations
 import Runtime.Adequacy.EnvelopeCore.ReconfigurationBridge
-import Runtime.Adequacy.EnvelopeCore.VMAdherence
+import Runtime.Adequacy.EnvelopeCore.ProtocolMachineAdherence
 import Runtime.Adequacy.EnvelopeCore.AdmissionLogic
 import Runtime.Adequacy.EnvelopeCore.FailureTaxonomy
 

@@ -55,8 +55,8 @@ def DelegationOnlyCrossLaneHandoff (st : VMState ι γ π ε ν) : Prop :=
 /-- Proof-carrying protocol admission contract:
 requires scheduler evidence plus theorem-pack evidence in one proof space. -/
 structure ProtocolAdmissionContract (store₀ : SessionStore ν) where
-  proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀
-  proofPack : VMProtocolProofPack (proofSpace := proofSpace)
+  proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀
+  proofPack : ProtocolMachineProofPack (proofSpace := proofSpace)
 
 /-- Proof-guided concurrency contract: runtime may step coroutines in parallel
 only when a proof-level eligibility predicate certifies the pair. -/
@@ -85,22 +85,36 @@ def planDeterministicWavesByContract {st₀ : VMState ι γ π ε ν}
 /-- Scheduler profile contract: runtime policy selection is backed by a certified
 scheduler bundle and profile extraction theorem. -/
 structure SchedulerProfileContract (st₀ : VMState ι γ π ε ν) where
-  bundle : VMSchedulerBundle st₀
+  bundle : ProtocolMachineSchedulerBundle st₀
   profilePinned : schedulerPolicyProfileOf st₀.sched.policy = bundle.profile
 
 /-- Theorem-pack capability contract: advanced runtime modes are gated by the
 inventory materialized from theorem-pack evidence. -/
 structure TheoremPackCapabilityContract
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) where
-  theoremPack : VMTheoremPack (space := space)
-  capabilityInventory : List (String × Bool)
-  semanticObjectInventory : List (String × Bool)
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) where
+  theoremPack : ProtocolMachineTheoremPack (space := space)
+
+/-- Runtime-facing compact capability inventory derived from theorem-pack evidence. -/
+def TheoremPackCapabilityContract.capabilityInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (contract : TheoremPackCapabilityContract space) : List (String × Bool) :=
+  Runtime.Proofs.TheoremPackAPI.capabilities
+    (space := space) contract.theoremPack
+
+/-- Runtime-facing semantic-object theorem inventory derived from theorem-pack evidence. -/
+def TheoremPackCapabilityContract.semanticObjectInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (contract : TheoremPackCapabilityContract space) : List (String × Bool) :=
+  Runtime.Proofs.TheoremPackAPI.semanticObjectInventory
+    (pack := contract.theoremPack)
 
 /-- Runtime-facing list of enabled semantic-object theorem attachment points. -/
 def TheoremPackCapabilityContract.semanticAttachmentPoints
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (contract : TheoremPackCapabilityContract space) : List String :=
   Runtime.Proofs.TheoremPackAPI.semanticObjectCapabilities
     (pack := contract.theoremPack)
@@ -108,7 +122,7 @@ def TheoremPackCapabilityContract.semanticAttachmentPoints
 /-! ## Combined Runtime Bundle -/
 
 /-- Combined runtime contract bundle threaded into VM admission/runtime policy. -/
-structure VMRuntimeContracts (store₀ : SessionStore ν) where
+structure ProtocolMachineRuntimeContracts (store₀ : SessionStore ν) where
   admission : ProtocolAdmissionContract (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀
   delegationOnly :
     DelegationOnlyCrossLaneHandoff (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν)
@@ -127,22 +141,22 @@ private def schedPolicyRequiresContracts : SchedPolicy → Bool
   | .cooperative => false
   | _ => true
 
-def requiresVMRuntimeContracts (cfg : VMConfig ι γ π ε ν) : Bool :=
+def requiresProtocolMachineRuntimeContracts (cfg : VMConfig ι γ π ε ν) : Bool :=
   schedPolicyRequiresContracts cfg.schedPolicy || cfg.speculationEnabled
 
 /-- VM admission result for advanced runtime mode checks. -/
-inductive VMAdmissionResult where
+inductive ProtocolMachineAdmissionResult where
   | admitted
   | rejectedMissingContracts
   deriving Repr, DecidableEq
 
-/-- VM admission path: advanced runtime modes require `VMRuntimeContracts`. -/
-def admitVMRuntime
+/-- VM admission path: advanced runtime modes require `ProtocolMachineRuntimeContracts`. -/
+def admitProtocolMachineRuntime
     (cfg : VMConfig ι γ π ε ν)
     {store₀ : SessionStore ν}
-    (contracts? : Option (VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
-    VMAdmissionResult :=
-  if requiresVMRuntimeContracts cfg then
+    (contracts? : Option (ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
+    ProtocolMachineAdmissionResult :=
+  if requiresProtocolMachineRuntimeContracts cfg then
     match contracts? with
     | some _ => .admitted
     | none => .rejectedMissingContracts
@@ -152,10 +166,10 @@ def admitVMRuntime
 /-- Advanced-mode admission succeeds only when contracts are supplied. -/
 theorem admit_vm_runtime_requires_contracts
     (cfg : VMConfig ι γ π ε ν) {store₀ : SessionStore ν}
-    (hReq : requiresVMRuntimeContracts cfg = true)
-    (contracts? : Option (VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
-    admitVMRuntime cfg contracts? = .admitted ↔ contracts?.isSome = true := by
-  unfold admitVMRuntime
+    (hReq : requiresProtocolMachineRuntimeContracts cfg = true)
+    (contracts? : Option (ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)) :
+    admitProtocolMachineRuntime cfg contracts? = .admitted ↔ contracts?.isSome = true := by
+  unfold admitProtocolMachineRuntime
   simp [hReq]
   cases contracts? <;> simp
 
@@ -171,21 +185,21 @@ structure LiveMigrationRequest where
 /-- Theorem-gated live migration capability check. -/
 def canUseLiveMigration
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     Bool :=
   Runtime.Proofs.TheoremPackAPI.canLiveMigrate contracts.capabilities.theoremPack
 
 /-- Theorem-gated placement-refinement switch. -/
 def canUsePlacementRefinement
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     Bool :=
   Runtime.Proofs.TheoremPackAPI.canRefinePlacement contracts.capabilities.theoremPack
 
 /-- Theorem-gated relaxed-reordering switch. -/
 def canUseRelaxedReordering
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     Bool :=
   Runtime.Proofs.TheoremPackAPI.canRelaxReordering contracts.capabilities.theoremPack
 
@@ -193,7 +207,7 @@ def canUseRelaxedReordering
 evidence is present in the theorem pack. -/
 def requestLiveMigration
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
     (req : LiveMigrationRequest) : Option LiveMigrationRequest :=
   if canUseLiveMigration contracts then some req else none
 
@@ -207,7 +221,7 @@ structure AutoscaleRequest where
 /-- Theorem-gated autoscale/repartition capability check. -/
 def canUseAutoscaleOrRepartition
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     Bool :=
   Runtime.Proofs.TheoremPackAPI.canAutoscaleOrRepartition
     contracts.capabilities.theoremPack
@@ -215,28 +229,28 @@ def canUseAutoscaleOrRepartition
 /-- Theorem-gated autoscale/repartition API. -/
 def requestAutoscaleOrRepartition
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
     (req : AutoscaleRequest) : Option AutoscaleRequest :=
   if canUseAutoscaleOrRepartition contracts then some req else none
 
 /-- Theorem-gated refinement switch API. -/
 def requestPlacementRefinement
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
     (enabled : Bool) : Option Bool :=
   if canUsePlacementRefinement contracts then some enabled else none
 
 /-- Theorem-gated reordering switch API. -/
 def requestRelaxedReordering
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
     (enabled : Bool) : Option Bool :=
   if canUseRelaxedReordering contracts then some enabled else none
 
 /-- Runtime capability snapshot emitted at startup. -/
 def runtimeCapabilitySnapshot
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     List (String × Bool) :=
   contracts.capabilities.capabilityInventory ++
     [ ("live_migration", canUseLiveMigration contracts)
@@ -249,8 +263,8 @@ def runtimeCapabilitySnapshot
 
 /-- Artifact check for one runtime determinism profile. -/
 def determinismProfileSupported
-    (artifacts : VMDeterminismArtifacts)
-    (profile : VMDeterminismProfile) : Bool :=
+    (artifacts : ProtocolMachineDeterminismArtifacts)
+    (profile : ProtocolMachineDeterminismProfile) : Bool :=
   match profile with
   | .full => artifacts.full
   | .moduloEffectTrace => artifacts.moduloEffectTrace
@@ -261,9 +275,9 @@ def determinismProfileSupported
 `full`, `moduloEffectTrace`, `moduloCommutativity`, and `replay`. -/
 def requestDeterminismProfile
     {store₀ : SessionStore ν}
-    (contracts : VMRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
-    (artifacts : VMDeterminismArtifacts)
-    (profile : VMDeterminismProfile) : Option VMDeterminismProfile :=
+    (contracts : ProtocolMachineRuntimeContracts (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
+    (artifacts : ProtocolMachineDeterminismArtifacts)
+    (profile : ProtocolMachineDeterminismProfile) : Option ProtocolMachineDeterminismProfile :=
   let mixedOk :=
     Runtime.Proofs.TheoremPackAPI.canUseMixedDeterminismProfiles
       contracts.capabilities.theoremPack
@@ -276,7 +290,7 @@ def requestDeterminismProfile
 
 /-- Build a scheduler profile contract from bundle evidence. -/
 def SchedulerProfileContract.ofBundle {st₀ : VMState ι γ π ε ν}
-    (bundle : VMSchedulerBundle st₀) :
+    (bundle : ProtocolMachineSchedulerBundle st₀) :
     SchedulerProfileContract st₀ :=
   { bundle := bundle
   , profilePinned := scheduler_profile_pinned_from_bundle bundle
@@ -285,17 +299,10 @@ def SchedulerProfileContract.ofBundle {st₀ : VMState ι γ π ε ν}
 /-- Build a theorem-pack capability contract from a proof space. -/
 def TheoremPackCapabilityContract.ofProofSpace
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
     TheoremPackCapabilityContract space :=
   let pack := Runtime.Proofs.TheoremPackAPI.mk (space := space)
-  let inventory :=
-    Runtime.Proofs.TheoremPackAPI.capabilities (space := space) pack
-  let semanticInventory :=
-    Runtime.Proofs.TheoremPackAPI.semanticObjectInventory (pack := pack)
-  { theoremPack := pack
-  , capabilityInventory := inventory
-  , semanticObjectInventory := semanticInventory
-  }
+  { theoremPack := pack }
 
 end
 

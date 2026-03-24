@@ -7,7 +7,7 @@
 mod test_support;
 
 use telltale_lean_bridge::{
-    default_schema_version, global_to_json, ChoreographyJson, ProtocolMachineRunInput,
+    canonical_schema_version, global_to_json, ChoreographyJson, ProtocolMachineRunInput,
     ProtocolMachineRunner,
 };
 use telltale_types::{GlobalType, Label};
@@ -28,9 +28,9 @@ fn test_lean_semantic_audit_matches_rust() {
     let roles = vec!["A".to_string(), "B".to_string()];
 
     let input = ProtocolMachineRunInput {
-        schema_version: default_schema_version(),
+        schema_version: canonical_schema_version(),
         choreographies: vec![ChoreographyJson {
-            schema_version: default_schema_version(),
+            schema_version: canonical_schema_version(),
             global_type: global_to_json(&global),
             roles: roles.clone(),
         }],

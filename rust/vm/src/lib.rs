@@ -193,7 +193,8 @@ pub use persistence::{NoopPersistence, PersistenceModel};
 pub use runtime_contracts::{
     admit_vm_runtime, determinism_profile_supported, enforce_vm_runtime_gates,
     request_determinism_profile, requires_vm_runtime_contracts, runtime_capability_snapshot,
-    DeterminismArtifacts, RuntimeAdmissionResult, RuntimeContracts, RuntimeGateResult,
+    DeterminismArtifacts, RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts,
+    RuntimeGateResult,
 };
 pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,
@@ -230,9 +231,8 @@ pub use transfer_semantics::{
     DelegationStatus, TransferRequest,
 };
 pub use verification::{
-    signValue, sign_value, verifySignedValue, verify_signed_value, AuthProof, AuthTree, Commitment,
-    DefaultVerificationModel, Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel,
-    VerifyingKey,
+    sign_value, verify_signed_value, AuthProof, AuthTree, Commitment, DefaultVerificationModel,
+    Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel, VerifyingKey,
 };
 pub use vm::{
     EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig, ObservabilityRetentionMode,

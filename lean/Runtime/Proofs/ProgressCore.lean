@@ -69,7 +69,7 @@ def SessionCoherentVM (store : SessionStore ν) (s : SessionId) : Prop :=
 theorem coherent_vm_state_iff_forall_session {store : SessionStore ν} :
     CoherentVMState store ↔ ∀ s, SessionCoherentVM store s := by
   simp only [CoherentVMState, SessionCoherentVM]
-  exact vm_coherent_iff_forall_session_coherent
+  exact protocol_machine_coherent_iff_forall_session_coherent
 
 -- Instruction Enablement
 

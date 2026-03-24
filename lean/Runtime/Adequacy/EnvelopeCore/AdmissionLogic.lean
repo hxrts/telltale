@@ -1,4 +1,4 @@
-import Runtime.Adequacy.EnvelopeCore.VMAdherence
+import Runtime.Adequacy.EnvelopeCore.ProtocolMachineAdherence
 
 /-! # Envelope Admission Logic
 
@@ -53,7 +53,7 @@ def DProg_shard (input : ProgramCapabilityInput) : CertifiedEnvelopeCapability :
 def DProgInferenceSoundness_local
     {State : Type u} {Obs : Type v}
     (input : ProgramCapabilityInput)
-    (h : VMLocalEnvelopeHypotheses State Obs) : Prop :=
+    (h : ProtocolMachineLocalEnvelopeHypotheses State Obs) : Prop :=
   ∀ dUser, dUserContained dUser (DProg_local input) = true →
     LocalEnvelopeSoundness h.localEnvelope h.refRun h.vmRun
 
@@ -61,7 +61,7 @@ def DProgInferenceSoundness_local
 def DProgInferenceSoundness_shard
     {State : Type u} {Obs : Type v}
     (input : ProgramCapabilityInput)
-    (h : VMShardedEnvelopeHypotheses State Obs) : Prop :=
+    (h : ProtocolMachineShardedEnvelopeHypotheses State Obs) : Prop :=
   ∀ dUser, dUserContained dUser (DProg_shard input) = true →
     ShardedEnvelopeSoundness h.shardedEnvelope h.refRun h.vmRun
 
@@ -284,10 +284,10 @@ theorem transport_catalog_minimal_basis_of_hardened_and_oracles
 /-! ## E4 Premise Bundle -/
 
 /-- E4: premise bundle for capability inference/admission theorem extraction. -/
-structure VMEnvelopeAdmissionPremises (State : Type u) (Obs : Type v) where
+structure ProtocolMachineEnvelopeAdmissionPremises (State : Type u) (Obs : Type v) where
   input : ProgramCapabilityInput
-  localHypotheses : VMLocalEnvelopeHypotheses State Obs
-  shardedHypotheses : VMShardedEnvelopeHypotheses State Obs
+  localHypotheses : ProtocolMachineLocalEnvelopeHypotheses State Obs
+  shardedHypotheses : ProtocolMachineShardedEnvelopeHypotheses State Obs
   runtimeComplianceLocal : DUser → Prop
   runtimeComplianceSharded : DUser → Prop
   failedObligation : AdmissionObligation → Prop
@@ -331,10 +331,10 @@ structure VMEnvelopeAdmissionPremises (State : Type u) (Obs : Type v) where
 /-! ## E4 Packaged Protocol -/
 
 /-- E4: packaged capability inference/admission theorem family. -/
-structure VMEnvelopeAdmissionProtocol where
+structure ProtocolMachineEnvelopeAdmissionProtocol where
   State : Type u
   Obs : Type v
-  premises : VMEnvelopeAdmissionPremises State Obs
+  premises : ProtocolMachineEnvelopeAdmissionPremises State Obs
   localInferenceSoundness :
     DProgInferenceSoundness_local premises.input premises.localHypotheses :=
       premises.localInferenceSoundnessWitness

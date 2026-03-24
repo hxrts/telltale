@@ -14,36 +14,22 @@ use crate::vm::ObsEvent;
 /// Canonical schema version identifier for envelope differential artifacts.
 pub const ENVELOPE_DIFF_SCHEMA_VERSION: &str = "vm.envelope_diff.v1";
 
-fn default_schema_version() -> String {
+fn canonical_schema_version() -> String {
     ENVELOPE_DIFF_SCHEMA_VERSION.to_string()
-}
-
-fn normalize_envelope_schema_version(raw: &str) -> String {
-    if raw == "1" {
-        ENVELOPE_DIFF_SCHEMA_VERSION.to_string()
-    } else {
-        raw.to_string()
-    }
 }
 
 fn deserialize_envelope_schema_version<'de, D>(deserializer: D) -> Result<String, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum SchemaVersionValue {
-        String(String),
-        Integer(u64),
+    let version = String::deserialize(deserializer)?;
+    if version == ENVELOPE_DIFF_SCHEMA_VERSION {
+        Ok(version)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "unsupported schema_version '{version}'; expected '{ENVELOPE_DIFF_SCHEMA_VERSION}'"
+        )))
     }
-
-    let parsed = SchemaVersionValue::deserialize(deserializer)?;
-    Ok(match parsed {
-        SchemaVersionValue::String(version) => normalize_envelope_schema_version(&version),
-        SchemaVersionValue::Integer(version) => {
-            normalize_envelope_schema_version(&version.to_string())
-        }
-    })
 }
 
 /// Scheduler-level differential class between two runs.
@@ -100,10 +86,7 @@ impl WaveWidthBound {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeDiff {
     /// Schema version for this artifact payload.
-    #[serde(
-        default = "default_schema_version",
-        deserialize_with = "deserialize_envelope_schema_version"
-    )]
+    #[serde(deserialize_with = "deserialize_envelope_schema_version")]
     pub schema_version: String,
     /// Baseline engine identifier.
     pub baseline_engine: String,
@@ -141,7 +124,7 @@ impl EnvelopeDiff {
         let failure_visible_diff_class = classify_failure_visible(baseline, candidate);
 
         Self {
-            schema_version: default_schema_version(),
+            schema_version: canonical_schema_version(),
             baseline_engine: baseline_engine.into(),
             candidate_engine: candidate_engine.into(),
             scheduler_permutation_class,
@@ -176,10 +159,7 @@ impl EnvelopeDiff {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EnvelopeDiffArtifactV1 {
     /// Schema version for this artifact payload.
-    #[serde(
-        default = "default_schema_version",
-        deserialize_with = "deserialize_envelope_schema_version"
-    )]
+    #[serde(deserialize_with = "deserialize_envelope_schema_version")]
     pub schema_version: String,
     /// Envelope differential payload.
     pub envelope_diff: EnvelopeDiff,
@@ -218,7 +198,7 @@ impl EnvelopeDiffArtifactV1 {
         let candidate_fragment_hash = stable_hash_hex_from_serializable(candidate);
         let envelope_diff_hash = envelope_diff.stable_hash_hex();
         Self {
-            schema_version: default_schema_version(),
+            schema_version: canonical_schema_version(),
             envelope_diff,
             baseline_fragment_hash,
             candidate_fragment_hash,
@@ -407,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    fn legacy_numeric_schema_version_deserializes_to_string_identifier() {
+    fn numeric_schema_version_is_rejected() {
         let payload = serde_json::json!({
             "schema_version": 1,
             "baseline_engine": "lean",
@@ -422,8 +402,27 @@ mod tests {
             "failure_visible_diff_class": "Exact",
             "effect_determinism_tier": "strict_deterministic"
         });
-        let decoded: EnvelopeDiff =
-            serde_json::from_value(payload).expect("legacy schema version should deserialize");
-        assert_eq!(decoded.schema_version, ENVELOPE_DIFF_SCHEMA_VERSION);
+        serde_json::from_value::<EnvelopeDiff>(payload)
+            .expect_err("numeric schema version should be rejected");
+    }
+
+    #[test]
+    fn missing_schema_version_is_rejected() {
+        let payload = serde_json::json!({
+            "baseline_engine": "lean",
+            "candidate_engine": "threaded",
+            "scheduler_permutation_class": "Exact",
+            "wave_width_bound": {
+                "baseline_max_wave_width": 1,
+                "candidate_max_wave_width": 1,
+                "declared_upper_bound": 1
+            },
+            "effect_ordering_class": "Exact",
+            "failure_visible_diff_class": "Exact",
+            "effect_determinism_tier": "strict_deterministic"
+        });
+        let err = serde_json::from_value::<EnvelopeDiff>(payload)
+            .expect_err("missing schema version should be rejected");
+        assert!(err.to_string().contains("missing field `schema_version`"));
     }
 }

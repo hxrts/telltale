@@ -346,8 +346,8 @@ structure FailureEnvelopeArtifact where
 /-! ## VM Envelope Adherence -/
 
 /-- Packaged VM envelope-adherence theorem-family artifact. -/
-structure VMEnvelopeAdherenceArtifact where
-  protocol : Runtime.Adequacy.VMEnvelopeAdherenceProtocol
+structure ProtocolMachineEnvelopeAdherenceArtifact where
+  protocol : Runtime.Adequacy.ProtocolMachineEnvelopeAdherenceProtocol
   localAdherence :
     Runtime.Adequacy.LocalEnvelopeSoundness
       protocol.premises.localHypotheses.localEnvelope
@@ -370,12 +370,12 @@ structure VMEnvelopeAdherenceArtifact where
     Runtime.Adequacy.SpatialSubtypingMonotonicity
       protocol.premises.subtype protocol.premises.obligation
   localAdequacy :
-    Runtime.Adequacy.VMObservationalAdequacyModuloEnvelope
+    Runtime.Adequacy.ProtocolMachineObservationalAdequacyModuloEnvelope
       (Runtime.Adequacy.EqEnvLocal protocol.premises.localHypotheses.localEnvelope)
       protocol.premises.localHypotheses.refRun
       protocol.premises.localHypotheses.vmRun
   shardedAdequacy :
-    Runtime.Adequacy.VMObservationalAdequacyModuloEnvelope
+    Runtime.Adequacy.ProtocolMachineObservationalAdequacyModuloEnvelope
       (Runtime.Adequacy.EqEnvShard protocol.premises.shardedHypotheses.shardedEnvelope)
       protocol.premises.shardedHypotheses.refRun
       protocol.premises.shardedHypotheses.vmRun
@@ -394,8 +394,8 @@ structure VMEnvelopeAdherenceArtifact where
 /-! ## VM Envelope Admission -/
 
 /-- Packaged VM envelope-admission theorem-family artifact. -/
-structure VMEnvelopeAdmissionArtifact where
-  protocol : Runtime.Adequacy.VMEnvelopeAdmissionProtocol
+structure ProtocolMachineEnvelopeAdmissionArtifact where
+  protocol : Runtime.Adequacy.ProtocolMachineEnvelopeAdmissionProtocol
   localInferenceSoundness :
     Runtime.Adequacy.DProgInferenceSoundness_local
       protocol.premises.input protocol.premises.localHypotheses
@@ -479,12 +479,12 @@ structure ProtocolEnvelopeBridgeArtifact where
 
 /-- Packaged VM termination artifact (when liveness bundle is provided). -/
 structure TerminationArtifact {store₀ : SessionStore ν} where
-  bundle : VMLivenessBundle store₀
+  bundle : ProtocolMachineLivenessBundle store₀
   proof :
     ∃ (n : Nat) (store_final : SessionStore ν),
       store_final = executeSchedule bundle.model.step store₀ bundle.fairness.sched n ∧
       AllSessionsComplete store_final ∧
-      n ≤ bundle.fairness.k * vmMeasure store₀
+      n ≤ bundle.fairness.k * protocolMachineMeasure store₀
 
 /-- Packaged output-condition soundness artifact. -/
 structure OutputConditionArtifact where

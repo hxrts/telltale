@@ -48,13 +48,13 @@ def transformationClassRequiredCapabilities
     (cls : RuntimeTransformationEnvelopeClass) : List String :=
   match cls with
   | .schedulerPermutation =>
-      [ "protocol_envelope_bridge", "vm_envelope_adherence" ]
+      [ "protocol_envelope_bridge", "protocol_machine_envelope_adherence" ]
   | .waveWidening =>
-      [ "protocol_envelope_bridge", "vm_envelope_adherence", "vm_envelope_admission" ]
+      [ "protocol_envelope_bridge", "protocol_machine_envelope_adherence", "protocol_machine_envelope_admission" ]
   | .effectReordering =>
-      [ "protocol_envelope_bridge", "vm_envelope_adherence", "vm_envelope_admission" ]
+      [ "protocol_envelope_bridge", "protocol_machine_envelope_adherence", "protocol_machine_envelope_admission" ]
   | .failureReplayNormalization =>
-      [ "failure_envelope", "vm_envelope_adherence" ]
+      [ "failure_envelope", "protocol_machine_envelope_adherence" ]
 
 private def inventoryHasEnabled
     (inventory : List (String × Bool))
@@ -188,40 +188,40 @@ def replayConformsToClasses {ε : Type u} [EffectRuntime ε]
 def hasFailureEnvelopeCrossTargetWitness
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.failureEnvelope?.isSome
 
 /-- Restart/structured-error adequacy witness gate. -/
 def hasRestartStructuredErrorAdequacyWitness
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.failureEnvelope?.isSome
 
 /-- Release gate: single-thread evidence is present. -/
 def hasSingleThreadEvidence
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.failureEnvelope?.isSome
 
 /-- Release gate: multi-thread evidence is present. -/
 def hasMultiThreadEvidence
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.failureEnvelope?.isSome
 
 /-- Release gate: sharded evidence is present. -/
 def hasShardedEvidence
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : Bool :=
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
   pack.failureEnvelope?.isSome
 
 /-! ### Release Conformance Report -/
@@ -248,8 +248,8 @@ structure ReleaseConformanceReport where
 def buildReleaseConformanceReport {ε : Type w} [EffectRuntime ε]
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space))
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space))
     (baseline replay : List (TickedObsEvent ε))
     (classes : List CertifiedReplayEquivalenceClass := defaultCertifiedReplayClasses)
     (releaseTagged : Bool := false) :
@@ -288,8 +288,8 @@ def buildReleaseConformanceReport {ε : Type w} [EffectRuntime ε]
 def releaseBuildGate {ε : Type w} [EffectRuntime ε]
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space))
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space))
     (baseline replay : List (TickedObsEvent ε))
     (classes : List CertifiedReplayEquivalenceClass := defaultCertifiedReplayClasses)
     (releaseTagged : Bool := false) : Bool :=

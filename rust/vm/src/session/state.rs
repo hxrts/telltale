@@ -422,7 +422,7 @@ impl SessionState {
             sid: self.sid,
             role: from.to_string(),
         });
-        let signature = signValue(&val, &signer);
+        let signature = sign_value(&val, &signer);
         self.send_signed(
             from,
             to,
@@ -450,7 +450,7 @@ impl SessionState {
             sid: self.sid,
             role: from.to_string(),
         });
-        let signature = signValue(&val, &signer);
+        let signature = sign_value(&val, &signer);
         self.send_signed(
             from,
             to,
@@ -487,7 +487,7 @@ impl SessionState {
         let Some(signed) = signed else {
             return Ok(None);
         };
-        if !verifySignedValue(&signed.payload, &signed.signature, &verifying) {
+        if !verify_signed_value(&signed.payload, &signed.signature, &verifying) {
             return Err(format!(
                 "signature verification failed on edge {from} -> {to}"
             ));

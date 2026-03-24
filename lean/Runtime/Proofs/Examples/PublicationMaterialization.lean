@@ -1,4 +1,4 @@
-import Runtime.Proofs.VM.PublicationMaterialization
+import Runtime.VM.Model
 
 set_option autoImplicit false
 

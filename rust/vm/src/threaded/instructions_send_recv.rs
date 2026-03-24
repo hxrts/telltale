@@ -138,13 +138,7 @@ fn step_send(
     let enqueue = match decision {
         SendDecision::Deliver(payload) => {
             let edge = Edge::new(prepared.sid, role.to_string(), prepared.partner.clone());
-            let sequence_no = if matches!(
-                ctx.config.communication_replay_mode,
-                crate::communication_replay::CommunicationReplayMode::Off
-            ) {
-                // Off mode preserves legacy behavior and avoids replay bookkeeping.
-                0
-            } else {
+            let sequence_no = {
                 let mut model = ctx
                     .communication_consumption
                     .lock()
@@ -291,12 +285,6 @@ fn consume_receive_replay_identity(
     sequence_no: u64,
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<(), Fault> {
-    if matches!(
-        ctx.config.communication_replay_mode,
-        crate::communication_replay::CommunicationReplayMode::Off
-    ) {
-        return Ok(());
-    }
     let replay_label = crate::communication_replay::canonical_receive_label_context(
         &prepared.label,
         prepared.expected_type.as_ref(),
@@ -448,7 +436,6 @@ fn step_invoke(
     session: &SessionState,
     role: &str,
     action: InvokeAction,
-    legacy_dst: Option<u16>,
     handler: &dyn EffectHandler,
     tick: u64,
 ) -> Result<StepPack, Fault> {
@@ -462,11 +449,6 @@ fn step_invoke(
                 .ok_or(Fault::OutOfRegisters)?
         ),
     };
-    if let Some(dst) = legacy_dst {
-        if usize::from(dst) >= coro.regs.len() {
-            return Err(Fault::OutOfRegisters);
-        }
-    }
     if !session.has_bound_handler() {
         return Err(Fault::Invoke {
             failure: EffectFailure::contract_violation("no handler bound"),

@@ -12,10 +12,9 @@ pub(crate) fn step_invoke(
     coro_idx: usize,
     role: &str,
     action: InvokeAction,
-    dst: Option<u16>,
     handler: &dyn EffectHandler,
 ) -> Result<StepPack, Fault> {
-    vm.step_invoke(coro_idx, role, action, dst, handler)
+    vm.step_invoke(coro_idx, role, action, handler)
 }
 
 pub(crate) fn step_acquire(

@@ -62,13 +62,6 @@ fn vm_serialized_bytes<T: Serialize>(value: &T) -> usize {
 }
 
 impl VM {
-    fn communication_replay_enabled(&self) -> bool {
-        !matches!(
-            self.config.communication_replay_mode,
-            CommunicationReplayMode::Off
-        )
-    }
-
     fn intern_load_plan_symbols(&mut self, plan: &crate::session::SessionOpenPlan, sid: SessionId) {
         for role in plan.roles() {
             let _: StringId = self.role_symbols.intern(role);
@@ -182,10 +175,6 @@ impl VM {
     }
 
     fn allocate_send_sequence(&mut self, edge: &Edge) -> u64 {
-        if !self.communication_replay_enabled() {
-            // Off mode preserves legacy behavior and avoids replay bookkeeping.
-            return 0;
-        }
         self.sync_communication_consumption_mode();
         self.communication_consumption.allocate_send_sequence(edge)
     }
@@ -194,15 +183,6 @@ impl VM {
         &mut self,
         identity: CommunicationIdentity,
     ) -> Result<CommunicationConsumeResult, CommunicationReplayError> {
-        if !self.communication_replay_enabled() {
-            // Off mode intentionally skips replay-consumption state and artifacts.
-            return Ok(CommunicationConsumeResult {
-                mode: CommunicationReplayMode::Off,
-                pre_root: self.communication_consumption.root(),
-                post_root: self.communication_consumption.root(),
-                consumed_nullifier: None,
-            });
-        }
         self.sync_communication_consumption_mode();
         let result = self.communication_consumption.consume_receive(&identity)?;
         self.communication_consumption_artifacts.push(

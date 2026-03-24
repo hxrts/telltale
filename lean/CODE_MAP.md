@@ -689,7 +689,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | File | Lines | Description |
 |------|------:|-------------|
 | Proofs/VM/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
-| Proofs/VM/BridgeStrengthening.lean | 143 | VM bridge premise bundle (`VMBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
+| Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
 | Proofs/VM/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
 | Proofs/VM/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
 | Proofs/VM/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
@@ -716,7 +716,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Adequacy/EnvelopeCore.lean | 54 | V2: Envelope core re-exports |
 | Adequacy/EnvelopeCore/CoreFoundations.lean | 267 | V2: Core envelope definitions and axioms |
 | Adequacy/EnvelopeCore/AdmissionLogic.lean | 379 | V2: Runtime admission checks and capability gates |
-| Adequacy/EnvelopeCore/VMAdherence.lean | 314 | V2: VM adherence proofs for determinism envelope |
+| Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence proofs for determinism envelope |
 | Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration with coherence |
 | Adequacy/EnvelopeCore/FailureTaxonomy.lean | 7 | V2: Failure taxonomy re-exports |
 | Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification |
@@ -736,7 +736,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
 | Proofs/Progress.lean | 7 | Re-export wrapper for Progress* modules |
 | Proofs/ProgressCore.lean | 395 | `CoherentVMState`, `ProgressVMState`, core progress definitions |
-| Proofs/ProgressTheorems.lean | 233 | `vm_progress`, instruction enablement theorems |
+| Proofs/ProgressTheorems.lean | 233 | `protocol_machine_progress`, instruction enablement theorems |
 | Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API and optional progress hypothesis surface |
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
 | Proofs/ObserverProjectionEffectBisim.lean | 107 | Effect bisimulation for observer projection |
@@ -776,7 +776,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 
 ### Proofs (Additional V2 Files)
 | Proofs/Lyapunov.lean | 381 | `progressMeasure`, weighted measure W = 2·depth + buffer |
-| Proofs/VMPotential.lean | 266 | VM potential integration and transported Foster bridge |
+| Proofs/ProtocolMachinePotential.lean | 266 | Protocol-machine potential integration and transported Foster bridge |
 | Proofs/WeightedMeasure.lean | 1,198 | Lyapunov measure infrastructure, step decrease theorems |
 | Proofs/SchedulingBound.lean | 7 | Re-export wrapper for SchedulingBound* modules |
 | Proofs/SchedulingBoundCore.lean | 424 | Core k-fair scheduler termination bounds |

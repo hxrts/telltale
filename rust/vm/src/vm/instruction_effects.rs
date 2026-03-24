@@ -341,7 +341,6 @@ impl VM {
         coro_idx: usize,
         role: &str,
         action: InvokeAction,
-        legacy_dst: Option<u16>,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
         let action_repr = match action {
@@ -351,11 +350,6 @@ impl VM {
                 format!("{action_value:?}")
             }
         };
-        if let Some(dst) = legacy_dst {
-            if usize::from(dst) >= self.coroutines[coro_idx].regs.len() {
-                return Err(Fault::OutOfRegisters);
-            }
-        }
         let sid = self.coroutines[coro_idx].session_id;
         if self
             .sessions
@@ -615,7 +609,7 @@ impl VM {
             .get(usize::from(input.evidence))
             .ok_or(Fault::OutOfRegisters)?
             .clone();
-        let decoded = InMemoryGuardLayer::decodeEvidence(&ev).map_err(|e| Fault::Acquire {
+        let decoded = InMemoryGuardLayer::decode_evidence(&ev).map_err(|e| Fault::Acquire {
             layer: input.layer.to_string(),
             failure: EffectFailure::invalid_evidence(e),
         })?;

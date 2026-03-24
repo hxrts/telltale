@@ -16,7 +16,7 @@ Users need packaged artifacts that bundle these properties for each policy type.
 
 Solution Structure. Defines policy-specific artifact structures (RoundRobinPolicyArtifact,
 CooperativePolicyArtifact, etc.) with their characteristic properties. The
-`VMSchedulerArtifact` bundles all scheduler theorems for a given initial state
+`ProtocolMachineSchedulerArtifact` bundles all scheduler theorems for a given initial state
 with optional policy-specific extensions.
 -/
 
@@ -56,7 +56,7 @@ structure ProgressAwarePolicyArtifact (st₀ : VMState ι γ π ε ν) : Type wh
   pinned : SchedulerPolicyPinned st₀ .progressAware
 
 /-- Packaged scheduler artifact derived from one scheduler bundle. -/
-structure VMSchedulerArtifact (st₀ : VMState ι γ π ε ν) where
+structure ProtocolMachineSchedulerArtifact (st₀ : VMState ι γ π ε ν) where
   policy : SchedPolicy
   profile : SchedulerPolicyProfile
   policyPinned : SchedulerPolicyPinned st₀ policy
@@ -72,8 +72,8 @@ structure VMSchedulerArtifact (st₀ : VMState ι γ π ε ν) where
 -- Scheduler Artifact Construction
 
 /-- Build scheduler theorem artifact from a scheduler bundle. -/
-def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
-    (bundle : VMSchedulerBundle st₀) : VMSchedulerArtifact st₀ :=
+def buildProtocolMachineSchedulerArtifact {st₀ : VMState ι γ π ε ν}
+    (bundle : ProtocolMachineSchedulerBundle st₀) : ProtocolMachineSchedulerArtifact st₀ :=
   let roundRobin? :=
     match hpol : bundle.policy with
     | .roundRobin =>
@@ -137,27 +137,27 @@ def buildVMSchedulerArtifact {st₀ : VMState ι γ π ε ν}
 
 /-- Protocol proof space that combines scheduler evidence with invariant-space
 profiles for distributed/classical theorem derivation. -/
-structure VMProtocolProofSpace (store₀ : SessionStore ν) where
+structure ProtocolMachineProofSpace (store₀ : SessionStore ν) where
   st₀ : VMState ι γ π ε ν
   store_eq : st₀.sessions = store₀
-  scheduler : VMSchedulerBundle st₀
-  profiles : VMInvariantSpaceWithProfiles (ν := ν) store₀ (VMState ι γ π ε ν)
+  scheduler : ProtocolMachineSchedulerBundle st₀
+  profiles : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ (VMState ι γ π ε ν)
 
 /-- Combined proof pack: scheduler artifact + profile-derived theorem pack. -/
-structure VMProtocolProofPack
+structure ProtocolMachineProofPack
     {store₀ : SessionStore ν}
-    (proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
+    (proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀)
     where
-  scheduler : VMSchedulerArtifact (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) proofSpace.st₀
-  theorems : VMTheoremPack (space := proofSpace.profiles)
+  scheduler : ProtocolMachineSchedulerArtifact (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) proofSpace.st₀
+  theorems : ProtocolMachineTheoremPack (space := proofSpace.profiles)
 
 /-- Build a combined protocol proof pack from one proof space. -/
 /- ## Structured Block 3 -/
-def buildVMProtocolProofPack
+def buildProtocolMachineProofPack
     {store₀ : SessionStore ν}
-    (proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
-    VMProtocolProofPack (proofSpace := proofSpace) :=
-  { scheduler := buildVMSchedulerArtifact proofSpace.scheduler
+    (proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    ProtocolMachineProofPack (proofSpace := proofSpace) :=
+  { scheduler := buildProtocolMachineSchedulerArtifact proofSpace.scheduler
   , theorems := Runtime.Proofs.TheoremPackAPI.mk (space := proofSpace.profiles)
   }
 
@@ -166,8 +166,8 @@ def buildVMProtocolProofPack
 /-- Compact inventory for the combined proof pack. -/
 def protocolProofInventory
     {store₀ : SessionStore ν}
-    {proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀}
-    (pack : VMProtocolProofPack (proofSpace := proofSpace)) : List (String × Bool) :=
+    {proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀}
+    (pack : ProtocolMachineProofPack (proofSpace := proofSpace)) : List (String × Bool) :=
   [ ("scheduler_policy_pinned", true)
   , ("scheduler_profile_round_robin", pack.scheduler.roundRobin?.isSome)
   , ("scheduler_profile_cooperative", pack.scheduler.cooperative?.isSome)
@@ -182,15 +182,15 @@ def protocolProofInventory
 /-- Iris scheduler invariance extracted from protocol proof-space scheduler evidence. -/
 theorem scheduler_iris_invariant_from_protocol_space [Telltale.TelltaleIris]
     {store₀ : SessionStore ν}
-    (proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
+    (proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) proofSpace.st₀ :=
   scheduler_iris_invariant_from_bundle proofSpace.scheduler
 
 /-- Iris scheduler invariance extracted from a built protocol proof pack. -/
 theorem scheduler_iris_invariant_from_protocol_pack [Telltale.TelltaleIris]
     {store₀ : SessionStore ν}
-    {proofSpace : VMProtocolProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀}
-    (_pack : VMProtocolProofPack (proofSpace := proofSpace)) :
+    {proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀}
+    (_pack : ProtocolMachineProofPack (proofSpace := proofSpace)) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) proofSpace.st₀ :=
   scheduler_iris_invariant_from_bundle proofSpace.scheduler
 

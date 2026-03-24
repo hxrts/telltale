@@ -29,7 +29,7 @@ variants, and envelope theorem packs) need a uniform representation that can be
 attached to the VM invariant space.
 
 Solution Structure. Defines profile wrappers, canonical constructors, and the
-distributed-profile bundle carried by `VMInvariantSpaceWithDistributed`.
+distributed-profile bundle carried by `ProtocolMachineInvariantSpaceWithDistributedProfiles`.
 -/
 
 namespace Runtime
@@ -42,79 +42,61 @@ section
 
 variable {ν : Type u} [VerificationModel ν]
 
-/-! ## Distributed Family Profile Wrappers -/
+/-! ## Distributed Family Profile Aliases -/
 
-/-- FLP profile wrapper for invariant-space attachment. -/
-structure FLPProfile where
-  protocol : Distributed.FLP.ImpossibilityProtocol
+/-- Canonical FLP profile carried by the invariant space. -/
+abbrev FLPProfile := Distributed.FLP.ImpossibilityProtocol
 
-/-- CAP profile wrapper for invariant-space attachment. -/
-structure CAPProfile where
-  protocol : Distributed.CAP.ImpossibilityProtocol
+/-- Canonical CAP profile carried by the invariant space. -/
+abbrev CAPProfile := Distributed.CAP.ImpossibilityProtocol
 
-/-- Quorum-geometry profile wrapper for invariant-space attachment. -/
-structure QuorumGeometryProfile where
-  protocol : Distributed.QuorumGeometry.SafetyProtocol
+/-- Canonical quorum-geometry profile carried by the invariant space. -/
+abbrev QuorumGeometryProfile := Distributed.QuorumGeometry.SafetyProtocol
 
-/-- Partial-synchrony liveness profile wrapper for invariant-space attachment. -/
-structure PartialSynchronyProfile where
-  protocol : Distributed.PartialSynchrony.LivenessProtocol
+/-- Canonical partial-synchrony profile carried by the invariant space. -/
+abbrev PartialSynchronyProfile := Distributed.PartialSynchrony.LivenessProtocol
 
-/-- Responsiveness profile wrapper for invariant-space attachment. -/
-structure ResponsivenessProfile where
-  protocol : Distributed.Responsiveness.ResponsiveProtocol
+/-- Canonical responsiveness profile carried by the invariant space. -/
+abbrev ResponsivenessProfile := Distributed.Responsiveness.ResponsiveProtocol
 
-/-- Nakamoto-security profile wrapper for invariant-space attachment. -/
-structure NakamotoProfile where
-  protocol : Distributed.Nakamoto.SecurityProtocol
+/-- Canonical Nakamoto-security profile carried by the invariant space. -/
+abbrev NakamotoProfile := Distributed.Nakamoto.SecurityProtocol
 
-/-- Reconfiguration profile wrapper for invariant-space attachment. -/
-structure ReconfigurationProfile where
-  protocol : Distributed.Reconfiguration.ReconfigurationProtocol
+/-- Canonical reconfiguration profile carried by the invariant space. -/
+abbrev ReconfigurationProfile := Distributed.Reconfiguration.ReconfigurationProtocol
 
-/-- Atomic-broadcast profile wrapper for invariant-space attachment. -/
-structure AtomicBroadcastProfile where
-  protocol : Distributed.AtomicBroadcast.AtomicBroadcastProtocol
+/-- Canonical atomic-broadcast profile carried by the invariant space. -/
+abbrev AtomicBroadcastProfile := Distributed.AtomicBroadcast.AtomicBroadcastProtocol
 
-/-- Accountable-safety profile wrapper for invariant-space attachment. -/
-structure AccountableSafetyProfile where
-  protocol : Distributed.AccountableSafety.AccountableProtocol
+/-- Canonical accountable-safety profile carried by the invariant space. -/
+abbrev AccountableSafetyProfile := Distributed.AccountableSafety.AccountableProtocol
 
-/-- Failure-detector boundary profile wrapper for invariant-space attachment. -/
-structure FailureDetectorsProfile where
-  protocol : Distributed.FailureDetectors.BoundaryProtocol
+/-- Canonical failure-detector boundary profile carried by the invariant space. -/
+abbrev FailureDetectorsProfile := Distributed.FailureDetectors.BoundaryProtocol
 
-/-- Data-availability profile wrapper for invariant-space attachment. -/
-structure DataAvailabilityProfile where
-  protocol : Distributed.DataAvailability.DAProtocol
+/-- Canonical data-availability profile carried by the invariant space. -/
+abbrev DataAvailabilityProfile := Distributed.DataAvailability.DAProtocol
 
-/-- Coordination-characterization profile wrapper for invariant-space attachment. -/
-structure CoordinationProfile where
-  protocol : Distributed.Coordination.CoordinationProtocol
+/-- Canonical coordination-characterization profile carried by the invariant space. -/
+abbrev CoordinationProfile := Distributed.Coordination.CoordinationProtocol
 
-/-- CRDT theorem-family profile wrapper for invariant-space attachment. -/
-structure CRDTProfile where
-  protocol : Distributed.CRDT.CRDTProtocol
+/-- Canonical CRDT theorem-family profile carried by the invariant space. -/
+abbrev CRDTProfile := Distributed.CRDT.CRDTProtocol
 
-/-- Byzantine-safety theorem-family profile wrapper for invariant-space attachment. -/
-structure ByzantineSafetyProfile where
-  protocol : Distributed.ByzantineSafety.SafetyProtocol
+/-- Canonical Byzantine-safety theorem-family profile carried by the invariant space. -/
+abbrev ByzantineSafetyProfile := Distributed.ByzantineSafety.SafetyProtocol
 
-/-- Consensus-envelope theorem-family profile wrapper for invariant-space attachment. -/
-structure ConsensusEnvelopeProfile where
-  protocol : Distributed.ConsensusEnvelope.ConsensusEnvelopeProtocol
+/-- Canonical consensus-envelope theorem-family profile carried by the invariant space. -/
+abbrev ConsensusEnvelopeProfile := Distributed.ConsensusEnvelope.ConsensusEnvelopeProtocol
 
-/-- Failure-envelope theorem-family profile wrapper for invariant-space attachment. -/
-structure FailureEnvelopeProfile where
-  protocol : Runtime.Adequacy.FailureEnvelopeProtocol
+/-- Canonical failure-envelope theorem-family profile carried by the invariant space. -/
+abbrev FailureEnvelopeProfile := Runtime.Adequacy.FailureEnvelopeProtocol
 
-/-- VM envelope-adherence theorem-family profile wrapper for invariant-space attachment. -/
-structure VMEnvelopeAdherenceProfile where
-  protocol : Runtime.Adequacy.VMEnvelopeAdherenceProtocol
+/-- Canonical VM envelope-adherence theorem-family profile carried by the invariant space. -/
+abbrev ProtocolMachineEnvelopeAdherenceProfile := Runtime.Adequacy.ProtocolMachineEnvelopeAdherenceProtocol
 
-/-- VM envelope-admission theorem-family profile wrapper for invariant-space attachment. -/
-structure VMEnvelopeAdmissionProfile where
-  protocol : Runtime.Adequacy.VMEnvelopeAdmissionProtocol
+/-- Canonical VM envelope-admission theorem-family profile carried by the invariant space. -/
+abbrev ProtocolMachineEnvelopeAdmissionProfile := Runtime.Adequacy.ProtocolMachineEnvelopeAdmissionProtocol
 
 /-- Protocol envelope-bridge theorem-family profile wrapper for invariant-space attachment. -/
 structure ProtocolEnvelopeBridgeProfile where
@@ -126,22 +108,6 @@ structure ProtocolEnvelopeBridgeProfile where
   bundle :
     Runtime.Adequacy.ProtocolEnvelopeBridgeBundle
       Protocol Placement Deployment State Obs
-
-/-! ## Canonical Impossibility Constructors -/
-
-/-- Canonical FLP-class distributed profile constructor.
-The `ImpossibilityProtocol` type enforces asynchronous deterministic crash-resilient
-assumption packaging structurally. -/
-def asyncDeterministicCrashResilientProfile
-    (protocol : Distributed.FLP.ImpossibilityProtocol) : FLPProfile :=
-  { protocol := protocol }
-
-/-- Canonical CAP-class distributed profile constructor.
-The `ImpossibilityProtocol` type enforces async partition-tolerant assumption packaging
-structurally. -/
-def partitionTolerantAsyncProfile
-    (protocol : Distributed.CAP.ImpossibilityProtocol) : CAPProfile :=
-  { protocol := protocol }
 
 /-! ## Distributed Profile Bundles -/
 
@@ -163,14 +129,14 @@ structure DistributedProfiles where
   byzantineSafety? : Option ByzantineSafetyProfile := none
   consensusEnvelope? : Option ConsensusEnvelopeProfile := none
   failureEnvelope? : Option FailureEnvelopeProfile := none
-  vmEnvelopeAdherence? : Option VMEnvelopeAdherenceProfile := none
-  vmEnvelopeAdmission? : Option VMEnvelopeAdmissionProfile := none
+  vmEnvelopeAdherence? : Option ProtocolMachineEnvelopeAdherenceProfile := none
+  vmEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionProfile := none
   protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeProfile := none
 
 /-- VM invariant space extended with optional distributed-theory profiles. -/
-structure VMInvariantSpaceWithDistributed
+structure ProtocolMachineInvariantSpaceWithDistributedProfiles
     (store₀ : SessionStore ν) (State : Type v)
-    extends VMInvariantSpace (ν := ν) store₀ State where
+    extends ProtocolMachineInvariantSpace (ν := ν) store₀ State where
   distributed : DistributedProfiles := {}
 
 end

@@ -38,9 +38,7 @@ pub(crate) fn step_instr(
             dsts,
         } => session::step_open(vm, coro_idx, role, &roles, &local_types, &handlers, &dsts),
         Instr::Close { session } => session::step_close(vm, coro_idx, session),
-        Instr::Invoke { action, dst } => {
-            guard_effect::step_invoke(vm, coro_idx, role, action, dst, handler)
-        }
+        Instr::Invoke { action } => guard_effect::step_invoke(vm, coro_idx, role, action, handler),
         Instr::Acquire { layer, dst } => {
             guard_effect::step_acquire(vm, coro_idx, ep, role, sid, &layer, dst, handler)
         }

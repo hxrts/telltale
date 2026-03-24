@@ -127,7 +127,7 @@ fn arb_invariant_claims() -> impl Strategy<Value = InvariantClaims> {
                 };
 
                 InvariantClaims {
-                    schema_version: telltale_lean_bridge::default_schema_version(),
+                    schema_version: telltale_lean_bridge::canonical_schema_version(),
                     liveness,
                     distributed: telltale_lean_bridge::DistributedClaims::default(),
                     classical: telltale_lean_bridge::ClassicalClaims::default(),
@@ -231,7 +231,7 @@ impl EffectHandler for PropertyHandler {
 
 fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
     let mut out = ProtocolMachineTraceEvent {
-        schema_version: telltale_lean_bridge::default_schema_version(),
+        schema_version: telltale_lean_bridge::canonical_schema_version(),
         kind: String::new(),
         tick: 0,
         session: None,

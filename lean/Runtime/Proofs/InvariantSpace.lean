@@ -167,62 +167,62 @@ structure SemanticObjectWitnessBundle where
 - optional classical transport witness for theorem transport,
 - optional output-condition witness for predicate-gated output semantics,
 - optional semantic-object witness bundle for protocol-machine proof families. -/
-structure VMInvariantSpace (store₀ : SessionStore ν) (State : Type v) where
-  liveness? : Option (VMLivenessBundle store₀) := none
+structure ProtocolMachineInvariantSpace (store₀ : SessionStore ν) (State : Type v) where
+  liveness? : Option (ProtocolMachineLivenessBundle store₀) := none
   classicalWitness? : Option (ClassicalTransportWitness State) := none
   outputConditionWitness? : Option OutputConditionWitness := none
   semanticObjectWitnesses? : Option SemanticObjectWitnessBundle := none
 
 /-- Attach a liveness bundle to an invariant space. -/
-def VMInvariantSpace.withLiveness
+def ProtocolMachineInvariantSpace.withLiveness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State)
-    (bundle : VMLivenessBundle store₀) : VMInvariantSpace store₀ State :=
+    (space : ProtocolMachineInvariantSpace store₀ State)
+    (bundle : ProtocolMachineLivenessBundle store₀) : ProtocolMachineInvariantSpace store₀ State :=
   { space with liveness? := some bundle }
 
 /-- True iff an invariant space carries a liveness bundle. -/
-def VMInvariantSpace.hasLiveness
+def ProtocolMachineInvariantSpace.hasLiveness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State) : Bool :=
+    (space : ProtocolMachineInvariantSpace store₀ State) : Bool :=
   space.liveness?.isSome
 
 /-- Attach a classical witness to an invariant space. -/
-def VMInvariantSpace.withClassicalWitness
+def ProtocolMachineInvariantSpace.withClassicalWitness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State)
-    (w : ClassicalTransportWitness State) : VMInvariantSpace store₀ State :=
+    (space : ProtocolMachineInvariantSpace store₀ State)
+    (w : ClassicalTransportWitness State) : ProtocolMachineInvariantSpace store₀ State :=
   { space with classicalWitness? := some w }
 
 /-- True iff an invariant space carries a classical transport witness. -/
-def VMInvariantSpace.hasClassicalWitness
+def ProtocolMachineInvariantSpace.hasClassicalWitness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State) : Bool :=
+    (space : ProtocolMachineInvariantSpace store₀ State) : Bool :=
   space.classicalWitness?.isSome
 
 /-- Attach an output-condition witness to an invariant space. -/
-def VMInvariantSpace.withOutputConditionWitness
+def ProtocolMachineInvariantSpace.withOutputConditionWitness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State)
-    (w : OutputConditionWitness) : VMInvariantSpace store₀ State :=
+    (space : ProtocolMachineInvariantSpace store₀ State)
+    (w : OutputConditionWitness) : ProtocolMachineInvariantSpace store₀ State :=
   { space with outputConditionWitness? := some w }
 
 /-- True iff an invariant space carries output-condition witness evidence. -/
-def VMInvariantSpace.hasOutputConditionWitness
+def ProtocolMachineInvariantSpace.hasOutputConditionWitness
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State) : Bool :=
+    (space : ProtocolMachineInvariantSpace store₀ State) : Bool :=
   space.outputConditionWitness?.isSome
 
 /-- Attach semantic-object proof-family witnesses to an invariant space. -/
-def VMInvariantSpace.withSemanticObjectWitnesses
+def ProtocolMachineInvariantSpace.withSemanticObjectWitnesses
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State)
-    (w : SemanticObjectWitnessBundle) : VMInvariantSpace store₀ State :=
+    (space : ProtocolMachineInvariantSpace store₀ State)
+    (w : SemanticObjectWitnessBundle) : ProtocolMachineInvariantSpace store₀ State :=
   { space with semanticObjectWitnesses? := some w }
 
 /-- True iff an invariant space carries semantic-object proof-family evidence. -/
-def VMInvariantSpace.hasSemanticObjectWitnesses
+def ProtocolMachineInvariantSpace.hasSemanticObjectWitnesses
     {store₀ : SessionStore ν} {State : Type v}
-    (space : VMInvariantSpace store₀ State) : Bool :=
+    (space : ProtocolMachineInvariantSpace store₀ State) : Bool :=
   space.semanticObjectWitnesses?.isSome
 
 end

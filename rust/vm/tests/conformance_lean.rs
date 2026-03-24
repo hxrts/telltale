@@ -755,7 +755,6 @@ fn test_lean_invoke_and_output_condition_hint_behavior() {
     let image = single_role_end_image(vec![
         Instr::Invoke {
             action: InvokeAction::Reg(0),
-            dst: Some(1),
         },
         Instr::Halt,
     ]);
