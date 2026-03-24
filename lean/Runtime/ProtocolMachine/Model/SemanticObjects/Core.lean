@@ -11,8 +11,9 @@ without requiring theorem files to understand the executable data model.
 
 Solution Structure.
 This module defines the canonical semantic-object datatypes that mirror the Rust
-implementation vocabulary. The companion `Invariants` module states
-theorem-facing predicates over these objects.
+implementation vocabulary. The companion `Discipline` module states semantic
+predicates over these objects, and proof theorems over that discipline live
+under `Runtime/Proofs/ProtocolMachine/`.
 -/
 
 namespace Runtime.ProtocolMachine.Model

@@ -1,4 +1,5 @@
 import Runtime.ProtocolMachine.Runtime.Monitor
+import Runtime.Proofs.ProtocolMachine.MonitorContracts
 import Runtime.ProtocolMachine.Model.UnitModel
 import Runtime.Proofs.EffectBisim.Bridge
 import Runtime.Proofs.EffectBisim.ConfigEquivBridge
@@ -38,8 +39,8 @@ def handler_invoke_typed
 /-- Premise bundle for protocol-machine bridge theorems.
 
 Premise inventory:
-1. `monitorSound` maps to `monitor_sound` in `Runtime/ProtocolMachine/Runtime/Monitor.lean`.
-2. `monitorPreserves` maps to `unified_monitor_preserves` in `Runtime/ProtocolMachine/Runtime/Monitor.lean`.
+1. `monitorSound` maps to `monitor_sound` in `Runtime/Proofs/ProtocolMachine/MonitorContracts.lean`.
+2. `monitorPreserves` maps to `unified_monitor_preserves` in `Runtime/Proofs/ProtocolMachine/MonitorContracts.lean`.
 3. `handlerTyping` is discharged by `WellTypedInstr.wt_invoke` from the same monitor layer.
 
 Bridge transport used by end-to-end theorems:

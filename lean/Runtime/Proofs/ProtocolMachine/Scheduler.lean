@@ -1,4 +1,5 @@
 import Runtime.ProtocolMachine.Runtime.Scheduler
+import Runtime.Proofs.ProtocolMachine.SchedulerContracts
 
 set_option autoImplicit false
 

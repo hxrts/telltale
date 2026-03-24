@@ -1,4 +1,5 @@
 import Runtime.ProtocolMachine.Model
+import Runtime.Proofs.ProtocolMachine.Effects
 
 set_option autoImplicit false
 
@@ -76,8 +77,7 @@ theorem boundedAuthoritativeEffect_legal :
 theorem reentrantObservationEffect_legal :
     reentrantObservationEffect.architecturallyLegal := by
   constructor
-  · intro _
-    intro hAuthoritative
+  · intro _ hAuthoritative
     cases hAuthoritative
   constructor
   · intro hBestEffort

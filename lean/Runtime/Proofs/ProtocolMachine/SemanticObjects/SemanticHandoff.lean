@@ -1,12 +1,12 @@
 import Protocol.Coherence.ErasureCharacterization
 import Runtime.Adequacy.EnvelopeCore.ReconfigurationBridge
-import Runtime.ProtocolMachine.Model.SemanticObjects.OutstandingEffectsLemmas
+import Runtime.Proofs.ProtocolMachine.SemanticObjects.OutstandingEffects
 import Runtime.ProtocolMachine.Model.SemanticObjects.SemanticHandoffTransition
 
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.SemanticHandoffLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.SemanticHandoff
 
 The Problem.
 The semantic handoff model needs theorem-facing consequences: one owner before /

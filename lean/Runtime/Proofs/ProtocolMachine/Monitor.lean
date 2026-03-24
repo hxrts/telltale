@@ -1,4 +1,4 @@
-import Runtime.ProtocolMachine.Runtime.Monitor
+import Runtime.Proofs.ProtocolMachine.MonitorContracts
 
 set_option autoImplicit false
 

@@ -1,10 +1,10 @@
-import Runtime.ProtocolMachine.Model.SemanticObjects.OutstandingEffectsLemmas
+import Runtime.Proofs.ProtocolMachine.SemanticObjects.OutstandingEffects
 import Runtime.ProtocolMachine.Model.SemanticObjects.ReplayFailureExactness
 
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.ReplayFailureExactnessLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.ReplayFailureExactness
 
 The Problem.
 Replay/failure exactness needs theorem-facing consequences: replay-stable

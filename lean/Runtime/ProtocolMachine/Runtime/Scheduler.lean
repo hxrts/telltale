@@ -3,5 +3,5 @@ import Runtime.ProtocolMachine.Runtime.SchedulerStep
 
 /-! # Scheduler Model
 
-Barrel import for scheduler helpers and step/contracts.
+Barrel import for executable scheduler helpers and stepping.
 -/

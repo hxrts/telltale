@@ -3,23 +3,15 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.Core
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.Invariants
+# Runtime.ProtocolMachine.Model.SemanticObjects.Discipline
 
-The Problem.
-The protocol-machine semantic objects need theorem-facing invariants for
-identity, ownership, and non-authoritative observations. Those invariants should
-live above the implementation definitions rather than being mixed into the core
-datatype module.
+Semantic-object predicate surface for the protocol-machine model.
 
-Solution Structure.
-This module states reusable predicates over the canonical semantic objects and a
-small helper theorem surface. Later phases can refine these predicates into
-stronger adequacy and transport results.
+This file intentionally contains semantic predicates only. Proof theorems over
+these predicates live under `Runtime/Proofs/ProtocolMachine/`.
 -/
 
 namespace Runtime.ProtocolMachine.Model
-
-/-! ## Object-Level Predicates -/
 
 def OperationPhase.requiresActiveOwner : OperationPhase → Prop
   | .pending | .blocked => True
@@ -49,8 +41,6 @@ def AuthoritativeRead.hasAuthorityContext (read : AuthoritativeRead) : Prop :=
   read.ownerId.isSome ∨ read.witnessId.isSome ∨ read.generation.isSome
 
 def ObservedRead.isNonAuthoritative (_read : ObservedRead) : Prop := True
-
-/-! ## Aggregate Invariants -/
 
 def ProtocolMachineSemanticObjects.explicitOperationIdentity
     (objects : ProtocolMachineSemanticObjects) : Prop :=
@@ -102,24 +92,5 @@ def ProtocolMachineSemanticObjects.coreSemanticObjectInvariants
   objects.explicitHandoffs ∧
   objects.nonAuthoritativeObservedReads ∧
   objects.disjointReadIdentities
-
-/-! ## Helper Theorems -/
-
-theorem uniqueSemanticOwner_of_mem
-    {objects : ProtocolMachineSemanticObjects}
-    {operation₁ operation₂ : OperationInstance}
-    (hUnique : objects.uniqueSemanticOwner)
-    (hMem₁ : operation₁ ∈ objects.operationInstances)
-    (hMem₂ : operation₂ ∈ objects.operationInstances)
-    (hId : operation₁.operationId = operation₂.operationId)
-    (hOwner₁ : operation₁.phase.requiresActiveOwner)
-    (hOwner₂ : operation₂.phase.requiresActiveOwner) :
-    operation₁.ownerId = operation₂.ownerId :=
-  hUnique operation₁ hMem₁ operation₂ hMem₂ hId hOwner₁ hOwner₂
-
-theorem observedRead_is_non_authoritative
-    {read : ObservedRead} :
-    read.isNonAuthoritative :=
-  trivial
 
 end Runtime.ProtocolMachine.Model

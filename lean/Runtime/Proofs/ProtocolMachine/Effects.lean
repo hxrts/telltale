@@ -3,12 +3,11 @@ import Runtime.ProtocolMachine.Model.Effects
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.EffectsLemmas
+# Runtime.Proofs.ProtocolMachine.Effects
 
 The Problem.
-Effect admissibility, timeout discipline, retry rules, and reentrancy were
-previously carried only as metadata. The proof layer needs direct theorems over
-that metadata so architectural legality is not left to prose.
+The proof layer needs direct theorems over effect admissibility, timeout discipline,
+retry rules, and reentrancy that metadata so architectural legality is not left to prose.
 
 Solution Structure.
 This module proves legality consequences for effect-interface metadata and a

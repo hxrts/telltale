@@ -1,5 +1,5 @@
 import Runtime.ProtocolMachine.Model.SemanticObjects.Core
-import Runtime.ProtocolMachine.Model.SemanticObjects.Invariants
+import Runtime.ProtocolMachine.Model.SemanticObjects.Discipline
 
 set_option autoImplicit false
 

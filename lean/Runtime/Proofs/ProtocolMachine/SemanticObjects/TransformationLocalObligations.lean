@@ -5,7 +5,7 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.TransformationLocalObligati
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.TransformationLocalObligationsLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.TransformationLocalObligations
 
 The Problem.
 The transformation-local bundle layer needs theorem-facing consequences:

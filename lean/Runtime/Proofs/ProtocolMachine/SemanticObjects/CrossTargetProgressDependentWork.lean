@@ -3,7 +3,7 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.CrossTargetProgressDependen
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.CrossTargetProgressDependentWorkLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.CrossTargetProgressDependentWork
 
 The Problem.
 Cross-target progress semantics and dependent-work composition need theorem-

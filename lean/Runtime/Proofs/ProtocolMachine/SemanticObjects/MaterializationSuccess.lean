@@ -3,7 +3,7 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.MaterializationSuccess
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.MaterializationSuccessLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.MaterializationSuccess
 
 The Problem.
 The success/materialization model needs theorem-facing consequences: targeted

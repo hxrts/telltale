@@ -1,4 +1,5 @@
 import Runtime.ProtocolMachine.Model
+import Runtime.Proofs.ProtocolMachine.SemanticObjects.ReplayFailureExactness
 
 set_option autoImplicit false
 

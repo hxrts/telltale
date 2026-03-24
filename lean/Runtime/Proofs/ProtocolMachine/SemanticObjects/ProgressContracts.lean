@@ -3,7 +3,7 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.ProgressContracts
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.ProgressContractsLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.ProgressContracts
 
 The Problem.
 The progress-contract model needs theorem-facing consequences: owner-internal

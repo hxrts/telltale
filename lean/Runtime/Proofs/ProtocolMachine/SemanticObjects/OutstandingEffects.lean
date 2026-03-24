@@ -4,7 +4,7 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.OutstandingEffects
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.OutstandingEffectsLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.OutstandingEffects
 
 The Problem.
 The outstanding-effect lifecycle rules need theorem-facing consequences: when an

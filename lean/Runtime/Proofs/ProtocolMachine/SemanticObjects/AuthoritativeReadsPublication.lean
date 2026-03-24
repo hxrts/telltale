@@ -3,7 +3,7 @@ import Runtime.ProtocolMachine.Model.SemanticObjects.AuthoritativeReadsPublicati
 set_option autoImplicit false
 
 /-!
-# Runtime.ProtocolMachine.Model.SemanticObjects.AuthoritativeReadsPublicationLemmas
+# Runtime.Proofs.ProtocolMachine.SemanticObjects.AuthoritativeReadsPublication
 
 The Problem.
 The read/publication model needs theorem-facing consequences: observed reads

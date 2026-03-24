@@ -600,11 +600,9 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | State.lean | 304 | Full machine state, session table, buffer management |
 | Program.lean | 137 | Program representation and code segments |
 | SemanticObjects/Core.lean | 241 | Canonical protocol-machine semantic object implementation layer |
-| SemanticObjects/Invariants.lean | 120 | Basic theorem-facing predicates for identity, ownership, and observed-read discipline |
+| SemanticObjects/Discipline.lean | 96 | Semantic-object predicate surface for identity, ownership, and observed-read discipline |
 | SemanticObjects/OutstandingEffects.lean | 132 | Deferred-effect lifecycle model: issuance, blocking, completion, timeout, cancellation, invalidation, retry |
-| SemanticObjects/OutstandingEffectsLemmas.lean | 113 | Admissibility, late-result rejection, and observer / `EffectBisim` lemmas for outstanding effects |
 | SemanticObjects/SemanticHandoffTransition.lean | 134 | Semantic handoff realization for owner transfer, dependent work, effect transport, and publication authority |
-| SemanticObjects/SemanticHandoffLemmas.lean | 153 | One-owner-before/after, publication revocation, and delegation / envelope bridge lemmas |
 | SemanticObjects.lean | 9 | Re-export facade for semantic object implementation + invariants |
 | TypeClasses.lean | 251 | Identity, guard, persistence, effect, verification model typeclasses |
 | CompileLocalTypeR.lean | 190 | Compiler from LocalTypeR to protocol machine bytecode instructions |
@@ -631,17 +629,18 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 
 ### Protocol Machine Runtime (ProtocolMachine/Runtime/)
 
-Executable runtime surface used for Lean↔Rust parity. Proof theorems and proof-only
-predicate vocabularies now live under `Runtime/Proofs/ProtocolMachine/`.
+Executable runtime surface used for Lean↔Rust parity. Proof theorems and
+proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
 | Loader.lean | 234 | Dynamic choreography loading into running protocol machine state (result-typed admission + compatibility API) |
 | Runner.lean | 104 | N-concurrent scheduler-driven execution loop |
 | ThreadedRunner.lean | 445 | V2: Deterministic threaded execution with wave planning |
-| Scheduler.lean | 294 | Process scheduler with fairness and priority |
+| Scheduler.lean | 294 | Barrel import for executable scheduler helpers and stepping |
 | SchedulerHelpers.lean | 386 | Shared scheduler utility functions |
-| Monitor.lean | 181 | SessionKind, WellTypedInstr judgment, unified session monitor (executable monitor only) |
+| SchedulerStep.lean | 78 | Executable scheduler step orchestration only; proof contracts moved out |
+| Monitor.lean | 163 | SessionKind, WellTypedInstr judgment, unified session monitor (executable monitor only) |
 | Failure.lean | 40 | Failure runtime facade (executable symbols only) |
 | Failure/Core.lean | 418 | Failure modes (crash/partition/heal/corrupt/timeout), ingress updates, deterministic recovery actions |
 | Failure/Transitions.lean | 201 | Deterministic recovery transition helpers and mode classifiers |
@@ -689,13 +688,25 @@ predicate vocabularies now live under `Runtime/Proofs/ProtocolMachine/`.
 | File | Lines | Description |
 |------|------:|-------------|
 | Proofs/ProtocolMachine/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
+| Proofs/ProtocolMachine/Effects.lean | 101 | Effect admissibility and reentrancy theorem layer moved out of the protocol-machine model tree |
 | Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
+| Proofs/ProtocolMachine/MonitorContracts.lean | 23 | Proof-only monitor contract predicates moved out of `Runtime/ProtocolMachine/Runtime/Monitor.lean` |
+| Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |
+| Proofs/ProtocolMachine/SchedulerContracts.lean | 91 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
 | Proofs/ProtocolMachine/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
+| Proofs/ProtocolMachine/SemanticObjects/Invariants.lean | 37 | Theorem layer over semantic-object discipline predicates |
+| Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean | 116 | Outstanding-effect admissibility, late-result rejection, and observer / `EffectBisim` lemmas |
+| Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean | 171 | Semantic-handoff theorems and delegation / envelope bridge lemmas |
+| Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean | 185 | Authoritative-read/publication theorems and observer-projection consequences |
+| Proofs/ProtocolMachine/SemanticObjects/MaterializationSuccess.lean | 156 | Success/materialization theorem layer |
+| Proofs/ProtocolMachine/SemanticObjects/ProgressContracts.lean | 189 | Progress-contract theorem layer and compatibility obligations |
+| Proofs/ProtocolMachine/SemanticObjects/ReplayFailureExactness.lean | 131 | Replay/failure exactness theorem layer |
+| Proofs/ProtocolMachine/SemanticObjects/CrossTargetProgressDependentWork.lean | 107 | Cross-target progress and dependent-work theorem layer |
+| Proofs/ProtocolMachine/SemanticObjects/TransformationLocalObligations.lean | 176 | Transformation-local obligation theorems and deployment/reconfiguration bridges |
 | Proofs/ProtocolMachine/DomainComposition.lean | 49 | Domain composition and guard chain proofs |
 | Proofs/ProtocolMachine/ExecOwnership.lean | 22 | Ownership transfer proof bridge |
 | Proofs/ProtocolMachine/LoadChoreography.lean | 83 | Loader monotonicity and choreography-load disjointness proofs |
 | Proofs/ProtocolMachine/Knowledge.lean | 20 | Flow-policy serialization roundtrip theorems moved from `Runtime.protocol machine.Model.Knowledge` |
-| Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime.protocol machine.Runtime.Monitor` |
 | Proofs/ProtocolMachine/Failure.lean | 53 | Retry/deterministic recovery lemmas moved from failure runtime modules |
 | Proofs/ProtocolMachine/FailurePredicates.lean | 135 | Recovery predicate vocabulary (proof-only) moved from protocol machine failure runtime |
 | Proofs/ProtocolMachine/ProgramWitnesses.lean | 21 | Proof-only verified image witnesses moved from `Runtime.protocol machine.Model.Program` |

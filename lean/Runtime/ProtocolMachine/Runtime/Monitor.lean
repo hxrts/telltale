@@ -21,8 +21,6 @@ Monitor consistency across session kinds.
 - `SessionKind` — protocol, guard, handler, ghost
 - `WellTypedInstr` — unified typing judgment
 - `SessionMonitor` — monitor state tracking all session kinds
-- `monitor_sound`, `unified_monitor_preserves`
-- `cross_kind_interop`
 
 Failure model definitions live in `Runtime.ProtocolMachine.Runtime.Failure`.
 
@@ -160,21 +158,6 @@ def monitorAllows {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     roles.length == dsts.length
   | _ => true
 
-/-! ## Monitor Meta-Properties -/
-
-def monitor_sound {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (m : SessionMonitor γ) : Prop :=
-  -- Pure control flow instructions are always accepted by the monitor.
-  ∀ (i : Instr γ ε), instrNeedsSession i = false → monitorAllows m i = true
-
-def unified_monitor_preserves {γ : Type u} (m : SessionMonitor γ) : Prop :=
-  -- Monitor steps preserve protocol session ids when present.
-  ∀ sk sk', m.step sk = some sk' → SessionKind.sid? sk' = SessionKind.sid? sk
-
-def cross_kind_interop {γ : Type u} (m : SessionMonitor γ) : Prop :=
-  -- Distinct session kinds step independently of protocol ids.
-  ∀ sk1 sk2, sk1 ≠ sk2 →
-    SessionKind.sid? sk1 = none ∨ SessionKind.sid? sk2 = none ∨ SessionKind.sid? sk1 ≠ SessionKind.sid? sk2 →
-    (m.step sk1).isSome → (m.step sk2).isSome
-
-/-! Canonical monitor lemmas are in `Runtime.Proofs.ProtocolMachine.Monitor`. -/
+/-! Proof-facing monitor contracts and lemmas are in
+`Runtime.Proofs.ProtocolMachine.MonitorContracts` and
+`Runtime.Proofs.ProtocolMachine.Monitor`. -/
