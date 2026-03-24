@@ -1,7 +1,6 @@
 //! Time domain boundary lint.
-//!
 //! Flags direct wall-clock and timer primitives in deterministic
-//! runtime scope where time should be injected through effects.
+//! runtime paths where time must be injected through effects.
 
 use std::path::Path;
 
@@ -12,7 +11,13 @@ use syn::ExprCall;
 
 use crate::common::{call_path_string, file_matches_suffix, format_violation};
 
+/// Walk the AST looking for function calls that read the system
+/// clock or create timers. The protocol machine and simulator must
+/// receive time through explicit effect injection so that replay
+/// and cross-target equivalence are preserved.
 pub(crate) fn scan(file: &Path, syntax: &syn::File) -> Vec<String> {
+    // Bridge runner files legitimately interact with wall-clock time
+    // to drive the Lean binary subprocess.
     const ALLOWED_SUFFIXES: &[&str] = &[
         "rust/bridge/src/runner.rs",
         "rust/bridge/src/protocol_machine_runner.rs",
@@ -36,6 +41,7 @@ pub(crate) fn scan(file: &Path, syntax: &syn::File) -> Vec<String> {
 
     impl<'ast> Visit<'ast> for Visitor<'_> {
         fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+            // Match both fully-qualified and short forms of clock/timer calls.
             if let Some(path) = call_path_string(&node.func) {
                 if matches!(
                     path.as_str(),

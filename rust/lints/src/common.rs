@@ -1,4 +1,6 @@
-//! Shared utility functions for lint checks.
+//! Shared utilities used across all lint modes.
+//! Provides path normalization, violation formatting, and AST
+//! predicates for type classification and attribute inspection.
 
 use std::env;
 use std::path::Path;
@@ -7,6 +9,7 @@ use proc_macro2::Span;
 use quote::ToTokens;
 use syn::{Expr, ReturnType, Type};
 
+/// Strip the repo root prefix so violations print relative paths.
 pub(crate) fn display_path(file: &Path) -> String {
     if let Ok(root) = env::current_dir() {
         if let Ok(relative) = file.strip_prefix(&root) {
@@ -16,6 +19,8 @@ pub(crate) fn display_path(file: &Path) -> String {
     file.to_string_lossy().into_owned()
 }
 
+/// Test-like paths are excluded from most lint modes since test
+/// code intentionally exercises patterns the lints forbid.
 pub(crate) fn is_test_like_path(path: &str) -> bool {
     path.contains("/tests/")
         || path.contains("/benches/")
@@ -29,6 +34,7 @@ pub(crate) fn has_must_use(attrs: &[syn::Attribute]) -> bool {
     attrs.iter().any(|attr| attr.path().is_ident("must_use"))
 }
 
+/// Format a violation with file:line:col location from a proc_macro2 span.
 pub(crate) fn format_violation(file: &Path, span: Span, message: impl Into<String>) -> String {
     let start = span.start();
     format!(
@@ -78,6 +84,8 @@ pub(crate) fn is_integer_type(ty: &Type) -> bool {
     }
 }
 
+/// Constants with these suffixes carry their units in their name,
+/// so the constant-units lint does not flag them.
 pub(crate) fn has_allowed_constant_suffix(name: &str) -> bool {
     const ALLOWED_SUFFIXES: &[&str] = &[
         "_MS",
@@ -98,6 +106,8 @@ pub(crate) fn has_allowed_constant_suffix(name: &str) -> bool {
     ALLOWED_SUFFIXES.iter().any(|suffix| name.ends_with(suffix))
 }
 
+/// Extract the fully-qualified call path from a function call expression,
+/// collapsing whitespace so `std :: thread :: sleep` becomes `std::thread::sleep`.
 pub(crate) fn call_path_string(expr: &Expr) -> Option<String> {
     match expr {
         Expr::Path(path) => Some(path.path.to_token_stream().to_string().replace(' ', "")),
@@ -111,6 +121,8 @@ pub(crate) fn returns_non_unit(sig: &syn::Signature) -> bool {
     !matches!(sig.output, ReturnType::Default)
 }
 
+/// Result and Option already carry implicit must-use semantics,
+/// so builder methods returning them do not need an extra annotation.
 pub(crate) fn return_type_is_already_must_use(sig: &syn::Signature) -> bool {
     match &sig.output {
         ReturnType::Type(_, ty) => match ty.as_ref() {

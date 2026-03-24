@@ -1,6 +1,5 @@
 //! Style boundary lints.
-//!
-//! Checks for serialization hygiene, blocking lock boundaries,
+//! Enforces serialization hygiene, blocking lock boundaries,
 //! builder method annotations, and constant naming conventions.
 
 use std::path::Path;
@@ -17,11 +16,16 @@ use crate::common::{
     is_test_like_path, return_type_is_already_must_use, returns_non_unit,
 };
 
+/// Dispatch all style sub-checks for a single file. Each sub-check
+/// applies its own scope filter, so the dispatch itself only skips
+/// test-like paths that no sub-check cares about.
 pub(crate) fn scan(file: &Path, source: &str, syntax: &syn::File) -> Vec<String> {
     let path = display_path(file);
     let mut violations = Vec::new();
 
     if !is_test_like_path(&path) {
+        // Bincode calls must go through the canonical serialization
+        // module to keep wire format changes centralized.
         if path.starts_with("rust/machine/src/")
             && !path.ends_with("rust/machine/src/serialization.rs")
         {
@@ -38,6 +42,9 @@ pub(crate) fn scan(file: &Path, source: &str, syntax: &syn::File) -> Vec<String>
 }
 
 // ── Blocking lock boundaries ─────────────────────────────────────
+// Mutex and RwLock types break determinism in the single-threaded
+// protocol machine. Only the threaded backend and a few simulator
+// modules may use them.
 
 fn scan_blocking_lock_boundaries(file: &Path, source: &str) -> Vec<String> {
     const ALLOWED_PREFIXES: &[&str] = &["rust/machine/src/threaded/"];
@@ -84,6 +91,8 @@ fn scan_blocking_lock_boundaries(file: &Path, source: &str) -> Vec<String> {
 }
 
 // ── Canonical bincode ────────────────────────────────────────────
+// All bincode calls must route through the crate::serialization
+// module so wire-format versioning stays in one place.
 
 fn scan_canonical_bincode(file: &Path, syntax: &syn::File) -> Vec<String> {
     struct Visitor<'a> {
@@ -126,6 +135,8 @@ fn scan_canonical_bincode(file: &Path, syntax: &syn::File) -> Vec<String> {
 }
 
 // ── Serialized usize ─────────────────────────────────────────────
+// usize is platform-dependent and must not appear in serialized
+// types. Cross-target parity requires fixed-width integers.
 
 fn scan_serialized_usize(file: &Path, syntax: &syn::File) -> Vec<String> {
     const SERIALIZED_USIZE_SCOPE: &[&str] = &[
@@ -212,6 +223,8 @@ fn has_serde_derive(attrs: &[syn::Attribute]) -> bool {
 }
 
 // ── Builder #[must_use] ──────────────────────────────────────────
+// Public builder methods (with_* / try_with_*) that return a value
+// must be annotated #[must_use] to prevent silent configuration drops.
 
 fn scan_builder_must_use(file: &Path, syntax: &syn::File) -> Vec<String> {
     let mut violations = Vec::new();
@@ -256,6 +269,8 @@ fn maybe_flag_builder_method_without_must_use(
 }
 
 // ── Constant unit suffixes ───────────────────────────────────────
+// SCREAMING_CASE integer constants must carry a unit suffix like
+// _MS, _BYTES, or _COUNT to prevent ambiguous magic numbers.
 
 fn scan_constant_units(file: &Path, syntax: &syn::File) -> Vec<String> {
     let mut violations = Vec::new();

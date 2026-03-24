@@ -1,4 +1,6 @@
-//! Repo-local AST lint checks for Telltale boundary policies.
+//! Entry point for Telltale boundary lint checks.
+//! Parses a lint mode and file paths from the CLI, collects Rust
+//! source files, and dispatches to the appropriate AST scanner.
 
 mod common;
 mod session_ingress;
@@ -10,6 +12,8 @@ use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Each mode corresponds to a shell script in `scripts/check/` that
+/// invokes this binary with the mode name and a set of directories.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     SessionIngress,
@@ -54,6 +58,8 @@ fn run() -> Result<(), String> {
         return Err("expected at least one path to scan".to_string());
     }
 
+    // Recursively collect .rs files from all supplied paths, then
+    // deduplicate so overlapping directory arguments don't double-scan.
     let mut rust_files = Vec::new();
     for path in &paths {
         collect_rust_files(path, &mut rust_files)?;
@@ -61,6 +67,8 @@ fn run() -> Result<(), String> {
     rust_files.sort();
     rust_files.dedup();
 
+    // Parse each file into a syn AST and run the mode-specific scanner.
+    // All scanners return a flat list of violation strings.
     let mut violations = Vec::new();
     for file in &rust_files {
         let source = fs::read_to_string(file)
