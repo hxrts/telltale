@@ -122,11 +122,11 @@ The first expression creates a global type matching Lean's `GlobalType.comm "Cli
 
 This crate is located in `rust/theory/`. It implements pure algorithms for session type operations. The crate performs no IO or parsing.
 
-The `projection` module handles `GlobalType` to `LocalTypeR` projection with merging. The `merge` module implements branch merging with distinct semantics for send and receive. Send merge requires identical label sets. Receive merge unions labels. This matches Lean's `mergeSendSorted` and `mergeRecvSorted` functions.
+#### Modules
 
-The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates.
+The `projection` module handles `GlobalType` to `LocalTypeR` projection with merging. The `merge` module implements branch merging where send merge requires identical label sets and receive merge unions labels. This matches Lean's `mergeBranchesSend` and `mergeBranchesRecv` functions.
 
-The `duality` module computes dual types. The `bounded` module implements bounded recursion strategies.
+The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates. The `duality` module computes dual types and the `bounded` module implements bounded recursion strategies.
 
 Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](20_content_addressing.md) for details.
 
@@ -168,11 +168,15 @@ The canonical public entry modules are `telltale_vm::protocol_machine`,
 `vm` and `threaded` modules still exist as implementation modules, but they are
 not the architectural front door.
 
+#### Instruction Set and Modules
+
 The `instr` module defines the bytecode instruction set. Communication instructions include `Send`, `Receive`, `Offer`, and `Choose`. Session lifecycle uses `Open` and `Close`.
 
 Effect and guard execution uses `Invoke`, `Acquire`, and `Release`. Speculation and ownership support uses `Fork`, `Join`, `Abort`, `Transfer`, `Tag`, and `Check`. Control flow uses `Set`, `Move`, `Jump`, `Spawn`, `Yield`, and `Halt`.
 
 The `coroutine` module defines lightweight execution units. Each coroutine has a program counter, register file, and status. Each coroutine stores its session ID, role, and bytecode program.
+
+#### Scheduling, Sessions, and Loading
 
 The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, `Priority`, and `ProgressAware`.
 
@@ -188,13 +192,15 @@ let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);
 let _session: OwnedSession =
     machine.load_choreography_owned(&image, "runtime/owner")?;
-while machine.step(&handler)? {}
+let _status = machine.run(&handler, 1000)?;
 
 let mut guest = GuestRuntime::new(ProtocolMachineConfig::default());
 let _owned = guest.load_choreography_owned(&image, "runtime/owner")?;
 ```
 
-The first line creates a protocol machine with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line steps the protocol machine to completion with an external handler. The final two lines show the higher-level guest-runtime surface that wraps the protocol machine for host integration.
+The first line creates a protocol machine with default configuration. The second line creates a code image from local types. The third line opens the choreography and binds the current host owner. The fourth line runs the protocol machine to completion with an external handler and step limit.
+
+The final two lines show the higher-level guest-runtime surface that wraps the protocol machine for host integration.
 
 ### telltale-simulator
 
@@ -204,9 +210,11 @@ The `runner` module provides `run`, `run_concurrent`, and `run_with_scenario` fo
 
 The `ChoreographySpec` struct packages a choreography for simulation. It includes local types, global type, and initial state vectors. The `Trace` type collects step records during execution.
 
-The `harness` module adds high level integration APIs for third party projects. It exports `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, and `SimulationHarness`. The `contracts` module exports reusable post run checks for replay coherence and expected role coverage.
+#### Harness and Material Handlers
 
-Material-model handlers are grouped in `rust/simulator/src/material_handlers/`. The crate re-exports `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, and `handler_from_material` from this module for runtime selection by scenario material type.
+The `harness` module adds integration APIs for third-party projects. It exports `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, and `SimulationHarness`. The `contracts` module exports reusable post-run checks for replay coherence and expected role coverage.
+
+Material-model handlers are grouped in `rust/simulator/src/material_handlers/`. The crate re-exports `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, and `handler_from_material` from this module.
 
 ```rust
 use telltale_simulator::runner::{run, ChoreographySpec};
@@ -219,9 +227,7 @@ let spec = ChoreographySpec {
 let trace = run(&spec.local_types, &spec.global_type, &spec.initial_states, 100, &handler)?;
 ```
 
-The `run` function executes a choreography and returns a trace. The trace contains step records for each role at each step.
-
-The simulator crate also ships a CLI entrypoint in `rust/simulator/src/bin/run.rs`. Use `just sim-run <config>` for a single config file execution path.
+The `run` function executes a choreography and returns a trace. The trace contains step records for each role at each step. The simulator crate also ships a CLI entrypoint in `rust/simulator/src/bin/run.rs`.
 
 ### telltale-choreography
 
@@ -229,23 +235,27 @@ This crate is located in `rust/choreography/`. It provides DSL and parsing for c
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation.
 
-The parser supports proof-bundle declarations and protocol bundle requirements. Parsed bundles are stored as typed metadata on `Choreography` through `ProofBundleDecl`.
+#### Parser Features
 
-The parser supports enriched proof-bundle fields (`version`, `issuer`, `constraint`). It also supports capability inference that can auto-select required bundles when protocol `requires` is omitted.
+The parser supports proof-bundle declarations with enriched fields (`version`, `issuer`, `constraint`). Parsed bundles are stored as typed metadata on `Choreography` through `ProofBundleDecl`. Capability inference can auto-select required bundles when protocol `requires` is omitted.
 
-The parser supports protocol-machine-core statements such as `acquire`, `transfer`, `fork`, and `check`. These statements lower to `Protocol::Extension` nodes with annotations that record operation kind, operands, and required capability. Projection preserves continuation projection when it encounters these extension nodes.
+Protocol-machine-core statements such as `acquire`, `transfer`, `fork`, and `check` lower to `Protocol::Extension` nodes. Annotations record operation kind, operands, and required capability. A linear usage checker rejects double-consume, consume-before-acquire, and branch divergence for delegation assets.
 
-The parser includes a linear usage checker for delegation assets introduced by `acquire`. It rejects double-consume, consume-before-acquire, and branch divergence for linear asset state.
+First-class combinators (`handshake`, `retry`, `quorum_collect`) and typed metadata for role-set and topology declarations (`role_set`, `cluster`, `ring`, `mesh`) are supported. Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`.
 
-The parser supports first-class combinators (`handshake`, `retry`, `quorum_collect`). It also supports typed metadata for top-level role-set and topology declarations (`role_set`, `cluster`, `ring`, `mesh`).
+#### Validation and Submodules
 
-Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`. Lint output includes fix suggestions and an LSP-style JSON rendering helper.
-
-Validation in this crate includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
+Validation includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for VM-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
 
 The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
 The `topology/` directory provides deployment configuration. See [Topology](22_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](21_resource_heap.md) for nullifier-based consumption tracking.
+
+### telltale-macros
+
+This crate is located in `rust/macros/`. It provides procedural macros for deriving session type constructs. The crate exports `choreography!`, `session`, `Role`, `Roles`, and `Message` macros.
+
+The `choreography!` macro parses inline DSL text and generates role types, message types, and session types at compile time. The `Role` and `Roles` derive macros generate `RoleId` trait implementations. The `Message` derive macro generates `Serialize` and `Deserialize` bindings for protocol messages.
 
 ### effect-scaffold
 
@@ -264,7 +274,7 @@ This crate is located in `rust/transport/`. It provides production transport imp
 
 The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-choreography`.
 
-### src
+### telltale (root crate)
 
 This crate is defined at the repository root and uses `rust/src/` as its library source path. It re-exports core APIs from `telltale-types`, `telltale-macros`, and optional `telltale-theory` features.
 

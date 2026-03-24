@@ -5,51 +5,28 @@ It handles JSON conversion, schema versioning, runner invocation, trace comparis
 
 The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-vm`, `telltale-theory`, and Lean runtime modules.
-Historical module/file names such as `vm_runner` and `vm_trace` still exist internally,
-but the canonical public bridge surface is the protocol-machine surface:
-`ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`,
-and `ProtocolMachineSemanticObjects`.
-Bridge payloads describe guest-runtime and protocol-machine artifacts. Host-runtime
-handlers remain outside the bridge and re-enter through typed effect surfaces.
-On the Lean side, the semantic-object implementation layer lives in
-`Runtime/VM/Model/SemanticObjects/Core.lean`, while theorem-facing predicates
-for identity, ownership, and observed-read discipline live in
-`Runtime/VM/Model/SemanticObjects/Invariants.lean`.
-Deferred-effect admissibility and stale late-result rejection now live in
-`Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, with a small
-observation / `EffectBisim` bridge in
-`Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
-Semantic handoff activation, publication transfer, and the explicit bridge to
-delegation / envelope-preservation theorem families now live in
-`Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean` and
-`Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
-Authoritative-read commitment contexts, canonical publication-path uniqueness,
-and observer-class publication projection now live in
-`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, with
-observer-projection / blindness / noninterference consequences in
-`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
-Proof-backed success contexts, materialization-proof adequacy, and
-canonical-handle adequacy now live in
-`Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`, with
-theorem-facing proof-less-success rejection and observational-materialization
-rejection in
-`Runtime/VM/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
-Progress-contract semantics now live in
-`Runtime/VM/Model/SemanticObjects/ProgressContracts.lean`, with theorem-facing
-owner-liveness, escalation, and compatibility lemmas for the existing
-Lyapunov/weighted-measure/scheduling-bound surfaces in
-`Runtime/VM/Model/SemanticObjects/ProgressContractsLemmas.lean`.
-Transformation-local obligation bundles now live in
-`Runtime/VM/Model/SemanticObjects/TransformationLocalObligations.lean`, with
-coverage/admissibility lemmas and lightweight linking / reconfiguration bridge
-structures in
-`Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
-The semantic-object theorem families are now attached to theorem-pack proof
-spaces through `Runtime/Proofs/InvariantSpace.lean` via
-`SemanticObjectWitnessBundle`, and the canonical inventory / contract surfaces
-for those attachment points live in `Runtime/Proofs/TheoremPack/API.lean`,
-`Runtime/Proofs/TheoremPack/Inventory.lean`, and
-`Runtime/Proofs/Contracts/RuntimeContracts.lean`.
+The canonical public bridge surface uses `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, and `ProtocolMachineSemanticObjects`.
+Historical module names such as `vm_runner` and `vm_trace` still exist internally.
+
+Bridge payloads describe guest-runtime and protocol-machine artifacts.
+Host-runtime handlers remain outside the bridge and re-enter through typed effect surfaces.
+
+On the Lean side, semantic-object modules live under `Runtime/VM/Model/SemanticObjects/`.
+
+| Module | Content |
+|---|---|
+| `Core.lean`, `Invariants.lean` | Identity, ownership, observed-read discipline predicates |
+| `OutstandingEffects.lean`, `OutstandingEffectsLemmas.lean` | Deferred-effect admissibility and stale late-result rejection |
+| `SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` | Semantic handoff activation, delegation bridge |
+| `AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` | Authoritative-read commitment, publication projection |
+| `MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` | Materialization-proof adequacy, canonical-handle adequacy |
+| `ProgressContracts.lean`, `ProgressContractsLemmas.lean` | Progress-contract semantics and escalation lemmas |
+| `TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` | Transformation-local obligation bundles |
+| `ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` | Replay-failure exactness |
+| `CrossTargetProgressDependentWork.lean`, `CrossTargetProgressDependentWorkLemmas.lean` | Cross-target progress and dependent work |
+
+Semantic-object theorem families attach to theorem-pack proof spaces through `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
+Canonical inventory and contract surfaces for those attachment points live in `Runtime/Proofs/TheoremPack/API.lean`, `Runtime/Proofs/TheoremPack/Inventory.lean`, and `Runtime/Proofs/Contracts/RuntimeContracts.lean`.
 
 ## Scope
 
@@ -343,6 +320,7 @@ Bridge tests in `rust/lean-bridge/tests` cover conversion, projection parity, sc
 Most Lean-dependent tests skip when Lean binaries are missing.
 
 - `coherence_tests.rs`
+- `generated_effect_schema.rs`
 - `golden_equivalence_tests.rs`
 - `invariant_verification.rs`
 - `lean_integration_tests.rs`
@@ -356,6 +334,7 @@ Most Lean-dependent tests skip when Lean binaries are missing.
 - `proptest_json_roundtrip.rs`
 - `proptest_projection.rs`
 - `schema_version_tests.rs`
+- `semantic_object_roundtrip.rs`
 - `semantics_verification.rs`
 - `vm_composition_stress.rs`
 - `vm_correspondence_tests.rs`

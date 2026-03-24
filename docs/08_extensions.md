@@ -237,7 +237,7 @@ parser.register_extension(MyGrammarExtension, MyStatementParser)?;
 let choreography = parser.parse_with_extensions(source)?;
 ```
 
-The `parse_with_extensions` method currently runs the standard parser and does not dispatch extension statements. Extension grammar rules are composed, but statement parsing dispatch is not yet completed.
+The `parse_with_extensions` method currently runs the standard parser and does not dispatch extension statements. Extension grammar rules are composed. Statement parsing dispatch is not yet completed.
 
 ### Extension Discovery
 

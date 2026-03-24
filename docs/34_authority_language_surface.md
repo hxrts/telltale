@@ -138,7 +138,7 @@ case readiness of
   | Err(reason) => ...
 ```
 
-Protocol-critical matches must be exhaustive, and implicit catch-all masking is rejected.
+Protocol-critical matches must be exhaustive. Implicit catch-all masking is rejected.
 
 ### Typed External Query
 

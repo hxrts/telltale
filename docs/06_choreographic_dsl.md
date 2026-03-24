@@ -2,9 +2,9 @@
 
 ## Overview
 
-The parser translates a layout-sensitive DSL into the internal AST (`Choreography` and `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks.
+The parser translates a layout-sensitive DSL into the internal AST (`Choreography` and `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks. Empty blocks must use `{}`.
 
-Empty blocks must use `{}`. The DSL does not use an explicit `end` keyword. A protocol ends when its block ends.
+The parser module is located in `rust/choreography/src/compiler/parser/`. It uses Pest plus a layout preprocessor. The canonical source-file extension for Telltale choreography files is `.tell`.
 
 The preferred surface style mixes MPST operators with a small functional-language layout:
 
@@ -15,15 +15,9 @@ The preferred surface style mixes MPST operators with a small functional-languag
 - use sender records like `Role { priority = high }`
 - use `Message of module.Type` with dotted paths instead of Rust-style `::`
 
-The parser module is located in `rust/choreography/src/compiler/parser/`. It provides an implementation of the choreography DSL parser using Pest plus a layout preprocessor.
-The canonical source-file extension for Telltale choreography files is `.tell`.
+### Scope
 
-The DSL describes protocol structure, role-local communication obligations, and
-protocol-critical authority checks.
-It does not model arbitrary host state or general application ownership.
-Session/fragment ownership boundaries are still derived at runtime, typically
-from composition/link metadata when available, but protocol-visible authority
-queries and evidence flow are now part of the language surface.
+The DSL describes protocol structure, role-local communication obligations, and protocol-critical authority checks. It does not model arbitrary host state or general application ownership. Session and fragment ownership boundaries are still derived at runtime from composition and link metadata when available. Protocol-visible authority queries and evidence flow are part of the language surface.
 
 The current DSL includes an authority-oriented surface for protocol-critical
 host queries and typed local branching:
@@ -36,10 +30,7 @@ host queries and typed local branching:
 - `timeout ... on timeout ... on cancel ...`
 - evidence guards of the form `when check Effect.op(...) yields witness`
 
-These forms are parser and AST level surfaces first. `let` is treated as
-local-only and projects through to the continuation. `case/of` and `timeout`
-are intentionally rejected by the current MPST projection pass until their
-projection rules are formalized explicitly.
+These forms are parser and AST level surfaces first. `let` is treated as local-only and projects through to the continuation. `case/of` and `timeout` are intentionally rejected by the current MPST projection pass. Their projection rules are not yet formalized.
 
 ## DSL Syntax
 
@@ -63,7 +54,7 @@ choreography! {
 }
 ```
 
-This form passes the DSL as normal macro tokens. Semicolons are still normalized when present, but the canonical surface is indentation-based rather than brace-block-based.
+This form passes the DSL as normal macro tokens. Semicolons are normalized when present. The canonical surface is indentation-based rather than brace-block-based.
 
 ### Namespaces
 
@@ -297,8 +288,8 @@ protocol TimedRequest =
 ```
 
 Use `timeout duration Role at` when deadline expiry is a protocol-visible
-outcome. The runtime enforces the deadline, and projection currently rejects
-this form explicitly until the authority-sensitive lowering story is complete.
+outcome. The runtime enforces the deadline. Projection currently rejects
+this form until the authority-sensitive lowering rules are complete.
 
 Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours).
 
@@ -685,13 +676,18 @@ This pattern matches common parse errors. It formats diagnostics with the report
 - Identifiers: `[a-zA-Z][a-zA-Z0-9_]*`
 - Integers: `[0-9]+`
 - Strings: `"..."` (used in `loop while`)
-- Keywords: `protocol`, `roles`, `case`, `choose`, `of`, `choice`, `at`, `loop`,
-  `decide`, `by`, `repeat`, `while`, `forever`, `branch`, `par`, `rec`, `call`, `where`,
+- Keywords: `protocol`, `roles`, `case`, `of`, `choice`, `at`, `loop`,
+  `decide`, `by`, `repeat`, `while`, `forever`, `par`, `rec`, `continue`, `call`, `where`,
   `module`, `import`, `exposing`, `proof_bundle`, `requires`, `acquire`, `release`,
-  `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`,
+  `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`, `as`, `to`, `from`, `with`, `bundle`,
   `version`, `issuer`, `constraint`, `handshake`, `retry`, `quorum_collect`, `min`,
-  `role_set`, `subset`, `cluster`, `ring`, `mesh`
-- Operators: `->`, `->*`, `:`, `{}`, `()`, `,`, `|`
+  `role_set`, `subset`, `cluster`, `ring`, `mesh`,
+  `let`, `in`, `type`, `alias`, `effect`, `uses`, `timeout`, `on`, `cancel`,
+  `when`, `yields`, `heartbeat`, `every`, `on_missing`, `body`,
+  `observe`, `authoritative`, `command`, `Ok`, `Err`, `Just`, `Nothing`, `Result`, `Maybe`, `Unit`,
+  `publish`, `handoff`, `dependent`, `work`, `required`, `for`,
+  `fragment`, `operation`, `within`, `guest`, `runtime`, `entry`
+- Operators: `->`, `->*`, `<->`, `:`, `=>`, `=`, `..`, `{}`, `()`, `[]`, `,`, `|`
 
 ### Comments
 

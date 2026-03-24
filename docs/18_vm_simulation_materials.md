@@ -1,7 +1,7 @@
 # Protocol-Machine Simulation Materials
 
 This page documents material handlers, distributed simulation, and post-run analysis.
-It also records current limits and test coverage.
+It records current limits and test coverage.
 
 ## Material Handlers
 
@@ -16,7 +16,7 @@ These handlers are constructed directly or through `handler_from_material`.
 
 ## Distributed Simulation
 
-`DistributedSimBuilder` constructs an outer protocol machine plus per-site inner protocol machines through `NestedVMHandler`.
+`DistributedSimBuilder` constructs an outer protocol machine and per-site inner protocol machines through `NestedVMHandler`.
 Each site owns a local set of `CodeImage` protocols and one effect handler.
 
 Build fails when site names do not match outer protocol roles.

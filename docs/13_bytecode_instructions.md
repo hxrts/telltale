@@ -74,7 +74,7 @@ All register operands are bounds-checked at runtime. Out-of-range reads or write
 
 `rust/vm/src/compiler.rs` exposes `compile(local_type: &LocalTypeR) -> Vec<Instr>`.
 
-The compiler emits communication instructions, `Invoke`, and control-flow instructions. It does not emit guard, speculation, or ownership opcodes.
+The compiler emits communication instructions, `Invoke`, and control-flow instructions. It does not emit session lifecycle, guard, speculation, or ownership opcodes.
 
 | `LocalTypeR` node | Emission pattern |
 |---|---|

@@ -19,7 +19,7 @@ pub struct ContentId<H: Hasher = Sha256Hasher> {
 }
 ```
 
-SHA-256 is the default hasher. You can provide a custom `Hasher` to trade off speed or proof system constraints.
+SHA-256 is the default hasher. A custom `Hasher` implementation can trade off speed or proof system constraints.
 
 ## Contentable
 
@@ -37,7 +37,7 @@ pub trait Contentable: Sized {
 
 ## Closed vs Open Terms
 
-`content_id` is defined for closed terms only. For open terms, use `template_id`, which includes an explicit free-variable interface in the serialized template envelope.
+`content_id` is defined for closed terms only. Open terms use `template_id`, which includes an explicit free-variable interface in the serialized template envelope.
 
 ```rust
 use telltale_types::{GlobalType, Label};
@@ -50,7 +50,7 @@ let template_id = open.template_id_sha256()?;
 let template_bytes = open.to_template_bytes()?;
 ```
 
-Template bytes and template IDs let you cache and compare partially specified protocols before all binders are resolved.
+Template bytes and template IDs enable caching and comparing partially specified protocols before all binders are resolved.
 
 ## Serialization Formats
 
@@ -65,8 +65,7 @@ let json_bytes = g.to_bytes()?;
 let cid = g.content_id_sha256()?;
 ```
 
-JSON and DAG-CBOR produce different content IDs for the same value. Choose one format consistently within a system.
-If you switch formats, treat that change as a cache-boundary event and regenerate persisted IDs.
+JSON and DAG-CBOR produce different content IDs for the same value. One format should be used consistently within a system. Switching formats is a cache-boundary event that requires regenerating persisted IDs.
 
 ## ContentStore
 
@@ -84,7 +83,7 @@ store.insert(&global, local.clone())?;
 let cached = store.get(&global)?;
 ```
 
-Use `KeyedContentStore` when you need an additional key alongside the content ID.
+`KeyedContentStore` adds an additional key alongside the content ID for composite lookups.
 
 ## Memoization Pattern
 

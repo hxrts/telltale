@@ -14,7 +14,7 @@ pub enum Location {
 }
 ```
 
-The `Local` variant means in process execution. The `Remote` variant stores a network endpoint. The `Colocated` variant ties a role to another role location.
+The `Local` variant means in-process execution. The `Remote` variant stores a network endpoint. The `Colocated` variant ties a role to another role location.
 
 Topology state holds role mappings, constraints, and optional mode shortcuts.
 
@@ -151,7 +151,7 @@ let handler = TopologyHandler::local(RoleName::from_static("Alice"));
 handler.initialize().await?;
 ```
 
-The local constructor sets `TopologyMode::Local` and creates in process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`.
+The local constructor sets `TopologyMode::Local` and creates in-process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`.
 
 Generated protocols include helpers under `Protocol::topology`, including `Protocol::topology::handler(role)` and `Protocol::topology::with_topology(topology, role)`. These return a `TopologyHandler` for the selected role.
 

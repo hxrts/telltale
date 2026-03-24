@@ -248,12 +248,9 @@ When the role receives the choice, the projection is `Branch`. When the role is 
 
 When a role is not involved in a choice, the projections of all branches must be merged. The merge algorithm follows precise semantics based on whether the role sends or receives.
 
-Send merge requires identical label sets. A non-participant cannot choose which message to send based on a choice they did not observe. If a role sends different messages in different branches, projection fails.
+Send merge requires identical label sets. A non-participant cannot choose which message to send based on a choice they did not observe. If a role sends different messages in different branches, projection fails. Receive merge unions label sets because a non-participant can receive any message regardless of which branch was taken.
 
-Receive merge unions label sets. A non-participant can receive any message regardless of which branch was taken. Different incoming messages in different branches are combined into a single receive with multiple labels.
-
-This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `lean/Choreography/Projection/`.
-Projection parity checks are exercised from `rust/lean-bridge/tests/projection_runner_tests.rs`.
+This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `lean/Choreography/Projection/`. Projection parity checks are exercised from `rust/lean-bridge/tests/projection_runner_tests.rs`.
 
 ### Parallel Composition
 

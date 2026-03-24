@@ -106,8 +106,8 @@ This creates an Alice handler.
 For coordinated testing between roles, use shared channels.
 
 ```rust
-let channels = Arc::new(Mutex::new(HashMap::new()));
-let choice_channels = Arc::new(Mutex::new(HashMap::new()));
+let channels = Arc::new(Mutex::new(BTreeMap::new()));
+let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
 
 let alice = InMemoryHandler::with_channels(Role::Alice, channels.clone(), choice_channels.clone());
 let bob = InMemoryHandler::with_channels(Role::Bob, channels.clone(), choice_channels.clone());
@@ -135,7 +135,7 @@ use telltale_choreography::RecordingHandler;
 let mut handler = RecordingHandler::new(Role::Alice);
 // ... execute protocol ...
 let events = handler.events();
-assert_eq!(events[0], RecordedEvent::Send { to: Role::Bob, ... });
+assert!(matches!(events[0], RecordedEvent::Send { from: Role::Alice, to: Role::Bob, .. }));
 ```
 
 The recorded events can be inspected in tests to verify protocol behavior.
@@ -249,16 +249,16 @@ impl ChoreoHandler for MyHandler {
     
     async fn send<M: Serialize + Send + Sync>(
         &mut self, ep: &mut Self::Endpoint, to: Self::Role, msg: &M
-    ) -> Result<()> {
+    ) -> ChoreoResult<()> {
         let conn = self.connections.get_mut(&to)?;
         let bytes = bincode::serialize(msg)?;
         conn.send(bytes).await?;
         Ok(())
     }
-    
+
     async fn recv<M: DeserializeOwned + Send>(
         &mut self, ep: &mut Self::Endpoint, from: Self::Role
-    ) -> Result<M> {
+    ) -> ChoreoResult<M> {
         let conn = self.connections.get_mut(&from)?;
         let bytes = conn.recv().await?;
         let msg = bincode::deserialize(&bytes)?;
@@ -291,13 +291,9 @@ For WASM network communication, implement a custom handler. Use web-sys WebSocke
 
 ## Parameterized Roles
 
-Parameterized roles remain a choreography-level feature of the DSL and AST.
-Projection and interpretation still require concrete role values at execution time.
+Parameterized roles remain a choreography-level feature of the DSL and AST. Projection and interpretation still require concrete role values at execution time. Wildcard, symbolic, and unresolved range forms are not interpreted directly by `ChoreoHandler`. Resolve participant sets during choreography construction or initialization, then build effect programs over concrete `RoleId` values.
 
-Wildcard, symbolic, and unresolved range forms are not interpreted directly by `ChoreoHandler`.
-Resolve participant sets during choreography construction or initialization, then build effect programs over concrete `RoleId` values.
-
-Topology constraints remain useful for validating concrete deployments.
+Topology constraints validate concrete deployments against role family bounds.
 
 ```rust
 use telltale_choreography::topology::{Topology, parse_topology};

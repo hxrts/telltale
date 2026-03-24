@@ -39,6 +39,8 @@ For reproducible local setup, install the same tool version used in CI.
 cargo install wasm-pack --version 0.14.0 --locked
 ```
 
+This installs the same `wasm-pack` version used in CI for reproducible builds.
+
 ```bash
 wasm-pack build --target web
 ```

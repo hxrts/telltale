@@ -1,11 +1,10 @@
 # Rust-Lean Parity
 
-This document defines the Lean/Rust parity contract for protocol-machine behavior,
-choreography projection, semantic-object schemas, and deviation governance.
+This document defines the Lean/Rust parity contract for protocol-machine behavior, choreography projection, semantic-object schemas, and deviation governance.
 
 ## Contract Levels
 
-Parity is enforced at two levels. Level 1 is policy/data shape parity for shared runtime encodings. Level 2 is behavior parity for executable traces under the declared concurrency envelope.
+Parity is enforced at two levels. Level 1 covers policy and data shape parity for shared runtime encodings. Level 2 covers behavior parity for executable traces under the declared concurrency envelope.
 
 ## Protocol-Machine Policy and Data Shapes
 
@@ -40,18 +39,18 @@ These checks are automated by `just check-parity --types`.
 
 These checks are automated by `just check-parity --suite`.
 
-Explicit failure, timeout, cancellation, and session-terminal events are now part of the executable Lean runtime/event inventory. Replay tagging, JSON serialization, and theorem-pack release conformance all use the same observable event family.
+Explicit failure, timeout, cancellation, and session-terminal events are part of the executable Lean runtime/event inventory.
+Replay tagging, JSON serialization, and theorem-pack release conformance all use the same observable event family.
 
-Language-level nominal `effect` declarations do not introduce a second runtime bridge. Their intended justification remains the existing protocol-machine `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
+Language-level nominal `effect` declarations do not introduce a second runtime bridge.
+Their intended justification remains the existing protocol-machine `invoke` boundary and handler-typing obligations in `Runtime/Proofs/VM/BridgeStrengthening.lean`.
 
-Typed effect requests and outcomes are now part of the parity surface directly.
-Rust and Lean must agree on effect-interface metadata, request bodies, outcome
-statuses, and replay-visible effect exchanges.
+Typed effect requests and outcomes are part of the parity surface directly.
+Rust and Lean must agree on effect-interface metadata, request bodies, outcome statuses, and replay-visible effect exchanges.
 
 ## Effect Interface Justification
 
-The language-level effect interface design follows the same proof boundary used
-by the MPST-plus-effects papers and the Lean runtime:
+The language-level effect interface design follows the same proof boundary used by the MPST-plus-effects papers and the Lean runtime.
 
 - typed effect obligations remain attached to the executable handler boundary,
   not to a separate host-only mechanism
@@ -71,7 +70,7 @@ This is why the current language design is nominal-first:
 
 ## Choreography Projection Parity
 
-The parity scope covers projection behavior from global choreography forms to local session forms. It covers `send`, `choice`, recursion, and merge behavior for non-participant branches. It does not cover Rust-only runtime conveniences or extension-only AST constructs.
+The parity scope covers projection behavior from global choreography forms to local session forms. This includes `send`, `choice`, recursion, and merge behavior for non-participant branches. Rust-only runtime conveniences and extension-only AST constructs are excluded.
 
 ### Shared Projection Semantics
 
@@ -99,12 +98,11 @@ Projection cross-validation is exercised through `rust/lean-bridge/tests/project
 
 ## State Schema
 
-Lean and Rust schemas remain shape-equivalent on safety-visible and replay-visible fields. Runtime-only helper fields are allowed when they do not alter observable semantics.
+Lean and Rust schemas remain shape-equivalent on safety-visible and replay-visible fields. Runtime-only helper fields are permitted when they do not alter observable semantics.
 
 ### Semantic Object Family
 
-The canonical cross-language semantic-object family must remain aligned between
-Lean, Rust, and the Rust/Lean bridge.
+The canonical cross-language semantic-object family must remain aligned between Lean, Rust, and the Rust/Lean bridge.
 
 | Object | Lean Surface | Rust Surface | Bridge Surface | Status |
 |---|---|---|---|---|
@@ -118,80 +116,57 @@ Lean, Rust, and the Rust/Lean bridge.
 | `ProgressTransition` | `Runtime/VM/Model/SemanticObjects/Core.lean` | `rust/vm/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
 | typed effect metadata / request / outcome model | `Runtime/VM/Model/Effects.lean` | `rust/vm/src/effect.rs` | `rust/lean-bridge/src/vm_runner.rs` (`effect_exchanges`) | Aligned |
 
-`OperationInstance` and `OutstandingEffect` are now compared as canonical
-runtime state, not as post-hoc derivations from generic effect-trace order.
-Parity on these objects therefore covers owner identity, phase/status,
-budget/invalidation fields, dependent-operation edges, and terminal
-publication state.
+`OperationInstance` and `OutstandingEffect` are compared as canonical runtime state, not as post-hoc derivations from generic effect-trace order.
+Parity on these objects covers owner identity, phase/status, budget/invalidation fields, dependent-operation edges, and terminal publication state.
 
-`SemanticHandoff` parity now also covers explicit owner revocation and
-activation (`revoked_owner_id`, `activated_owner_id`).
-`TransformationObligation` parity covers transformed fragments, affected
-operations/effects, transport vs invalidation policy, and publication transfer
-or revocation. Bridge-side execution comparison reports these handoff and
-invalidation surfaces separately from raw trace equivalence so stale-owner and
-late-result mismatches do not hide inside otherwise equivalent instruction
-traces.
+`SemanticHandoff` parity also covers explicit owner revocation and activation (`revoked_owner_id`, `activated_owner_id`).
+`TransformationObligation` parity covers transformed fragments, affected operations/effects, transport vs invalidation policy, and publication transfer or revocation.
+Bridge-side execution comparison reports these handoff and invalidation surfaces separately from raw trace equivalence.
+This prevents stale-owner and late-result mismatches from hiding inside otherwise equivalent instruction traces.
 
-`ProgressContract` parity now covers bounded-wait metadata, explicit
-no-progress and degraded states, and timeout escalation state. `ProgressTransition`
-parity makes those escalations replay-visible instead of leaving them as
-target-specific scheduling heuristics.
+`ProgressContract` parity covers bounded-wait metadata, explicit no-progress and degraded states, and timeout escalation state.
+`ProgressTransition` parity makes those escalations replay-visible instead of leaving them as target-specific scheduling heuristics.
 
-The Lean implementation layer now keeps the executable semantic-object
-definitions in `Runtime/VM/Model/SemanticObjects/Core.lean` and the basic
-theorem-facing predicates in `Runtime/VM/Model/SemanticObjects/Invariants.lean`,
-with `Runtime/VM/Model/SemanticObjects.lean` serving as the re-export facade.
-Deferred-effect admissibility, retry shape, and late-result rejection now live
-in `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, with the
-associated theorem-facing lemmas in
-`Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
-Semantic handoff realization now lives in
-`Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean`, with
-theorem-facing owner/publication/delegation bridge lemmas in
-`Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
-Authoritative-read commitment contexts, canonical publication-path uniqueness,
-and observer-class publication projection now live in
-`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, with
-observer-projection / blindness / noninterference lemmas in
-`Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
-Proof-backed success contexts, materialization-proof adequacy, and
-canonical-handle adequacy now live in
-`Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`, with lemmas
-that rule out proof-less success and observational materialization promotion in
-`Runtime/VM/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
-Progress-contract semantics now live in
-`Runtime/VM/Model/SemanticObjects/ProgressContracts.lean`, with theorem-facing
-owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound
-compatibility lemmas in
-`Runtime/VM/Model/SemanticObjects/ProgressContractsLemmas.lean`.
-Transformation-local obligation bundles now live in
-`Runtime/VM/Model/SemanticObjects/TransformationLocalObligations.lean`, with
-coverage/admissibility lemmas and lightweight linking / reconfiguration bridge
-structures in
-`Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
-Theorem-pack attachment for these semantic-object proof families now lives in
-`Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`, and the
-same attachment points are exposed through
-`Runtime/Proofs/TheoremPack/Inventory.lean`,
-`Runtime/Proofs/TheoremPack/API.lean`, and
-`Runtime/Proofs/Contracts/RuntimeContracts.lean`.
+The Lean implementation layer keeps executable semantic-object definitions in `Runtime/VM/Model/SemanticObjects/Core.lean`.
+Basic theorem-facing predicates live in `Runtime/VM/Model/SemanticObjects/Invariants.lean`.
+The re-export facade is `Runtime/VM/Model/SemanticObjects.lean`.
+
+Deferred-effect admissibility, retry shape, and late-result rejection live in `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`.
+Associated theorem-facing lemmas are in `Runtime/VM/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
+
+Semantic handoff realization lives in `Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean`.
+Theorem-facing owner/publication/delegation bridge lemmas are in `Runtime/VM/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
+
+Authoritative-read commitment contexts and canonical publication-path uniqueness live in `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`.
+Observer-projection, blindness, and noninterference lemmas are in `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
+
+Proof-backed success contexts and materialization-proof adequacy live in `Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`.
+Lemmas ruling out proof-less success and observational materialization promotion are in `Runtime/VM/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
+
+Progress-contract semantics live in `Runtime/VM/Model/SemanticObjects/ProgressContracts.lean`.
+Owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound compatibility lemmas are in `Runtime/VM/Model/SemanticObjects/ProgressContractsLemmas.lean`.
+
+Transformation-local obligation bundles live in `Runtime/VM/Model/SemanticObjects/TransformationLocalObligations.lean`.
+Coverage/admissibility lemmas and lightweight linking/reconfiguration bridge structures are in `Runtime/VM/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
+
+Theorem-pack attachment for these semantic-object proof families lives in `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
+The same attachment points are exposed through `Runtime/Proofs/TheoremPack/Inventory.lean`, `Runtime/Proofs/TheoremPack/API.lean`, and `Runtime/Proofs/Contracts/RuntimeContracts.lean`.
 
 ### Lean ProtocolMachineState
 
 Source: `lean/Runtime/VM/Model/State.lean`
 
-The `CoroutineState` structure contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
+`CoroutineState` contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
 
-The Lean protocol-machine state structure (`VMState` in the current Lean files) contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
+The Lean protocol-machine state structure (`VMState`) contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
 
 ### Rust Protocol Machine
 
 Source: `rust/vm/src/vm.rs`
 
-The Rust protocol-machine structure (`ProtocolMachine`, currently implemented by `VM`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
+The Rust protocol-machine structure (`ProtocolMachine`, exported as an alias for `VM`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
 
-The `Coroutine` structure in `rust/vm/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/knowledge sets, cost budget, speculation metadata, and effect context.
+`Coroutine` in `rust/vm/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/knowledge sets, cost budget, speculation metadata, and effect context.
 
 ## Runtime Capability Gates
 
@@ -204,9 +179,7 @@ Runtime modes that require theorem/capability evidence are admission gated.
 | Runtime capability snapshot | `runtimeCapabilitySnapshot` | `runtime_capability_snapshot` | Aligned |
 
 The Rust surfaces are in `rust/vm/src/runtime_contracts.rs` and `rust/vm/src/composition.rs`.
-On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints`
-provides the canonical runtime-facing list of enabled semantic-object theorem
-attachment points.
+On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints` provides the canonical runtime-facing list of enabled semantic-object theorem attachment points.
 
 ## Determinism Profiles
 
@@ -217,7 +190,9 @@ attachment points.
 | Modulo commutativity | `moduloCommutativity` | `DeterminismMode::ModuloCommutativity` | Aligned |
 | Replay | `replay` | `DeterminismMode::Replay` | Aligned |
 
-`Full` is exact-trace mode. `ModuloEffects` and `ModuloCommutativity` require mixed-profile capability evidence plus artifact support. `Replay` requires replay artifact support and mixed-profile capability evidence.
+`Full` is exact-trace mode.
+`ModuloEffects` and `ModuloCommutativity` require mixed-profile capability evidence and artifact support.
+`Replay` requires replay artifact support and mixed-profile capability evidence.
 
 ## Threaded Concurrency Envelope
 
@@ -230,7 +205,7 @@ attachment points.
 
 ## Simulator Material Mirror
 
-Lean now includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`. Rust material handlers live under `rust/simulator/src/material_handlers/`.
+Lean includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`. Rust material handlers live under `rust/simulator/src/material_handlers/`.
 
 Parity fixtures are enforced by:
 
@@ -243,13 +218,14 @@ The `lean/Runtime/VM` directory is organized into executable and proof modules.
 
 The `Runtime/VM/Model/` directory contains runtime data types, config, state, instruction forms, and event surfaces. The `Runtime/VM/Semantics/` directory contains executable step semantics. The `Runtime/VM/Runtime/` directory contains runtime adapters for loading, JSON, monitoring, and failure ingress.
 
-The `Runtime/VM/API.lean` file provides the stable facade for executable protocol-machine API imports. The `Runtime/VM/Composition/` directory contains composition/admission and theorem-pack integration surfaces. The `Runtime/Proofs/` directory contains proof/theorem-pack modules not required for core executable stepping.
+The `Runtime/VM/API.lean` file provides the stable facade for executable protocol-machine API imports. The `Runtime/VM/Composition.lean` file contains composition/admission and theorem-pack integration surfaces. The `Runtime/Proofs/` directory contains proof/theorem-pack modules not required for core executable stepping.
 
 Executable modules must not depend on placeholder proof definitions. Proof-only placeholders stay isolated under proof modules. Any executable-path dependency on a stub or placeholder is a release blocker.
 
 ## Deviation Governance
 
-Any intentional parity break must be recorded in the deviation table below before merge. Required fields include id, owner, status, reason, impact, alternatives considered, revisit date, and coverage scope.
+Any intentional parity break must be recorded in the deviation table below before merge.
+Required fields include id, owner, status, reason, impact, alternatives considered, revisit date, and coverage scope.
 
 ### Deviation Registry (Active)
 

@@ -1,8 +1,7 @@
 # Protocol-Machine Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
-It covers scenario TOML shape, generated effect-family scripting, fault injection,
-network modeling, and property monitoring.
+It covers scenario TOML shape, generated effect-family scripting, fault injection, network modeling, and property monitoring.
 
 ## Scenario Schema
 
@@ -64,8 +63,7 @@ Quoted decimal strings are the safest TOML form for `FixedQ32` values.
 The parser also accepts compatible numeric representations.
 
 Generated effect interfaces add a second scenario lane for effect-centric tests.
-Instead of expressing only network or scheduler perturbations, a scenario can
-script declared effect operations directly:
+A scenario can script declared effect operations directly instead of expressing only network or scheduler perturbations.
 
 ```rust
 let generated = GeneratedEffectScenario::builder()
@@ -76,13 +74,12 @@ let generated = GeneratedEffectScenario::builder()
     .build();
 ```
 
-This is the preferred lane for testing timeout, cancellation, stale late
-results, blocked execution, and degraded outcomes on parity-critical flows.
+This is the preferred lane for testing timeout, cancellation, stale late results, blocked execution, and degraded outcomes on parity-critical flows.
 
 ## Fault Middleware
 
 `FaultInjector` wraps an inner external handler.
-It handles activation, expiry, random triggers, delay queues, corruption, and crash state.
+It manages activation, expiry, random triggers, delay queues, corruption, and crash state.
 
 Supported actions are `MessageDrop`, `MessageDelay`, `MessageCorruption`, `NodeCrash`, and `NetworkPartition`.
 Supported triggers are `Immediate`, `AtTick`, `AfterStep`, `Random`, and `OnEvent`.
@@ -90,7 +87,7 @@ Scenario trigger declarations must contain exactly one trigger condition.
 
 ## Network Middleware
 
-`NetworkModel` typically wraps `FaultInjector` in scenario runs.
+`NetworkModel` wraps `FaultInjector` in scenario runs.
 It applies partition checks, link overrides, latency sampling, loss sampling, and deferred delivery.
 
 Per-link policies are matched by `(from_role, to_role)` plus optional active tick windows.

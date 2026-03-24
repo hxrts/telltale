@@ -139,6 +139,23 @@ pub enum Protocol {
     Parallel { protocols: NonEmptyVec<Protocol> },
     Rec { label: Ident, body: Box<Protocol> },
     Var(Ident),
+    Publish {
+        event: String,
+        arg: Option<String>,
+        continuation: Box<Protocol>,
+    },
+    Handoff {
+        operation: String,
+        target: Role,
+        receipt: String,
+        continuation: Box<Protocol>,
+    },
+    DependentWork {
+        name: String,
+        arg: Option<String>,
+        required_for: String,
+        continuation: Box<Protocol>,
+    },
     Extension {
         extension: Box<dyn ProtocolExtension>,
         continuation: Box<Protocol>,
@@ -148,13 +165,15 @@ pub enum Protocol {
 }
 ```
 
-`Protocol` is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, recursive definitions, authority bindings, case matching, and timeouts are supported. `NonEmptyVec` is used where the DSL enforces at least one branch.
+`Protocol` is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, recursive definitions, authority bindings, case matching, and timeouts are supported. Semantic publication, ownership handoff, and dependent work declarations support runtime lifecycle coordination.
+
+`NonEmptyVec` is used where the DSL enforces at least one branch.
 
 ### Parser Module
 
 The parser module is located in `rust/choreography/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
-The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with record braces, indentation-sensitive structural blocks, distinct `->` message arrows versus `=>` branch arrows, `choice Role at` branches with leading `|`, and `par` blocks.
+The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with `->` message arrows, `=>` branch arrows, `choice Role at` branches with leading `|`, and `par` blocks.
 
 Two entry points are available.
 
@@ -268,9 +287,9 @@ The protocol machine provides a bytecode execution model for local types. The `t
 
 The protocol machine maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested protocol machines can be hosted inside a coroutine for hierarchical simulation.
 
-At the embedding boundary, the protocol machine now also distinguishes current host ownership from protocol typing and capability admission. Production host integrations can use `load_choreography_owned(...)` and `OwnedSession` when they need explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers. Delegation/reconfiguration paths emit explicit receipts and audit records instead of relying on ad hoc owner mutation.
+At the embedding boundary, the protocol machine distinguishes current host ownership from protocol typing and capability admission. Production host integrations use `load_choreography_owned(...)` and `OwnedSession` for explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers.
 
-See [Protocol Machine Architecture](12_vm_architecture.md) for details on the underlying bytecode protocol-machine architecture.
+Delegation and reconfiguration paths emit explicit receipts and audit records. See [Protocol Machine Architecture](12_vm_architecture.md) for details on the underlying bytecode protocol-machine architecture.
 
 ## Data Flow
 

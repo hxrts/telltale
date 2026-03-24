@@ -31,6 +31,13 @@ It serves as the stable lookup for terminology and notation.
 | communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
 | communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [Protocol Machine Architecture](12_vm_architecture.md), [Session Lifecycle](14_session_lifecycle.md) |
 | consumption root | Deterministic accumulator root over communication replay-consumption state. | [Protocol Machine Architecture](12_vm_architecture.md), [Rust-Lean Parity](19_rust_lean_parity.md) |
+| protocol machine | Single-thread execution engine (`ProtocolMachine`) that runs projected local types with session type monitoring. | [Protocol Machine Architecture](12_vm_architecture.md) |
+| guest runtime | Telltale-owned driver (`GuestRuntime`) instantiated around the protocol machine for simulation and runtime integration. | [Protocol Machine Architecture](12_vm_architecture.md), [API Reference](30_api_reference.md) |
+| external handler | Host-runtime boundary trait (`ExternalHandler`) implemented by embedders and simulators. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [API Reference](30_api_reference.md) |
+| semantic object | Typed introspection record (such as `OperationInstance`, `OutstandingEffect`, `CanonicalHandle`) maintained by the protocol machine for audit and replay. | [Protocol Machine Architecture](12_vm_architecture.md), [API Reference](30_api_reference.md) |
+| typed outcome | Structured success/failure result at the effect boundary using `EffectResult` and `EffectFailure` rather than raw strings. | [Protocol-Critical Authority Scope](33_protocol_authority_scope.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
+| content addressing | Cryptographic identity scheme (`ContentId`) for protocol artifacts enabling deduplication and integrity checks. | [API Reference](30_api_reference.md) |
+| nominal effect interface | Named effect declaration (`effect Name`) that makes host dependencies explicit and typed at the language level. | [Authority Language Surface](34_authority_language_surface.md), [Protocol-Critical Authority Scope](33_protocol_authority_scope.md) |
 
 ## Symbol and Notation Index
 

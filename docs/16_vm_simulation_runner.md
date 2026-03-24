@@ -1,15 +1,14 @@
 # Protocol-Machine Simulation Runner
 
 This page documents runner behavior in `telltale-simulator`.
-It covers trace shapes, semantic artifacts, runner APIs, harness APIs, and sampling logic.
+It covers trace shapes, runner APIs, harness APIs, and sampling logic.
 
 ## Core Data Types
 
 `Trace` is the sampled role-state output container.
 Each `StepRecord` stores one role snapshot at one sampled step.
-Scenario-driven runs also carry canonical semantic artifacts from the protocol
-machine so effect outcomes, publication, and handoff state can be validated
-without reconstructing them from raw traces.
+Scenario-driven runs also carry replay artifacts and run statistics from the protocol machine.
+Effect outcomes, publication, and handoff state can be validated from these artifacts without reconstructing them from raw traces.
 
 ```rust
 pub struct StepRecord {
@@ -24,13 +23,16 @@ pub struct Trace {
 
 pub struct ScenarioResult {
     pub trace: Trace,
-    pub semantic_audit: Vec<SemanticAuditRecord>,
-    pub semantic_objects: ProtocolMachineSemanticObjects,
+    pub violations: Vec<PropertyViolation>,
+    pub replay: ScenarioReplayArtifact,
+    pub stats: ScenarioStats,
 }
 ```
 
 `step` is a simulator sampling index.
 `state` is extracted from protocol-machine registers as fixed-point values.
+`ScenarioResult` bundles the trace with property violations, replay artifacts, and run statistics.
+`ScenarioReplayArtifact` contains canonical semantic objects, semantic audit records, effect traces, and output-condition checks.
 
 ## Runner Entry Points
 
@@ -62,14 +64,12 @@ pub fn run_with_scenario(
 
 `run` returns one sampled trace.
 `run_concurrent` returns one trace per input choreography in deterministic input order.
-`run_with_scenario` adds middleware, property checks, replay artifacts, and
-canonical semantic objects.
+`run_with_scenario` adds middleware, property checks, replay artifacts, run statistics, and canonical semantic objects.
 
 ## Harness API
 
 `SimulationHarness` is the integration path for external projects.
-It can run against a direct external handler, a material-backed handler, or a
-generated effect-family scenario.
+It can run against a direct external handler, a material-backed handler, or a generated effect-family scenario.
 
 ```rust
 pub trait HostAdapter {
@@ -83,10 +83,8 @@ pub trait HostAdapter {
 
 `DirectAdapter` wraps a direct `EffectHandler`.
 `MaterialAdapter` constructs handlers from scenario material parameters.
-Generated effect-family scenarios should use
-`GeneratedEffectScenario` / `ScenarioEffectResult<T>` so tests can script
-timeouts, stale late results, blocked outcomes, and degraded execution without
-falling back to raw trace surgery.
+Generated effect-family scenarios should use `GeneratedEffectScenario` and `ScenarioEffectResult<T>`.
+These types let tests script timeouts, stale late results, blocked outcomes, and degraded execution without falling back to raw trace surgery.
 
 ## Initial State Derivation
 

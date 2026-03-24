@@ -1,8 +1,8 @@
 # Effect Handlers and Session Types
 
 This document defines the integration boundary between Telltale and a host runtime.
-The boundary is the protocol-machine `EffectHandler` interface, centered on
-typed `EffectRequest` and `EffectOutcome` values.
+The boundary is the protocol-machine `EffectHandler` interface.
+It is centered on typed `EffectRequest` and `EffectOutcome` values.
 
 ## Scope
 
@@ -23,7 +23,8 @@ Projection and runtime checks preserve obligations across these layers.
 
 This document describes a host-runtime contract.
 It is normative for Rust embedders. It is not itself a theorem statement.
-The theorem-backed protocol properties remain in projection, coherence, and harmony. The host ownership rules below are implementation contracts enforced by the protocol-machine boundary.
+The theorem-backed protocol properties remain in projection, coherence, and harmony.
+The host ownership rules below are implementation contracts enforced by the protocol-machine boundary.
 
 ## Rust Handler Surfaces
 
@@ -113,7 +114,7 @@ The normative contract is documented in that trait module.
 | Surface | protocol-machine call point | Runtime behavior | Integration note |
 |---|---|---|---|
 | `handle_effect(EffectRequest)` | all host-facing instruction sites | one canonical request/outcome surface | new runtime code must use this path |
-| `EffectRequest.metadata` | all request construction sites | carries interface name, operation name, authority class, admissibility, totality, timeout, reentrancy, and handler domain | validated before dispatch |
+| `EffectRequest.metadata` | all request construction sites | carries `EffectInterfaceMetadata` fields: interface name, operation name, authority class, admissibility, totality, timeout, reentrancy, handler domain | validated before dispatch |
 | `EffectRequestBody::SendDecision` | `step_send`, `step_offer` | called before enqueue | receives send context plus optional precomputed payload |
 | `EffectRequestBody::Receive` | `step_recv`, `step_choose` | called after dequeue and verification | use for state updates and host-side effects |
 | `EffectRequestBody::Choose` | trait helper / custom runners | branch-selection helper | not part of the canonical default dispatch path |
@@ -134,15 +135,15 @@ Helper-method compatibility notes:
 ## Typed Effect Outcomes
 
 The protocol machine now uses a typed effect boundary.
-`EffectHandler::handle_effect` returns an `EffectOutcome`, and helper methods use
-typed `EffectResult<T>` rather than `Result<T, String>`.
+`EffectHandler::handle_effect` returns an `EffectOutcome`.
+Helper methods use typed `EffectResult<T>` rather than `Result<T, String>`.
 
 | Outcome surface | Purpose |
 |---|---|
 | `EffectOutcome::success(EffectResponse)` | request completed successfully |
 | `EffectOutcome::blocked()` / `EffectResult::Blocked` | request requested a clean scheduler-visible block |
 | `EffectOutcome::failure(EffectFailure)` / `EffectResult::Failure(EffectFailure)` | request failed with typed diagnostics |
-| `EffectFailureKind` | coarse failure taxonomy including timeout, cancellation, stale authority, invalid evidence, determinism, topology disruption, and contract violation |
+| `EffectFailureKind` | coarse failure taxonomy including denied, timeout, cancellation, stale authority, invalid evidence, unavailable, invalid input, determinism, topology disruption, and contract violation |
 
 Host guidance:
 
@@ -236,7 +237,7 @@ The command now reads DSL `effect` declarations and emits:
 - a local scaffold `README.md` with next-step instructions
 
 ```text
-just effect-scaffold
+just effect-scaffold path/to/protocol.tell
 ```
 
 This command writes files under `artifacts/effect_handler_scaffold` by default. The direct form is:

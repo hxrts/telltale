@@ -1,12 +1,12 @@
 # Protocol Machine Architecture
 
-This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `VM` filename only because the current crate/module paths still use it. The canonical public abstraction is the protocol machine.
+This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `VM` filename only because the current crate/module paths still use it. The canonical public abstraction is the protocol machine.
 
 ## Architecture Overview
 
-The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedGuestRuntime` (currently implemented by `ThreadedVM`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
+The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `VM`) and threaded `ThreadedGuestRuntime` (currently implemented by `NativeThreadedDriver` wrapping `ThreadedVM`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
-The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, effect trace, live operation-instance state, live outstanding-effect state, delegation audit records, and failure-topology snapshot fields.
+The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, and effect trace. It also includes live operation-instance state, live outstanding-effect state, delegation audit records, and failure-topology snapshot fields.
 The canonical exported semantic surface is the semantic-object family:
 `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
 `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
@@ -20,7 +20,7 @@ The canonical round model is one semantic step when concurrency is nonzero. Thre
 | Engine | Role | Contract Surface |
 |---|---|---|
 | `ProtocolMachine` (`VM`) | Canonical cooperative protocol machine | Exact reference for parity at concurrency `1` |
-| `ThreadedGuestRuntime` (`ThreadedVM`) | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
+| `ThreadedGuestRuntime` (`NativeThreadedDriver`) | Parallel wave executor | Certified-wave execution with fallback to canonical one-step |
 | WASM guest runtime | Single-thread deployment | Cooperative schedule only |
 
 ## Scheduler Semantics
@@ -74,7 +74,7 @@ Runtime mode admission and profile selection are capability gated.
 
 The guest-runtime adapters now enforce explicit runtime hardening at load and startup boundaries.
 
-- `ThreadedGuestRuntime` (currently backed by `ThreadedVM`) provides both `with_workers` (panic-on-invalid initialization compatibility path) and `try_with_workers` (fallible initialization with `VMError`).
+- `ThreadedGuestRuntime` (currently backed by `NativeThreadedDriver`) provides `with_workers` for initialization. The inner `ThreadedVM` also provides `try_with_workers` (fallible initialization with `VMError`).
 - Cooperative and threaded `load_choreography` paths validate trusted `CodeImage` runtime shape before session allocation.
 - Preferred host integration uses `load_choreography_owned(...)` and `OwnedSession` when the embedding runtime needs explicit session ownership after open.
 - Register-bound violations are fail-closed through `Fault::OutOfRegisters` rather than unchecked index panic in executable instruction paths.
@@ -126,7 +126,7 @@ Replay-visible auditability now has one canonical surface derived from existing 
 |---|---|
 | authority witness audit log | `SemanticAuditRecord::Authority` |
 | delegation audit log | `SemanticAuditRecord::Delegation` |
-| explicit failure/timeout/cancellation/session-terminal events | `FailureBranch`, `TimeoutIssued`, `CancellationRequested`, `Cancelled`, `SessionTerminal` |
+| explicit failure/timeout/cancellation/session-terminal events | `FailureBranchEntered`, `TimeoutIssued`, `CancellationRequested`, `Cancelled`, `SessionTerminal` |
 | outstanding-effect runtime state | `EffectObservation` with nominal interface/operation classification |
 
 Runtime accessors:
@@ -167,13 +167,13 @@ later from raw trace order.
 bounded-wait metadata, last-progress tick, escalation timestamp, and the
 current explicit state (`pending`, `blocked`, `no_progress`, `degraded`,
 `timed_out`, and the existing terminal states). `ProgressTransition` makes each
-escalation replay-visible so late-result invalidation and degraded behavior are
-comparable across cooperative, threaded, and wasm targets.
+escalation replay-visible. This allows late-result invalidation and degraded behavior to be
+compared across cooperative, threaded, and wasm targets.
 
 `PublicationEvent` is the one canonical runtime publication surface. It carries
 publication id, operation id, observer class, publication status, and optional
-proof/handle references. This makes proof-bearing success and publication-path
-uniqueness replay-visible instead of leaving them as host-side conventions.
+proof/handle references. Proof-bearing success and publication-path
+uniqueness are replay-visible through this surface.
 
 ## Delegation and Reconfiguration Path
 

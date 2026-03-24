@@ -1,8 +1,10 @@
 # Introduction
 
-[Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The accompanying Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
+[Telltale](https://github.com/hxrts/telltale) is a Rust framework for choreographic programming with multiparty session types. It enables writing distributed protocols from a global perspective with automatic projection to local implementations. The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony.
 
-The framework includes a protocol machine with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration. Content addressing assigns cryptographic identities to protocol artifacts.
+The framework includes a protocol machine with deterministic scheduling and configurable buffer backpressure policies. Asynchronous subtyping uses SISO decomposition with orphan-free deadlock checks. Endpoint transfer semantics support ownership handoff at runtime with progress token migration.
+
+Content addressing assigns cryptographic identities to protocol artifacts.
 
 The same choreography compiles to native and WASM targets.
 
@@ -10,7 +12,7 @@ The same choreography compiles to native and WASM targets.
 
 Session types encode communication protocols as types. A type like `!String.?Int.end` sends a string, receives an integer, then closes the channel. The compiler checks that implementations follow the protocol contract.
 
-Multiparty session types extend this to protocols with three or more participants. Global types describe the full protocol. Projection transforms global types into local types for each participant. The type system tracks dependencies between participants to prevent deadlocks.
+Multiparty session types extend this to protocols with three or more participants. Global types describe the full protocol. Projection transforms global types into local types for each participant.
 
 Choreographic programming builds on global types. A choreography describes computations and message flow from a neutral perspective. Endpoint projection generates the local implementation for each role.
 
@@ -22,11 +24,11 @@ Handlers determine how messages are delivered. In-memory channels serve testing 
 
 ## Protocol Machine
 
-The protocol machine compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter `N` controls how many coroutines advance per round. Per-session traces are invariant over `N`.
+The protocol machine compiles local types to bytecode instructions. It manages scheduling, message buffers, and session lifecycle. The concurrency parameter `N` controls how many coroutines advance per round.
 
 ## Lean Verification
 
-The Lean 4 formalization spans roughly 626 files and 128k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
+The Lean 4 formalization spans roughly 649 files and 132k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
 The `telltale-lean-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 

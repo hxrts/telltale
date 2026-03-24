@@ -8,7 +8,7 @@ The heap lives in `telltale_choreography::heap`. It is immutable by default, so 
 
 ## Resource Types
 
-Resources are immutable values with content based identifiers.
+Resources are immutable values with content-based identifiers.
 
 ```rust
 pub struct ResourceId {
@@ -42,7 +42,7 @@ pub struct Heap {
 
 ## Heap Operations
 
-Allocate and consume resources using the functional API.
+The functional API allocates and consumes resources on the heap.
 
 ```rust
 use telltale_choreography::heap::{Heap, Resource};
@@ -55,7 +55,7 @@ let heap = heap.consume(&msg_id)?;
 
 The `alloc` method returns a new heap and the allocated resource ID. The `consume` method marks a resource as nullified while keeping it in the heap. The `read` method returns an error if the resource does not exist or has already been consumed.
 
-Additional heap methods include `size()`, `nullified_count()`, `contains()`, `is_consumed()`, `is_active()`, and `alloc_counter()`. `size()` reports allocated resources, including consumed entries that are retained for auditability. The mutable variants `alloc_mut` and `consume_mut` modify the heap in place.
+Additional heap methods include `size()`, `nullified_count()`, `contains()`, `is_consumed()`, `is_active()`, and `alloc_counter()`. `size()` returns the total number of entries in the resource map, including consumed entries retained for auditability. The mutable variants `alloc_mut` and `consume_mut` modify the heap in place.
 
 ## Merkle Commitments
 
@@ -85,7 +85,7 @@ pub enum HeapError {
 }
 ```
 
-Use these errors to distinguish missing resources from double consumption.
+These variants distinguish missing resources from double consumption.
 
 ## Determinism Notes
 

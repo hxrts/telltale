@@ -11,7 +11,7 @@ Verification scale and proof-hole status are tracked by generated reports.
 | [Lean Verification Code Map](../lean/CODE_MAP.md) | generated library map with file counts and module inventory |
 | `just escape` | machine check for axiom and sorry budget |
 
-Current scale and proof-hole status are tracked in these generated artifacts.
+These generated artifacts are the canonical sources for current scale and proof-hole status.
 
 ## Library Layers
 
@@ -27,6 +27,7 @@ The Lean tree is organized as a layered stack.
 | Runtime | protocol-machine model, semantics, runtime adapters, theorem-pack APIs |
 | Distributed | FLP, CAP, quorum, synchrony, Nakamoto, reconfiguration, safety families |
 | Classical | transported queueing and stochastic theorem families |
+| ClassicalAnalysis | real-analysis-backed concrete models used by classical transport |
 | IrisExtraction | runtime proof extraction and ghost logic bridge |
 
 ## Protocol-Machine Model and Runtime Surfaces
@@ -41,6 +42,24 @@ The protocol-machine model is centered under `lean/Runtime/VM`.
 | Composition and domain instances | `Runtime/VM/Composition.lean` |
 
 The effect model uses the current split `EffectRuntime` and `EffectSpec`. Monitor typing lives in `Runtime/VM/Runtime/Monitor.lean`.
+
+## Semantic Objects Model
+
+The semantic objects layer lives under `Runtime/VM/Model/SemanticObjects/`.
+
+| Surface | Location |
+|---|---|
+| Identity, ownership, observed-read discipline | `Runtime/VM/Model/SemanticObjects/Core.lean`, `Invariants.lean` |
+| Deferred-effect admissibility and stale late-result rejection | `Runtime/VM/Model/SemanticObjects/OutstandingEffects.lean`, `OutstandingEffectsLemmas.lean` |
+| Semantic handoff activation and delegation bridge | `Runtime/VM/Model/SemanticObjects/SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` |
+| Authoritative-read commitment and publication projection | `Runtime/VM/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` |
+| Materialization-proof adequacy and canonical-handle adequacy | `Runtime/VM/Model/SemanticObjects/MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` |
+| Progress-contract semantics and escalation lemmas | `Runtime/VM/Model/SemanticObjects/ProgressContracts.lean`, `ProgressContractsLemmas.lean` |
+| Transformation-local obligation bundles | `Runtime/VM/Model/SemanticObjects/TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` |
+| Replay-failure exactness | `Runtime/VM/Model/SemanticObjects/ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` |
+| Cross-target progress and dependent work | `Runtime/VM/Model/SemanticObjects/CrossTargetProgressDependentWork.lean`, `CrossTargetProgressDependentWorkLemmas.lean` |
+
+Semantic-object theorem families attach to theorem-pack proof spaces through `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
 
 ## Proof Packs and Admission APIs
 
