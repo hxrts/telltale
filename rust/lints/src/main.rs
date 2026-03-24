@@ -309,8 +309,8 @@ fn scan_session_ingress(file: &Path, syntax: &File) -> Vec<String> {
 
 fn scan_time_domain(file: &Path, syntax: &File) -> Vec<String> {
     const ALLOWED_SUFFIXES: &[&str] = &[
-        "rust/lean-bridge/src/runner.rs",
-        "rust/lean-bridge/src/protocol_machine_runner.rs",
+        "rust/bridge/src/runner.rs",
+        "rust/bridge/src/protocol_machine_runner.rs",
     ];
 
     if file_matches_suffix(file, ALLOWED_SUFFIXES) {
@@ -470,7 +470,7 @@ fn scan_canonical_bincode(file: &Path, syntax: &File) -> Vec<String> {
 
 fn scan_serialized_usize(file: &Path, syntax: &File) -> Vec<String> {
     const SERIALIZED_USIZE_SCOPE: &[&str] = &[
-        "rust/lean-bridge/src/vm_export.rs",
+        "rust/bridge/src/vm_export.rs",
         "rust/simulator/src/bin/run.rs",
     ];
 

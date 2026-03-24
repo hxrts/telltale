@@ -1,6 +1,6 @@
 # Lean-Rust Bridge
 
-The `telltale-lean-bridge` crate is the typed boundary between Rust artifacts and Lean validation entrypoints.
+The `telltale-bridge` crate is the typed boundary between Rust artifacts and Lean validation entrypoints.
 It handles JSON conversion, schema versioning, runner invocation, trace comparison, and typed invariant bundle export.
 
 The bridge does not define protocol-machine semantics.
@@ -30,12 +30,12 @@ Canonical inventory and contract surfaces for those attachment points live in `R
 
 ## Scope
 
-This document covers runtime bridge behavior implemented in `rust/lean-bridge/src`.
+This document covers runtime bridge behavior implemented in `rust/bridge/src`.
 It covers `export`, `import`, `schema`, `runner`, `protocol_machine_runner`,
 `sim_reference`, `semantic_objects`, `protocol_machine_trace`, `invariants`,
 `equivalence`, and `validate`.
 
-This document also covers bridge CLIs and bridge test lanes in `rust/lean-bridge/tests`.
+This document also covers bridge CLIs and bridge test lanes in `rust/bridge/tests`.
 It does not restate theorem internals from Lean proof files.
 
 ## Crate Features and Binaries
@@ -316,7 +316,7 @@ It resolves relative `--golden-dir` paths from the crate manifest directory.
 
 ## Test Lanes
 
-Bridge tests in `rust/lean-bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, and protocol-machine correspondence.
+Bridge tests in `rust/bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, and protocol-machine correspondence.
 Most Lean-dependent tests skip when Lean binaries are missing.
 
 - `coherence_tests.rs`

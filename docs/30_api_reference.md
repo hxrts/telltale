@@ -118,7 +118,7 @@ Module access (not re-exported at crate root):
   `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, `handler_from_material`
   in `rust/simulator/src/material_handlers/`
 
-### `telltale-lean-bridge`
+### `telltale-bridge`
 
 Lean bridge for JSON export, import, and validation.
 

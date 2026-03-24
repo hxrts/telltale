@@ -1,0 +1,134 @@
+//! Lean verification bridge for Telltale protocol-machine artifacts.
+//!
+//! This crate provides bidirectional conversion between Rust protocol/session
+//! artifacts and Lean-compatible JSON format, enabling formal verification of
+//! protocol-machine properties in Lean.
+//!
+//! # Features
+//!
+//! - `runner` (default) - Enable LeanRunner for invoking the Lean binary
+//! - `cli` - Enable command-line interface binary
+//!
+//! # Overview
+//!
+//! The bridge supports:
+//!
+//! - **Export**: Convert Rust types to Lean-compatible JSON
+//! - **Import**: Parse Lean JSON output into Rust types
+//! - **Validation**: Cross-validate Rust implementations against Lean proofs (requires `runner` feature)
+//!
+//! # JSON Format
+//!
+//! The JSON format matches the Lean type definitions:
+//!
+//! ```json
+//! {
+//!   "kind": "comm",
+//!   "sender": "Client",
+//!   "receiver": "Server",
+//!   "branches": [
+//!     {
+//!       "label": { "name": "request", "sort": "unit" },
+//!       "continuation": { "kind": "end" }
+//!     }
+//!   ]
+//! }
+//! ```
+//!
+//! # Example
+//!
+//! ```
+//! use telltale_types::{GlobalType, Label};
+//! use telltale_bridge::export::global_to_json;
+//!
+//! let g = GlobalType::comm(
+//!     "Client",
+//!     "Server",
+//!     vec![(Label::new("hello"), GlobalType::End)],
+//! );
+//!
+//! let json = global_to_json(&g);
+//! assert_eq!(json["kind"], "comm");
+//! ```
+
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
+
+use cfg_if::cfg_if;
+
+pub mod export;
+pub mod import;
+pub mod invariants;
+pub mod protocol_machine_trace;
+pub mod schema;
+pub mod semantic_objects;
+
+cfg_if! {
+    if #[cfg(feature = "runner")] {
+        pub(crate) mod projection_payload;
+        pub mod equivalence;
+        pub mod protocol_machine_runner;
+        pub mod runner;
+        pub mod sim_reference;
+        pub mod validate;
+    }
+}
+
+#[cfg(test)]
+pub mod test_utils;
+
+pub use export::{global_to_json, local_to_json};
+pub use import::{json_to_global, json_to_local, ImportError};
+pub use invariants::{
+    export_protocol_bundle, AccountableSafetyConfig, AvailabilityLevel, ByzantineSafetyConfig,
+    CAPConfig, CRDTConfig, ClassicalClaims, ConcentrationConfig, ConsensusEnvelopeConfig,
+    ConsistencyLevel, CoordinationConfig, DataAvailabilityConfig, DistributedClaims, FLPConfig,
+    FailureDetectorsConfig, FailureEnvelopeConfig, FaultModel, FluidConfig, FosterConfig,
+    FunctionalCLTConfig, HeavyTrafficConfig, InvariantClaims, LDPConfig, LittlesLawConfig,
+    LivenessConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
+    PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
+    ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
+    QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
+    SchedulerKind, TimingModel, PROTOCOL_BUNDLE_SCHEMA_VERSION,
+};
+pub use protocol_machine_trace::{
+    event_session, normalize_semantic_audit, observationally_equivalent, partition_by_session,
+    semantic_audits_equivalent, EffectTraceEvent, NormalizedEvent, OutputConditionTraceEvent,
+    ProtocolMachineReplayBundle, SessionTrace, TopologyPerturbationEvent, TopologyPerturbationKind,
+};
+pub use schema::{
+    canonical_schema_version, deserialize_schema_version, ensure_supported_schema_version,
+    is_supported_schema_version, LEAN_BRIDGE_SCHEMA_VERSION,
+};
+pub use semantic_objects::{
+    canonical_semantic_objects_schema_version, semantic_objects_from_json,
+    semantic_objects_to_json, AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle,
+    CanonicalHandle, CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead,
+    OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope,
+    ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
+    PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff, TickedObsEvent,
+    TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+};
+
+cfg_if! {
+    if #[cfg(feature = "runner")] {
+        pub use equivalence::{
+            CoherenceBundle, EquivalenceChecker, EquivalenceConfig, EquivalenceError,
+            EquivalenceResult, GoldenBundle,
+        };
+        pub use runner::{ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult};
+        pub use sim_reference::{
+            SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
+        };
+        pub use protocol_machine_runner::{
+            compute_trace_diff, ComparisonResult, InvariantVerificationResult, LeanStructuredError,
+            ProtocolMachineRunInput, ProtocolMachineRunOutput, ProtocolMachineRunner,
+            ProtocolMachineRunnerError, ProtocolMachineSessionStatus,
+            ProtocolMachineStepState, ProtocolMachineTraceEvent, TraceValidation,
+        };
+        pub use validate::{ValidationResult, Validator};
+    }
+}

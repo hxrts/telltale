@@ -30,7 +30,7 @@ The protocol machine compiles local types to bytecode instructions. It manages s
 
 The Lean 4 formalization spans roughly 649 files and 132k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
-The `telltale-lean-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
+The `telltale-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 
 ## Document Index
 

@@ -80,7 +80,7 @@ Rust and Lean are expected to align on the following surfaces.
 |---|---|---|---|
 | Projection core relation | `lean/Choreography/Projection/Project.lean` | `rust/choreography/src/compiler/projection.rs` | Aligned on supported subset |
 | Merge semantics | `lean/Choreography/Projection/Erasure/Merge.lean` | `rust/choreography/src/compiler/projection/merge.rs` | Aligned |
-| Projection validation pipeline | `lean/Choreography/Projection/Validator.lean` | `rust/lean-bridge/src/runner_projection_export.rs` | Aligned |
+| Projection validation pipeline | `lean/Choreography/Projection/Validator.lean` | `rust/bridge/src/runner_projection_export.rs` | Aligned |
 
 ### Rust-Only Extensions
 
@@ -94,7 +94,7 @@ The following surfaces are intentionally outside direct Lean parity. They must b
 
 ### Projection Cross-Validation
 
-Projection cross-validation is exercised through `rust/lean-bridge/tests/projection_runner_tests.rs`. Tests skip per test when the Lean validator binary is unavailable. Skipping one test must not terminate the rest of the suite.
+Projection cross-validation is exercised through `rust/bridge/tests/projection_runner_tests.rs`. Tests skip per test when the Lean validator binary is unavailable. Skipping one test must not terminate the rest of the suite.
 
 ## State Schema
 
@@ -106,15 +106,15 @@ The canonical cross-language semantic-object family must remain aligned between 
 
 | Object | Lean Surface | Rust Surface | Bridge Surface | Status |
 |---|---|---|---|---|
-| `OperationInstance` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `OutstandingEffect` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `SemanticHandoff` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `TransformationObligation` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `AuthoritativeRead` / `ObservedRead` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `MaterializationProof` / `CanonicalHandle` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `ProgressContract` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| `ProgressTransition` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/lean-bridge/src/semantic_objects.rs` | Aligned |
-| typed effect metadata / request / outcome model | `Runtime/protocol machine/Model/Effects.lean` | `rust/machine/src/effect.rs` | `rust/lean-bridge/src/protocol_machine_runner.rs` (`effect_exchanges`) | Aligned |
+| `OperationInstance` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `OutstandingEffect` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `SemanticHandoff` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `TransformationObligation` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `AuthoritativeRead` / `ObservedRead` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `MaterializationProof` / `CanonicalHandle` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressContract` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| `ProgressTransition` | `Runtime/protocol machine/Model/SemanticObjects/Core.lean` | `rust/machine/src/semantic_objects.rs` | `rust/bridge/src/semantic_objects.rs` | Aligned |
+| typed effect metadata / request / outcome model | `Runtime/protocol machine/Model/Effects.lean` | `rust/machine/src/effect.rs` | `rust/bridge/src/protocol_machine_runner.rs` (`effect_exchanges`) | Aligned |
 
 `OperationInstance` and `OutstandingEffect` are compared as canonical runtime state, not as post-hoc derivations from generic effect-trace order.
 Parity on these objects covers owner identity, phase/status, budget/invalidation fields, dependent-operation edges, and terminal publication state.
@@ -174,21 +174,21 @@ The Rust public runtime surface now exposes one canonical naming scheme:
 protocol-machine objects use `ProtocolMachine*`, guest-runtime objects use
 `GuestRuntime*`, and bridge execution objects use `ProtocolMachineRunner*`.
 No public `telltale_machine::vm::*`, `telltale_machine::threaded::*`,
-`telltale_lean_bridge::protocol_machine_runner::*`, or `telltale_lean_bridge::vm_trace::*`
+`telltale_bridge::protocol_machine_runner::*`, or `telltale_bridge::vm_trace::*`
 entrypoints remain.
 
 | Runtime Object | Lean Surface | Rust Surface | Bridge Surface | Status |
 |---|---|---|---|---|
-| protocol-machine config | `Runtime/protocol machine/Model/Config.lean` | `telltale_machine::ProtocolMachineConfig` | `telltale_lean_bridge::ProtocolMachineRunInput` | Aligned |
-| protocol-machine state | `Runtime/protocol machine/Model/State.lean` | `telltale_machine::ProtocolMachineState` | `telltale_lean_bridge::ProtocolMachineRunOutput` | Aligned |
-| protocol-machine executor | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Runtime/Runner.lean` | `telltale_machine::ProtocolMachine` | `telltale_lean_bridge::ProtocolMachineRunner` | Aligned |
-| protocol-machine step result | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::ProtocolMachineStepResult` | `telltale_lean_bridge::ProtocolMachineStepState` | Aligned |
-| protocol-machine run status | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::ProtocolMachineRunStatus` | `telltale_lean_bridge::ProtocolMachineRunOutput.status` | Aligned |
-| protocol-machine error surface | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean` | `telltale_machine::ProtocolMachineError` | `telltale_lean_bridge::LeanStructuredError` | Aligned |
+| protocol-machine config | `Runtime/protocol machine/Model/Config.lean` | `telltale_machine::ProtocolMachineConfig` | `telltale_bridge::ProtocolMachineRunInput` | Aligned |
+| protocol-machine state | `Runtime/protocol machine/Model/State.lean` | `telltale_machine::ProtocolMachineState` | `telltale_bridge::ProtocolMachineRunOutput` | Aligned |
+| protocol-machine executor | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Runtime/Runner.lean` | `telltale_machine::ProtocolMachine` | `telltale_bridge::ProtocolMachineRunner` | Aligned |
+| protocol-machine step result | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::ProtocolMachineStepResult` | `telltale_bridge::ProtocolMachineStepState` | Aligned |
+| protocol-machine run status | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::ProtocolMachineRunStatus` | `telltale_bridge::ProtocolMachineRunOutput.status` | Aligned |
+| protocol-machine error surface | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean` | `telltale_machine::ProtocolMachineError` | `telltale_bridge::LeanStructuredError` | Aligned |
 | protocol-machine memory accounting | `Runtime/protocol machine/Model/State.lean` | `telltale_machine::ProtocolMachineMemoryUsage`, `telltale_machine::ProtocolMachineRetainedBytes` | n/a | Aligned |
 | guest runtime driver | `Runtime/protocol machine/API.lean` | `telltale_machine::GuestRuntime`, `telltale_machine::ThreadedGuestRuntime` | n/a | Aligned |
-| threaded protocol-machine adapter | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Composition.lean` | `telltale_machine::ThreadedProtocolMachine` | parity tests under `rust/lean-bridge/tests/protocol_machine_cross_target_tests.rs` | Aligned |
-| semantic-object inventory | `Runtime/protocol machine/Model/SemanticObjects/*.lean` | `telltale_machine::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | `telltale_lean_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | Aligned |
+| threaded protocol-machine adapter | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Composition.lean` | `telltale_machine::ThreadedProtocolMachine` | parity tests under `rust/bridge/tests/protocol_machine_cross_target_tests.rs` | Aligned |
+| semantic-object inventory | `Runtime/protocol machine/Model/SemanticObjects/*.lean` | `telltale_machine::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | `telltale_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | Aligned |
 | runtime admission contracts | `Runtime/Proofs/Contracts/RuntimeContracts.lean` | `telltale_machine::{requires_protocol_machine_runtime_contracts, admit_protocol_machine_runtime, enforce_protocol_machine_runtime_gates, request_determinism_profile, runtime_capability_snapshot}` | n/a | Aligned |
 
 ## Runtime Capability Gates
@@ -332,7 +332,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 #### theory-async-subtyping-conservative
 
 **Lean:** `lean/SessionTypes/LocalTypeR/AsyncSubtype.lean`, `lean/Choreography/Projection/Validator.lean`
-**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/lean-bridge/src/runner_projection_export.rs`
+**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/bridge/src/runner_projection_export.rs`
 
 **Resolution:** Lean and Rust now expose matching conservative executable async-subtyping with parity tests.
 
@@ -341,7 +341,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 #### theory-orphan-free-conservative
 
 **Lean:** `lean/SessionTypes/LocalTypeR/AsyncSubtype.lean`, `lean/Choreography/Projection/Validator.lean`
-**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/lean-bridge/src/runner_projection_export.rs`
+**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/bridge/src/runner_projection_export.rs`
 
 **Resolution:** Lean and Rust now expose matching conservative executable orphan-freedom with parity tests.
 

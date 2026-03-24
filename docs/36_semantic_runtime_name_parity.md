@@ -109,5 +109,5 @@ When a shared semantic/runtime object is added, renamed, split, or removed:
 
 1. Update the Lean definition in `lean/Runtime/protocol machine/Model/SemanticObjects/Core.lean`.
 2. Update the Rust definition in `rust/machine/src/semantic_objects.rs`.
-3. Update the bridge schema in `rust/lean-bridge/src/semantic_objects.rs`.
+3. Update the bridge schema in `rust/bridge/src/semantic_objects.rs`.
 4. Update this parity inventory in the same change.

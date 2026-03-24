@@ -513,9 +513,9 @@ lean-init:
 telltale-lean-check: lean-init
     # Export rust choreography data, build the Lean runner, and verify three roles with logs
     mkdir -p lean/artifacts
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-sample.tell --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-sample.tell --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-sample.tell --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-chef.json --log lean/artifacts/runner-chef.log --json-log lean/artifacts/runner-chef.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-sous.json --log lean/artifacts/runner-sous.log --json-log lean/artifacts/runner-sous.json
@@ -524,9 +524,9 @@ telltale-lean-check: lean-init
 telltale-lean-check-extended: lean-init
     # Extended scenario with looped service and dessert fan-out
     mkdir -p lean/artifacts
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-extended.tell --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-extended.tell --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-extended.tell --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-extended.tell --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-extended.tell --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-extended.tell --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
@@ -535,30 +535,30 @@ telltale-lean-check-extended: lean-init
 # Regenerate golden files from Lean (requires Lean build)
 regenerate-golden: lean-init
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
-    cargo run -p telltale-lean-bridge --bin golden --features golden -- regenerate
+    cargo run -p telltale-bridge --bin golden --features golden -- regenerate
 
 # Check for golden file drift (fails if golden files are outdated)
 check-golden-drift: lean-init
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
-    cargo run -p telltale-lean-bridge --bin golden --features golden -- check
+    cargo run -p telltale-bridge --bin golden --features golden -- check
 
 # List all golden test cases
 list-golden:
-    cargo run -p telltale-lean-bridge --bin golden --features golden -- list
+    cargo run -p telltale-bridge --bin golden --features golden -- list
 
 # Run golden file equivalence tests (fast, no Lean required)
 test-golden:
-    cargo test -p telltale-lean-bridge --test golden_equivalence_tests
+    cargo test -p telltale-bridge --test golden_equivalence_tests
 
 # Run live Lean equivalence tests (requires Lean build)
 test-live-equivalence: lean-init
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
-    cargo test -p telltale-lean-bridge --test live_equivalence_tests
+    cargo test -p telltale-bridge --test live_equivalence_tests
 
 # Intentional failure fixture: labels mismatch.
 telltale-lean-check-failing: lean-init
     mkdir -p lean/artifacts
-    cargo run -p telltale-lean-bridge --features exporter --bin lean-bridge-exporter -- --input rust/lean-bridge/fixtures/lean-failing.tell --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
+    cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-failing.tell --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
     # Corrupt the exported program to introduce a label mismatch
     perl -0pi -e 's/"name": "Pong"/"name": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
     LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
@@ -566,12 +566,12 @@ telltale-lean-check-failing: lean-init
 
 # Emit protocol-bundle artifacts by running the bridge bundle tests.
 export-protocol-bundles:
-    cargo test -p telltale-lean-bridge --test invariant_verification_tests -- --nocapture
+    cargo test -p telltale-bridge --test invariant_verification_tests -- --nocapture
 
 # Rust/Lean protocol machine trace correspondence checks.
 verify-protocol-machine-correspondence:
-    cargo test -p telltale-lean-bridge --test vm_correspondence_tests
-    cargo test -p telltale-lean-bridge --test vm_differential_steps
+    cargo test -p telltale-bridge --test vm_correspondence_tests
+    cargo test -p telltale-bridge --test vm_differential_steps
 
 # Track A gate: naming/API changes must preserve behavior.
 verify-track-a:
@@ -581,13 +581,13 @@ verify-track-a:
 
 # Lean-side invariant verification checks for protocol bundles.
 verify-invariants:
-    cargo test -p telltale-lean-bridge --test invariant_verification
+    cargo test -p telltale-bridge --test invariant_verification
 
 # Targeted protocol verification lane (fast CI).
 verify-protocols:
     just verify-protocol-machine-correspondence
     just verify-invariants
-    cargo test -p telltale-lean-bridge --test schema_version_tests
+    cargo test -p telltale-bridge --test schema_version_tests
 
 # Track B gate: semantic-alignment acceptance, including cross-target checks.
 verify-track-b:
@@ -612,20 +612,20 @@ verify-cross-target-matrix:
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence
     cargo test -p telltale-machine --test lean_vm_equivalence
     CARGO_TARGET_DIR="$wasm_target" wasm-pack test --node rust/machine --features wasm -- --nocapture
-    cargo test -p telltale-lean-bridge --test vm_cross_target_matrix_tests
+    cargo test -p telltale-bridge --test vm_cross_target_matrix_tests
 
 # Composition/concurrency stress lane.
 verify-composition-stress:
     cargo test -p telltale-machine --features multi-thread --test threaded_lane_runtime -- --nocapture
-    cargo test -p telltale-lean-bridge --test vm_composition_stress_tests -- --nocapture
+    cargo test -p telltale-bridge --test vm_composition_stress_tests -- --nocapture
 
 # Property-based verification lane.
 verify-properties:
-    cargo test -p telltale-lean-bridge --test property_tests
-    cargo test -p telltale-lean-bridge --test proptest_projection
-    cargo test -p telltale-lean-bridge --test proptest_json_roundtrip
-    cargo test -p telltale-lean-bridge --test proptest_async_subtyping
+    cargo test -p telltale-bridge --test property_tests
+    cargo test -p telltale-bridge --test proptest_projection
+    cargo test -p telltale-bridge --test proptest_json_roundtrip
+    cargo test -p telltale-bridge --test proptest_async_subtyping
 
 # Generate normalized traces for bridge-level protocol machine correspondence fixtures.
 generate-test-traces:
-    cargo test -p telltale-lean-bridge --test vm_correspondence_tests -- --nocapture
+    cargo test -p telltale-bridge --test vm_correspondence_tests -- --nocapture

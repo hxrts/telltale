@@ -250,7 +250,7 @@ When a role is not involved in a choice, the projections of all branches must be
 
 Send merge requires identical label sets. A non-participant cannot choose which message to send based on a choice they did not observe. If a role sends different messages in different branches, projection fails. Receive merge unions label sets because a non-participant can receive any message regardless of which branch was taken.
 
-This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `lean/Choreography/Projection/`. Projection parity checks are exercised from `rust/lean-bridge/tests/projection_runner_tests.rs`.
+This distinction is critical for protocol safety. The Rust implementation matches the Lean formalization in `lean/Choreography/Projection/`. Projection parity checks are exercised from `rust/bridge/tests/projection_runner_tests.rs`.
 
 ### Parallel Composition
 

@@ -136,7 +136,7 @@ Rust workspace crates are split between the repo root (`telltale`) and the `rust
 | `telltale-theory` | `rust/theory/` | Session type algorithms (projection, merge, duality, sync/async subtyping, bounded recursion) |
 | `telltale-machine` | `rust/machine/` | Bytecode VM execution engine (single source of truth for scheduling) |
 | `telltale-simulator` | `rust/simulator/` | VM-backed simulation with deterministic middleware (network, faults, properties) |
-| `telltale-lean-bridge` | `rust/lean-bridge/` | Lean interop with JSON export/import, validation, choreography exporter |
+| `telltale-bridge` | `rust/bridge/` | Lean interop with JSON export/import, validation, choreography exporter |
 | `telltale-transport` | `rust/transport/` | Production transport integration layer for runtime/choreography execution |
 | `telltale-lints` | `rust/lints/` | Custom lint checks for architecture and style enforcement |
 

@@ -362,7 +362,7 @@ if [[ -f "$GETTING_STARTED" ]]; then
     TARGET_CRATES="telltale
 telltale-theory
 telltale-choreography
-telltale-lean-bridge"
+telltale-bridge"
 
     # Build actual features per target crate (excluding default, _-prefixed,
     # and pure optional-dep features).

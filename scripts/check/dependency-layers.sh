@@ -32,7 +32,7 @@ declare -A layer_of=(
   ["telltale-machine"]=3
   # Session tooling, transport, and facade layer
   ["telltale-choreography"]=4
-  ["telltale-lean-bridge"]=4
+  ["telltale-bridge"]=4
   ["telltale-simulator"]=4
   ["telltale-transport"]=4
   ["telltale"]=4

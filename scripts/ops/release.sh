@@ -16,7 +16,7 @@ RELEASE_PACKAGES=(
   "telltale-choreography"
   "telltale-transport"
   "telltale-machine"
-  "telltale-lean-bridge"
+  "telltale-bridge"
   "telltale-simulator"
 )
 
@@ -126,7 +126,7 @@ manifest_path() {
     telltale-choreography) echo "rust/choreography/Cargo.toml" ;;
     telltale-transport) echo "rust/transport/Cargo.toml" ;;
     telltale-machine) echo "rust/machine/Cargo.toml" ;;
-    telltale-lean-bridge) echo "rust/lean-bridge/Cargo.toml" ;;
+    telltale-bridge) echo "rust/bridge/Cargo.toml" ;;
     telltale-simulator) echo "rust/simulator/Cargo.toml" ;;
     *) return 1 ;;
   esac

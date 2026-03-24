@@ -41,7 +41,7 @@ graph TB
     end
 
     subgraph Verification
-        lean["telltale-lean-bridge<br/>Lean interop & validation"]
+        lean["telltale-bridge<br/>Lean interop & validation"]
     end
 
     subgraph Runtime
@@ -86,7 +86,7 @@ graph TB
     choreo --> transport
 ```
 
-This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated. For example, `telltale-theory` and `telltale-choreography` support in `telltale-lean-bridge` requires explicit feature flags.
+This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated. For example, `telltale-theory` and `telltale-choreography` support in `telltale-bridge` requires explicit feature flags.
 
 ## Crate Descriptions
 
@@ -141,9 +141,9 @@ assert!(sync_subtype(&local_a, &local_a_expected));
 
 The `project` function computes the local type for a given role. The `sync_subtype` function checks synchronous subtyping between local types.
 
-### telltale-lean-bridge
+### telltale-bridge
 
-This crate is located in `rust/lean-bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](24_lean_rust_bridge.md) for detailed documentation.
+This crate is located in `rust/bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](24_lean_rust_bridge.md) for detailed documentation.
 
 The `export` module converts Rust types to JSON for Lean. The `import` module converts Lean JSON back to Rust types. The `validate` module provides cross-validation between Rust and Lean.
 
