@@ -1611,7 +1611,7 @@ dependencies = [
  "serde",
  "serde_json",
  "telltale-choreography",
- "telltale-protocol-machine",
+ "telltale-machine",
  "telltale-theory",
  "telltale-types",
  "tempfile",
@@ -1629,19 +1629,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "telltale-macros"
-version = "6.0.0"
-dependencies = [
- "futures",
- "proc-macro2",
- "quote",
- "syn 2.0.110",
- "telltale",
- "trybuild",
-]
-
-[[package]]
-name = "telltale-protocol-machine"
+name = "telltale-machine"
 version = "6.0.0"
 dependencies = [
  "assert_matches",
@@ -1663,6 +1651,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-macros"
+version = "6.0.0"
+dependencies = [
+ "futures",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.110",
+ "telltale",
+ "trybuild",
+]
+
+[[package]]
 name = "telltale-simulator"
 version = "6.0.0"
 dependencies = [
@@ -1673,7 +1673,7 @@ dependencies = [
  "serde",
  "serde_json",
  "telltale-lean-bridge",
- "telltale-protocol-machine",
+ "telltale-machine",
  "telltale-theory",
  "telltale-types",
  "toml 0.8.23",

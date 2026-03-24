@@ -6,7 +6,7 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use telltale_protocol_machine::ObsEvent;
+use telltale_machine::ObsEvent;
 
 use crate::runner::ScenarioResult;
 

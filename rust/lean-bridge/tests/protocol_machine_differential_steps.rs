@@ -10,13 +10,13 @@ use telltale_lean_bridge::{
     canonical_schema_version, global_to_json, normalize_semantic_audit, ChoreographyJson,
     ProtocolMachineRunInput, ProtocolMachineRunner, ProtocolMachineTraceEvent, TickedObsEvent,
 };
-use telltale_protocol_machine::coroutine::Value;
-use telltale_protocol_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_protocol_machine::loader::CodeImage;
-use telltale_protocol_machine::output_condition::OutputConditionPolicy;
-use telltale_protocol_machine::session::SessionStatus;
-use telltale_protocol_machine::{ObsEvent, ProtocolMachineStepResult};
-use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::loader::CodeImage;
+use telltale_machine::output_condition::OutputConditionPolicy;
+use telltale_machine::session::SessionStatus;
+use telltale_machine::{ObsEvent, ProtocolMachineStepResult};
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -265,11 +265,11 @@ fn run_rust_step_states(
             selected_coro: step_meta.as_ref().map(|m| m.selected_coro as u64),
             exec_status: step_meta.as_ref().map(|m| {
                 match m.exec_status {
-                    telltale_protocol_machine::SchedExecStatus::Continue => "continue",
-                    telltale_protocol_machine::SchedExecStatus::Yielded => "yielded",
-                    telltale_protocol_machine::SchedExecStatus::Blocked => "blocked",
-                    telltale_protocol_machine::SchedExecStatus::Halted => "halted",
-                    telltale_protocol_machine::SchedExecStatus::Faulted => "faulted",
+                    telltale_machine::SchedExecStatus::Continue => "continue",
+                    telltale_machine::SchedExecStatus::Yielded => "yielded",
+                    telltale_machine::SchedExecStatus::Blocked => "blocked",
+                    telltale_machine::SchedExecStatus::Halted => "halted",
+                    telltale_machine::SchedExecStatus::Faulted => "faulted",
                 }
                 .to_string()
             }),

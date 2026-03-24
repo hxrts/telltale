@@ -4,13 +4,13 @@ use std::collections::BTreeSet;
 use std::sync::Mutex;
 use telltale_types::FixedQ32;
 
-use telltale_protocol_machine::buffer::EnqueueResult;
-use telltale_protocol_machine::coroutine::Value;
-use telltale_protocol_machine::effect::{
+use telltale_machine::buffer::EnqueueResult;
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_protocol_machine::session::SessionId;
-use telltale_protocol_machine::ObsEvent;
+use telltale_machine::session::SessionId;
+use telltale_machine::ObsEvent;
 
 use crate::rng::SimRng;
 use crate::value_conv::{

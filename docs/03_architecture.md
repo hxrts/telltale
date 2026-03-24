@@ -277,13 +277,13 @@ pub trait ChoreoHandler: Send {
 }
 ```
 
-Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_protocol_machine::effect::EffectHandler` used by the protocol machine.
+Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_machine::effect::EffectHandler` used by the protocol machine.
 
 Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for protocol-machine integration guidance.
 
 ### Protocol-Machine Execution Layer
 
-The protocol machine provides a bytecode execution model for local types. The `telltale-protocol-machine` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. The `telltale-simulator` crate wraps guest runtimes around that protocol machine with deterministic middleware for latency, faults, property monitoring, and checkpointing.
+The protocol machine provides a bytecode execution model for local types. The `telltale-machine` crate compiles `LocalTypeR` into bytecode and executes it with a policy-based scheduler. The `telltale-simulator` crate wraps guest runtimes around that protocol machine with deterministic middleware for latency, faults, property monitoring, and checkpointing.
 
 The protocol machine maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested protocol machines can be hosted inside a coroutine for hierarchical simulation.
 

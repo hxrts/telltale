@@ -29,7 +29,7 @@ declare -A layer_of=(
   ["telltale-theory"]=2
   ["telltale-macros"]=2
   # Runtime/verification
-  ["telltale-protocol-machine"]=3
+  ["telltale-machine"]=3
   # Session tooling, transport, and facade layer
   ["telltale-choreography"]=4
   ["telltale-lean-bridge"]=4

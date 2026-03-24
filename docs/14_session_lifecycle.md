@@ -1,6 +1,6 @@
 # Session Lifecycle
 
-This document defines session state and lifecycle behavior in `rust/protocol-machine/src/session/mod.rs` and `rust/protocol-machine/src/vm.rs`.
+This document defines session state and lifecycle behavior in `rust/machine/src/session/mod.rs` and `rust/machine/src/vm.rs`.
 
 ## Session State Model
 

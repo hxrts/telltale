@@ -8,12 +8,12 @@ use telltale_lean_bridge::{
     EffectTraceEvent, OutputConditionTraceEvent, ProtocolMachineRunOutput, ProtocolMachineRunner,
     ProtocolMachineSessionStatus, ProtocolMachineTraceEvent,
 };
-use telltale_protocol_machine::coroutine::Value;
-use telltale_protocol_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_protocol_machine::loader::CodeImage;
-use telltale_protocol_machine::output_condition::OutputConditionPolicy;
-use telltale_protocol_machine::ObsEvent;
-use telltale_protocol_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::loader::CodeImage;
+use telltale_machine::output_condition::OutputConditionPolicy;
+use telltale_machine::ObsEvent;
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, thiserror::Error)]
 enum ProtocolMachineCorrespondenceError {
@@ -192,7 +192,7 @@ fn run_rust_vm(
             terminal: vm
                 .sessions()
                 .get(sid)
-                .map(|s| !matches!(s.status, telltale_protocol_machine::session::SessionStatus::Active))
+                .map(|s| !matches!(s.status, telltale_machine::session::SessionStatus::Active))
                 .unwrap_or(false),
         })
         .collect();

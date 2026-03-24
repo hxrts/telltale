@@ -14,8 +14,8 @@ use telltale_types::FixedQ32;
 
 use crate::material::HamiltonianParams;
 use crate::value_conv::{fixed_to_value, registers_to_f64s, value_to_f64, write_f64s};
-use telltale_protocol_machine::coroutine::Value;
-use telltale_protocol_machine::effect::{
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 
@@ -239,7 +239,7 @@ mod tests {
     use super::*;
     use crate::material::HamiltonianParams;
     use crate::value_conv::{registers_to_f64s, write_f64s};
-    use telltale_protocol_machine::effect::{EffectFailure, EffectResult};
+    use telltale_machine::effect::{EffectFailure, EffectResult};
 
     fn expect_success<T>(result: EffectResult<T>) -> T {
         result

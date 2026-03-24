@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use telltale_protocol_machine::ProtocolMachine;
+use telltale_machine::ProtocolMachine;
 
 /// Serialized ProtocolMachine state blob.
 pub type SerializedState = Vec<u8>;

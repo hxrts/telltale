@@ -71,7 +71,7 @@ The theorem program is operationalized through theorem-pack inventory and admiss
 
 `Runtime/Proofs/TheoremPack/API.lean` provides gate aliases. `Runtime/Proofs/TheoremPack/Inventory.lean` provides capability key extraction. `Runtime/Adequacy/EnvelopeCore/AdmissionLogic.lean` provides admission soundness, completeness, and diagnostics categories.
 
-Rust admission paths in `rust/protocol-machine/src/runtime_contracts.rs` and `rust/protocol-machine/src/composition.rs` consume these proof-facing concepts as executable gates.
+Rust admission paths in `rust/machine/src/runtime_contracts.rs` and `rust/machine/src/composition.rs` consume these proof-facing concepts as executable gates.
 
 ## Related Docs
 

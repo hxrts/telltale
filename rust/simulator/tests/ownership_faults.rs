@@ -5,12 +5,12 @@ use std::collections::BTreeMap;
 use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
 use telltale_simulator::rng::SimRng;
 use telltale_types::{GlobalType, LocalTypeR};
-use telltale_protocol_machine::buffer::EnqueueResult;
-use telltale_protocol_machine::coroutine::Value;
-use telltale_protocol_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_protocol_machine::instr::{ImmValue, Instr};
-use telltale_protocol_machine::loader::CodeImage;
-use telltale_protocol_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult};
+use telltale_machine::buffer::EnqueueResult;
+use telltale_machine::coroutine::Value;
+use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::instr::{ImmValue, Instr};
+use telltale_machine::loader::CodeImage;
+use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult};
 
 #[derive(Debug, Clone, Copy)]
 struct NoopHandler;

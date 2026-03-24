@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use telltale_protocol_machine::{ProtocolMachineSemanticObjects, SemanticAuditRecord};
+use telltale_machine::{ProtocolMachineSemanticObjects, SemanticAuditRecord};
 
 /// Canonical simulator outcome classification for one generated effect step.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

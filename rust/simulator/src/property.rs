@@ -4,11 +4,11 @@ use std::collections::{BTreeMap, VecDeque};
 use telltale_types::FixedQ32;
 
 use telltale_types::LocalTypeR;
-use telltale_protocol_machine::coroutine::{CoroStatus, Coroutine};
-use telltale_protocol_machine::instr::Endpoint;
-use telltale_protocol_machine::session::{SessionId, SessionStore};
-use telltale_protocol_machine::trace::obs_session;
-use telltale_protocol_machine::ObsEvent;
+use telltale_machine::coroutine::{CoroStatus, Coroutine};
+use telltale_machine::instr::Endpoint;
+use telltale_machine::session::{SessionId, SessionStore};
+use telltale_machine::trace::obs_session;
+use telltale_machine::ObsEvent;
 
 use crate::value_conv::registers_to_f64s;
 

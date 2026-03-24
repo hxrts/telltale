@@ -136,11 +136,11 @@ check_delegation() {
   local cooperative_target_dir="${ROOT_DIR}/target/capability-gates/cooperative"
   local threaded_target_dir="${ROOT_DIR}/target/capability-gates/threaded"
   run_check "cooperative transfer guard rejects non-delegation ownership mutation" \
-    "CARGO_TARGET_DIR='${cooperative_target_dir}' cargo test -p telltale-protocol-machine test_transfer_rejects_delegation_guard_violation"
+    "CARGO_TARGET_DIR='${cooperative_target_dir}' cargo test -p telltale-machine test_transfer_rejects_delegation_guard_violation"
   run_check "threaded transfer handoff emits delegation evidence" \
-    "CARGO_TARGET_DIR='${threaded_target_dir}' TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread --test threaded_lane_runtime deterministic_transfer_handoff_uses_delegation_path"
+    "CARGO_TARGET_DIR='${threaded_target_dir}' TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread --test threaded_lane_runtime deterministic_transfer_handoff_uses_delegation_path"
   run_check "threaded transfer guard rejects ambiguous ownership mutation" \
-    "CARGO_TARGET_DIR='${threaded_target_dir}' TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-protocol-machine --features multi-thread delegation_handoff_guard_rejects_ambiguous_endpoint_ownership"
+    "CARGO_TARGET_DIR='${threaded_target_dir}' TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread delegation_handoff_guard_rejects_ambiguous_endpoint_ownership"
 }
 
 # ── Envelope Capability Checks ────────────────────────────────
@@ -151,7 +151,7 @@ check_envelope() {
   local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
   local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed.lean"
   local TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
-  local RUST_ENVELOPE_TEST_FILE="${ROOT_DIR}/rust/protocol-machine/tests/parity_fixtures_v2.rs"
+  local RUST_ENVELOPE_TEST_FILE="${ROOT_DIR}/rust/machine/tests/parity_fixtures_v2.rs"
 
   echo "== Envelope Conformance =="
 

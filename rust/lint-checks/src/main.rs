@@ -247,12 +247,12 @@ fn file_matches_suffix(file: &Path, suffixes: &[&str]) -> bool {
 
 fn scan_session_ingress(file: &Path, syntax: &File) -> Vec<String> {
     const ALLOWED_SUFFIXES: &[&str] = &[
-        "rust/protocol-machine/src/owned.rs",
-        "rust/protocol-machine/src/session/store.rs",
-        "rust/protocol-machine/src/session/tests.rs",
-        "rust/protocol-machine/src/threaded/runtime_and_scheduling.rs",
-        "rust/protocol-machine/src/engine/topology_and_dispatch.rs",
-        "rust/protocol-machine/src/engine/validation.rs",
+        "rust/machine/src/owned.rs",
+        "rust/machine/src/session/store.rs",
+        "rust/machine/src/session/tests.rs",
+        "rust/machine/src/threaded/runtime_and_scheduling.rs",
+        "rust/machine/src/engine/topology_and_dispatch.rs",
+        "rust/machine/src/engine/validation.rs",
     ];
 
     if is_test_like_path(&display_path(file)) || file_matches_suffix(file, ALLOWED_SUFFIXES) {
@@ -367,7 +367,7 @@ fn scan_style(file: &Path, source: &str, syntax: &File) -> Vec<String> {
     let mut violations = Vec::new();
 
     if !is_test_like_path(&path) {
-        if path.starts_with("rust/protocol-machine/src/") && !path.ends_with("rust/protocol-machine/src/serialization.rs") {
+        if path.starts_with("rust/machine/src/") && !path.ends_with("rust/machine/src/serialization.rs") {
             violations.extend(scan_canonical_bincode(file, syntax));
         }
 
@@ -385,10 +385,10 @@ fn scan_style(file: &Path, source: &str, syntax: &File) -> Vec<String> {
 }
 
 fn scan_blocking_lock_boundaries(file: &Path, source: &str) -> Vec<String> {
-    const ALLOWED_PREFIXES: &[&str] = &["rust/protocol-machine/src/threaded/"];
+    const ALLOWED_PREFIXES: &[&str] = &["rust/machine/src/threaded/"];
     const ALLOWED_SUFFIXES: &[&str] = &[
-        "rust/protocol-machine/src/nested.rs",
-        "rust/protocol-machine/src/effect/runtime_types.rs",
+        "rust/machine/src/nested.rs",
+        "rust/machine/src/effect/runtime_types.rs",
         "rust/simulator/src/network.rs",
         "rust/simulator/src/fault.rs",
         "rust/simulator/src/material_handlers/continuum.rs",
@@ -402,7 +402,7 @@ fn scan_blocking_lock_boundaries(file: &Path, source: &str) -> Vec<String> {
     ];
 
     let path = display_path(file);
-    if !(path.starts_with("rust/protocol-machine/src/") || path.starts_with("rust/simulator/src/")) {
+    if !(path.starts_with("rust/machine/src/") || path.starts_with("rust/simulator/src/")) {
         return Vec::new();
     }
     if ALLOWED_PREFIXES

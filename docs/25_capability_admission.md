@@ -15,8 +15,8 @@ Admission is enforced across Lean theorem-pack surfaces and Rust runtime checks.
 | Lean theorem-pack facade | `Runtime/Proofs/TheoremPack/API.lean` |
 | Lean capability inventory | `Runtime/Proofs/TheoremPack/Inventory.lean` |
 | Lean admission logic | `Runtime/Adequacy/EnvelopeCore/AdmissionLogic.lean` |
-| Rust runtime gates | `rust/protocol-machine/src/runtime_contracts.rs` |
-| Rust composition admission | `rust/protocol-machine/src/composition.rs` |
+| Rust runtime gates | `rust/machine/src/runtime_contracts.rs` |
+| Rust composition admission | `rust/machine/src/composition.rs` |
 
 ## Runtime Gate Flow
 
@@ -93,7 +93,7 @@ Rust capability snapshots should align with this inventory for release and admis
 
 ## Composition Admission
 
-Composed runtime admission in `rust/protocol-machine/src/composition.rs` enforces both proof artifacts and runtime gates.
+Composed runtime admission in `rust/machine/src/composition.rs` enforces both proof artifacts and runtime gates.
 
 | Requirement | Failure mode |
 |---|---|

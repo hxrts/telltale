@@ -80,7 +80,7 @@ Several parts of that boundary still rely on raw strings or convention-driven ho
 
 ### protocol machine/Effect Callback Surface
 
-The protocol machine `EffectHandler` trait in `rust/protocol-machine/src/effect/handler_trait.rs`
+The protocol machine `EffectHandler` trait in `rust/machine/src/effect/handler_trait.rs`
 has now moved to typed outcomes.
 Callbacks return `EffectResult<_>` with typed failure variants.
 Failures use `EffectFailure` and `EffectFailureKind` rather than raw `String` classification.
@@ -91,7 +91,7 @@ and contract failures explicit at the protocol boundary.
 
 ### Guard/Evidence Surface
 
-The guard boundary in `rust/protocol-machine/src/guard.rs` also uses `Result<_, String>`
+The guard boundary in `rust/machine/src/guard.rs` also uses `Result<_, String>`
 for:
 
 - `open_`
@@ -110,9 +110,9 @@ They should be inventoried so future typed-boundary work does not stop at the tr
 
 Examples include:
 
-- session send/recv/close operations in `rust/protocol-machine/src/session/state.rs`
-- `SessionStore::close` in `rust/protocol-machine/src/session/store.rs`
-- runtime shape validation in `rust/protocol-machine/src/loader.rs`
+- session send/recv/close operations in `rust/machine/src/session/state.rs`
+- `SessionStore::close` in `rust/machine/src/session/store.rs`
+- runtime shape validation in `rust/machine/src/loader.rs`
 
 Phase 1 conclusion:
 

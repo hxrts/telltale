@@ -30,7 +30,7 @@
 //!
 //! ## ProtocolMachine Boundary
 //!
-//! The bytecode ProtocolMachine in `telltale-protocol-machine` exposes a separate, synchronous
+//! The bytecode ProtocolMachine in `telltale-machine` exposes a separate, synchronous
 //! `EffectHandler` trait for simulation/runtime integration. It is not
 //! interchangeable with `ChoreoHandler`: `ChoreoHandler` is async and typed
 //! over concrete message/role types, while the ProtocolMachine handler operates over
