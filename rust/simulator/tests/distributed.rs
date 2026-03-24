@@ -220,7 +220,7 @@ fn test_distributed_two_site() {
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
-    sim.run(50).expect("run outer vm");
+    sim.run(50).expect("run outer machine");
 
     assert_eq!(sim.handler().site_all_done("site_A"), Some(true));
     assert_eq!(sim.handler().site_all_done("site_B"), Some(true));
@@ -254,7 +254,7 @@ fn test_nested_matches_flat_per_site() {
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
-    sim.run(50).expect("run outer vm");
+    sim.run(50).expect("run outer machine");
 
     let nested_a = normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace"));
     let nested_b = normalized_pairs(&sim.handler().site_trace("site_B").expect("site B trace"));
@@ -264,7 +264,7 @@ fn test_nested_matches_flat_per_site() {
     let sid_b = flat.load_choreography(&inner_image).expect("load B");
 
     let handler = NoOpHandler;
-    flat.run_concurrent(&handler, 50, 1).expect("run flat vm");
+    flat.run_concurrent(&handler, 50, 1).expect("run flat machine");
 
     let flat_a = per_session(flat.trace(), sid_a);
     let flat_b = per_session(flat.trace(), sid_b);
@@ -295,7 +295,7 @@ fn test_distributed_concurrency_configuration() {
     assert_eq!(sim.outer_concurrency(), 2);
     assert_eq!(sim.handler().rounds_per_step(), 3);
 
-    sim.run(50).expect("run outer vm");
+    sim.run(50).expect("run outer machine");
     assert_eq!(sim.handler().site_all_done("site_A"), Some(true));
     assert_eq!(sim.handler().site_all_done("site_B"), Some(true));
 }

@@ -175,7 +175,7 @@ publish_stmt = { "publish" ~ ident ~ ctor_value_payload? }
 handoff_stmt = { "handoff" ~ ident ~ "to" ~ role_ref ~ "using" ~ ident }
 dependent_work_stmt = { "dependent" ~ "work" ~ ident ~ ctor_value_payload? ~ "required" ~ "for" ~ ident }
 
-// VM-core operational statements
+// Protocol-machine-core operational statements
 vm_acquire_stmt = { "acquire" ~ vm_layer ~ "as" ~ ident }
 vm_release_stmt = { "release" ~ vm_layer ~ "using" ~ ident }
 vm_fork_stmt = { "fork" ~ ident }

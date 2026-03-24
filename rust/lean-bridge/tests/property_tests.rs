@@ -292,10 +292,10 @@ fn run_rust_semantic_audit(
     protocol: &GeneratedProtocol,
 ) -> Result<Vec<ProtocolMachineTraceEvent>, String> {
     let image = CodeImage::from_local_types(&protocol.local_types, &protocol.global);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).map_err(|e| e.to_string())?;
-    vm.run(&PropertyHandler, 128).map_err(|e| e.to_string())?;
-    Ok(vm
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).map_err(|e| e.to_string())?;
+    machine.run(&PropertyHandler, 128).map_err(|e| e.to_string())?;
+    Ok(machine
         .trace()
         .iter()
         .filter_map(obs_to_semantic_audit_event)

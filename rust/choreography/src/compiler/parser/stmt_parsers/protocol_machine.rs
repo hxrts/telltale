@@ -13,7 +13,7 @@ fn parse_vm_layer(
         Rule::vm_layer => {
             let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
                 span: ErrorSpan::from_pest_span(span, input),
-                message: "vm layer is missing name".to_string(),
+                message: "protocol machine layer is missing name".to_string(),
             })?;
             inner.as_str().to_string()
         }
@@ -21,7 +21,7 @@ fn parse_vm_layer(
         _ => {
             return Err(ParseError::Syntax {
                 span: ErrorSpan::from_pest_span(span, input),
-                message: "invalid vm layer".to_string(),
+                message: "invalid protocol machine layer".to_string(),
             });
         }
     };

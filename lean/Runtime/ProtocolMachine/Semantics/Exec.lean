@@ -43,9 +43,9 @@ private def outputConditionClaimOfEvent {ε : Type u} [EffectRuntime ε]
   | .internal => none
   | .obs _ =>
       some
-        { predicateRef := "vm.observable_output"
+        { predicateRef := "protocol_machine.observable_output"
         , witnessRef := none
-        , outputDigest := "vm.output_digest.unspecified" }
+        , outputDigest := "protocol_machine.output_digest.unspecified" }
 
 private def appendOutputConditionCheck {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]

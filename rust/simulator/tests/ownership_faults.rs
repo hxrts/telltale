@@ -92,23 +92,23 @@ fn transfer_image() -> CodeImage {
 }
 
 fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolMachine {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&transfer_image())
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&transfer_image())
         .expect("load transfer fixture");
     let fault = FaultInjector::new(NoopHandler, schedule, SimRng::new(7));
 
     for logical_step in 1..=max_rounds {
-        let next_tick = vm.clock().tick + 1;
+        let next_tick = machine.clock().tick + 1;
         fault
             .tick(
                 next_tick,
                 u64::try_from(logical_step).expect("logical step fits in u64"),
-                vm.trace(),
+                machine.trace(),
             )
             .expect("advance fault schedule");
         fault
             .deliver(next_tick, |sid, from, to, value| {
-                vm.inject_message(sid, from, to, value)
+                machine.inject_message(sid, from, to, value)
                     .map_err(|err| err.to_string())
                     .map(|result| match result {
                         EnqueueResult::Ok => EnqueueResult::Ok,
@@ -118,18 +118,18 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolM
                     })
             })
             .expect("deliver delayed messages");
-        vm.set_paused_roles(
+        machine.set_paused_roles(
             &fault
                 .crashed_roles()
                 .expect("read currently crashed simulator roles"),
         );
-        match vm.step_round(&fault, 1).expect("step transfer fixture") {
+        match machine.step_round(&fault, 1).expect("step transfer fixture") {
             ProtocolMachineStepResult::Continue => {}
             ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck => break,
         }
     }
 
-    vm
+    machine
 }
 
 #[test]
@@ -145,16 +145,16 @@ fn ownership_owner_failure_before_handoff_emits_no_transfer_event() {
         }],
         max_concurrent: 1,
     };
-    let vm = run_faulted_transfer(schedule, 8);
+    let machine = run_faulted_transfer(schedule, 8);
 
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .all(|event| !matches!(event, ObsEvent::Transferred { .. })),
         "crashing the current owner before the transfer should suppress handoff observables"
     );
     assert!(
-        vm.semantic_objects().semantic_handoffs.is_empty(),
+        machine.semantic_objects().semantic_handoffs.is_empty(),
         "owner crash before transfer should leave no semantic handoff state"
     );
 }
@@ -172,10 +172,10 @@ fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
         }],
         max_concurrent: 1,
     };
-    let vm = run_faulted_transfer(schedule, 8);
+    let machine = run_faulted_transfer(schedule, 8);
 
     assert_eq!(
-        vm.trace()
+        machine.trace()
             .iter()
             .filter(|event| matches!(event, ObsEvent::Transferred { .. }))
             .count(),
@@ -183,7 +183,7 @@ fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
         "target crash should not erase the explicit ownership handoff observable"
     );
     assert_eq!(
-        vm.semantic_objects().semantic_handoffs.len(),
+        machine.semantic_objects().semantic_handoffs.len(),
         1,
         "simulator ownership race should preserve one semantic handoff artifact"
     );

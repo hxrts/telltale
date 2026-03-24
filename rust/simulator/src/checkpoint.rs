@@ -40,12 +40,12 @@ impl CheckpointStore {
     }
 
     /// Record a checkpoint if `tick` hits the interval.
-    pub fn maybe_checkpoint(&mut self, tick: u64, vm: &ProtocolMachine) {
+    pub fn maybe_checkpoint(&mut self, tick: u64, machine: &ProtocolMachine) {
         if self.interval == 0 || tick % self.interval != 0 {
             return;
         }
         self.last_persist_error = None;
-        let data = match serde_json::to_vec(vm) {
+        let data = match serde_json::to_vec(machine) {
             Ok(data) => data,
             Err(err) => {
                 self.last_persist_error =

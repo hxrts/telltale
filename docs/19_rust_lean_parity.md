@@ -262,9 +262,9 @@ Resolved deviations move to history after one stable release cycle with no regre
 
 | ID | Status | Owner | Moved On | Summary |
 |----|--------|-------|----------|---------|
-| threaded-round-extension | resolved | vm-runtime | 2026-02-27 | Threaded backend defaults to canonical one-step rounds |
-| payload-hardening-extension | resolved | vm-runtime | 2026-02-27 | Lean and Rust now enforce payload-size admission on executable send/receive paths and strict-schema annotation rejection on annotationless send/receive shapes |
-| comm-replay-label-context | resolved | vm-runtime | 2026-02-27 | Rust receive replay identity now canonicalizes to the Lean-style typed-context label token when session payload annotation is available |
+| threaded-round-extension | resolved | protocol-machine-runtime | 2026-02-27 | Threaded backend defaults to canonical one-step rounds |
+| payload-hardening-extension | resolved | protocol-machine-runtime | 2026-02-27 | Lean and Rust now enforce payload-size admission on executable send/receive paths and strict-schema annotation rejection on annotationless send/receive shapes |
+| comm-replay-label-context | resolved | protocol-machine-runtime | 2026-02-27 | Rust receive replay identity now canonicalizes to the Lean-style typed-context label token when session payload annotation is available |
 | types-merge-payload-annotation | resolved | types-parity | 2026-02-27 | Lean canonical merge now enforces payload-annotation compatibility on overlapping send/recv labels and exposes matching soundness at the compatibility-gated entrypoint |
 | types-content-id-closedness | resolved | types-parity | 2026-02-27 | Lean now exposes explicit closed-only canonical identity and open-term template identity policy surfaces with proofs matching Rust `content_id`/`template_id` contract |
 | types-local-db-payload-retention | resolved | types-parity | 2026-02-27 | Lean payload-preserving DB conversion is promoted via parity surfaces with explicit success-equivalence bridge theorems to legacy erased conversion |

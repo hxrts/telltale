@@ -26,7 +26,7 @@ fn main() {
 
     let checkpoint =
         std::fs::read(&replay_args.checkpoint_path).unwrap_or_else(|e| fatal(&e.to_string()));
-    let mut vm: ProtocolMachine =
+    let mut machine: ProtocolMachine =
         serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
 
     let handler = handler_from_material(&scenario.material);
@@ -51,7 +51,7 @@ fn main() {
             fault,
             cfg,
             rng.fork(),
-            vm.clock().tick_duration,
+            machine.clock().tick_duration,
         ));
     } else {
         fault_only = Some(fault);
@@ -59,21 +59,21 @@ fn main() {
 
     let mut rounds_executed = 0_u64;
     for _ in 0..max_rounds {
-        let next_tick = vm.clock().tick + 1;
+        let next_tick = machine.clock().tick + 1;
         let next_logical_step = rounds_executed.saturating_add(1);
         if let Some(net) = &network {
             net.inner()
-                .tick(next_tick, next_logical_step, vm.trace())
+                .tick(next_tick, next_logical_step, machine.trace())
                 .unwrap_or_else(|e| fatal(&format!("fault middleware tick: {e}")));
             net.inner()
                 .deliver(next_tick, |sid, from, to, val| {
-                    vm.inject_message(sid, from, to, val)
+                    machine.inject_message(sid, from, to, val)
                         .map_err(|e| e.to_string())
                 })
                 .unwrap_or_else(|e| fatal(&format!("fault middleware deliver: {e}")));
             net.set_tick(next_tick);
             net.deliver(next_tick, |sid, from, to, val| {
-                vm.inject_message(sid, from, to, val)
+                machine.inject_message(sid, from, to, val)
                     .map_err(|e| e.to_string())
             })
             .unwrap_or_else(|e| fatal(&format!("network middleware deliver: {e}")));
@@ -81,48 +81,48 @@ fn main() {
                 .inner()
                 .crashed_roles()
                 .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
-            vm.set_paused_roles(&paused_roles);
-            match vm.step_round(net, concurrency) {
+            machine.set_paused_roles(&paused_roles);
+            match machine.step_round(net, concurrency) {
                 Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
                 Ok(ProtocolMachineStepResult::Continue) => {}
-                Err(e) => fatal(&format!("vm error: {e}")),
+                Err(e) => fatal(&format!("machine error: {e}")),
             }
         } else {
             let fault = fault_only
                 .as_ref()
                 .unwrap_or_else(|| fatal("internal replay error: missing fault middleware"));
             fault
-                .tick(next_tick, next_logical_step, vm.trace())
+                .tick(next_tick, next_logical_step, machine.trace())
                 .unwrap_or_else(|e| fatal(&format!("fault middleware tick: {e}")));
             fault
                 .deliver(next_tick, |sid, from, to, val| {
-                    vm.inject_message(sid, from, to, val)
+                    machine.inject_message(sid, from, to, val)
                         .map_err(|e| e.to_string())
                 })
                 .unwrap_or_else(|e| fatal(&format!("fault middleware deliver: {e}")));
             let paused_roles = fault
                 .crashed_roles()
                 .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
-            vm.set_paused_roles(&paused_roles);
-            match vm.step_round(fault, concurrency) {
+            machine.set_paused_roles(&paused_roles);
+            match machine.step_round(fault, concurrency) {
                 Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
                 Ok(ProtocolMachineStepResult::Continue) => {}
-                Err(e) => fatal(&format!("vm error: {e}")),
+                Err(e) => fatal(&format!("machine error: {e}")),
             }
         }
         rounds_executed = rounds_executed.saturating_add(1);
 
         let ctx = PropertyContext {
-            tick: vm.clock().tick,
-            trace: vm.trace(),
-            sessions: vm.sessions(),
-            coroutines: vm.coroutines(),
+            tick: machine.clock().tick,
+            trace: machine.trace(),
+            sessions: machine.sessions(),
+            coroutines: machine.coroutines(),
         };
         monitor.check(&ctx);
     }
 
     if monitor.violations().is_empty() {
-        println!("replay completed (tick {})", vm.clock().tick);
+        println!("replay completed (tick {})", machine.clock().tick);
     } else {
         println!(
             "replay completed with {} violations",

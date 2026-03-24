@@ -223,7 +223,7 @@ pub fn run_concurrent(
         match machine.step(handler) {
             Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
             Ok(ProtocolMachineStepResult::Continue) => {}
-            Err(e) => return Err(format!("vm error: {e}")),
+            Err(e) => return Err(format!("protocol machine error: {e}")),
         }
 
         let invoked_sessions: Vec<usize> = {
@@ -313,7 +313,7 @@ pub fn run(
         match machine.step(handler) {
             Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
             Ok(ProtocolMachineStepResult::Continue) => {}
-            Err(e) => return Err(format!("vm error: {e}")),
+            Err(e) => return Err(format!("protocol machine error: {e}")),
         }
 
         let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
@@ -505,7 +505,7 @@ pub fn run_with_scenario(
             match machine.step_round(net, concurrency) {
                 Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
                 Ok(ProtocolMachineStepResult::Continue) => {}
-                Err(e) => return Err(format!("vm error: {e}")),
+                Err(e) => return Err(format!("protocol machine error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);
         } else {
@@ -529,7 +529,7 @@ pub fn run_with_scenario(
             match machine.step_round(fault, concurrency) {
                 Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
                 Ok(ProtocolMachineStepResult::Continue) => {}
-                Err(e) => return Err(format!("vm error: {e}")),
+                Err(e) => return Err(format!("protocol machine error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);
         }

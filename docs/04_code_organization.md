@@ -17,7 +17,7 @@ telltale/
 │   ├── theory/             Session type algorithms (telltale-theory)
 │   ├── choreography/       DSL, projection glue, and effect runtime
 │   ├── lean-bridge/        Lean export/import/validation
-│   ├── vm/                 Protocol machine and guest runtime
+│   ├── protocol-machine/                 Protocol machine and guest runtime
 │   ├── simulator/          Protocol-machine-backed simulation
 │   ├── effect-scaffold/    Internal scaffolding tool
 │   ├── macros/             Procedural macros
@@ -68,15 +68,15 @@ graph TB
     types --> main
     types --> choreo
     types --> lean
-    types --> vm
+    types --> protocol-machine
     types --> simulator
 
     theory --> main
-    theory --> vm
+    theory --> protocol-machine
     theory --> choreo
     theory --> lean
 
-    vm --> simulator
+    protocol-machine --> simulator
 
     macros --> main
     macros --> choreo
@@ -165,7 +165,7 @@ This crate is located in `rust/protocol-machine/`. It provides the protocol mach
 
 The canonical public entry modules are `telltale_protocol_machine::protocol_machine`,
 `telltale_protocol_machine::guest_runtime`, and `telltale_protocol_machine::host_runtime`. The historical
-`vm` and `threaded` modules still exist as implementation modules, but they are
+`engine` and `threaded` modules still exist as implementation modules, but they are
 not the architectural front door.
 
 #### Instruction Set and Modules

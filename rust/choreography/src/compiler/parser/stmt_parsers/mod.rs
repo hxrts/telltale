@@ -17,7 +17,7 @@ mod control_flow;
 mod looping;
 mod semantic;
 mod send;
-mod vm;
+mod protocol_machine;
 pub(crate) use authority::{
     parse_case_stmt, parse_let_in_stmt, parse_let_stmt, parse_timeout_stmt,
 };
@@ -29,7 +29,7 @@ pub(super) use control_flow::{
 pub(crate) use looping::{parse_heartbeat_stmt, parse_loop_stmt};
 pub(crate) use semantic::{parse_dependent_work_stmt, parse_handoff_stmt, parse_publish_stmt};
 pub(crate) use send::{parse_broadcast_stmt, parse_send_stmt};
-pub(super) use vm::{
+pub(super) use protocol_machine::{
     parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt, parse_vm_fork_stmt,
     parse_vm_join_stmt, parse_vm_release_stmt, parse_vm_tag_stmt, parse_vm_transfer_stmt,
 };

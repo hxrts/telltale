@@ -816,7 +816,7 @@ print_hits "warning" "functions over 60 lines (refactor into smaller units)" "${
 # protocol machine core lint-allow policy: keep suppressions narrow and explicit.
 vm_core_allow_hits="$(rg -n --pcre2 '^[[:space:]]*#[[:space:]]*\\[[[:space:]]*allow\\([[:space:]]*clippy::[^)]+\\)[[:space:]]*\\]' "${RUST_DIR}/protocol-machine/src" -g '*.rs' || true)"
 vm_core_allow_hits="$(printf '%s\n' "${vm_core_allow_hits}" | rg -v 'clippy::(as_conversions|derivable_impls|field_reassign_with_default)' || true)"
-print_hits "warning" "broad clippy allow annotations in vm core paths" "${vm_core_allow_hits}" "Remove broad vm-core lint suppressions or replace them with smaller helper refactors. Keep only narrowly justified allows with an adjacent rationale comment."
+print_hits "warning" "broad clippy allow annotations in protocol machine core paths" "${vm_core_allow_hits}" "Remove broad protocol-machine-core lint suppressions or replace them with smaller helper refactors. Keep only narrowly justified allows with an adjacent rationale comment."
 
 # ── Numeric Safety Checks ─────────────────────────────────────
 
@@ -854,7 +854,7 @@ done
 float_type_hits="$(scan_scope_hits '\b(f32|f64)\b' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
 float_type_hits="$(filter_float_matches_to_code_tokens "${float_type_hits}")"
 float_type_hits="$(filter_out_paths "${float_type_hits}" '/protocol-machine/tests/helpers/')"
-print_hits "error" "floating-point types in deterministic VM/simulation scope" "${float_type_hits}" "Replace floating-point values with deterministic fixed-point or integer representations (for example, scaled i64/u64 newtypes)."
+print_hits "error" "floating-point types in deterministic protocol machine/simulation scope" "${float_type_hits}" "Replace floating-point values with deterministic fixed-point or integer representations (for example, scaled i64/u64 newtypes)."
 
 # 15) Direct host nondeterminism must not appear in deterministic scope.
 # Note: MockClock's Instant::now() is documented as unavoidable - Rust's Instant
@@ -863,7 +863,7 @@ nondet_hits="$(scan_scope_hits 'SystemTime::now\(|Instant::now\(|UNIX_EPOCH|rand
 nondet_hits="$(filter_out_paths "${nondet_hits}" 'kernel_nondeterminism_guard.rs:' 'kernel_ndet_guard.rs:')"
 nondet_hits="$(filter_out_paths "${nondet_hits}" 'simulation/clock.rs:.*start: Instant::now')"
 nondet_hits="$(filter_out_comments "${nondet_hits}")"
-print_hits "error" "direct host nondeterminism in deterministic VM/simulation scope" "${nondet_hits}" "Route entropy and wall-clock access through explicit effect injection APIs; keep core runtime logic pure and replayable."
+print_hits "error" "direct host nondeterminism in deterministic protocol machine/simulation scope" "${nondet_hits}" "Route entropy and wall-clock access through explicit effect injection APIs; keep core runtime logic pure and replayable."
 
 # 16) Potential lock-held-across-await patterns.
 lock_await_hits=""
@@ -881,11 +881,11 @@ print_hits "error" "direct host side effects in protocol machine kernel sources"
 
 # 18) HashMap/HashSet in deterministic scope can destabilize iteration order.
 hash_collection_hits="$(scan_scope_hits '\b(HashMap|HashSet)\b' "${DETERMINISM_RUNTIME_SCOPE[@]}")"
-print_hits "warning" "hash-based collections in deterministic VM/simulation scope" "${hash_collection_hits}" "Prefer BTreeMap/BTreeSet for stable ordering, or enforce deterministic ordering before iterating/emitting externally visible results."
+print_hits "warning" "hash-based collections in deterministic protocol machine/simulation scope" "${hash_collection_hits}" "Prefer BTreeMap/BTreeSet for stable ordering, or enforce deterministic ordering before iterating/emitting externally visible results."
 
 # 19) Thread scheduling/time sleeps in deterministic scope.
 thread_nondet_hits="$(scan_scope_hits 'std::thread::spawn\(|std::thread::sleep\(|tokio::spawn\(|tokio::time::sleep\(' "${DETERMINISM_RUNTIME_SCOPE[@]}" "${DETERMINISM_TEST_SCOPE[@]}")"
-print_hits "error" "direct thread scheduling/timer calls in deterministic VM/simulation scope" "${thread_nondet_hits}" "Model scheduling and timers as explicit scheduler/effect inputs so replay behavior is controlled and cross-target equivalent."
+print_hits "error" "direct thread scheduling/timer calls in deterministic protocol machine/simulation scope" "${thread_nondet_hits}" "Model scheduling and timers as explicit scheduler/effect inputs so replay behavior is controlled and cross-target equivalent."
 
 echo ""
 print_section "Summary"
