@@ -222,8 +222,9 @@ impl ProtocolMachineConfig {
 }
 
 /// Observable event emitted by the ProtocolMachine.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TickedObsEvent {
+pub(crate) struct TickedObsEvent {
     /// Scheduler tick when the wrapped event occurred.
     pub tick: u64,
     /// Underlying observable event payload.

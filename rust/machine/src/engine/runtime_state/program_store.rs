@@ -15,7 +15,7 @@ fn default_max_payload_bytes() -> usize {
 }
 
 /// Scope identifier type, aligned with Lean's scope representation.
-pub type ScopeId = usize;
+pub(crate) type ScopeId = usize;
 
 /// Lean-aligned immutable program representation.
 pub type Program = Box<[Instr]>;

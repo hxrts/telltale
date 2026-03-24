@@ -53,8 +53,9 @@ pub struct LaneSchedulerState {
 }
 
 /// Certificate for one threaded scheduler wave plan.
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct WaveCertificate {
+pub(crate) struct WaveCertificate {
     /// Planned waves for this round.
     pub waves: Vec<Vec<usize>>,
     /// Scheduler step at planning time.
@@ -146,20 +147,22 @@ impl KernelMachine for ThreadedProtocolMachine {
 }
 
 /// Session-scoped locks for concurrent execution.
+#[allow(dead_code)]
 #[derive(Debug, Default)]
-pub struct SessionLock {
+pub(crate) struct SessionLock {
     locks: BTreeMap<SessionId, Mutex<()>>,
 }
 
+#[allow(dead_code)]
 impl SessionLock {
     /// Create an empty lock table.
     #[must_use]
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self::default()
     }
 
     /// Ensure a lock exists for a session.
-    pub fn ensure(&mut self, sid: SessionId) {
+    pub(crate) fn ensure(&mut self, sid: SessionId) {
         self.locks.entry(sid).or_insert_with(|| Mutex::new(()));
     }
 }
