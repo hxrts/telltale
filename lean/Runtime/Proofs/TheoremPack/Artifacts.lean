@@ -37,6 +37,10 @@ structure SemanticObjectArtifacts where
   authoritativeReadsPublication? : Option AuthoritativeReadPublicationWitness := none
   materializationSuccess? : Option MaterializationSuccessWitness := none
   progressContracts? : Option ProgressContractWitness := none
+  effectContracts? : Option EffectContractWitness := none
+  replayFailureExactness? : Option ReplayFailureExactnessWitness := none
+  crossTargetProgressDependentWork? :
+    Option CrossTargetProgressDependentWorkWitness := none
   transformationLocalObligations? : Option TransformationLocalObligationWitness := none
 
 /-- Lift invariant-space semantic witnesses into the theorem-pack artifact layer. -/
@@ -48,6 +52,9 @@ def SemanticObjectArtifacts.ofWitnessBundle
   , authoritativeReadsPublication? := bundle.authoritativeReadsPublication?
   , materializationSuccess? := bundle.materializationSuccess?
   , progressContracts? := bundle.progressContracts?
+  , effectContracts? := bundle.effectContracts?
+  , replayFailureExactness? := bundle.replayFailureExactness?
+  , crossTargetProgressDependentWork? := bundle.crossTargetProgressDependentWork?
   , transformationLocalObligations? := bundle.transformationLocalObligations?
   }
 
@@ -63,6 +70,11 @@ def SemanticObjectArtifacts.inventory
           artifacts.authoritativeReadsPublication?.isSome)
       , ("semantic_object_materialization_success", artifacts.materializationSuccess?.isSome)
       , ("semantic_object_progress_contracts", artifacts.progressContracts?.isSome)
+      , ("semantic_object_effect_contracts", artifacts.effectContracts?.isSome)
+      , ("semantic_object_replay_failure_exactness",
+          artifacts.replayFailureExactness?.isSome)
+      , ("semantic_object_cross_target_progress_dependent_work",
+          artifacts.crossTargetProgressDependentWork?.isSome)
       , ("semantic_object_transformation_local_obligations",
           artifacts.transformationLocalObligations?.isSome)
       ]
@@ -73,6 +85,9 @@ def SemanticObjectArtifacts.inventory
       , ("semantic_object_authoritative_reads_publication", false)
       , ("semantic_object_materialization_success", false)
       , ("semantic_object_progress_contracts", false)
+      , ("semantic_object_effect_contracts", false)
+      , ("semantic_object_replay_failure_exactness", false)
+      , ("semantic_object_cross_target_progress_dependent_work", false)
       , ("semantic_object_transformation_local_obligations", false)
       ]
 

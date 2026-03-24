@@ -741,7 +741,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
 | Proofs/ObserverProjectionEffectBisim.lean | 107 | Effect bisimulation for observer projection |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
-| Proofs/InvariantSpace.lean | 61 | Proof-carrying invariant-space bundle plus semantic-object theorem attachment points |
+| Proofs/InvariantSpace.lean | 231 | Proof-carrying invariant-space bundle with integrated semantic-object witness families through replay and cross-target progress |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
 | Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
 | Proofs/Adapters/Distributed.lean | 87 | V2: Distributed adapter re-exports |
@@ -756,11 +756,11 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/TheoremPack/API.lean | 267 | V2: Public theorem pack interface including semantic-object attachment APIs |
+| Proofs/TheoremPack/API.lean | 319 | V2: Public theorem pack interface including semantic-object composition, inventory, and runtime gate APIs |
 | Proofs/TheoremPack/Build.lean | 371 | V2: Theorem pack construction |
-| Proofs/TheoremPack/Artifacts.lean | 426 | V2: Artifact generation for release gates |
+| Proofs/TheoremPack/Artifacts.lean | 497 | V2: Artifact generation plus semantic-object theorem-family packaging for invariant-space witnesses |
 | Proofs/TheoremPack/Profiles.lean | 287 | V2: Determinism profile definitions |
-| Proofs/TheoremPack/Inventory.lean | 66 | V2: Capability inventory management including semantic-object proof families |
+| Proofs/TheoremPack/Inventory.lean | 75 | V2: Capability inventory management including integrated semantic-object proof-family inventories |
 | Proofs/TheoremPack/ReleaseConformance.lean | 299 | V2: Release gate conformance checking |
 
 ### Proofs/EffectBisim (V2 Handler Equivalence)
@@ -783,6 +783,7 @@ predicate vocabularies now live under `Runtime/Proofs/VM/`.
 | Proofs/SchedulingBoundTightness.lean | 328 | Tightness proofs and round-robin corollary |
 | Proofs/Diamond.lean | 468 | Cross-session diamond lemmas and main confluence theorem |
 | Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end VM examples: profile attachment auto-materializes distributed theorem artifacts |
+| Proofs/Examples/ComposedProofPack.lean | 347 | End-to-end theorem-pack example showing semantic-object witness bundles flowing through the canonical composition and inventory path |
 | Proofs/Examples/InvariantBundle.lean | 74 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
 
 ### Examples and Tests

@@ -1,7 +1,10 @@
 import Runtime.Proofs.ProgressApi
+import Runtime.VM.Model.Effects
 import Runtime.VM.Model.OutputCondition
 import Runtime.VM.Model.SemanticObjects.AuthoritativeReadsPublication
+import Runtime.VM.Model.SemanticObjects.CrossTargetProgressDependentWork
 import Runtime.VM.Model.SemanticObjects.ProgressContracts
+import Runtime.VM.Model.SemanticObjects.ReplayFailureExactness
 import Runtime.VM.Model.SemanticObjects.TransformationLocalObligations
 
 set_option autoImplicit false
@@ -61,22 +64,83 @@ structure SemanticHandoffWitness where
 structure AuthoritativeReadPublicationWitness where
   objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
   ctx : Runtime.VM.Model.AuthoritativeCommitmentContext
+  read : Runtime.VM.Model.AuthoritativeRead
+  readMember : read ∈ objects.authoritativeReads
+  readSatisfiesContext : read.satisfiesCommitmentContext ctx
+  commitmentPermitted : objects.authoritativeCommitPermitted ctx
   observedCannotAuthorTruth : objects.observedStateCannotAuthorTruth ctx
   canonicalPublicationPathUnique : objects.canonicalPublicationPathUnique
+  canonicalPublicationSurfaceExclusive : objects.canonicalPublicationSurfaceExclusive
   publicationObserverClassDisciplined : objects.publicationObserverClassDisciplined
 
 /-- Attachment surface for proof-backed materialization / success. -/
 structure MaterializationSuccessWitness where
   objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
   ctx : Runtime.VM.Model.SuccessProofContext
+  operation : Runtime.VM.Model.OperationInstance
+  proof : Runtime.VM.Model.MaterializationProof
+  handle : Runtime.VM.Model.CanonicalHandle
+  operationMember : operation ∈ objects.operationInstances
+  proofMember : proof ∈ objects.materializationProofs
+  handleMember : handle ∈ objects.canonicalHandles
+  operationRequiresSuccessProof : operation.requiresSuccessProofFor ctx
+  proofAdequate : proof.adequateForSuccessContext ctx
+  handleAdequate : handle.adequateForSuccessContext ctx proof
   successProofBacked : objects.successProofBacked ctx
+  authoritativeMaterializationAdequate : objects.authoritativeMaterializationAdequate ctx
+  canonicalHandleDomainUnique : objects.canonicalHandleDomainUnique ctx
   observedMaterializationInsufficient : objects.observedMaterializationInsufficient ctx
+  weakerPublicationInsufficient : objects.weakerPublicationInsufficient ctx
 
 /-- Attachment surface for progress-contract / escalation discipline. -/
 structure ProgressContractWitness where
   objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
+  operation : Runtime.VM.Model.OperationInstance
   contract : Runtime.VM.Model.ProgressContract
+  operationMember : operation ∈ objects.operationInstances
+  tracksOperation : contract.tracksOperation operation
   trackedLiveness : objects.ownerInternalLivenessContract contract
+
+/-- Attachment surface for effect admissibility / reentrancy contracts. -/
+structure EffectContractWitness where
+  metadata : Runtime.VM.Model.EffectInterfaceMetadata
+  activeDomain : Runtime.VM.Model.EffectResponsibilityDomain
+  incomingDomain : Runtime.VM.Model.EffectResponsibilityDomain
+  architecturallyLegal : metadata.architecturallyLegal
+  reentrancyPolicySound :
+    metadata.reentrancyAdmissible activeDomain incomingDomain ↔
+      metadata.reentrancyPolicy.admits activeDomain incomingDomain
+
+/-- Attachment surface for replay stability / failure exactness discipline. -/
+structure ReplayFailureExactnessWitness where
+  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
+  ctx : Runtime.VM.Model.ReplayFailureContext
+  operation : Runtime.VM.Model.OperationInstance
+  effect : Runtime.VM.Model.OutstandingEffect
+  contract : Runtime.VM.Model.ProgressContract
+  operationMember : operation ∈ objects.operationInstances
+  effectMember : effect ∈ objects.outstandingEffects
+  contractMember : contract ∈ objects.progressContracts
+  contractMatchesContext : contract.matchesReplayFailureContext ctx
+  replayStableOperationIdentity : objects.replayStableOperationIdentity
+  terminalTruthStableUnderReplay : objects.terminalTruthStableUnderReplay
+  staleLateResultRejected : objects.staleLateResultRejected
+  failureAuditAligned : objects.failureAuditAligned ctx
+  replayFailureConformanceAligned : objects.replayFailureConformanceAligned ctx
+
+/-- Attachment surface for cross-target progress / dependent-work composition. -/
+structure CrossTargetProgressDependentWorkWitness where
+  objects : Runtime.VM.Model.ProtocolMachineSemanticObjects
+  left : Runtime.VM.Model.RealizedProgressView
+  right : Runtime.VM.Model.RealizedProgressView
+  parent : Runtime.VM.Model.OperationInstance
+  contract : Runtime.VM.Model.ProgressContract
+  parentMember : parent ∈ objects.operationInstances
+  tracksOperation : contract.tracksOperation parent
+  crossTargetProgressPreserved : objects.crossTargetProgressPreserved left right
+  dependentWorkFullyResolved : objects.dependentWorkFullyResolved parent
+  parentTerminalityComposedFromDependents :
+    objects.parentTerminalityComposedFromDependents parent contract
 
 /-- Attachment surface for transformation-local obligation bundles. -/
 structure TransformationLocalObligationWitness where
@@ -92,6 +156,10 @@ structure SemanticObjectWitnessBundle where
   authoritativeReadsPublication? : Option AuthoritativeReadPublicationWitness := none
   materializationSuccess? : Option MaterializationSuccessWitness := none
   progressContracts? : Option ProgressContractWitness := none
+  effectContracts? : Option EffectContractWitness := none
+  replayFailureExactness? : Option ReplayFailureExactnessWitness := none
+  crossTargetProgressDependentWork? :
+    Option CrossTargetProgressDependentWorkWitness := none
   transformationLocalObligations? : Option TransformationLocalObligationWitness := none
 
 /-- Core VM invariant space:
