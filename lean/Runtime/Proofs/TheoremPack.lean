@@ -64,13 +64,6 @@ def envelopeCapabilityBits
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   ]
 
-/-- Facade-level semantic-object theorem inventory. -/
-def semanticObjectInventory
-    {store₀ : SessionStore ν} {State : Type v}
-    {space : VMInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : VMTheoremPack (space := space)) : List (String × Bool) :=
-  Runtime.Proofs.semanticObjectInventory (pack := pack)
-
 /-- Facade-level list of enabled semantic-object theorem attachment points. -/
 def semanticObjectAttachmentPoints
     {store₀ : SessionStore ν} {State : Type v}
