@@ -92,20 +92,12 @@ include!("engine/instruction_choice.rs");
 include!("engine/open_commit.rs");
 include!("engine/kernel_impl.rs");
 
+// Test convenience aliases for types that were renamed during the
+// telltale-vm -> telltale-protocol-machine migration.
 #[cfg(test)]
-type ProtocolMachine<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
-    ProtocolMachine<I, G, P, Nu>;
+pub(crate) type ProtocolMachineStepResult = StepResult;
 #[cfg(test)]
-type ProtocolMachineConfig = ProtocolMachineConfig;
-#[cfg(test)]
-type ProtocolMachineError = ProtocolMachineError;
-#[cfg(test)]
-type ProtocolMachineState<I = (), G = (), P = NoopPersistence, Nu = DefaultVerificationModel> =
-    ProtocolMachineState<I, G, P, Nu>;
-#[cfg(test)]
-type ProtocolMachineStepResult = StepResult;
-#[cfg(test)]
-type ProtocolMachineRunStatus = RunStatus;
+pub(crate) type ProtocolMachineRunStatus = RunStatus;
 
 #[cfg(test)]
 mod tests {

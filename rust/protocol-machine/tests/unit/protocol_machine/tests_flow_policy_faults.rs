@@ -304,7 +304,7 @@
                 session,
                 witness_id,
                 ..
-            } if *session == owned.session_id() && *witness_id == witness.witness_id
+            } if session == &owned.session_id() && witness_id == &witness.witness_id
         )));
         assert!(vm.obs_trace().iter().any(|event| matches!(
             event,
@@ -312,7 +312,7 @@
                 session,
                 witness_id,
                 ..
-            } if *session == owned.session_id() && *witness_id == witness.witness_id
+            } if session == &owned.session_id() && witness_id == &witness.witness_id
         )));
         assert!(vm.obs_trace().iter().any(|event| matches!(
             event,
@@ -320,7 +320,7 @@
                 session,
                 reason: SessionTerminalReason::Cancelled { .. },
                 ..
-            } if *session == owned.session_id()
+            } if session == &owned.session_id()
         )));
     }
 

@@ -216,7 +216,7 @@ impl ThreadedProtocolMachine {
         }
 
         self.assert_delegation_events_audited(&pack.events)
-            .map_err(|err| Fault::Invoke {
+            .map_err(|err: ProtocolMachineError| Fault::Invoke {
                 failure: EffectFailure::contract_violation(err.to_string()),
             })?;
 

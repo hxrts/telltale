@@ -78,9 +78,9 @@ fn owned_boundary_docs_do_not_recommend_raw_open_or_backend_abstractions() {
 #[wasm_bindgen_test(unsupported = test)]
 fn internal_raw_open_surfaces_are_hidden_from_rustdoc() {
     let lib_src = include_str!("../src/lib.rs");
-    let coop_src = include_str!("../src/vm/runtime_exec/core.rs");
+    let coop_src = include_str!("../src/engine/runtime_exec/core.rs");
     let threaded_src = include_str!("../src/threaded/runtime_and_scheduling.rs");
-    let validation_src = include_str!("../src/vm/validation.rs");
+    let validation_src = include_str!("../src/engine/validation.rs");
 
     assert!(
         !lib_src.contains("pub use backend::ProtocolMachineBackend;"),

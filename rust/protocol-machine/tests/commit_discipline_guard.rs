@@ -8,12 +8,12 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 fn vm_impl_source() -> String {
     [
-        include_str!("../src/vm/runtime_exec/mod.rs"),
-        include_str!("../src/vm/validation.rs"),
-        include_str!("../src/vm/topology_and_dispatch.rs"),
-        include_str!("../src/vm/instruction_effects.rs"),
-        include_str!("../src/vm/instruction_choice.rs"),
-        include_str!("../src/vm/open_commit.rs"),
+        include_str!("../src/engine/runtime_exec/mod.rs"),
+        include_str!("../src/engine/validation.rs"),
+        include_str!("../src/engine/topology_and_dispatch.rs"),
+        include_str!("../src/engine/instruction_effects.rs"),
+        include_str!("../src/engine/instruction_choice.rs"),
+        include_str!("../src/engine/open_commit.rs"),
     ]
     .join("\n")
 }

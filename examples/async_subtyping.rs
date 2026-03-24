@@ -11,7 +11,7 @@
 //!
 //! Run with: cargo run --example async_subtyping
 
-use telltale_theory::{
+use telltale_theory::subtyping::{
     async_subtype, orphan_free, siso_decompose, sync_subtype, InputTree, OutputTree,
 };
 use telltale_types::{Label, LocalTypeR};

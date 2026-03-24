@@ -4,7 +4,7 @@
     use crate::coroutine::KnowledgeFact;
     use crate::effect::{EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput};
     use crate::verification::{Hash, Signature, VerifyingKey};
-    use crate::vm::{FlowPolicy, FlowPredicate};
+    use crate::engine::{FlowPolicy, FlowPredicate};
     use std::collections::{BTreeMap, BTreeSet};
     use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -205,7 +205,7 @@
         let status = vm
             .run(&NoopHandler, 8)
             .expect("run should return bounded status");
-        assert_eq!(status, ProtocolMachineRunStatus::MaxRoundsExceeded);
+        assert_eq!(status, RunStatus::MaxRoundsExceeded);
     }
 
     #[test]

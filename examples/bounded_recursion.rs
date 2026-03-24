@@ -8,9 +8,8 @@
 //!
 //! Run with: cargo run --example bounded_recursion
 
-use telltale_theory::{
-    bound_recursion, unfold_bounded, BoundingStrategy, FuelSteps, YieldAfterSteps,
-};
+use telltale_theory::bounded::{bound_recursion, unfold_bounded, BoundingStrategy};
+use telltale_theory::limits::{FuelSteps, YieldAfterSteps};
 use telltale_types::{Label, LocalTypeR};
 
 fn main() {

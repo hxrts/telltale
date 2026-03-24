@@ -21,7 +21,7 @@ const FORBIDDEN_PATTERNS: &[&str] = &[
 
 const KERNEL_SOURCES: &[(&str, &str)] = &[
     ("src/kernel.rs", include_str!("../src/kernel.rs")),
-    ("src/vm.rs", include_str!("../src/vm.rs")),
+    ("src/engine.rs", include_str!("../src/engine.rs")),
     ("src/threaded.rs", include_str!("../src/threaded.rs")),
     (
         "src/scheduler/mod.rs",
@@ -66,11 +66,11 @@ const FORBIDDEN_TOPOLOGY_MUTATORS: &[&str] = &[
     "TopologyPerturbation::Heal",
 ];
 
-// vm.rs is excluded from topology mutation check because it contains
+// engine.rs is excluded from topology mutation check because it contains
 // apply_topology_event which legitimately processes events received from
 // the effect handler via ingest_topology_events. This is the correct
 // ingress point for topology effects flowing through the handler.
-const TOPOLOGY_CHECK_EXCLUDES: &[&str] = &["src/vm.rs"];
+const TOPOLOGY_CHECK_EXCLUDES: &[&str] = &["src/engine.rs"];
 
 #[wasm_bindgen_test(unsupported = test)]
 fn vm_kernel_has_no_direct_nondeterministic_calls() {

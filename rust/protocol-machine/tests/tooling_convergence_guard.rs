@@ -5,16 +5,16 @@ use wasm_bindgen_test::wasm_bindgen_test;
 const TOOLING_SOURCES: &[(&str, &str)] = &[
     ("../../../Justfile", include_str!("../../../Justfile")),
     (
-        "../../../docs/15_vm_simulation_overview.md",
-        include_str!("../../../docs/15_vm_simulation_overview.md"),
+        "../../../docs/15_protocol_machine_simulation_overview.md",
+        include_str!("../../../docs/15_protocol_machine_simulation_overview.md"),
     ),
     (
-        "../../../docs/16_vm_simulation_runner.md",
-        include_str!("../../../docs/16_vm_simulation_runner.md"),
+        "../../../docs/16_protocol_machine_simulation_runner.md",
+        include_str!("../../../docs/16_protocol_machine_simulation_runner.md"),
     ),
     (
-        "../../../docs/17_vm_simulation_scenarios.md",
-        include_str!("../../../docs/17_vm_simulation_scenarios.md"),
+        "../../../docs/17_protocol_machine_simulation_scenarios.md",
+        include_str!("../../../docs/17_protocol_machine_simulation_scenarios.md"),
     ),
     (
         "../../choreography/examples/authority_surface.rs",
@@ -25,12 +25,12 @@ const TOOLING_SOURCES: &[(&str, &str)] = &[
         include_str!("../examples/v2_baseline_capture.rs"),
     ),
     (
-        "../benches/vm_bench_common.rs",
-        include_str!("../benches/vm_bench_common.rs"),
+        "../benches/protocol_machine_bench_common.rs",
+        include_str!("../benches/protocol_machine_bench_common.rs"),
     ),
     (
-        "../benches/vm_bench_runtime.rs",
-        include_str!("../benches/vm_bench_runtime.rs"),
+        "../benches/protocol_machine_bench_runtime.rs",
+        include_str!("../benches/protocol_machine_bench_runtime.rs"),
     ),
 ];
 
@@ -46,33 +46,32 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
             "./scripts/check/tooling-convergence.sh",
         ),
         (
-            "../../../docs/15_vm_simulation_overview.md",
+            "../../../docs/15_protocol_machine_simulation_overview.md",
             "GeneratedEffectScenario::builder()",
         ),
         (
-            "../../../docs/16_vm_simulation_runner.md",
+            "../../../docs/16_protocol_machine_simulation_runner.md",
             "ProtocolMachineSemanticObjects",
         ),
         (
-            "../../../docs/17_vm_simulation_scenarios.md",
+            "../../../docs/17_protocol_machine_simulation_scenarios.md",
             "record_stale_late_result",
         ),
         (
             "../../choreography/examples/authority_surface.rs",
             "generated_effect_families()",
         ),
-        ("../examples/v2_baseline_capture.rs", "ProtocolMachine::new"),
         (
             "../examples/v2_baseline_capture.rs",
             "ThreadedGuestRuntime::with_workers",
         ),
-        ("../benches/vm_bench_common.rs", "load_choreography_owned"),
+        ("../benches/protocol_machine_bench_common.rs", "load_choreography_owned"),
         (
-            "../benches/vm_bench_common.rs",
+            "../benches/protocol_machine_bench_common.rs",
             "fn handle_effect(&self, request: EffectRequest) -> EffectOutcome",
         ),
         (
-            "../benches/vm_bench_runtime.rs",
+            "../benches/protocol_machine_bench_runtime.rs",
             "protocol_machine_run_yield_small",
         ),
     ];
@@ -83,14 +82,9 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
             "../examples/v2_baseline_capture.rs",
             "ThreadedProtocolMachine",
         ),
-        ("../examples/v2_baseline_capture.rs", "ProtocolMachine::new"),
-        (
-            "../examples/v2_baseline_capture.rs",
-            "ProtocolMachineConfig",
-        ),
-        ("../benches/vm_bench_common.rs", "load_choreography("),
-        ("../benches/vm_bench_runtime.rs", "\"vm_run_yield_small\""),
-        ("../benches/vm_bench_runtime.rs", "load_choreography("),
+        ("../benches/protocol_machine_bench_common.rs", "load_choreography("),
+        ("../benches/protocol_machine_bench_runtime.rs", "\"vm_run_yield_small\""),
+        ("../benches/protocol_machine_bench_runtime.rs", "load_choreography("),
     ];
 
     let mut violations = Vec::new();
