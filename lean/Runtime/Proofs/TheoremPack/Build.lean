@@ -54,9 +54,10 @@ structure ProtocolMachineTheoremPack
   byzantineSafety? : Option ByzantineSafetyArtifact
   consensusEnvelope? : Option ConsensusEnvelopeArtifact
   failureEnvelope? : Option FailureEnvelopeArtifact
-  vmEnvelopeAdherence? : Option ProtocolMachineEnvelopeAdherenceArtifact
-  vmEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionArtifact
+  protocolMachineEnvelopeAdherence? : Option ProtocolMachineEnvelopeAdherenceArtifact
+  protocolMachineEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionArtifact
   protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeArtifact
+  proofCarryingMetadata : ProofCarryingArtifactMetadata
   foster? : Option (Adapters.FosterArtifact State)
   maxWeight? : Option Adapters.MaxWeightArtifact
   ldp? : Option Adapters.LDPArtifact
@@ -280,8 +281,8 @@ def buildProtocolMachineTheoremPack
 
   -- Builder: protocol machine Envelope Families
 
-  let vmEnvelopeAdherence? :=
-    match space.distributed.vmEnvelopeAdherence? with
+  let protocolMachineEnvelopeAdherence? :=
+    match space.distributed.protocolMachineEnvelopeAdherence? with
     | none => none
     | some p =>
         some
@@ -297,8 +298,8 @@ def buildProtocolMachineTheoremPack
           , shardedFullAbstraction := p.shardedFullAbstraction
           , capabilityMonotonicity := p.capabilityMonotonicity
           }
-  let vmEnvelopeAdmission? :=
-    match space.distributed.vmEnvelopeAdmission? with
+  let protocolMachineEnvelopeAdmission? :=
+    match space.distributed.protocolMachineEnvelopeAdmission? with
     | none => none
     | some p =>
         some
@@ -334,6 +335,13 @@ def buildProtocolMachineTheoremPack
           , shardCutPreservation := p.bundle.shardCutPreservation
           }
   let classicalPack := Adapters.buildProtocolMachineClassicalTheoremPack (space := space.toClassicalSpace)
+  let proofCarryingMetadata :=
+    ProofCarryingArtifactMetadata.ofInvariantSpace
+      (space := space)
+      semanticObjects?
+      protocolMachineEnvelopeAdherence?.isSome
+      protocolMachineEnvelopeAdmission?.isSome
+      protocolEnvelopeBridge?.isSome
   { termination? := termination?
   , outputCondition? := outputCondition?
   , semanticObjects? := semanticObjects?
@@ -354,9 +362,10 @@ def buildProtocolMachineTheoremPack
   , byzantineSafety? := byzantineSafety?
   , consensusEnvelope? := consensusEnvelope?
   , failureEnvelope? := failureEnvelope?
-  , vmEnvelopeAdherence? := vmEnvelopeAdherence?
-  , vmEnvelopeAdmission? := vmEnvelopeAdmission?
+  , protocolMachineEnvelopeAdherence? := protocolMachineEnvelopeAdherence?
+  , protocolMachineEnvelopeAdmission? := protocolMachineEnvelopeAdmission?
   , protocolEnvelopeBridge? := protocolEnvelopeBridge?
+  , proofCarryingMetadata := proofCarryingMetadata
   , foster? := classicalPack.foster?
   , maxWeight? := classicalPack.maxWeight?
   , ldp? := classicalPack.ldp?
@@ -369,6 +378,39 @@ def buildProtocolMachineTheoremPack
   , littlesLaw? := classicalPack.littlesLaw?
   , functionalCLT? := classicalPack.functionalCLT?
   }
+
+/-- Theorem-pack adherence artifact presence matches the canonical execution-profile flag. -/
+theorem protocolMachineEnvelopeAdherence_matches_execution_profile
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    (buildProtocolMachineTheoremPack (space := space)).protocolMachineEnvelopeAdherence?.isSome =
+      space.executionProfile.supportsProtocolMachineEnvelopeAdherence := by
+  cases h : space.distributed.protocolMachineEnvelopeAdherence? <;>
+    simp [buildProtocolMachineTheoremPack,
+      ProtocolMachineInvariantSpaceWithProfiles.executionProfile,
+      ProtocolMachineExecutionProfile.supportsProtocolMachineEnvelopeAdherence, h]
+
+/-- Theorem-pack admission artifact presence matches the canonical execution-profile flag. -/
+theorem protocolMachineEnvelopeAdmission_matches_execution_profile
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    (buildProtocolMachineTheoremPack (space := space)).protocolMachineEnvelopeAdmission?.isSome =
+      space.executionProfile.supportsProtocolMachineEnvelopeAdmission := by
+  cases h : space.distributed.protocolMachineEnvelopeAdmission? <;>
+    simp [buildProtocolMachineTheoremPack,
+      ProtocolMachineInvariantSpaceWithProfiles.executionProfile,
+      ProtocolMachineExecutionProfile.supportsProtocolMachineEnvelopeAdmission, h]
+
+/-- Theorem-pack bridge artifact presence matches the canonical execution-profile flag. -/
+theorem protocolEnvelopeBridge_matches_execution_profile
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    (buildProtocolMachineTheoremPack (space := space)).protocolEnvelopeBridge?.isSome =
+      space.executionProfile.supportsProtocolEnvelopeBridge := by
+  cases h : space.distributed.protocolEnvelopeBridge? <;>
+    simp [buildProtocolMachineTheoremPack,
+      ProtocolMachineInvariantSpaceWithProfiles.executionProfile,
+      ProtocolMachineExecutionProfile.supportsProtocolEnvelopeBridge, h]
 
 end
 

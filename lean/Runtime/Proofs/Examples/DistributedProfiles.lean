@@ -137,14 +137,14 @@ example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.FailureE
 
 example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.ProtocolMachineEnvelopeAdherenceProfile) :
     (buildProtocolMachineTheoremPack
-      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withVMEnvelopeAdherence p)
-    ).vmEnvelopeAdherence?.isSome = true := by
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withProtocolMachineEnvelopeAdherence p)
+    ).protocolMachineEnvelopeAdherence?.isSome = true := by
   rfl
 
 example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.ProtocolMachineEnvelopeAdmissionProfile) :
     (buildProtocolMachineTheoremPack
-      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withVMEnvelopeAdmission p)
-    ).vmEnvelopeAdmission?.isSome = true := by
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withProtocolMachineEnvelopeAdmission p)
+    ).protocolMachineEnvelopeAdmission?.isSome = true := by
   rfl
 
 example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.ProtocolEnvelopeBridgeProfile) :

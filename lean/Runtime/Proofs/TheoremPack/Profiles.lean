@@ -2,6 +2,7 @@ import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Distributed.ProfileWrappers
 import Runtime.Proofs.Adapters.Classical
 import Runtime.Proofs.Contracts.DeterminismApi
+import Runtime.Adequacy.EnvelopeCore.AdmissionLogic
 
 set_option autoImplicit false
 
@@ -244,22 +245,22 @@ def ProtocolMachineInvariantSpaceWithProfiles.withFailureEnvelope
     (fun distributed => { distributed with failureEnvelope? := some p })
 
 /-- Attach a protocol machine-envelope-adherence distributed profile to a combined space. -/
-def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdherence
+def ProtocolMachineInvariantSpaceWithProfiles.withProtocolMachineEnvelopeAdherence
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ProtocolMachineEnvelopeAdherenceProfile) :
     ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
-    (fun distributed => { distributed with vmEnvelopeAdherence? := some p })
+    (fun distributed => { distributed with protocolMachineEnvelopeAdherence? := some p })
 
 /-- Attach a protocol machine-envelope-admission distributed profile to a combined space. -/
-def ProtocolMachineInvariantSpaceWithProfiles.withVMEnvelopeAdmission
+def ProtocolMachineInvariantSpaceWithProfiles.withProtocolMachineEnvelopeAdmission
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (p : Adapters.ProtocolMachineEnvelopeAdmissionProfile) :
     ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
-    (fun distributed => { distributed with vmEnvelopeAdmission? := some p })
+    (fun distributed => { distributed with protocolMachineEnvelopeAdmission? := some p })
 
 /-- Attach a protocol-envelope-bridge distributed profile to a combined space. -/
 def ProtocolMachineInvariantSpaceWithProfiles.withProtocolEnvelopeBridge
@@ -280,6 +281,125 @@ def ProtocolMachineInvariantSpaceWithProfiles.withFoster
     ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
   ProtocolMachineInvariantSpaceWithProfiles.updateClassicalProfiles space
     (fun classical => { classical with foster? := some p })
+
+/-! ## Execution Profiles -/
+
+/-- Canonical fairness assumptions fixed by one proof-carrying execution profile. -/
+inductive ProtocolMachineFairnessAssumption where
+  | scheduleConfluence
+  | starvationFreedom
+  | livenessFairness
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Canonical admissibility classes fixed by one proof-carrying execution profile. -/
+inductive ProtocolMachineAdmissibilityClass where
+  | localEnvelope
+  | shardedEnvelope
+  | protocolEnvelopeBridge
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Canonical escalation-window classes fixed by one proof-carrying execution profile. -/
+inductive ProtocolMachineEscalationWindowClass where
+  | progressContractBounded
+  | admissionComplexityBounded
+  | protocolBridgeBounded
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Profile-level proof-carrying execution context for theorem-pack derivation. -/
+structure ProtocolMachineExecutionProfile where
+  fairnessAssumptions : List ProtocolMachineFairnessAssumption
+  admissibilityClasses : List ProtocolMachineAdmissibilityClass
+  escalationWindowClasses : List ProtocolMachineEscalationWindowClass
+  theoremPackEligibility : List (String × Bool)
+  necessityCatalog : List Runtime.Adequacy.TransportNecessityProfile := []
+  deriving Repr, Inhabited
+
+/-- Whether this execution profile carries protocol-machine adherence eligibility. -/
+def ProtocolMachineExecutionProfile.supportsProtocolMachineEnvelopeAdherence
+    (profile : ProtocolMachineExecutionProfile) : Bool :=
+  (profile.theoremPackEligibility.find? (fun entry =>
+    entry.1 = "protocol_machine_envelope_adherence")).map Prod.snd |>.getD false
+
+/-- Whether this execution profile carries protocol-machine admission eligibility. -/
+def ProtocolMachineExecutionProfile.supportsProtocolMachineEnvelopeAdmission
+    (profile : ProtocolMachineExecutionProfile) : Bool :=
+  (profile.theoremPackEligibility.find? (fun entry =>
+    entry.1 = "protocol_machine_envelope_admission")).map Prod.snd |>.getD false
+
+/-- Whether this execution profile carries protocol-envelope bridge eligibility. -/
+def ProtocolMachineExecutionProfile.supportsProtocolEnvelopeBridge
+    (profile : ProtocolMachineExecutionProfile) : Bool :=
+  (profile.theoremPackEligibility.find? (fun entry =>
+    entry.1 = "protocol_envelope_bridge")).map Prod.snd |>.getD false
+
+/-- Catalog-level necessity hardening attached to an execution profile. -/
+def ProtocolMachineExecutionProfile.necessityHardened
+    (profile : ProtocolMachineExecutionProfile) : Prop :=
+  Runtime.Adequacy.transportCatalogNecessityHardened profile.necessityCatalog
+
+/-- Catalog-level minimal-basis closure attached to an execution profile. -/
+def ProtocolMachineExecutionProfile.necessityMinimalBasis
+    (profile : ProtocolMachineExecutionProfile) : Prop :=
+  Runtime.Adequacy.transportCatalogMinimalBasis profile.necessityCatalog
+
+/-- Build the canonical execution profile carried by one invariant space. -/
+def ProtocolMachineInvariantSpaceWithProfiles.executionProfile
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
+    ProtocolMachineExecutionProfile :=
+  { fairnessAssumptions :=
+      [ .scheduleConfluence
+      , .starvationFreedom
+      ] ++
+      match space.toProtocolMachineInvariantSpace.liveness? with
+      | some _ => [ .livenessFairness ]
+      | none => []
+  , admissibilityClasses :=
+      [ .localEnvelope
+      , .shardedEnvelope
+      ] ++
+      match space.distributed.protocolEnvelopeBridge? with
+      | some _ => [ .protocolEnvelopeBridge ]
+      | none => []
+  , escalationWindowClasses :=
+      [ .progressContractBounded ] ++
+      (match space.distributed.protocolMachineEnvelopeAdmission? with
+      | some _ => [ .admissionComplexityBounded ]
+      | none => []) ++
+      (match space.distributed.protocolEnvelopeBridge? with
+      | some _ => [ .protocolBridgeBounded ]
+      | none => [])
+  , theoremPackEligibility :=
+      [ ("termination", space.toProtocolMachineInvariantSpace.liveness?.isSome)
+      , ("protocol_machine_envelope_adherence",
+          space.distributed.protocolMachineEnvelopeAdherence?.isSome)
+      , ("protocol_machine_envelope_admission",
+          space.distributed.protocolMachineEnvelopeAdmission?.isSome)
+      , ("protocol_envelope_bridge", space.distributed.protocolEnvelopeBridge?.isSome)
+      , ("classical_foster", space.classical.foster?.isSome)
+      ]
+  }
+
+/-- If every transport assumption in the execution profile is marked proven-necessary,
+the profile is necessity-hardened. -/
+theorem executionProfile_necessity_hardened_of_all_proven_necessary
+    (profile : ProtocolMachineExecutionProfile)
+    (hAll : ∀ p, p ∈ profile.necessityCatalog →
+      Runtime.Adequacy.profileNecessityHardened p) :
+    profile.necessityHardened := by
+  exact Runtime.Adequacy.transport_catalog_necessity_hardened_of_profiles
+    profile.necessityCatalog hAll
+
+/-- Build minimal-basis closure for an execution profile from hardened transport
+profiles plus dropped-assumption oracles. -/
+theorem executionProfile_necessity_minimal_basis_of_hardened_and_oracles
+    (profile : ProtocolMachineExecutionProfile)
+    (hHard : profile.necessityHardened)
+    (hOracle : ∀ p, p ∈ profile.necessityCatalog →
+      Runtime.Adequacy.TransportProfileMinimalityOracle p) :
+    profile.necessityMinimalBasis := by
+  exact Runtime.Adequacy.transport_catalog_minimal_basis_of_hardened_and_oracles
+    profile.necessityCatalog hHard hOracle
 
 end
 

@@ -97,6 +97,64 @@ def SemanticObjectArtifacts.attachmentPoints
   (SemanticObjectArtifacts.inventory artifacts?).foldr
     (fun entry acc => if entry.2 then entry.1 :: acc else acc) []
 
+/-! ## Proof-Carrying Artifact Metadata -/
+
+/-- Profile metadata carried alongside theorem-pack artifacts. -/
+structure ProfileArtifactMetadata where
+  executionProfile : ProtocolMachineExecutionProfile
+  theoremPackEligibility : List (String × Bool)
+
+/-- Progress metadata carried alongside theorem-pack artifacts. -/
+structure ProgressArtifactMetadata where
+  requiresExplicitProgressContracts : Bool
+  parityCriticalOperationsProtected : Bool
+  failureTaxonomyLinked : Bool
+
+/-- Envelope/adherence metadata carried alongside theorem-pack artifacts. -/
+structure EnvelopeArtifactMetadata where
+  protocolMachineEnvelopeAdherence : Bool
+  protocolMachineEnvelopeAdmission : Bool
+  protocolEnvelopeBridge : Bool
+  adequacyLinked : Bool
+  adherenceLinked : Bool
+
+/-- Canonical proof-carrying artifact metadata surface for one theorem pack. -/
+structure ProofCarryingArtifactMetadata where
+  profile : ProfileArtifactMetadata
+  progress : ProgressArtifactMetadata
+  envelope : EnvelopeArtifactMetadata
+
+/-- Build proof-carrying artifact metadata from the current invariant space and
+derived artifact presence. -/
+def ProofCarryingArtifactMetadata.ofInvariantSpace
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (semanticObjects? : Option SemanticObjectArtifacts)
+    (hasProtocolMachineEnvelopeAdherence : Bool)
+    (hasProtocolMachineEnvelopeAdmission : Bool)
+    (hasProtocolEnvelopeBridge : Bool) :
+    ProofCarryingArtifactMetadata :=
+  let executionProfile := space.executionProfile
+  { profile :=
+      { executionProfile := executionProfile
+      , theoremPackEligibility := executionProfile.theoremPackEligibility
+      }
+  , progress :=
+      { requiresExplicitProgressContracts := true
+      , parityCriticalOperationsProtected := semanticObjects?.isSome
+      , failureTaxonomyLinked := semanticObjects?.isSome
+      }
+  , envelope :=
+      { protocolMachineEnvelopeAdherence := hasProtocolMachineEnvelopeAdherence
+      , protocolMachineEnvelopeAdmission := hasProtocolMachineEnvelopeAdmission
+      , protocolEnvelopeBridge := hasProtocolEnvelopeBridge
+      , adequacyLinked :=
+          hasProtocolMachineEnvelopeAdherence || hasProtocolMachineEnvelopeAdmission
+      , adherenceLinked :=
+          hasProtocolMachineEnvelopeAdherence && hasProtocolEnvelopeBridge
+      }
+  }
+
 /-! ## FLP Artifacts -/
 
 structure FLPLowerBoundArtifact where

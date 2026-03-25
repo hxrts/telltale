@@ -129,8 +129,8 @@ structure DistributedProfiles where
   byzantineSafety? : Option ByzantineSafetyProfile := none
   consensusEnvelope? : Option ConsensusEnvelopeProfile := none
   failureEnvelope? : Option FailureEnvelopeProfile := none
-  vmEnvelopeAdherence? : Option ProtocolMachineEnvelopeAdherenceProfile := none
-  vmEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionProfile := none
+  protocolMachineEnvelopeAdherence? : Option ProtocolMachineEnvelopeAdherenceProfile := none
+  protocolMachineEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionProfile := none
   protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeProfile := none
 
 /-- protocol machine invariant space extended with optional distributed-theory profiles. -/

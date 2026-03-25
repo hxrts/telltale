@@ -18,6 +18,41 @@ def semanticObjectInventory
     (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
   SemanticObjectArtifacts.inventory pack.semanticObjects?
 
+/-- Proof-carrying artifact metadata inventory extracted from one theorem pack. -/
+def proofCarryingMetadataInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
+  [ ("profile_fairness_schedule_confluence",
+      ProtocolMachineFairnessAssumption.scheduleConfluence ∈
+        pack.proofCarryingMetadata.profile.executionProfile.fairnessAssumptions)
+  , ("profile_fairness_starvation_freedom",
+      ProtocolMachineFairnessAssumption.starvationFreedom ∈
+        pack.proofCarryingMetadata.profile.executionProfile.fairnessAssumptions)
+  , ("profile_progress_contract_bounded",
+      ProtocolMachineEscalationWindowClass.progressContractBounded ∈
+        pack.proofCarryingMetadata.profile.executionProfile.escalationWindowClasses)
+  , ("profile_protocol_bridge_bounded",
+      ProtocolMachineEscalationWindowClass.protocolBridgeBounded ∈
+        pack.proofCarryingMetadata.profile.executionProfile.escalationWindowClasses)
+  , ("metadata_requires_explicit_progress_contracts",
+      pack.proofCarryingMetadata.progress.requiresExplicitProgressContracts)
+  , ("metadata_parity_critical_progress_protected",
+      pack.proofCarryingMetadata.progress.parityCriticalOperationsProtected)
+  , ("metadata_failure_taxonomy_linked",
+      pack.proofCarryingMetadata.progress.failureTaxonomyLinked)
+  , ("metadata_protocol_machine_envelope_adherence",
+      pack.proofCarryingMetadata.envelope.protocolMachineEnvelopeAdherence)
+  , ("metadata_protocol_machine_envelope_admission",
+      pack.proofCarryingMetadata.envelope.protocolMachineEnvelopeAdmission)
+  , ("metadata_protocol_envelope_bridge",
+      pack.proofCarryingMetadata.envelope.protocolEnvelopeBridge)
+  , ("metadata_envelope_adequacy_linked",
+      pack.proofCarryingMetadata.envelope.adequacyLinked)
+  , ("metadata_envelope_adherence_linked",
+      pack.proofCarryingMetadata.envelope.adherenceLinked)
+  ]
+
 def theoremInventory
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
@@ -41,11 +76,11 @@ def theoremInventory
   , ("byzantine_safety_characterization", pack.byzantineSafety?.isSome)
   , ("consensus_envelope", pack.consensusEnvelope?.isSome)
   , ("failure_envelope", pack.failureEnvelope?.isSome)
-  , ("protocol_machine_envelope_adherence", pack.vmEnvelopeAdherence?.isSome)
-  , ("protocol_machine_envelope_admission", pack.vmEnvelopeAdmission?.isSome)
+  , ("protocol_machine_envelope_adherence", pack.protocolMachineEnvelopeAdherence?.isSome)
+  , ("protocol_machine_envelope_admission", pack.protocolMachineEnvelopeAdmission?.isSome)
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   , ("effect_interface_bridge",
-      pack.vmEnvelopeAdherence?.isSome && pack.protocolEnvelopeBridge?.isSome)
+      pack.protocolMachineEnvelopeAdherence?.isSome && pack.protocolEnvelopeBridge?.isSome)
   , ("classical_foster", pack.foster?.isSome)
   , ("classical_maxweight", pack.maxWeight?.isSome)
   , ("classical_ldp", pack.ldp?.isSome)
@@ -56,7 +91,8 @@ def theoremInventory
   , ("classical_concentration", pack.concentration?.isSome)
   , ("classical_littles_law", pack.littlesLaw?.isSome)
   , ("classical_functional_clt", pack.functionalCLT?.isSome)
-  ] ++ semanticObjectInventory (pack := pack)
+  ] ++ semanticObjectInventory (pack := pack) ++
+    proofCarryingMetadataInventory (pack := pack)
 
 /-! ## Determinism Extension -/
 

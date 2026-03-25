@@ -67,6 +67,21 @@ abbrev semanticObjectInventory
     List (String × Bool) :=
   Runtime.Proofs.semanticObjectInventory (pack := pack)
 
+/-- API alias: proof-carrying artifact metadata attached to the theorem pack. -/
+abbrev proofCarryingMetadata
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) : ProofCarryingArtifactMetadata :=
+  pack.proofCarryingMetadata
+
+/-- API alias: proof-carrying artifact metadata inventory extracted from the theorem pack. -/
+abbrev proofCarryingMetadataInventory
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space)) :
+    List (String × Bool) :=
+  Runtime.Proofs.proofCarryingMetadataInventory (pack := pack)
+
 /-- Compact list of enabled semantic-object theorem attachment points. -/
 def semanticObjectCapabilities
     {store₀ : SessionStore ν} {State : Type v}
@@ -276,14 +291,14 @@ def canUseMixedDeterminismProfiles
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.vmEnvelopeAdherence?.isSome && pack.vmEnvelopeAdmission?.isSome
+  pack.protocolMachineEnvelopeAdherence?.isSome && pack.protocolMachineEnvelopeAdmission?.isSome
 
 /-- Runtime gate: Byzantine-safe operation requires Byzantine + protocol machine adherence artifacts. -/
 def canOperateUnderByzantineEnvelope
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.byzantineSafety?.isSome && pack.vmEnvelopeAdherence?.isSome
+  pack.byzantineSafety?.isSome && pack.protocolMachineEnvelopeAdherence?.isSome
 
 /-- Runtime gate: autoscaling/repartitioning requires compositional-envelope evidence. -/
 def canAutoscaleOrRepartition

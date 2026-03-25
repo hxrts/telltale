@@ -760,7 +760,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided protocol machine policy |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
 | Proofs/ConcurrencyThreaded.lean | 102 | V2: Threaded concurrency proofs with wave certification |
-| Proofs/SchedulerTheoremPack.lean | 200 | V2: Scheduler theorem bundle for runtime admission |
+| Proofs/SchedulerTheoremPack.lean | 200 | V2: Scheduler theorem bundle for runtime admission and proof-space packaging |
 | Proofs/SchedulerApi.lean | 257 | Scheduler API surface for runtime admission |
 | Proofs/CompileLocalTypeRCorrectness.lean | 53 | Compiler correctness properties (nonempty, ends with halt/jmp) |
 | Proofs/SessionLocal.lean | 337 | `SessionSlice`, `SessionCoherent`, session-local frame infrastructure |
@@ -779,7 +779,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Adapters/Distributed.lean | 87 | V2: Distributed adapter re-exports |
 | Proofs/Adapters/Distributed/CoreProfiles.lean | 10 | V2: Distributed profile definitions |
 | Proofs/Adapters/Distributed/ProfileSetters.lean | 223 | V2: Profile configuration utilities |
-| Proofs/Adapters/Distributed/ProfileWrappers.lean | 180 | V2: Profile wrapper types |
+| Proofs/Adapters/Distributed/ProfileWrappers.lean | 146 | V2: Canonical distributed profile wrapper types, including protocol-machine envelope profiles |
 | Proofs/Adapters/Distributed/ProfileExtractionTheorems.lean | 217 | V2: Profile extraction theorems |
 | Proofs/Adapters/Distributed/EnvelopeTheorems.lean | 488 | V2: Envelope theorem facade |
 | Proofs/Adapters/Distributed/EnvelopeTheoremsAdmissionBridge.lean | 133 | V2: Admission and bridge theorems |
@@ -788,11 +788,11 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/TheoremPack/API.lean | 319 | V2: Public theorem pack interface including semantic-object composition, inventory, and runtime gate APIs |
-| Proofs/TheoremPack/Build.lean | 371 | V2: Theorem pack construction |
-| Proofs/TheoremPack/Artifacts.lean | 497 | V2: Artifact generation plus semantic-object theorem-family packaging for invariant-space witnesses |
-| Proofs/TheoremPack/Profiles.lean | 287 | V2: Determinism profile definitions |
-| Proofs/TheoremPack/Inventory.lean | 75 | V2: Capability inventory management including integrated semantic-object proof-family inventories |
+| Proofs/TheoremPack/API.lean | 334 | V2: Public theorem-pack interface including proof-carrying metadata, semantic-object composition, inventory, and runtime gate APIs |
+| Proofs/TheoremPack/Build.lean | 418 | V2: Theorem-pack construction plus execution-profile/adherence correspondence theorems |
+| Proofs/TheoremPack/Artifacts.lean | 555 | V2: Artifact generation plus semantic-object packaging and proof-carrying metadata surfaces |
+| Proofs/TheoremPack/Profiles.lean | 407 | V2: Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
+| Proofs/TheoremPack/Inventory.lean | 111 | V2: Capability inventory management including semantic-object and proof-carrying metadata inventories |
 | Proofs/TheoremPack/ReleaseConformance.lean | 299 | V2: Release gate conformance checking |
 
 ### Proofs/EffectBisim (V2 Handler Equivalence)
