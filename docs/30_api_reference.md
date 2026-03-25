@@ -129,6 +129,7 @@ Key exports:
 - `global_to_json`, `local_to_json`, `json_to_global`, `json_to_local`
 - `LeanRunner`, `Validator`, `ValidationResult`
 - `ProtocolMachineSemanticObjects` and semantic-object schema helpers
+  These come from the same canonical semantic-object family as `telltale_machine::model::semantic_objects`, not a bridge-local duplicate.
 
 See [Lean-Rust Bridge](24_lean_rust_bridge.md) for details.
 

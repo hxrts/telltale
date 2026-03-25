@@ -132,6 +132,7 @@ Canonical layout mapping for this family is:
   `rust/machine/src/semantic_objects.rs`
 - Rust bridge mirror:
   `rust/bridge/src/semantic_objects.rs`
+  This bridge surface must re-export the machine semantic-object family rather than carrying a duplicate schema copy.
 
 Region remains a choreography/topology identifier outside the protocol-machine semantic-object family.
 It must not be used as a substitute for the protocol-machine semantic-object vocabulary until the region proof/model layer lands.

@@ -29,6 +29,8 @@ for path in "${required_surfaces[@]}"; do
 done
 
 required_types=(
+  "OwnershipScope"
+  "DelegationStatus"
   "OperationInstance"
   "OutstandingEffect"
   "SemanticHandoff"
@@ -120,10 +122,19 @@ if ! rg -q '^pub const SEMANTIC_OBJECTS_SCHEMA_VERSION' "${RUST_MACHINE_SEMANTIC
   exit 1
 fi
 
-if ! rg -q '^pub const SEMANTIC_OBJECTS_SCHEMA_VERSION' "${RUST_BRIDGE_SEMANTIC_OBJECTS}"; then
-  echo "[semantic-name-parity] rust bridge semantic objects missing schema version marker" >&2
+if ! rg -q 'pub use telltale_machine::model::semantic_objects::\{' "${RUST_BRIDGE_SEMANTIC_OBJECTS}"; then
+  echo "[semantic-name-parity] rust bridge semantic objects must reuse the machine semantic-object family" >&2
   exit 1
 fi
+
+for duplicate in "pub struct OperationInstance" "pub struct OutstandingEffect" "pub struct SemanticHandoff" \
+  "pub struct AuthoritativeRead" "pub struct ObservedRead" "pub struct MaterializationProof" \
+  "pub struct CanonicalHandle" "pub struct ProgressContract"; do
+  if rg -q "${duplicate}" "${RUST_BRIDGE_SEMANTIC_OBJECTS}"; then
+    echo "[semantic-name-parity] rust bridge semantic objects still define duplicate canonical types" >&2
+    exit 1
+  fi
+done
 
 if ! rg -q 'Region remains a choreography/topology identifier outside the protocol-machine semantic-object family' \
   "${ROOT_DIR}/docs/19_rust_lean_parity.md"; then

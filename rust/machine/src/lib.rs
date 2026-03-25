@@ -137,11 +137,10 @@ pub mod model {
         pub use crate::effect::{
             CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectExchangeRecord,
             EffectFailure, EffectFailureKind, EffectHandler, EffectHandlerDomain,
-            EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus,
-            EffectReentrancyPolicy, EffectRequest, EffectRequestBody, EffectResponse,
-            EffectResult, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry,
-            EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler, SendDecision,
-            SendDecisionInput, TopologyPerturbation,
+            EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus, EffectReentrancyPolicy,
+            EffectRequest, EffectRequestBody, EffectResponse, EffectResult, EffectTimeoutPolicy,
+            EffectTotality, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler,
+            ReplayEffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation,
         };
     }
 
@@ -179,11 +178,11 @@ pub mod model {
     pub mod semantic_objects {
         pub use crate::semantic_objects::{
             protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
-            AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, MaterializationProof,
-            ObservedRead, OperationInstance, OperationPhase, OutstandingEffect,
-            OutstandingEffectStatus, ProgressContract, ProgressState, ProgressTransition,
-            ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
-            PublicationStatus, SemanticHandoff, TransformationObligation,
+            AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, DelegationStatus,
+            MaterializationProof, ObservedRead, OperationInstance, OperationPhase,
+            OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
+            ProgressState, ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent,
+            PublicationObserverClass, PublicationStatus, SemanticHandoff, TransformationObligation,
             SEMANTIC_OBJECTS_SCHEMA_VERSION,
         };
     }
@@ -277,8 +276,7 @@ pub use engine::{
     ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, ProtocolMachine,
     ProtocolMachineConfig, ProtocolMachineError, ProtocolMachineMemoryUsage,
     ProtocolMachineRetainedBytes, ProtocolMachineState, ResourceState, RunStatus,
-    RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult,
-    ThreadedRoundSemantics,
+    RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
 };
 pub use engine::{FlowPolicy, FlowPredicate};
 pub use envelope_diff::{

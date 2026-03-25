@@ -10,9 +10,9 @@
 use crate::output_condition::OutputConditionCheck;
 use crate::session::{
     AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord, AuthorityWitnessId,
-    FragmentOwnerId, OwnershipEpoch, OwnershipScope, SessionId,
+    FragmentOwnerId, OwnershipEpoch, SessionId,
 };
-use crate::transfer_semantics::{DelegationAuditRecord, DelegationStatus};
+use crate::transfer_semantics::DelegationAuditRecord;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -119,6 +119,20 @@ pub enum ProgressState {
     Cancelled,
     TimedOut,
     HandedOff,
+}
+
+/// Ownership scope carried by the canonical semantic-object family.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum OwnershipScope {
+    Session,
+    Fragments(Vec<String>),
+}
+
+/// Delegation outcome carried by the canonical semantic-object family.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum DelegationStatus {
+    Committed,
+    RolledBack,
 }
 
 fn default_progress_contract_last_progress_tick() -> Option<u64> {
@@ -447,7 +461,25 @@ fn coro_owner_id(coro_id: usize) -> String {
 fn transformed_fragments(scope: &OwnershipScope) -> Vec<String> {
     match scope {
         OwnershipScope::Session => vec!["session".to_string()],
-        OwnershipScope::Fragments(fragments) => fragments.iter().cloned().collect(),
+        OwnershipScope::Fragments(fragments) => fragments.clone(),
+    }
+}
+
+fn semantic_ownership_scope(scope: &crate::session::OwnershipScope) -> OwnershipScope {
+    match scope {
+        crate::session::OwnershipScope::Session => OwnershipScope::Session,
+        crate::session::OwnershipScope::Fragments(fragments) => {
+            OwnershipScope::Fragments(fragments.iter().cloned().collect())
+        }
+    }
+}
+
+fn semantic_delegation_status(
+    status: &crate::transfer_semantics::DelegationStatus,
+) -> DelegationStatus {
+    match status {
+        crate::transfer_semantics::DelegationStatus::Committed => DelegationStatus::Committed,
+        crate::transfer_semantics::DelegationStatus::RolledBack => DelegationStatus::RolledBack,
     }
 }
 
@@ -536,8 +568,8 @@ pub fn protocol_machine_semantic_objects_v1(
             to_coro: record.receipt.to_coro,
             revoked_owner_id: coro_owner_id(record.receipt.from_coro),
             activated_owner_id: coro_owner_id(record.receipt.to_coro),
-            scope: record.receipt.scope.clone(),
-            status: record.status.clone(),
+            scope: semantic_ownership_scope(&record.receipt.scope),
+            status: semantic_delegation_status(&record.status),
             tick: record.tick,
             reason: record.reason.clone(),
         })
@@ -577,20 +609,25 @@ pub fn protocol_machine_semantic_objects_v1(
                 obligation_id: format!("handoff:{}", record.receipt.receipt_id),
                 handoff_id: record.receipt.receipt_id,
                 session: record.receipt.session,
-                transformed_fragments: transformed_fragments(&record.receipt.scope),
+                transformed_fragments: transformed_fragments(&semantic_ownership_scope(
+                    &record.receipt.scope,
+                )),
                 affected_operation_ids,
                 affected_effect_ids,
                 transported_effect_ids,
                 invalidated_effect_ids,
-                witness_policy: if matches!(record.status, DelegationStatus::Committed) {
+                witness_policy: if matches!(
+                    semantic_delegation_status(&record.status),
+                    DelegationStatus::Committed
+                ) {
                     "transport_pending_invalidate_blocked".to_string()
                 } else {
                     "rollback".to_string()
                 },
                 publication_revoked_from: coro_owner_id(record.receipt.from_coro),
                 publication_activated_to: coro_owner_id(record.receipt.to_coro),
-                scope: record.receipt.scope.clone(),
-                status: record.status.clone(),
+                scope: semantic_ownership_scope(&record.receipt.scope),
+                status: semantic_delegation_status(&record.status),
                 tick: record.tick,
                 reason: record.reason.clone(),
             }
