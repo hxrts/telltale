@@ -15,22 +15,14 @@ mod authority;
 mod branching;
 mod control_flow;
 mod looping;
-mod protocol_machine;
 mod semantic;
 mod send;
 pub(crate) use authority::{
     parse_case_stmt, parse_let_in_stmt, parse_let_stmt, parse_timeout_stmt,
 };
 pub(crate) use branching::{parse_choice_stmt, parse_par_stmt};
-pub(super) use control_flow::{
-    parse_call_stmt, parse_continue_stmt, parse_handshake_stmt, parse_quorum_collect_stmt,
-    parse_rec_stmt, parse_retry_stmt,
-};
-pub(crate) use looping::{parse_heartbeat_stmt, parse_loop_stmt};
-pub(super) use protocol_machine::{
-    parse_vm_abort_stmt, parse_vm_acquire_stmt, parse_vm_check_stmt, parse_vm_fork_stmt,
-    parse_vm_join_stmt, parse_vm_release_stmt, parse_vm_tag_stmt, parse_vm_transfer_stmt,
-};
+pub(super) use control_flow::{parse_call_stmt, parse_continue_stmt, parse_rec_stmt};
+pub(crate) use looping::parse_loop_stmt;
 pub(crate) use semantic::{parse_dependent_work_stmt, parse_handoff_stmt, parse_publish_stmt};
 pub(crate) use send::{parse_broadcast_stmt, parse_send_stmt};
 

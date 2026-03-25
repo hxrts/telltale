@@ -1,7 +1,9 @@
 use super::*;
 use crate::ast::{
-    EffectOpAuthorityClass, EffectOpDecl, FragmentDecl, GuestRuntimeDecl, OperationDecl,
-    OperationParamDecl, TypeConstructorDecl,
+    EffectAuthorityClass, EffectInterfaceDeclaration, EffectOperationDeclaration,
+    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration,
+    OperationParameterDeclaration, RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration,
+    TopologyDeclaration, TypeConstructorDeclaration, TypeDeclaration,
 };
 
 pub(super) fn enforce_same_line_equals(
@@ -22,6 +24,14 @@ pub(super) fn enforce_same_line_equals(
 }
 
 pub(super) fn parse_protocol_uses(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
+    parse_declared_name_list(pair)
+}
+
+pub(super) fn parse_protocol_profiles(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
+    parse_declared_name_list(pair)
+}
+
+fn parse_declared_name_list(pair: pest::iterators::Pair<Rule>) -> Vec<String> {
     pair.into_inner()
         .filter(|p| p.as_rule() == Rule::ident)
         .map(|p| p.as_str().to_string())
@@ -49,7 +59,7 @@ pub(super) fn parse_module_decl(
 pub(super) fn parse_proof_bundle_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<ProofBundleDecl, ParseError> {
+) -> std::result::Result<TheoremPackDeclaration, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
     let Some(name_pair) = inner.next() else {
@@ -131,12 +141,63 @@ pub(super) fn parse_proof_bundle_decl(
         }
     }
 
-    Ok(ProofBundleDecl {
+    Ok(TheoremPackDeclaration {
         name: name_pair.as_str().to_string(),
         capabilities,
         version,
         issuer,
         constraints,
+    })
+}
+
+pub(super) fn parse_profile_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<ExecutionProfileDeclaration, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "profile declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let mut fairness = None;
+    let mut admissibility = None;
+    let mut escalation_window = None;
+
+    for item in inner {
+        if item.as_rule() != Rule::profile_meta {
+            continue;
+        }
+        let Some(meta) = item.into_inner().next() else {
+            continue;
+        };
+        let rule = meta.as_rule();
+        let value = meta
+            .into_inner()
+            .next()
+            .ok_or_else(|| ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: "profile metadata is missing value".to_string(),
+            })?
+            .as_str()
+            .to_string();
+        match rule {
+            Rule::profile_fairness => fairness = Some(value),
+            Rule::profile_admissibility => admissibility = Some(value),
+            Rule::profile_escalation_window => escalation_window = Some(value),
+            _ => {}
+        }
+    }
+
+    Ok(ExecutionProfileDeclaration {
+        name,
+        fairness,
+        admissibility,
+        escalation_window,
     })
 }
 
@@ -159,7 +220,7 @@ pub(super) fn parse_protocol_requires(pair: pest::iterators::Pair<Rule>) -> Vec<
 pub(super) fn parse_role_set_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<RoleSetDecl, ParseError> {
+) -> std::result::Result<RoleSetDeclaration, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
     let name = inner
@@ -175,7 +236,7 @@ pub(super) fn parse_role_set_decl(
         message: "role_set is missing expression".to_string(),
     })?;
 
-    let mut decl = RoleSetDecl {
+    let mut decl = RoleSetDeclaration {
         name,
         members: Vec::new(),
         subset_of: None,
@@ -237,7 +298,7 @@ pub(super) fn parse_role_set_decl(
 pub(super) fn parse_topology_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<TopologyDecl, ParseError> {
+) -> std::result::Result<TopologyDeclaration, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
     let kind = inner
@@ -265,7 +326,7 @@ pub(super) fn parse_topology_decl(
         .filter(|p| p.as_rule() == Rule::ident)
         .map(|p| p.as_str().to_string())
         .collect();
-    Ok(TopologyDecl {
+    Ok(TopologyDeclaration {
         kind,
         name,
         members,
@@ -275,7 +336,7 @@ pub(super) fn parse_topology_decl(
 pub(super) fn parse_type_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<TypeDecl, ParseError> {
+) -> std::result::Result<TypeDeclaration, ParseError> {
     let span = pair.as_span();
     enforce_same_line_equals(pair.as_str(), span, input, "type declaration")?;
     let inner = pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
@@ -302,7 +363,7 @@ pub(super) fn parse_type_decl(
                 .as_str()
                 .trim()
                 .to_string();
-            Ok(TypeDecl {
+            Ok(TypeDeclaration {
                 name,
                 is_alias: true,
                 alias_of: Some(alias_of),
@@ -340,10 +401,10 @@ pub(super) fn parse_type_decl(
                             .map(|inner| inner.as_str().trim().to_string())
                             .unwrap_or_default()
                     });
-                    TypeConstructorDecl { name, payload_type }
+                    TypeConstructorDeclaration { name, payload_type }
                 })
                 .collect();
-            Ok(TypeDecl {
+            Ok(TypeDeclaration {
                 name,
                 is_alias: false,
                 alias_of: None,
@@ -360,7 +421,7 @@ pub(super) fn parse_type_decl(
 pub(super) fn parse_effect_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<EffectDecl, ParseError> {
+) -> std::result::Result<EffectInterfaceDeclaration, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
     let name = inner
@@ -390,9 +451,9 @@ pub(super) fn parse_effect_decl(
             let (authority_class, op_name_pair) =
                 if first.as_rule() == Rule::effect_op_authority_class {
                     let authority_class = match first.as_str() {
-                        "authoritative" => EffectOpAuthorityClass::Authoritative,
-                        "observe" => EffectOpAuthorityClass::Observe,
-                        _ => EffectOpAuthorityClass::Command,
+                        "authoritative" => EffectAuthorityClass::Authoritative,
+                        "observe" => EffectAuthorityClass::Observe,
+                        _ => EffectAuthorityClass::Command,
                     };
                     let op_name = op_inner.next().ok_or_else(|| ParseError::Syntax {
                         span: ErrorSpan::from_pest_span(span, input),
@@ -400,7 +461,7 @@ pub(super) fn parse_effect_decl(
                     })?;
                     (authority_class, op_name)
                 } else {
-                    (EffectOpAuthorityClass::Command, first)
+                    (EffectAuthorityClass::Command, first)
                 };
             let op_name = op_name_pair.as_str().to_string();
             let input_type = op_inner
@@ -421,7 +482,7 @@ pub(super) fn parse_effect_decl(
                 .as_str()
                 .trim()
                 .to_string();
-            operations.push(EffectOpDecl {
+            operations.push(EffectOperationDeclaration {
                 name: op_name,
                 authority_class,
                 input_type,
@@ -429,13 +490,13 @@ pub(super) fn parse_effect_decl(
             });
         }
     }
-    Ok(EffectDecl { name, operations })
+    Ok(EffectInterfaceDeclaration { name, operations })
 }
 
 pub(super) fn parse_fragment_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<FragmentDecl, ParseError> {
+) -> std::result::Result<RegionDeclaration, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
     let name = inner
@@ -455,13 +516,13 @@ pub(super) fn parse_fragment_decl(
                 .collect()
         })
         .unwrap_or_default();
-    Ok(FragmentDecl { name, params })
+    Ok(RegionDeclaration { name, params })
 }
 
 pub(super) fn parse_operation_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<OperationDecl, ParseError> {
+) -> std::result::Result<OperationDeclaration, ParseError> {
     let span = pair.as_span();
     enforce_same_line_equals(pair.as_str(), span, input, "operation declaration")?;
     let mut inner = pair.into_inner();
@@ -477,6 +538,8 @@ pub(super) fn parse_operation_decl(
     let mut params = Vec::new();
     let mut owner_role = None;
     let mut within = None;
+    let mut progress_contract = None;
+    let mut composition_policy = None;
     let mut body_source = None;
 
     for item in inner {
@@ -504,7 +567,7 @@ pub(super) fn parse_operation_decl(
                         .as_str()
                         .trim()
                         .to_string();
-                    params.push(OperationParamDecl {
+                    params.push(OperationParameterDeclaration {
                         name: param_name,
                         type_name,
                     });
@@ -538,6 +601,31 @@ pub(super) fn parse_operation_decl(
                     format!("{}({})", fragment_name, args.join(", "))
                 });
             }
+            Rule::operation_progress => {
+                progress_contract = Some(
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "operation progress clause is missing contract name"
+                                .to_string(),
+                        })?
+                        .as_str()
+                        .to_string(),
+                );
+            }
+            Rule::operation_compose => {
+                composition_policy = Some(
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "operation compose clause is missing policy".to_string(),
+                        })?
+                        .as_str()
+                        .to_string(),
+                );
+            }
             Rule::protocol_body => {
                 body_source = Some(item.as_str().trim().to_string());
             }
@@ -545,7 +633,7 @@ pub(super) fn parse_operation_decl(
         }
     }
 
-    Ok(OperationDecl {
+    Ok(OperationDeclaration {
         name,
         params,
         owner_role: owner_role.ok_or_else(|| ParseError::Syntax {
@@ -553,6 +641,8 @@ pub(super) fn parse_operation_decl(
             message: "operation declaration is missing owner role".to_string(),
         })?,
         within,
+        progress_contract,
+        composition_policy,
         body_source: body_source.ok_or_else(|| ParseError::Syntax {
             span: ErrorSpan::from_pest_span(span, input),
             message: "operation declaration is missing body".to_string(),
@@ -563,7 +653,7 @@ pub(super) fn parse_operation_decl(
 pub(super) fn parse_guest_runtime_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<GuestRuntimeDecl, ParseError> {
+) -> std::result::Result<GuestRuntimeDeclaration, ParseError> {
     let span = pair.as_span();
     enforce_same_line_equals(pair.as_str(), span, input, "guest runtime declaration")?;
     let mut inner = pair.into_inner();
@@ -621,7 +711,7 @@ pub(super) fn parse_guest_runtime_decl(
         }
     }
 
-    Ok(GuestRuntimeDecl {
+    Ok(GuestRuntimeDeclaration {
         name,
         uses,
         entry: entry.ok_or_else(|| ParseError::Syntax {

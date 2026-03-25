@@ -28,8 +28,9 @@ pub use lints::{
 };
 
 use crate::ast::{
-    Choreography, EffectDecl, FragmentDecl, GuestRuntimeDecl, OperationDecl, ProofBundleDecl,
-    RoleSetDecl, TopologyDecl, TypeDecl,
+    Choreography, EffectInterfaceDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration,
+    OperationDeclaration, RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration,
+    TopologyDeclaration, TypeDeclaration,
 };
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
@@ -43,8 +44,9 @@ use std::collections::{HashMap, HashSet};
 use conversion::{convert_statements_to_protocol, inline_calls};
 use declarations::{
     enforce_same_line_equals, parse_effect_decl, parse_fragment_decl, parse_guest_runtime_decl,
-    parse_module_decl, parse_operation_decl, parse_proof_bundle_decl, parse_protocol_requires,
-    parse_protocol_uses, parse_role_set_decl, parse_topology_decl, parse_type_decl,
+    parse_module_decl, parse_operation_decl, parse_profile_decl, parse_proof_bundle_decl,
+    parse_protocol_profiles, parse_protocol_requires, parse_protocol_uses, parse_role_set_decl,
+    parse_topology_decl, parse_type_decl,
 };
 use linear::{infer_required_proof_bundles, validate_authority_surface, validate_linear_vm_assets};
 use role::parse_roles_from_pair;
@@ -72,6 +74,7 @@ pub fn parse_choreography_str_with_extensions(
 ) -> std::result::Result<(Choreography, Vec<Box<dyn ProtocolExtension>>), ParseError> {
     let dedented = strip_common_indent(input);
     reject_legacy_structural_braces(&dedented)?;
+    reject_removed_legacy_surfaces(&dedented)?;
     let layout = preprocess_layout(&dedented).map_err(|e| ParseError::Layout {
         span: ErrorSpan::from_line_col(e.line, e.column, &dedented),
         message: e.message,
@@ -84,16 +87,18 @@ pub fn parse_choreography_str_with_extensions(
     let mut declared_roles: HashSet<String> = HashSet::new();
     let mut protocol_defs: HashMap<String, Vec<Statement>> = HashMap::new();
     let mut statements: Vec<Statement> = Vec::new();
-    let mut proof_bundles: Vec<ProofBundleDecl> = Vec::new();
+    let mut theorem_packs: Vec<TheoremPackDeclaration> = Vec::new();
     let mut required_bundles: Vec<String> = Vec::new();
     let mut protocol_uses: Vec<String> = Vec::new();
-    let mut role_sets: Vec<RoleSetDecl> = Vec::new();
-    let mut topologies: Vec<TopologyDecl> = Vec::new();
-    let mut type_decls: Vec<TypeDecl> = Vec::new();
-    let mut effect_decls: Vec<EffectDecl> = Vec::new();
-    let mut fragment_decls: Vec<FragmentDecl> = Vec::new();
-    let mut operation_decls: Vec<OperationDecl> = Vec::new();
-    let mut guest_runtime_decls: Vec<GuestRuntimeDecl> = Vec::new();
+    let mut protocol_profiles: Vec<String> = Vec::new();
+    let mut role_sets: Vec<RoleSetDeclaration> = Vec::new();
+    let mut topologies: Vec<TopologyDeclaration> = Vec::new();
+    let mut type_declarations: Vec<TypeDeclaration> = Vec::new();
+    let mut effect_interface_declarations: Vec<EffectInterfaceDeclaration> = Vec::new();
+    let mut region_declarations: Vec<RegionDeclaration> = Vec::new();
+    let mut operation_declarations: Vec<OperationDeclaration> = Vec::new();
+    let mut guest_runtime_declarations: Vec<GuestRuntimeDeclaration> = Vec::new();
+    let mut execution_profile_declarations: Vec<ExecutionProfileDeclaration> = Vec::new();
 
     for pair in pairs {
         if pair.as_rule() == Rule::choreography {
@@ -106,7 +111,10 @@ pub fn parse_choreography_str_with_extensions(
                         // Imports are parsed but not processed (reserved syntax)
                     }
                     Rule::proof_bundle_decl => {
-                        proof_bundles.push(parse_proof_bundle_decl(inner, &layout)?);
+                        theorem_packs.push(parse_proof_bundle_decl(inner, &layout)?);
+                    }
+                    Rule::profile_decl => {
+                        execution_profile_declarations.push(parse_profile_decl(inner, &layout)?);
                     }
                     Rule::role_set_decl => {
                         role_sets.push(parse_role_set_decl(inner, &layout)?);
@@ -115,19 +123,19 @@ pub fn parse_choreography_str_with_extensions(
                         topologies.push(parse_topology_decl(inner, &layout)?);
                     }
                     Rule::type_decl => {
-                        type_decls.push(parse_type_decl(inner, &layout)?);
+                        type_declarations.push(parse_type_decl(inner, &layout)?);
                     }
                     Rule::effect_decl => {
-                        effect_decls.push(parse_effect_decl(inner, &layout)?);
+                        effect_interface_declarations.push(parse_effect_decl(inner, &layout)?);
                     }
                     Rule::fragment_decl => {
-                        fragment_decls.push(parse_fragment_decl(inner, &layout)?);
+                        region_declarations.push(parse_fragment_decl(inner, &layout)?);
                     }
                     Rule::operation_decl => {
-                        operation_decls.push(parse_operation_decl(inner, &layout)?);
+                        operation_declarations.push(parse_operation_decl(inner, &layout)?);
                     }
                     Rule::guest_runtime_decl => {
-                        guest_runtime_decls.push(parse_guest_runtime_decl(inner, &layout)?);
+                        guest_runtime_declarations.push(parse_guest_runtime_decl(inner, &layout)?);
                     }
                     Rule::protocol_decl => {
                         let protocol_span = inner.as_span();
@@ -158,6 +166,9 @@ pub fn parse_choreography_str_with_extensions(
                                 }
                                 Rule::protocol_uses => {
                                     protocol_uses = parse_protocol_uses(item);
+                                }
+                                Rule::protocol_profiles => {
+                                    protocol_profiles = parse_protocol_profiles(item);
                                 }
                                 Rule::protocol_body => {
                                     body_pair = Some(item);
@@ -240,13 +251,13 @@ pub fn parse_choreography_str_with_extensions(
     };
 
     choreography
-        .set_proof_bundles(&proof_bundles)
+        .set_theorem_packs(&theorem_packs)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     let inferred_required_bundles =
-        infer_required_proof_bundles(&required_bundles, &proof_bundles, &statements);
+        infer_required_proof_bundles(&required_bundles, &theorem_packs, &statements);
     let resolved_required_bundles = if required_bundles.is_empty() {
         inferred_required_bundles.clone()
     } else {
@@ -254,13 +265,13 @@ pub fn parse_choreography_str_with_extensions(
     };
 
     choreography
-        .set_required_proof_bundles(&resolved_required_bundles)
+        .set_required_theorem_packs(&resolved_required_bundles)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
-        .set_inferred_required_proof_bundles(&inferred_required_bundles)
+        .set_inferred_required_theorem_packs(&inferred_required_bundles)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
@@ -278,13 +289,13 @@ pub fn parse_choreography_str_with_extensions(
             message,
         })?;
     choreography
-        .set_type_decls(&type_decls)
+        .set_type_declarations(&type_declarations)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
-        .set_effect_decls(&effect_decls)
+        .set_effect_interface_declarations(&effect_interface_declarations)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
@@ -296,19 +307,31 @@ pub fn parse_choreography_str_with_extensions(
             message,
         })?;
     choreography
-        .set_fragment_decls(&fragment_decls)
+        .set_region_declarations(&region_declarations)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
-        .set_operation_decls(&operation_decls)
+        .set_operation_declarations(&operation_declarations)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
         })?;
     choreography
-        .set_guest_runtime_decls(&guest_runtime_decls)
+        .set_guest_runtime_declarations(&guest_runtime_declarations)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &layout),
+            message,
+        })?;
+    choreography
+        .set_execution_profile_declarations(&execution_profile_declarations)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &layout),
+            message,
+        })?;
+    choreography
+        .set_protocol_execution_profiles(&protocol_profiles)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
@@ -496,6 +519,62 @@ fn reject_legacy_structural_braces(input: &str) -> std::result::Result<(), Parse
     Ok(())
 }
 
+fn reject_removed_legacy_surfaces(input: &str) -> std::result::Result<(), ParseError> {
+    fn line_col(input: &str, offset: usize) -> (usize, usize) {
+        let prefix = &input[..offset];
+        let line = prefix.bytes().filter(|b| *b == b'\n').count() + 1;
+        let column = prefix
+            .rsplit('\n')
+            .next()
+            .map_or(1, |segment| segment.chars().count() + 1);
+        (line, column)
+    }
+
+    let patterns = [
+        (
+            Regex::new(r"(?m)^\s*heartbeat\b").expect("heartbeat regex"),
+            "legacy DSL construct `heartbeat` was removed from the proof-backed language surface; model liveness with explicit `timeout`, effect outcomes, and progress contracts instead",
+        ),
+        (
+            Regex::new(r"(?m)^\s*handshake\b").expect("handshake regex"),
+            "legacy DSL construct `handshake` was removed from the proof-backed language surface; express coordination through protocol sends/choices plus explicit semantic handoff or publication when needed",
+        ),
+        (
+            Regex::new(r"(?m)^\s*retry\b").expect("retry regex"),
+            "legacy DSL construct `retry` was removed from the proof-backed language surface; express retry policy through effects, choices, and progress contracts",
+        ),
+        (
+            Regex::new(r"(?m)^\s*quorum_collect\b").expect("quorum regex"),
+            "legacy DSL construct `quorum_collect` was removed from the proof-backed language surface; express quorum behavior through operation composition metadata and explicit protocol steps",
+        ),
+        (
+            Regex::new(r"(?m)^\s*(acquire|release|fork|join|abort|delegate|tag)\b")
+                .expect("protocol machine regex"),
+            "legacy DSL construct `protocol-machine core statement` was removed from the proof-backed language surface; keep protocol-machine instructions in the runtime model, not in DSL source",
+        ),
+        (
+            Regex::new(r"(?m)^\s*check\s+\w+\s+for\s+").expect("protocol machine check regex"),
+            "legacy DSL construct `protocol-machine core statement` was removed from the proof-backed language surface; keep protocol-machine instructions in the runtime model, not in DSL source",
+        ),
+        (
+            Regex::new(r"(?m)^\s*transfer\s+\w+\s+to\s+\w+").expect("protocol machine transfer regex"),
+            "legacy DSL construct `protocol-machine core statement` was removed from the proof-backed language surface; keep protocol-machine instructions in the runtime model, not in DSL source",
+        ),
+    ];
+
+    for (pattern, message) in patterns {
+        if let Some(found) = pattern.find(input) {
+            let (line, column) = line_col(input, found.start());
+            return Err(ParseError::Syntax {
+                span: ErrorSpan::from_line_col(line, column, input),
+                message: message.to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
 fn strip_common_indent(input: &str) -> String {
     let lines: Vec<&str> = input.lines().collect();
     let mut min_indent: Option<usize> = None;
@@ -539,13 +618,13 @@ pub fn parse_choreography(input: TokenStream) -> syn::Result<Choreography> {
     if let Ok(lit_str) = syn::parse2::<LitStr>(input.clone()) {
         return Err(syn::Error::new(
             lit_str.span(),
-            "string-literal choreography input was removed; use parse_choreography_str for DSL strings or the choreography! proc macro with canonical token syntax",
+            "string-literal tell! input was removed; use parse_choreography_str for DSL strings or the tell! proc macro with canonical token syntax",
         ));
     }
 
     Err(syn::Error::new(
         proc_macro2::Span::call_site(),
-        "proc-macro2 token parsing for choreography DSL was removed; use parse_choreography_str for DSL text or the choreography! proc macro with canonical indentation-based token syntax",
+        "proc-macro2 token parsing for the tell! DSL was removed; use parse_choreography_str for DSL text or the tell! proc macro with canonical indentation-based token syntax",
     ))
 }
 
@@ -1473,60 +1552,10 @@ protocol Liveness =
   }
 "#;
 
-        let result = parse_choreography_str(input);
-        assert!(
-            result.is_ok(),
-            "Failed to parse heartbeat: {:?}",
-            result.err()
-        );
-
-        let choreo = result.unwrap();
-        assert_eq!(choreo.name.to_string(), "Liveness");
-
-        // Heartbeat desugars to: rec HeartbeatLoop { ... }
-        match &choreo.protocol {
-            Protocol::Rec { label, body } => {
-                assert_eq!(label.to_string(), "HeartbeatLoop");
-
-                // Inside: Sender -> Receiver: Heartbeat; choice Receiver at { ... }
-                match body.as_ref() {
-                    Protocol::Send {
-                        from,
-                        to,
-                        message,
-                        continuation,
-                        ..
-                    } => {
-                        assert_eq!(from.name().to_string(), "Alice");
-                        assert_eq!(to.name().to_string(), "Bob");
-                        assert_eq!(message.name.to_string(), "Heartbeat");
-
-                        // Continuation is Choice at Receiver
-                        match continuation.as_ref() {
-                            Protocol::Choice {
-                                role,
-                                branches,
-                                annotations,
-                            } => {
-                                assert_eq!(role.name().to_string(), "Bob");
-                                assert_eq!(branches.len(), 2);
-                                assert_eq!(branches[0].label.to_string(), "Alive");
-                                assert_eq!(branches[1].label.to_string(), "Dead");
-
-                                // Check heartbeat annotation
-                                assert!(annotations.has_heartbeat());
-                                let (interval, on_missing) = annotations.heartbeat().unwrap();
-                                assert_eq!(interval, std::time::Duration::from_secs(1));
-                                assert_eq!(on_missing, 3);
-                            }
-                            _ => panic!("Expected Choice as continuation"),
-                        }
-                    }
-                    _ => panic!("Expected Send inside Rec"),
-                }
-            }
-            _ => panic!("Expected Rec as top-level protocol"),
-        }
+        let err = parse_choreography_str(input).expect_err("heartbeat surface should fail");
+        assert!(err
+            .to_string()
+            .contains("legacy DSL construct `heartbeat` was removed"));
     }
 
     #[test]
@@ -1541,29 +1570,11 @@ protocol FastHeartbeat =
   }
 "#;
 
-        let result = parse_choreography_str(input);
-        assert!(
-            result.is_ok(),
-            "Failed to parse heartbeat with ms: {:?}",
-            result.err()
-        );
-
-        let choreo = result.unwrap();
-        match &choreo.protocol {
-            Protocol::Rec { body, .. } => match body.as_ref() {
-                Protocol::Send { continuation, .. } => match continuation.as_ref() {
-                    Protocol::Choice { annotations, .. } => {
-                        assert!(annotations.has_heartbeat());
-                        let (interval, on_missing) = annotations.heartbeat().unwrap();
-                        assert_eq!(interval, std::time::Duration::from_millis(500));
-                        assert_eq!(on_missing, 5);
-                    }
-                    _ => panic!("Expected Choice"),
-                },
-                _ => panic!("Expected Send"),
-            },
-            _ => panic!("Expected Rec"),
-        }
+        let err =
+            parse_choreography_str(input).expect_err("heartbeat milliseconds surface should fail");
+        assert!(err
+            .to_string()
+            .contains("legacy DSL construct `heartbeat` was removed"));
     }
 
     #[test]
@@ -2080,7 +2091,7 @@ protocol WithBundles requires Base, Extra =
 "#;
 
         let choreo = parse_choreography_str(input).expect("parse should succeed");
-        let bundles = choreo.proof_bundles();
+        let bundles = choreo.theorem_packs();
         assert_eq!(bundles.len(), 2);
         assert_eq!(bundles[0].name, "Base");
         assert_eq!(
@@ -2090,67 +2101,13 @@ protocol WithBundles requires Base, Extra =
         assert_eq!(bundles[1].name, "Extra");
         assert_eq!(bundles[1].capabilities, vec!["knowledge_flow".to_string()]);
         assert_eq!(
-            choreo.required_proof_bundles(),
+            choreo.required_theorem_packs(),
             vec!["Base".to_string(), "Extra".to_string()]
         );
     }
 
     #[test]
-    fn test_parse_vm_core_statements_into_extensions() {
-        fn collect_vm_ops(protocol: &Protocol, out: &mut Vec<String>) {
-            match protocol {
-                Protocol::Extension {
-                    annotations,
-                    continuation,
-                    ..
-                } => {
-                    if let Some(op) = annotations.custom("vm_core_op") {
-                        out.push(op.to_string());
-                    }
-                    collect_vm_ops(continuation, out);
-                }
-                Protocol::Send { continuation, .. }
-                | Protocol::Broadcast { continuation, .. }
-                | Protocol::Publish { continuation, .. }
-                | Protocol::Handoff { continuation, .. }
-                | Protocol::DependentWork { continuation, .. } => {
-                    collect_vm_ops(continuation, out);
-                }
-                Protocol::Let { continuation, .. } => collect_vm_ops(continuation, out),
-                Protocol::Choice { branches, .. } => {
-                    for branch in branches {
-                        collect_vm_ops(&branch.protocol, out);
-                    }
-                }
-                Protocol::Case { branches, .. } => {
-                    for branch in branches {
-                        collect_vm_ops(&branch.protocol, out);
-                    }
-                }
-                Protocol::Timeout {
-                    body,
-                    on_timeout,
-                    on_cancel,
-                    ..
-                } => {
-                    collect_vm_ops(body, out);
-                    collect_vm_ops(on_timeout, out);
-                    if let Some(on_cancel) = on_cancel.as_deref() {
-                        collect_vm_ops(on_cancel, out);
-                    }
-                }
-                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
-                    collect_vm_ops(body, out);
-                }
-                Protocol::Parallel { protocols } => {
-                    for protocol in protocols {
-                        collect_vm_ops(protocol, out);
-                    }
-                }
-                Protocol::Var(_) | Protocol::End => {}
-            }
-        }
-
+    fn test_protocol_machine_core_statements_are_rejected() {
         let input = r#"
 protocol VmOps =
   roles A, B
@@ -2160,17 +2117,11 @@ protocol VmOps =
   A -> B : Ping
 "#;
 
-        let choreo = parse_choreography_str(input).expect("parse should succeed");
-        let mut vm_ops = Vec::new();
-        collect_vm_ops(&choreo.protocol, &mut vm_ops);
-        assert_eq!(
-            vm_ops,
-            vec![
-                "acquire".to_string(),
-                "transfer".to_string(),
-                "check".to_string()
-            ]
-        );
+        let err =
+            parse_choreography_str(input).expect_err("protocol-machine statements should fail");
+        assert!(err
+            .to_string()
+            .contains("legacy DSL construct `protocol-machine core statement` was removed"));
     }
 
     #[test]
@@ -2190,21 +2141,18 @@ protocol MissingBundle requires Core =
     }
 
     #[test]
-    fn test_validate_missing_capability_fails() {
+    fn test_validate_missing_execution_profile_fails() {
         let input = r#"
-proof_bundle DelegationOnly requires [delegation]
-protocol NeedGuard requires DelegationOnly =
+protocol NeedReplay under Replay =
   roles A, B
-  acquire guard as token
   A -> B : Ping
 "#;
 
         let choreo = parse_choreography_str(input).expect("parse should succeed");
         let err = choreo.validate().expect_err("validation should fail");
-        assert!(matches!(
-            err,
-            ValidationError::MissingCapability(ref cap) if cap == "guard_tokens"
-        ));
+        assert!(err
+            .to_string()
+            .contains("undeclared execution profile `Replay`"));
     }
 
     #[test]
@@ -2257,11 +2205,14 @@ protocol LoopTypeCheck =
     }
 
     #[test]
-    fn test_projection_preserves_continuation_after_extension() {
+    fn test_projection_preserves_continuation_after_authority_binding() {
         let input = r#"
-protocol ExtensionProjection =
+effect Runtime
+  authoritative ready : Session -> Session
+
+protocol ExtensionProjection uses Runtime =
   roles A, B
-  acquire guard as token
+  let witness = check Runtime.ready(session)
   A -> B : Ping
 "#;
 
@@ -2290,7 +2241,7 @@ protocol BundleMeta requires Base =
 "#;
 
         let choreo = parse_choreography_str(input).expect("parse should succeed");
-        let bundles = choreo.proof_bundles();
+        let bundles = choreo.theorem_packs();
         assert_eq!(bundles.len(), 1);
         let bundle = &bundles[0];
         assert_eq!(bundle.name, "Base");
@@ -2307,20 +2258,20 @@ protocol BundleMeta requires Base =
     }
 
     #[test]
-    fn test_infer_required_bundles_from_vm_capabilities() {
+    fn test_parse_execution_profiles_and_protocol_profiles() {
         let input = r#"
-proof_bundle Spec requires [speculation]
-protocol Inferred =
+profile Replay fairness eventual admissibility replay escalation_window bounded
+protocol Inferred under Replay =
   roles A, B
-  fork ghost0
   A -> B : Ping
 "#;
 
         let choreo = parse_choreography_str(input).expect("parse should succeed");
-        assert_eq!(choreo.required_proof_bundles(), vec!["Spec".to_string()]);
+        assert_eq!(choreo.execution_profile_declarations().len(), 1);
+        assert_eq!(choreo.execution_profile_declarations()[0].name, "Replay");
         assert_eq!(
-            choreo.inferred_required_proof_bundles(),
-            vec!["Spec".to_string()]
+            choreo.protocol_execution_profiles(),
+            vec!["Replay".to_string()]
         );
         assert!(choreo.validate().is_ok());
     }
@@ -2330,13 +2281,13 @@ protocol Inferred =
         let input = r#"
 protocol LinearDoubleConsume =
   roles A, B
-  acquire guard as token
-  release guard using token
-  release guard using token
+  let token = transfer Session from A to B
+  A -> B : Use(token)
+  A -> B : UseAgain(token)
 "#;
 
         let err = parse_choreography_str(input).expect_err("parse should fail");
-        assert!(err.to_string().contains("before acquire"));
+        assert!(err.to_string().contains("consumed more than once"));
     }
 
     #[test]
@@ -2344,10 +2295,10 @@ protocol LinearDoubleConsume =
         let input = r#"
 protocol LinearBranchDivergence =
   roles A, B
-  acquire guard as token
+  let token = transfer Session from A to B
   choice A at
     | consume =>
-      release guard using token
+      A -> B : Use(token)
     | keep =>
       A -> B : Skip
 "#;
@@ -2357,49 +2308,7 @@ protocol LinearBranchDivergence =
     }
 
     #[test]
-    fn test_parse_first_class_combinators() {
-        fn has_quorum_extension(protocol: &Protocol) -> bool {
-            match protocol {
-                Protocol::Extension {
-                    annotations,
-                    continuation,
-                    ..
-                } => {
-                    annotations.custom("dsl_combinator") == Some("quorum_collect")
-                        || has_quorum_extension(continuation)
-                }
-                Protocol::Send { continuation, .. }
-                | Protocol::Broadcast { continuation, .. }
-                | Protocol::Publish { continuation, .. }
-                | Protocol::Handoff { continuation, .. }
-                | Protocol::DependentWork { continuation, .. } => {
-                    has_quorum_extension(continuation)
-                }
-                Protocol::Let { continuation, .. } => has_quorum_extension(continuation),
-                Protocol::Choice { branches, .. } => {
-                    branches.iter().any(|b| has_quorum_extension(&b.protocol))
-                }
-                Protocol::Case { branches, .. } => {
-                    branches.iter().any(|b| has_quorum_extension(&b.protocol))
-                }
-                Protocol::Timeout {
-                    body,
-                    on_timeout,
-                    on_cancel,
-                    ..
-                } => {
-                    has_quorum_extension(body)
-                        || has_quorum_extension(on_timeout)
-                        || on_cancel.as_deref().is_some_and(has_quorum_extension)
-                }
-                Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
-                    has_quorum_extension(body)
-                }
-                Protocol::Parallel { protocols } => protocols.iter().any(has_quorum_extension),
-                Protocol::Var(_) | Protocol::End => false,
-            }
-        }
-
+    fn test_removed_first_class_combinators_are_rejected() {
         let input = r#"
 protocol Combinators =
   roles A, B
@@ -2411,28 +2320,11 @@ protocol Combinators =
   }
 "#;
 
-        let choreo = parse_choreography_str(input).expect("parse should succeed");
-        match &choreo.protocol {
-            Protocol::Send {
-                from,
-                to,
-                message,
-                continuation,
-                ..
-            } => {
-                assert_eq!(from.name(), "A");
-                assert_eq!(to.name(), "B");
-                assert_eq!(message.name.to_string(), "Hello");
-                match continuation.as_ref() {
-                    Protocol::Send { message, .. } => {
-                        assert_eq!(message.name.to_string(), "HelloAck");
-                    }
-                    _ => panic!("expected second send from handshake"),
-                }
-            }
-            _ => panic!("expected send from handshake lowering"),
-        }
-        assert!(has_quorum_extension(&choreo.protocol));
+        let err = parse_choreography_str(input)
+            .expect_err("removed first-class combinators should fail closed");
+        assert!(err
+            .to_string()
+            .contains("legacy DSL construct `handshake` was removed"));
     }
 
     #[test]
@@ -2468,30 +2360,23 @@ protocol TopologyAware =
     }
 
     #[test]
-    fn test_explain_lowering_and_lint_suggestions() {
+    fn test_explain_lowering_report_for_proof_backed_surface() {
         let input = r#"
-proof_bundle Spec requires [speculation]
+proof_bundle Spec requires [delegation]
 protocol ExplainMe =
   roles A, B
-  fork ghost0
   A -> B : Ping
 "#;
 
         let report = explain_lowering(input).expect("report generation should succeed");
-        assert!(report.contains("Inferred bundles: Spec"));
-        assert!(report.contains("dsl.inferred_requires"));
+        assert!(report.contains("Proof bundles: Spec"));
         assert!(report.contains("Lowering:"));
 
         let choreo = parse_choreography_str(input).expect("parse should succeed");
         let lints = collect_dsl_lints(&choreo, LintLevel::Warn);
-        assert!(!lints.is_empty());
-        assert!(lints[0]
-            .suggestion
-            .as_deref()
-            .unwrap_or_default()
-            .contains("requires"));
+        assert!(lints.is_empty());
         let lsp = render_lsp_lint_diagnostics(&choreo, LintLevel::Warn);
-        assert!(lsp.contains("\"quickFix\""));
+        assert_eq!(lsp, "[]");
     }
 
     #[test]
@@ -2523,7 +2408,7 @@ protocol PredicateTyping =
         let err = parse_choreography(input).expect_err("proc-macro2 token parsing should fail");
         assert!(err
             .to_string()
-            .contains("proc-macro2 token parsing for choreography DSL was removed"));
+            .contains("proc-macro2 token parsing for the tell! DSL was removed"));
     }
 
     #[test]
@@ -2539,7 +2424,7 @@ protocol ReplicatedWrite =
         let err = parse_choreography(input).expect_err("string literal macro input should fail");
         assert!(err
             .to_string()
-            .contains("string-literal choreography input was removed"));
+            .contains("string-literal tell! input was removed"));
     }
 
     #[test]
@@ -2566,7 +2451,7 @@ protocol Branchy = {
         let err = parse_choreography_str(input).expect_err("legacy braces should fail");
         assert!(err
             .to_string()
-            .contains("legacy structural braces are no longer accepted"));
+            .contains("legacy brace-based protocol blocks are removed"));
     }
 
     // ── authority_surface ────────────────────────────────────────────
@@ -2609,18 +2494,18 @@ protocol CommitFlow uses Runtime, Audit =
 "#;
 
         let choreography = parse_choreography_str(input).expect("authority surface should parse");
-        assert_eq!(choreography.type_decls().len(), 2);
-        assert_eq!(choreography.effect_decls().len(), 2);
+        assert_eq!(choreography.type_declarations().len(), 2);
+        assert_eq!(choreography.effect_interface_declarations().len(), 2);
         assert_eq!(
             choreography.protocol_uses(),
             vec!["Runtime".to_string(), "Audit".to_string()]
         );
-        let runtime_metadata = choreography.runtime_effect_metadata();
+        let runtime_metadata = choreography.effect_contract_declarations();
         assert!(
             runtime_metadata.iter().any(|op| {
                 op.interface_name == "Runtime"
                     && op.operation_name == "ready"
-                    && op.authority_class == crate::ast::EffectOpAuthorityClass::Authoritative
+                    && op.authority_class == crate::ast::EffectAuthorityClass::Authoritative
             }),
             "runtime effect metadata should carry effect authority class"
         );
@@ -2785,41 +2670,59 @@ protocol WatchFlow uses Runtime =
         let input = r#"
 fragment ChannelMembership(channel)
 
-operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) =
+profile Replay fairness eventual admissibility replay escalation_window bounded
+
+operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) progress MembershipProgress compose all_success =
   publish SyncQueued(channel)
 
 guest runtime MessagingGuest =
   uses Runtime, Audit
   entry CommitFlow
 
-protocol CommitFlow uses Runtime, Audit =
+protocol CommitFlow uses Runtime, Audit under Replay =
   roles Coordinator, Worker
   Coordinator -> Worker : Ping
 "#;
 
         let choreography = parse_choreography_str(input).expect("surface metadata should parse");
-        assert_eq!(choreography.fragment_decls().len(), 1);
-        assert_eq!(choreography.fragment_decls()[0].name, "ChannelMembership");
-        assert_eq!(choreography.fragment_decls()[0].params, vec!["channel"]);
+        assert_eq!(choreography.region_declarations().len(), 1);
+        assert_eq!(
+            choreography.region_declarations()[0].name,
+            "ChannelMembership"
+        );
+        assert_eq!(
+            choreography.region_declarations()[0].params,
+            vec!["channel"]
+        );
 
-        assert_eq!(choreography.operation_decls().len(), 1);
-        let operation = &choreography.operation_decls()[0];
+        assert_eq!(choreography.operation_declarations().len(), 1);
+        let operation = &choreography.operation_declarations()[0];
         assert_eq!(operation.name, "syncMembership");
         assert_eq!(operation.owner_role, "Worker");
         assert_eq!(
             operation.within.as_deref(),
             Some("ChannelMembership(channel)")
         );
+        assert_eq!(
+            operation.progress_contract.as_deref(),
+            Some("MembershipProgress")
+        );
+        assert_eq!(operation.composition_policy.as_deref(), Some("all_success"));
         assert_eq!(operation.params.len(), 1);
         assert!(operation
             .body_source
             .contains("publish SyncQueued(channel)"));
 
-        assert_eq!(choreography.guest_runtime_decls().len(), 1);
-        let guest_runtime = &choreography.guest_runtime_decls()[0];
+        assert_eq!(choreography.guest_runtime_declarations().len(), 1);
+        let guest_runtime = &choreography.guest_runtime_declarations()[0];
         assert_eq!(guest_runtime.name, "MessagingGuest");
         assert_eq!(guest_runtime.uses, vec!["Runtime", "Audit"]);
         assert_eq!(guest_runtime.entry, "CommitFlow");
+        assert_eq!(choreography.execution_profile_declarations().len(), 1);
+        assert_eq!(
+            choreography.protocol_execution_profiles(),
+            vec!["Replay".to_string()]
+        );
     }
 
     #[test]

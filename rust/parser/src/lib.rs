@@ -10,8 +10,10 @@ pub mod effect_spec;
 pub mod extensions;
 
 pub use ast::{
-    Choreography, Condition, EffectDecl, FragmentDecl, GuestRuntimeDecl, LocalType, MessageType,
-    OperationDecl, ProofBundleDecl, Protocol, Role, RoleSetDecl, TopologyDecl, TypeDecl,
+    Choreography, Condition, EffectInterfaceDeclaration, ExecutionProfileDeclaration,
+    GuestRuntimeDeclaration, LanguageTier, LanguageTierStatus, LocalType, MessageType,
+    OperationDeclaration, Protocol, RegionDeclaration, Role, RoleSetDeclaration,
+    TheoremPackDeclaration, TopologyDeclaration, TypeDeclaration,
 };
 pub use compiler::codegen::{
     generate_choreography_code, generate_choreography_code_with_annotations,

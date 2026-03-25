@@ -1,26 +1,9 @@
-use super::types::VmCoreOp;
 use super::*;
 
 fn linear_usage_error(input: &str, message: impl Into<String>) -> ParseError {
     ParseError::Syntax {
         span: ErrorSpan::from_line_col(1, 1, input),
         message: message.into(),
-    }
-}
-
-fn consume_linear_asset(
-    live_assets: &mut HashSet<String>,
-    asset: &str,
-    input: &str,
-    op: &str,
-) -> Result<(), ParseError> {
-    if live_assets.remove(asset) {
-        Ok(())
-    } else {
-        Err(linear_usage_error(
-            input,
-            format!("linear asset '{asset}' used by {op} before acquire"),
-        ))
     }
 }
 
@@ -57,24 +40,6 @@ fn validate_linear_choice_branches(
         }
     }
     Ok(merged.unwrap_or_else(|| live_assets.clone()))
-}
-
-fn validate_linear_heartbeat(
-    body: &[Statement],
-    on_missing_body: &[Statement],
-    live_assets: &HashSet<String>,
-    input: &str,
-) -> Result<HashSet<String>, ParseError> {
-    let alive = validate_linear_block(body, live_assets, input)?;
-    let missing = validate_linear_block(on_missing_body, live_assets, input)?;
-    if alive == missing && alive == *live_assets {
-        Ok(alive)
-    } else {
-        Err(linear_usage_error(
-            input,
-            "heartbeat branches must preserve identical linear assets",
-        ))
-    }
 }
 
 fn validate_linear_block(
@@ -146,27 +111,6 @@ fn validate_linear_block(
                 }
                 live_assets = body_out;
             }
-            Statement::VmCoreOp { op } => match op {
-                VmCoreOp::Acquire { dst, .. } => {
-                    if !live_assets.insert(dst.clone()) {
-                        return Err(linear_usage_error(
-                            input,
-                            format!("linear asset '{dst}' acquired more than once"),
-                        ));
-                    }
-                }
-                VmCoreOp::Release { evidence, .. } => {
-                    consume_linear_asset(&mut live_assets, evidence, input, "release")?;
-                }
-                VmCoreOp::Transfer { endpoint, .. } => {
-                    consume_linear_asset(&mut live_assets, endpoint, input, "transfer")?;
-                }
-                VmCoreOp::Fork { .. }
-                | VmCoreOp::Join
-                | VmCoreOp::Abort
-                | VmCoreOp::Tag { .. }
-                | VmCoreOp::Check { .. } => {}
-            },
             Statement::Choice { branches, .. } => {
                 live_assets = validate_linear_choice_branches(branches, &live_assets, input)?;
             }
@@ -199,22 +143,12 @@ fn validate_linear_block(
                     )?;
                 }
             }
-            Statement::Heartbeat {
-                on_missing_body,
-                body,
-                ..
-            } => {
-                live_assets =
-                    validate_linear_heartbeat(body, on_missing_body, &live_assets, input)?;
-            }
             Statement::Send { .. }
             | Statement::Broadcast { .. }
             | Statement::Publish { .. }
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
-            | Statement::Handshake { .. }
-            | Statement::QuorumCollect { .. }
             | Statement::Call { .. } => {}
         }
     }
@@ -277,14 +211,6 @@ fn validate_case_exhaustiveness(statements: &[Statement], input: &str) -> Result
                     validate_case_exhaustiveness(branch, input)?;
                 }
             }
-            Statement::Heartbeat {
-                on_missing_body,
-                body,
-                ..
-            } => {
-                validate_case_exhaustiveness(on_missing_body, input)?;
-                validate_case_exhaustiveness(body, input)?;
-            }
             Statement::Timeout {
                 body,
                 on_timeout,
@@ -308,10 +234,7 @@ fn validate_case_exhaustiveness(statements: &[Statement], input: &str) -> Result
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
-            | Statement::Handshake { .. }
-            | Statement::QuorumCollect { .. }
-            | Statement::Call { .. }
-            | Statement::VmCoreOp { .. } => {}
+            | Statement::Call { .. } => {}
         }
     }
     Ok(())
@@ -342,6 +265,17 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
                     format!("linear binding '{name}' is consumed more than once"),
                 ));
             }
+            let remaining = if let Some(body) = body {
+                body.as_slice()
+            } else {
+                &statements[idx + 1..]
+            };
+            if binding_usage_diverges_across_choice_branches(remaining, name) {
+                return Err(linear_usage_error(
+                    input,
+                    format!("linear binding '{name}' diverges across choice branches"),
+                ));
+            }
         }
         match statement {
             Statement::Choice { branches, .. } => {
@@ -356,14 +290,6 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
                 for branch in branches {
                     validate_linear_bindings(branch, input)?;
                 }
-            }
-            Statement::Heartbeat {
-                on_missing_body,
-                body,
-                ..
-            } => {
-                validate_linear_bindings(on_missing_body, input)?;
-                validate_linear_bindings(body, input)?;
             }
             Statement::Timeout {
                 body,
@@ -393,13 +319,63 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
-            | Statement::Handshake { .. }
-            | Statement::QuorumCollect { .. }
-            | Statement::Call { .. }
-            | Statement::VmCoreOp { .. } => {}
+            | Statement::Call { .. } => {}
         }
     }
     Ok(())
+}
+
+fn binding_usage_diverges_across_choice_branches(statements: &[Statement], name: &str) -> bool {
+    statements
+        .iter()
+        .any(|statement| statement_binding_usage_diverges(statement, name))
+}
+
+fn statement_binding_usage_diverges(statement: &Statement, name: &str) -> bool {
+    match statement {
+        Statement::Choice { branches, .. } => {
+            let counts: Vec<usize> = branches
+                .iter()
+                .map(|branch| count_binding_uses(&branch.statements, name))
+                .collect();
+            let divergent_here = counts.windows(2).any(|window| window[0] != window[1]);
+            divergent_here
+                || branches.iter().any(|branch| {
+                    binding_usage_diverges_across_choice_branches(&branch.statements, name)
+                })
+        }
+        Statement::Loop { body, .. } | Statement::Rec { body, .. } => {
+            binding_usage_diverges_across_choice_branches(body, name)
+        }
+        Statement::Parallel { branches } => branches
+            .iter()
+            .any(|branch| binding_usage_diverges_across_choice_branches(branch, name)),
+        Statement::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            binding_usage_diverges_across_choice_branches(body, name)
+                || binding_usage_diverges_across_choice_branches(on_timeout, name)
+                || on_cancel.as_deref().is_some_and(|branch| {
+                    binding_usage_diverges_across_choice_branches(branch, name)
+                })
+        }
+        Statement::Case { branches, .. } => branches
+            .iter()
+            .any(|branch| binding_usage_diverges_across_choice_branches(&branch.statements, name)),
+        Statement::Let { body, .. } => body
+            .as_deref()
+            .is_some_and(|body| binding_usage_diverges_across_choice_branches(body, name)),
+        Statement::Send { .. }
+        | Statement::Broadcast { .. }
+        | Statement::Publish { .. }
+        | Statement::Handoff { .. }
+        | Statement::DependentWork { .. }
+        | Statement::Continue { .. }
+        | Statement::Call { .. } => false,
+    }
 }
 
 fn count_binding_uses(statements: &[Statement], name: &str) -> usize {
@@ -452,17 +428,7 @@ fn count_statement_uses(statement: &Statement, name: &str) -> usize {
             .iter()
             .map(|branch| count_binding_uses(branch, name))
             .sum(),
-        Statement::Heartbeat {
-            on_missing_body,
-            body,
-            ..
-        } => count_binding_uses(on_missing_body, name) + count_binding_uses(body, name),
-        Statement::VmCoreOp { .. }
-        | Statement::Publish { .. }
-        | Statement::Continue { .. }
-        | Statement::Handshake { .. }
-        | Statement::QuorumCollect { .. }
-        | Statement::Call { .. } => 0,
+        Statement::Publish { .. } | Statement::Continue { .. } | Statement::Call { .. } => 0,
         Statement::Handoff {
             operation,
             target,
@@ -506,72 +472,9 @@ fn count_expr_uses(expr: &super::types::AuthorityExprSpec, name: &str) -> usize 
     }
 }
 
-// RECURSION_SAFE: recursion consumes finite nested statement blocks.
-fn collect_vm_required_capabilities(statements: &[Statement], out: &mut HashSet<String>) {
-    for statement in statements {
-        match statement {
-            Statement::Let { body, .. } => {
-                if let Some(body) = body {
-                    collect_vm_required_capabilities(body, out);
-                }
-            }
-            Statement::Case { branches, .. } => {
-                for branch in branches {
-                    collect_vm_required_capabilities(&branch.statements, out);
-                }
-            }
-            Statement::Timeout {
-                body,
-                on_timeout,
-                on_cancel,
-                ..
-            } => {
-                collect_vm_required_capabilities(body, out);
-                collect_vm_required_capabilities(on_timeout, out);
-                if let Some(on_cancel) = on_cancel {
-                    collect_vm_required_capabilities(on_cancel, out);
-                }
-            }
-            Statement::VmCoreOp { op } => {
-                out.insert(op.required_capability().to_string());
-            }
-            Statement::Choice { branches, .. } => {
-                for branch in branches {
-                    collect_vm_required_capabilities(&branch.statements, out);
-                }
-            }
-            Statement::Loop { body, .. } | Statement::Rec { body, .. } => {
-                collect_vm_required_capabilities(body, out);
-            }
-            Statement::Parallel { branches } => {
-                for branch in branches {
-                    collect_vm_required_capabilities(branch, out);
-                }
-            }
-            Statement::Heartbeat {
-                on_missing_body,
-                body,
-                ..
-            } => {
-                collect_vm_required_capabilities(on_missing_body, out);
-                collect_vm_required_capabilities(body, out);
-            }
-            Statement::Send { .. }
-            | Statement::Broadcast { .. }
-            | Statement::Publish { .. }
-            | Statement::Handoff { .. }
-            | Statement::DependentWork { .. }
-            | Statement::Continue { .. }
-            | Statement::Handshake { .. }
-            | Statement::QuorumCollect { .. }
-            | Statement::Call { .. } => {}
-        }
-    }
-}
-
 pub(super) fn infer_required_proof_bundles(
     explicit_required: &[String],
-    proof_bundles: &[ProofBundleDecl],
+    proof_bundles: &[TheoremPackDeclaration],
     statements: &[Statement],
 ) -> Vec<String> {
     if !explicit_required.is_empty() {
@@ -580,35 +483,6 @@ pub(super) fn infer_required_proof_bundles(
     if proof_bundles.is_empty() {
         return Vec::new();
     }
-
-    let mut required_caps = HashSet::new();
-    collect_vm_required_capabilities(statements, &mut required_caps);
-    if required_caps.is_empty() {
-        return Vec::new();
-    }
-
-    let mut selected = Vec::new();
-    let mut covered = HashSet::new();
-    let mut caps: Vec<_> = required_caps.into_iter().collect();
-    caps.sort();
-
-    for cap in caps {
-        if covered.contains(&cap) {
-            continue;
-        }
-        let Some(bundle) = proof_bundles
-            .iter()
-            .find(|bundle| bundle.capabilities.iter().any(|c| c == &cap))
-        else {
-            return Vec::new();
-        };
-        if !selected.contains(&bundle.name) {
-            selected.push(bundle.name.clone());
-        }
-        for bundle_cap in &bundle.capabilities {
-            covered.insert(bundle_cap.clone());
-        }
-    }
-
-    selected
+    let _ = statements;
+    Vec::new()
 }

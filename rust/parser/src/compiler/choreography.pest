@@ -12,16 +12,21 @@ choreography = {
     SOI
         ~ module_decl?
         ~ import_decl*
-        ~ proof_bundle_decl*
-        ~ role_set_decl*
-        ~ topology_decl*
-        ~ type_decl*
-        ~ effect_decl*
-        ~ fragment_decl*
-        ~ operation_decl*
-        ~ guest_runtime_decl*
+        ~ top_level_decl*
         ~ protocol_decl
         ~ EOI
+}
+
+top_level_decl = _{
+    proof_bundle_decl
+    | profile_decl
+    | role_set_decl
+    | topology_decl
+    | type_decl
+    | effect_decl
+    | fragment_decl
+    | operation_decl
+    | guest_runtime_decl
 }
 
 // Module and imports (optional)
@@ -30,7 +35,7 @@ import_decl = { "import" ~ ident ~ ("as" ~ ident)? ~ ("exposing" ~ "(" ~ expose_
 expose_list = { (!")" ~ ANY)* }
 
 // Protocol definitions
-protocol_decl = { "protocol" ~ ident ~ header_roles? ~ protocol_requires? ~ protocol_uses? ~ "=" ~ protocol_body ~ where_block? }
+protocol_decl = { "protocol" ~ ident ~ header_roles? ~ protocol_requires? ~ protocol_uses? ~ protocol_profiles? ~ "=" ~ protocol_body ~ where_block? }
 where_block = { "where" ~ locals_block }
 locals_block = { "{" ~ local_protocol_decl+ ~ "}" | "(" ~ local_protocol_decl+ ~ ")" | local_protocol_decl+ }
 local_protocol_decl = { "protocol" ~ ident ~ header_roles? ~ "=" ~ protocol_body }
@@ -45,6 +50,13 @@ proof_bundle_requires = { "requires" ~ "[" ~ capability_list? ~ "]" }
 capability_list = { ident ~ ("," ~ ident)* }
 protocol_requires = { "requires" ~ ident ~ ("," ~ ident)* }
 protocol_uses = { "uses" ~ ident ~ ("," ~ ident)* }
+protocol_profiles = { "under" ~ ident ~ ("," ~ ident)* }
+
+profile_decl = { "profile" ~ ident ~ profile_meta* }
+profile_meta = { profile_fairness | profile_admissibility | profile_escalation_window }
+profile_fairness = { "fairness" ~ ident }
+profile_admissibility = { "admissibility" ~ ident }
+profile_escalation_window = { "escalation_window" ~ ident }
 
 type_decl = { type_alias_decl | union_type_decl }
 type_alias_decl = { "type" ~ "alias" ~ ident ~ "=" ~ type_expr }
@@ -74,10 +86,12 @@ topology_kind = { "cluster" | "ring" | "mesh" }
 topology_members = { ident ~ ("," ~ ident)* }
 fragment_decl = { "fragment" ~ ident ~ ident_list? }
 ident_list = { "(" ~ ident ~ ("," ~ ident)* ~ ")" }
-operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ operation_within? ~ "=" ~ protocol_body }
+operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ operation_within? ~ operation_progress? ~ operation_compose? ~ "=" ~ protocol_body }
 operation_params = { "(" ~ operation_param_decl ~ ("," ~ operation_param_decl)* ~ ")" }
 operation_param_decl = { ident ~ ":" ~ type_expr }
 operation_within = { "within" ~ ident ~ ident_list? }
+operation_progress = { "progress" ~ ident }
+operation_compose = { "compose" ~ ident }
 guest_runtime_decl = { "guest" ~ "runtime" ~ ident ~ "=" ~ guest_runtime_body }
 guest_runtime_body = { "{" ~ guest_runtime_stmt+ ~ "}" | guest_runtime_stmt+ }
 guest_runtime_stmt = { guest_runtime_uses | guest_runtime_entry }
@@ -105,27 +119,15 @@ statement = _{
     | timeout_stmt
     | send_stmt
     | broadcast_stmt
-    | heartbeat_stmt
     | choice_stmt
     | par_stmt
     | loop_stmt
     | rec_stmt
     | continue_stmt
     | call_stmt
-    | handshake_stmt
-    | retry_stmt
-    | quorum_collect_stmt
     | publish_stmt
     | handoff_stmt
     | dependent_work_stmt
-    | vm_acquire_stmt
-    | vm_release_stmt
-    | vm_fork_stmt
-    | vm_join_stmt
-    | vm_abort_stmt
-    | vm_transfer_stmt
-    | vm_tag_stmt
-    | vm_check_stmt
 }
 
 let_in_stmt = { "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
@@ -158,33 +160,12 @@ ident_expr = { ident ~ ("." ~ ident)* }
 duration = { integer ~ time_unit }
 time_unit = { "ms" | "s" | "m" | "h" }
 
-// Heartbeat statement - desugars to recursive choice with liveness detection
-// Syntax: heartbeat Sender -> Receiver every 1s on_missing(3) { timeout_body } body { normal_body }
-heartbeat_stmt = { "heartbeat" ~ role_ref ~ "->" ~ role_ref ~ "every" ~ duration ~ heartbeat_on_missing ~ heartbeat_body }
-heartbeat_on_missing = { "on_missing" ~ "(" ~ integer ~ ")" ~ block }
-heartbeat_body = { "body" ~ block }
-
 // Protocol call statement (for sub-protocols in where blocks)
 call_stmt = { "call" ~ ident }
 
-// First-class combinators
-handshake_stmt = { "handshake" ~ role_ref ~ "<->" ~ role_ref ~ ":" ~ ident }
-retry_stmt = { "retry" ~ int_expr ~ block }
-quorum_collect_stmt = { "quorum_collect" ~ role_ref ~ "->" ~ role_ref ~ "min" ~ integer ~ ":" ~ message }
 publish_stmt = { "publish" ~ ident ~ ctor_value_payload? }
 handoff_stmt = { "handoff" ~ ident ~ "to" ~ role_ref ~ "using" ~ ident }
 dependent_work_stmt = { "dependent" ~ "work" ~ ident ~ ctor_value_payload? ~ "required" ~ "for" ~ ident }
-
-// Protocol-machine-core operational statements
-vm_acquire_stmt = { "acquire" ~ vm_layer ~ "as" ~ ident }
-vm_release_stmt = { "release" ~ vm_layer ~ "using" ~ ident }
-vm_fork_stmt = { "fork" ~ ident }
-vm_join_stmt = { "join" }
-vm_abort_stmt = { "abort" }
-vm_transfer_stmt = { ("transfer" | "delegate") ~ ident ~ "to" ~ ident ~ ("with" ~ "bundle" ~ ident)? }
-vm_tag_stmt = { "tag" ~ ident ~ "as" ~ ident }
-vm_check_stmt = { "check" ~ ident ~ "for" ~ role_ref ~ "into" ~ ident }
-vm_layer = { ident | string }
 
 // Continue statement (for recursive back-references)
 continue_stmt = { "continue" ~ ident }

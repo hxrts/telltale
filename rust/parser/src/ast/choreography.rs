@@ -5,21 +5,23 @@ use proc_macro2::Ident;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeSet, HashMap};
 
-const ATTR_PROOF_BUNDLES: &str = "dsl.proof_bundles";
-const ATTR_REQUIRED_PROOF_BUNDLES: &str = "dsl.required_proof_bundles";
-const ATTR_INFERRED_REQUIRED_PROOF_BUNDLES: &str = "dsl.inferred_required_proof_bundles";
+const ATTR_THEOREM_PACKS: &str = "dsl.proof_bundles";
+const ATTR_REQUIRED_THEOREM_PACKS: &str = "dsl.required_proof_bundles";
+const ATTR_INFERRED_REQUIRED_THEOREM_PACKS: &str = "dsl.inferred_required_proof_bundles";
 const ATTR_ROLE_SETS: &str = "dsl.role_sets";
 const ATTR_TOPOLOGIES: &str = "dsl.topologies";
-const ATTR_TYPE_DECLS: &str = "dsl.type_decls";
-const ATTR_EFFECT_DECLS: &str = "dsl.effect_decls";
+const ATTR_TYPE_DECLARATIONS: &str = "dsl.type_decls";
+const ATTR_EFFECT_INTERFACE_DECLARATIONS: &str = "dsl.effect_decls";
 const ATTR_PROTOCOL_USES: &str = "dsl.protocol_uses";
-const ATTR_FRAGMENT_DECLS: &str = "dsl.fragment_decls";
-const ATTR_OPERATION_DECLS: &str = "dsl.operation_decls";
-const ATTR_GUEST_RUNTIME_DECLS: &str = "dsl.guest_runtime_decls";
+const ATTR_REGION_DECLARATIONS: &str = "dsl.fragment_decls";
+const ATTR_OPERATION_DECLARATIONS: &str = "dsl.operation_decls";
+const ATTR_GUEST_RUNTIME_DECLARATIONS: &str = "dsl.guest_runtime_decls";
+const ATTR_EXECUTION_PROFILE_DECLARATIONS: &str = "dsl.execution_profile_decls";
+const ATTR_PROTOCOL_EXECUTION_PROFILES: &str = "dsl.protocol_execution_profiles";
 
 /// Typed proof-bundle declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ProofBundleDecl {
+pub struct TheoremPackDeclaration {
     /// Stable bundle name.
     pub name: String,
     /// Capabilities provided by this bundle.
@@ -38,7 +40,7 @@ pub struct ProofBundleDecl {
 
 /// Typed role-set declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RoleSetDecl {
+pub struct RoleSetDeclaration {
     /// Stable role-set name.
     pub name: String,
     /// Explicit members for this role-set.
@@ -57,7 +59,7 @@ pub struct RoleSetDecl {
 
 /// Typed topology declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TopologyDecl {
+pub struct TopologyDeclaration {
     /// Topology kind (`cluster`, `ring`, `mesh`).
     pub kind: String,
     /// Topology name.
@@ -69,7 +71,7 @@ pub struct TopologyDecl {
 
 /// DSL type declaration metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TypeDecl {
+pub struct TypeDeclaration {
     /// Declared type name.
     pub name: String,
     /// Whether this is a `type alias`.
@@ -79,12 +81,12 @@ pub struct TypeDecl {
     pub alias_of: Option<String>,
     /// Union constructors for nominal sum types.
     #[serde(default)]
-    pub constructors: Vec<TypeConstructorDecl>,
+    pub constructors: Vec<TypeConstructorDeclaration>,
 }
 
 /// Constructor declaration for one nominal union type.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct TypeConstructorDecl {
+pub struct TypeConstructorDeclaration {
     /// Constructor name.
     pub name: String,
     /// Optional payload type rendered from source syntax.
@@ -94,18 +96,18 @@ pub struct TypeConstructorDecl {
 
 /// Nominal effect interface declaration metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EffectDecl {
+pub struct EffectInterfaceDeclaration {
     /// Effect interface name.
     pub name: String,
     /// Declared operations for this interface.
     #[serde(default)]
-    pub operations: Vec<EffectOpDecl>,
+    pub operations: Vec<EffectOperationDeclaration>,
 }
 
 /// Authority class for one nominal effect operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
-pub enum EffectOpAuthorityClass {
+pub enum EffectAuthorityClass {
     /// Operation may produce authoritative semantic evidence.
     Authoritative,
     /// Operation performs command work without itself proving semantic truth.
@@ -117,12 +119,12 @@ pub enum EffectOpAuthorityClass {
 
 /// One operation in a nominal effect interface.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EffectOpDecl {
+pub struct EffectOperationDeclaration {
     /// Operation name.
     pub name: String,
     /// Authority class attached to this operation.
     #[serde(default)]
-    pub authority_class: EffectOpAuthorityClass,
+    pub authority_class: EffectAuthorityClass,
     /// Input type as declared in DSL surface syntax.
     pub input_type: String,
     /// Output type as declared in DSL surface syntax.
@@ -131,13 +133,13 @@ pub struct EffectOpDecl {
 
 /// Runtime-facing effect metadata derived from one nominal effect declaration.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RuntimeEffectMetadataDecl {
+pub struct EffectContractDeclaration {
     /// Nominal effect interface name.
     pub interface_name: String,
     /// Nominal effect operation name.
     pub operation_name: String,
     /// Authority class attached to this operation.
-    pub authority_class: EffectOpAuthorityClass,
+    pub authority_class: EffectAuthorityClass,
     /// Runtime admissibility policy name.
     pub admissibility: String,
     /// Runtime totality policy name.
@@ -152,7 +154,7 @@ pub struct RuntimeEffectMetadataDecl {
 
 /// Fragment declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct FragmentDecl {
+pub struct RegionDeclaration {
     /// Fragment name.
     pub name: String,
     /// Named fragment parameters.
@@ -162,7 +164,7 @@ pub struct FragmentDecl {
 
 /// Operation parameter declaration metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OperationParamDecl {
+pub struct OperationParameterDeclaration {
     /// Parameter name.
     pub name: String,
     /// Parameter type rendered from source syntax.
@@ -171,24 +173,30 @@ pub struct OperationParamDecl {
 
 /// Operation declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct OperationDecl {
+pub struct OperationDeclaration {
     /// Operation name.
     pub name: String,
     /// Operation parameters.
     #[serde(default)]
-    pub params: Vec<OperationParamDecl>,
+    pub params: Vec<OperationParameterDeclaration>,
     /// Semantic owner role.
     pub owner_role: String,
     /// Optional fragment scope rendered from source syntax.
     #[serde(default)]
     pub within: Option<String>,
+    /// Required progress contract for parity-critical execution.
+    #[serde(default)]
+    pub progress_contract: Option<String>,
+    /// Declared effect-composition policy for the operation.
+    #[serde(default)]
+    pub composition_policy: Option<String>,
     /// Raw operation body source.
     pub body_source: String,
 }
 
 /// Guest-runtime declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GuestRuntimeDecl {
+pub struct GuestRuntimeDeclaration {
     /// Guest-runtime name.
     pub name: String,
     /// Declared effect interface uses.
@@ -196,6 +204,42 @@ pub struct GuestRuntimeDecl {
     pub uses: Vec<String>,
     /// Entry protocol name.
     pub entry: String,
+}
+
+/// Execution-profile declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExecutionProfileDeclaration {
+    /// Stable profile name.
+    pub name: String,
+    /// Fairness class fixed by the profile.
+    #[serde(default)]
+    pub fairness: Option<String>,
+    /// Admissibility class fixed by the profile.
+    #[serde(default)]
+    pub admissibility: Option<String>,
+    /// Escalation-window class fixed by the profile.
+    #[serde(default)]
+    pub escalation_window: Option<String>,
+}
+
+/// Strongest artifact tier justified by the parsed specification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum LanguageTier {
+    FullSpec,
+    SessionProjectable,
+    ProtocolMachineExecutable,
+    ProofOnly,
+}
+
+/// Explicit language-tier status for one parsed specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LanguageTierStatus {
+    pub strongest_tier: LanguageTier,
+    pub session_projectable: bool,
+    pub protocol_machine_executable: bool,
+    pub proof_only: bool,
+    pub diagnostic: String,
 }
 
 /// A complete choreographic protocol specification
@@ -241,12 +285,14 @@ impl Choreography {
         self.protocol.validate(&self.roles)?;
         self.validate_proof_bundles()?;
         self.validate_effect_surface()?;
+        self.validate_execution_profile_surface()?;
+        self.validate_operation_surface()?;
 
         Ok(())
     }
 
     fn validate_proof_bundles(&self) -> Result<(), ValidationError> {
-        let bundles = self.proof_bundles();
+        let bundles = self.theorem_packs();
         let mut declared: BTreeSet<String> = BTreeSet::new();
         for bundle in &bundles {
             if !declared.insert(bundle.name.clone()) {
@@ -254,13 +300,13 @@ impl Choreography {
             }
         }
 
-        for required in self.required_proof_bundles() {
+        for required in self.required_theorem_packs() {
             if !declared.contains(&required) {
                 return Err(ValidationError::MissingProofBundle(required));
             }
         }
 
-        let required_caps = self.required_bundle_capabilities();
+        let required_caps = self.required_theorem_pack_capabilities();
         for capability in self.required_vm_core_capabilities() {
             if !required_caps.contains(&capability) {
                 return Err(ValidationError::MissingCapability(capability));
@@ -272,8 +318,9 @@ impl Choreography {
 
     fn validate_effect_surface(&self) -> Result<(), ValidationError> {
         let mut effect_names = BTreeSet::new();
-        let mut effect_ops: HashMap<String, HashMap<String, EffectOpDecl>> = HashMap::new();
-        for effect in self.effect_decls() {
+        let mut effect_ops: HashMap<String, HashMap<String, EffectOperationDeclaration>> =
+            HashMap::new();
+        for effect in self.effect_interface_declarations() {
             if !effect_names.insert(effect.name.clone()) {
                 return Err(ValidationError::ExtensionError(format!(
                     "duplicate effect interface declaration `{}`",
@@ -304,7 +351,7 @@ impl Choreography {
 
         fn validate_expr(
             expr: &super::AuthorityExpr,
-            effect_ops: &HashMap<String, HashMap<String, EffectOpDecl>>,
+            effect_ops: &HashMap<String, HashMap<String, EffectOperationDeclaration>>,
             used: &BTreeSet<String>,
         ) -> Result<(), ValidationError> {
             match expr {
@@ -326,7 +373,7 @@ impl Choreography {
                             "effect invocation references undeclared operation `{effect}.{operation}`"
                         )));
                     };
-                    if matches!(op_decl.authority_class, EffectOpAuthorityClass::Observe) {
+                    if matches!(op_decl.authority_class, EffectAuthorityClass::Observe) {
                         return Err(ValidationError::ExtensionError(format!(
                             "effect invocation `{effect}.{operation}` is observational and may not be invoked with `check`"
                         )));
@@ -351,7 +398,7 @@ impl Choreography {
                             "effect invocation references undeclared operation `{effect}.{operation}`"
                         )));
                     };
-                    if !matches!(op_decl.authority_class, EffectOpAuthorityClass::Observe) {
+                    if !matches!(op_decl.authority_class, EffectAuthorityClass::Observe) {
                         return Err(ValidationError::ExtensionError(format!(
                             "effect invocation `{effect}.{operation}` is not observational and may not be invoked with `observe`"
                         )));
@@ -367,7 +414,7 @@ impl Choreography {
 
         fn validate_protocol_effects(
             protocol: &Protocol,
-            effect_ops: &HashMap<String, HashMap<String, EffectOpDecl>>,
+            effect_ops: &HashMap<String, HashMap<String, EffectOperationDeclaration>>,
             used: &BTreeSet<String>,
         ) -> Result<(), ValidationError> {
             match protocol {
@@ -404,7 +451,7 @@ impl Choreography {
                                     "effect guard references undeclared operation `{effect}.{operation}`"
                                 )));
                             };
-                            if matches!(op_decl.authority_class, EffectOpAuthorityClass::Observe) {
+                            if matches!(op_decl.authority_class, EffectAuthorityClass::Observe) {
                                 return Err(ValidationError::ExtensionError(format!(
                                     "effect guard `{effect}.{operation}` is observational and may not be invoked with `check`"
                                 )));
@@ -448,6 +495,82 @@ impl Choreography {
         }
 
         validate_protocol_effects(&self.protocol, &effect_ops, &used)
+    }
+
+    fn validate_execution_profile_surface(&self) -> Result<(), ValidationError> {
+        let mut declared = BTreeSet::new();
+        for profile in self.execution_profile_declarations() {
+            if !declared.insert(profile.name.clone()) {
+                return Err(ValidationError::ExtensionError(format!(
+                    "duplicate execution profile declaration `{}`",
+                    profile.name
+                )));
+            }
+        }
+
+        for profile in self.protocol_execution_profiles() {
+            if !declared.contains(&profile) {
+                return Err(ValidationError::ExtensionError(format!(
+                    "protocol references undeclared execution profile `{profile}`"
+                )));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_operation_surface(&self) -> Result<(), ValidationError> {
+        for operation in self.operation_declarations() {
+            if operation.progress_contract.is_none() {
+                return Err(ValidationError::ExtensionError(format!(
+                    "operation `{}` is parity-critical and must declare a progress contract",
+                    operation.name
+                )));
+            }
+        }
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn language_tier_status(&self) -> LanguageTierStatus {
+        let session_blocker = find_session_projection_blocker(&self.protocol);
+        let missing_progress = self
+            .operation_declarations()
+            .iter()
+            .find(|operation| operation.progress_contract.is_none())
+            .map(|operation| {
+                format!(
+                    "operation `{}` is missing the required progress contract",
+                    operation.name
+                )
+            });
+
+        let protocol_machine_executable = missing_progress.is_none();
+        let session_projectable = session_blocker.is_none();
+        let strongest_tier = match (session_projectable, protocol_machine_executable) {
+            (true, true) => LanguageTier::SessionProjectable,
+            (false, true) => LanguageTier::ProtocolMachineExecutable,
+            (_, false) => LanguageTier::ProofOnly,
+        };
+        let diagnostic = if let Some(blocker) = session_blocker {
+            format!(
+                "full spec is valid, protocol-machine execution is available, but session projection is blocked: {blocker}"
+            )
+        } else if let Some(missing_progress) = missing_progress {
+            format!(
+                "full spec is valid for proof analysis only; protocol-machine execution is blocked: {missing_progress}"
+            )
+        } else {
+            "full spec is valid, protocol-machine execution is available, and the protocol is session-projectable".to_string()
+        };
+
+        LanguageTierStatus {
+            strongest_tier,
+            session_projectable,
+            protocol_machine_executable,
+            proof_only: matches!(strongest_tier, LanguageTier::ProofOnly),
+            diagnostic,
+        }
     }
 
     /// Get choreography-level attributes/annotations
@@ -551,64 +674,67 @@ impl Choreography {
         self.attribute_count() + self.protocol.deep_annotation_count()
     }
 
-    /// Set proof-bundle declarations for this choreography.
-    pub fn set_proof_bundles(&mut self, bundles: &[ProofBundleDecl]) -> Result<(), String> {
-        let encoded =
-            serde_json::to_string(bundles).map_err(|e| format!("encode proof bundles: {e}"))?;
-        self.attrs.insert(ATTR_PROOF_BUNDLES.to_string(), encoded);
+    /// Set theorem-pack declarations for this choreography.
+    pub fn set_theorem_packs(
+        &mut self,
+        theorem_packs: &[TheoremPackDeclaration],
+    ) -> Result<(), String> {
+        let encoded = serde_json::to_string(theorem_packs)
+            .map_err(|e| format!("encode theorem packs: {e}"))?;
+        self.attrs.insert(ATTR_THEOREM_PACKS.to_string(), encoded);
         Ok(())
     }
 
-    /// Get typed proof-bundle declarations.
+    /// Get typed theorem-pack declarations.
     #[must_use]
-    pub fn proof_bundles(&self) -> Vec<ProofBundleDecl> {
+    pub fn theorem_packs(&self) -> Vec<TheoremPackDeclaration> {
         self.attrs
-            .get(ATTR_PROOF_BUNDLES)
-            .and_then(|s| serde_json::from_str::<Vec<ProofBundleDecl>>(s).ok())
+            .get(ATTR_THEOREM_PACKS)
+            .and_then(|s| serde_json::from_str::<Vec<TheoremPackDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
-    /// Set protocol-required proof bundles.
-    pub fn set_required_proof_bundles(&mut self, required: &[String]) -> Result<(), String> {
-        let encoded =
-            serde_json::to_string(required).map_err(|e| format!("encode required bundles: {e}"))?;
+    /// Set protocol-required theorem packs.
+    pub fn set_required_theorem_packs(&mut self, required: &[String]) -> Result<(), String> {
+        let encoded = serde_json::to_string(required)
+            .map_err(|e| format!("encode required theorem packs: {e}"))?;
         self.attrs
-            .insert(ATTR_REQUIRED_PROOF_BUNDLES.to_string(), encoded);
+            .insert(ATTR_REQUIRED_THEOREM_PACKS.to_string(), encoded);
         Ok(())
     }
 
-    /// Get protocol-required proof bundles.
+    /// Get protocol-required theorem packs.
     #[must_use]
-    pub fn required_proof_bundles(&self) -> Vec<String> {
+    pub fn required_theorem_packs(&self) -> Vec<String> {
         self.attrs
-            .get(ATTR_REQUIRED_PROOF_BUNDLES)
+            .get(ATTR_REQUIRED_THEOREM_PACKS)
             .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
             .unwrap_or_default()
     }
 
-    /// Set inferred protocol-required proof bundles.
-    pub fn set_inferred_required_proof_bundles(
+    /// Set inferred protocol-required theorem packs.
+    pub fn set_inferred_required_theorem_packs(
         &mut self,
         required: &[String],
     ) -> Result<(), String> {
-        let encoded =
-            serde_json::to_string(required).map_err(|e| format!("encode inferred bundles: {e}"))?;
+        let encoded = serde_json::to_string(required)
+            .map_err(|e| format!("encode inferred theorem packs: {e}"))?;
         self.attrs
-            .insert(ATTR_INFERRED_REQUIRED_PROOF_BUNDLES.to_string(), encoded);
+            .insert(ATTR_INFERRED_REQUIRED_THEOREM_PACKS.to_string(), encoded);
         Ok(())
     }
 
-    /// Get inferred protocol-required proof bundles.
+    /// Get inferred protocol-required theorem packs.
     #[must_use]
-    pub fn inferred_required_proof_bundles(&self) -> Vec<String> {
+    pub fn inferred_required_theorem_packs(&self) -> Vec<String> {
         self.attrs
-            .get(ATTR_INFERRED_REQUIRED_PROOF_BUNDLES)
+            .get(ATTR_INFERRED_REQUIRED_THEOREM_PACKS)
             .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Set role-set declarations for this choreography.
-    pub fn set_role_sets(&mut self, role_sets: &[RoleSetDecl]) -> Result<(), String> {
+    pub fn set_role_sets(&mut self, role_sets: &[RoleSetDeclaration]) -> Result<(), String> {
         let encoded =
             serde_json::to_string(role_sets).map_err(|e| format!("encode role sets: {e}"))?;
         self.attrs.insert(ATTR_ROLE_SETS.to_string(), encoded);
@@ -617,15 +743,15 @@ impl Choreography {
 
     /// Get typed role-set declarations.
     #[must_use]
-    pub fn role_sets(&self) -> Vec<RoleSetDecl> {
+    pub fn role_sets(&self) -> Vec<RoleSetDeclaration> {
         self.attrs
             .get(ATTR_ROLE_SETS)
-            .and_then(|s| serde_json::from_str::<Vec<RoleSetDecl>>(s).ok())
+            .and_then(|s| serde_json::from_str::<Vec<RoleSetDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Set topology declarations for this choreography.
-    pub fn set_topologies(&mut self, topologies: &[TopologyDecl]) -> Result<(), String> {
+    pub fn set_topologies(&mut self, topologies: &[TopologyDeclaration]) -> Result<(), String> {
         let encoded =
             serde_json::to_string(topologies).map_err(|e| format!("encode topologies: {e}"))?;
         self.attrs.insert(ATTR_TOPOLOGIES.to_string(), encoded);
@@ -634,53 +760,58 @@ impl Choreography {
 
     /// Get typed topology declarations.
     #[must_use]
-    pub fn topologies(&self) -> Vec<TopologyDecl> {
+    pub fn topologies(&self) -> Vec<TopologyDeclaration> {
         self.attrs
             .get(ATTR_TOPOLOGIES)
-            .and_then(|s| serde_json::from_str::<Vec<TopologyDecl>>(s).ok())
+            .and_then(|s| serde_json::from_str::<Vec<TopologyDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Set nominal type declarations for this choreography.
-    pub fn set_type_decls(&mut self, decls: &[TypeDecl]) -> Result<(), String> {
+    pub fn set_type_declarations(&mut self, decls: &[TypeDeclaration]) -> Result<(), String> {
         let encoded =
             serde_json::to_string(decls).map_err(|e| format!("encode type declarations: {e}"))?;
-        self.attrs.insert(ATTR_TYPE_DECLS.to_string(), encoded);
+        self.attrs
+            .insert(ATTR_TYPE_DECLARATIONS.to_string(), encoded);
         Ok(())
     }
 
     /// Get nominal type declarations.
     #[must_use]
-    pub fn type_decls(&self) -> Vec<TypeDecl> {
+    pub fn type_declarations(&self) -> Vec<TypeDeclaration> {
         self.attrs
-            .get(ATTR_TYPE_DECLS)
-            .and_then(|s| serde_json::from_str::<Vec<TypeDecl>>(s).ok())
+            .get(ATTR_TYPE_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<TypeDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Set nominal effect interface declarations for this choreography.
-    pub fn set_effect_decls(&mut self, decls: &[EffectDecl]) -> Result<(), String> {
+    pub fn set_effect_interface_declarations(
+        &mut self,
+        decls: &[EffectInterfaceDeclaration],
+    ) -> Result<(), String> {
         let encoded =
             serde_json::to_string(decls).map_err(|e| format!("encode effect declarations: {e}"))?;
-        self.attrs.insert(ATTR_EFFECT_DECLS.to_string(), encoded);
+        self.attrs
+            .insert(ATTR_EFFECT_INTERFACE_DECLARATIONS.to_string(), encoded);
         Ok(())
     }
 
     /// Get nominal effect interface declarations.
     #[must_use]
-    pub fn effect_decls(&self) -> Vec<EffectDecl> {
+    pub fn effect_interface_declarations(&self) -> Vec<EffectInterfaceDeclaration> {
         self.attrs
-            .get(ATTR_EFFECT_DECLS)
-            .and_then(|s| serde_json::from_str::<Vec<EffectDecl>>(s).ok())
+            .get(ATTR_EFFECT_INTERFACE_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<EffectInterfaceDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Derive runtime-facing effect metadata from nominal effect declarations
     /// and protocol `uses` dependencies.
     #[must_use]
-    pub fn runtime_effect_metadata(&self) -> Vec<RuntimeEffectMetadataDecl> {
+    pub fn effect_contract_declarations(&self) -> Vec<EffectContractDeclaration> {
         let used: BTreeSet<String> = self.protocol_uses().into_iter().collect();
-        self.effect_decls()
+        self.effect_interface_declarations()
             .into_iter()
             .flat_map(|effect| {
                 let is_used = used.contains(effect.name.as_str());
@@ -692,7 +823,7 @@ impl Choreography {
                         reentrancy_policy,
                         handler_domain,
                     ) = match op.authority_class {
-                        EffectOpAuthorityClass::Authoritative => (
+                        EffectAuthorityClass::Authoritative => (
                             if is_used {
                                 "declared_use_only"
                             } else {
@@ -703,7 +834,7 @@ impl Choreography {
                             "reject_same_fragment",
                             if is_used { "external" } else { "internal" },
                         ),
-                        EffectOpAuthorityClass::Command => (
+                        EffectAuthorityClass::Command => (
                             if is_used {
                                 "declared_use_only"
                             } else {
@@ -714,7 +845,7 @@ impl Choreography {
                             "allow",
                             if is_used { "external" } else { "internal" },
                         ),
-                        EffectOpAuthorityClass::Observe => (
+                        EffectAuthorityClass::Observe => (
                             if is_used {
                                 "declared_use_only"
                             } else {
@@ -726,7 +857,7 @@ impl Choreography {
                             if is_used { "external" } else { "internal" },
                         ),
                     };
-                    RuntimeEffectMetadataDecl {
+                    EffectContractDeclaration {
                         interface_name: effect.name.clone(),
                         operation_name: op.name,
                         authority_class: op.authority_class,
@@ -758,62 +889,109 @@ impl Choreography {
             .unwrap_or_default()
     }
 
-    /// Set fragment declarations for this choreography.
-    pub fn set_fragment_decls(&mut self, decls: &[FragmentDecl]) -> Result<(), String> {
-        let encoded = serde_json::to_string(decls)
-            .map_err(|e| format!("encode fragment declarations: {e}"))?;
-        self.attrs.insert(ATTR_FRAGMENT_DECLS.to_string(), encoded);
+    /// Set region declarations for this choreography.
+    pub fn set_region_declarations(&mut self, decls: &[RegionDeclaration]) -> Result<(), String> {
+        let encoded =
+            serde_json::to_string(decls).map_err(|e| format!("encode region declarations: {e}"))?;
+        self.attrs
+            .insert(ATTR_REGION_DECLARATIONS.to_string(), encoded);
         Ok(())
     }
 
-    /// Get fragment declarations.
+    /// Get region declarations.
     #[must_use]
-    pub fn fragment_decls(&self) -> Vec<FragmentDecl> {
+    pub fn region_declarations(&self) -> Vec<RegionDeclaration> {
         self.attrs
-            .get(ATTR_FRAGMENT_DECLS)
-            .and_then(|s| serde_json::from_str::<Vec<FragmentDecl>>(s).ok())
+            .get(ATTR_REGION_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<RegionDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Set operation declarations for this choreography.
-    pub fn set_operation_decls(&mut self, decls: &[OperationDecl]) -> Result<(), String> {
+    pub fn set_operation_declarations(
+        &mut self,
+        decls: &[OperationDeclaration],
+    ) -> Result<(), String> {
         let encoded = serde_json::to_string(decls)
             .map_err(|e| format!("encode operation declarations: {e}"))?;
-        self.attrs.insert(ATTR_OPERATION_DECLS.to_string(), encoded);
+        self.attrs
+            .insert(ATTR_OPERATION_DECLARATIONS.to_string(), encoded);
         Ok(())
     }
 
     /// Get operation declarations.
     #[must_use]
-    pub fn operation_decls(&self) -> Vec<OperationDecl> {
+    pub fn operation_declarations(&self) -> Vec<OperationDeclaration> {
         self.attrs
-            .get(ATTR_OPERATION_DECLS)
-            .and_then(|s| serde_json::from_str::<Vec<OperationDecl>>(s).ok())
+            .get(ATTR_OPERATION_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<OperationDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
     /// Set guest-runtime declarations for this choreography.
-    pub fn set_guest_runtime_decls(&mut self, decls: &[GuestRuntimeDecl]) -> Result<(), String> {
+    pub fn set_guest_runtime_declarations(
+        &mut self,
+        decls: &[GuestRuntimeDeclaration],
+    ) -> Result<(), String> {
         let encoded = serde_json::to_string(decls)
             .map_err(|e| format!("encode guest runtime declarations: {e}"))?;
         self.attrs
-            .insert(ATTR_GUEST_RUNTIME_DECLS.to_string(), encoded);
+            .insert(ATTR_GUEST_RUNTIME_DECLARATIONS.to_string(), encoded);
         Ok(())
     }
 
     /// Get guest-runtime declarations.
     #[must_use]
-    pub fn guest_runtime_decls(&self) -> Vec<GuestRuntimeDecl> {
+    pub fn guest_runtime_declarations(&self) -> Vec<GuestRuntimeDeclaration> {
         self.attrs
-            .get(ATTR_GUEST_RUNTIME_DECLS)
-            .and_then(|s| serde_json::from_str::<Vec<GuestRuntimeDecl>>(s).ok())
+            .get(ATTR_GUEST_RUNTIME_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<GuestRuntimeDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 
-    fn required_bundle_capabilities(&self) -> BTreeSet<String> {
-        let required = self.required_proof_bundles();
+    /// Set execution-profile declarations for this choreography.
+    pub fn set_execution_profile_declarations(
+        &mut self,
+        decls: &[ExecutionProfileDeclaration],
+    ) -> Result<(), String> {
+        let encoded = serde_json::to_string(decls)
+            .map_err(|e| format!("encode execution profile declarations: {e}"))?;
+        self.attrs
+            .insert(ATTR_EXECUTION_PROFILE_DECLARATIONS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get execution-profile declarations.
+    #[must_use]
+    pub fn execution_profile_declarations(&self) -> Vec<ExecutionProfileDeclaration> {
+        self.attrs
+            .get(ATTR_EXECUTION_PROFILE_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<ExecutionProfileDeclaration>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set protocol-selected execution profiles.
+    pub fn set_protocol_execution_profiles(&mut self, profiles: &[String]) -> Result<(), String> {
+        let encoded = serde_json::to_string(profiles)
+            .map_err(|e| format!("encode protocol execution profiles: {e}"))?;
+        self.attrs
+            .insert(ATTR_PROTOCOL_EXECUTION_PROFILES.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get protocol-selected execution profiles.
+    #[must_use]
+    pub fn protocol_execution_profiles(&self) -> Vec<String> {
+        self.attrs
+            .get(ATTR_PROTOCOL_EXECUTION_PROFILES)
+            .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    fn required_theorem_pack_capabilities(&self) -> BTreeSet<String> {
+        let required = self.required_theorem_packs();
         let required_set: BTreeSet<&str> = required.iter().map(String::as_str).collect();
-        self.proof_bundles()
+        self.theorem_packs()
             .into_iter()
             .filter(|bundle| required_set.contains(bundle.name.as_str()))
             .flat_map(|bundle| bundle.capabilities.into_iter())
@@ -871,6 +1049,32 @@ impl Choreography {
     }
 }
 
+fn find_session_projection_blocker(protocol: &Protocol) -> Option<&'static str> {
+    match protocol {
+        Protocol::Case { .. } => Some("authority-local case/of requires protocol-machine lowering"),
+        Protocol::Timeout { .. } => Some("timeout requires protocol-machine progress semantics"),
+        Protocol::Publish { .. } => Some("publish requires publication/materialization semantics"),
+        Protocol::Handoff { .. } => Some("handoff requires semantic handoff semantics"),
+        Protocol::DependentWork { .. } => {
+            Some("dependent work requires protocol-machine commitment semantics")
+        }
+        Protocol::Send { continuation, .. }
+        | Protocol::Broadcast { continuation, .. }
+        | Protocol::Let { continuation, .. }
+        | Protocol::Extension { continuation, .. } => find_session_projection_blocker(continuation),
+        Protocol::Choice { branches, .. } => branches
+            .iter()
+            .find_map(|branch| find_session_projection_blocker(&branch.protocol)),
+        Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+            find_session_projection_blocker(body)
+        }
+        Protocol::Parallel { protocols } => {
+            protocols.iter().find_map(find_session_projection_blocker)
+        }
+        Protocol::Var(_) | Protocol::End => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -886,14 +1090,14 @@ mod tests {
             attrs: HashMap::new(),
         };
         let bundles = vec![
-            ProofBundleDecl {
+            TheoremPackDeclaration {
                 name: "Base".to_string(),
                 capabilities: vec!["delegation".to_string()],
                 version: None,
                 issuer: None,
                 constraints: Vec::new(),
             },
-            ProofBundleDecl {
+            TheoremPackDeclaration {
                 name: "Guard".to_string(),
                 capabilities: vec!["guard_tokens".to_string()],
                 version: None,
@@ -904,13 +1108,13 @@ mod tests {
         let required = vec!["Base".to_string()];
 
         choreo
-            .set_proof_bundles(&bundles)
+            .set_theorem_packs(&bundles)
             .expect("set proof bundles");
         choreo
-            .set_required_proof_bundles(&required)
+            .set_required_theorem_packs(&required)
             .expect("set required bundles");
 
-        assert_eq!(choreo.proof_bundles(), bundles);
-        assert_eq!(choreo.required_proof_bundles(), required);
+        assert_eq!(choreo.theorem_packs(), bundles);
+        assert_eq!(choreo.required_theorem_packs(), required);
     }
 }

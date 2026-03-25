@@ -38,8 +38,11 @@ protocol CommitFlow uses Runtime, Audit =
     let choreography = parse_choreography_str(input)?;
     let generated = choreography.generated_effect_families();
     println!("protocol: {}", choreography.qualified_name());
-    println!("types: {}", choreography.type_decls().len());
-    println!("effects: {}", choreography.effect_decls().len());
+    println!("types: {}", choreography.type_declarations().len());
+    println!(
+        "effects: {}",
+        choreography.effect_interface_declarations().len()
+    );
     println!("uses: {}", choreography.protocol_uses().join(", "));
     println!("generated effect families: {}", generated.len());
     for family in generated {

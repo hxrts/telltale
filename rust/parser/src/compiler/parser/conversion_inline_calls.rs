@@ -39,23 +39,6 @@ pub(crate) fn inline_calls(
                     annotations: HashMap::new(),
                 });
             }
-            Statement::Heartbeat {
-                sender,
-                receiver,
-                interval_ms,
-                on_missing_count,
-                on_missing_body,
-                body,
-            } => {
-                result.push(Statement::Heartbeat {
-                    sender: sender.clone(),
-                    receiver: receiver.clone(),
-                    interval_ms: *interval_ms,
-                    on_missing_count: *on_missing_count,
-                    on_missing_body: inline_calls(on_missing_body, protocol_defs, input)?,
-                    body: inline_calls(body, protocol_defs, input)?,
-                });
-            }
             Statement::Loop { condition, body } => {
                 result.push(Statement::Loop {
                     condition: condition.clone(),
@@ -76,33 +59,6 @@ pub(crate) fn inline_calls(
                     label: label.clone(),
                     body: inline_calls(body, protocol_defs, input)?,
                 });
-            }
-            Statement::Handshake {
-                initiator,
-                responder,
-                label,
-            } => {
-                result.push(Statement::Handshake {
-                    initiator: initiator.clone(),
-                    responder: responder.clone(),
-                    label: label.clone(),
-                });
-            }
-            Statement::QuorumCollect {
-                source,
-                destination,
-                min_responses,
-                message,
-            } => {
-                result.push(Statement::QuorumCollect {
-                    source: source.clone(),
-                    destination: destination.clone(),
-                    min_responses: *min_responses,
-                    message: message.clone(),
-                });
-            }
-            Statement::VmCoreOp { op } => {
-                result.push(Statement::VmCoreOp { op: op.clone() });
             }
             _ => {
                 result.push(statement.clone());

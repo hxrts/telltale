@@ -2,9 +2,14 @@
 
 ## Overview
 
-The parser translates a layout-sensitive DSL into the internal AST (`Choreography` and `Protocol`). The DSL is direct style. Statements are newline separated. Indentation defines blocks. Empty blocks must use `{}`.
+The parser translates the layout-sensitive Telltale DSL into the internal AST
+(`Choreography` and `Protocol`). The DSL is direct style. Statements are
+newline separated. Indentation defines blocks. Records keep braces; structural
+blocks do not.
 
-The parser module is located in `rust/choreography/src/compiler/parser/`. It uses Pest plus a layout preprocessor. The canonical source-file extension for Telltale choreography files is `.tell`.
+The parser lives in `rust/parser/src/compiler/parser/`. It uses Pest plus a
+layout preprocessor. The canonical source-file extension for Telltale source
+files is `.tell`.
 
 The preferred surface style mixes MPST operators with a small functional-language layout:
 
@@ -30,23 +35,25 @@ host queries and typed local branching:
 - `timeout ... on timeout ... on cancel ...`
 - evidence guards of the form `when check Effect.op(...) yields witness`
 
-These forms are parser and AST level surfaces first. `let` is treated as local-only and projects through to the continuation. `case/of` and `timeout` are intentionally rejected by the current MPST projection pass. Their projection rules are not yet formalized.
+These forms participate in explicit language tiers:
+
+- full spec: the DSL can express the construct and the semantic object model
+  justifies it
+- session projectable: the construct admits MPST/session projection
+- protocol-machine executable: the construct is executable through the
+  protocol-machine path even when it is not session projectable
+- proof only: the construct parses, but lacks the metadata required for
+  executable lowering
+
+The generated Rust surface exposes this status through
+`Protocol::proof_status`.
 
 ## DSL Syntax
 
 ```rust
-choreography!(r#"
-protocol PingPong =
-  roles Alice, Bob
-  Alice -> Bob : Ping
-  Bob -> Alice : Pong
-"#);
-```
+use telltale::tell;
 
-This form passes the DSL as a string literal.
-
-```rust
-choreography! {
+tell! {
   protocol PingPong =
     roles Alice, Bob
     Alice -> Bob : Ping
@@ -54,23 +61,30 @@ choreography! {
 }
 ```
 
-This form passes the DSL as normal macro tokens. Semicolons are normalized when present. The canonical surface is indentation-based rather than brace-block-based.
+`tell!` is the canonical public DSL entrypoint. String-literal macro input and
+legacy brace-based structural syntax are rejected. The canonical surface is
+token-form, indentation-based, and proof-directed.
+
+When a protocol projects cleanly to sessions, the generated module exposes
+`Protocol::sessions`. Every generated protocol also exposes
+`Protocol::proof_status`, which reports the strongest supported tier and any
+projection blocker.
 
 ### Namespaces
 
-Namespaces are expressed via a module declaration (rather than attributes).
+Namespaces are expressed via a module declaration (rather than attributes) in
+source files:
 
-```rust
-let protocol = r#"
+```tell
 module threshold_ceremony exposing (ThresholdProtocol)
 
 protocol ThresholdProtocol =
   roles Coordinator, Signers[*]
   Coordinator -> Signers[*] : Request
-"#;
 ```
 
-Multiple modules can coexist in separate files. Inside the `choreography!` macro you typically omit the module header. String-based parsing supports module headers.
+Multiple modules can coexist in separate files. Inside `tell!` you typically
+omit the module header and define one protocol-oriented spec directly in Rust.
 
 The parser recognizes `import` declarations for completeness. Import resolution is not currently applied during compilation.
 
@@ -201,22 +215,18 @@ The `continue` keyword is for recursive back-references within a `rec` block. Th
 Define and reuse local protocol fragments inside a `where` block.
 
 ```tell
-protocol Main = {
+protocol Main =
   roles A, B, C
   call Handshake
   call DataTransfer
   A -> C : Done
-}
-where {
-  protocol Handshake = {
+where
+  protocol Handshake =
     A -> B : Hello
     B -> A : Hi
-  }
-  protocol DataTransfer = {
+  protocol DataTransfer =
     A -> B : Data
     B -> A : Ack
-  }
-}
 ```
 
 Local protocols can call each other and can be used within choices, loops, and branches.
@@ -258,6 +268,34 @@ protocol ConsensusProtocol =
   Leader -> Followers[*] : Proposal
   Followers[i] -> Leader : Vote
 ```
+
+#### 10) Profiles, Progress, And Proof Status
+
+Profiles and explicit progress attachment are part of the proof-backed surface.
+
+```rust
+use telltale::tell;
+
+tell! {
+  profile Replay
+    fairness strong
+
+  operation MembershipCheck
+    progress MembershipProgress
+    compose all_success
+
+  protocol Membership under Replay =
+    roles Coordinator, Member
+    Coordinator -> Member : Invite
+}
+
+assert_eq!(Membership::proof_status::STRONGEST_TIER, "session_projectable");
+assert!(Membership::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+```
+
+Profiles, theorem-pack requirements, and language-tier diagnostics are surfaced
+as generated metadata because they are part of the verified model, not an
+afterthought layered on top.
 
 This example mixes a named count with index variables. It enables parameterized protocols.
 

@@ -84,6 +84,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut host = HostRuntime::default();
     let session = effects::Session::new("commit-flow-7");
 
+    println!(
+        "strongest tier = {}",
+        CommitFlow::proof_status::STRONGEST_TIER
+    );
+    println!(
+        "session projectable = {}",
+        CommitFlow::proof_status::SESSION_PROJECTABLE
+    );
+
     // Direct trait calls are the primary developer path for effectful work.
     let witness = effects::Runtime::ready(&mut host, session.clone())?;
     let receipt = effects::Runtime::publish(&mut host, witness.clone())?;

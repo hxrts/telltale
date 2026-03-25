@@ -5,135 +5,16 @@
 //! and inlining of protocol calls.
 
 use crate::ast::{
-    Annotations, AuthorityExpr, Branch, CaseBranch, CasePattern, ChoiceGuard, Condition, LocalType,
-    MessageType, NonEmptyVec, Protocol, ProtocolAnnotation, Role,
-};
-use crate::compiler::projection::ProjectionError;
-use crate::extensions::{
-    CodegenContext, ExtensionValidationError, ProjectionContext, ProtocolExtension,
+    Annotations, AuthorityExpr, Branch, CaseBranch, CasePattern, ChoiceGuard, Condition,
+    MessageType, NonEmptyVec, Protocol, Role,
 };
 use quote::format_ident;
-use std::any::{Any, TypeId};
 
-use super::types::{AuthorityExprSpec, CaseBranchSpec, ChoiceGuardSpec, Statement, VmCoreOp};
+use super::types::{AuthorityExprSpec, CaseBranchSpec, ChoiceGuardSpec, Statement};
 
 #[path = "conversion_inline_calls.rs"]
 mod inline_calls;
 pub(crate) use inline_calls::inline_calls;
-
-#[derive(Debug, Clone)]
-struct VmCoreOpExtension {
-    op_name: String,
-}
-
-impl VmCoreOpExtension {
-    fn new(op_name: impl Into<String>) -> Self {
-        Self {
-            op_name: op_name.into(),
-        }
-    }
-}
-
-impl ProtocolExtension for VmCoreOpExtension {
-    fn type_name(&self) -> &'static str {
-        "vm_core_op"
-    }
-
-    fn mentions_role(&self, _role: &Role) -> bool {
-        false
-    }
-
-    fn validate(&self, _roles: &[Role]) -> Result<(), ExtensionValidationError> {
-        Ok(())
-    }
-
-    fn project(
-        &self,
-        _role: &Role,
-        _context: &ProjectionContext,
-    ) -> Result<LocalType, ProjectionError> {
-        Ok(LocalType::End)
-    }
-
-    fn generate_code(&self, _context: &CodegenContext) -> proc_macro2::TokenStream {
-        let op = &self.op_name;
-        quote::quote! {
-            {
-                let _vm_core_op: &str = #op;
-                // Intentional discard: suppress unused warning in generated code.
-                let _ = _vm_core_op;
-            }
-        }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-}
-
-#[derive(Debug, Clone)]
-struct DslCombinatorExtension {
-    kind: String,
-}
-
-impl DslCombinatorExtension {
-    fn new(kind: impl Into<String>) -> Self {
-        Self { kind: kind.into() }
-    }
-}
-
-impl ProtocolExtension for DslCombinatorExtension {
-    fn type_name(&self) -> &'static str {
-        "dsl_combinator"
-    }
-
-    fn mentions_role(&self, _role: &Role) -> bool {
-        false
-    }
-
-    fn validate(&self, _roles: &[Role]) -> Result<(), ExtensionValidationError> {
-        Ok(())
-    }
-
-    fn project(
-        &self,
-        _role: &Role,
-        _context: &ProjectionContext,
-    ) -> Result<LocalType, ProjectionError> {
-        Ok(LocalType::End)
-    }
-
-    fn generate_code(&self, _context: &CodegenContext) -> proc_macro2::TokenStream {
-        let kind = &self.kind;
-        quote::quote! {
-            {
-                let _dsl_combinator_kind: &str = #kind;
-                // Intentional discard: suppress unused warning in generated code.
-                let _ = _dsl_combinator_kind;
-            }
-        }
-    }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
-    }
-
-    fn type_id(&self) -> TypeId {
-        TypeId::of::<Self>()
-    }
-}
 
 fn convert_authority_expr(expr: &AuthorityExprSpec) -> AuthorityExpr {
     match expr {
@@ -201,32 +82,6 @@ fn convert_case_branch(branch: &CaseBranchSpec, roles: &[Role]) -> CaseBranch {
 
 fn binding_is_linear(expr: &AuthorityExprSpec) -> bool {
     matches!(expr, AuthorityExprSpec::Transfer { .. })
-}
-
-fn vm_op_operands(op: &VmCoreOp) -> String {
-    match op {
-        VmCoreOp::Acquire { layer, dst } => format!("layer={layer},dst={dst}"),
-        VmCoreOp::Release { layer, evidence } => {
-            format!("layer={layer},evidence={evidence}")
-        }
-        VmCoreOp::Fork { ghost } => format!("ghost={ghost}"),
-        VmCoreOp::Join => "none".to_string(),
-        VmCoreOp::Abort => "none".to_string(),
-        VmCoreOp::Transfer {
-            endpoint,
-            target,
-            bundle,
-        } => format!(
-            "endpoint={endpoint},target={target},bundle={}",
-            bundle.as_deref().unwrap_or("none")
-        ),
-        VmCoreOp::Tag { fact, dst } => format!("fact={fact},dst={dst}"),
-        VmCoreOp::Check {
-            knowledge,
-            target_role,
-            dst,
-        } => format!("knowledge={knowledge},target_role={target_role},dst={dst}"),
-    }
 }
 
 /// Convert statements to protocol AST.
@@ -355,77 +210,6 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     }
                 } else {
                     current
-                }
-            }
-            // Heartbeat desugars to recursive choice with liveness detection:
-            //   rec HeartbeatLoop {
-            //       Sender -> Receiver: Heartbeat;
-            //       choice Receiver at {
-            //           Alive { body; continue HeartbeatLoop }
-            //           Dead { on_missing_body }
-            //       }
-            //   }
-            Statement::Heartbeat {
-                sender,
-                receiver,
-                interval_ms,
-                on_missing_count,
-                on_missing_body,
-                body,
-            } => {
-                let rec_label = format_ident!("HeartbeatLoop");
-
-                // Heartbeat annotation carries runtime info (interval, on_missing_count)
-                let heartbeat_annotation =
-                    ProtocolAnnotation::heartbeat_ms(*interval_ms, *on_missing_count);
-                let annotations = Annotations::single(heartbeat_annotation);
-
-                // Build body with continue at the end
-                let mut alive_body = body.clone();
-                alive_body.push(Statement::Continue {
-                    label: rec_label.clone(),
-                });
-                let alive_protocol = convert_statements_to_protocol(&alive_body, roles);
-
-                // Build on_missing body (Dead branch)
-                let dead_protocol = convert_statements_to_protocol(on_missing_body, roles);
-
-                // Build the choice: Receiver decides Alive or Dead
-                let alive_branch = Branch {
-                    label: format_ident!("Alive"),
-                    guard: None,
-                    protocol: alive_protocol,
-                };
-                let dead_branch = Branch {
-                    label: format_ident!("Dead"),
-                    guard: None,
-                    protocol: dead_protocol,
-                };
-                let choice = Protocol::Choice {
-                    role: receiver.clone(),
-                    branches: NonEmptyVec::from_head_tail(alive_branch, vec![dead_branch]),
-                    annotations,
-                };
-
-                // Build the heartbeat send: Sender -> Receiver: Heartbeat
-                let heartbeat_send = Protocol::Send {
-                    from: sender.clone(),
-                    to: receiver.clone(),
-                    message: MessageType {
-                        name: format_ident!("Heartbeat"),
-                        type_annotation: None,
-                        payload: None,
-                    },
-                    continuation: Box::new(choice),
-                    annotations: Annotations::new(),
-                    from_annotations: Annotations::new(),
-                    to_annotations: Annotations::new(),
-                };
-
-                // Wrap in recursion
-                Protocol::Rec {
-                    label: rec_label,
-                    body: Box::new(heartbeat_send),
                 }
             }
             // RoleDecides desugars to choice+rec pattern (Option B: fused with first message)
@@ -557,61 +341,6 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
             },
             Statement::Continue { label } => Protocol::Var(label.clone()),
             Statement::Call { .. } => current,
-            Statement::Handshake {
-                initiator,
-                responder,
-                label,
-            } => {
-                let ack_label = format_ident!("{}Ack", label);
-                let ack = Protocol::Send {
-                    from: responder.clone(),
-                    to: initiator.clone(),
-                    message: MessageType {
-                        name: ack_label,
-                        type_annotation: None,
-                        payload: None,
-                    },
-                    continuation: Box::new(current),
-                    annotations: Annotations::new(),
-                    from_annotations: Annotations::new(),
-                    to_annotations: Annotations::new(),
-                };
-                Protocol::Send {
-                    from: initiator.clone(),
-                    to: responder.clone(),
-                    message: MessageType {
-                        name: label.clone(),
-                        type_annotation: None,
-                        payload: None,
-                    },
-                    continuation: Box::new(ack),
-                    annotations: Annotations::new(),
-                    from_annotations: Annotations::new(),
-                    to_annotations: Annotations::new(),
-                }
-            }
-            Statement::QuorumCollect {
-                source,
-                destination,
-                min_responses,
-                message,
-            } => {
-                let annotations = Annotations::from_vec(vec![
-                    ProtocolAnnotation::custom("dsl_combinator", "quorum_collect"),
-                    ProtocolAnnotation::custom("quorum_min", min_responses.to_string()),
-                    ProtocolAnnotation::custom("quorum_source", source.name().to_string()),
-                    ProtocolAnnotation::custom(
-                        "quorum_destination",
-                        destination.name().to_string(),
-                    ),
-                    ProtocolAnnotation::custom("quorum_message", message.name.to_string()),
-                ]);
-                Protocol::Extension {
-                    extension: Box::new(DslCombinatorExtension::new("quorum_collect")),
-                    continuation: Box::new(current),
-                    annotations,
-                }
-            }
             Statement::Publish { event, arg } => Protocol::Publish {
                 event: event.clone(),
                 arg: arg.clone(),
@@ -637,18 +366,6 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                 required_for: required_for.clone(),
                 continuation: Box::new(current),
             },
-            Statement::VmCoreOp { op } => {
-                let annotations = Annotations::from_vec(vec![
-                    ProtocolAnnotation::custom("vm_core_op", op.op_name()),
-                    ProtocolAnnotation::custom("required_capability", op.required_capability()),
-                    ProtocolAnnotation::custom("vm_core_operands", vm_op_operands(op)),
-                ]);
-                Protocol::Extension {
-                    extension: Box::new(VmCoreOpExtension::new(op.op_name())),
-                    continuation: Box::new(current),
-                    annotations,
-                }
-            }
         };
     }
 

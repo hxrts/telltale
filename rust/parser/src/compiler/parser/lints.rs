@@ -41,8 +41,8 @@ pub fn collect_dsl_lints(choreography: &Choreography, level: LintLevel) -> Vec<L
     }
 
     let mut diagnostics = Vec::new();
-    let inferred = choreography.inferred_required_proof_bundles();
-    let required = choreography.required_proof_bundles();
+    let inferred = choreography.inferred_required_theorem_packs();
+    let required = choreography.required_theorem_packs();
     if !inferred.is_empty() && inferred == required {
         push_lint(
             &mut diagnostics,
@@ -255,7 +255,7 @@ fn render_lowering_summary(choreography: &Choreography, out: &mut String) {
             .join(", ")
     )
     .unwrap();
-    let bundles = choreography.proof_bundles();
+    let bundles = choreography.theorem_packs();
     if !bundles.is_empty() {
         writeln!(
             out,
@@ -268,11 +268,11 @@ fn render_lowering_summary(choreography: &Choreography, out: &mut String) {
         )
         .unwrap();
     }
-    let required = choreography.required_proof_bundles();
+    let required = choreography.required_theorem_packs();
     if !required.is_empty() {
         writeln!(out, "Required bundles: {}", required.join(", ")).unwrap();
     }
-    let inferred = choreography.inferred_required_proof_bundles();
+    let inferred = choreography.inferred_required_theorem_packs();
     if !inferred.is_empty() {
         writeln!(out, "Inferred bundles: {}", inferred.join(", ")).unwrap();
     }

@@ -48,9 +48,11 @@ pub use telltale_types::{
 // Re-export DSL-specific types
 pub use annotation::{Annotations, ProtocolAnnotation};
 pub use choreography::{
-    Choreography, EffectDecl, EffectOpAuthorityClass, EffectOpDecl, FragmentDecl, GuestRuntimeDecl,
-    OperationDecl, OperationParamDecl, ProofBundleDecl, RoleSetDecl, RuntimeEffectMetadataDecl,
-    TopologyDecl, TypeConstructorDecl, TypeDecl,
+    Choreography, EffectAuthorityClass, EffectContractDeclaration, EffectInterfaceDeclaration,
+    EffectOperationDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration, LanguageTier,
+    LanguageTierStatus, OperationDeclaration, OperationParameterDeclaration, RegionDeclaration,
+    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration, TypeConstructorDeclaration,
+    TypeDeclaration,
 };
 pub use execution_hints::{
     ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,

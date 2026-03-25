@@ -1,4 +1,4 @@
-use crate::ast::{Choreography, EffectOpAuthorityClass};
+use crate::ast::{Choreography, EffectAuthorityClass};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -33,7 +33,7 @@ pub struct GeneratedEffectOperation {
     pub rust_method_name: String,
     pub request_type_name: String,
     pub outcome_type_name: String,
-    pub authority_class: EffectOpAuthorityClass,
+    pub authority_class: EffectAuthorityClass,
     pub input_type: String,
     pub output_type: String,
     pub simulation: GeneratedSimulationMetadata,
@@ -53,7 +53,7 @@ pub struct GeneratedEffectFamily {
 /// Derive canonical effect-interface families from a parsed choreography.
 pub fn generated_effect_families(choreography: &Choreography) -> Vec<GeneratedEffectFamily> {
     choreography
-        .effect_decls()
+        .effect_interface_declarations()
         .into_iter()
         .map(|effect| {
             let request_enum_name = format!("{}Request", effect.name);
@@ -457,21 +457,21 @@ fn render_scenario_builder_methods(
     )
 }
 
-fn simulation_defaults(authority_class: EffectOpAuthorityClass) -> GeneratedSimulationMetadata {
+fn simulation_defaults(authority_class: EffectAuthorityClass) -> GeneratedSimulationMetadata {
     match authority_class {
-        EffectOpAuthorityClass::Observe => GeneratedSimulationMetadata {
+        EffectAuthorityClass::Observe => GeneratedSimulationMetadata {
             behavior: GeneratedEffectBehavior::Stream,
             mode: GeneratedSimulationMode::Deterministic,
             latency_policy: "best_effort".to_string(),
             timeout_policy: "not_authoritative".to_string(),
         },
-        EffectOpAuthorityClass::Authoritative => GeneratedSimulationMetadata {
+        EffectAuthorityClass::Authoritative => GeneratedSimulationMetadata {
             behavior: GeneratedEffectBehavior::OneShot,
             mode: GeneratedSimulationMode::Deterministic,
             latency_policy: "bounded".to_string(),
             timeout_policy: "required".to_string(),
         },
-        EffectOpAuthorityClass::Command => GeneratedSimulationMetadata {
+        EffectAuthorityClass::Command => GeneratedSimulationMetadata {
             behavior: GeneratedEffectBehavior::OneShot,
             mode: GeneratedSimulationMode::Deterministic,
             latency_policy: "immediate".to_string(),
@@ -480,11 +480,11 @@ fn simulation_defaults(authority_class: EffectOpAuthorityClass) -> GeneratedSimu
     }
 }
 
-fn authority_class_name(class: EffectOpAuthorityClass) -> &'static str {
+fn authority_class_name(class: EffectAuthorityClass) -> &'static str {
     match class {
-        EffectOpAuthorityClass::Authoritative => "authoritative",
-        EffectOpAuthorityClass::Command => "command",
-        EffectOpAuthorityClass::Observe => "observe",
+        EffectAuthorityClass::Authoritative => "authoritative",
+        EffectAuthorityClass::Command => "command",
+        EffectAuthorityClass::Observe => "observe",
     }
 }
 
@@ -541,10 +541,13 @@ fn now_nanos() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::{
-        generate_effect_interface_scaffold, generated_effect_families, GeneratedEffectBehavior,
+        generate_effect_interface_scaffold, generated_effect_families, now_nanos,
+        render_generated_effects, render_generated_simulator, GeneratedEffectBehavior,
     };
     use crate::compiler::parser::parse_choreography_str;
     use std::env;
+    use std::fs;
+    use std::path::PathBuf;
 
     fn sample_dsl() -> &'static str {
         r#"

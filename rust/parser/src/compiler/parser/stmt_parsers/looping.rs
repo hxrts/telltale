@@ -4,7 +4,7 @@ use crate::ast::Condition;
 
 use super::super::error::{ErrorSpan, ParseError};
 use super::super::role::parse_role_ref;
-use super::super::statement::{parse_block, parse_duration};
+use super::super::statement::parse_block;
 use super::super::types::Statement;
 use super::super::Rule;
 use super::{next_required, parse_loop_predicate};
@@ -74,85 +74,6 @@ fn parse_loop_condition(
         Rule::loop_forever => Ok(None),
         _ => Ok(None),
     }
-}
-
-/// Parse heartbeat statement.
-pub(crate) fn parse_heartbeat_stmt(
-    pair: pest::iterators::Pair<Rule>,
-    declared_roles: &std::collections::HashSet<String>,
-    input: &str,
-    protocol_defs: &HashMap<String, Vec<Statement>>,
-) -> std::result::Result<Statement, ParseError> {
-    let span = pair.as_span();
-    let mut sender = None;
-    let mut receiver = None;
-    let mut interval_ms = None;
-    let mut on_missing_count = None;
-    let mut on_missing_body = Vec::new();
-    let mut body = Vec::new();
-
-    for item in pair.into_inner() {
-        match item.as_rule() {
-            Rule::role_ref => {
-                let role = parse_role_ref(item, declared_roles, input)?;
-                if sender.is_none() {
-                    sender = Some(role);
-                } else {
-                    receiver = Some(role);
-                }
-            }
-            Rule::duration => {
-                interval_ms = Some(parse_duration(item, input)?);
-            }
-            Rule::heartbeat_on_missing => {
-                for inner in item.into_inner() {
-                    match inner.as_rule() {
-                        Rule::integer => {
-                            on_missing_count =
-                                Some(inner.as_str().parse().map_err(|_| ParseError::Syntax {
-                                    span: ErrorSpan::from_pest_span(span, input),
-                                    message: "Invalid on_missing count".to_string(),
-                                })?);
-                        }
-                        Rule::block => {
-                            on_missing_body =
-                                parse_block(inner, declared_roles, input, protocol_defs)?;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            Rule::heartbeat_body => {
-                for inner in item.into_inner() {
-                    if inner.as_rule() == Rule::block {
-                        body = parse_block(inner, declared_roles, input, protocol_defs)?;
-                    }
-                }
-            }
-            _ => {}
-        }
-    }
-
-    Ok(Statement::Heartbeat {
-        sender: sender.ok_or_else(|| ParseError::Syntax {
-            span: ErrorSpan::from_pest_span(span, input),
-            message: "heartbeat is missing sender role".to_string(),
-        })?,
-        receiver: receiver.ok_or_else(|| ParseError::Syntax {
-            span: ErrorSpan::from_pest_span(span, input),
-            message: "heartbeat is missing receiver role".to_string(),
-        })?,
-        interval_ms: interval_ms.ok_or_else(|| ParseError::Syntax {
-            span: ErrorSpan::from_pest_span(span, input),
-            message: "heartbeat is missing interval duration".to_string(),
-        })?,
-        on_missing_count: on_missing_count.ok_or_else(|| ParseError::Syntax {
-            span: ErrorSpan::from_pest_span(span, input),
-            message: "heartbeat is missing on_missing count".to_string(),
-        })?,
-        on_missing_body,
-        body,
-    })
 }
 
 /// Parse loop statement.

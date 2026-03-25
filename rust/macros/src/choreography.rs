@@ -10,8 +10,8 @@ use quote::{format_ident, quote, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{Error, LitStr, Result};
 use telltale_parser::ast::{
-    Branch, Choreography, EffectDecl, EffectOpDecl, LocalType, MessageType, Protocol, Role,
-    TypeDecl,
+    Branch, Choreography, EffectInterfaceDeclaration, EffectOperationDeclaration, LocalType,
+    MessageType, Protocol, Role, TypeDeclaration,
 };
 
 struct ParsedMacroChoreography {
@@ -234,6 +234,31 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
     );
     let choreography_source = LitStr::new(source, Span::call_site());
     let qualified_name = LitStr::new(&choreography.qualified_name(), Span::call_site());
+    let language_tier_status = choreography.language_tier_status();
+    let protocol_machine_executable = language_tier_status.protocol_machine_executable;
+    let proof_only = language_tier_status.proof_only;
+    let strongest_tier = LitStr::new(
+        match language_tier_status.strongest_tier {
+            telltale_parser::ast::LanguageTier::FullSpec => "full_spec",
+            telltale_parser::ast::LanguageTier::SessionProjectable => "session_projectable",
+            telltale_parser::ast::LanguageTier::ProtocolMachineExecutable => {
+                "protocol_machine_executable"
+            }
+            telltale_parser::ast::LanguageTier::ProofOnly => "proof_only",
+        },
+        Span::call_site(),
+    );
+    let tier_diagnostic = LitStr::new(&language_tier_status.diagnostic, Span::call_site());
+    let theorem_packs = choreography
+        .required_theorem_packs()
+        .into_iter()
+        .map(|name| LitStr::new(&name, Span::call_site()))
+        .collect::<Vec<_>>();
+    let execution_profiles = choreography
+        .protocol_execution_profiles()
+        .into_iter()
+        .map(|name| LitStr::new(&name, Span::call_site()))
+        .collect::<Vec<_>>();
     let type_decls = generate_type_declarations(choreography)?;
     let effects_module = generate_effects_module(choreography)?;
     let (projectable, projection_error, sessions_module) = match project_local_types(choreography) {
@@ -256,11 +281,34 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
         #[allow(dead_code)]
         pub const QUALIFIED_NAME: &str = #qualified_name;
 
-        #[allow(dead_code)]
-        pub const SESSION_SURFACE_AVAILABLE: bool = #projectable;
+        pub mod proof_status {
+            #[allow(dead_code)]
+            pub const FULL_SPEC_LEGAL: bool = true;
 
-        #[allow(dead_code)]
-        pub const SESSION_PROJECTION_ERROR: Option<&str> = #projection_error;
+            #[allow(dead_code)]
+            pub const STRONGEST_TIER: &str = #strongest_tier;
+
+            #[allow(dead_code)]
+            pub const SESSION_PROJECTABLE: bool = #projectable;
+
+            #[allow(dead_code)]
+            pub const PROTOCOL_MACHINE_EXECUTABLE: bool = #protocol_machine_executable;
+
+            #[allow(dead_code)]
+            pub const PROOF_ONLY: bool = #proof_only;
+
+            #[allow(dead_code)]
+            pub const DIAGNOSTIC: &str = #tier_diagnostic;
+
+            #[allow(dead_code)]
+            pub const SESSION_PROJECTION_ERROR: Option<&str> = #projection_error;
+
+            #[allow(dead_code)]
+            pub const REQUIRED_THEOREM_PACKS: &[&str] = &[#(#theorem_packs),*];
+
+            #[allow(dead_code)]
+            pub const EXECUTION_PROFILES: &[&str] = &[#(#execution_profiles),*];
+        }
 
         #type_decls
 
@@ -322,20 +370,23 @@ enum TypeToken {
 
 fn generate_type_declarations(choreography: &Choreography) -> Result<TokenStream> {
     let declarations = choreography
-        .type_decls()
+        .type_declarations()
         .iter()
         .map(generate_type_declaration)
         .collect::<Result<Vec<_>>>()?;
     Ok(quote! { #(#declarations)* })
 }
 
-fn generate_type_declaration(type_decl: &TypeDecl) -> Result<TokenStream> {
+fn generate_type_declaration(type_decl: &TypeDeclaration) -> Result<TokenStream> {
     let name = format_ident!("{}", type_decl.name);
     if type_decl.is_alias {
         let alias_of = type_decl.alias_of.as_deref().ok_or_else(|| {
             Error::new(
                 Span::call_site(),
-                format!("type alias `{}` is missing a right-hand side", type_decl.name),
+                format!(
+                    "type alias `{}` is missing a right-hand side",
+                    type_decl.name
+                ),
             )
         })?;
         let parsed = parse_dsl_type_expr(alias_of)?;
@@ -408,12 +459,12 @@ fn generate_record_field(field: &DslRecordField) -> Result<TokenStream> {
 
 fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
     let type_exports = choreography
-        .type_decls()
+        .type_declarations()
         .iter()
         .map(|decl| format_ident!("{}", decl.name))
         .collect::<Vec<_>>();
     let effect_surfaces = choreography
-        .effect_decls()
+        .effect_interface_declarations()
         .iter()
         .map(generate_effect_surface)
         .collect::<Result<Vec<_>>>()?;
@@ -433,7 +484,7 @@ fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
     })
 }
 
-fn generate_effect_surface(effect: &EffectDecl) -> Result<TokenStream> {
+fn generate_effect_surface(effect: &EffectInterfaceDeclaration) -> Result<TokenStream> {
     let trait_name = format_ident!("{}", effect.name);
     let request_name = format_ident!("{}Request", effect.name);
     let outcome_name = format_ident!("{}Outcome", effect.name);
@@ -481,19 +532,19 @@ fn generate_effect_surface(effect: &EffectDecl) -> Result<TokenStream> {
     })
 }
 
-fn generate_effect_request_variant(op: &EffectOpDecl) -> Result<TokenStream> {
+fn generate_effect_request_variant(op: &EffectOperationDeclaration) -> Result<TokenStream> {
     let variant = format_ident!("{}", to_upper_camel_identifier(&op.name));
     let input = lower_dsl_type_expr(&parse_dsl_type_expr(&op.input_type)?, false)?;
     Ok(quote!(#variant(#input)))
 }
 
-fn generate_effect_outcome_variant(op: &EffectOpDecl) -> Result<TokenStream> {
+fn generate_effect_outcome_variant(op: &EffectOperationDeclaration) -> Result<TokenStream> {
     let variant = format_ident!("{}", to_upper_camel_identifier(&op.name));
     let output = lower_dsl_type_expr(&parse_dsl_type_expr(&op.output_type)?, false)?;
     Ok(quote!(#variant(#output)))
 }
 
-fn generate_effect_method_signature(op: &EffectOpDecl) -> Result<TokenStream> {
+fn generate_effect_method_signature(op: &EffectOperationDeclaration) -> Result<TokenStream> {
     let method = format_ident!("{}", to_snake_identifier(&op.name));
     let input = lower_dsl_type_expr(&parse_dsl_type_expr(&op.input_type)?, false)?;
     let output = lower_dsl_type_expr(&parse_dsl_type_expr(&op.output_type)?, false)?;
@@ -503,7 +554,7 @@ fn generate_effect_method_signature(op: &EffectOpDecl) -> Result<TokenStream> {
 }
 
 fn generate_effect_handle_arm(
-    op: &EffectOpDecl,
+    op: &EffectOperationDeclaration,
     request_name: &Ident,
     outcome_name: &Ident,
 ) -> Result<TokenStream> {
@@ -691,7 +742,9 @@ impl TypeCursor {
                         other => {
                             return Err(Error::new(
                                 Span::call_site(),
-                                format!("expected `:` after record field `{field_name}`, got {other:?}"),
+                                format!(
+                                    "expected `:` after record field `{field_name}`, got {other:?}"
+                                ),
                             ))
                         }
                     }

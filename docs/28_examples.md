@@ -2,18 +2,21 @@
 
 This document points to the example programs and common usage patterns. Each example demonstrates a specific protocol shape or runtime feature. The repo intentionally has two example families:
 
-- projection examples, where `choreography!` demonstrates global protocol structure and projected session surfaces
-- generated-interface examples, where `effect` declarations are the source of truth for the Rust host boundary and simulator scaffolding
+- projection examples, where `tell!` demonstrates global protocol structure and projected session surfaces
+- generated-interface examples, where `effect` declarations are the source of truth for the Rust host boundary
 
 ## Example Index
 
-All examples compile against the workspace. Use the projection examples when you want to inspect session projection and endpoint code. Use the generated-interface examples when you want to follow the target architecture: protocol-visible orchestration in Telltale, host realization in Rust.
+All examples compile against the workspace. Use the projection examples when you
+want to inspect session projection and endpoint code. Use the
+generated-interface examples when you want to follow the target architecture:
+protocol-visible orchestration in Telltale, host realization in Rust.
 
 Top level examples in `examples/`:
 
-- `three_adder.rs` — three-party sum via `choreography!`
-- `ring.rs` — three-node ring topology via `choreography!`
-- `double_buffering.rs` — producer-consumer coordination via `choreography!`
+- `three_adder.rs` — three-party sum via `tell!`
+- `ring.rs` — three-node ring topology via `tell!`
+- `double_buffering.rs` — producer-consumer coordination via `tell!`
 - `adder.rs` — recursive two-party adder
 - `alternating_bit.rs` — reliable delivery with ACK branching
 - `oauth.rs` — three-party authentication with nested choices
@@ -21,24 +24,28 @@ Top level examples in `examples/`:
 - `client_server_log.rs` — three-party protocol with infinite logging loop
 - `elevator.rs` — three-role infinite state machine
 - `fft.rs` — eight-role FFT butterfly network
-- `generated_effect_interfaces.rs` — generate canonical Rust handler traits, manifests, and simulator scaffolds from `effect` declarations
+- `generated_effect_interfaces.rs` — use canonical Rust handler traits and request/outcome enums emitted from `effect` declarations
 - `async_subtyping.rs` — async-subtyping checks and subtype relation examples
 - `bounded_recursion.rs` — bounded recursion strategies with configurable depth
 - `wasm-ping-pong/` — browser builds using `wasm-pack`
 
 Generated-interface examples in `rust/choreography/examples/`:
 
-- `authority_surface.rs` — inspect `effect` declarations and derived effect-family metadata
+- `authority_surface.rs` — inspect `effect` declarations and proof-backed parser metadata
 - `telltale_client_server.rs` and `three_party_negotiation.rs` — runtime-oriented examples behind `native-examples`
 
 ## Common Patterns
 
-The following patterns cover the core choreography constructs for projection examples. `choreography!` parses the DSL at compile time, validates role declarations, and generates projection code.
+The following patterns cover the core protocol constructs for projection
+examples. `tell!` parses the DSL at compile time, validates the proof-backed
+surface, and emits sessions only when the protocol is session-projectable.
 
 ### Request Response
 
 ```rust
-choreography! {
+use telltale::tell;
+
+tell! {
   protocol RequestResponse =
     roles Client, Server
     Client -> Server : Request(api.Request)
@@ -46,12 +53,16 @@ choreography! {
 }
 ```
 
-Each message line declares a sender, receiver, label, and optional payload type. Projection produces one local session type per role.
+Each message line declares a sender, receiver, label, and optional payload type.
+Projection produces one local session type per role when
+`RequestResponse::proof_status::SESSION_PROJECTABLE` is `true`.
 
 ### Choice
 
 ```rust
-choreography! {
+use telltale::tell;
+
+tell! {
   protocol ChoicePattern =
     roles Client, Server
     choice at Server
@@ -67,7 +78,9 @@ Only the deciding role selects the branch. Other roles react to that choice. The
 ### Loops
 
 ```rust
-choreography! {
+use telltale::tell;
+
+tell! {
   protocol LoopPattern =
     roles Client, Server
     loop repeat 5
@@ -81,7 +94,9 @@ Use bounded loops for batch workflows or retries. The `repeat` count sets an upp
 ### Parallel Branches
 
 ```rust
-choreography! {
+use telltale::tell;
+
+tell! {
   protocol ParallelPattern =
     roles Coordinator, Worker1, Worker2
     par
@@ -94,7 +109,10 @@ Parallel branches must be independent in order to remain well formed. Each branc
 
 ## Generated Effect Interfaces
 
-Use the generated-interface path when the example needs typed effect boundaries, simulator scenarios, or richer host/runtime integration. In these examples, the DSL remains the source of truth and Rust supplies handler implementations directly against the generated traits.
+Use the generated-interface path when the example needs typed effect boundaries
+or richer host/runtime integration. In these examples, the DSL remains the
+source of truth and Rust supplies handler implementations directly against the
+generated traits.
 
 ```rust
 use telltale::tell;
@@ -116,18 +134,17 @@ tell! {
       Coordinator -> Worker : Commit
 }
 
-use CommitFlow::effects::{Runtime, RuntimeRequest, RuntimeOutcome, Session};
-use CommitFlow::{CommitReceipt, CommitError, ReadyWitness};
+use CommitFlow::effects;
 
 struct Host;
 
-impl Runtime for Host {
-    fn ready(&mut self, _input: Session) -> Result<ReadyWitness, CommitError> {
-        Ok(ReadyWitness { epoch: 7, issued_by: telltale::dsl::Role::new("Coordinator") })
+impl effects::Runtime for Host {
+    fn ready(&mut self, _input: effects::Session) -> Result<effects::ReadyWitness, effects::CommitError> {
+        Ok(effects::ReadyWitness { epoch: 7, issued_by: effects::Role::new("Coordinator") })
     }
 
-    fn publish(&mut self, witness: ReadyWitness) -> Result<CommitReceipt, CommitError> {
-        Ok(CommitReceipt {
+    fn publish(&mut self, witness: effects::ReadyWitness) -> Result<effects::CommitReceipt, effects::CommitError> {
+        Ok(effects::CommitReceipt {
             commit_id: format!("commit-{}", witness.epoch),
             published_by: witness.issued_by,
         })
@@ -135,11 +152,18 @@ impl Runtime for Host {
 }
 
 let mut host = Host;
-let presence = Runtime::handle(&mut host, RuntimeRequest::Ready(Session::new("commit-7")));
-assert!(matches!(presence, RuntimeOutcome::Ready(Ok(_))));
+assert_eq!(CommitFlow::proof_status::STRONGEST_TIER, "session_projectable");
+let presence = effects::Runtime::handle(
+    &mut host,
+    effects::RuntimeRequest::Ready(effects::Session::new("commit-7")),
+);
+assert!(matches!(presence, effects::RuntimeOutcome::Ready(Ok(_))));
 ```
 
-This produces canonical host-facing request/outcome enums and handler traits directly from the declared `effect` surface. File export remains tooling-only and is no longer the primary developer path.
+This produces canonical host-facing request/outcome enums and handler traits
+directly from the declared `effect` surface. `Protocol::proof_status` reports
+which generated surfaces are available. File export remains tooling-only and is
+no longer the primary developer path.
 
 ## Testing Patterns
 
