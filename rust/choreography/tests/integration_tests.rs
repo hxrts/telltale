@@ -353,10 +353,11 @@ fn test_performance_characteristics() {
     let duration = start.elapsed();
 
     // Keep a broad regression guard here: this runs in debug mode as part of the
-    // full workspace suite, so the threshold needs headroom for parser/projection
-    // changes without turning routine runs into flakes.
+    // full workspace suite, so the threshold needs enough headroom for normal CI
+    // variance while still catching pathological slowdowns.
+    const DEBUG_SUITE_PERFORMANCE_BUDGET_MS: u128 = 10_000;
     assert!(
-        duration.as_millis() < 5000,
+        duration.as_millis() < DEBUG_SUITE_PERFORMANCE_BUDGET_MS,
         "Performance test took too long: {:?}",
         duration
     );

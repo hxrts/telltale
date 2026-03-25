@@ -12,7 +12,7 @@ When one of these values changes legitimately:
 | Metric | Value | Source |
 |---|---:|---|
 | Lean core-library files | 647 | `lean/CODE_MAP.md` total row |
-| Lean core-library lines | 131,664 | `lean/CODE_MAP.md` total row |
+| Lean core-library lines | 131,670 | `lean/CODE_MAP.md` total row |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 6 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |

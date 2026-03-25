@@ -67,9 +67,13 @@ theorem canonical_success_requires_canonical_publication_surface
     hAdequate
 
 theorem observed_reads_are_non_authoritative
-    (read : ObservedRead) :
+    (read : ObservedRead)
+    (hInterface : read.effectInterface.isSome)
+    (hOperation : read.effectOperation.isSome)
+    (hHandler : read.handlerIdentity ≠ "") :
     read.isNonAuthoritative :=
-  trivial
+  by
+    exact ⟨hInterface, hOperation, hHandler⟩
 
 end Conservation
 end Proofs

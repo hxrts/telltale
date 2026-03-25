@@ -21,7 +21,6 @@ import Runtime.Proofs.EffectBisim.Core
 import Runtime.Proofs.EffectBisim.Bridge
 import Runtime.Proofs.EffectBisim.Congruence
 import Runtime.Proofs.EffectBisim.ConfigEquivBridge
-import Runtime.Proofs.EffectBisim.Examples
 import Runtime.Proofs.EffectBisim.RationalFragment
 import Runtime.Proofs.BridgeStrengthening
 import Runtime.Proofs.ReconfigurationObserver

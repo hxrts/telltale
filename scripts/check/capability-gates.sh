@@ -83,14 +83,13 @@ check_byzantine() {
   require_mathlib_cache
   local TEST_FILE="${ROOT_DIR}/lean/Distributed/Tests/ByzantineConformance.lean"
   local THEOREMPACK_API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
-  local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
   local INVENTORY_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Inventory.lean"
 
   echo "== Byzantine Conformance =="
 
   check "positive profile test: theorem-pack byzantine slot materializes" \
     "rg -q 'def canOperateUnderByzantineEnvelope' '${THEOREMPACK_API_FILE}' && \
-     rg -q 'pack\\.byzantineSafety\\?\\.isSome && pack\\.vmEnvelopeAdherence\\?\\.isSome' '${THEOREMPACK_API_FILE}'"
+     rg -q 'pack\\.byzantineSafety\\?\\.isSome && pack\\.protocolMachineEnvelopeAdherence\\?\\.isSome' '${THEOREMPACK_API_FILE}'"
   check "positive profile test: BFT specialization theorem is covered" \
     "rg -q 'bft_specialization_of_quorum(_geometry|Geometry)' '${TEST_FILE}'"
   check "positive profile test: Nakamoto specialization theorem is covered" \
@@ -100,7 +99,7 @@ check_byzantine() {
 
   check "negative profile test: runtime gate rejects missing artifacts" \
     "rg -q 'canOperateUnderByzantineEnvelope' '${THEOREMPACK_API_FILE}' && \
-     rg -q '&& pack\\.vmEnvelopeAdherence\\?\\.isSome' '${THEOREMPACK_API_FILE}'"
+     rg -q '&& pack\\.protocolMachineEnvelopeAdherence\\?\\.isSome' '${THEOREMPACK_API_FILE}'"
   check "negative profile test: inventory gate rejects unsupported claim" \
     "rg -q 'def claimedCapabilitiesWithinInventory' '${THEOREMPACK_API_FILE}'"
 
@@ -114,8 +113,7 @@ check_byzantine() {
     "rg -q 'primitiveMismatchCounterexample_of_droppedAssumption' '${TEST_FILE}'"
 
   check "theorem-pack inventory includes byzantine capability slot check" \
-    "rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${INVENTORY_FILE}' && \
-     rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+    "rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${INVENTORY_FILE}'"
 
   check "cross-target byzantine injection conformance tests exist" \
     "rg -q 'injectByzantineEvents' '${TEST_FILE}' && \
@@ -148,8 +146,8 @@ check_envelope() {
   require_ripgrep
   require_mathlib_cache
   local THEOREMPACK_API_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/API.lean"
-  local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
-  local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed.lean"
+  local INVENTORY_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Inventory.lean"
+  local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean"
   local TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
   local RUST_ENVELOPE_TEST_FILE="${ROOT_DIR}/rust/machine/tests/parity_fixtures_v2.rs"
 
@@ -176,22 +174,22 @@ check_envelope() {
     "rg -q 'def envelopeCapabilitySnapshot' '${THEOREMPACK_API_FILE}'"
 
   check "theorem-pack carries protocol bridge capability bit" \
-    "rg -q '\\(\"protocol_envelope_bridge\", pack\\.protocolEnvelopeBridge\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+    "rg -q '\\(\"protocol_envelope_bridge\", pack\\.protocolEnvelopeBridge\\?\\.isSome\\)' '${INVENTORY_FILE}'"
   check "theorem-pack carries byzantine safety capability bit" \
-    "rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+    "rg -q '\\(\"byzantine_safety_characterization\", pack\\.byzantineSafety\\?\\.isSome\\)' '${INVENTORY_FILE}'"
   check "theorem-pack carries protocol machine envelope adherence capability bit" \
-    "rg -q '\\(\"vm_envelope_adherence\", pack\\.vmEnvelopeAdherence\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+    "rg -q '\\(\"protocol_machine_envelope_adherence\", pack\\.protocolMachineEnvelopeAdherence\\?\\.isSome\\)' '${INVENTORY_FILE}'"
   check "theorem-pack carries protocol machine envelope admission capability bit" \
-    "rg -q '\\(\"vm_envelope_admission\", pack\\.vmEnvelopeAdmission\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+    "rg -q '\\(\"protocol_machine_envelope_admission\", pack\\.protocolMachineEnvelopeAdmission\\?\\.isSome\\)' '${INVENTORY_FILE}'"
 
   check "distributed adapter carries protocol bridge profile slot" \
     "rg -q 'protocolEnvelopeBridge\\?' '${ADAPTER_FILE}'"
   check "distributed adapter carries byzantine safety profile slot" \
     "rg -q 'byzantineSafety\\?' '${ADAPTER_FILE}'"
   check "distributed adapter carries protocol machine adherence profile slot" \
-    "rg -q 'vmEnvelopeAdherence\\?' '${ADAPTER_FILE}'"
+    "rg -q 'protocolMachineEnvelopeAdherence\\?' '${ADAPTER_FILE}'"
   check "distributed adapter carries protocol machine admission profile slot" \
-    "rg -q 'vmEnvelopeAdmission\\?' '${ADAPTER_FILE}'"
+    "rg -q 'protocolMachineEnvelopeAdmission\\?' '${ADAPTER_FILE}'"
 
   check "local-envelope differential conformance test exists" \
     "rg -q 'local envelope modulo conformance mismatch' '${TEST_FILE}'"
@@ -218,8 +216,11 @@ check_failure() {
   require_ripgrep
   local FAILURE_FILE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Runtime/Failure.lean"
   local FAILURE_PROOFS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/ProtocolMachine/Failure.lean"
-  local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed.lean"
-  local THEOREMPACK_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack.lean"
+  local ADAPTER_FILE="${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean"
+  local THEOREMPACK_BUILD_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Build.lean"
+  local THEOREMPACK_ARTIFACTS_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Artifacts.lean"
+  local THEOREMPACK_INVENTORY_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Inventory.lean"
+  local THEOREMPACK_PROFILES_FILE="${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Profiles.lean"
   local TEST_FILE="${ROOT_DIR}/lean/Runtime/Tests/Main.lean"
   local STATE_FILE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/State.lean"
   local ENVELOPE_FILE="${ROOT_DIR}/lean/Runtime/Adequacy/EnvelopeCore.lean"
@@ -233,11 +234,11 @@ check_failure() {
     check "distributed adapters expose failure-envelope profile slot" \
       "rg -q 'failureEnvelope\\?' '${ADAPTER_FILE}'"
     check "distributed adapters expose failure-envelope attach helper" \
-      "rg -q 'withFailureEnvelope' '${ADAPTER_FILE}'"
+      "rg -q 'withFailureEnvelope' '${THEOREMPACK_PROFILES_FILE}'"
     check "theorem-pack carries failure-envelope artifact slot" \
-      "rg -q 'failureEnvelope\\? : Option FailureEnvelopeArtifact' '${THEOREMPACK_FILE}'"
+      "rg -q 'failureEnvelope\\? : Option FailureEnvelopeArtifact' '${THEOREMPACK_BUILD_FILE}'"
     check "theorem inventory exposes failure-envelope capability bit" \
-      "rg -q '\\(\"failure_envelope\", pack\\.failureEnvelope\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+      "rg -q '\\(\"failure_envelope\", pack\\.failureEnvelope\\?\\.isSome\\)' '${THEOREMPACK_INVENTORY_FILE}'"
   fi
 
   check "artifact-level cross-target error-code compatibility tests exist" \
@@ -262,18 +263,18 @@ check_failure() {
   check "phase-3 gate: abstract failure proofs are bridged through adapters/theorem-pack" \
     "rg -q 'structure FailureEnvelopeProtocol' '${ENVELOPE_FILE}' && \
      rg -q 'failureEnvelope\\?' '${ADAPTER_FILE}' && \
-     rg -q 'FailureEnvelopeArtifact' '${THEOREMPACK_FILE}'"
+     rg -q 'FailureEnvelopeArtifact' '${THEOREMPACK_ARTIFACTS_FILE}'"
 
   check "phase-3.5 gate: cross-target failure conformance theorem is exposed" \
     "rg -q 'def CrossTargetFailureConformance' '${ENVELOPE_FILE}' && \
-     rg -q 'crossTargetConformance' '${THEOREMPACK_FILE}'"
+     rg -q 'crossTargetConformance' '${THEOREMPACK_ARTIFACTS_FILE}'"
 
   check "phase-3.6 gate: restart-refinement + structured-error adequacy theorem is exposed" \
     "rg -q 'def RestartRefinementStructuredErrorAdequacy' '${ENVELOPE_FILE}' && \
-     rg -q 'restartStructuredErrorAdequacy' '${THEOREMPACK_FILE}'"
+     rg -q 'restartStructuredErrorAdequacy' '${THEOREMPACK_ARTIFACTS_FILE}'"
 
   check "phase-4 gate: protocol machine theorem-pack exposes failure-envelope capability" \
-    "rg -q '\\(\"failure_envelope\", pack\\.failureEnvelope\\?\\.isSome\\)' '${THEOREMPACK_FILE}'"
+    "rg -q '\\(\"failure_envelope\", pack\\.failureEnvelope\\?\\.isSome\\)' '${THEOREMPACK_INVENTORY_FILE}'"
 
   check "phase-5 gate: CI enforces failure conformance checks" \
     "rg -q 'check-capability-gates' '${ROOT_DIR}/justfile'"

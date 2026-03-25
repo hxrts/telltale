@@ -40,7 +40,10 @@ def SemanticHandoff.hasExplicitOwnerTransition (handoff : SemanticHandoff) : Pro
 def AuthoritativeRead.hasAuthorityContext (read : AuthoritativeRead) : Prop :=
   read.ownerId.isSome ∨ read.witnessId.isSome ∨ read.generation.isSome
 
-def ObservedRead.isNonAuthoritative (_read : ObservedRead) : Prop := True
+def ObservedRead.isNonAuthoritative (read : ObservedRead) : Prop :=
+  read.effectInterface.isSome ∧
+  read.effectOperation.isSome ∧
+  read.handlerIdentity ≠ ""
 
 def ProtocolMachineSemanticObjects.explicitOperationIdentity
     (objects : ProtocolMachineSemanticObjects) : Prop :=
