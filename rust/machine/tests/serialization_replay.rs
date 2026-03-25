@@ -106,21 +106,24 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
         .expect("serialize canonical replay fragment rhs");
     assert_eq!(lhs, rhs, "canonical replay fragments should match");
     assert!(
-        machine_a.canonical_replay_fragment()
+        machine_a
+            .canonical_replay_fragment()
             .semantic_audit_log
             .iter()
             .any(|record| matches!(record, SemanticAuditRecord::EffectObservation { .. })),
         "canonical replay fragments should retain structured semantic audit records"
     );
     assert!(
-        machine_a.canonical_replay_fragment()
+        machine_a
+            .canonical_replay_fragment()
             .semantic_audit_log
             .iter()
             .any(|record| matches!(record, SemanticAuditRecord::Publication { .. })),
         "canonical replay fragments should retain canonical publication records"
     );
     assert!(
-        machine_a.canonical_replay_fragment()
+        machine_a
+            .canonical_replay_fragment()
             .semantic_objects
             .schema_version
             == telltale_machine::SEMANTIC_OBJECTS_SCHEMA_VERSION,
@@ -160,7 +163,8 @@ fn canonical_replay_fragment_sorts_topology_state() {
 
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     machine.load_choreography(&image).expect("load machine");
-    machine.step_round(&handler, 1)
+    machine
+        .step_round(&handler, 1)
         .expect("step with topology events");
 
     let fragment = machine.canonical_replay_fragment();

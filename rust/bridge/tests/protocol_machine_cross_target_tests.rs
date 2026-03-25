@@ -174,7 +174,9 @@ fn scheduler_signature(trace: &[ObsEvent]) -> Vec<(usize, String)> {
         .collect()
 }
 
-fn effect_signature(effect_trace: &[telltale_machine::model::effects::EffectTraceEntry]) -> Vec<String> {
+fn effect_signature(
+    effect_trace: &[telltale_machine::model::effects::EffectTraceEntry],
+) -> Vec<String> {
     effect_trace
         .iter()
         .map(|entry| entry.effect_kind.clone())
@@ -331,7 +333,8 @@ fn run_single_thread(
 ) {
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     machine.load_choreography(image).expect("load choreography");
-    machine.run(&DeterministicHandler, 256)
+    machine
+        .run(&DeterministicHandler, 256)
         .expect("single-thread run");
     (machine.trace().to_vec(), machine.effect_trace().to_vec())
 }
@@ -360,7 +363,8 @@ fn run_threaded_with_concurrency(
     for _ in 0..sessions {
         machine.load_choreography(image).expect("load choreography");
     }
-    machine.run_concurrent(&DeterministicHandler, 256, concurrency)
+    machine
+        .run_concurrent(&DeterministicHandler, 256, concurrency)
         .expect("threaded run");
     (
         machine.trace().to_vec(),

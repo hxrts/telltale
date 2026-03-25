@@ -51,7 +51,13 @@ fn validate_linear_block(
 
     for statement in statements {
         match statement {
-            Statement::Let { name, expr, body } => {
+            Statement::Begin { .. }
+            | Statement::Await { .. }
+            | Statement::Resolve { .. }
+            | Statement::Invalidate { .. } => {}
+            Statement::Let {
+                name, expr, body, ..
+            } => {
                 if matches!(expr, super::types::AuthorityExprSpec::Transfer { .. })
                     && !live_assets.insert(name.clone())
                 {
@@ -146,6 +152,8 @@ fn validate_linear_block(
             Statement::Send { .. }
             | Statement::Broadcast { .. }
             | Statement::Publish { .. }
+            | Statement::PublishAuthority { .. }
+            | Statement::Materialize { .. }
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
@@ -175,6 +183,10 @@ pub(super) fn validate_authority_surface(
 fn validate_case_exhaustiveness(statements: &[Statement], input: &str) -> Result<(), ParseError> {
     for statement in statements {
         match statement {
+            Statement::Begin { .. }
+            | Statement::Await { .. }
+            | Statement::Resolve { .. }
+            | Statement::Invalidate { .. } => {}
             Statement::Case { branches, .. } => {
                 let ctors: HashSet<&str> = branches
                     .iter()
@@ -231,6 +243,8 @@ fn validate_case_exhaustiveness(statements: &[Statement], input: &str) -> Result
             Statement::Send { .. }
             | Statement::Broadcast { .. }
             | Statement::Publish { .. }
+            | Statement::PublishAuthority { .. }
+            | Statement::Materialize { .. }
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
@@ -246,6 +260,7 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
             name,
             expr: super::types::AuthorityExprSpec::Transfer { .. },
             body,
+            ..
         } = statement
         {
             let usage_count = if let Some(body) = body {
@@ -278,6 +293,10 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
             }
         }
         match statement {
+            Statement::Begin { .. }
+            | Statement::Await { .. }
+            | Statement::Resolve { .. }
+            | Statement::Invalidate { .. } => {}
             Statement::Choice { branches, .. } => {
                 for branch in branches {
                     validate_linear_bindings(&branch.statements, input)?;
@@ -316,6 +335,8 @@ fn validate_linear_bindings(statements: &[Statement], input: &str) -> Result<(),
             Statement::Send { .. }
             | Statement::Broadcast { .. }
             | Statement::Publish { .. }
+            | Statement::PublishAuthority { .. }
+            | Statement::Materialize { .. }
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
@@ -333,6 +354,10 @@ fn binding_usage_diverges_across_choice_branches(statements: &[Statement], name:
 
 fn statement_binding_usage_diverges(statement: &Statement, name: &str) -> bool {
     match statement {
+        Statement::Begin { .. }
+        | Statement::Await { .. }
+        | Statement::Resolve { .. }
+        | Statement::Invalidate { .. } => false,
         Statement::Choice { branches, .. } => {
             let counts: Vec<usize> = branches
                 .iter()
@@ -371,6 +396,8 @@ fn statement_binding_usage_diverges(statement: &Statement, name: &str) -> bool {
         Statement::Send { .. }
         | Statement::Broadcast { .. }
         | Statement::Publish { .. }
+        | Statement::PublishAuthority { .. }
+        | Statement::Materialize { .. }
         | Statement::Handoff { .. }
         | Statement::DependentWork { .. }
         | Statement::Continue { .. }
@@ -387,6 +414,10 @@ fn count_binding_uses(statements: &[Statement], name: &str) -> usize {
 
 fn count_statement_uses(statement: &Statement, name: &str) -> usize {
     match statement {
+        Statement::Begin { .. }
+        | Statement::Await { .. }
+        | Statement::Resolve { .. }
+        | Statement::Invalidate { .. } => 0,
         Statement::Let { expr, body, .. } => {
             count_expr_uses(expr, name)
                 + body
@@ -428,7 +459,11 @@ fn count_statement_uses(statement: &Statement, name: &str) -> usize {
             .iter()
             .map(|branch| count_binding_uses(branch, name))
             .sum(),
-        Statement::Publish { .. } | Statement::Continue { .. } | Statement::Call { .. } => 0,
+        Statement::Publish { .. }
+        | Statement::PublishAuthority { .. }
+        | Statement::Materialize { .. }
+        | Statement::Continue { .. }
+        | Statement::Call { .. } => 0,
         Statement::Handoff {
             operation,
             target,

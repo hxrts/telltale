@@ -91,6 +91,72 @@ def auditPublication : PublicationEvent :=
   , reason := none
   }
 
+def invitationAgreementProfile : AgreementProfile :=
+  { profileName := "InvitationSoftSafeFinalized"
+  , visibility := .pending
+  , rule := .threshold 2
+  , usableAt := .softSafe
+  , finalizedAt := .finalized
+  , requiredEvidenceKind := .materialization
+  }
+
+def invitationAgreementContract : AgreementContract :=
+  { contractName := "AcceptInviteAgreement"
+  , operationId := "op-accept"
+  , session := some 7
+  , ownerId := some "owner-a"
+  , profileName := some "InvitationSoftSafeFinalized"
+  , visibility := .pending
+  , rule := .threshold 2
+  , usableAt := .softSafe
+  , finalizedAt := .finalized
+  , requiredEvidenceKind := .materialization
+  }
+
+def invitationPrestateBinding : PrestateBinding :=
+  { bindingId := "binding-1"
+  , operationId := "op-accept"
+  , session := some 7
+  , stateDigest := "prestate-1"
+  , epochRef := some "epoch-7"
+  , participantDigest := some "participants-a"
+  }
+
+def invitationAgreementEvidence : AgreementEvidence :=
+  { evidenceId := "agreement-evidence-1"
+  , operationId := "op-accept"
+  , session := some 7
+  , ownerId := some "owner-a"
+  , level := .finalized
+  , kind := .materialization
+  , reference := "proof-1"
+  , authoritative := true
+  }
+
+def invitationSoftSafeState : AgreementState :=
+  { operationId := "op-accept"
+  , session := some 7
+  , ownerId := some "owner-a"
+  , contractName := "AcceptInviteAgreement"
+  , level := .softSafe
+  , finalization := none
+  , evidenceIds := []
+  , lastUpdatedTick := some 4
+  , reason := some "soft-safe witness set reached"
+  }
+
+def invitationFinalizedState : AgreementState :=
+  { operationId := "op-accept"
+  , session := some 7
+  , ownerId := some "owner-a"
+  , contractName := "AcceptInviteAgreement"
+  , level := .finalized
+  , finalization := some .finalized
+  , evidenceIds := ["agreement-evidence-1"]
+  , lastUpdatedTick := some 5
+  , reason := some "materialization committed"
+  }
+
 def publicationObjects : ProtocolMachineSemanticObjects :=
   { operationInstances := [successOp]
   , outstandingEffects := []
@@ -101,6 +167,12 @@ def publicationObjects : ProtocolMachineSemanticObjects :=
   , materializationProofs := [successProof]
   , canonicalHandles := [successHandle]
   , publicationEvents := [successPublication, auditPublication]
+  , prestateBindings := [invitationPrestateBinding]
+  , agreementProfiles := [invitationAgreementProfile]
+  , agreementContracts := [invitationAgreementContract]
+  , agreementEvidence := [invitationAgreementEvidence]
+  , agreementStates := [invitationSoftSafeState, invitationFinalizedState]
+  , regions := []
   , progressContracts := []
   , progressTransitions := []
   }
@@ -146,6 +218,33 @@ theorem publicationObjects_noncanonical_forgery_blocked :
     intro hAdequate
     simp [PublicationEvent.adequateForSuccessContext, auditPublication,
       successCtx, successProof, successHandle] at hAdequate
+
+theorem publicationObjects_named_agreement_available :
+    publicationObjects.namedAgreementProfileAvailable "InvitationSoftSafeFinalized" := by
+  refine ⟨invitationAgreementProfile, by simp [publicationObjects], rfl⟩
+
+theorem invitationSoftSafeState_usable :
+    invitationAgreementContract.provisionalUsable invitationSoftSafeState := by
+  simp [AgreementContract.provisionalUsable, AgreementState.tracksContract,
+    AgreementLevel.atLeast, AgreementLevel.rank,
+    OperationVisibility.permitsUseAt, invitationAgreementContract,
+    invitationSoftSafeState]
+
+theorem invitationFinalization_admissible :
+    invitationAgreementContract.finalizationAdmissible
+      invitationPrestateBinding invitationAgreementEvidence invitationFinalizedState := by
+  simp [AgreementContract.finalizationAdmissible, AgreementState.tracksContract,
+    AgreementEvidence.satisfiesContract, invitationAgreementContract,
+    invitationPrestateBinding, invitationAgreementEvidence, invitationFinalizedState,
+    AgreementLevel.atLeast, AgreementLevel.rank]
+
+theorem publicationObjects_finalization_backed :
+    publicationObjects.finalizationBacked successOp := by
+  refine ⟨invitationAgreementContract, by simp [publicationObjects], invitationPrestateBinding,
+    by simp [publicationObjects], invitationAgreementEvidence, by simp [publicationObjects],
+    invitationFinalizedState, by simp [publicationObjects], ?_, ?_⟩
+  · simp [AgreementContract.tracksOperation, invitationAgreementContract, successOp]
+  · exact invitationFinalization_admissible
 
 example :
     publicationObjects.authoritativeMaterializationAdequate successCtx := by

@@ -10,8 +10,8 @@ mod test_support;
 use std::collections::BTreeMap;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ContentionMetrics, ThreadedProtocolMachine};
 use telltale_machine::{ProtocolMachineConfig, StepResult, ThreadedRoundSemantics};
@@ -111,7 +111,9 @@ fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) 
     let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
     for i in 0..protocols {
         let image = ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image();
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
     }
 
     let handler = RuntimeHandler;
@@ -139,7 +141,9 @@ fn lane_assignment_and_single_lane_compatibility() {
     let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for i in 0..6 {
         let image = ScenarioSpec::simple("A", "B", &format!("lane{i}")).to_code_image();
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
     }
     machine.run(&RuntimeHandler, 512).expect("threaded run");
 
@@ -168,13 +172,16 @@ fn lane_assignment_and_single_lane_compatibility() {
 #[test]
 fn deterministic_transfer_handoff_uses_delegation_path() {
     let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
-    machine.load_choreography(&transfer_image())
+    machine
+        .load_choreography(&transfer_image())
         .expect("load choreography");
 
     // Stop as soon as the transfer handoff has been committed; the fixture
     // does not model a post-transfer continuation for the source coroutine.
     for _ in 0..16 {
-        machine.step_round(&RuntimeHandler, 2).expect("threaded step");
+        machine
+            .step_round(&RuntimeHandler, 2)
+            .expect("threaded step");
         if !machine.handoff_trace().is_empty() {
             break;
         }
@@ -220,7 +227,8 @@ fn disjoint_footprints_parallelize_in_same_wave() {
         .load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
         .expect("load choreography B");
 
-    machine.step_round(&RuntimeHandler, 2)
+    machine
+        .step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
     let tick = machine.clock().tick;
     let wave0: Vec<_> = machine
@@ -246,7 +254,8 @@ fn overlapping_footprints_serialize_per_wave() {
         .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");
 
-    machine.step_round(&RuntimeHandler, 2)
+    machine
+        .step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
     let tick = machine.clock().tick;
     let mut by_wave: BTreeMap<u64, usize> = BTreeMap::new();
@@ -270,7 +279,9 @@ fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
         let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
         for i in 0..8 {
             let image = ScenarioSpec::simple("A", "B", &format!("det{i}")).to_code_image();
-            machine.load_choreography(&image).expect("load choreography");
+            machine
+                .load_choreography(&image)
+                .expect("load choreography");
         }
         machine.run(&RuntimeHandler, 512).expect("threaded run");
         machine.lane_trace().to_vec()
@@ -290,9 +301,12 @@ fn planner_trace_is_worker_count_invariant_for_fixed_ready_set() {
         let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
         for i in 0..2 {
             let image = ScenarioSpec::simple("A", "B", &format!("wc{i}")).to_code_image();
-            machine.load_choreography(&image).expect("load choreography");
+            machine
+                .load_choreography(&image)
+                .expect("load choreography");
         }
-        machine.run_concurrent(&RuntimeHandler, 512, 4)
+        machine
+            .run_concurrent(&RuntimeHandler, 512, 4)
             .expect("threaded run");
         machine.lane_trace().to_vec()
     };
@@ -310,9 +324,12 @@ fn lane_scheduler_state_roundtrip_is_stable() {
     let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for i in 0..4 {
         let image = ScenarioSpec::simple("A", "B", &format!("state{i}")).to_code_image();
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
     }
-    machine.step_round(&RuntimeHandler, 4)
+    machine
+        .step_round(&RuntimeHandler, 4)
         .expect("threaded step round");
 
     let state = machine.lane_scheduler_state();
@@ -328,13 +345,16 @@ fn lane_scheduler_state_roundtrip_is_stable() {
 #[test]
 fn invalid_wave_certificate_falls_back_to_single_step() {
     let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
-    machine.load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
+    machine
+        .load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
         .expect("load choreography A");
-    machine.load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
+    machine
+        .load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
         .expect("load choreography B");
 
     machine.force_invalid_wave_certificate_once();
-    machine.step_round(&RuntimeHandler, 2)
+    machine
+        .step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
 
     let tick = machine.clock().tick;
@@ -360,7 +380,8 @@ fn footprint_guided_wave_widening_allows_same_session_disjoint_roles() {
         .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");
 
-    machine.step_round(&RuntimeHandler, 2)
+    machine
+        .step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
     let tick = machine.clock().tick;
     let count = machine

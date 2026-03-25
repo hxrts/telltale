@@ -30,12 +30,16 @@ fn coroutine_lookup_proxy_stays_stable_for_large_id_sets() {
     let session_count = 256usize;
 
     for _ in 0..session_count {
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
     }
 
     for _ in 0..32 {
         for coro_id in 0..session_count {
-            let coro = machine.coroutine(coro_id).expect("coroutine id should exist");
+            let coro = machine
+                .coroutine(coro_id)
+                .expect("coroutine id should exist");
             assert_eq!(coro.id, coro_id);
         }
     }

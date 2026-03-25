@@ -7,12 +7,12 @@ use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
-use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::model::output_condition::OutputConditionCheck;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
-    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
-    StepResult, SemanticAuditRecord,
+    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects, SemanticAuditRecord,
+    StepResult,
 };
 use telltale_types::{GlobalType, LocalTypeR};
 

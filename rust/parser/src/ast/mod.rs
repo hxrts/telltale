@@ -50,9 +50,9 @@ pub use annotation::{Annotations, ProtocolAnnotation};
 pub use choreography::{
     Choreography, EffectAuthorityClass, EffectContractDeclaration, EffectInterfaceDeclaration,
     EffectOperationDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration, LanguageTier,
-    LanguageTierStatus, OperationDeclaration, OperationParameterDeclaration, RegionDeclaration,
-    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration, TypeConstructorDeclaration,
-    TypeDeclaration,
+    LanguageTierStatus, OperationDeclaration, OperationParameterDeclaration, ProgressAttachment,
+    RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
+    TypeConstructorDeclaration, TypeDeclaration,
 };
 pub use execution_hints::{
     ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,
@@ -63,7 +63,8 @@ pub use local_type::LocalType; // Extended LocalType for code generation
 pub use message::MessageType;
 pub use non_empty::{NonEmptyError, NonEmptyVec};
 pub use protocol::{
-    AuthorityExpr, Branch, CaseBranch, CasePattern, ChoiceGuard, Condition, Protocol,
+    AuthorityBindingMode, AuthorityExpr, Branch, CaseBranch, CasePattern, ChoiceGuard,
+    CommitmentOutcome, Condition, Protocol,
 };
 pub use role::{
     RangeExpr, Role, RoleBoundsChecker, RoleIndex, RoleParam, RoleRange, RoleValidationError,

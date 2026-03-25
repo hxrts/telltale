@@ -4,12 +4,12 @@ use std::collections::BTreeMap;
 
 use telltale_machine::buffer::EnqueueResult;
 use telltale_machine::coroutine::Value;
-use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_machine::instr::{ImmValue, Instr};
-use telltale_machine::runtime::loader::CodeImage;
-use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult,
+use telltale_machine::model::effects::{
+    EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult};
 use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
 use telltale_simulator::rng::SimRng;
 use telltale_types::{GlobalType, LocalTypeR};

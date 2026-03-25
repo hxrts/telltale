@@ -18,8 +18,7 @@ use telltale_machine::coroutine::{CoroStatus, Fault, Value};
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
-    StepResult,
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError, StepResult,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -43,7 +42,10 @@ fn test_send_success() {
         .iter()
         .any(|e| matches!(e, ObsEvent::Sent { label, .. } if label == "msg"));
     assert!(sent, "expected Sent event");
-    assert!(machine.session_coroutines(sid).iter().all(|c| c.is_terminal()));
+    assert!(machine
+        .session_coroutines(sid)
+        .iter()
+        .all(|c| c.is_terminal()));
 }
 
 #[test]
@@ -336,7 +338,10 @@ fn test_recv_blocks_when_empty() {
     assert_matches!(ty_before, Some(LocalTypeR::Recv { .. }));
 
     machine.run(&handler, 100).unwrap();
-    assert!(machine.session_coroutines(sid).iter().all(|c| c.is_terminal()));
+    assert!(machine
+        .session_coroutines(sid)
+        .iter()
+        .all(|c| c.is_terminal()));
 }
 
 #[test]
@@ -401,7 +406,10 @@ fn test_recv_unblocks_on_send() {
     let handler = PassthroughHandler;
     machine.run(&handler, 100).unwrap();
 
-    assert!(machine.session_coroutines(sid).iter().all(|c| c.is_terminal()));
+    assert!(machine
+        .session_coroutines(sid)
+        .iter()
+        .all(|c| c.is_terminal()));
 
     let recv = machine
         .trace()

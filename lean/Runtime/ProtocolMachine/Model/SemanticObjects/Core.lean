@@ -80,6 +80,42 @@ inductive ProgressState where
   | handedOff
   deriving Repr, DecidableEq
 
+inductive OperationVisibility where
+  | immediate
+  | pending
+  | blockedUntilFinalized
+  deriving Repr, DecidableEq
+
+inductive AgreementLevel where
+  | none
+  | provisional
+  | softSafe
+  | finalized
+  deriving Repr, DecidableEq
+
+inductive AgreementRule where
+  | noAgreement
+  | anyParticipant
+  | unanimous
+  | threshold (requiredParticipants : Nat)
+  | named (ruleName : String)
+  deriving Repr, DecidableEq
+
+inductive AgreementEvidenceKind where
+  | witness
+  | certificate
+  | commitFact
+  | publication
+  | materialization
+  deriving Repr, DecidableEq
+
+inductive FinalizationOutcome where
+  | finalized
+  | aborted
+  | rejected
+  | timedOut
+  deriving Repr, DecidableEq
+
 inductive OwnershipScope where
   | session
   | fragments (roles : List String)
@@ -208,6 +244,72 @@ structure PublicationEvent where
   reason : Option String
   deriving Repr, DecidableEq
 
+structure PrestateBinding where
+  bindingId : String
+  operationId : String
+  session : Option Nat
+  stateDigest : String
+  epochRef : Option String
+  participantDigest : Option String
+  deriving Repr, DecidableEq
+
+structure AgreementProfile where
+  profileName : String
+  visibility : OperationVisibility
+  rule : AgreementRule
+  usableAt : AgreementLevel
+  finalizedAt : AgreementLevel
+  requiredEvidenceKind : AgreementEvidenceKind
+  deriving Repr, DecidableEq
+
+structure AgreementContract where
+  contractName : String
+  operationId : String
+  session : Option Nat
+  ownerId : Option String
+  profileName : Option String
+  visibility : OperationVisibility
+  rule : AgreementRule
+  usableAt : AgreementLevel
+  finalizedAt : AgreementLevel
+  requiredEvidenceKind : AgreementEvidenceKind
+  deriving Repr, DecidableEq
+
+structure AgreementEvidence where
+  evidenceId : String
+  operationId : String
+  session : Option Nat
+  ownerId : Option String
+  level : AgreementLevel
+  kind : AgreementEvidenceKind
+  reference : String
+  authoritative : Bool
+  deriving Repr, DecidableEq
+
+structure AgreementState where
+  operationId : String
+  session : Option Nat
+  ownerId : Option String
+  contractName : String
+  level : AgreementLevel
+  finalization : Option FinalizationOutcome
+  evidenceIds : List String
+  lastUpdatedTick : Option Nat
+  reason : Option String
+  deriving Repr, DecidableEq
+
+structure Region where
+  regionId : String
+  session : Option Nat
+  ownerId : Option String
+  scope : OwnershipScope
+  operationIds : List String
+  effectIds : List Nat
+  authoritativeReadIds : List String
+  handleIds : List String
+  publicationIds : List String
+  deriving Repr, DecidableEq
+
 structure ProgressContract where
   operationId : String
   session : Option Nat
@@ -239,6 +341,12 @@ structure ProtocolMachineSemanticObjects where
   materializationProofs : List MaterializationProof
   canonicalHandles : List CanonicalHandle
   publicationEvents : List PublicationEvent
+  prestateBindings : List PrestateBinding
+  agreementProfiles : List AgreementProfile
+  agreementContracts : List AgreementContract
+  agreementEvidence : List AgreementEvidence
+  agreementStates : List AgreementState
+  regions : List Region
   progressContracts : List ProgressContract
   progressTransitions : List ProgressTransition
   deriving Repr, DecidableEq

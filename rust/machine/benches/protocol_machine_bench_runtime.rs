@@ -30,7 +30,8 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
                 observability_retention: capped_retention_config(),
                 ..ProtocolMachineConfig::strict_minimal()
             });
-            machine.load_choreography_owned(black_box(&image_small), "bench/runtime/small")
+            machine
+                .load_choreography_owned(black_box(&image_small), "bench/runtime/small")
                 .expect("load choreography");
             let status = machine.run(&handler, 10_000).expect("run machine");
             assert!(matches!(status, RunStatus::AllDone));
@@ -44,7 +45,8 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
                 observability_retention: capped_retention_config(),
                 ..ProtocolMachineConfig::strict_large_fanout()
             });
-            machine.load_choreography_owned(black_box(&image_wide), "bench/runtime/wide")
+            machine
+                .load_choreography_owned(black_box(&image_wide), "bench/runtime/wide")
                 .expect("load choreography");
             let status = machine.run(&handler, 20_000).expect("run machine");
             assert!(matches!(status, RunStatus::AllDone));

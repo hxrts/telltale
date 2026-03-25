@@ -11,10 +11,12 @@ use std::collections::{HashMap, HashSet};
 use super::declarations::enforce_same_line_equals;
 use super::error::{ErrorSpan, ParseError};
 use super::stmt_parsers::{
-    parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt, parse_continue_stmt,
-    parse_dependent_work_stmt, parse_handoff_stmt, parse_let_in_stmt, parse_let_stmt,
-    parse_loop_stmt, parse_par_stmt, parse_publish_stmt, parse_rec_stmt, parse_send_stmt,
-    parse_timeout_stmt,
+    parse_authority_let_in_stmt, parse_authority_let_stmt, parse_await_stmt, parse_begin_stmt,
+    parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt,
+    parse_continue_stmt, parse_dependent_work_stmt, parse_handoff_stmt, parse_invalidate_stmt,
+    parse_let_in_stmt, parse_let_stmt, parse_loop_stmt, parse_materialize_stmt, parse_par_stmt,
+    parse_publish_authority_stmt, parse_publish_stmt, parse_rec_stmt, parse_resolve_stmt,
+    parse_send_stmt, parse_timeout_stmt, parse_observe_let_in_stmt, parse_observe_let_stmt,
 };
 use super::types::{MessageSpec, ParsedBody, Statement};
 use super::Rule;
@@ -114,6 +116,18 @@ fn parse_statement_inner(
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, ParseError> {
     match pair.as_rule() {
+        Rule::begin_stmt => parse_begin_stmt(pair, input),
+        Rule::await_stmt => parse_await_stmt(pair, input),
+        Rule::resolve_stmt => parse_resolve_stmt(pair, input),
+        Rule::invalidate_stmt => parse_invalidate_stmt(pair, input),
+        Rule::authority_let_in_stmt => {
+            parse_authority_let_in_stmt(pair, declared_roles, input, protocol_defs)
+        }
+        Rule::authority_let_stmt => parse_authority_let_stmt(pair, declared_roles, input),
+        Rule::observe_let_in_stmt => {
+            parse_observe_let_in_stmt(pair, declared_roles, input, protocol_defs)
+        }
+        Rule::observe_let_stmt => parse_observe_let_stmt(pair, declared_roles, input),
         Rule::let_in_stmt => parse_let_in_stmt(pair, declared_roles, input, protocol_defs),
         Rule::let_stmt => parse_let_stmt(pair, declared_roles, input),
         Rule::case_stmt => parse_case_stmt(pair, declared_roles, input, protocol_defs),
@@ -126,7 +140,9 @@ fn parse_statement_inner(
         Rule::rec_stmt => parse_rec_stmt(pair, declared_roles, input, protocol_defs),
         Rule::continue_stmt => parse_continue_stmt(pair, input),
         Rule::call_stmt => parse_call_stmt(pair, input),
+        Rule::publish_authority_stmt => parse_publish_authority_stmt(pair, input),
         Rule::publish_stmt => parse_publish_stmt(pair, input),
+        Rule::materialize_stmt => parse_materialize_stmt(pair, input),
         Rule::handoff_stmt => parse_handoff_stmt(pair, declared_roles, input),
         Rule::dependent_work_stmt => parse_dependent_work_stmt(pair, input),
         _ => {

@@ -176,7 +176,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let mut door_host = DoorHost::default();
     executor::block_on(async {
-        try_join!(user(&mut u, &mut user_host), door(&mut d, &mut door_host), elevator(&mut e))
+        try_join!(
+            user(&mut u, &mut user_host),
+            door(&mut d, &mut door_host),
+            elevator(&mut e)
+        )
     })?;
     println!("\nElevator protocol completed successfully");
     Ok(())

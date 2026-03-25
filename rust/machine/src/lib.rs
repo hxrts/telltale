@@ -179,13 +179,13 @@ pub mod model {
     /// Canonical protocol-machine semantic-object family.
     pub mod semantic_objects {
         pub use crate::semantic_objects::{
-            protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
+            protocol_machine_semantic_objects, AuthoritativeRead, AuthoritativeReadKind,
             AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, DelegationStatus,
             MaterializationProof, ObservedRead, OperationInstance, OperationPhase,
             OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
             ProgressState, ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent,
-            PublicationObserverClass, PublicationStatus, SemanticHandoff, TransformationObligation,
-            SEMANTIC_OBJECTS_SCHEMA_VERSION,
+            PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
+            TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
         };
     }
 }
@@ -319,12 +319,12 @@ pub use scheduler::{
     Scheduler, StepUpdate,
 };
 pub use semantic_objects::{
-    protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
-    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, ObservedRead,
-    OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus,
+    protocol_machine_semantic_objects, AuthoritativeRead, AuthoritativeReadKind,
+    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, MaterializationProof,
+    ObservedRead, OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus,
     ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
-    PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff,
-    SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    PublicationEvent, PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
+    TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 pub use serialization::{
     canonical_effect_trace, canonical_replay_fragment_v1, canonical_semantic_audit_log,

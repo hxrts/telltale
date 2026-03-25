@@ -40,6 +40,12 @@ def emptySemanticObjects : Runtime.ProtocolMachine.Model.ProtocolMachineSemantic
   , materializationProofs := []
   , canonicalHandles := []
   , publicationEvents := []
+  , prestateBindings := []
+  , agreementProfiles := []
+  , agreementContracts := []
+  , agreementEvidence := []
+  , agreementStates := []
+  , regions := []
   , progressContracts := []
   , progressTransitions := []
   }

@@ -57,11 +57,14 @@ fn run_for_policy(policy: SchedPolicy) -> Vec<Vec<CommEvent>> {
         sched_policy: policy,
         ..ProtocolMachineConfig::default()
     });
-    machine.load_choreography(&test_support::simple_send_recv_image("A", "B", "m1"))
+    machine
+        .load_choreography(&test_support::simple_send_recv_image("A", "B", "m1"))
         .expect("load image m1");
-    machine.load_choreography(&test_support::simple_send_recv_image("A", "B", "m2"))
+    machine
+        .load_choreography(&test_support::simple_send_recv_image("A", "B", "m2"))
         .expect("load image m2");
-    machine.run_concurrent(&PassthroughHandler, 256, 2)
+    machine
+        .run_concurrent(&PassthroughHandler, 256, 2)
         .expect("run under scheduler policy");
     canonical_comm_trace(&machine)
 }

@@ -10,8 +10,9 @@ use quote::{format_ident, quote, ToTokens};
 use std::collections::{BTreeMap, HashMap};
 use syn::{Error, LitStr, Result};
 use telltale_parser::ast::{
-    Branch, Choreography, EffectInterfaceDeclaration, EffectOperationDeclaration, LocalType,
-    MessageType, Protocol, Role, TypeDeclaration,
+    AuthorityBindingMode, AuthorityExpr, Branch, Choreography, EffectInterfaceDeclaration,
+    EffectOperationDeclaration, LocalType, MessageType, OperationDeclaration, Protocol, Role,
+    TypeDeclaration,
 };
 
 struct ParsedMacroChoreography {
@@ -262,6 +263,8 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
         .collect::<Vec<_>>();
     let type_decls = generate_type_declarations(choreography)?;
     let effects_module = generate_effects_module(choreography)?;
+    let authority_module = generate_authority_module(choreography)?;
+    let commitments_module = generate_commitments_module(choreography)?;
     let (projectable, projection_error, sessions_module) = match project_local_types(choreography) {
         Ok(local_types) => (
             quote!(true),
@@ -315,6 +318,10 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
 
         #effects_module
 
+        #authority_module
+
+        #commitments_module
+
         #sessions_module
     };
 
@@ -326,6 +333,7 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
                     #[doc(hidden)]
                     pub mod #protocol_impl_ident {
                         #![allow(dead_code, unused_imports, unused_variables, missing_docs)]
+                        use ::telltale::serde as serde;
                         #spec_body
                     }
 
@@ -337,6 +345,7 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
             #[doc(hidden)]
             pub mod #protocol_impl_ident {
                 #![allow(dead_code, unused_imports, unused_variables, missing_docs)]
+                use ::telltale::serde as serde;
                 #spec_body
             }
 
@@ -398,7 +407,8 @@ fn generate_type_declaration(type_decl: &TypeDeclaration) -> Result<TokenStream>
                     .map(generate_record_field)
                     .collect::<Result<Vec<_>>>()?;
                 Ok(quote! {
-                    #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+                    #[derive(Clone, Debug, PartialEq, ::telltale::serde::Serialize, ::telltale::serde::Deserialize)]
+                    #[serde(crate = "::telltale::serde")]
                     pub struct #name {
                         #(#fields),*
                     }
@@ -426,7 +436,8 @@ fn generate_type_declaration(type_decl: &TypeDeclaration) -> Result<TokenStream>
             })
             .collect::<Result<Vec<_>>>()?;
         Ok(quote! {
-            #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+            #[derive(Clone, Debug, PartialEq, ::telltale::serde::Serialize, ::telltale::serde::Deserialize)]
+            #[serde(crate = "::telltale::serde")]
             pub enum #name {
                 #(#variants),*
             }
@@ -511,12 +522,14 @@ fn generate_effect_surface(effect: &EffectInterfaceDeclaration) -> Result<TokenS
         .collect::<Result<Vec<_>>>()?;
 
     Ok(quote! {
-        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Debug, PartialEq, ::telltale::serde::Serialize, ::telltale::serde::Deserialize)]
+        #[serde(crate = "::telltale::serde")]
         pub enum #request_name {
             #(#request_variants),*
         }
 
-        #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+        #[derive(Clone, Debug, PartialEq, ::telltale::serde::Serialize, ::telltale::serde::Deserialize)]
+        #[serde(crate = "::telltale::serde")]
         pub enum #outcome_name {
             #(#outcome_variants),*
         }
@@ -529,6 +542,574 @@ fn generate_effect_surface(effect: &EffectInterfaceDeclaration) -> Result<TokenS
                     #(#handle_arms),*
                 }
             }
+        }
+    })
+}
+
+#[derive(Default)]
+struct AuthoritySurfaceCollector {
+    authoritative_reads: BTreeMap<String, (String, String)>,
+    observed_reads: BTreeMap<String, (String, String)>,
+    publications: BTreeMap<String, String>,
+    materializations: BTreeMap<String, String>,
+    handoffs: BTreeMap<String, (String, String)>,
+}
+
+fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream> {
+    let mut collector = AuthoritySurfaceCollector::default();
+    collect_authority_surfaces(&choreography.protocol, &mut collector);
+
+    let authoritative_reads = collector
+        .authoritative_reads
+        .iter()
+        .map(|(binding_name, (effect_interface, effect_operation))| {
+            let binding_name = LitStr::new(binding_name, Span::call_site());
+            let effect_interface = LitStr::new(effect_interface, Span::call_site());
+            let effect_operation = LitStr::new(effect_operation, Span::call_site());
+            quote! {
+                AuthorityReadMetadata {
+                    binding_name: #binding_name,
+                    effect_interface: #effect_interface,
+                    effect_operation: #effect_operation,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    let observed_reads = collector
+        .observed_reads
+        .iter()
+        .map(|(binding_name, (effect_interface, effect_operation))| {
+            let binding_name = LitStr::new(binding_name, Span::call_site());
+            let effect_interface = LitStr::new(effect_interface, Span::call_site());
+            let effect_operation = LitStr::new(effect_operation, Span::call_site());
+            quote! {
+                AuthorityReadMetadata {
+                    binding_name: #binding_name,
+                    effect_interface: #effect_interface,
+                    effect_operation: #effect_operation,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    let publications = collector
+        .publications
+        .iter()
+        .map(|(publication_name, witness_name)| {
+            let publication_name = LitStr::new(publication_name, Span::call_site());
+            let witness_name = LitStr::new(witness_name, Span::call_site());
+            quote! {
+                PublicationMetadata {
+                    publication_name: #publication_name,
+                    witness_name: #witness_name,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    let materializations = collector
+        .materializations
+        .iter()
+        .map(|(proof_name, publication_name)| {
+            let proof_name = LitStr::new(proof_name, Span::call_site());
+            let publication_name = LitStr::new(publication_name, Span::call_site());
+            quote! {
+                MaterializationMetadata {
+                    proof_name: #proof_name,
+                    publication_name: #publication_name,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    let handoffs = collector
+        .handoffs
+        .iter()
+        .map(|(operation_name, (target_role, receipt_name))| {
+            let operation_name = LitStr::new(operation_name, Span::call_site());
+            let target_role = LitStr::new(target_role, Span::call_site());
+            let receipt_name = LitStr::new(receipt_name, Span::call_site());
+            quote! {
+                HandoffMetadata {
+                    operation_name: #operation_name,
+                    target_role: #target_role,
+                    receipt_name: #receipt_name,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+
+    Ok(quote! {
+        pub mod authority {
+            pub use ::telltale::dsl::semantic::{
+                AuthoritativeRead,
+                AuthoritativeReadKind,
+                AuthoritativeReadLifecycle,
+                CanonicalHandle,
+                CanonicalHandleKind,
+                DelegationStatus,
+                MaterializationProof,
+                ObservedRead,
+                OutstandingEffectStatus,
+                OwnershipScope,
+                PublicationEvent,
+                PublicationObserverClass,
+                PublicationStatus,
+                SemanticHandoff,
+            };
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct AuthorityReadMetadata {
+                pub binding_name: &'static str,
+                pub effect_interface: &'static str,
+                pub effect_operation: &'static str,
+            }
+
+            impl AuthorityReadMetadata {
+                #[must_use]
+                pub fn authoritative_read(
+                    &self,
+                    read_id: impl Into<::std::string::String>,
+                ) -> AuthoritativeRead {
+                    AuthoritativeRead {
+                        read_id: read_id.into(),
+                        session: None,
+                        owner_id: None,
+                        kind: AuthoritativeReadKind::Readiness,
+                        lifecycle: AuthoritativeReadLifecycle::Issued,
+                        predicate_ref: ::std::option::Option::Some(format!(
+                            "{}.{}",
+                            self.effect_interface, self.effect_operation
+                        )),
+                        witness_id: None,
+                        generation: None,
+                        reason: None,
+                    }
+                }
+
+                #[must_use]
+                pub fn observed_read(
+                    &self,
+                    read_id: impl Into<::std::string::String>,
+                    effect_id: u64,
+                    handler_identity: impl Into<::std::string::String>,
+                ) -> ObservedRead {
+                    ObservedRead {
+                        read_id: read_id.into(),
+                        session: None,
+                        effect_id,
+                        effect_interface: ::std::option::Option::Some(
+                            self.effect_interface.to_string(),
+                        ),
+                        effect_operation: ::std::option::Option::Some(
+                            self.effect_operation.to_string(),
+                        ),
+                        handler_identity: handler_identity.into(),
+                        status: OutstandingEffectStatus::Pending,
+                    }
+                }
+            }
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct PublicationMetadata {
+                pub publication_name: &'static str,
+                pub witness_name: &'static str,
+            }
+
+            impl PublicationMetadata {
+                #[must_use]
+                pub fn publication_event(
+                    &self,
+                    publication_id: impl Into<::std::string::String>,
+                    operation_id: impl Into<::std::string::String>,
+                ) -> PublicationEvent {
+                    PublicationEvent {
+                        publication_id: publication_id.into(),
+                        session: None,
+                        operation_id: operation_id.into(),
+                        owner_id: None,
+                        publication: self.publication_name.to_string(),
+                        observer_class: PublicationObserverClass::Canonical,
+                        status: PublicationStatus::Published,
+                        proof_ref: None,
+                        handle_ref: None,
+                        reason: None,
+                    }
+                }
+            }
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct MaterializationMetadata {
+                pub proof_name: &'static str,
+                pub publication_name: &'static str,
+            }
+
+            impl MaterializationMetadata {
+                #[must_use]
+                pub fn materialization_proof(
+                    &self,
+                    proof_id: impl Into<::std::string::String>,
+                    predicate_ref: impl Into<::std::string::String>,
+                    output_digest: impl Into<::std::string::String>,
+                ) -> MaterializationProof {
+                    MaterializationProof {
+                        proof_id: proof_id.into(),
+                        session: None,
+                        predicate_ref: predicate_ref.into(),
+                        witness_ref: ::std::option::Option::Some(self.publication_name.to_string()),
+                        output_digest: output_digest.into(),
+                        passed: true,
+                    }
+                }
+
+                #[must_use]
+                pub fn canonical_handle(
+                    &self,
+                    handle_id: impl Into<::std::string::String>,
+                    proof: &MaterializationProof,
+                ) -> CanonicalHandle {
+                    CanonicalHandle {
+                        handle_id: handle_id.into(),
+                        session: None,
+                        owner_id: None,
+                        kind: CanonicalHandleKind::Materialization,
+                        proof_ref: ::std::option::Option::Some(proof.proof_id.clone()),
+                    }
+                }
+            }
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct HandoffMetadata {
+                pub operation_name: &'static str,
+                pub target_role: &'static str,
+                pub receipt_name: &'static str,
+            }
+
+            impl HandoffMetadata {
+                #[must_use]
+                pub fn semantic_handoff(
+                    &self,
+                    handoff_id: u64,
+                    session: usize,
+                    from_coro: usize,
+                    to_coro: usize,
+                ) -> SemanticHandoff {
+                    SemanticHandoff {
+                        handoff_id,
+                        session,
+                        from_coro,
+                        to_coro,
+                        revoked_owner_id: ::std::string::String::new(),
+                        activated_owner_id: self.target_role.to_string(),
+                        scope: OwnershipScope::Session,
+                        status: DelegationStatus::Committed,
+                        tick: 0,
+                        reason: ::std::option::Option::Some(self.receipt_name.to_string()),
+                    }
+                }
+            }
+
+            #[allow(dead_code)]
+            pub const AUTHORITATIVE_READS: &[AuthorityReadMetadata] = &[#(#authoritative_reads),*];
+            #[allow(dead_code)]
+            pub const OBSERVED_READS: &[AuthorityReadMetadata] = &[#(#observed_reads),*];
+            #[allow(dead_code)]
+            pub const PUBLICATIONS: &[PublicationMetadata] = &[#(#publications),*];
+            #[allow(dead_code)]
+            pub const MATERIALIZATIONS: &[MaterializationMetadata] = &[#(#materializations),*];
+            #[allow(dead_code)]
+            pub const HANDOFFS: &[HandoffMetadata] = &[#(#handoffs),*];
+
+            #[must_use]
+            pub fn authoritative_binding(name: &str) -> Option<&'static AuthorityReadMetadata> {
+                AUTHORITATIVE_READS.iter().find(|entry| entry.binding_name == name)
+            }
+
+            #[must_use]
+            pub fn observed_binding(name: &str) -> Option<&'static AuthorityReadMetadata> {
+                OBSERVED_READS.iter().find(|entry| entry.binding_name == name)
+            }
+
+            #[must_use]
+            pub fn publication(name: &str) -> Option<&'static PublicationMetadata> {
+                PUBLICATIONS.iter().find(|entry| entry.publication_name == name)
+            }
+
+            #[must_use]
+            pub fn materialization(name: &str) -> Option<&'static MaterializationMetadata> {
+                MATERIALIZATIONS.iter().find(|entry| entry.proof_name == name)
+            }
+
+            #[must_use]
+            pub fn handoff(operation: &str) -> Option<&'static HandoffMetadata> {
+                HANDOFFS.iter().find(|entry| entry.operation_name == operation)
+            }
+        }
+    })
+}
+
+fn collect_authority_surfaces(protocol: &Protocol, collector: &mut AuthoritySurfaceCollector) {
+    match protocol {
+        Protocol::Begin { continuation, .. }
+        | Protocol::Await { continuation, .. }
+        | Protocol::Resolve { continuation, .. }
+        | Protocol::Invalidate { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::Extension { continuation, .. }
+        | Protocol::DependentWork { continuation, .. } => {
+            collect_authority_surfaces(continuation, collector);
+        }
+        Protocol::Let {
+            name,
+            mode,
+            expr,
+            continuation,
+            ..
+        } => {
+            match (mode, expr) {
+                (AuthorityBindingMode::Authoritative, AuthorityExpr::Check { effect, operation, .. }) => {
+                    collector.authoritative_reads.insert(
+                        name.clone(),
+                        (effect.clone(), operation.clone()),
+                    );
+                }
+                (AuthorityBindingMode::Observe, AuthorityExpr::Observe { effect, operation, .. }) => {
+                    collector
+                        .observed_reads
+                        .insert(name.clone(), (effect.clone(), operation.clone()));
+                }
+                _ => {}
+            }
+            collect_authority_surfaces(continuation, collector);
+        }
+        Protocol::PublishAuthority {
+            witness,
+            publication_name,
+            continuation,
+        } => {
+            collector
+                .publications
+                .insert(publication_name.clone(), witness.clone());
+            collect_authority_surfaces(continuation, collector);
+        }
+        Protocol::Materialize {
+            proof,
+            publication,
+            continuation,
+        } => {
+            collector
+                .materializations
+                .insert(proof.clone(), publication.clone());
+            collect_authority_surfaces(continuation, collector);
+        }
+        Protocol::Handoff {
+            operation,
+            target,
+            receipt,
+            continuation,
+        } => {
+            collector.handoffs.insert(
+                operation.clone(),
+                (target.name().to_string(), receipt.clone()),
+            );
+            collect_authority_surfaces(continuation, collector);
+        }
+        Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
+            collect_authority_surfaces(continuation, collector);
+        }
+        Protocol::Choice { branches, .. } => {
+            for branch in branches {
+                collect_authority_surfaces(&branch.protocol, collector);
+            }
+        }
+        Protocol::Case { branches, .. } => {
+            for branch in branches {
+                collect_authority_surfaces(&branch.protocol, collector);
+            }
+        }
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => {
+            collect_authority_surfaces(body, collector);
+            collect_authority_surfaces(on_timeout, collector);
+            if let Some(on_cancel) = on_cancel {
+                collect_authority_surfaces(on_cancel, collector);
+            }
+        }
+        Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => {
+            collect_authority_surfaces(body, collector);
+        }
+        Protocol::Parallel { protocols } => {
+            for protocol in protocols {
+                collect_authority_surfaces(protocol, collector);
+            }
+        }
+        Protocol::Var(_) | Protocol::End => {}
+    }
+}
+
+fn generate_commitments_module(choreography: &Choreography) -> Result<TokenStream> {
+    let entries = choreography
+        .operation_declarations()
+        .iter()
+        .map(generate_commitment_metadata)
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(quote! {
+        pub mod commitments {
+            pub use ::telltale::dsl::semantic::{
+                OperationInstance,
+                OperationPhase,
+                ProgressContract,
+                ProgressState,
+            };
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct ProgressMetadata {
+                pub contract_name: &'static str,
+                pub requires_profile: Option<&'static str>,
+                pub within_window: Option<&'static str>,
+                pub on_timeout: Option<&'static str>,
+                pub on_stall: Option<&'static str>,
+            }
+
+            impl ProgressMetadata {
+                #[must_use]
+                pub const fn is_bounded(&self) -> bool {
+                    self.within_window.is_some()
+                }
+            }
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct CommitmentMetadata {
+                pub operation_name: &'static str,
+                pub owner_role: &'static str,
+                pub region: Option<&'static str>,
+                pub composition_policy: Option<&'static str>,
+                pub progress: ProgressMetadata,
+            }
+
+            impl CommitmentMetadata {
+                #[must_use]
+                pub fn operation_instance(
+                    &self,
+                    operation_id: impl Into<::std::string::String>,
+                ) -> OperationInstance {
+                    OperationInstance {
+                        operation_id: operation_id.into(),
+                        session: None,
+                        owner_id: None,
+                        kind: self.operation_name.to_string(),
+                        phase: OperationPhase::Pending,
+                        handler_identity: None,
+                        effect_ids: ::std::vec::Vec::new(),
+                        dependent_operation_ids: ::std::vec::Vec::new(),
+                        terminal_publication: None,
+                        budget_ticks: None,
+                        requires_proof: true,
+                    }
+                }
+
+                #[must_use]
+                pub fn progress_contract(
+                    &self,
+                    operation_id: impl Into<::std::string::String>,
+                ) -> ProgressContract {
+                    ProgressContract {
+                        operation_id: operation_id.into(),
+                        session: None,
+                        state: ProgressState::Pending,
+                        last_ordering_key: None,
+                        bounded: self.progress.is_bounded(),
+                        budget_ticks: None,
+                        last_progress_tick: None,
+                        escalated_at_tick: None,
+                        reason: None,
+                    }
+                }
+            }
+
+            #[allow(dead_code)]
+            pub const OPERATIONS: &[CommitmentMetadata] = &[#(#entries),*];
+
+            #[must_use]
+            pub fn operation(name: &str) -> Option<&'static CommitmentMetadata> {
+                OPERATIONS.iter().find(|entry| entry.operation_name == name)
+            }
+        }
+    })
+}
+
+fn generate_commitment_metadata(operation: &OperationDeclaration) -> Result<TokenStream> {
+    let Some(progress) = operation.progress_contract.as_ref() else {
+        return Err(Error::new(
+            Span::call_site(),
+            format!(
+                "operation `{}` is missing explicit progress metadata",
+                operation.name
+            ),
+        ));
+    };
+
+    let operation_name = LitStr::new(&operation.name, Span::call_site());
+    let owner_role = LitStr::new(&operation.owner_role, Span::call_site());
+    let region = operation.within.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+    let composition_policy = operation.composition_policy.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+    let contract_name = LitStr::new(&progress.contract_name, Span::call_site());
+    let requires_profile = progress.requires_profile.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+    let within_window = progress.within_window.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+    let on_timeout = progress.on_timeout.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+    let on_stall = progress.on_stall.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+
+    Ok(quote! {
+        CommitmentMetadata {
+            operation_name: #operation_name,
+            owner_role: #owner_role,
+            region: #region,
+            composition_policy: #composition_policy,
+            progress: ProgressMetadata {
+                contract_name: #contract_name,
+                requires_profile: #requires_profile,
+                within_window: #within_window,
+                on_timeout: #on_timeout,
+                on_stall: #on_stall,
+            },
         }
     })
 }
@@ -962,6 +1543,12 @@ fn collect_label_surfaces(
     labels: &mut BTreeMap<String, LabelSurface>,
 ) -> Result<()> {
     match protocol {
+        Protocol::Begin { continuation, .. }
+        | Protocol::Await { continuation, .. }
+        | Protocol::Resolve { continuation, .. }
+        | Protocol::Invalidate { continuation, .. } => {
+            collect_label_surfaces(continuation, labels)?;
+        }
         Protocol::Send {
             message,
             continuation,
@@ -1008,6 +1595,8 @@ fn collect_label_surfaces(
         }
         Protocol::Let { continuation, .. }
         | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. }
         | Protocol::DependentWork { continuation, .. }
         | Protocol::Extension { continuation, .. } => {
             collect_label_surfaces(continuation, labels)?;

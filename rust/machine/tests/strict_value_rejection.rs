@@ -67,8 +67,11 @@ fn choose_rejects_non_string_label_payload() {
     };
 
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = machine.load_choreography(&image).expect("load choreography");
-    machine.sessions_mut()
+    let sid = machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    machine
+        .sessions_mut()
         .get_mut(sid)
         .expect("session")
         .send("A", "B", Value::Nat(1))
@@ -113,7 +116,9 @@ fn tag_rejects_non_fact_shape() {
     };
 
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&image).expect("load choreography");
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
 
     let handler = PassthroughHandler;
     let result = machine.run(&handler, 8);

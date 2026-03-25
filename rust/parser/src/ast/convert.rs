@@ -119,6 +119,16 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             hint: "Parallel composition has no theory equivalent".to_string(),
         }),
 
+        Protocol::Begin { .. }
+        | Protocol::Await { .. }
+        | Protocol::Resolve { .. }
+        | Protocol::Invalidate { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "CommitmentLifecycle".to_string(),
+            hint:
+                "Explicit commitment lifecycle requires protocol-machine lowering instead of theory conversion"
+                    .to_string(),
+        }),
+
         Protocol::Let { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Let".to_string(),
             hint: "Authority-local let bindings must be erased or lowered before theory conversion"
@@ -141,6 +151,19 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             feature: "Publish".to_string(),
             hint: "Publication surfaces must be erased or lowered before theory conversion"
                 .to_string(),
+        }),
+
+        Protocol::PublishAuthority { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "PublishAuthority".to_string(),
+            hint: "Canonical publication requires protocol-machine lowering before theory conversion"
+                .to_string(),
+        }),
+
+        Protocol::Materialize { .. } => Err(ConversionError::UnsupportedFeature {
+            feature: "Materialize".to_string(),
+            hint:
+                "Materialization requires protocol-machine lowering before theory conversion"
+                    .to_string(),
         }),
 
         Protocol::Handoff { .. } => Err(ConversionError::UnsupportedFeature {

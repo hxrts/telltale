@@ -6,7 +6,12 @@ set_option autoImplicit false
 # Runtime.ProtocolMachine.Model.EffectAlgebra
 
 Executable effect-algebra vocabulary for effect classification, immediate-effect
-discipline, and multi-effect composition.
+discipline, and lower-level sibling effect aggregation.
+
+This module is intentionally secondary to the agreement/finality model in
+`SemanticObjects.AgreementCore`: composition policies describe how already-
+declared child effects combine, not the top-level agreement semantics of one
+operation.
 -/
 
 namespace Runtime.ProtocolMachine.Model

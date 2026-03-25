@@ -171,6 +171,25 @@ pub struct OperationParameterDeclaration {
     pub type_name: String,
 }
 
+/// Structured progress-contract attachment metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgressAttachment {
+    /// Stable progress-contract name.
+    pub contract_name: String,
+    /// Required execution/admission profile.
+    #[serde(default)]
+    pub requires_profile: Option<String>,
+    /// Required escalation window class.
+    #[serde(default)]
+    pub within_window: Option<String>,
+    /// Named timeout branch or escalation action.
+    #[serde(default)]
+    pub on_timeout: Option<String>,
+    /// Named stall branch or escalation action.
+    #[serde(default)]
+    pub on_stall: Option<String>,
+}
+
 /// Operation declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OperationDeclaration {
@@ -186,7 +205,7 @@ pub struct OperationDeclaration {
     pub within: Option<String>,
     /// Required progress contract for parity-critical execution.
     #[serde(default)]
-    pub progress_contract: Option<String>,
+    pub progress_contract: Option<ProgressAttachment>,
     /// Declared effect-composition policy for the operation.
     #[serde(default)]
     pub composition_policy: Option<String>,
@@ -418,15 +437,36 @@ impl Choreography {
             used: &BTreeSet<String>,
         ) -> Result<(), ValidationError> {
             match protocol {
-                Protocol::Send { continuation, .. }
+                Protocol::Begin { continuation, .. }
+                | Protocol::Await { continuation, .. }
+                | Protocol::Resolve { continuation, .. }
+                | Protocol::Invalidate { continuation, .. }
+                | Protocol::Send { continuation, .. }
                 | Protocol::Broadcast { continuation, .. }
                 | Protocol::Extension { continuation, .. }
                 | Protocol::Let { continuation, .. }
                 | Protocol::Publish { continuation, .. }
+                | Protocol::PublishAuthority { continuation, .. }
+                | Protocol::Materialize { continuation, .. }
                 | Protocol::Handoff { continuation, .. }
                 | Protocol::DependentWork { continuation, .. } => {
-                    if let Protocol::Let { expr, .. } = protocol {
+                    if let Protocol::Let { mode, expr, .. } = protocol {
                         validate_expr(expr, effect_ops, used)?;
+                        match (mode, expr) {
+                            (super::AuthorityBindingMode::Authoritative, super::AuthorityExpr::Check { .. })
+                            | (super::AuthorityBindingMode::Observe, super::AuthorityExpr::Observe { .. })
+                            | (super::AuthorityBindingMode::Plain, _) => {}
+                            (super::AuthorityBindingMode::Authoritative, _) => {
+                                return Err(ValidationError::ExtensionError(
+                                    "`authoritative let` must bind a `check` expression".to_string(),
+                                ));
+                            }
+                            (super::AuthorityBindingMode::Observe, _) => {
+                                return Err(ValidationError::ExtensionError(
+                                    "`observe let` must bind an `observe` expression".to_string(),
+                                ));
+                            }
+                        }
                     }
                     validate_protocol_effects(continuation, effect_ops, used)
                 }
@@ -527,6 +567,16 @@ impl Choreography {
                     operation.name
                 )));
             }
+            if !operation
+                .progress_contract
+                .as_ref()
+                .is_some_and(|progress| progress.is_explicit())
+            {
+                return Err(ValidationError::ExtensionError(format!(
+                    "operation `{}` must declare explicit progress metadata using `requires`, `within`, `on timeout`, or `on stall`",
+                    operation.name
+                )));
+            }
         }
         Ok(())
     }
@@ -537,7 +587,13 @@ impl Choreography {
         let missing_progress = self
             .operation_declarations()
             .iter()
-            .find(|operation| operation.progress_contract.is_none())
+            .find(|operation| {
+                operation.progress_contract.is_none()
+                    || !operation
+                        .progress_contract
+                        .as_ref()
+                        .is_some_and(|progress| progress.is_explicit())
+            })
             .map(|operation| {
                 format!(
                     "operation `{}` is missing the required progress contract",
@@ -1004,10 +1060,16 @@ impl Choreography {
                 out.insert(cap.to_string());
             }
             match protocol {
-                Protocol::Send { continuation, .. }
+                Protocol::Begin { continuation, .. }
+                | Protocol::Await { continuation, .. }
+                | Protocol::Resolve { continuation, .. }
+                | Protocol::Invalidate { continuation, .. }
+                | Protocol::Send { continuation, .. }
                 | Protocol::Broadcast { continuation, .. }
                 | Protocol::Extension { continuation, .. }
                 | Protocol::Publish { continuation, .. }
+                | Protocol::PublishAuthority { continuation, .. }
+                | Protocol::Materialize { continuation, .. }
                 | Protocol::Handoff { continuation, .. }
                 | Protocol::DependentWork { continuation, .. } => collect(continuation, out),
                 Protocol::Choice { branches, .. } => {
@@ -1049,11 +1111,34 @@ impl Choreography {
     }
 }
 
+impl ProgressAttachment {
+    /// Whether this attachment carries explicit progress policy rather than a bare name.
+    #[must_use]
+    pub fn is_explicit(&self) -> bool {
+        self.requires_profile.is_some()
+            || self.within_window.is_some()
+            || self.on_timeout.is_some()
+            || self.on_stall.is_some()
+    }
+}
+
 fn find_session_projection_blocker(protocol: &Protocol) -> Option<&'static str> {
     match protocol {
+        Protocol::Begin { .. } => Some("begin requires protocol-machine commitment semantics"),
+        Protocol::Await { .. } => Some("await requires protocol-machine commitment semantics"),
+        Protocol::Resolve { .. } => Some("resolve requires protocol-machine commitment semantics"),
+        Protocol::Invalidate { .. } => {
+            Some("invalidate requires protocol-machine commitment semantics")
+        }
         Protocol::Case { .. } => Some("authority-local case/of requires protocol-machine lowering"),
         Protocol::Timeout { .. } => Some("timeout requires protocol-machine progress semantics"),
         Protocol::Publish { .. } => Some("publish requires publication/materialization semantics"),
+        Protocol::PublishAuthority { .. } => {
+            Some("publish requires publication/materialization semantics")
+        }
+        Protocol::Materialize { .. } => {
+            Some("materialize requires publication/materialization semantics")
+        }
         Protocol::Handoff { .. } => Some("handoff requires semantic handoff semantics"),
         Protocol::DependentWork { .. } => {
             Some("dependent work requires protocol-machine commitment semantics")

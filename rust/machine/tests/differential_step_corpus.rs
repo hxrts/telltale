@@ -12,14 +12,12 @@ use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 
 use telltale_machine::coroutine::Value;
+use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
 use telltale_machine::runtime::loader::CodeImage;
-use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult,
-};
+use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult};
 use telltale_types::{GlobalType, LocalTypeR};
 
 use test_support::PassthroughHandler;
@@ -97,10 +95,7 @@ fn run_cooperative_snaps(
             result: result_name(&result),
             new_events,
         });
-        if matches!(
-            result,
-            StepResult::AllDone | StepResult::Stuck
-        ) {
+        if matches!(result, StepResult::AllDone | StepResult::Stuck) {
             break;
         }
     }
@@ -139,10 +134,7 @@ fn run_cooperative_snaps_with_config(
             result: result_name(&result),
             new_events,
         });
-        if matches!(
-            result,
-            StepResult::AllDone | StepResult::Stuck
-        ) {
+        if matches!(result, StepResult::AllDone | StepResult::Stuck) {
             break;
         }
     }

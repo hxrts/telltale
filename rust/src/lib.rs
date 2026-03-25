@@ -38,6 +38,7 @@ pub mod channel;
 // Re-export core types (always available)
 pub use telltale_types as types;
 pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+pub use serde;
 
 // Re-export optional crates
 #[cfg(feature = "theory")]
@@ -59,6 +60,18 @@ pub mod prelude {
 /// Shared DSL builtin types used by the `tell!` macro output.
 pub mod dsl {
     use serde::{Deserialize, Serialize};
+
+    /// Canonical protocol-machine semantic objects exposed to generated `tell!`
+    /// surfaces.
+    pub mod semantic {
+        pub use telltale_machine::model::semantic_objects::{
+            AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
+            CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead,
+            OperationInstance, OperationPhase, OutstandingEffectStatus, OwnershipScope,
+            ProgressContract, ProgressState, PublicationEvent, PublicationObserverClass,
+            PublicationStatus, SemanticHandoff,
+        };
+    }
 
     /// Opaque role identifier used by generated effect interfaces.
     #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

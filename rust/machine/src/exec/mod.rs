@@ -26,8 +26,12 @@ pub(crate) fn step_instr(
 ) -> Result<StepPack, Fault> {
     match instr {
         Instr::Send { chan, val } => comm::step_send(machine, coro_idx, role, chan, val, handler),
-        Instr::Receive { chan, dst } => comm::step_receive(machine, coro_idx, role, chan, dst, handler),
-        Instr::Offer { chan, label } => comm::step_offer(machine, coro_idx, role, chan, &label, handler),
+        Instr::Receive { chan, dst } => {
+            comm::step_receive(machine, coro_idx, role, chan, dst, handler)
+        }
+        Instr::Offer { chan, label } => {
+            comm::step_offer(machine, coro_idx, role, chan, &label, handler)
+        }
         Instr::Choose { chan, table } => {
             comm::step_choose(machine, coro_idx, role, chan, &table, handler)
         }
@@ -36,9 +40,19 @@ pub(crate) fn step_instr(
             local_types,
             handlers,
             dsts,
-        } => session::step_open(machine, coro_idx, role, &roles, &local_types, &handlers, &dsts),
+        } => session::step_open(
+            machine,
+            coro_idx,
+            role,
+            &roles,
+            &local_types,
+            &handlers,
+            &dsts,
+        ),
         Instr::Close { session } => session::step_close(machine, coro_idx, session),
-        Instr::Invoke { action } => guard_effect::step_invoke(machine, coro_idx, role, action, handler),
+        Instr::Invoke { action } => {
+            guard_effect::step_invoke(machine, coro_idx, role, action, handler)
+        }
         Instr::Acquire { layer, dst } => {
             guard_effect::step_acquire(machine, coro_idx, ep, role, sid, &layer, dst, handler)
         }

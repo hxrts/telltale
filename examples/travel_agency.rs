@@ -90,7 +90,9 @@ async fn customer(role: &mut Customer, host: &mut CustomerHost) -> Result<(), Bo
                 let s = s.send(Address(address)).await?;
 
                 let (Date(date), s) = s.receive().await?;
-                println!("Order: distance {distance}, quote {price} — accepted. Delivery date: {date}");
+                println!(
+                    "Order: distance {distance}, quote {price} — accepted. Delivery date: {date}"
+                );
                 Ok(((), s))
             }
             effects::QuoteDecision::Reject => {
@@ -138,7 +140,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let mut agency_host = AgencyHost;
     executor::block_on(async {
-        try_join!(customer(&mut c, &mut customer_host), agency(&mut a, &mut agency_host))
+        try_join!(
+            customer(&mut c, &mut customer_host),
+            agency(&mut a, &mut agency_host)
+        )
     })?;
     Ok(())
 }

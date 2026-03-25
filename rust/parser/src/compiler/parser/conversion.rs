@@ -97,7 +97,35 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
     // Build protocol from back to front
     for statement in statements.iter().rev() {
         current = match statement {
-            Statement::Let { name, expr, body } => {
+            Statement::Begin {
+                operation,
+                args,
+                progress,
+            } => Protocol::Begin {
+                operation: operation.clone(),
+                args: args.clone(),
+                progress: progress.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::Await { operation } => Protocol::Await {
+                operation: operation.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::Resolve { operation, outcome } => Protocol::Resolve {
+                operation: operation.clone(),
+                outcome: outcome.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::Invalidate { operation } => Protocol::Invalidate {
+                operation: operation.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::Let {
+                name,
+                mode,
+                expr,
+                body,
+            } => {
                 let continuation = if let Some(body) = body {
                     convert_statements_to_protocol(body, roles)
                 } else {
@@ -105,6 +133,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                 };
                 Protocol::Let {
                     name: name.clone(),
+                    mode: *mode,
                     expr: convert_authority_expr(expr),
                     linear: binding_is_linear(expr),
                     continuation: Box::new(continuation),
@@ -344,6 +373,19 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
             Statement::Publish { event, arg } => Protocol::Publish {
                 event: event.clone(),
                 arg: arg.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::PublishAuthority {
+                witness,
+                publication_name,
+            } => Protocol::PublishAuthority {
+                witness: witness.clone(),
+                publication_name: publication_name.clone(),
+                continuation: Box::new(current),
+            },
+            Statement::Materialize { proof, publication } => Protocol::Materialize {
+                proof: proof.clone(),
+                publication: publication.clone(),
                 continuation: Box::new(current),
             },
             Statement::Handoff {

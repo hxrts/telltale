@@ -68,10 +68,12 @@ fn cooperative_monitor_precheck_bypasses_control_flow_instrs() {
     });
     machine.load_choreography(&image).expect("load image");
 
-    machine.run(&PassthroughHandler, 1)
+    machine
+        .run(&PassthroughHandler, 1)
         .expect("control-flow step should bypass monitor precheck");
     assert_eq!(
-        machine.last_sched_step()
+        machine
+            .last_sched_step()
             .expect("expected at least one scheduled step")
             .selected_coro,
         0
@@ -98,7 +100,8 @@ fn cooperative_monitor_offer_passes_on_send_state() {
     });
     machine.load_choreography(&image).expect("load image");
 
-    machine.run(&PassthroughHandler, 1)
+    machine
+        .run(&PassthroughHandler, 1)
         .expect("offer should pass monitor on send state");
 }
 
@@ -157,7 +160,8 @@ fn cooperative_monitor_choose_passes_on_recv_state() {
     });
     machine.load_choreography(&image).expect("load image");
 
-    machine.run(&PassthroughHandler, 1)
+    machine
+        .run(&PassthroughHandler, 1)
         .expect("choose should pass monitor on recv state");
 }
 

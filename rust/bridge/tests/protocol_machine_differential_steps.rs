@@ -11,10 +11,12 @@ use telltale_bridge::{
     ProtocolMachineRunInput, ProtocolMachineRunner, ProtocolMachineTraceEvent, TickedObsEvent,
 };
 use telltale_machine::coroutine::Value;
-use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::model::effects::{
+    EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 use telltale_machine::model::output_condition::OutputConditionPolicy;
 use telltale_machine::model::state::SessionStatus;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, StepResult};
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
@@ -232,13 +234,17 @@ fn run_rust_step_states(
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..ProtocolMachineConfig::default()
     });
-    machine.load_choreography(&image).map_err(|e| e.to_string())?;
+    machine
+        .load_choreography(&image)
+        .map_err(|e| e.to_string())?;
 
     let mut out = Vec::new();
     for step_index in 0..max_steps {
         let old_len = machine.trace().len();
         let before_counts = session_type_counts(&machine);
-        let status = machine.step(&PassthroughHandler).map_err(|e| e.to_string())?;
+        let status = machine
+            .step(&PassthroughHandler)
+            .map_err(|e| e.to_string())?;
         let status = match status {
             StepResult::Continue => "continue",
             StepResult::Stuck => "stuck",

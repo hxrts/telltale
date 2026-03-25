@@ -48,8 +48,8 @@ structure AuthorityRegion where
   canonicalPublicationExclusivity : Prop
   observerSeparation : Prop
 
-/-- Region layering for the proof system: execution region + authority region. -/
-structure Region where
+/-- Proof witness layering execution and authority facts for one region. -/
+structure RegionLayeringWitness where
   execution : ExecutionRegion
   authority : AuthorityRegion
 
@@ -83,7 +83,7 @@ def regionOfCommitmentAndDelegation
     (hCoh : Coherent G D)
     (hDeleg : DelegationStep G G' D D' s A B)
     (objects : ProtocolMachineSemanticObjects)
-    (ctx : AuthoritativeCommitmentContext) : Region :=
+    (ctx : AuthoritativeCommitmentContext) : RegionLayeringWitness :=
   { execution := executionRegionOfDelegation hCoh hDeleg
   , authority := authorityRegionOfCommitment objects ctx
   }

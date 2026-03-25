@@ -6,13 +6,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use telltale_machine::buffer::BufferConfig;
 use telltale_machine::coroutine::Value;
+use telltale_machine::instr::Endpoint;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse,
     SendDecision,
 };
-use telltale_machine::instr::Endpoint;
-use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::model::state::SessionStore;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
     CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineMemoryUsage,
@@ -328,8 +328,10 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> ProtocolMachin
             .map(|coro| coro.id)
             .collect();
         for coro_id in coro_ids {
-            machine.coroutine_mut(coro_id).expect("coroutine exists").status =
-                telltale_machine::CoroStatus::Done;
+            machine
+                .coroutine_mut(coro_id)
+                .expect("coroutine exists")
+                .status = telltale_machine::CoroStatus::Done;
         }
         let _ = machine.reap_closed_sessions();
         last_usage = machine.memory_usage();

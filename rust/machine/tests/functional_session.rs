@@ -136,7 +136,10 @@ fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_sta
         .map(|coro| coro.id)
         .collect();
     for coro_id in &coro_ids {
-        machine.coroutine_mut(*coro_id).expect("coroutine exists").status = CoroStatus::Done;
+        machine
+            .coroutine_mut(*coro_id)
+            .expect("coroutine exists")
+            .status = CoroStatus::Done;
     }
 
     let before = machine.memory_usage();
@@ -229,8 +232,12 @@ fn test_vm_observability_retention_disabled_drops_storage_without_changing_fault
         },
         ..ProtocolMachineConfig::default()
     });
-    machine.load_choreography(&image).expect("load choreography");
-    machine.run(&PassthroughHandler, 100).expect("run choreography");
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    machine
+        .run(&PassthroughHandler, 100)
+        .expect("run choreography");
 
     assert!(machine.trace().is_empty());
     assert!(machine.effect_trace().is_empty());
@@ -251,13 +258,17 @@ fn test_vm_reuses_immutable_program_storage_across_identical_loads() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 
-    let sid1 = machine.load_choreography(&image).expect("load choreography");
+    let sid1 = machine
+        .load_choreography(&image)
+        .expect("load choreography");
     let usage_after_first = machine.memory_usage();
     assert_eq!(machine.unique_program_count(), 2);
     let program_instruction_count = usage_after_first.program_instruction_count;
     assert!(program_instruction_count > 0);
 
-    let sid2 = machine.load_choreography(&image).expect("load choreography");
+    let sid2 = machine
+        .load_choreography(&image)
+        .expect("load choreography");
     let usage_after_second = machine.memory_usage();
 
     assert_ne!(sid1, sid2);
@@ -283,7 +294,9 @@ fn test_vm_session_churn_with_reaping_and_capped_retention_stays_bounded() {
     let handler = PassthroughHandler;
 
     for _ in 0..32 {
-        let sid = machine.load_choreography(&image).expect("load choreography");
+        let sid = machine
+            .load_choreography(&image)
+            .expect("load choreography");
         machine.run(&handler, 100).expect("run choreography");
         machine.sessions_mut().close(sid).expect("close session");
         let coro_ids: Vec<usize> = machine
@@ -292,7 +305,10 @@ fn test_vm_session_churn_with_reaping_and_capped_retention_stays_bounded() {
             .map(|coro| coro.id)
             .collect();
         for coro_id in coro_ids {
-            machine.coroutine_mut(coro_id).expect("coroutine exists").status = CoroStatus::Done;
+            machine
+                .coroutine_mut(coro_id)
+                .expect("coroutine exists")
+                .status = CoroStatus::Done;
         }
 
         let reaped = machine.reap_closed_sessions();
@@ -506,7 +522,10 @@ fn test_three_sessions_complete_independently() {
 
     for sid in [sid1, sid2, sid3] {
         assert!(
-            machine.session_coroutines(sid).iter().all(|c| c.is_terminal()),
+            machine
+                .session_coroutines(sid)
+                .iter()
+                .all(|c| c.is_terminal()),
             "session {sid} should have all terminal coroutines"
         );
     }

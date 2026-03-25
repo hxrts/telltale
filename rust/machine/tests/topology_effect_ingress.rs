@@ -102,7 +102,9 @@ fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = TopologyBurstHandler::new();
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&image).expect("load choreography");
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
 
     machine.step_round(&handler, 1).expect("step round");
 

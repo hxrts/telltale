@@ -109,8 +109,8 @@ pub use semantic_objects::{
     CanonicalHandle, CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead,
     OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope,
     ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
-    PublicationEvent, PublicationObserverClass, PublicationStatus, SemanticHandoff, TickedObsEvent,
-    TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    PublicationEvent, PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
+    TickedObsEvent, TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 
 cfg_if! {

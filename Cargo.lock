@@ -1533,6 +1533,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.110",
+ "telltale-machine",
  "telltale-macros",
  "telltale-parser",
  "telltale-theory",

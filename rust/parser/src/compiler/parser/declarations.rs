@@ -2,8 +2,8 @@ use super::*;
 use crate::ast::{
     EffectAuthorityClass, EffectInterfaceDeclaration, EffectOperationDeclaration,
     ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration,
-    OperationParameterDeclaration, RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration,
-    TopologyDeclaration, TypeConstructorDeclaration, TypeDeclaration,
+    OperationParameterDeclaration, ProgressAttachment, RegionDeclaration, RoleSetDeclaration,
+    TheoremPackDeclaration, TopologyDeclaration, TypeConstructorDeclaration, TypeDeclaration,
 };
 
 pub(super) fn enforce_same_line_equals(
@@ -519,6 +519,98 @@ pub(super) fn parse_fragment_decl(
     Ok(RegionDeclaration { name, params })
 }
 
+pub(super) fn parse_progress_attachment(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<ProgressAttachment, ParseError> {
+    let span = pair.as_span();
+    let pair = if pair.as_rule() == Rule::operation_progress {
+        pair.into_inner().next().ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "progress attachment is missing content".to_string(),
+        })?
+    } else {
+        pair
+    };
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let contract_name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "progress attachment is missing contract name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+    let mut requires_profile = None;
+    let mut within_window = None;
+    let mut on_timeout = None;
+    let mut on_stall = None;
+
+    for item in inner {
+        match item.as_rule() {
+            Rule::progress_requires => {
+                requires_profile = Some(
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "progress requires clause is missing profile name".to_string(),
+                        })?
+                        .as_str()
+                        .to_string(),
+                );
+            }
+            Rule::progress_within => {
+                within_window = Some(
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "progress within clause is missing window name".to_string(),
+                        })?
+                        .as_str()
+                        .to_string(),
+                );
+            }
+            Rule::progress_on_timeout => {
+                on_timeout = Some(
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "progress on timeout clause is missing branch name"
+                                .to_string(),
+                        })?
+                        .as_str()
+                        .to_string(),
+                );
+            }
+            Rule::progress_on_stall => {
+                on_stall = Some(
+                    item.into_inner()
+                        .next()
+                        .ok_or_else(|| ParseError::Syntax {
+                            span: ErrorSpan::from_pest_span(span, input),
+                            message: "progress on stall clause is missing branch name".to_string(),
+                        })?
+                        .as_str()
+                        .to_string(),
+                );
+            }
+            _ => {}
+        }
+    }
+
+    Ok(ProgressAttachment {
+        contract_name,
+        requires_profile,
+        within_window,
+        on_timeout,
+        on_stall,
+    })
+}
+
 pub(super) fn parse_operation_decl(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
@@ -602,17 +694,7 @@ pub(super) fn parse_operation_decl(
                 });
             }
             Rule::operation_progress => {
-                progress_contract = Some(
-                    item.into_inner()
-                        .next()
-                        .ok_or_else(|| ParseError::Syntax {
-                            span: ErrorSpan::from_pest_span(span, input),
-                            message: "operation progress clause is missing contract name"
-                                .to_string(),
-                        })?
-                        .as_str()
-                        .to_string(),
-                );
+                progress_contract = Some(parse_progress_attachment(item, input)?);
             }
             Rule::operation_compose => {
                 composition_policy = Some(

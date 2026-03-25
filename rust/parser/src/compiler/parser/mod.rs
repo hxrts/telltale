@@ -2704,7 +2704,10 @@ protocol CommitFlow uses Runtime, Audit under Replay =
             Some("ChannelMembership(channel)")
         );
         assert_eq!(
-            operation.progress_contract.as_deref(),
+            operation
+                .progress_contract
+                .as_ref()
+                .map(|progress| progress.contract_name.as_str()),
             Some("MembershipProgress")
         );
         assert_eq!(operation.composition_policy.as_deref(), Some("all_success"));
@@ -2726,13 +2729,71 @@ protocol CommitFlow uses Runtime, Audit under Replay =
     }
 
     #[test]
-    fn test_parse_publish_handoff_and_dependent_work_and_fail_projection_closed() {
+    fn test_parse_commitment_lifecycle_and_structured_progress_metadata() {
+        let input = r#"
+profile Replay fairness eventual admissibility replay escalation_window bounded
+
+operation syncLedger(entryId : Int) at Coordinator progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose compose fallback =
+  publish SyncQueued(entryId)
+
+protocol CommitLifecycle under Replay =
+  roles Coordinator, Worker
+  begin syncLedger(42) progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose
+  Coordinator -> Worker : Prepare
+  await syncLedger
+  resolve syncLedger as Success
+"#;
+
+        let choreography =
+            parse_choreography_str(input).expect("commitment lifecycle surface should parse");
+        choreography
+            .validate()
+            .expect("structured progress metadata should validate");
+
+        let operation = &choreography.operation_declarations()[0];
+        let progress = operation
+            .progress_contract
+            .as_ref()
+            .expect("operation should carry progress metadata");
+        assert_eq!(progress.contract_name, "LedgerProgress");
+        assert_eq!(progress.requires_profile.as_deref(), Some("Replay"));
+        assert_eq!(progress.within_window.as_deref(), Some("bounded"));
+        assert_eq!(progress.on_timeout.as_deref(), Some("escalate"));
+        assert_eq!(progress.on_stall.as_deref(), Some("diagnose"));
+    }
+
+    #[test]
+    fn test_legacy_implicit_progress_contract_is_rejected() {
+        let input = r#"
+profile Replay fairness eventual admissibility replay escalation_window bounded
+fragment ChannelMembership(channel)
+
+operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) progress MembershipProgress compose all_success =
+  publish SyncQueued(channel)
+
+protocol CommitFlow under Replay =
+  roles Coordinator, Worker
+  begin syncMembership(1) progress MembershipProgress
+"#;
+
+        let choreography =
+            parse_choreography_str(input).expect("legacy form still parses before validation");
+        choreography
+            .validate()
+            .expect_err("legacy implicit progress metadata must be rejected");
+    }
+
+    #[test]
+    fn test_parse_authority_publication_materialization_and_handoff_fail_projection_closed() {
         let input = r#"
 protocol AcceptFlow =
   roles Coordinator, Worker
-  publish Started
+  authoritative let witness = check Runtime.ready(session)
+  observe let presence = observe Runtime.watchPresence(session)
+  publish witness as AcceptedPublication
+  materialize acceptedProof from AcceptedPublication
   let receipt = transfer Session from Coordinator to Worker
-  handoff acceptInvite to Worker using receipt
+  handoff acceptInvite to Worker with receipt
   dependent work SyncMembership(channel) required for acceptInvite
   Coordinator -> Worker : Commit
 "#;

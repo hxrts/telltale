@@ -9,9 +9,11 @@ use telltale_bridge::{
     ProtocolMachineSessionStatus, ProtocolMachineTraceEvent,
 };
 use telltale_machine::coroutine::Value;
-use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::model::effects::{
+    EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 use telltale_machine::model::output_condition::OutputConditionPolicy;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
@@ -172,9 +174,11 @@ fn run_rust_vm(
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..ProtocolMachineConfig::default()
     });
-    machine.load_choreography(&image)
+    machine
+        .load_choreography(&image)
         .map_err(|e| ProtocolMachineCorrespondenceError::Load(e.to_string()))?;
-    machine.run(&PassthroughHandler, max_steps)
+    machine
+        .run(&PassthroughHandler, max_steps)
         .map_err(|e| ProtocolMachineCorrespondenceError::Run(e.to_string()))?;
 
     let trace = machine
@@ -192,7 +196,12 @@ fn run_rust_vm(
             terminal: machine
                 .sessions()
                 .get(sid)
-                .map(|s| !matches!(s.status, telltale_machine::model::state::SessionStatus::Active))
+                .map(|s| {
+                    !matches!(
+                        s.status,
+                        telltale_machine::model::state::SessionStatus::Active
+                    )
+                })
                 .unwrap_or(false),
         })
         .collect();

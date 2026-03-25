@@ -18,12 +18,17 @@ mod looping;
 mod semantic;
 mod send;
 pub(crate) use authority::{
-    parse_case_stmt, parse_let_in_stmt, parse_let_stmt, parse_timeout_stmt,
+    parse_authority_let_in_stmt, parse_authority_let_stmt, parse_case_stmt, parse_let_in_stmt,
+    parse_let_stmt, parse_observe_let_in_stmt, parse_observe_let_stmt, parse_timeout_stmt,
 };
 pub(crate) use branching::{parse_choice_stmt, parse_par_stmt};
 pub(super) use control_flow::{parse_call_stmt, parse_continue_stmt, parse_rec_stmt};
 pub(crate) use looping::parse_loop_stmt;
-pub(crate) use semantic::{parse_dependent_work_stmt, parse_handoff_stmt, parse_publish_stmt};
+pub(crate) use semantic::{
+    parse_await_stmt, parse_begin_stmt, parse_dependent_work_stmt, parse_handoff_stmt,
+    parse_invalidate_stmt, parse_materialize_stmt, parse_publish_authority_stmt,
+    parse_publish_stmt, parse_resolve_stmt,
+};
 pub(crate) use send::{parse_broadcast_stmt, parse_send_stmt};
 
 fn syntax_error(span: pest::Span<'_>, input: &str, message: impl Into<String>) -> ParseError {

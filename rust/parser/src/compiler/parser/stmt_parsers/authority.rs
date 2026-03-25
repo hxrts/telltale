@@ -1,6 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
-use crate::ast::Role;
+use crate::ast::{AuthorityBindingMode, Role};
 
 use super::super::role::parse_role_ref;
 use super::super::statement::{parse_block, parse_duration, parse_statement};
@@ -170,10 +170,11 @@ pub(crate) fn parse_effect_call(
     Ok((effect, operation, args))
 }
 
-pub(crate) fn parse_let_stmt(
+fn parse_let_stmt_with_mode(
     pair: pest::iterators::Pair<Rule>,
     _declared_roles: &HashSet<String>,
     input: &str,
+    mode: AuthorityBindingMode,
 ) -> std::result::Result<Statement, super::super::error::ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
@@ -182,10 +183,66 @@ pub(crate) fn parse_let_stmt(
         .to_string();
     let expr = next_required(&mut inner, span, input, "let binding is missing expression")?;
     let expr = parse_authority_expr(expr).map_err(|message| syntax_error(span, input, message))?;
+    validate_binding_mode(mode, &expr, span, input)?;
     Ok(Statement::Let {
         name,
+        mode,
         expr,
         body: None,
+    })
+}
+
+pub(crate) fn parse_let_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<Statement, super::super::error::ParseError> {
+    parse_let_stmt_with_mode(pair, declared_roles, input, AuthorityBindingMode::Plain)
+}
+
+pub(crate) fn parse_authority_let_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<Statement, super::super::error::ParseError> {
+    parse_let_stmt_with_mode(
+        pair,
+        declared_roles,
+        input,
+        AuthorityBindingMode::Authoritative,
+    )
+}
+
+pub(crate) fn parse_observe_let_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+) -> std::result::Result<Statement, super::super::error::ParseError> {
+    parse_let_stmt_with_mode(pair, declared_roles, input, AuthorityBindingMode::Observe)
+}
+
+fn parse_let_in_stmt_with_mode(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+    mode: AuthorityBindingMode,
+) -> std::result::Result<Statement, super::super::error::ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let name = next_required(&mut inner, span, input, "let binding is missing name")?
+        .as_str()
+        .to_string();
+    let expr = next_required(&mut inner, span, input, "let binding is missing expression")?;
+    let expr = parse_authority_expr(expr).map_err(|message| syntax_error(span, input, message))?;
+    validate_binding_mode(mode, &expr, span, input)?;
+    let body_pair = next_required(&mut inner, span, input, "let ... in is missing body")?;
+    let body = parse_block(body_pair, declared_roles, input, protocol_defs)?;
+    Ok(Statement::Let {
+        name,
+        mode,
+        expr,
+        body: Some(body),
     })
 }
 
@@ -195,20 +252,76 @@ pub(crate) fn parse_let_in_stmt(
     input: &str,
     protocol_defs: &HashMap<String, Vec<Statement>>,
 ) -> std::result::Result<Statement, super::super::error::ParseError> {
-    let span = pair.as_span();
-    let mut inner = pair.into_inner();
-    let name = next_required(&mut inner, span, input, "let binding is missing name")?
-        .as_str()
-        .to_string();
-    let expr = next_required(&mut inner, span, input, "let binding is missing expression")?;
-    let expr = parse_authority_expr(expr).map_err(|message| syntax_error(span, input, message))?;
-    let body_pair = next_required(&mut inner, span, input, "let ... in is missing body")?;
-    let body = parse_block(body_pair, declared_roles, input, protocol_defs)?;
-    Ok(Statement::Let {
-        name,
-        expr,
-        body: Some(body),
-    })
+    parse_let_in_stmt_with_mode(
+        pair,
+        declared_roles,
+        input,
+        protocol_defs,
+        AuthorityBindingMode::Plain,
+    )
+}
+
+pub(crate) fn parse_authority_let_in_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, super::super::error::ParseError> {
+    parse_let_in_stmt_with_mode(
+        pair,
+        declared_roles,
+        input,
+        protocol_defs,
+        AuthorityBindingMode::Authoritative,
+    )
+}
+
+pub(crate) fn parse_observe_let_in_stmt(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<Statement>>,
+) -> std::result::Result<Statement, super::super::error::ParseError> {
+    parse_let_in_stmt_with_mode(
+        pair,
+        declared_roles,
+        input,
+        protocol_defs,
+        AuthorityBindingMode::Observe,
+    )
+}
+
+fn validate_binding_mode(
+    mode: AuthorityBindingMode,
+    expr: &AuthorityExprSpec,
+    span: pest::Span<'_>,
+    input: &str,
+) -> std::result::Result<(), super::super::error::ParseError> {
+    match mode {
+        AuthorityBindingMode::Plain => Ok(()),
+        AuthorityBindingMode::Authoritative => {
+            if matches!(expr, AuthorityExprSpec::Check { .. }) {
+                Ok(())
+            } else {
+                Err(syntax_error(
+                    span,
+                    input,
+                    "`authoritative let` must bind a `check` expression",
+                ))
+            }
+        }
+        AuthorityBindingMode::Observe => {
+            if matches!(expr, AuthorityExprSpec::Observe { .. }) {
+                Ok(())
+            } else {
+                Err(syntax_error(
+                    span,
+                    input,
+                    "`observe let` must bind an `observe` expression",
+                ))
+            }
+        }
+    }
 }
 
 pub(crate) fn parse_case_stmt(

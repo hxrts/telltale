@@ -49,7 +49,7 @@ use crate::output_condition::{OutputConditionCheck, OutputConditionHint};
 use crate::owned::OwnedSession;
 use crate::scheduler::Scheduler;
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, OperationInstance, OperationPhase, OutstandingEffect,
+    protocol_machine_semantic_objects, OperationInstance, OperationPhase, OutstandingEffect,
     OutstandingEffectStatus, ProgressContract, ProgressState, ProgressTransition,
     ProtocolMachineSemanticObjects,
 };

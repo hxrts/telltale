@@ -135,6 +135,22 @@ impl<'a> ProjectionContext<'a> {
 
     fn project_protocol(&mut self, protocol: &Protocol) -> Result<LocalType, ProjectionError> {
         match protocol {
+            Protocol::Begin { .. } => {
+                Err(ProjectionError::UnsupportedAuthorityConstruct { construct: "begin" })
+            }
+
+            Protocol::Await { .. } => {
+                Err(ProjectionError::UnsupportedAuthorityConstruct { construct: "await" })
+            }
+
+            Protocol::Resolve { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "resolve",
+            }),
+
+            Protocol::Invalidate { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "invalidate",
+            }),
+
             Protocol::Send {
                 from,
                 to,
@@ -177,6 +193,16 @@ impl<'a> ProjectionContext<'a> {
 
             Protocol::Publish { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
                 construct: "publish",
+            }),
+
+            Protocol::PublishAuthority { .. } => {
+                Err(ProjectionError::UnsupportedAuthorityConstruct {
+                    construct: "publish as",
+                })
+            }
+
+            Protocol::Materialize { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "materialize",
             }),
 
             Protocol::Handoff { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {

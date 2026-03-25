@@ -126,7 +126,9 @@ fn mutated_programs_are_deterministically_rejected() {
     let mut observed = Vec::new();
     for (name, image, expected_fault) in cases {
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-        machine.load_choreography(&image).expect("load mutated image");
+        machine
+            .load_choreography(&image)
+            .expect("load mutated image");
         let result = machine.run(&PassthroughHandler, 32);
         let tag = match result {
             Ok(_) => "ok",

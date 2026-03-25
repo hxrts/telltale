@@ -141,7 +141,8 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         workers,
     );
     for i in 0..protocols {
-        machine.load_choreography(&simple_image(&format!("m{i}")))
+        machine
+            .load_choreography(&simple_image(&format!("m{i}")))
             .expect("load choreography");
     }
 

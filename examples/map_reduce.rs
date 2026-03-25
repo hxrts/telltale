@@ -61,7 +61,8 @@ impl effects::WorkerCompute for WorkerHost {
 
 async fn coordinator(role: &mut Coordinator, host: &mut CoordinatorHost) -> Result<i32> {
     try_session(role, |s: CoordinatorSession<'_, _>| async {
-        let assignment = effects::CoordinatorPlan::assign(host, effects::Session::new("map-reduce"));
+        let assignment =
+            effects::CoordinatorPlan::assign(host, effects::Session::new("map-reduce"));
         let s = s.send(Work(i32::try_from(assignment.w1)?)).await?;
         let s = s.send(Work(i32::try_from(assignment.w2)?)).await?;
         let s = s.send(Work(i32::try_from(assignment.w3)?)).await?;
@@ -80,7 +81,11 @@ async fn coordinator(role: &mut Coordinator, host: &mut CoordinatorHost) -> Resu
 async fn worker_1(role: &mut W1, host: &mut WorkerHost) -> Result<()> {
     try_session(role, |s: W1Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(i32::try_from(effects::WorkerCompute::process(host, x.into()))?)).await?;
+        let s = s
+            .send(PartialResult(i32::try_from(
+                effects::WorkerCompute::process(host, x.into()),
+            )?))
+            .await?;
         Ok(((), s))
     })
     .await
@@ -89,7 +94,11 @@ async fn worker_1(role: &mut W1, host: &mut WorkerHost) -> Result<()> {
 async fn worker_2(role: &mut W2, host: &mut WorkerHost) -> Result<()> {
     try_session(role, |s: W2Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(i32::try_from(effects::WorkerCompute::process(host, x.into()))?)).await?;
+        let s = s
+            .send(PartialResult(i32::try_from(
+                effects::WorkerCompute::process(host, x.into()),
+            )?))
+            .await?;
         Ok(((), s))
     })
     .await
@@ -98,7 +107,11 @@ async fn worker_2(role: &mut W2, host: &mut WorkerHost) -> Result<()> {
 async fn worker_3(role: &mut W3, host: &mut WorkerHost) -> Result<()> {
     try_session(role, |s: W3Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(i32::try_from(effects::WorkerCompute::process(host, x.into()))?)).await?;
+        let s = s
+            .send(PartialResult(i32::try_from(
+                effects::WorkerCompute::process(host, x.into()),
+            )?))
+            .await?;
         Ok(((), s))
     })
     .await
@@ -107,7 +120,11 @@ async fn worker_3(role: &mut W3, host: &mut WorkerHost) -> Result<()> {
 async fn worker_4(role: &mut W4, host: &mut WorkerHost) -> Result<()> {
     try_session(role, |s: W4Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(i32::try_from(effects::WorkerCompute::process(host, x.into()))?)).await?;
+        let s = s
+            .send(PartialResult(i32::try_from(
+                effects::WorkerCompute::process(host, x.into()),
+            )?))
+            .await?;
         Ok(((), s))
     })
     .await

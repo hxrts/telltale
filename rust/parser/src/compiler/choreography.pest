@@ -90,7 +90,7 @@ operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ o
 operation_params = { "(" ~ operation_param_decl ~ ("," ~ operation_param_decl)* ~ ")" }
 operation_param_decl = { ident ~ ":" ~ type_expr }
 operation_within = { "within" ~ ident ~ ident_list? }
-operation_progress = { "progress" ~ ident }
+operation_progress = { progress_attachment }
 operation_compose = { "compose" ~ ident }
 guest_runtime_decl = { "guest" ~ "runtime" ~ ident ~ "=" ~ guest_runtime_body }
 guest_runtime_body = { "{" ~ guest_runtime_stmt+ ~ "}" | guest_runtime_stmt+ }
@@ -113,6 +113,16 @@ block_protocol = { "{" ~ roles_decl? ~ statement* ~ "}" | "(" ~ roles_decl? ~ st
 
 // Statement types
 statement = _{
+    begin_stmt
+    | await_stmt
+    | resolve_stmt
+    | invalidate_stmt
+    |
+    authority_let_in_stmt
+    | authority_let_stmt
+    | observe_let_in_stmt
+    | observe_let_stmt
+    |
     let_in_stmt
     | let_stmt
     | case_stmt
@@ -125,11 +135,35 @@ statement = _{
     | rec_stmt
     | continue_stmt
     | call_stmt
+    | publish_authority_stmt
     | publish_stmt
+    | materialize_stmt
     | handoff_stmt
     | dependent_work_stmt
 }
 
+progress_attachment = { "progress" ~ ident ~ progress_meta* }
+progress_meta = _{ progress_requires | progress_within | progress_on_timeout | progress_on_stall }
+progress_requires = { "requires" ~ ident }
+progress_within = { "within" ~ ident }
+progress_on_timeout = { "on" ~ "timeout" ~ "=>" ~ ident }
+progress_on_stall = { "on" ~ "stall" ~ "=>" ~ ident }
+
+begin_stmt = { "begin" ~ ident ~ begin_args? ~ progress_attachment? }
+begin_args = { "(" ~ argument_list? ~ ")" }
+await_stmt = { "await" ~ ident }
+resolve_stmt = { "resolve" ~ ident ~ "as" ~ resolve_outcome }
+resolve_outcome = { resolve_success | resolve_failure | resolve_timeout | resolve_cancelled }
+resolve_success = { "Success" ~ ctor_value_payload? }
+resolve_failure = { "Failure" ~ ctor_value_payload? }
+resolve_timeout = { "Timeout" ~ ctor_value_payload? }
+resolve_cancelled = { "Cancelled" }
+invalidate_stmt = { "invalidate" ~ ident }
+
+authority_let_in_stmt = { "authoritative" ~ "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
+authority_let_stmt = { "authoritative" ~ "let" ~ ident ~ "=" ~ authority_expr }
+observe_let_in_stmt = { "observe" ~ "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
+observe_let_stmt = { "observe" ~ "let" ~ ident ~ "=" ~ authority_expr }
 let_in_stmt = { "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
 let_stmt = { "let" ~ ident ~ "=" ~ authority_expr }
 case_stmt = { "case" ~ authority_expr ~ "of" ~ case_block }
@@ -163,8 +197,10 @@ time_unit = { "ms" | "s" | "m" | "h" }
 // Protocol call statement (for sub-protocols in where blocks)
 call_stmt = { "call" ~ ident }
 
+publish_authority_stmt = { "publish" ~ ident ~ "as" ~ ident }
 publish_stmt = { "publish" ~ ident ~ ctor_value_payload? }
-handoff_stmt = { "handoff" ~ ident ~ "to" ~ role_ref ~ "using" ~ ident }
+materialize_stmt = { "materialize" ~ ident ~ "from" ~ ident }
+handoff_stmt = { "handoff" ~ ident ~ "to" ~ role_ref ~ "with" ~ ident }
 dependent_work_stmt = { "dependent" ~ "work" ~ ident ~ ctor_value_payload? ~ "required" ~ "for" ~ ident }
 
 // Continue statement (for recursive back-references)

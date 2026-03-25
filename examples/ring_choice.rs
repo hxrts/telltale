@@ -114,7 +114,11 @@ fn main() -> Result<()> {
     let Roles(mut a, mut b, mut c) = Roles::default();
     let rounds = max_rounds();
     executor::block_on(async {
-        try_join!(ring_a(&mut a, -1, rounds), ring_b(&mut b, 0), ring_c(&mut c, 1))
+        try_join!(
+            ring_a(&mut a, -1, rounds),
+            ring_b(&mut b, 0),
+            ring_c(&mut c, 1)
+        )
     })?;
     println!("\nRing protocol completed after {rounds} rounds");
     Ok(())

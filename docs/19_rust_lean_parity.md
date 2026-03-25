@@ -134,14 +134,15 @@ Canonical layout mapping for this family is:
   `rust/bridge/src/semantic_objects.rs`
   This bridge surface must re-export the machine semantic-object family rather than carrying a duplicate schema copy.
 
-Region remains a choreography/topology identifier outside the protocol-machine semantic-object family.
-It must not be used as a substitute for the protocol-machine semantic-object vocabulary until the region proof/model layer lands.
+`Region` is now part of the canonical protocol-machine semantic-object family.
+It names the session-scoped locality and framing domain over operations,
+effects, authoritative reads, canonical handles, and publication events.
 
 `ProgressContract` parity covers bounded-wait metadata, explicit no-progress and degraded states, and timeout escalation state.
 `ProgressTransition` parity makes those escalations replay-visible instead of leaving them as target-specific scheduling heuristics.
 
 The Lean implementation layer keeps executable semantic-object definitions in `Runtime/protocol machine/Model/SemanticObjects/Core.lean`.
-Basic theorem-facing predicates live in `Runtime/protocol machine/Model/SemanticObjects/Invariants.lean`.
+Basic theorem-facing predicates live in `Runtime/protocol machine/Model/SemanticObjects/Discipline.lean`.
 The re-export facade is `Runtime/protocol machine/Model/SemanticObjects.lean`.
 
 Deferred-effect admissibility, retry shape, and late-result rejection live in `Runtime/protocol machine/Model/SemanticObjects/OutstandingEffects.lean`.
@@ -201,7 +202,7 @@ entrypoints remain.
 | protocol-machine memory accounting | `Runtime/protocol machine/Model/State.lean` | `telltale_machine::ProtocolMachineMemoryUsage`, `telltale_machine::ProtocolMachineRetainedBytes` | n/a | Aligned |
 | guest runtime driver | `Runtime/protocol machine/API.lean` | `telltale_machine::GuestRuntime`, `telltale_machine::ThreadedGuestRuntime` | n/a | Aligned |
 | threaded protocol-machine adapter | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Composition.lean` | `telltale_machine::ThreadedProtocolMachine` | parity tests under `rust/bridge/tests/protocol_machine_cross_target_tests.rs` | Aligned |
-| semantic-object inventory | `Runtime/protocol machine/Model/SemanticObjects/*.lean` | `telltale_machine::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | `telltale_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, ProgressContract, ProgressTransition}` | Aligned |
+| semantic-object inventory | `Runtime/protocol machine/Model/SemanticObjects*.lean` | `telltale_machine::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, Region, ProgressContract, ProgressTransition}` | `telltale_bridge::{ProtocolMachineSemanticObjects, OperationInstance, OutstandingEffect, SemanticHandoff, TransformationObligation, AuthoritativeRead, ObservedRead, MaterializationProof, CanonicalHandle, PublicationEvent, Region, ProgressContract, ProgressTransition}` | Aligned |
 | runtime admission contracts | `Runtime/Proofs/Contracts/RuntimeContracts.lean` | `telltale_machine::{requires_protocol_machine_runtime_contracts, admit_protocol_machine_runtime, enforce_protocol_machine_runtime_gates, request_determinism_profile, runtime_capability_snapshot}` | n/a | Aligned |
 
 ## Runtime Capability Gates

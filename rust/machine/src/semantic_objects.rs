@@ -283,6 +283,20 @@ pub struct PublicationEvent {
     pub reason: Option<String>,
 }
 
+/// Canonical framing and locality domain for one session-scoped semantic slice.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Region {
+    pub region_id: String,
+    pub session: Option<SessionId>,
+    pub owner_id: Option<FragmentOwnerId>,
+    pub scope: OwnershipScope,
+    pub operation_ids: Vec<String>,
+    pub effect_ids: Vec<u64>,
+    pub authoritative_read_ids: Vec<String>,
+    pub handle_ids: Vec<String>,
+    pub publication_ids: Vec<String>,
+}
+
 /// Explicit progress contract attached to one operation instance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgressContract {
@@ -434,6 +448,7 @@ pub struct ProtocolMachineSemanticObjects {
     pub canonical_handles: Vec<CanonicalHandle>,
     #[serde(default)]
     pub publication_events: Vec<PublicationEvent>,
+    pub regions: Vec<Region>,
     pub progress_contracts: Vec<ProgressContract>,
     #[serde(default)]
     pub progress_transitions: Vec<ProgressTransition>,
@@ -452,6 +467,7 @@ impl Default for ProtocolMachineSemanticObjects {
             materialization_proofs: Vec::new(),
             canonical_handles: Vec::new(),
             publication_events: Vec::new(),
+            regions: Vec::new(),
             progress_contracts: Vec::new(),
             progress_transitions: Vec::new(),
         }
@@ -636,6 +652,103 @@ fn progress_state_rank(state: ProgressState) -> u8 {
     }
 }
 
+fn push_unique<T: PartialEq>(items: &mut Vec<T>, item: T) {
+    if !items.iter().any(|existing| existing == &item) {
+        items.push(item);
+    }
+}
+
+fn absorb_region_owner(region: &mut Region, owner_id: Option<&FragmentOwnerId>) {
+    if region.owner_id.is_none() {
+        region.owner_id = owner_id.cloned();
+    }
+}
+
+fn derive_regions(
+    operation_instances: &[OperationInstance],
+    outstanding_effects: &[OutstandingEffect],
+    authoritative_reads: &[AuthoritativeRead],
+    canonical_handles: &[CanonicalHandle],
+    publication_events: &BTreeMap<String, PublicationEvent>,
+    progress_contracts: &[ProgressContract],
+) -> Vec<Region> {
+    fn region_entry(regions: &mut BTreeMap<SessionId, Region>, session: SessionId) -> &mut Region {
+        regions.entry(session).or_insert_with(|| Region {
+            region_id: format!("session:{session}"),
+            session: Some(session),
+            owner_id: None,
+            scope: OwnershipScope::Session,
+            operation_ids: Vec::new(),
+            effect_ids: Vec::new(),
+            authoritative_read_ids: Vec::new(),
+            handle_ids: Vec::new(),
+            publication_ids: Vec::new(),
+        })
+    }
+
+    let mut regions = BTreeMap::<SessionId, Region>::new();
+
+    for operation in operation_instances {
+        let Some(session) = operation.session else {
+            continue;
+        };
+        let region = region_entry(&mut regions, session);
+        absorb_region_owner(region, operation.owner_id.as_ref());
+        push_unique(&mut region.operation_ids, operation.operation_id.clone());
+    }
+
+    for effect in outstanding_effects {
+        let Some(session) = effect.session else {
+            continue;
+        };
+        let region = region_entry(&mut regions, session);
+        absorb_region_owner(region, effect.owner_id.as_ref());
+        push_unique(&mut region.effect_ids, effect.effect_id);
+        push_unique(&mut region.operation_ids, effect.operation_id.clone());
+    }
+
+    for read in authoritative_reads {
+        let Some(session) = read.session else {
+            continue;
+        };
+        let region = region_entry(&mut regions, session);
+        absorb_region_owner(region, read.owner_id.as_ref());
+        push_unique(&mut region.authoritative_read_ids, read.read_id.clone());
+    }
+
+    for handle in canonical_handles {
+        let Some(session) = handle.session else {
+            continue;
+        };
+        let region = region_entry(&mut regions, session);
+        absorb_region_owner(region, handle.owner_id.as_ref());
+        push_unique(&mut region.handle_ids, handle.handle_id.clone());
+    }
+
+    for publication in publication_events.values() {
+        let Some(session) = publication.session else {
+            continue;
+        };
+        let region = region_entry(&mut regions, session);
+        absorb_region_owner(region, publication.owner_id.as_ref());
+        push_unique(
+            &mut region.publication_ids,
+            publication.publication_id.clone(),
+        );
+        push_unique(&mut region.operation_ids, publication.operation_id.clone());
+    }
+
+    for contract in progress_contracts {
+        let Some(session) = contract.session else {
+            continue;
+        };
+        let region = region_entry(&mut regions, session);
+        push_unique(&mut region.operation_ids, contract.operation_id.clone());
+    }
+
+    regions.into_values().collect()
+}
+
 fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSemanticObjects {
     out.operation_instances
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
@@ -655,6 +768,20 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
         .sort_by(|lhs, rhs| lhs.handle_id.cmp(&rhs.handle_id));
     out.publication_events
         .sort_by(|lhs, rhs| lhs.publication_id.cmp(&rhs.publication_id));
+    out.regions
+        .sort_by(|lhs, rhs| lhs.region_id.cmp(&rhs.region_id));
+    for region in &mut out.regions {
+        region.operation_ids.sort();
+        region.operation_ids.dedup();
+        region.effect_ids.sort();
+        region.effect_ids.dedup();
+        region.authoritative_read_ids.sort();
+        region.authoritative_read_ids.dedup();
+        region.handle_ids.sort();
+        region.handle_ids.dedup();
+        region.publication_ids.sort();
+        region.publication_ids.dedup();
+    }
     out.progress_contracts
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
     out.progress_transitions.sort_by(|lhs, rhs| {
@@ -678,7 +805,7 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
 /// artifacts.
 #[must_use]
 #[allow(clippy::too_many_lines)]
-pub fn protocol_machine_semantic_objects_v1(
+pub fn protocol_machine_semantic_objects(
     authority_audit_log: &[AuthorityAuditRecord],
     delegation_audit_log: &[DelegationAuditRecord],
     operation_instances: &[OperationInstance],
@@ -1000,6 +1127,15 @@ pub fn protocol_machine_semantic_objects_v1(
         });
     }
 
+    let regions = derive_regions(
+        &operation_instances,
+        &outstanding_effects,
+        &authoritative_reads,
+        &canonical_handles,
+        &publication_events,
+        &progress_contracts,
+    );
+
     canonicalize(ProtocolMachineSemanticObjects {
         schema_version: canonical_semantic_objects_schema_version(),
         operation_instances,
@@ -1011,6 +1147,7 @@ pub fn protocol_machine_semantic_objects_v1(
         materialization_proofs,
         canonical_handles,
         publication_events: publication_events.into_values().collect(),
+        regions,
         progress_contracts,
         progress_transitions: progress_transitions.to_vec(),
     })
@@ -1022,7 +1159,7 @@ mod semantic_object_tests {
 
     #[test]
     fn parity_critical_operations_synthesize_progress_contracts() {
-        let objects = protocol_machine_semantic_objects_v1(
+        let objects = protocol_machine_semantic_objects(
             &[],
             &[],
             &[OperationInstance {
@@ -1050,6 +1187,8 @@ mod semantic_object_tests {
             .iter()
             .any(|contract| contract.operation_id == "materialization:proof"
                 && contract.state == ProgressState::Succeeded));
+        assert_eq!(objects.regions.len(), 1);
+        assert_eq!(objects.regions[0].region_id, "session:1");
     }
 
     #[test]

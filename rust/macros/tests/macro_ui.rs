@@ -4,6 +4,8 @@ fn choreography_macro_ui() {
     t.pass("tests/ui/pass/multiparty_protocol.rs");
     t.pass("tests/ui/pass/choice_protocol.rs");
     t.pass("tests/ui/pass/broadcast_protocol.rs");
+    t.pass("tests/ui/pass/authority_surface.rs");
+    t.pass("tests/ui/pass/commitment_surface.rs");
     t.pass("tests/ui/pass/namespaced_protocol.rs");
     t.pass("tests/ui/pass/profiled_protocol.rs");
     t.pass("tests/ui/pass/role_derive.rs");

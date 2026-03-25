@@ -15,10 +15,10 @@ use std::time::Duration;
 use assert_matches::assert_matches;
 use telltale_machine::buffer::BufferConfig;
 use telltale_machine::coroutine::{CoroStatus, Fault};
+use telltale_machine::instr::Endpoint;
 use telltale_machine::model::effects::{
     EffectHandler, EffectResult, SendDecision, SendDecisionInput, TopologyPerturbation,
 };
-use telltale_machine::instr::Endpoint;
 use telltale_machine::model::output_condition::OutputConditionHint;
 use telltale_machine::model::state::{
     AuthorityArtifact, AuthorityAuditEvent, OwnershipScope, SessionStatus, SessionStore,
@@ -95,9 +95,11 @@ impl EffectHandler for KnowledgePayloadHandler {
     ) -> EffectResult<String> {
         match labels.first().cloned() {
             Some(label) => EffectResult::success(label),
-            None => EffectResult::failure(telltale_machine::model::effects::EffectFailure::invalid_input(
-                "no labels available",
-            )),
+            None => EffectResult::failure(
+                telltale_machine::model::effects::EffectFailure::invalid_input(
+                    "no labels available",
+                ),
+            ),
         }
     }
 
@@ -144,9 +146,11 @@ impl EffectHandler for HintedInvokeHandler {
     ) -> EffectResult<String> {
         match labels.first().cloned() {
             Some(label) => EffectResult::success(label),
-            None => EffectResult::failure(telltale_machine::model::effects::EffectFailure::invalid_input(
-                "no labels available",
-            )),
+            None => EffectResult::failure(
+                telltale_machine::model::effects::EffectFailure::invalid_input(
+                    "no labels available",
+                ),
+            ),
         }
     }
 
@@ -205,9 +209,11 @@ impl EffectHandler for TimeoutAtTickOneHandler {
     ) -> EffectResult<String> {
         match labels.first().cloned() {
             Some(label) => EffectResult::success(label),
-            None => EffectResult::failure(telltale_machine::model::effects::EffectFailure::invalid_input(
-                "no labels available",
-            )),
+            None => EffectResult::failure(
+                telltale_machine::model::effects::EffectFailure::invalid_input(
+                    "no labels available",
+                ),
+            ),
         }
     }
 
@@ -698,7 +704,8 @@ fn test_lean_tag_check_epistemic_behavior() {
     machine.run(&KnowledgePayloadHandler, 100).unwrap();
 
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Tagged { session, fact, .. }
                 if *session == sid && fact == "secret")),
@@ -737,13 +744,15 @@ fn test_lean_acquire_release_guard_behavior() {
     machine.run(&PassthroughHandler, 100).unwrap();
 
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Acquired { layer, .. } if layer == "auth")),
         "expected acquired event"
     );
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Released { layer, .. } if layer == "auth")),
         "expected released event"
@@ -773,7 +782,8 @@ fn test_lean_invoke_and_output_condition_hint_behavior() {
     machine.run(&HintedInvokeHandler, 100).unwrap();
 
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Invoked { .. })),
         "expected invoked event"
@@ -850,7 +860,8 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
         "timeout ingress should block scheduling"
     );
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|event| matches!(event, ObsEvent::TimeoutIssued { site, .. } if site == "A")),
         "expected explicit timeout event"
@@ -863,7 +874,8 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
         "expected issued timeout witness in authority audit log"
     );
     assert!(
-        machine.semantic_objects()
+        machine
+            .semantic_objects()
             .outstanding_effects
             .iter()
             .any(|effect| effect.effect_kind == "topology_event"),
@@ -1044,19 +1056,22 @@ fn test_lean_fork_join_abort_speculation_behavior() {
     machine.run(&PassthroughHandler, 100).unwrap();
 
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Forked { ghost, .. } if *ghost == 9)),
         "expected forked event"
     );
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Joined { .. })),
         "expected joined event"
     );
     assert!(
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Aborted { .. })),
         "expected aborted event"
@@ -1242,7 +1257,8 @@ fn test_lean_schedule_confluence() {
         let handler = PassthroughHandler;
         machine.run(&handler, 100).unwrap();
 
-        machine.trace()
+        machine
+            .trace()
             .iter()
             .filter_map(|e| match e {
                 ObsEvent::Sent { label, .. } => Some(format!("sent:{label}")),
@@ -1275,7 +1291,10 @@ fn test_lean_cooperative_refines_concurrent() {
         let sid = machine.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
         machine.run(&handler, 100).unwrap();
-        machine.session_coroutines(sid).iter().all(|c| c.is_terminal())
+        machine
+            .session_coroutines(sid)
+            .iter()
+            .all(|c| c.is_terminal())
     };
 
     assert!(run_with_policy(SchedPolicy::Cooperative));
@@ -1519,10 +1538,9 @@ fn test_lean_wf_pc_bounds() {
         }
 
         match machine.step(&handler) {
-            Ok(
-                telltale_machine::StepResult::AllDone
-                | telltale_machine::StepResult::Stuck,
-            ) => break,
+            Ok(telltale_machine::StepResult::AllDone | telltale_machine::StepResult::Stuck) => {
+                break
+            }
             Ok(telltale_machine::StepResult::Continue) => {}
             Err(_) => break,
         }

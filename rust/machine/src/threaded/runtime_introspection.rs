@@ -66,7 +66,7 @@ impl ThreadedProtocolMachine {
     /// output-condition surfaces.
     #[must_use]
     pub fn semantic_objects(&self) -> ProtocolMachineSemanticObjects {
-        protocol_machine_semantic_objects_v1(
+        protocol_machine_semantic_objects(
             &[],
             &self.delegation_audit_log,
             &self.operation_instances,

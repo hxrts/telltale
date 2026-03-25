@@ -8,7 +8,7 @@ pub use telltale_machine::model::semantic_objects::{
     CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead, OperationInstance,
     OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
     ProgressState, ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent,
-    PublicationObserverClass, PublicationStatus, SemanticHandoff, TransformationObligation,
+    PublicationObserverClass, PublicationStatus, Region, SemanticHandoff, TransformationObligation,
     SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 
@@ -155,6 +155,17 @@ mod tests {
                 proof_ref: Some("session.ready:digest".to_string()),
                 handle_ref: Some("materialization:digest".to_string()),
                 reason: None,
+            }],
+            regions: vec![Region {
+                region_id: "session:1".to_string(),
+                session: Some(1),
+                owner_id: Some("runtime/owner".to_string()),
+                scope: OwnershipScope::Session,
+                operation_ids: vec!["effect:1".to_string()],
+                effect_ids: vec![1],
+                authoritative_read_ids: vec!["readiness:1:Issued".to_string()],
+                handle_ids: Vec::new(),
+                publication_ids: Vec::new(),
             }],
             progress_contracts: vec![ProgressContract {
                 operation_id: "effect:1".to_string(),

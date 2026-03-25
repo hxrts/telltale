@@ -170,7 +170,9 @@ mod tests {
     fn loaded_protocol_machine_harness_reports_replay_conformance() {
         let image = simple_send_recv_image();
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
 
         let report = run_loaded_protocol_machine_record_replay_conformance(
             &mut machine,

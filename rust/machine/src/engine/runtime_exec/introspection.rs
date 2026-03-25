@@ -172,7 +172,7 @@ impl ProtocolMachine {
     #[must_use]
     pub fn semantic_objects(&self) -> ProtocolMachineSemanticObjects {
         let authority_audit_log = self.combined_authority_audit_log();
-        protocol_machine_semantic_objects_v1(
+        protocol_machine_semantic_objects(
             authority_audit_log.as_slice(),
             self.delegation_audit_log.as_slice(),
             self.operation_instances.as_slice(),

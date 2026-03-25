@@ -1,7 +1,7 @@
 // Protocol AST definitions
 
 use super::annotation::Annotations;
-use super::{MessageType, NonEmptyVec, Role, ValidationError};
+use super::{MessageType, NonEmptyVec, ProgressAttachment, Role, ValidationError};
 use proc_macro2::{Ident, TokenStream};
 
 #[path = "protocol_validation.rs"]
@@ -29,6 +29,33 @@ fn annotation_has_value(
 /// Protocol specification using choreographic constructs
 #[derive(Debug)]
 pub enum Protocol {
+    /// Begin one explicit semantic operation instance.
+    Begin {
+        operation: String,
+        args: Vec<String>,
+        progress: Option<ProgressAttachment>,
+        continuation: Box<Protocol>,
+    },
+
+    /// Await one previously begun semantic operation instance.
+    Await {
+        operation: String,
+        continuation: Box<Protocol>,
+    },
+
+    /// Resolve one previously begun semantic operation instance.
+    Resolve {
+        operation: String,
+        outcome: CommitmentOutcome,
+        continuation: Box<Protocol>,
+    },
+
+    /// Invalidate one previously begun semantic operation instance.
+    Invalidate {
+        operation: String,
+        continuation: Box<Protocol>,
+    },
+
     /// Message send: A -> B: Message
     Send {
         from: Role,
@@ -67,6 +94,8 @@ pub enum Protocol {
     Let {
         /// Bound variable name.
         name: String,
+        /// Whether the binding is authoritative, observational, or plain.
+        mode: AuthorityBindingMode,
         /// Bound expression.
         expr: AuthorityExpr,
         /// Whether the binding is linear/single-use.
@@ -116,6 +145,20 @@ pub enum Protocol {
     Publish {
         event: String,
         arg: Option<String>,
+        continuation: Box<Protocol>,
+    },
+
+    /// Canonical publication that lifts an authoritative witness into a named publication.
+    PublishAuthority {
+        witness: String,
+        publication_name: String,
+        continuation: Box<Protocol>,
+    },
+
+    /// Canonical materialization from one named publication.
+    Materialize {
+        proof: String,
+        publication: String,
         continuation: Box<Protocol>,
     },
 
@@ -171,6 +214,14 @@ pub struct CasePattern {
     pub binders: Vec<String>,
 }
 
+/// Explicit authority/observation mode for one local binding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AuthorityBindingMode {
+    Plain,
+    Authoritative,
+    Observe,
+}
+
 /// Authority- or evidence-oriented expression surface syntax.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AuthorityExpr {
@@ -198,6 +249,15 @@ pub enum AuthorityExpr {
         name: String,
         args: Vec<String>,
     },
+}
+
+/// Explicit outcome used to resolve a begun semantic operation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CommitmentOutcome {
+    Success(Option<String>),
+    Failure(Option<String>),
+    Timeout(Option<String>),
+    Cancelled,
 }
 
 /// Guard surface syntax attached to one choice branch.
@@ -233,6 +293,10 @@ impl Protocol {
     #[must_use]
     pub fn mentions_role(&self, role: &Role) -> bool {
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => continuation.mentions_role(role),
             Protocol::Send {
                 from,
                 to,
@@ -278,6 +342,8 @@ impl Protocol {
             Protocol::Parallel { protocols } => protocols.iter().any(|p| p.mentions_role(role)),
             Protocol::Rec { body, .. } => body.mentions_role(role),
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => continuation.mentions_role(role),
             Protocol::Handoff {
                 target,
@@ -295,6 +361,10 @@ impl Protocol {
 
     pub(crate) fn validate(&self, roles: &[Role]) -> Result<(), ValidationError> {
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => continuation.validate(roles),
             Protocol::Send {
                 from,
                 to,
@@ -353,6 +423,8 @@ impl Protocol {
             }
             Protocol::Rec { body, .. } => body.validate(roles),
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => continuation.validate(roles),
             Protocol::Handoff {
                 target,
@@ -383,10 +455,16 @@ impl Protocol {
             Protocol::Send { annotations, .. } => annotations,
             Protocol::Broadcast { annotations, .. } => annotations,
             Protocol::Choice { annotations, .. } => annotations,
-            Protocol::Let { .. }
+            Protocol::Begin { .. }
+            | Protocol::Await { .. }
+            | Protocol::Resolve { .. }
+            | Protocol::Invalidate { .. }
+            | Protocol::Let { .. }
             | Protocol::Case { .. }
             | Protocol::Timeout { .. }
             | Protocol::Publish { .. }
+            | Protocol::PublishAuthority { .. }
+            | Protocol::Materialize { .. }
             | Protocol::Handoff { .. }
             | Protocol::DependentWork { .. } => {
                 static EMPTY: std::sync::OnceLock<Annotations> = std::sync::OnceLock::new();
@@ -432,10 +510,16 @@ impl Protocol {
             Protocol::Send { annotations, .. } => Some(annotations),
             Protocol::Broadcast { annotations, .. } => Some(annotations),
             Protocol::Choice { annotations, .. } => Some(annotations),
-            Protocol::Let { .. }
+            Protocol::Begin { .. }
+            | Protocol::Await { .. }
+            | Protocol::Resolve { .. }
+            | Protocol::Invalidate { .. }
+            | Protocol::Let { .. }
             | Protocol::Case { .. }
             | Protocol::Timeout { .. }
             | Protocol::Publish { .. }
+            | Protocol::PublishAuthority { .. }
+            | Protocol::Materialize { .. }
             | Protocol::Handoff { .. }
             | Protocol::DependentWork { .. } => None,
             Protocol::Extension { annotations, .. } => Some(annotations),
@@ -560,6 +644,12 @@ impl Protocol {
 
         // Recursively traverse protocol structure
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => {
+                continuation.collect_nodes_with_annotation(key, nodes);
+            }
             Protocol::Send { continuation, .. } => {
                 continuation.collect_nodes_with_annotation(key, nodes);
             }
@@ -603,6 +693,8 @@ impl Protocol {
                 body.collect_nodes_with_annotation(key, nodes);
             }
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 continuation.collect_nodes_with_annotation(key, nodes);
@@ -633,6 +725,12 @@ impl Protocol {
 
         // Recursively traverse protocol structure
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => {
+                continuation.collect_nodes_with_annotation_value(key, value, nodes);
+            }
             Protocol::Send { continuation, .. } => {
                 continuation.collect_nodes_with_annotation_value(key, value, nodes);
             }
@@ -680,6 +778,8 @@ impl Protocol {
                 body.collect_nodes_with_annotation_value(key, value, nodes);
             }
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 continuation.collect_nodes_with_annotation_value(key, value, nodes);
@@ -698,6 +798,12 @@ impl Protocol {
         let mut count = self.annotation_count();
 
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => {
+                count += continuation.deep_annotation_count();
+            }
             Protocol::Send { continuation, .. } => {
                 count += continuation.deep_annotation_count();
             }
@@ -741,6 +847,8 @@ impl Protocol {
                 count += body.deep_annotation_count();
             }
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 count += continuation.deep_annotation_count();
@@ -766,6 +874,12 @@ impl Protocol {
         }
 
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => {
+                continuation.visit_annotated_nodes(f);
+            }
             Protocol::Send { continuation, .. } => {
                 continuation.visit_annotated_nodes(f);
             }
@@ -809,6 +923,8 @@ impl Protocol {
                 body.visit_annotated_nodes(f);
             }
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 continuation.visit_annotated_nodes(f);
@@ -832,6 +948,12 @@ impl Protocol {
         }
 
         match self {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => {
+                continuation.visit_annotated_nodes_mut(f);
+            }
             Protocol::Send { continuation, .. } => {
                 continuation.visit_annotated_nodes_mut(f);
             }
@@ -875,6 +997,8 @@ impl Protocol {
                 body.visit_annotated_nodes_mut(f);
             }
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 continuation.visit_annotated_nodes_mut(f);

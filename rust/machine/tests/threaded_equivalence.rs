@@ -72,7 +72,8 @@ fn run_cooperative(
     for image in images {
         machine.load_choreography(image).expect("load image");
     }
-    machine.run_concurrent(&handler, 200, concurrency)
+    machine
+        .run_concurrent(&handler, 200, concurrency)
         .expect("cooperative run");
     per_session(machine.trace())
 }
@@ -82,11 +83,13 @@ fn run_threaded(
     workers: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
-    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), workers);
+    let mut machine =
+        ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), workers);
     for image in images {
         machine.load_choreography(image).expect("load image");
     }
-    machine.run_concurrent(&handler, 200, 1)
+    machine
+        .run_concurrent(&handler, 200, 1)
         .expect("threaded run at canonical concurrency=1");
     per_session(machine.trace())
 }

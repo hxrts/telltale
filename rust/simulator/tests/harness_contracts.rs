@@ -3,7 +3,9 @@
 use std::collections::BTreeMap;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::model::effects::{
+    EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 use telltale_simulator::contracts::{evaluate_contracts, ContractCheckConfig};
 use telltale_simulator::generated::ScenarioEffectResult;
 use telltale_simulator::harness::{DirectAdapter, HarnessConfig, HarnessSpec, SimulationHarness};

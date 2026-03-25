@@ -6,7 +6,7 @@ use crate::effect::{CorruptionType, EffectTraceEntry};
 use crate::engine::{ObsEvent, SessionTerminalReason};
 use crate::output_condition::OutputConditionCheck;
 use crate::semantic_objects::{
-    protocol_machine_semantic_objects_v1, OperationInstance, OutstandingEffect, ProgressContract,
+    protocol_machine_semantic_objects, OperationInstance, OutstandingEffect, ProgressContract,
     ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent, TransformationObligation,
 };
 use crate::session::{
@@ -423,7 +423,7 @@ pub fn semantic_audit_log_v1(
         }
     }));
 
-    let semantic_objects = protocol_machine_semantic_objects_v1(
+    let semantic_objects = protocol_machine_semantic_objects(
         authority_audit_log,
         delegation_audit_log,
         operation_instances,
@@ -589,7 +589,7 @@ pub fn canonical_replay_fragment_v1(
             progress_transitions,
         ),
         semantic_objects: canonicalize_protocol_machine_semantic_objects(
-            &protocol_machine_semantic_objects_v1(
+            &protocol_machine_semantic_objects(
                 authority_audit_log,
                 delegation_audit_log,
                 operation_instances,

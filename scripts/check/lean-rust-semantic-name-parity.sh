@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 LEAN_SEMANTIC_CORE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean"
+LEAN_SEMANTIC_OBJECTS_BARREL="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/SemanticObjects.lean"
 LEAN_PROTOCOL_MACHINE_API="${ROOT_DIR}/lean/Runtime/ProtocolMachine/API.lean"
 RUST_MACHINE_SEMANTIC_OBJECTS="${ROOT_DIR}/rust/machine/src/semantic_objects.rs"
 RUST_MACHINE_LIB="${ROOT_DIR}/rust/machine/src/lib.rs"
@@ -12,6 +13,7 @@ RUST_BRIDGE_SEMANTIC_OBJECTS="${ROOT_DIR}/rust/bridge/src/semantic_objects.rs"
 
 required_surfaces=(
   "${LEAN_SEMANTIC_CORE}"
+  "${LEAN_SEMANTIC_OBJECTS_BARREL}"
   "${LEAN_PROTOCOL_MACHINE_API}"
   "${RUST_MACHINE_SEMANTIC_OBJECTS}"
   "${RUST_MACHINE_LIB}"
@@ -38,6 +40,8 @@ required_types=(
   "ObservedRead"
   "MaterializationProof"
   "CanonicalHandle"
+  "PublicationEvent"
+  "Region"
   "ProgressContract"
   "ProgressTransition"
   "ProtocolMachineSemanticObjects"
@@ -136,9 +140,9 @@ for duplicate in "pub struct OperationInstance" "pub struct OutstandingEffect" "
   fi
 done
 
-if ! rg -q 'Region remains a choreography/topology identifier outside the protocol-machine semantic-object family' \
+if ! rg -q '`Region` is now part of the canonical protocol-machine semantic-object family' \
   "${ROOT_DIR}/docs/19_rust_lean_parity.md"; then
-  echo "[semantic-name-parity] docs/19_rust_lean_parity.md is missing the Region boundary note" >&2
+  echo "[semantic-name-parity] docs/19_rust_lean_parity.md is missing the Region semantic-core note" >&2
   exit 1
 fi
 

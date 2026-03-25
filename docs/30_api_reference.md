@@ -77,7 +77,7 @@ Key exports:
   `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
   `TransformationObligation`,
   `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`,
-  `CanonicalHandle`, `PublicationEvent`, `ProgressContract`,
+  `CanonicalHandle`, `PublicationEvent`, `Region`, `ProgressContract`,
   `ProgressTransition`,
   `ProtocolMachineSemanticObjects`
 - proof-carrying runtime profiles:

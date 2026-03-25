@@ -106,7 +106,9 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
             observability_retention: capped_retention_config(),
             ..ProtocolMachineConfig::strict_large_fanout()
         });
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
         for idx in 1..256 {
             machine.pause_role(&format!("R{idx}"));
         }
@@ -132,7 +134,9 @@ fn profile_repeated_load_reuse(iterations: usize) -> usize {
         .max(iterations.saturating_mul(16).saturating_add(16));
     let mut machine = ProtocolMachine::new(config);
     for _ in 0..iterations {
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
     }
     black_box(machine.memory_usage().retained_bytes.total)
 }
@@ -145,7 +149,9 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
-    machine.load_choreography(&image).expect("load choreography");
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
     for idx in 1..256 {
         machine.pause_role(&format!("R{idx}"));
     }
@@ -167,7 +173,9 @@ fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
         ..ProtocolMachineConfig::strict_verified()
     });
     for _ in 0..iterations {
-        machine.load_choreography(&image).expect("load choreography");
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
     }
     let status = machine.run(&handler, 100_000).expect("run machine");
     black_box(machine.trace().len())
@@ -190,7 +198,9 @@ fn profile_repeated_open_same_image(iterations: usize) -> usize {
     let mut machine = ProtocolMachine::new(config);
     let mut checksum = 0usize;
     for _ in 0..iterations {
-        let sid = machine.load_choreography(&image).expect("load choreography");
+        let sid = machine
+            .load_choreography(&image)
+            .expect("load choreography");
         checksum ^= black_box(sid) ^ black_box(machine.session_coroutines(sid).len());
     }
     checksum

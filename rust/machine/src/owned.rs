@@ -49,7 +49,8 @@ impl OwnedSession {
         machine: &mut ProtocolMachine,
         mutation: SessionHostMutation,
     ) -> Result<(), OwnershipError> {
-        machine.sessions_mut()
+        machine
+            .sessions_mut()
             .apply_owned_session_mutation(&self.capability, mutation)
     }
 
@@ -63,7 +64,8 @@ impl OwnedSession {
         machine: &mut ProtocolMachine,
         predicate_ref: impl Into<String>,
     ) -> Result<ReadinessWitness, OwnershipError> {
-        machine.sessions_mut()
+        machine
+            .sessions_mut()
             .issue_readiness_witness(&self.capability, predicate_ref)
     }
 
@@ -77,7 +79,8 @@ impl OwnedSession {
         machine: &mut ProtocolMachine,
         witness: &ReadinessWitness,
     ) -> Result<(), OwnershipError> {
-        machine.sessions_mut()
+        machine
+            .sessions_mut()
             .consume_readiness_witness(&self.capability, witness)
     }
 
@@ -92,7 +95,8 @@ impl OwnedSession {
         new_owner_id: impl Into<String>,
         new_scope: OwnershipScope,
     ) -> Result<OwnershipReceipt, OwnershipError> {
-        machine.sessions_mut()
+        machine
+            .sessions_mut()
             .begin_ownership_transfer(&self.capability, new_owner_id, new_scope)
     }
 

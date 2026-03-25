@@ -118,6 +118,12 @@ def dependentWorkObjects : ProtocolMachineSemanticObjects :=
   , materializationProofs := []
   , canonicalHandles := []
   , publicationEvents := [terminalPublication]
+  , prestateBindings := []
+  , agreementProfiles := []
+  , agreementContracts := []
+  , agreementEvidence := []
+  , agreementStates := []
+  , regions := []
   , progressContracts := [nativeBlocked.contract, wasmNoProgress.contract, nativeSucceeded.contract]
   , progressTransitions := []
   }

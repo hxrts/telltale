@@ -8,9 +8,7 @@ use telltale_machine::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::runtime::loader::CodeImage;
-use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineError, StepResult,
-};
+use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineError, StepResult};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Deterministic seed for reproducibility.

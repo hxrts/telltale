@@ -9,14 +9,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cfg_if::cfg_if;
 use telltale_machine::coroutine::Value;
+use telltale_machine::instr::{ImmValue, Instr};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_machine::instr::{ImmValue, Instr};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
-    protocol_machine_semantic_objects_v1, run_loaded_protocol_machine_record_replay_conformance,
+    protocol_machine_semantic_objects, run_loaded_protocol_machine_record_replay_conformance,
     AuthoritativeReadKind, CanonicalHandleKind, DelegationStatus, Edge, OperationInstance,
     OperationPhase, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
     ProtocolMachineConfig, PublicationStatus, SemanticAuditRecord, SessionHostMutation,
@@ -167,11 +167,13 @@ fn ownership_owned_session_transfer_invalidates_stale_handles() {
 #[test]
 fn ownership_transfer_record_replay_preserves_observable_handoff() {
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&transfer_image())
+    machine
+        .load_choreography(&transfer_image())
         .expect("load transfer fixture");
 
-    let report = run_loaded_protocol_machine_record_replay_conformance(&mut machine, &NoopHandler, 32)
-        .expect("record/replay harness should succeed");
+    let report =
+        run_loaded_protocol_machine_record_replay_conformance(&mut machine, &NoopHandler, 32)
+            .expect("record/replay harness should succeed");
 
     assert!(report.replay_consistent);
     assert!(report.exact_trace_match);
@@ -295,7 +297,7 @@ fn ownership_observed_reads_are_rejected_on_semantic_paths() {
 
 #[test]
 fn ownership_proof_bearing_success_is_enforced_for_publication() {
-    let objects = protocol_machine_semantic_objects_v1(
+    let objects = protocol_machine_semantic_objects(
         &[],
         &[],
         &[OperationInstance {
@@ -353,7 +355,7 @@ fn ownership_canonical_handle_is_required_on_parity_critical_paths() {
 
 #[test]
 fn ownership_publication_path_is_canonical_and_unique() {
-    let objects = protocol_machine_semantic_objects_v1(
+    let objects = protocol_machine_semantic_objects(
         &[],
         &[],
         &[

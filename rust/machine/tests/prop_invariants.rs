@@ -19,8 +19,8 @@ use telltale_machine::buffer::{BackpressurePolicy, BoundedBuffer, BufferConfig, 
 use telltale_machine::compiler::compile;
 use telltale_machine::coroutine::Value;
 use telltale_machine::instr::{Endpoint, Instr};
-use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::model::state::{unfold_if_var, unfold_mu};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 

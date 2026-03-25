@@ -165,6 +165,7 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
             "handle_ref": "materialization:digest",
             "reason": null
         }],
+        "regions": [],
         "progress_contracts": [{
             "operation_id": "effect:1",
             "session": 1,
@@ -279,6 +280,7 @@ fn protocol_machine_run_output_roundtrip_preserves_semantic_objects() {
                 "handle_ref": null,
                 "reason": null
             }],
+            "regions": [],
             "progress_contracts": []
         }
     });
@@ -351,6 +353,7 @@ fn semantic_objects_roundtrip_preserves_handoff_obligations() {
             "handle_ref": "handoff:4",
             "reason": null
         }],
+        "regions": [],
         "progress_contracts": []
     });
 

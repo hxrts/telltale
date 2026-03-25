@@ -119,6 +119,12 @@ def replayFailureObjects : ProtocolMachineSemanticObjects :=
   , materializationProofs := []
   , canonicalHandles := []
   , publicationEvents := [failurePublication]
+  , prestateBindings := []
+  , agreementProfiles := []
+  , agreementContracts := []
+  , agreementEvidence := []
+  , agreementStates := []
+  , regions := []
   , progressContracts := [exactFailureContract, degradedContract]
   , progressTransitions := [degradedTransition]
   }

@@ -94,6 +94,46 @@ pub fn render_lsp_lint_diagnostics(choreography: &Choreography, level: LintLevel
 fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String) {
     let indent = "  ".repeat(depth);
     match protocol {
+        Protocol::Begin {
+            operation,
+            progress,
+            continuation,
+            ..
+        } => {
+            if let Some(progress) = progress {
+                writeln!(
+                    out,
+                    "{indent}- begin {operation} progress {}",
+                    progress.contract_name
+                )
+                .unwrap();
+            } else {
+                writeln!(out, "{indent}- begin {operation}").unwrap();
+            }
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::Await {
+            operation,
+            continuation,
+        } => {
+            writeln!(out, "{indent}- await {operation}").unwrap();
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::Resolve {
+            operation,
+            outcome,
+            continuation,
+        } => {
+            writeln!(out, "{indent}- resolve {operation} as {outcome:?}").unwrap();
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::Invalidate {
+            operation,
+            continuation,
+        } => {
+            writeln!(out, "{indent}- invalidate {operation}").unwrap();
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
         Protocol::Send {
             from,
             to,
@@ -187,6 +227,22 @@ fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String)
             } else {
                 writeln!(out, "{indent}- publish {event}").unwrap();
             }
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::PublishAuthority {
+            witness,
+            publication_name,
+            continuation,
+        } => {
+            writeln!(out, "{indent}- publish {witness} as {publication_name}").unwrap();
+            render_lowering_protocol(continuation, depth + 1, out);
+        }
+        Protocol::Materialize {
+            proof,
+            publication,
+            continuation,
+        } => {
+            writeln!(out, "{indent}- materialize {proof} from {publication}").unwrap();
             render_lowering_protocol(continuation, depth + 1, out);
         }
         Protocol::Handoff {

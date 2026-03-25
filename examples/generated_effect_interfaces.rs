@@ -33,12 +33,17 @@ tell! {
     -- // Minimal commit flow used to generate effect-facing Rust interfaces.
     protocol CommitFlow uses Runtime, Audit under Replay =
       roles Coordinator, Worker, Client
+      observe let presence = observe Runtime.watchPresence(commitSession)
+      authoritative let witness = check Runtime.ready(commitSession)
+      publish witness as CommitPublication
+      materialize commitProof from CommitPublication
       Coordinator -> Worker : Commit
       Worker -> Client : Published
 }
 
 // Import the generated effect surface as one module: traits, requests, outcomes, and
 // effect-domain data all live together here because they describe one boundary.
+use CommitFlow::authority;
 use CommitFlow::effects;
 
 #[derive(Default)]
@@ -104,6 +109,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let witness = effects::Runtime::ready(&mut host, session.clone())?;
     let receipt = effects::Runtime::publish(&mut host, witness.clone())?;
 
+    let observed = authority::observed_binding("presence")
+        .ok_or("missing generated observe binding metadata")?
+        .observed_read("presence-read#1", 7, "host-runtime");
+    let authoritative = authority::authoritative_binding("witness")
+        .ok_or("missing generated authoritative binding metadata")?
+        .authoritative_read("ready-read#1");
+    let publication = authority::publication("CommitPublication")
+        .ok_or("missing generated publication metadata")?
+        .publication_event("publication#1", "commit-flow#1");
+    let materialization = authority::materialization("commitProof")
+        .ok_or("missing generated materialization metadata")?;
+    let proof = materialization.materialization_proof(
+        "proof#1",
+        "Runtime.ready",
+        format!("digest:{}", receipt.commit_id),
+    );
+    let handle = materialization.canonical_handle("handle#1", &proof);
+
     // The generated request/outcome enums are the typed dispatch form of the same effect surface.
     match effects::Runtime::handle(&mut host, effects::RuntimeRequest::WatchPresence(session)) {
         effects::RuntimeOutcome::WatchPresence(view) => {
@@ -123,6 +146,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("issued_by = {}", witness.issued_by.0);
+    println!("observed binding = {}", observed.read_id);
+    println!("authoritative binding = {}", authoritative.read_id);
+    println!("publication = {}", publication.publication);
+    println!("canonical handle = {}", handle.handle_id);
     println!("audit entries = {}", host.audit_log.len());
     Ok(())
 }

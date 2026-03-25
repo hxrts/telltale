@@ -334,6 +334,12 @@ impl ExecutionHints {
         counters: &mut HintExtractionCounters,
     ) {
         match protocol {
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. } => {
+                Self::extract_recursive(continuation, path, hints, counters);
+            }
             Protocol::Send {
                 annotations,
                 continuation,
@@ -428,6 +434,8 @@ impl ExecutionHints {
                 Self::extract_recursive(body, &rec_path, hints, &mut rec_counters);
             }
             Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 Self::extract_recursive(continuation, path, hints, counters);

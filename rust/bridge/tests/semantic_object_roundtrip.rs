@@ -2,7 +2,9 @@
 
 use telltale_bridge::ProtocolMachineSemanticObjects;
 use telltale_machine::coroutine::Value;
-use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::model::effects::{
+    EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 

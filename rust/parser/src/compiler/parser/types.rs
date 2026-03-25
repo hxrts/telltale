@@ -3,7 +3,7 @@
 //! These types represent the intermediate parse tree before conversion
 //! to the final Protocol AST.
 
-use crate::ast::Role;
+use crate::ast::{AuthorityBindingMode, CommitmentOutcome, ProgressAttachment, Role};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use std::collections::HashMap;
@@ -13,8 +13,24 @@ use syn::{BinOp, Expr, Lit, UnOp};
 #[derive(Debug, Clone)]
 #[allow(clippy::large_enum_variant)] // Statement enum is internal to parser; performance impact is minimal
 pub(crate) enum Statement {
+    Begin {
+        operation: String,
+        args: Vec<String>,
+        progress: Option<ProgressAttachment>,
+    },
+    Await {
+        operation: String,
+    },
+    Resolve {
+        operation: String,
+        outcome: CommitmentOutcome,
+    },
+    Invalidate {
+        operation: String,
+    },
     Let {
         name: String,
+        mode: AuthorityBindingMode,
         expr: AuthorityExprSpec,
         body: Option<Vec<Statement>>,
     },
@@ -69,6 +85,14 @@ pub(crate) enum Statement {
     Publish {
         event: String,
         arg: Option<String>,
+    },
+    PublishAuthority {
+        witness: String,
+        publication_name: String,
+    },
+    Materialize {
+        proof: String,
+        publication: String,
     },
     Handoff {
         operation: String,

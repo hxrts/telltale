@@ -183,25 +183,28 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("protocol_machine_replay_nullifier_consume_json_legacy", |b| {
-        let identity = legacy_identity_build(
-            &Edge::new(7, "A", "B"),
-            CommunicationStepKind::Receive,
-            "msg",
-            &Value::Nat(7),
-            0,
-        );
-        b.iter_batched(
-            CommunicationReplayState::default,
-            |mut state| {
-                black_box(
-                    legacy_nullifier_consume(black_box(&identity), &mut state)
-                        .expect("legacy consume replay identity"),
-                )
-            },
-            BatchSize::SmallInput,
-        );
-    });
+    c.bench_function(
+        "protocol_machine_replay_nullifier_consume_json_legacy",
+        |b| {
+            let identity = legacy_identity_build(
+                &Edge::new(7, "A", "B"),
+                CommunicationStepKind::Receive,
+                "msg",
+                &Value::Nat(7),
+                0,
+            );
+            b.iter_batched(
+                CommunicationReplayState::default,
+                |mut state| {
+                    black_box(
+                        legacy_nullifier_consume(black_box(&identity), &mut state)
+                            .expect("legacy consume replay identity"),
+                    )
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
 
     c.bench_function("protocol_machine_session_open_allocation_count", |b| {
         b.iter(|| black_box(session_open_allocation_count(black_box(64))));
