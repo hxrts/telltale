@@ -8,7 +8,7 @@ Telltale is a session-typed execution system for protocol-critical concurrent an
 
 The system enables writing distributed protocols from a global viewpoint with automatic projection to local session types for each participant. Multiparty session types provide compile-time safety guarantees. The protocol machine is a deterministic small-step reducer that commits all protocol-visible truth. Typed effect interfaces form the operational vocabulary between the protocol machine and the world.
 
-The Lean 4 formalization covers ~647 core-library files and ~131k lines (see generated metrics in `lean/CODE_MAP.md`) and provides mechanized proofs of preservation, progress, coherence, and harmony for asynchronous buffered multiparty session types.
+The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony for asynchronous buffered multiparty session types. See `lean/CODE_MAP.md` for generated metrics.
 
 ## Parity Policy
 
@@ -145,20 +145,20 @@ Rust workspace crates are split between the repo root (`telltale`) and the `rust
 
 ## Lean Codebase Structure
 
-The Lean formalization is in the `lean/` directory. See `lean/CODE_MAP.md` for detailed file-by-file documentation.
+The Lean formalization is in the `lean/` directory. See `lean/CODE_MAP.md` for generated metrics and detailed file-by-file documentation.
 
-| Library | Lines | Purpose |
-|---------|------:|---------|
-| SessionTypes | 9,967 | Global/local type definitions, de Bruijn indices, participation |
-| SessionCoTypes | 16,302 | Coinductive theory (EQ2, bisimulation, duality, async subtyping) |
-| Choreography | 19,308 | Projection from global to local types, harmony correctness |
-| Semantics | 2,359 | Operational semantics, typing, determinism, deadlock freedom |
-| Protocol | 40,077 | Async buffered MPST: coherence, preservation, monitoring, deployment |
-| Runtime | 32,240 | Protocol machine, Iris separation logic backend, WP rules, adequacy |
-| Classical | 2,193 | Transported theorems (Foster-Lyapunov, mixing times, LDP) |
-| ClassicalAnalysis | 1,128 | Real-analysis-backed concrete models used by classical transport |
-| Distributed | 7,266 | Distributed assumptions, FLP/CAP theorem families |
-| IrisExtraction | 830 | Iris ghost-state/program-logic extraction support modules |
+| Library | Purpose |
+|---------|---------|
+| SessionTypes | Global/local type definitions, de Bruijn indices, participation |
+| SessionCoTypes | Coinductive theory (EQ2, bisimulation, duality, async subtyping) |
+| Choreography | Projection from global to local types, harmony correctness |
+| Semantics | Operational semantics, typing, determinism, deadlock freedom |
+| Protocol | Async buffered MPST: coherence, preservation, monitoring, deployment |
+| Runtime | Protocol machine, Iris separation logic backend, WP rules, adequacy |
+| Classical | Transported theorems (Foster-Lyapunov, mixing times, LDP) |
+| ClassicalAnalysis | Real-analysis-backed concrete models used by classical transport |
+| Distributed | Distributed assumptions, FLP/CAP theorem families |
+| IrisExtraction | Iris ghost-state/program-logic extraction support modules |
 
 Key entry points: `lean/lakefile.lean` (build configuration), `lean/CODE_MAP.md` (complete module documentation).
 
