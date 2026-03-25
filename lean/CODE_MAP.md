@@ -771,7 +771,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ProgressTheorems.lean | 233 | `protocol_machine_progress`, instruction enablement theorems |
 | Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API with required progress hypothesis and explicit scheduler/fairness linkage |
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
-| Proofs/ObserverProjectionEffectBisim.lean | 107 | Effect bisimulation for observer projection |
+| Proofs/ReconfigurationObserver.lean | 253 | Canonical proof-facing surface for region layering, linking/delegation harmony, observer equivalence, and replay/cross-target observer alignment |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
 | Proofs/InvariantSpace.lean | 231 | Proof-carrying invariant-space bundle with tightened progress-contract witnesses and integrated semantic-object families |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
