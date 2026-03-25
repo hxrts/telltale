@@ -50,6 +50,7 @@ cfg-if = { workspace = true }
 proptest = { workspace = true }
 telltale-theory = { path = "../theory", version = "6.0.0" }
 telltale-choreography = { path = "../choreography", version = "6.0.0" }
+telltale-parser = { path = "../parser", version = "6.0.0" }
 telltale-machine = { path = "../machine", version = "6.0.0", features = ["multi-thread"] }
 tempfile = { workspace = true }
 serde_json = { workspace = true }

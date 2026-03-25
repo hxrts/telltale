@@ -5,8 +5,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use telltale_choreography::compiler::parser::parse_choreography_str;
-use telltale_choreography::ChoreographyEffectExt;
-use telltale_parser::generate_effect_interface_scaffold;
+use telltale_parser::{generate_effect_interface_scaffold, generated_effect_families};
 
 const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";
 const DEFAULT_WITH_SIMULATOR: bool = true;
@@ -43,7 +42,7 @@ fn run() -> Result<(), String> {
         fs::read_to_string(dsl_path).map_err(|e| format!("failed to read '{dsl_path}': {e}"))?;
     let choreography =
         parse_choreography_str(&dsl_src).map_err(|e| format!("failed to parse DSL: {e}"))?;
-    let families = choreography.generated_effect_families();
+    let families = generated_effect_families(&choreography);
     if families.is_empty() {
         return Err("DSL does not declare any effect interfaces".to_string());
     }

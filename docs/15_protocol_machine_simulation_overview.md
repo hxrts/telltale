@@ -33,7 +33,10 @@ It is the recommended integration lane for host runtimes.
 
 It is also the recommended lane for testing ownership handoff, stale-owner rejection, and owner-failure scenarios. The simulator can inject timing, crash, and replay conditions around the same protocol-machine ownership contract used in production runtimes.
 
-When a project uses generated effect interfaces from the `effect-scaffold` binary, the simulator should be treated as a first-class handler domain. Generated scenario builders cover success, timeout, cancellation, stale late result, blocked, and degraded outcomes by default.
+When a project uses exported effect interfaces from the tooling-only
+`effect-scaffold` binary, the simulator should be treated as a first-class
+handler domain. Generated scenario builders cover success, timeout,
+cancellation, stale late result, blocked, and degraded outcomes by default.
 
 ## Document Map
 

@@ -157,7 +157,7 @@ Generated protocols include helpers under `Protocol::topology`, including `Proto
 
 ### Generated Topology Helper Surface
 
-`choreography!` emits a topology helper module per protocol. The generated surface follows this shape:
+`tell!` emits a topology helper module per protocol. The generated surface follows this shape:
 
 ```rust
 pub mod topology {

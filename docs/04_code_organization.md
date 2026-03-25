@@ -50,7 +50,7 @@ graph TB
     end
 
     subgraph Application
-        choreo["telltale-choreography<br/>DSL, parsing, code generation & scaffold"]
+        choreo["telltale-choreography<br/>DSL, parsing, generated surfaces & tooling"]
         macros["telltale-macros<br/>Proc macros"]
     end
 
@@ -273,7 +273,7 @@ The `effect-scaffold` binary (`rust/choreography/src/bin/effect_scaffold.rs`) is
 - first-class simulator traits and scenario builders
 - an exported effect-family manifest
 
-Run via `just effect-scaffold path/to/protocol.tell` when repository workflows need exported files on disk. Normal library code should use the typed effect interfaces emitted directly by `tell!`.
+Run via `just effect-scaffold path/to/protocol.tell` only when repository workflows need exported files on disk. Normal application/library code should use the typed effect interfaces emitted directly by `tell!`.
 
 ### telltale-transport
 

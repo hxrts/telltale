@@ -116,22 +116,23 @@ This enables compilation to WebAssembly targets.
 
 This example shows a simple ping-pong protocol between two roles.
 
-Define the choreography using the `choreography!` macro.
+Define the protocol using the `tell!` macro.
 
 ```rust
-use telltale_choreography::choreography;
+use telltale::tell;
 
-choreography!(r#"
-protocol PingPong =
-  roles Alice, Bob
-  Alice
-    -> Bob : Ping
-  Bob
-    -> Alice : Pong
-"#);
+tell! {
+  protocol PingPong =
+    roles Alice, Bob
+    Alice -> Bob : Ping
+    Bob -> Alice : Pong
+}
 ```
 
-The macro automatically generates role types, message types, and session types. This is the recommended approach for most use cases. For advanced scenarios requiring runtime parsing, see [Choreographic DSL](06_choreographic_dsl.md).
+The macro generates the protocol module and, when the protocol is projectable,
+the session surfaces. Use `PingPong::proof_status` to inspect whether a protocol
+is session-projectable or only protocol-machine executable. For advanced
+scenarios requiring runtime parsing, see [Choreographic DSL](06_choreographic_dsl.md).
 
 Run the protocol using the effect system.
 

@@ -10,7 +10,10 @@ The `telltale-choreography` crate supports WASM targets. Core effects, handlers,
 
 In WASM builds you can use `Program`, `interpret`, and effect handlers. `InMemoryHandler` and `TelltaleHandler` are WASM compatible for local or custom transports. Middleware such as `Trace`, `Metrics`, and `Retry` is WASM compatible. `FaultInjection` is available with the `test-utils` feature.
 
-Protocol definitions written with `choreography!` produce the same projected types on both platforms. The effect algebra is transport-agnostic. Only the lowest-level spawn and timer calls differ between native and WASM.
+Protocol definitions written with `tell!` produce the same projected types on
+both platforms when the protocol is session-projectable. The proof-status and
+effect surfaces are platform-agnostic. Only the lowest-level spawn and timer
+calls differ between native and WASM.
 
 ## Limitations
 

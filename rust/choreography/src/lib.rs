@@ -18,7 +18,6 @@ pub mod ast;
 pub mod compiler;
 pub mod effects;
 pub mod extensions;
-pub mod generated_effects;
 pub mod heap;
 pub mod identifiers;
 pub mod runtime;
@@ -52,10 +51,6 @@ pub use effects::{TelltaleEndpoint, TelltaleHandler, TelltaleSession};
 pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
-};
-pub use generated_effects::{
-    ChoreographyEffectExt, GeneratedEffectBehavior, GeneratedEffectFamily,
-    GeneratedEffectOperation, GeneratedSimulationMetadata, GeneratedSimulationMode,
 };
 pub use runtime::{spawn, spawn_local};
 pub use topology::{

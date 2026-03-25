@@ -228,13 +228,17 @@ authority checks and evidence-bearing branches after lowering.
 
 ## Integration Tooling
 
-Use `just effect-scaffold` to generate host integration stubs.
-The command now reads DSL `effect` declarations and emits:
+When repository tooling needs exported files on disk, use
+`just effect-scaffold` to generate host integration stubs. This is not the
+normal application path; normal code should implement the typed effect
+interfaces emitted directly by `tell!`.
+
+The command reads DSL `effect` declarations and emits:
 
 - `generated_effects.rs` with canonical Rust request/outcome enums and host-handler traits
 - `generated_simulator.rs` with first-class simulator traits, state, and scenario builders
 - `generated_effect_manifest.json` with the exported effect-family schema
-- a local scaffold `README.md` with next-step instructions
+- a local generated `README.md` with next-step instructions
 
 ```text
 just effect-scaffold path/to/protocol.tell

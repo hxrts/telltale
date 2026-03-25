@@ -5,6 +5,22 @@ use wasm_bindgen_test::wasm_bindgen_test;
 const TOOLING_SOURCES: &[(&str, &str)] = &[
     ("../../../Justfile", include_str!("../../../Justfile")),
     (
+        "../../../docs/02_getting_started.md",
+        include_str!("../../../docs/02_getting_started.md"),
+    ),
+    (
+        "../../../docs/04_code_organization.md",
+        include_str!("../../../docs/04_code_organization.md"),
+    ),
+    (
+        "../../../docs/06_choreographic_dsl.md",
+        include_str!("../../../docs/06_choreographic_dsl.md"),
+    ),
+    (
+        "../../../docs/11_effect_session_bridge.md",
+        include_str!("../../../docs/11_effect_session_bridge.md"),
+    ),
+    (
         "../../../docs/15_protocol_machine_simulation_overview.md",
         include_str!("../../../docs/15_protocol_machine_simulation_overview.md"),
     ),
@@ -15,6 +31,18 @@ const TOOLING_SOURCES: &[(&str, &str)] = &[
     (
         "../../../docs/17_protocol_machine_simulation_scenarios.md",
         include_str!("../../../docs/17_protocol_machine_simulation_scenarios.md"),
+    ),
+    (
+        "../../../docs/22_topology.md",
+        include_str!("../../../docs/22_topology.md"),
+    ),
+    (
+        "../../../docs/28_examples.md",
+        include_str!("../../../docs/28_examples.md"),
+    ),
+    (
+        "../../../docs/29_wasm_guide.md",
+        include_str!("../../../docs/29_wasm_guide.md"),
     ),
     (
         "../../choreography/examples/authority_surface.rs",
@@ -45,6 +73,14 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
             "../../../Justfile",
             "./scripts/check/tooling-convergence.sh",
         ),
+        ("../../../docs/02_getting_started.md", "use telltale::tell;"),
+        ("../../../docs/02_getting_started.md", "PingPong::proof_status"),
+        ("../../../docs/04_code_organization.md", "generated surfaces & tooling"),
+        ("../../../docs/06_choreographic_dsl.md", "Protocol::proof_status"),
+        (
+            "../../../docs/11_effect_session_bridge.md",
+            "interfaces emitted directly by `tell!`",
+        ),
         (
             "../../../docs/15_protocol_machine_simulation_overview.md",
             "GeneratedEffectScenario::builder()",
@@ -57,9 +93,12 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
             "../../../docs/17_protocol_machine_simulation_scenarios.md",
             "record_stale_late_result",
         ),
+        ("../../../docs/22_topology.md", "`tell!` emits a topology helper module"),
+        ("../../../docs/28_examples.md", "Protocol::proof_status"),
+        ("../../../docs/29_wasm_guide.md", "Protocol definitions written with `tell!`"),
         (
             "../../choreography/examples/authority_surface.rs",
-            "generated_effect_families()",
+            "generated_effect_families(&choreography)",
         ),
         (
             "../examples/v2_baseline_capture.rs",
@@ -94,6 +133,11 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
             "../benches/protocol_machine_bench_runtime.rs",
             "load_choreography(",
         ),
+        ("../../../docs/02_getting_started.md", "choreography!("),
+        ("../../../docs/06_choreographic_dsl.md", "choreography!("),
+        ("../../../docs/22_topology.md", "`choreography!`"),
+        ("../../../docs/28_examples.md", "`choreography!`"),
+        ("../../../docs/29_wasm_guide.md", "`choreography!`"),
     ];
 
     let mut violations = Vec::new();

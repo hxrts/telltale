@@ -1,7 +1,5 @@
-use telltale_choreography::compiler::parser::parse_choreography_str;
-use telltale_choreography::{
-    ChoreographyEffectExt, GeneratedEffectBehavior, GeneratedEffectFamily,
-};
+use telltale_parser::compiler::parser::parse_choreography_str;
+use telltale_parser::{generated_effect_families, GeneratedEffectBehavior, GeneratedEffectFamily};
 
 #[test]
 fn generated_effect_family_schema_roundtrips_with_simulation_metadata() {
@@ -19,7 +17,7 @@ protocol Flow uses Runtime =
     )
     .expect("parse choreography");
 
-    let families = choreography.generated_effect_families();
+    let families = generated_effect_families(&choreography);
     assert_eq!(families.len(), 1);
     assert_eq!(families[0].interface_name, "Runtime");
     assert_eq!(families[0].host_trait_name, "RuntimeExternalHandler");

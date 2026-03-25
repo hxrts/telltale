@@ -1,5 +1,5 @@
 use telltale_choreography::compiler::parser::parse_choreography_str;
-use telltale_choreography::ChoreographyEffectExt;
+use telltale_parser::generated_effect_families;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = r#"
@@ -36,8 +36,18 @@ protocol CommitFlow uses Runtime, Audit =
 "#;
 
     let choreography = parse_choreography_str(input)?;
-    let generated = choreography.generated_effect_families();
+    let generated = generated_effect_families(&choreography);
     println!("protocol: {}", choreography.qualified_name());
+    println!(
+        "strongest tier: {}",
+        match choreography.language_tier_status().strongest_tier {
+            telltale_parser::ast::LanguageTier::FullSpec => "full_spec",
+            telltale_parser::ast::LanguageTier::SessionProjectable => "session_projectable",
+            telltale_parser::ast::LanguageTier::ProtocolMachineExecutable =>
+                "protocol_machine_executable",
+            telltale_parser::ast::LanguageTier::ProofOnly => "proof_only",
+        }
+    );
     println!("types: {}", choreography.type_declarations().len());
     println!(
         "effects: {}",

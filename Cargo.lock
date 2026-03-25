@@ -1562,6 +1562,7 @@ dependencies = [
  "serde_json",
  "telltale-choreography",
  "telltale-machine",
+ "telltale-parser",
  "telltale-theory",
  "telltale-types",
  "tempfile",

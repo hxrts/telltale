@@ -5,6 +5,7 @@ fn choreography_macro_ui() {
     t.pass("tests/ui/pass/choice_protocol.rs");
     t.pass("tests/ui/pass/broadcast_protocol.rs");
     t.pass("tests/ui/pass/namespaced_protocol.rs");
+    t.pass("tests/ui/pass/profiled_protocol.rs");
     t.pass("tests/ui/pass/role_derive.rs");
     t.compile_fail("tests/ui/fail/string_literal_protocol.rs");
     t.compile_fail("tests/ui/fail/legacy_brace_protocol.rs");

@@ -8,6 +8,9 @@ use serde_json::json;
 use telltale::tell;
 
 tell! {
+    -- // Execution profile metadata is part of the generated proof status surface.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Effect-domain data: failure variants returned by Runtime operations.
     type CommitError =
       | NotReady
@@ -28,7 +31,7 @@ tell! {
       observe record : AuditEvent -> Unit
 
     -- // Minimal commit flow used to generate effect-facing Rust interfaces.
-    protocol CommitFlow uses Runtime, Audit =
+    protocol CommitFlow uses Runtime, Audit under Replay =
       roles Coordinator, Worker, Client
       Coordinator -> Worker : Commit
       Worker -> Client : Published
@@ -91,6 +94,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
         "session projectable = {}",
         CommitFlow::proof_status::SESSION_PROJECTABLE
+    );
+    println!(
+        "execution profiles = {:?}",
+        CommitFlow::proof_status::EXECUTION_PROFILES
     );
 
     // Direct trait calls are the primary developer path for effectful work.

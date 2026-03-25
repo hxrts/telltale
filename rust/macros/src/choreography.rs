@@ -71,6 +71,7 @@ fn normalize_macro_indentation(source: String) -> String {
         "import ",
         "protocol ",
         "proof_bundle ",
+        "profile ",
         "role_set ",
         "topology ",
         "type ",

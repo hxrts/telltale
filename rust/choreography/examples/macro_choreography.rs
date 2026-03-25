@@ -21,7 +21,7 @@ use telltale_choreography::{
     RecordingHandler, RoleId, RoleName,
 };
 
-// NOTE: The choreography! macro generates Telltale session types
+// NOTE: The tell! macro generates Telltale session types
 // For this example, we'll demonstrate the algebraic effect API directly
 // without using the macro, showing how to build choreographic programs programmatically
 
