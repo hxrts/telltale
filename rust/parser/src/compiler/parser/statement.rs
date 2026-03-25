@@ -12,11 +12,11 @@ use super::declarations::enforce_same_line_equals;
 use super::error::{ErrorSpan, ParseError};
 use super::stmt_parsers::{
     parse_authority_let_in_stmt, parse_authority_let_stmt, parse_await_stmt, parse_begin_stmt,
-    parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt,
-    parse_continue_stmt, parse_dependent_work_stmt, parse_handoff_stmt, parse_invalidate_stmt,
-    parse_let_in_stmt, parse_let_stmt, parse_loop_stmt, parse_materialize_stmt, parse_par_stmt,
-    parse_publish_authority_stmt, parse_publish_stmt, parse_rec_stmt, parse_resolve_stmt,
-    parse_send_stmt, parse_timeout_stmt, parse_observe_let_in_stmt, parse_observe_let_stmt,
+    parse_broadcast_stmt, parse_call_stmt, parse_case_stmt, parse_choice_stmt, parse_continue_stmt,
+    parse_dependent_work_stmt, parse_handoff_stmt, parse_invalidate_stmt, parse_let_in_stmt,
+    parse_let_stmt, parse_loop_stmt, parse_materialize_stmt, parse_observe_let_in_stmt,
+    parse_observe_let_stmt, parse_par_stmt, parse_publish_authority_stmt, parse_publish_stmt,
+    parse_rec_stmt, parse_resolve_stmt, parse_send_stmt, parse_timeout_stmt,
 };
 use super::types::{MessageSpec, ParsedBody, Statement};
 use super::Rule;

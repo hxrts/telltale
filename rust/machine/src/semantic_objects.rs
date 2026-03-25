@@ -890,9 +890,9 @@ impl ProtocolMachineSemanticObjects {
             contract.tracks_operation(operation)
                 && self.prestate_bindings.iter().any(|binding| {
                     self.agreement_evidence.iter().any(|evidence| {
-                        self.agreement_states.iter().any(|state| {
-                            contract.finalization_admissible(binding, evidence, state)
-                        })
+                        self.agreement_states
+                            .iter()
+                            .any(|state| contract.finalization_admissible(binding, evidence, state))
                     })
                 })
         })
@@ -1543,20 +1543,24 @@ pub fn protocol_machine_semantic_objects(
                 && event.handle_ref.is_some(),
         })
         .collect();
-    agreement_evidence.extend(materialization_proofs.iter().map(|proof| AgreementEvidence {
-        evidence_id: format!("materialization:{}", proof.proof_id),
-        operation_id: format!("materialization:{}", proof.proof_id),
-        session: proof.session,
-        owner_id: None,
-        level: if proof.passed {
-            AgreementLevel::Finalized
-        } else {
-            AgreementLevel::Provisional
-        },
-        kind: AgreementEvidenceKind::Materialization,
-        reference: proof.proof_id.clone(),
-        authoritative: proof.passed,
-    }));
+    agreement_evidence.extend(
+        materialization_proofs
+            .iter()
+            .map(|proof| AgreementEvidence {
+                evidence_id: format!("materialization:{}", proof.proof_id),
+                operation_id: format!("materialization:{}", proof.proof_id),
+                session: proof.session,
+                owner_id: None,
+                level: if proof.passed {
+                    AgreementLevel::Finalized
+                } else {
+                    AgreementLevel::Provisional
+                },
+                kind: AgreementEvidenceKind::Materialization,
+                reference: proof.proof_id.clone(),
+                authoritative: proof.passed,
+            }),
+    );
 
     let mut agreement_profiles_by_name = BTreeMap::<String, AgreementProfile>::new();
     let mut agreement_contracts = Vec::new();
@@ -1604,10 +1608,7 @@ pub fn protocol_machine_semantic_objects(
                 "{}:{:?}:{}",
                 operation.kind,
                 operation.phase,
-                operation
-                    .terminal_publication
-                    .as_deref()
-                    .unwrap_or("none")
+                operation.terminal_publication.as_deref().unwrap_or("none")
             ),
             epoch_ref: operation.budget_ticks.map(|ticks| format!("ticks:{ticks}")),
             participant_digest: operation.owner_id.clone(),
@@ -1642,12 +1643,14 @@ pub fn protocol_machine_semantic_objects(
                     (AgreementLevel::SoftSafe, None)
                 }
             }
-            OperationPhase::Failed | OperationPhase::Cancelled => {
-                (AgreementLevel::Provisional, Some(FinalizationOutcome::Aborted))
-            }
-            OperationPhase::TimedOut => {
-                (AgreementLevel::Provisional, Some(FinalizationOutcome::TimedOut))
-            }
+            OperationPhase::Failed | OperationPhase::Cancelled => (
+                AgreementLevel::Provisional,
+                Some(FinalizationOutcome::Aborted),
+            ),
+            OperationPhase::TimedOut => (
+                AgreementLevel::Provisional,
+                Some(FinalizationOutcome::TimedOut),
+            ),
             OperationPhase::HandedOff => (AgreementLevel::SoftSafe, None),
         };
 

@@ -85,7 +85,11 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             write_line(
                 out,
                 indent,
-                &format!("resolve {} as {}", operation, format_commitment_outcome(outcome)),
+                &format!(
+                    "resolve {} as {}",
+                    operation,
+                    format_commitment_outcome(outcome)
+                ),
             );
             format_protocol(continuation, indent, config, out);
         }
@@ -285,24 +289,18 @@ fn format_progress_attachment(progress: &crate::ast::ProgressAttachment) -> Stri
 
 fn format_commitment_outcome(outcome: &crate::ast::CommitmentOutcome) -> String {
     match outcome {
-        crate::ast::CommitmentOutcome::Success(payload) => {
-            payload.as_ref().map_or_else(
-                || "Success".to_string(),
-                |payload| format!("Success({payload})"),
-            )
-        }
-        crate::ast::CommitmentOutcome::Failure(payload) => {
-            payload.as_ref().map_or_else(
-                || "Failure".to_string(),
-                |payload| format!("Failure({payload})"),
-            )
-        }
-        crate::ast::CommitmentOutcome::Timeout(payload) => {
-            payload.as_ref().map_or_else(
-                || "Timeout".to_string(),
-                |payload| format!("Timeout({payload})"),
-            )
-        }
+        crate::ast::CommitmentOutcome::Success(payload) => payload.as_ref().map_or_else(
+            || "Success".to_string(),
+            |payload| format!("Success({payload})"),
+        ),
+        crate::ast::CommitmentOutcome::Failure(payload) => payload.as_ref().map_or_else(
+            || "Failure".to_string(),
+            |payload| format!("Failure({payload})"),
+        ),
+        crate::ast::CommitmentOutcome::Timeout(payload) => payload.as_ref().map_or_else(
+            || "Timeout".to_string(),
+            |payload| format!("Timeout({payload})"),
+        ),
         crate::ast::CommitmentOutcome::Cancelled => "Cancelled".to_string(),
     }
 }

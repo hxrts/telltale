@@ -60,7 +60,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("progress contract = {}", sync.progress.contract_name);
     println!("agreement profile = {}", agreement.profile_name);
     println!("agreement visibility = {:?}", agreement.visibility);
-    println!("agreement finalized at = {:?}", agreement_profile.finalized_at);
+    println!(
+        "agreement finalized at = {:?}",
+        agreement_profile.finalized_at
+    );
     println!(
         "child effect aggregation = {:?}",
         agreement.child_effect_aggregation

@@ -29,9 +29,8 @@ pub use lints::{
 
 use crate::ast::{
     AgreementProfileDeclaration, Choreography, EffectInterfaceDeclaration,
-    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration,
-    RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
-    TypeDeclaration,
+    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration, RegionDeclaration,
+    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration, TypeDeclaration,
 };
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
@@ -44,11 +43,10 @@ use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use declarations::{
-    enforce_same_line_equals, parse_agreement_profile_decl, parse_effect_decl,
-    parse_fragment_decl, parse_guest_runtime_decl, parse_module_decl, parse_operation_decl,
-    parse_profile_decl, parse_proof_bundle_decl, parse_protocol_profiles,
-    parse_protocol_requires, parse_protocol_uses, parse_role_set_decl, parse_topology_decl,
-    parse_type_decl,
+    enforce_same_line_equals, parse_agreement_profile_decl, parse_effect_decl, parse_fragment_decl,
+    parse_guest_runtime_decl, parse_module_decl, parse_operation_decl, parse_profile_decl,
+    parse_proof_bundle_decl, parse_protocol_profiles, parse_protocol_requires, parse_protocol_uses,
+    parse_role_set_decl, parse_topology_decl, parse_type_decl,
 };
 use linear::{infer_required_proof_bundles, validate_authority_surface, validate_linear_vm_assets};
 use role::parse_roles_from_pair;

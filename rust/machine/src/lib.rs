@@ -140,9 +140,9 @@ pub mod model {
             EffectHandler, EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome,
             EffectOutcomeStatus, EffectReentrancyPolicy, EffectRegionScope, EffectRequest,
             EffectRequestBody, EffectResponse, EffectResponsibilityDomain, EffectResult,
-            EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
-            RecordingEffectHandler, ReplayEffectHandler, SendDecision, SendDecisionInput,
-            TopologyPerturbation,
+            EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy, EffectTotality,
+            EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
+            SendDecision, SendDecisionInput, TopologyPerturbation,
         };
     }
 
@@ -180,15 +180,14 @@ pub mod model {
     pub mod semantic_objects {
         pub use crate::semantic_objects::{
             protocol_machine_semantic_objects, AgreementContract, AgreementEvidence,
-            AgreementEvidenceKind, AgreementLevel, AgreementProfile, AgreementRule,
-            AgreementState, AuthoritativeRead, AuthoritativeReadKind,
-            AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, DelegationStatus,
-            FinalizationOutcome, MaterializationProof, ObservedRead, OperationInstance,
-            OperationPhase, OperationVisibility, OutstandingEffect, OutstandingEffectStatus,
-            OwnershipScope, PrestateBinding, ProgressContract, ProgressState, ProgressTransition,
-            ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
-            PublicationStatus, Region, SemanticHandoff, TransformationObligation,
-            SEMANTIC_OBJECTS_SCHEMA_VERSION,
+            AgreementEvidenceKind, AgreementLevel, AgreementProfile, AgreementRule, AgreementState,
+            AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
+            CanonicalHandleKind, DelegationStatus, FinalizationOutcome, MaterializationProof,
+            ObservedRead, OperationInstance, OperationPhase, OperationVisibility,
+            OutstandingEffect, OutstandingEffectStatus, OwnershipScope, PrestateBinding,
+            ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
+            PublicationEvent, PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
+            TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
         };
     }
 }

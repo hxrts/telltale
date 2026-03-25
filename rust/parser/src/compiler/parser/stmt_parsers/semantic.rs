@@ -171,9 +171,14 @@ pub(crate) fn parse_publish_authority_stmt(
 ) -> std::result::Result<Statement, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let witness = next_required(&mut inner, span, input, "publish is missing a witness binding")?
-        .as_str()
-        .to_string();
+    let witness = next_required(
+        &mut inner,
+        span,
+        input,
+        "publish is missing a witness binding",
+    )?
+    .as_str()
+    .to_string();
     let publication_name = next_required(
         &mut inner,
         span,
@@ -194,9 +199,14 @@ pub(crate) fn parse_materialize_stmt(
 ) -> std::result::Result<Statement, ParseError> {
     let span = pair.as_span();
     let mut inner = pair.into_inner();
-    let proof = next_required(&mut inner, span, input, "materialize is missing a proof name")?
-        .as_str()
-        .to_string();
+    let proof = next_required(
+        &mut inner,
+        span,
+        input,
+        "materialize is missing a proof name",
+    )?
+    .as_str()
+    .to_string();
     let publication = next_required(
         &mut inner,
         span,

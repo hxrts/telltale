@@ -530,7 +530,10 @@ fn generate_record_field(field: &DslRecordField) -> Result<TokenStream> {
 }
 
 fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
-    let used_effects = choreography.protocol_uses().into_iter().collect::<BTreeSet<_>>();
+    let used_effects = choreography
+        .protocol_uses()
+        .into_iter()
+        .collect::<BTreeSet<_>>();
     let type_exports = choreography
         .type_declarations()
         .iter()
@@ -1056,13 +1059,22 @@ fn collect_authority_surfaces(protocol: &Protocol, collector: &mut AuthoritySurf
             ..
         } => {
             match (mode, expr) {
-                (AuthorityBindingMode::Authoritative, AuthorityExpr::Check { effect, operation, .. }) => {
-                    collector.authoritative_reads.insert(
-                        name.clone(),
-                        (effect.clone(), operation.clone()),
-                    );
+                (
+                    AuthorityBindingMode::Authoritative,
+                    AuthorityExpr::Check {
+                        effect, operation, ..
+                    },
+                ) => {
+                    collector
+                        .authoritative_reads
+                        .insert(name.clone(), (effect.clone(), operation.clone()));
                 }
-                (AuthorityBindingMode::Observe, AuthorityExpr::Observe { effect, operation, .. }) => {
+                (
+                    AuthorityBindingMode::Observe,
+                    AuthorityExpr::Observe {
+                        effect, operation, ..
+                    },
+                ) => {
                     collector
                         .observed_reads
                         .insert(name.clone(), (effect.clone(), operation.clone()));
@@ -1443,7 +1455,9 @@ fn generate_agreements_module(choreography: &Choreography) -> Result<TokenStream
     })
 }
 
-fn generate_agreement_profile_metadata(profile: &AgreementProfileDeclaration) -> Result<TokenStream> {
+fn generate_agreement_profile_metadata(
+    profile: &AgreementProfileDeclaration,
+) -> Result<TokenStream> {
     let profile_name = LitStr::new(&profile.name, Span::call_site());
     let visibility = lower_operation_visibility(&profile.visibility)?;
     let rule_name = LitStr::new(&profile.rule, Span::call_site());
@@ -1587,7 +1601,9 @@ fn lower_agreement_evidence_kind(value: &str) -> Result<TokenStream> {
     }
 }
 
-fn lower_child_effect_aggregation_policy(policy: &ChildEffectAggregationPolicy) -> Result<TokenStream> {
+fn lower_child_effect_aggregation_policy(
+    policy: &ChildEffectAggregationPolicy,
+) -> Result<TokenStream> {
     Ok(match policy {
         ChildEffectAggregationPolicy::AllSuccess => {
             quote!(EffectCompositionPolicy::AllSuccess)
@@ -1604,9 +1620,7 @@ fn lower_child_effect_aggregation_policy(policy: &ChildEffectAggregationPolicy) 
     })
 }
 
-fn lower_effect_authority_class(
-    value: telltale_parser::ast::EffectAuthorityClass,
-) -> TokenStream {
+fn lower_effect_authority_class(value: telltale_parser::ast::EffectAuthorityClass) -> TokenStream {
     match value {
         telltale_parser::ast::EffectAuthorityClass::Authoritative => {
             quote!(EffectAuthorityClass::Authoritative)
@@ -1655,9 +1669,7 @@ fn lower_effect_region_scope(value: &str) -> Result<TokenStream> {
         "global" => Ok(quote!(EffectRegionScope::Global)),
         other => Err(Error::new(
             Span::call_site(),
-            format!(
-                "unsupported effect region `{other}`; use `session`, `fragment`, or `global`"
-            ),
+            format!("unsupported effect region `{other}`; use `session`, `fragment`, or `global`"),
         )),
     }
 }
@@ -1676,9 +1688,7 @@ fn lower_effect_totality(value: &str) -> Result<TokenStream> {
         "may_block" => Ok(quote!(EffectTotality::MayBlock)),
         other => Err(Error::new(
             Span::call_site(),
-            format!(
-                "unsupported effect progress `{other}`; use `immediate` or `may_block`"
-            ),
+            format!("unsupported effect progress `{other}`; use `immediate` or `may_block`"),
         )),
     }
 }
@@ -1689,9 +1699,7 @@ fn lower_effect_timeout_policy(value: &str) -> Result<TokenStream> {
         "may_block" => Ok(quote!(EffectTimeoutPolicy::Required { budget_ticks: None })),
         other => Err(Error::new(
             Span::call_site(),
-            format!(
-                "unsupported effect progress `{other}`; use `immediate` or `may_block`"
-            ),
+            format!("unsupported effect progress `{other}`; use `immediate` or `may_block`"),
         )),
     }
 }

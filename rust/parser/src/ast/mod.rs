@@ -50,11 +50,10 @@ pub use annotation::{Annotations, ProtocolAnnotation};
 pub use choreography::{
     AgreementProfileDeclaration, ChildEffectAggregation, ChildEffectAggregationPolicy,
     Choreography, EffectAuthorityClass, EffectContractDeclaration, EffectInterfaceDeclaration,
-    EffectOperationDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration,
-    LanguageTier, LanguageTierStatus, OperationAgreementAttachment, OperationDeclaration,
+    EffectOperationDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration, LanguageTier,
+    LanguageTierStatus, OperationAgreementAttachment, OperationDeclaration,
     OperationParameterDeclaration, ProgressAttachment, RegionDeclaration, RoleSetDeclaration,
-    TheoremPackDeclaration, TopologyDeclaration,
-    TypeConstructorDeclaration, TypeDeclaration,
+    TheoremPackDeclaration, TopologyDeclaration, TypeConstructorDeclaration, TypeDeclaration,
 };
 pub use execution_hints::{
     ChoreographyWithHints, ExecutionHints, ExecutionHintsBuilder, OperationHints, OperationPath,

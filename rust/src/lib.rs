@@ -36,9 +36,9 @@
 pub mod channel;
 
 // Re-export core types (always available)
+pub use serde;
 pub use telltale_types as types;
 pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
-pub use serde;
 
 // Re-export optional crates
 #[cfg(feature = "theory")]
@@ -64,6 +64,12 @@ pub mod dsl {
     /// Canonical protocol-machine semantic objects exposed to generated `tell!`
     /// surfaces.
     pub mod semantic {
+        pub use telltale_machine::model::effects::{
+            EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass, EffectCompositionPolicy,
+            EffectHandlerDomain, EffectInterfaceMetadata, EffectReentrancyPolicy,
+            EffectRegionScope, EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy,
+            EffectTotality,
+        };
         pub use telltale_machine::model::semantic_objects::{
             AgreementContract, AgreementEvidence, AgreementEvidenceKind, AgreementLevel,
             AgreementProfile, AgreementRule, AgreementState, AuthoritativeRead,
@@ -73,12 +79,6 @@ pub mod dsl {
             OutstandingEffectStatus, OwnershipScope, PrestateBinding, ProgressContract,
             ProgressState, PublicationEvent, PublicationObserverClass, PublicationStatus,
             SemanticHandoff,
-        };
-        pub use telltale_machine::model::effects::{
-            EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,
-            EffectCompositionPolicy, EffectHandlerDomain, EffectInterfaceMetadata,
-            EffectReentrancyPolicy, EffectRegionScope, EffectRetryShape, EffectSemanticClass,
-            EffectTimeoutPolicy, EffectTotality,
         };
     }
 

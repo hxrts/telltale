@@ -615,12 +615,19 @@ impl Choreography {
                     if let Protocol::Let { mode, expr, .. } = protocol {
                         validate_expr(expr, effect_ops, used)?;
                         match (mode, expr) {
-                            (super::AuthorityBindingMode::Authoritative, super::AuthorityExpr::Check { .. })
-                            | (super::AuthorityBindingMode::Observe, super::AuthorityExpr::Observe { .. })
+                            (
+                                super::AuthorityBindingMode::Authoritative,
+                                super::AuthorityExpr::Check { .. },
+                            )
+                            | (
+                                super::AuthorityBindingMode::Observe,
+                                super::AuthorityExpr::Observe { .. },
+                            )
                             | (super::AuthorityBindingMode::Plain, _) => {}
                             (super::AuthorityBindingMode::Authoritative, _) => {
                                 return Err(ValidationError::ExtensionError(
-                                    "`authoritative let` must bind a `check` expression".to_string(),
+                                    "`authoritative let` must bind a `check` expression"
+                                        .to_string(),
                                 ));
                             }
                             (super::AuthorityBindingMode::Observe, _) => {

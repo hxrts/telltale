@@ -4,8 +4,8 @@ use crate::ast::{
     EffectAuthorityClass, EffectInterfaceDeclaration, EffectOperationDeclaration,
     ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationAgreementAttachment,
     OperationDeclaration, OperationParameterDeclaration, ProgressAttachment, RegionDeclaration,
-    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
-    TypeConstructorDeclaration, TypeDeclaration,
+    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration, TypeConstructorDeclaration,
+    TypeDeclaration,
 };
 
 pub(super) fn enforce_same_line_equals(
@@ -533,7 +533,8 @@ pub(super) fn parse_effect_decl(
                 span: ErrorSpan::from_pest_span(span, input),
                 message: "effect operation is missing name".to_string(),
             })?;
-            let (authority_class, op_name_pair) = if first.as_rule() == Rule::effect_op_authority_class {
+            let (authority_class, op_name_pair) =
+                if first.as_rule() == Rule::effect_op_authority_class {
                     let authority_class = match first.as_str() {
                         "authoritative" => EffectAuthorityClass::Authoritative,
                         "observe" => EffectAuthorityClass::Observe,
@@ -876,18 +877,21 @@ pub(super) fn parse_operation_decl(
                     })?
                     .as_str()
                     .to_string();
-                let threshold = compose_inner.next().map(|value| {
-                    value
-                        .as_str()
-                        .parse::<u64>()
-                        .map_err(|err| ParseError::Syntax {
-                            span: compose_span.clone(),
-                            message: format!(
-                                "invalid threshold_success count `{}`: {err}",
-                                value.as_str()
-                            ),
-                        })
-                }).transpose()?;
+                let threshold = compose_inner
+                    .next()
+                    .map(|value| {
+                        value
+                            .as_str()
+                            .parse::<u64>()
+                            .map_err(|err| ParseError::Syntax {
+                                span: compose_span.clone(),
+                                message: format!(
+                                    "invalid threshold_success count `{}`: {err}",
+                                    value.as_str()
+                                ),
+                            })
+                    })
+                    .transpose()?;
                 child_effect_aggregation = Some(parse_operation_composition(
                     &policy_name,
                     threshold,
@@ -968,9 +972,7 @@ fn parse_operation_composition(
         }
     };
 
-    Ok(ChildEffectAggregation {
-        policy,
-    })
+    Ok(ChildEffectAggregation { policy })
 }
 
 pub(super) fn parse_guest_runtime_decl(

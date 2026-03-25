@@ -187,8 +187,9 @@ mod tests {
                 required_evidence_kind: AgreementEvidenceKind::Publication,
             }],
             agreement_evidence: vec![AgreementEvidence {
-                evidence_id: "publication:materialization:session.ready:digest:materialization.succeeded"
-                    .to_string(),
+                evidence_id:
+                    "publication:materialization:session.ready:digest:materialization.succeeded"
+                        .to_string(),
                 operation_id: "materialization:session.ready:digest".to_string(),
                 session: None,
                 owner_id: None,
