@@ -5,10 +5,9 @@
 //! topology follows the standard Cooley-Tukey bit-reversal pattern, with each
 //! stage pairing roles at increasing stride distances.
 //!
-//! Uses the `tell!` macro to define the global protocol from which
-//! per-role session types are projected automatically. The choreography
-//! sequences each butterfly exchange so that the lower-indexed role in a pair
-//! sends first.
+//! This is a projection-surface example: `tell!` owns the butterfly exchange
+//! topology, while Rust provides the host-side complex arithmetic and local
+//! twiddle/butterfly computation.
 
 use futures::{executor, try_join};
 use num_complex::{Complex, Complex32};

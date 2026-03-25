@@ -12,15 +12,9 @@
 //! 5. On **OpenDoor**, the elevator automatically closes the door afterward
 //!    (the full open-wait-close cycle from the original protocol).
 //!
-//! The original implementation used infinite mutually recursive session types
-//! (the user continuously selected commands in an unbounded loop, and the
-//! elevator/door state machine cycled through open/close/stop transitions
-//! without any `End` state). This version models a single command cycle with
-//! the automatic close-after-open behavior, demonstrating the same three-role
-//! topology and choice-based coordination in a form the `tell!` macro
-//! can project.
-//! Uses the `tell!` macro to derive session types, roles, messages,
-//! and channel wiring from the global protocol specification.
+//! This is a projection-surface example: `tell!` owns the command and relay
+//! structure, while Rust provides the user's local command input and the
+//! door/elevator host behavior.
 
 use futures::{executor, try_join};
 use std::error::Error;
@@ -67,9 +61,9 @@ use Elevator::sessions::*;
 // User
 // ---------------------------------------------------------------------------
 
-async fn user(role: &mut U) -> Result<(), Box<dyn Error>> {
+async fn user(role: &mut U, command: UserCommand) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: USession<'_, _>| async {
-        match user_command() {
+        match command {
             UserCommand::OpenDoor => {
                 println!("U: requesting door open");
                 let s = s.select(OpenDoor).await?;
@@ -172,7 +166,8 @@ async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut u, mut d, mut e) = Roles::default();
-    executor::block_on(async { try_join!(user(&mut u), door(&mut d), elevator(&mut e)) })?;
+    let command = user_command();
+    executor::block_on(async { try_join!(user(&mut u, command), door(&mut d), elevator(&mut e)) })?;
     println!("\nElevator protocol completed successfully");
     Ok(())
 }

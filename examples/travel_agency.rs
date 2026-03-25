@@ -1,10 +1,37 @@
 //! Two-party travel agency negotiation protocol.
-//! Uses the `tell!` macro to derive session types, roles, messages,
-//! and channel wiring from the global protocol specification.
+//!
+//! This is a projection-surface example: `tell!` owns the accept/reject
+//! negotiation branch, while Rust provides the customer's budget and the
+//! agency's local quote calculation.
 
 use futures::{executor, try_join};
 use std::error::Error;
 use telltale::{tell, try_session};
+
+#[derive(Clone, Copy, Debug)]
+struct TravelRequest {
+    distance: i32,
+    max_budget: i32,
+    address: i32,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum QuoteDecision {
+    Accept,
+    Reject,
+}
+
+fn decide_quote(price: i32, max_budget: i32) -> QuoteDecision {
+    if price < max_budget {
+        QuoteDecision::Accept
+    } else {
+        QuoteDecision::Reject
+    }
+}
+
+fn quote_for_distance(distance: i32) -> i32 {
+    distance * 10
+}
 
 tell! {
     -- // Customer places one order, receives a quote, then accepts or rejects it.
@@ -28,32 +55,31 @@ use TravelAgency::sessions::*;
 // Endpoint implementations
 // ---------------------------------------------------------------------------
 
-async fn customer(role: &mut Customer) -> Result<(), Box<dyn Error>> {
+async fn customer(role: &mut Customer, request: TravelRequest) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: CustomerSession<'_, _>| async {
-        let distance: i32 = 5;
-
-        // Send order with trip distance
-        let s = s.send(Order(distance)).await?;
+        let s = s.send(Order(request.distance)).await?;
 
         // Receive quote from agency
         let (Quote(price), s) = s.receive().await?;
 
-        if price < 100 {
-            // Accept and send delivery address
-            let s = s.select(Accept).await?;
-            let address = 123;
-            let s = s.send(Address(address)).await?;
+        match decide_quote(price, request.max_budget) {
+            QuoteDecision::Accept => {
+                let s = s.select(Accept).await?;
+                let s = s.send(Address(request.address)).await?;
 
-            // Receive delivery date
-            let (Date(date), s) = s.receive().await?;
-            println!("Order: distance {distance}, quote {price} — accepted. Delivery date: {date}");
-            Ok(((), s))
-        } else {
-            // Reject the quote
-            let s = s.select(Reject).await?;
-            let s = s.send(Rejection(price)).await?;
-            println!("Order: distance {distance}, quote {price} — rejected.");
-            Ok(((), s))
+                let (Date(date), s) = s.receive().await?;
+                println!(
+                    "Order: distance {}, quote {price} — accepted. Delivery date: {date}",
+                    request.distance
+                );
+                Ok(((), s))
+            }
+            QuoteDecision::Reject => {
+                let s = s.select(Reject).await?;
+                let s = s.send(Rejection(price)).await?;
+                println!("Order: distance {}, quote {price} — rejected.", request.distance);
+                Ok(((), s))
+            }
         }
     })
     .await
@@ -64,8 +90,7 @@ async fn agency(role: &mut Agency) -> Result<(), Box<dyn Error>> {
         // Receive order
         let (Order(distance), s) = s.receive().await?;
 
-        // Quote 10x the distance
-        let price = distance * 10;
+        let price = quote_for_distance(distance);
         let s = s.send(Quote(price)).await?;
 
         // Branch on customer's choice
@@ -91,6 +116,11 @@ async fn agency(role: &mut Agency) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut c, mut a) = Roles::default();
-    executor::block_on(async { try_join!(customer(&mut c), agency(&mut a)) })?;
+    let request = TravelRequest {
+        distance: 5,
+        max_budget: 100,
+        address: 123,
+    };
+    executor::block_on(async { try_join!(customer(&mut c, request), agency(&mut a)) })?;
     Ok(())
 }

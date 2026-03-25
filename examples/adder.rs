@@ -1,27 +1,23 @@
 //! Recursive adder protocol between a client and server.
 //!
-//! The client sends an initial value, then repeatedly chooses to either add
-//! another pair of numbers (receiving back the running sum) or say goodbye.
-//! The recursive `Select`/`Branch` loop (Add -> Add -> Sum -> choose again)
-//! encodes an unbounded number of additions terminated by a `Bye` exit.
-//! Uses the `tell!` macro to derive session types, roles, messages,
-//! and channel wiring from the global protocol specification.
+//! This is a projection-surface example: `tell!` owns the protocol-visible
+//! loop and branching structure, while Rust only provides the client's local
+//! request plan and the server's arithmetic.
 
 use futures::{executor, try_join};
 use std::error::Error;
 use telltale::{tell, try_session};
 
 #[derive(Clone, Copy, Debug)]
-enum AdderAction {
-    Add(i32, i32),
-    Bye,
+struct AddRequest {
+    left: i32,
+    right: i32,
 }
 
-const CLIENT_PLAN: &[AdderAction] = &[
-    AdderAction::Add(2, 3),
-    AdderAction::Add(4, 5),
-    AdderAction::Add(6, 7),
-    AdderAction::Bye,
+const CLIENT_PLAN: &[AddRequest] = &[
+    AddRequest { left: 2, right: 3 },
+    AddRequest { left: 4, right: 5 },
+    AddRequest { left: 6, right: 7 },
 ];
 
 tell! {
@@ -50,30 +46,22 @@ use Adder::sessions::*;
 // Endpoint implementations
 // ---------------------------------------------------------------------------
 
-async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
+async fn client(role: &mut C, initial: i32, plan: &[AddRequest]) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: CSession<'_, _>| async {
-        let initial = 1;
         let mut s = s.send(Hello(initial)).await?;
 
-        for action in CLIENT_PLAN {
-            match *action {
-                AdderAction::Add(left, right) => {
-                    let add_session = s.select(Add(left)).await?;
-                    let add_session = add_session.send(Add(right)).await?;
-                    let (Sum(total), next) = add_session.receive().await?;
-                    println!("{initial} + {left} + {right} = {total}");
-                    assert_eq!(total, initial + left + right);
-                    s = next;
-                }
-                AdderAction::Bye => {
-                    let bye_session = s.select(Bye).await?;
-                    let (Bye, end) = bye_session.receive().await?;
-                    return Ok(((), end));
-                }
-            }
+        for request in plan {
+            let add_session = s.select(Add(request.left)).await?;
+            let add_session = add_session.send(Add(request.right)).await?;
+            let (Sum(total), next) = add_session.receive().await?;
+            println!("{initial} + {} + {} = {total}", request.left, request.right);
+            assert_eq!(total, initial + request.left + request.right);
+            s = next;
         }
 
-        unreachable!("the client plan must terminate with Bye")
+        let bye_session = s.select(Bye).await?;
+        let (Bye, end) = bye_session.receive().await?;
+        Ok(((), end))
     })
     .await
 }
@@ -102,6 +90,6 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut c, mut s) = Roles::default();
-    executor::block_on(async { try_join!(client(&mut c), server(&mut s)) })?;
+    executor::block_on(async { try_join!(client(&mut c, 1, CLIENT_PLAN), server(&mut s)) })?;
     Ok(())
 }

@@ -1,4 +1,7 @@
 //! Ring topology example demonstrating circular communication.
+//!
+//! This is a projection-surface example: `tell!` owns the ring topology and
+//! message ordering, while Rust only supplies each participant's local value.
 
 use futures::{executor, try_join};
 use std::{error::Error, result};

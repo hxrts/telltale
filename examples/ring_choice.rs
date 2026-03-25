@@ -1,13 +1,8 @@
 //! Ring protocol with per-hop choices and recursive session types.
 //!
-//! Three roles (A, B, C) form a ring where A decides on each round to
-//! continue (sending an `Add` value around the ring) or stop (sending
-//! `Stop` to terminate). The `rec`/`continue` construct produces
-//! self-referential session types that the type system enforces at
-//! compile time. Execution is bounded at runtime by a configurable
-//! `RING_MAX_ROUNDS` limit (default 5).
-//! Uses the `tell!` macro to derive session types, roles, messages,
-//! and channel wiring from the global protocol specification.
+//! This is a projection-surface example: `tell!` owns the recursive branch
+//! structure, while Rust supplies the initiator's runtime round bound and the
+//! local arithmetic performed at each hop.
 
 use futures::{executor, try_join};
 use std::{error::Error, result};
@@ -49,10 +44,9 @@ use RingChoice::sessions::*;
 // Endpoint implementations
 // ---------------------------------------------------------------------------
 
-async fn ring_a(role: &mut A, mut input: i32) -> Result<()> {
+async fn ring_a(role: &mut A, mut input: i32, rounds: usize) -> Result<()> {
     try_session(role, |mut s: ASession<'_, _>| async {
-        let max = max_rounds();
-        for round in 0..max {
+        for round in 0..rounds {
             println!("A (round {round}): {input}");
             let x = input % 100; // keep values small to prevent overflow
             let recv_s = s.select(Add(x)).await?;
@@ -60,7 +54,7 @@ async fn ring_a(role: &mut A, mut input: i32) -> Result<()> {
             input = x + y;
             s = next;
         }
-        println!("A: completed {max} rounds, final value: {input}");
+        println!("A: completed {rounds} rounds, final value: {input}");
 
         // Terminate the ring
         let end = s.select(Stop).await?;
@@ -118,7 +112,10 @@ async fn ring_c(role: &mut C, mut input: i32) -> Result<()> {
 
 fn main() -> Result<()> {
     let Roles(mut a, mut b, mut c) = Roles::default();
-    executor::block_on(async { try_join!(ring_a(&mut a, -1), ring_b(&mut b, 0), ring_c(&mut c, 1)) })?;
-    println!("\nRing protocol completed after {} rounds", max_rounds());
+    let rounds = max_rounds();
+    executor::block_on(async {
+        try_join!(ring_a(&mut a, -1, rounds), ring_b(&mut b, 0), ring_c(&mut c, 1))
+    })?;
+    println!("\nRing protocol completed after {rounds} rounds");
     Ok(())
 }

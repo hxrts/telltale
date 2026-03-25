@@ -1,9 +1,8 @@
 //! OAuth example demonstrating authentication session types.
 //!
-//! This example uses the `tell!` macro to define the protocol with nested
-//! choice/branching. The outer choice is made by S (server) selecting Login or
-//! Cancel. In the Login path, A (authenticator) decides Granted or Denied, and S
-//! forwards the result to C (client) via explicit relay choices.
+//! This is a projection-surface example: `tell!` owns the protocol-visible
+//! cancel/login/auth-result branches, while Rust supplies the server's local
+//! intent and the authenticator's local approval policy.
 //!
 //! Adapted from: Stay safe under panic: Rust programming with affine MPST
 use futures::{executor, try_join};
@@ -11,17 +10,22 @@ use std::error::Error;
 use telltale::{tell, try_session};
 
 #[derive(Clone, Copy, Debug)]
-enum LoginScenario {
+enum ServerIntent {
     Cancel(i32),
-    Grant(i32),
-    Deny(i32),
+    Login(i32),
 }
 
-fn login_scenario() -> LoginScenario {
+#[derive(Clone, Copy, Debug)]
+enum AuthDecision {
+    Grant,
+    Deny,
+}
+
+fn login_configuration() -> (ServerIntent, AuthDecision) {
     match std::env::var("OAUTH_SCENARIO").ok().as_deref() {
-        Some("cancel") => LoginScenario::Cancel(10),
-        Some("deny") => LoginScenario::Deny(10),
-        _ => LoginScenario::Grant(10),
+        Some("cancel") => (ServerIntent::Cancel(10), AuthDecision::Grant),
+        Some("deny") => (ServerIntent::Login(10), AuthDecision::Deny),
+        _ => (ServerIntent::Login(10), AuthDecision::Grant),
     }
 }
 
@@ -96,24 +100,21 @@ async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
     .await
 }
 
-async fn auth(role: &mut A) -> Result<(), Box<dyn Error>> {
+async fn auth(role: &mut A, decision: AuthDecision) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: ASession<'_, _>| async {
         match s.branch().await? {
             AChoice1::Proceed(Proceed, cont) => {
                 let (Password(i), s) = cont.receive().await?;
-                match login_scenario() {
-                    LoginScenario::Grant(_) => {
+                match decision {
+                    AuthDecision::Grant => {
                         let s = s.select(Granted).await?;
                         let end = s.send(Approved(i)).await?;
                         Ok(((), end))
                     }
-                    LoginScenario::Deny(_) => {
+                    AuthDecision::Deny => {
                         let s = s.select(Denied).await?;
                         let end = s.send(Rejected(i)).await?;
                         Ok(((), end))
-                    }
-                    LoginScenario::Cancel(_) => {
-                        unreachable!("cancel never reaches the authenticator")
                     }
                 }
             }
@@ -126,15 +127,15 @@ async fn auth(role: &mut A) -> Result<(), Box<dyn Error>> {
     .await
 }
 
-async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
+async fn server(role: &mut S, intent: ServerIntent) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: SSession<'_, _>| async {
-        match login_scenario() {
-            LoginScenario::Cancel(i) => {
+        match intent {
+            ServerIntent::Cancel(i) => {
                 let s = s.select(Cancel).await?;
                 let end = s.send(CancelReq(i)).await?;
                 Ok(((), end))
             }
-            LoginScenario::Grant(i) | LoginScenario::Deny(i) => {
+            ServerIntent::Login(i) => {
                 let s = s.select(Login).await?;
                 let s = s.send(LoginReq(i)).await?;
                 match s.branch().await? {
@@ -163,6 +164,7 @@ async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut s, mut c, mut a) = Roles::default();
-    executor::block_on(async { try_join!(client(&mut c), server(&mut s), auth(&mut a)) })?;
+    let (intent, decision) = login_configuration();
+    executor::block_on(async { try_join!(client(&mut c), server(&mut s, intent), auth(&mut a, decision)) })?;
     Ok(())
 }

@@ -9,17 +9,9 @@
 //! - **Retry** -- the server asks the client to resend, then succeeds on the
 //!   second attempt.
 //!
-//! The original implementation used infinite recursive session types (the
-//! logging loop `S -> L : Log` cycled forever with no `End` state). This
-//! version models a single request-response cycle with all three outcomes,
-//! demonstrating the same three-role topology and choice-based branching
-//! in a form the `tell!` macro can project.
-//!
-//! The server notifies both the client and the logger in every branch so that
-//! each role's projected session type is compatible across all choice arms
-//! (a requirement for well-formed multiparty projection).
-//! Uses the `tell!` macro to derive session types, roles, messages,
-//! and channel wiring from the global protocol specification.
+//! This is a projection-surface example: `tell!` owns the outcome branches, and
+//! Rust supplies the server's local processing outcome plus the logger's host
+//! implementation.
 
 use futures::{executor, try_join};
 use std::error::Error;
@@ -102,12 +94,12 @@ async fn client(role: &mut C) -> Result<(), Box<dyn Error>> {
 // Server
 // ---------------------------------------------------------------------------
 
-async fn server(role: &mut S) -> Result<(), Box<dyn Error>> {
+async fn server(role: &mut S, outcome: ServerOutcome) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: SSession<'_, _>| async {
         let (Request(i), s) = s.receive().await?;
         println!("S: received Request({i})");
 
-        match server_outcome() {
+        match outcome {
             ServerOutcome::Fault => {
                 let s = s.select(Fault).await?;
                 let end = s.send(Fault).await?;
@@ -165,7 +157,8 @@ async fn logger(role: &mut L) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut c, mut s, mut l) = Roles::default();
-    executor::block_on(async { try_join!(client(&mut c), server(&mut s), logger(&mut l)) })?;
+    let outcome = server_outcome();
+    executor::block_on(async { try_join!(client(&mut c), server(&mut s, outcome), logger(&mut l)) })?;
     println!("\nClient-server-log protocol completed successfully");
     Ok(())
 }

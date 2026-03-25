@@ -2,8 +2,8 @@
 //!
 //! Each node holds a local value. The ring forwards the running maximum around
 //! the full cycle so that the initiator receives the global max.
-//! This protocol is purely linear (no branching or recursion), so the
-//! `tell!` projection surface can express it directly.
+//! This is a projection-surface example: `tell!` owns the linear topology,
+//! while Rust provides each node's local value and pure `max` computation.
 
 use futures::{executor, try_join};
 use std::{cmp, error::Error, result};

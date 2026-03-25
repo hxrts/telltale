@@ -1,13 +1,32 @@
 //! Three-party shopping protocol demonstrating multiparty session types.
 //!
-//! Alice wants to buy an item. She asks Seller for a quote, then negotiates
-//! with Bob to split the cost. Bob decides whether to confirm or quit.
-//! Uses the `tell!` macro to generate session types, roles, and
-//! messages from the global protocol specification.
+//! This is a projection-surface example: `tell!` owns the confirm/quit branch,
+//! while Rust supplies Alice's requested item and contribution strategy plus
+//! Bob's local affordability calculation.
 
 use futures::{executor, try_join};
 use std::error::Error;
 use telltale::{tell, try_session};
+
+#[derive(Clone, Copy, Debug)]
+struct AlicePlan {
+    item: i32,
+    contribution: i32,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum PurchaseDecision {
+    Confirm(i32),
+    Quit,
+}
+
+fn decide_purchase(seller_price: i32, alice_share: i32) -> PurchaseDecision {
+    if alice_share == seller_price {
+        PurchaseDecision::Confirm(alice_share)
+    } else {
+        PurchaseDecision::Quit
+    }
+}
 
 tell! {
     -- // Alice asks for a quote, then Bob decides whether the purchase proceeds.
@@ -35,19 +54,18 @@ use ThreeBuyers::sessions::*;
 // Endpoint implementations
 // ---------------------------------------------------------------------------
 
-async fn alice(role: &mut Alice) -> Result<(), Box<dyn Error>> {
+async fn alice(role: &mut Alice, plan: AlicePlan) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: AliceSession<'_, _>| async {
-        // Request item 42
-        let s = s.send(Request(42)).await?;
-        println!("Alice: requested item 42");
+        let s = s.send(Request(plan.item)).await?;
+        println!("Alice: requested item {}", plan.item);
 
         // Receive quote from Seller
         let (Quote(price), s) = s.receive().await?;
         println!("Alice: received quote of {price}");
 
         // Tell Bob how much Alice will contribute
-        let s = s.send(Contribution(price)).await?;
-        println!("Alice: told Bob contribution of {price}");
+        let s = s.send(Contribution(plan.contribution)).await?;
+        println!("Alice: told Bob contribution of {}", plan.contribution);
 
         // Wait for Bob's decision
         match s.branch().await? {
@@ -75,24 +93,25 @@ async fn bob(role: &mut Bob) -> Result<(), Box<dyn Error>> {
         println!("Bob: Alice will contribute {alice_share}");
 
         // Decide based on whether quotes match
-        if alice_share == seller_price {
-            println!("Bob: quotes match, confirming purchase");
+        match decide_purchase(seller_price, alice_share) {
+            PurchaseDecision::Confirm(amount) => {
+                println!("Bob: quotes match, confirming purchase");
 
-            // Notify Alice and Seller, then receive delivery date
-            let s = s.select(Confirm(alice_share)).await?;
-            let s = s.send(Confirm(alice_share)).await?;
-            let (Date(date), end) = s.receive().await?;
-            println!("Bob: delivery in {date} days");
+                let s = s.select(Confirm(amount)).await?;
+                let s = s.send(Confirm(amount)).await?;
+                let (Date(date), end) = s.receive().await?;
+                println!("Bob: delivery in {date} days");
 
-            Ok(((), end))
-        } else {
-            println!("Bob: quotes don't match, quitting");
+                Ok(((), end))
+            }
+            PurchaseDecision::Quit => {
+                println!("Bob: quotes don't match, quitting");
 
-            // Notify Alice and Seller
-            let s = s.select(Quit(0)).await?;
-            let end = s.send(Quit(0)).await?;
+                let s = s.select(Quit(0)).await?;
+                let end = s.send(Quit(0)).await?;
 
-            Ok(((), end))
+                Ok(((), end))
+            }
         }
     })
     .await
@@ -134,6 +153,10 @@ async fn seller(role: &mut Seller) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut a, mut b, mut s) = Roles::default();
-    executor::block_on(async { try_join!(alice(&mut a), bob(&mut b), seller(&mut s)) })?;
+    let alice_plan = AlicePlan {
+        item: 42,
+        contribution: 42,
+    };
+    executor::block_on(async { try_join!(alice(&mut a, alice_plan), bob(&mut b), seller(&mut s)) })?;
     Ok(())
 }

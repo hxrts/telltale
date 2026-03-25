@@ -1,13 +1,17 @@
 //! Fan-out/fan-in work distribution protocol.
 //!
-//! A coordinator distributes workloads to four workers, each computes a partial
-//! result (doubling its input), and returns it. The coordinator collects all
-//! partial results and sums them.
+//! This is a projection-surface example: `tell!` owns the fan-out/fan-in
+//! structure, while Rust supplies the local work items and each worker's pure
+//! computation.
 use futures::{executor, try_join};
 use std::{error::Error, result};
 use telltale::{tell, try_session};
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
+
+fn compute_partial(work_item: i32) -> i32 {
+    work_item * 2
+}
 
 tell! {
     -- // Coordinator fans work out to all workers, then collects partial results.
@@ -50,7 +54,7 @@ async fn coordinator(role: &mut Coordinator) -> Result<i32> {
 async fn worker_1(role: &mut W1) -> Result<()> {
     try_session(role, |s: W1Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(x * 2)).await?;
+        let s = s.send(PartialResult(compute_partial(x))).await?;
         Ok(((), s))
     })
     .await
@@ -59,7 +63,7 @@ async fn worker_1(role: &mut W1) -> Result<()> {
 async fn worker_2(role: &mut W2) -> Result<()> {
     try_session(role, |s: W2Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(x * 2)).await?;
+        let s = s.send(PartialResult(compute_partial(x))).await?;
         Ok(((), s))
     })
     .await
@@ -68,7 +72,7 @@ async fn worker_2(role: &mut W2) -> Result<()> {
 async fn worker_3(role: &mut W3) -> Result<()> {
     try_session(role, |s: W3Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(x * 2)).await?;
+        let s = s.send(PartialResult(compute_partial(x))).await?;
         Ok(((), s))
     })
     .await
@@ -77,7 +81,7 @@ async fn worker_3(role: &mut W3) -> Result<()> {
 async fn worker_4(role: &mut W4) -> Result<()> {
     try_session(role, |s: W4Session<'_, _>| async {
         let (Work(x), s) = s.receive().await?;
-        let s = s.send(PartialResult(x * 2)).await?;
+        let s = s.send(PartialResult(compute_partial(x))).await?;
         Ok(((), s))
     })
     .await

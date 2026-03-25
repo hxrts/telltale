@@ -1,4 +1,8 @@
 //! Double buffering example demonstrating concurrent data transfer.
+//!
+//! This is a projection-surface example: `tell!` owns the two-buffer handoff
+//! structure, while Rust provides the host-side thread pool and local buffer
+//! contents.
 
 use futures::{
     executor::{self, ThreadPool},
