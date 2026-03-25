@@ -82,7 +82,7 @@ This diagram summarizes the compile time flow from DSL input to runtime executio
 
 ### AST Module
 
-The AST module is located in `rust/choreography/src/ast/`. It represents choreographies as data structures.
+The AST module is located in `rust/parser/src/ast/`. It represents choreographies as data structures.
 
 The main type is `Choreography`.
 
@@ -177,7 +177,7 @@ pub enum Protocol {
 
 ### Parser Module
 
-The parser module is located in `rust/choreography/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
+The parser module is located in `rust/parser/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
 The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with `->` message arrows, `=>` branch arrows, `choice Role at` branches with leading `|`, and `par` blocks.
 

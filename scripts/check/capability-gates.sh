@@ -291,9 +291,9 @@ check_contracts() {
   echo "== Runtime Contract Gates =="
 
   check "admission API requires runtime contracts for advanced modes" \
-    "rg -q 'def requiresVMRuntimeContracts' '${CONTRACTS_FILE}' && \
-     rg -q 'def admitVMRuntime' '${CONTRACTS_FILE}' && \
-     rg -q 'theorem admit(_vm_runtime|VMRuntime)_requires_contracts' '${CONTRACTS_FILE}'"
+    "rg -q 'def requiresProtocolMachineRuntimeContracts' '${CONTRACTS_FILE}' && \
+     rg -q 'def admitProtocolMachineRuntime' '${CONTRACTS_FILE}' && \
+     rg -q 'theorem admit(_vm_runtime|VMRuntime|_protocol_machine_runtime|ProtocolMachineRuntime)_requires_contracts' '${CONTRACTS_FILE}'"
 
   check "determinism profile selection is capability-gated and validated" \
     "rg -q 'def determinismProfileSupported' '${CONTRACTS_FILE}' && \

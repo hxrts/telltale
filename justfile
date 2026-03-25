@@ -577,7 +577,7 @@ verify-protocol-machine-correspondence:
 verify-track-a:
     cargo test -p telltale-machine --test trace_corpus
     cargo test -p telltale-machine --test strict_tick_equality
-    cargo test -p telltale-machine --test lean_vm_equivalence
+    cargo test -p telltale-machine --test lean_protocol_machine_equivalence
 
 # Lean-side invariant verification checks for protocol bundles.
 verify-invariants:
@@ -610,7 +610,7 @@ verify-cross-target-matrix:
     wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-cross-target-wasm.XXXXXX")"
     trap 'rm -rf "$wasm_target"' EXIT
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence
-    cargo test -p telltale-machine --test lean_vm_equivalence
+    cargo test -p telltale-machine --test lean_protocol_machine_equivalence
     CARGO_TARGET_DIR="$wasm_target" wasm-pack test --node rust/machine --features wasm -- --nocapture
     cargo test -p telltale-bridge --test protocol_machine_cross_target_tests
 

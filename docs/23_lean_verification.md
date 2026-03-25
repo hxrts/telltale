@@ -32,7 +32,7 @@ The Lean tree is organized as a layered stack.
 
 ## Protocol-Machine Model and Runtime Surfaces
 
-The protocol-machine model is centered under `lean/Runtime/protocol machine`.
+The protocol-machine model is centered under `lean/Runtime/ProtocolMachine`.
 
 | Surface | Location |
 |---|---|

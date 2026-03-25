@@ -7,14 +7,14 @@ Rules:
 
 - Shared semantic/runtime objects keep the same PascalCase type name in Lean and Rust.
 - Field names may differ only by language casing convention:
-  Lean uses `camelCase`; Rust uses `snake_case`.
+  Lean uses `camelCase`. Rust uses `snake_case`.
 - Proof-only Lean packaging objects and Rust-only operational wrappers are listed
   separately and are not parity targets.
 
 ## Shared Semantic Object Inventory
 
 Lean source of truth:
-[lean/Runtime/protocol machine/Model/SemanticObjects/Core.lean](../lean/Runtime/protocol machine/Model/SemanticObjects/Core.lean)
+[lean/Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean](../lean/Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean)
 
 Rust source of truth:
 [rust/machine/src/semantic_objects.rs](../rust/machine/src/semantic_objects.rs)
@@ -103,13 +103,13 @@ Rust-only wrappers, so they are not expected to have direct Lean theorem peers.
 - `ProtocolMachineRunInput`
 - `ProtocolMachineRunOutput`
 - `ProtocolMachineReplayBundle`
-- `GuestRuntimeDecl`
+- `GuestRuntimeDeclaration`
 
 ## Maintenance Rule
 
 When a shared semantic/runtime object is added, renamed, split, or removed:
 
-1. Update the Lean definition in `lean/Runtime/protocol machine/Model/SemanticObjects/Core.lean`.
+1. Update the Lean definition in `lean/Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean`.
 2. Update the Rust definition in `rust/machine/src/semantic_objects.rs`.
 3. Update the bridge re-export surface in `rust/bridge/src/semantic_objects.rs`.
 4. Update this parity inventory in the same change.

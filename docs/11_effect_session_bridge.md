@@ -230,7 +230,7 @@ authority checks and evidence-bearing branches after lowering.
 
 When repository tooling needs exported files on disk, use
 `just effect-scaffold` to generate host integration stubs. This is not the
-normal application path; normal code should implement the typed effect
+normal application path. Normal code should implement the typed effect
 interfaces emitted directly by `tell!`.
 
 The command reads DSL `effect` declarations and emits:
@@ -304,15 +304,15 @@ Default value is `false`.
 ## Lean Correspondence
 
 Lean splits effect execution and typing.
-This split is in `lean/Runtime/protocol machine/Model/TypeClasses.lean` and the typed
-request/outcome model in `lean/Runtime/protocol machine/Model/Effects.lean`.
+This split is in `lean/Runtime/ProtocolMachine/Model/TypeClasses.lean` and the typed
+request/outcome model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`.
 
 | Rust or protocol-machine surface | Lean surface | Purpose |
 |---|---|---|
 | `EffectHandler` execution boundary | `EffectRuntime.exec` | executable effect semantics |
 | handler typing obligation | `EffectSpec.handlerType` | typing-level effect contract |
 | typed request/outcome model | `Runtime/protocol machine/Model/Effects.lean` | shared effect-interface metadata plus request/outcome correspondence |
-| invoke typing | `WellTypedInstr.wt_invoke` in `lean/Runtime/protocol machine/Runtime/Monitor.lean` | ties invoke to handler type |
+| invoke typing | `WellTypedInstr.wt_invoke` in `lean/Runtime/ProtocolMachine/Runtime/Monitor.lean` | ties invoke to handler type |
 | behavioral equivalence | `Runtime/Proofs/EffectBisim/*` | observer-level bisimulation bridge |
 | config equivalence bridge | `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean` | links protocol quotient and effect bisimulation |
 | composed effect domains | `Runtime/Proofs/protocol machine/DomainComposition.lean` | sum and product composition instances |

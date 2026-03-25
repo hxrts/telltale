@@ -25,8 +25,9 @@ echo
 declare -A layer_of=(
   # Foundation
   ["telltale-types"]=1
-  # Core algorithm and macro layer
+  # Core algorithm, parser, and macro layer
   ["telltale-theory"]=2
+  ["telltale-parser"]=2
   ["telltale-macros"]=2
   # Runtime/verification
   ["telltale-machine"]=3

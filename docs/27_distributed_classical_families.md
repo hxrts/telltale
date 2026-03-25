@@ -52,7 +52,7 @@ These profiles are transported into theorem artifacts by adapter constructors an
 
 The combined builder is in `lean/Runtime/Proofs/TheoremPack/Build.lean`.
 
-Optional artifacts are assembled into `VMTheoremPack`. The `theoremInventory` function in `lean/Runtime/Proofs/TheoremPack/Inventory.lean` summarizes the pack. This inventory is the capability surface used by release and admission checks.
+Optional artifacts are assembled into `ProtocolMachineTheoremPack`. The `theoremInventory` function in `lean/Runtime/Proofs/TheoremPack/Inventory.lean` summarizes the pack. This inventory is the capability surface used by release and admission checks.
 
 ## Runtime Admission Impact
 

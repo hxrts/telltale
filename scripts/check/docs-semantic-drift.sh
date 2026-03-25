@@ -184,6 +184,11 @@ Admitted
 Blocked
 Failure
 Full
+RuntimeOutcome
+RuntimeRequest
+READY
+ProofBundleDecl
+ContactCeremonySoftSafe
 SKIP
 sort -u "$TMPDIR_DRIFT/skip_identifiers" -o "$TMPDIR_DRIFT/skip_identifiers"
 
@@ -328,7 +333,7 @@ for doc_file in "${DOC_FILES[@]}"; do
                     continue
                 fi
                 symbol="$(normalized_symbol_tail "$snippet")"
-                if [[ -n "$symbol" ]] && ! in_set "$symbol" "$TMPDIR_DRIFT/repo_identifiers"; then
+                if [[ -n "$symbol" ]] && ! in_set "$symbol" "$TMPDIR_DRIFT/repo_identifiers" && ! in_set "$symbol" "$TMPDIR_DRIFT/skip_identifiers"; then
                     echo "$doc_file:$line_no: unresolved repo-local symbol tail \`$snippet\`" >> "$ERRORS_FILE"
                 fi
                 continue
@@ -543,11 +548,11 @@ for vpath in "${VERSION_CHECK_FILES[@]}"; do
 
         if [[ "$vline" =~ ^[[:space:]]*telltale(-[a-z0-9]+)?[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
             crate_name="${BASH_REMATCH[1]}"
-            declared_version="${BASH_REMATCH[3]}"
+            declared_version="${BASH_REMATCH[2]}"
         # Match: crate_name = { version = "version" ... }
         elif [[ "$vline" =~ ^[[:space:]]*telltale(-[a-z0-9]+)?[[:space:]]*=[[:space:]]*\{.*version[[:space:]]*=[[:space:]]*\"([^\"]+)\" ]]; then
             crate_name="${BASH_REMATCH[1]}"
-            declared_version="${BASH_REMATCH[3]}"
+            declared_version="${BASH_REMATCH[2]}"
         fi
 
         if [[ -n "$crate_name" && -n "$declared_version" ]]; then

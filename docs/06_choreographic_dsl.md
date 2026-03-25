@@ -4,8 +4,8 @@
 
 The parser translates the layout-sensitive Telltale DSL into the internal AST
 (`Choreography` and `Protocol`). The DSL is direct style. Statements are
-newline separated. Indentation defines blocks. Records keep braces; structural
-blocks do not.
+newline separated. Indentation defines blocks. Records keep braces, but
+structural blocks do not.
 
 The parser lives in `rust/parser/src/compiler/parser/`. It uses Pest plus a
 layout preprocessor. The canonical source-file extension for Telltale source
@@ -270,6 +270,8 @@ protocol ConsensusProtocol =
   Followers[i] -> Leader : Vote
 ```
 
+The consensus protocol above demonstrates a symbolic role count (`N`) with an index variable (`i`) iterating over the follower set.
+
 #### 10) Profiles, Progress, And Proof Status
 
 Profiles and explicit progress attachment are part of the proof-backed surface.
@@ -307,7 +309,7 @@ Profiles, theorem-pack requirements, and language-tier diagnostics are surfaced
 as generated metadata because they are part of the verified model, not an
 afterthought layered on top.
 
-For effect interfaces, the canonical Rust import is `use Protocol::effects;`.
+For effect interfaces, the canonical Rust import is `use Protocol::effects`.
 Traits, request/outcome enums, effect-domain data, and per-operation semantic
 metadata all live under that one boundary. Interface metadata is exposed under
 snake-case effect modules such as `Protocol::effects::runtime`.
@@ -582,7 +584,7 @@ This lowering preserves statement order and continuation structure. Projection s
 
 `compose ...` is a secondary child-effect aggregation clause on an operation.
 It does not define distributed agreement by itself. Agreement lives in named
-agreement profiles; child-effect aggregation only says how sibling child
+agreement profiles. Child-effect aggregation only says how sibling child
 effects roll up underneath that parent agreement.
 
 ```tell
@@ -599,6 +601,8 @@ operation syncMembership(channel : ChannelId) at Worker
   compose threshold_success(2) =
     publish SyncQueued(channel)
 ```
+
+The `compose threshold_success(2)` clause attaches a child-effect rollup policy to the operation without overriding the parent agreement profile.
 
 ##### Reusable Domain Agreement Profiles
 
@@ -627,7 +631,7 @@ This keeps Telltale generic:
   semantic vocabulary
 - `ContactCeremonySoftSafe` and `aura_soft_safe` are domain-defined names
 - `compose ...` only describes child-effect rollup below the agreement
-  contract; it is not the agreement contract itself
+  contract, not the agreement contract itself
 
 The generated Rust surface preserves those domain names through
 `Protocol::agreements` and `Protocol::proof_status`, so downstream host code

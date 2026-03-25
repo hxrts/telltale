@@ -18,7 +18,7 @@ See `rust/src/lib.rs` for the full list of re-exports.
 
 Generated `tell!` APIs use one canonical effect-boundary import style:
 
-- `use Protocol::effects;`
+- import `Protocol::effects`
 - `effects::Runtime` for host traits
 - `effects::RuntimeRequest` / `effects::RuntimeOutcome` for typed dispatch
 - `effects::runtime::operation("ready")` or `effects::runtime::READY` for

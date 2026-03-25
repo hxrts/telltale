@@ -305,13 +305,13 @@ check_types() {
 
   compare_enum "FlowPolicy" \
     "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/Knowledge.lean" "FlowPolicy" \
-    "${ROOT_DIR}/rust/machine/src/vm/runtime_state/policy.rs" "FlowPolicy" \
+    "${ROOT_DIR}/rust/machine/src/engine/runtime_state/policy.rs" "FlowPolicy" \
     "allowAll|denyAll|allowRoles|denyRoles|predicate|predicateExpr" \
     "AllowAll|DenyAll|AllowRoles|DenyRoles|Predicate|PredicateExpr"
 
   compare_enum "FlowPredicate" \
     "${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/Knowledge.lean" "FlowPredicate" \
-    "${ROOT_DIR}/rust/machine/src/vm/runtime_state/policy.rs" "FlowPredicate" \
+    "${ROOT_DIR}/rust/machine/src/engine/runtime_state/policy.rs" "FlowPredicate" \
     "targetRolePrefix|factContains|endpointRoleMatchesTarget|all|any" \
     "TargetRolePrefix|FactContains|EndpointRoleMatchesTarget|All|Any"
 

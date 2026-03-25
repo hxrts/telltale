@@ -79,7 +79,7 @@ Rust and Lean are expected to align on the following surfaces.
 | Area | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
 | Projection core relation | `lean/Choreography/Projection/Project.lean` | `rust/choreography/src/compiler/projection.rs` | Aligned on supported subset |
-| Merge semantics | `lean/Choreography/Projection/Erasure/Merge.lean` | `rust/choreography/src/compiler/projection/merge.rs` | Aligned |
+| Merge semantics | `lean/Choreography/Projection/Erasure/Merge.lean` | `rust/parser/src/compiler/projection/merge.rs` | Aligned |
 | Projection validation pipeline | `lean/Choreography/Projection/Validator.lean` | `rust/bridge/src/runner_projection_export.rs` | Aligned |
 
 ### Rust-Only Extensions
@@ -88,8 +88,8 @@ The following surfaces are intentionally outside direct Lean parity. They must b
 
 | Surface | Rust Module | Parity Status |
 |---|---|---|
-| `LocalType::LocalChoice` | `rust/choreography/src/ast/local_type.rs` | Rust extension |
-| Timeout wrappers in local AST | `rust/choreography/src/ast/local_type.rs` | Rust extension |
+| `LocalType::LocalChoice` | `rust/parser/src/ast/local_type.rs` | Rust extension |
+| Timeout wrappers in local AST | `rust/parser/src/ast/local_type.rs` | Rust extension |
 | Effect runtime `Parallel` execution contract | `rust/choreography/src/effects/interpreter.rs` | Rust runtime contract |
 
 ### Projection Cross-Validation
@@ -168,7 +168,7 @@ The same attachment points are exposed through `Runtime/Proofs/TheoremPack/Inven
 
 ### Lean ProtocolMachineState
 
-Source: `lean/Runtime/protocol machine/Model/State.lean`
+Source: `lean/Runtime/ProtocolMachine/Model/State.lean`
 
 `CoroutineState` contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
 
@@ -251,7 +251,7 @@ Parity fixtures are enforced by:
 
 ## Lean Module Boundaries
 
-The `lean/Runtime/protocol machine` directory is organized into executable and proof modules.
+The `lean/Runtime/ProtocolMachine` directory is organized into executable and proof modules.
 
 The `Runtime/protocol machine/Model/` directory contains runtime data types, config, state, instruction forms, and event surfaces. The `Runtime/protocol machine/Semantics/` directory contains executable step semantics. The `Runtime/protocol machine/Runtime/` directory contains runtime adapters for loading, JSON, monitoring, and failure ingress.
 
@@ -300,7 +300,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 
 #### payload-hardening-extension
 
-**Lean:** `lean/Runtime/protocol machine/Model/Config.lean`, `lean/Runtime/protocol machine/Semantics/ExecComm.lean`
+**Lean:** `lean/Runtime/ProtocolMachine/Model/Config.lean`, `lean/Runtime/ProtocolMachine/Semantics/ExecComm.lean`
 **Rust:** `rust/machine/src/engine/`, `rust/machine/src/threaded.rs`, `rust/machine/tests/parity_fixtures_v2.rs`
 
 **Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes. Parity fixtures cover oversized payload rejection behavior at canonical concurrency.
@@ -409,7 +409,7 @@ Every Rust PR that changes type semantics must include this checklist in the PR 
 
 ## Naming Surface
 
-Rust protocol-machine code uses one canonical snake_case naming surface. Lean-specific casing remains on the Lean side; Rust APIs should not preserve parallel wrapper names such as `openDelta`, `siteName`, or `signValue`.
+Rust protocol-machine code uses one canonical snake_case naming surface. Lean-specific casing remains on the Lean side. Rust APIs should not preserve parallel wrapper names such as `openDelta`, `siteName`, or `signValue`.
 
 ## Related Docs
 

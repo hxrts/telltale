@@ -14,37 +14,37 @@ protocol-visible orchestration in Telltale, host realization in Rust.
 
 Projection examples in `examples/`:
 
-- `adder.rs` — recursive two-party adder
-- `alternating_bit.rs` — reliable delivery with ACK branching
-- `double_buffering.rs` — producer-consumer coordination via `tell!`
-- `fft.rs` — eight-role FFT butterfly network
-- `ring.rs` — three-node ring topology via `tell!`
-- `ring_choice.rs` — ring with per-hop branching and infinite types
-- `ring_max.rs` — linear ring maximum propagation
-- `three_adder.rs` — three-party sum via `tell!`
+- `adder.rs`:recursive two-party adder
+- `alternating_bit.rs`:reliable delivery with ACK branching
+- `double_buffering.rs`:producer-consumer coordination via `tell!`
+- `fft.rs`:eight-role FFT butterfly network
+- `ring.rs`:three-node ring topology via `tell!`
+- `ring_choice.rs`:ring with per-hop branching and infinite types
+- `ring_max.rs`:linear ring maximum propagation
+- `three_adder.rs`:three-party sum via `tell!`
 
 Effect-boundary examples in `examples/`:
 
-- `client_server_log.rs` — logging decisions at the host boundary
-- `commitment_lifecycle.rs` — commitment, profile-driven progress, and Aura-shaped agreement/finality metadata
-- `elevator.rs` — host-driven door/elevator capabilities
-- `generated_effect_interfaces.rs` — canonical generated Rust effect traits and semantic metadata
-- `map_reduce.rs` — structured fan-out/fan-in work with host compute boundaries
-- `oauth.rs` — authentication and authorization decisions at the effect boundary
-- `reactive_signal.rs` — reactive signal subscription/current-value/publish interface
-- `three_buyers.rs` — pricing and affordability decisions at the host boundary
-- `travel_agency.rs` — quote/schedule capabilities behind one protocol boundary
-- `wasm-ping-pong/` — browser integration via generated effects
+- `client_server_log.rs`:logging decisions at the host boundary
+- `commitment_lifecycle.rs`:commitment, profile-driven progress, and Aura-shaped agreement/finality metadata
+- `elevator.rs`:host-driven door/elevator capabilities
+- `generated_effect_interfaces.rs`:canonical generated Rust effect traits and semantic metadata
+- `map_reduce.rs`:structured fan-out/fan-in work with host compute boundaries
+- `oauth.rs`:authentication and authorization decisions at the effect boundary
+- `reactive_signal.rs`:reactive signal subscription/current-value/publish interface
+- `three_buyers.rs`:pricing and affordability decisions at the host boundary
+- `travel_agency.rs`:quote/schedule capabilities behind one protocol boundary
+- `wasm-ping-pong/`:browser integration via generated effects
 
 Theory examples in `examples/`:
 
-- `async_subtyping.rs` — async-subtyping checks and subtype relation examples
-- `bounded_recursion.rs` — bounded recursion strategies with configurable depth
+- `async_subtyping.rs`:async-subtyping checks and subtype relation examples
+- `bounded_recursion.rs`:bounded recursion strategies with configurable depth
 
 Generated-interface examples in `rust/choreography/examples/`:
 
-- `authority_surface.rs` — inspect `effect` declarations and proof-backed parser metadata
-- `telltale_client_server.rs` and `three_party_negotiation.rs` — runtime-oriented examples behind `native-examples`
+- `authority_surface.rs`:inspect `effect` declarations and proof-backed parser metadata
+- `telltale_client_server.rs` and `three_party_negotiation.rs`:runtime-oriented examples behind `native-examples`
 
 ## Common Patterns
 
@@ -198,7 +198,7 @@ assert!(matches!(presence, effects::RuntimeOutcome::Ready(Ok(_))));
 
 This produces canonical host-facing request/outcome enums, handler traits, and
 generated semantic metadata directly from the declared `effect` surface. Use
-`Protocol::effects` as the single import boundary; per-interface metadata lives
+`Protocol::effects` as the single import boundary. Per-interface metadata lives
 under `Protocol::effects::<effect_name_in_snake_case>`. `Protocol::proof_status`
 reports which generated proof-backed surfaces are available. File export
 remains tooling-only and is no longer the primary developer path.
