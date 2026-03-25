@@ -266,11 +266,11 @@ pub struct OperationDeclaration {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChildEffectAggregationPolicy {
     /// All child effects must succeed.
-    AllSuccess,
+    All,
     /// The first successful child effect resolves the aggregation.
-    FirstSuccess,
+    First,
     /// A fixed number of successful child effects is required.
-    ThresholdSuccess {
+    Threshold {
         /// Required success count.
         required_successes: u64,
     },
@@ -288,9 +288,9 @@ impl ChildEffectAggregationPolicy {
     #[must_use]
     pub fn dsl_name(&self) -> String {
         match self {
-            Self::AllSuccess => "all_success".to_string(),
-            Self::FirstSuccess => "first_success".to_string(),
-            Self::ThresholdSuccess { required_successes } => {
+            Self::All => "all_success".to_string(),
+            Self::First => "first_success".to_string(),
+            Self::Threshold { required_successes } => {
                 format!("threshold_success({required_successes})")
             }
         }

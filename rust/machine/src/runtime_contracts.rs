@@ -96,11 +96,11 @@ pub enum ProtocolMachineAdmissibilityClass {
 #[serde(rename_all = "snake_case")]
 pub enum ProtocolMachineEscalationWindowClass {
     /// Progress contracts carry bounded escalation windows.
-    ProgressContractBounded,
+    ProgressContract,
     /// Admission complexity remains within the bounded proof envelope.
-    AdmissionComplexityBounded,
+    AdmissionComplexity,
     /// Protocol-envelope bridge escalation windows are bounded.
-    ProtocolBridgeBounded,
+    ProtocolBridge,
 }
 
 /// Proof-carrying execution profile aligned with the Lean theorem-pack layer.
@@ -136,9 +136,9 @@ impl ProtocolMachineExecutionProfile {
             .into_iter()
             .collect(),
             escalation_window_classes: [
-                ProtocolMachineEscalationWindowClass::ProgressContractBounded,
-                ProtocolMachineEscalationWindowClass::AdmissionComplexityBounded,
-                ProtocolMachineEscalationWindowClass::ProtocolBridgeBounded,
+                ProtocolMachineEscalationWindowClass::ProgressContract,
+                ProtocolMachineEscalationWindowClass::AdmissionComplexity,
+                ProtocolMachineEscalationWindowClass::ProtocolBridge,
             ]
             .into_iter()
             .collect(),
@@ -237,7 +237,7 @@ pub fn runtime_execution_profile(
         ]
         .into_iter()
         .collect(),
-        escalation_window_classes: [ProtocolMachineEscalationWindowClass::ProgressContractBounded]
+        escalation_window_classes: [ProtocolMachineEscalationWindowClass::ProgressContract]
             .into_iter()
             .collect(),
         theorem_pack_eligibility: vec![
@@ -268,7 +268,7 @@ pub fn runtime_execution_profile(
     if contracts.is_some() {
         profile
             .escalation_window_classes
-            .insert(ProtocolMachineEscalationWindowClass::AdmissionComplexityBounded);
+            .insert(ProtocolMachineEscalationWindowClass::AdmissionComplexity);
     }
     if !matches!(cfg.output_condition_policy, OutputConditionPolicy::Disabled) {
         profile
@@ -276,7 +276,7 @@ pub fn runtime_execution_profile(
             .insert(ProtocolMachineAdmissibilityClass::ProtocolEnvelopeBridge);
         profile
             .escalation_window_classes
-            .insert(ProtocolMachineEscalationWindowClass::ProtocolBridgeBounded);
+            .insert(ProtocolMachineEscalationWindowClass::ProtocolBridge);
     }
 
     profile

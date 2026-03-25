@@ -936,7 +936,7 @@ fn parse_operation_composition(
                     message: "`all_success` does not take a threshold argument".to_string(),
                 });
             }
-            ChildEffectAggregationPolicy::AllSuccess
+            ChildEffectAggregationPolicy::All
         }
         "first" | "first_success" => {
             if threshold.is_some() {
@@ -945,7 +945,7 @@ fn parse_operation_composition(
                     message: "`first_success` does not take a threshold argument".to_string(),
                 });
             }
-            ChildEffectAggregationPolicy::FirstSuccess
+            ChildEffectAggregationPolicy::First
         }
         "threshold_success" => {
             let required_successes = threshold.ok_or_else(|| ParseError::Syntax {
@@ -960,7 +960,7 @@ fn parse_operation_composition(
                     message: "`threshold_success` requires a positive success count".to_string(),
                 });
             }
-            ChildEffectAggregationPolicy::ThresholdSuccess { required_successes }
+            ChildEffectAggregationPolicy::Threshold { required_successes }
         }
         _ => {
             return Err(ParseError::Syntax {

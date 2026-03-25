@@ -111,17 +111,18 @@ fn macro_source_text(input: MacroTokenStream) -> Option<String> {
         column: usize,
     }
 
-    fn location_of(start: proc_macro::Span) -> (Location, Location) {
-        let start_loc = start.start();
-        let end_loc = start.end();
+    #[allow(clippy::incompatible_msrv)]
+    fn location_of(span: proc_macro::Span) -> (Location, Location) {
+        let start = span.start();
+        let end = span.end();
         (
             Location {
-                line: start_loc.line(),
-                column: start_loc.column(),
+                line: start.line(),
+                column: start.column(),
             },
             Location {
-                line: end_loc.line(),
-                column: end_loc.column(),
+                line: end.line(),
+                column: end.column(),
             },
         )
     }
@@ -158,8 +159,7 @@ fn macro_source_text(input: MacroTokenStream) -> Option<String> {
                     *previous_end = Some(close_end);
                 }
                 MacroTokenTree::Ident(ident) => {
-                    let span = ident.span();
-                    let (start, end) = location_of(span);
+                    let (start, end) = location_of(ident.span());
                     if let Some(prev) = previous_end.as_ref() {
                         append_gap(out, *prev, start);
                     }
@@ -167,8 +167,7 @@ fn macro_source_text(input: MacroTokenStream) -> Option<String> {
                     *previous_end = Some(end);
                 }
                 MacroTokenTree::Punct(punct) => {
-                    let span = punct.span();
-                    let (start, end) = location_of(span);
+                    let (start, end) = location_of(punct.span());
                     if let Some(prev) = previous_end.as_ref() {
                         append_gap(out, *prev, start);
                     }
@@ -176,8 +175,7 @@ fn macro_source_text(input: MacroTokenStream) -> Option<String> {
                     *previous_end = Some(end);
                 }
                 MacroTokenTree::Literal(literal) => {
-                    let span = literal.span();
-                    let (start, end) = location_of(span);
+                    let (start, end) = location_of(literal.span());
                     if let Some(prev) = previous_end.as_ref() {
                         append_gap(out, *prev, start);
                     }
@@ -1605,15 +1603,11 @@ fn lower_child_effect_aggregation_policy(
     policy: &ChildEffectAggregationPolicy,
 ) -> Result<TokenStream> {
     Ok(match policy {
-        ChildEffectAggregationPolicy::AllSuccess => {
-            quote!(EffectCompositionPolicy::AllSuccess)
-        }
-        ChildEffectAggregationPolicy::FirstSuccess => {
-            quote!(EffectCompositionPolicy::FirstSuccess)
-        }
-        ChildEffectAggregationPolicy::ThresholdSuccess { required_successes } => {
+        ChildEffectAggregationPolicy::All => quote!(EffectCompositionPolicy::All),
+        ChildEffectAggregationPolicy::First => quote!(EffectCompositionPolicy::First),
+        ChildEffectAggregationPolicy::Threshold { required_successes } => {
             let required_successes = *required_successes;
-            quote!(EffectCompositionPolicy::ThresholdSuccess {
+            quote!(EffectCompositionPolicy::Threshold {
                 required_successes: #required_successes
             })
         }

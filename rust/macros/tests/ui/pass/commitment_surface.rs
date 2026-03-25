@@ -37,7 +37,7 @@ fn main() {
     assert_eq!(contract.profile_name.as_deref(), Some("SoftSafe"));
     assert_eq!(
         agreement.child_effect_aggregation,
-        Some(telltale::dsl::semantic::EffectCompositionPolicy::FirstSuccess)
+        Some(telltale::dsl::semantic::EffectCompositionPolicy::First)
     );
     assert_eq!(CommitLifecycle::proof_status::PARITY_CRITICAL_OPERATIONS, ["syncLedger"]);
     assert!(!CommitLifecycle::proof_status::SESSION_PROJECTABLE);

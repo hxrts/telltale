@@ -111,13 +111,12 @@ impl TheoremPackCapabilities {
         .into_iter()
         .collect();
         let mut escalation_window_classes: std::collections::BTreeSet<_> =
-            [ProtocolMachineEscalationWindowClass::ProgressContractBounded]
+            [ProtocolMachineEscalationWindowClass::ProgressContract]
                 .into_iter()
                 .collect();
         if self.output_condition_gating {
             admissibility_classes.insert(ProtocolMachineAdmissibilityClass::ProtocolEnvelopeBridge);
-            escalation_window_classes
-                .insert(ProtocolMachineEscalationWindowClass::ProtocolBridgeBounded);
+            escalation_window_classes.insert(ProtocolMachineEscalationWindowClass::ProtocolBridge);
         }
         if self
             .determinism
@@ -125,7 +124,7 @@ impl TheoremPackCapabilities {
             .any(|capability| !matches!(capability, DeterminismCapability::Full))
         {
             escalation_window_classes
-                .insert(ProtocolMachineEscalationWindowClass::AdmissionComplexityBounded);
+                .insert(ProtocolMachineEscalationWindowClass::AdmissionComplexity);
         }
 
         ProtocolMachineExecutionProfile {

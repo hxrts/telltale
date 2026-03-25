@@ -499,132 +499,155 @@ impl EffectInterfaceMetadata {
     pub fn for_effect_kind(effect_kind: &str) -> Self {
         let (interface_name, operation_name) = infer_effect_interface_and_operation(effect_kind);
         match effect_kind {
-            "send_decision" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "sendDecision".to_string()),
-                authority_class: EffectAuthorityClass::Command,
-                semantic_class: EffectSemanticClass::BestEffort,
-                agreement_use: EffectAgreementUse::Forbidden,
-                region_scope: EffectRegionScope::Session,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::Allow,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            "handle_recv" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "handleRecv".to_string()),
-                authority_class: EffectAuthorityClass::Command,
-                semantic_class: EffectSemanticClass::BestEffort,
-                agreement_use: EffectAgreementUse::Forbidden,
-                region_scope: EffectRegionScope::Session,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::Allow,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            "handle_choose" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "handleChoose".to_string()),
-                authority_class: EffectAuthorityClass::Command,
-                semantic_class: EffectSemanticClass::BestEffort,
-                agreement_use: EffectAgreementUse::Forbidden,
-                region_scope: EffectRegionScope::Session,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::Allow,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            "invoke_step" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "invoke".to_string()),
-                authority_class: EffectAuthorityClass::Command,
-                semantic_class: EffectSemanticClass::BestEffort,
-                agreement_use: EffectAgreementUse::Forbidden,
-                region_scope: EffectRegionScope::Fragment,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::InheritOperationBudget,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::RejectSameOperation,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            "handle_acquire" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Guard".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "acquire".to_string()),
-                authority_class: EffectAuthorityClass::Authoritative,
-                semantic_class: EffectSemanticClass::Authoritative,
-                agreement_use: EffectAgreementUse::Required,
-                region_scope: EffectRegionScope::Fragment,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::MayBlock,
-                timeout_policy: EffectTimeoutPolicy::Required { budget_ticks: None },
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::RejectSameFragment,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            "handle_release" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Guard".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "release".to_string()),
-                authority_class: EffectAuthorityClass::Authoritative,
-                semantic_class: EffectSemanticClass::Authoritative,
-                agreement_use: EffectAgreementUse::Required,
-                region_scope: EffectRegionScope::Fragment,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::RejectSameFragment,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            "topology_events" | "topology_event" => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| "topologyEvents".to_string()),
-                authority_class: EffectAuthorityClass::Authoritative,
-                semantic_class: EffectSemanticClass::Authoritative,
-                agreement_use: EffectAgreementUse::Required,
-                region_scope: EffectRegionScope::Fragment,
-                admissibility: EffectAdmissibility::InternalOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::Allow,
-                handler_domain: EffectHandlerDomain::Internal,
-            },
-            "output_condition_hint" => Self {
-                interface_name: "Runtime".to_string(),
-                operation_name: "outputConditionHint".to_string(),
-                authority_class: EffectAuthorityClass::Authoritative,
-                semantic_class: EffectSemanticClass::Authoritative,
-                agreement_use: EffectAgreementUse::Required,
-                region_scope: EffectRegionScope::Fragment,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::Allow,
-                handler_domain: EffectHandlerDomain::External,
-            },
-            _ => Self {
-                interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
-                operation_name: operation_name.unwrap_or_else(|| effect_kind.to_string()),
-                authority_class: EffectAuthorityClass::Command,
-                semantic_class: EffectSemanticClass::BestEffort,
-                agreement_use: EffectAgreementUse::Forbidden,
-                region_scope: EffectRegionScope::Session,
-                admissibility: EffectAdmissibility::DeclaredUseOnly,
-                totality: EffectTotality::Immediate,
-                timeout_policy: EffectTimeoutPolicy::None,
-                retry_shape: EffectRetryShape::Forbidden,
-                reentrancy_policy: EffectReentrancyPolicy::Allow,
-                handler_domain: EffectHandlerDomain::External,
-            },
+            "send_decision" => {
+                Self::transport_command(interface_name, operation_name, "sendDecision")
+            }
+            "handle_recv" => Self::transport_command(interface_name, operation_name, "handleRecv"),
+            "handle_choose" => {
+                Self::transport_command(interface_name, operation_name, "handleChoose")
+            }
+            "invoke_step" => Self::runtime_invoke(interface_name, operation_name),
+            "handle_acquire" => Self::guard_authoritative(
+                interface_name,
+                operation_name,
+                "acquire",
+                EffectTotality::MayBlock,
+                EffectTimeoutPolicy::Required { budget_ticks: None },
+                EffectReentrancyPolicy::RejectSameFragment,
+            ),
+            "handle_release" => Self::guard_authoritative(
+                interface_name,
+                operation_name,
+                "release",
+                EffectTotality::Immediate,
+                EffectTimeoutPolicy::None,
+                EffectReentrancyPolicy::RejectSameFragment,
+            ),
+            "topology_events" | "topology_event" => {
+                Self::runtime_topology_events(interface_name, operation_name)
+            }
+            "output_condition_hint" => Self::output_condition_hint(),
+            _ => Self::default_runtime_command(interface_name, operation_name, effect_kind),
+        }
+    }
+
+    fn transport_command(
+        interface_name: Option<String>,
+        operation_name: Option<String>,
+        default_operation_name: &str,
+    ) -> Self {
+        Self {
+            interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
+            operation_name: operation_name.unwrap_or_else(|| default_operation_name.to_string()),
+            authority_class: EffectAuthorityClass::Command,
+            semantic_class: EffectSemanticClass::BestEffort,
+            agreement_use: EffectAgreementUse::Forbidden,
+            region_scope: EffectRegionScope::Session,
+            admissibility: EffectAdmissibility::DeclaredUseOnly,
+            totality: EffectTotality::Immediate,
+            timeout_policy: EffectTimeoutPolicy::None,
+            retry_shape: EffectRetryShape::Forbidden,
+            reentrancy_policy: EffectReentrancyPolicy::Allow,
+            handler_domain: EffectHandlerDomain::External,
+        }
+    }
+
+    fn runtime_invoke(interface_name: Option<String>, operation_name: Option<String>) -> Self {
+        Self {
+            interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
+            operation_name: operation_name.unwrap_or_else(|| "invoke".to_string()),
+            authority_class: EffectAuthorityClass::Command,
+            semantic_class: EffectSemanticClass::BestEffort,
+            agreement_use: EffectAgreementUse::Forbidden,
+            region_scope: EffectRegionScope::Fragment,
+            admissibility: EffectAdmissibility::DeclaredUseOnly,
+            totality: EffectTotality::Immediate,
+            timeout_policy: EffectTimeoutPolicy::InheritOperationBudget,
+            retry_shape: EffectRetryShape::Forbidden,
+            reentrancy_policy: EffectReentrancyPolicy::RejectSameOperation,
+            handler_domain: EffectHandlerDomain::External,
+        }
+    }
+
+    fn guard_authoritative(
+        interface_name: Option<String>,
+        operation_name: Option<String>,
+        default_operation_name: &str,
+        totality: EffectTotality,
+        timeout_policy: EffectTimeoutPolicy,
+        reentrancy_policy: EffectReentrancyPolicy,
+    ) -> Self {
+        Self {
+            interface_name: interface_name.unwrap_or_else(|| "Guard".to_string()),
+            operation_name: operation_name.unwrap_or_else(|| default_operation_name.to_string()),
+            authority_class: EffectAuthorityClass::Authoritative,
+            semantic_class: EffectSemanticClass::Authoritative,
+            agreement_use: EffectAgreementUse::Required,
+            region_scope: EffectRegionScope::Fragment,
+            admissibility: EffectAdmissibility::DeclaredUseOnly,
+            totality,
+            timeout_policy,
+            retry_shape: EffectRetryShape::Forbidden,
+            reentrancy_policy,
+            handler_domain: EffectHandlerDomain::External,
+        }
+    }
+
+    fn runtime_topology_events(
+        interface_name: Option<String>,
+        operation_name: Option<String>,
+    ) -> Self {
+        Self {
+            interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
+            operation_name: operation_name.unwrap_or_else(|| "topologyEvents".to_string()),
+            authority_class: EffectAuthorityClass::Authoritative,
+            semantic_class: EffectSemanticClass::Authoritative,
+            agreement_use: EffectAgreementUse::Required,
+            region_scope: EffectRegionScope::Fragment,
+            admissibility: EffectAdmissibility::InternalOnly,
+            totality: EffectTotality::Immediate,
+            timeout_policy: EffectTimeoutPolicy::None,
+            retry_shape: EffectRetryShape::Forbidden,
+            reentrancy_policy: EffectReentrancyPolicy::Allow,
+            handler_domain: EffectHandlerDomain::Internal,
+        }
+    }
+
+    fn output_condition_hint() -> Self {
+        Self {
+            interface_name: "Runtime".to_string(),
+            operation_name: "outputConditionHint".to_string(),
+            authority_class: EffectAuthorityClass::Authoritative,
+            semantic_class: EffectSemanticClass::Authoritative,
+            agreement_use: EffectAgreementUse::Required,
+            region_scope: EffectRegionScope::Fragment,
+            admissibility: EffectAdmissibility::DeclaredUseOnly,
+            totality: EffectTotality::Immediate,
+            timeout_policy: EffectTimeoutPolicy::None,
+            retry_shape: EffectRetryShape::Forbidden,
+            reentrancy_policy: EffectReentrancyPolicy::Allow,
+            handler_domain: EffectHandlerDomain::External,
+        }
+    }
+
+    fn default_runtime_command(
+        interface_name: Option<String>,
+        operation_name: Option<String>,
+        effect_kind: &str,
+    ) -> Self {
+        Self {
+            interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
+            operation_name: operation_name.unwrap_or_else(|| effect_kind.to_string()),
+            authority_class: EffectAuthorityClass::Command,
+            semantic_class: EffectSemanticClass::BestEffort,
+            agreement_use: EffectAgreementUse::Forbidden,
+            region_scope: EffectRegionScope::Session,
+            admissibility: EffectAdmissibility::DeclaredUseOnly,
+            totality: EffectTotality::Immediate,
+            timeout_policy: EffectTimeoutPolicy::None,
+            retry_shape: EffectRetryShape::Forbidden,
+            reentrancy_policy: EffectReentrancyPolicy::Allow,
+            handler_domain: EffectHandlerDomain::External,
         }
     }
 }
@@ -1145,32 +1168,34 @@ impl EffectExchangeRecord {
 #[serde(rename_all = "snake_case")]
 pub enum EffectCompositionPolicy {
     /// Every effect exchange must succeed.
-    AllSuccess,
+    All,
     /// Any successful effect exchange resolves the commitment.
-    FirstSuccess,
+    First,
     /// A fixed number of successful exchanges is required.
-    ThresholdSuccess {
+    Threshold {
         /// Required success count.
         required_successes: u64,
     },
 }
 
 impl EffectCompositionPolicy {
-    fn count_successful_effects(records: &[EffectExchangeRecord]) -> usize {
-        records.iter().filter(|record| record.succeeded()).count()
+    fn count_successful_effects(records: &[EffectExchangeRecord]) -> u64 {
+        records
+            .iter()
+            .fold(0_u64, |count, record| count + u64::from(record.succeeded()))
     }
 
     /// Whether the composition policy resolves the combined commitment.
     #[must_use]
     pub fn commitment_resolved(&self, records: &[EffectExchangeRecord]) -> bool {
         match self {
-            Self::AllSuccess => {
+            Self::All => {
                 !records.is_empty() && records.iter().all(EffectExchangeRecord::succeeded)
             }
-            Self::FirstSuccess => records.iter().any(EffectExchangeRecord::succeeded),
-            Self::ThresholdSuccess { required_successes } => {
+            Self::First => records.iter().any(EffectExchangeRecord::succeeded),
+            Self::Threshold { required_successes } => {
                 *required_successes > 0
-                    && Self::count_successful_effects(records) >= *required_successes as usize
+                    && Self::count_successful_effects(records) >= *required_successes
             }
         }
     }
@@ -1182,10 +1207,10 @@ impl EffectCompositionPolicy {
             return true;
         }
         match self {
-            Self::AllSuccess => records.iter().all(EffectExchangeRecord::succeeded),
-            Self::FirstSuccess => records.iter().any(EffectExchangeRecord::succeeded),
-            Self::ThresholdSuccess { required_successes } => {
-                Self::count_successful_effects(records) >= *required_successes as usize
+            Self::All => records.iter().all(EffectExchangeRecord::succeeded),
+            Self::First => records.iter().any(EffectExchangeRecord::succeeded),
+            Self::Threshold { required_successes } => {
+                Self::count_successful_effects(records) >= *required_successes
             }
         }
     }
@@ -1500,12 +1525,12 @@ mod effect_contract_tests {
             reason: None,
         };
 
-        let first_success = EffectCompositionPolicy::FirstSuccess;
+        let first_success = EffectCompositionPolicy::First;
         assert!(first_success.commitment_resolved(&[success.clone(), blocked.clone()]));
         assert!(first_success.commitment_compatible(&[success.clone(), blocked.clone()]));
         assert!(first_success.progress_compatible(&[success.clone(), blocked.clone()], &contract));
 
-        let threshold = EffectCompositionPolicy::ThresholdSuccess {
+        let threshold = EffectCompositionPolicy::Threshold {
             required_successes: 1,
         };
         assert!(threshold.commitment_resolved(&[success.clone(), blocked.clone()]));
