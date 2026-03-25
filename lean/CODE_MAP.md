@@ -708,7 +708,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ProtocolMachine/Knowledge.lean | 20 | Flow-policy serialization roundtrip theorems moved from `Runtime.protocol machine.Model.Knowledge` |
 | Proofs/ProtocolMachine/Failure.lean | 53 | Retry/deterministic recovery lemmas moved from failure runtime modules |
 | Proofs/ProtocolMachine/FailurePredicates.lean | 135 | Recovery predicate vocabulary (proof-only) moved from protocol machine failure runtime |
-| Proofs/ProtocolMachine/ProgramWitnesses.lean | 21 | Proof-only verified image witnesses moved from `Runtime.protocol machine.Model.Program` |
+| Proofs/ProtocolMachine/ProgramWitnesses.lean | 31 | Proof-only verified image witnesses now tied to the theoremized lowering/artifact chain |
 | Proofs/ProtocolMachine/Speculation.lean | 84 | V2: Speculation correctness (depth monotonicity, abort restore, join cleanup) |
 | Proofs/ProtocolMachine/InstrSpec/ConfigEquivSendRecv.lean | 338 | V2: Send/recv configuration equivalence |
 | Proofs/ProtocolMachine/InstrSpec/ConfigEquivSelectBranch.lean | 341 | V2: Select/branch configuration equivalence |
@@ -728,6 +728,14 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Conservation/Commitment.lean | 73 | Commitment conservation theorems over outstanding effects, progress measures, and dependent work |
 | Proofs/Conservation/Structure.lean | 60 | Structure conservation theorems over delegation-preserved coherence and scheduler-normalized traces |
 | Proofs/Conservation/Premise.lean | 68 | Premise conservation theorems over timeout discipline, progress contracts, scheduler fairness, and liveness bundles |
+
+### Proofs/Lowering
+
+| File | Lines | Description |
+|------|------:|-------------|
+| Proofs/Lowering/API.lean | 10 | Public facade for the theoremized surface→AST→semantic→protocol-machine→artifact lowering chain |
+| Proofs/Lowering/Core.lean | 155 | Core lowering structures, subset predicates, rejection reasons, and artifact-generation surface |
+| Proofs/Lowering/Correctness.lean | 184 | Stage-by-stage refinement theorems and theorem-backed rejection conditions for non-projectable/non-executable forms |
 
 ### Adequacy (V2 Envelope-Based)
 
