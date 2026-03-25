@@ -4,16 +4,18 @@ This file provides guidance to Claude Code when working with code in this reposi
 
 ## Project Overview
 
-Telltale is a Rust framework for choreographic programming with session types, paired with formal verification in Lean 4. The project enables writing distributed protocols from a global viewpoint with automatic projection to local session types for each participant. Multiparty session types provide compile-time safety guarantees. An effect handler system decouples protocol logic from transport implementation.
+Telltale is a session-typed execution system for protocol-critical concurrent and distributed programs. It is designed as a conservation system over protocol semantics: all semantically meaningful behavior is expressed in terms of six conserved quantities (evidence, authority, identity, commitment, structure, premise), and all other behavior is erased or reduced to those quantities.
 
-The Lean formalization currently covers ~624 core-library files and ~127k lines (see generated metrics in `lean/CODE_MAP.md`) and provides mechanized proofs of preservation, progress, coherence, and harmony for asynchronous buffered multiparty session types.
+The system enables writing distributed protocols from a global viewpoint with automatic projection to local session types for each participant. Multiparty session types provide compile-time safety guarantees. The protocol machine is a deterministic small-step reducer that commits all protocol-visible truth. Typed effect interfaces form the operational vocabulary between the protocol machine and the world.
 
-## VM Parity Policy
+The Lean 4 formalization covers ~647 core-library files and ~131k lines (see generated metrics in `lean/CODE_MAP.md`) and provides mechanized proofs of preservation, progress, coherence, and harmony for asynchronous buffered multiparty session types.
 
-For VM policy/data encodings, the project follows:
+## Parity Policy
 
-- spec-first for shape,
-- runtime-first for justified execution details.
+For protocol-machine policy/data encodings, the project follows:
+
+- spec-first for shape
+- runtime-first for justified execution details
 
 Lean/Rust mismatches must be documented as justified breaks in `docs/19_rust_lean_parity.md` (Deviation Registry section) before merge.
 
@@ -77,21 +79,21 @@ nix develop
 lake --dir lean build
 
 # Verification pipelines
-just telltale-lean-check           # Basic verification (3 roles)
-just telltale-lean-check-extended  # Extended scenarios
-just telltale-lean-check-failing   # Intentional failure test
-just verify-lean-full              # Full Lean build (nightly)
-just verify-lean-vm-targets        # Fast CI: VM architecture only
+just telltale-lean-check                # Basic verification (3 roles)
+just telltale-lean-check-extended       # Extended scenarios
+just telltale-lean-check-failing        # Intentional failure test
+just verify-lean-full                   # Full Lean build (nightly)
+just verify-lean-protocol-machine-targets  # Fast CI: protocol-machine architecture only
 
 # Check for escape hatches
-just escape                        # Report sorry/axiom/unsafe counts
+just escape                             # Report sorry/axiom/unsafe counts
 ```
 
 ### Verification Lanes
 
 ```bash
 # Protocol verification
-just verify-protocols              # VM correspondence + invariants + schema
+just verify-protocols              # Protocol-machine correspondence + invariants + schema
 
 # CI gates
 just verify-track-a                # Naming/API changes preserve behavior
@@ -131,26 +133,15 @@ Rust workspace crates are split between the repo root (`telltale`) and the `rust
 |-------|------|---------|
 | `telltale` | `rust/src/` | Facade crate with session types (`Send`, `Receive`, `Select`, `Branch`, `End`) and async channel abstractions |
 | `telltale-types` | `rust/types/` | Core types (`GlobalType`, `LocalTypeR`, `Label`) matching Lean definitions with content addressing |
-| `telltale-macros` | `rust/macros/` | Procedural macros (`choreography!`, `session`, `Role`, `Roles`, `Message`) |
-| `telltale-choreography` | `rust/choreography/` | DSL parser, projection, effect handlers, simulation, topology, effect scaffold |
+| `telltale-macros` | `rust/macros/` | Procedural macros (`tell!`, `session`, `Role`, `Roles`, `Message`) |
+| `telltale-parser` | `rust/parser/` | DSL parser (Pest grammar, layout preprocessor), AST, projection, codegen |
+| `telltale-choreography` | `rust/choreography/` | Effect handlers, formatter binary, topology, heap, testing infrastructure |
 | `telltale-theory` | `rust/theory/` | Session type algorithms (projection, merge, duality, sync/async subtyping, bounded recursion) |
-| `telltale-machine` | `rust/machine/` | Bytecode VM execution engine (single source of truth for scheduling) |
-| `telltale-simulator` | `rust/simulator/` | VM-backed simulation with deterministic middleware (network, faults, properties) |
+| `telltale-machine` | `rust/machine/` | Protocol machine execution engine (single source of truth for scheduling) |
+| `telltale-simulator` | `rust/simulator/` | Protocol-machine-backed simulation with deterministic middleware (network, faults, properties) |
 | `telltale-bridge` | `rust/bridge/` | Lean interop with JSON export/import, validation, choreography exporter |
 | `telltale-transport` | `rust/transport/` | Production transport integration layer for runtime/choreography execution |
 | `telltale-lints` | `rust/lints/` | Custom lint checks for architecture and style enforcement |
-
-### Choreography Crate Structure (`rust/choreography/src/`)
-
-- **`ast/`**: AST types (`Choreography`, `Protocol`, `Role`, `MessageType`), validation
-- **`bin/`**: Formatter binary (`choreo_fmt`)
-- **`compiler/`**: Pest parser (`choreography.pest`), projection, codegen, diagnostics
-- **`effects/`**: Effect algebra (`Program`), handlers (`InMemoryHandler`, `TelltaleHandler`), middleware
-- **`extensions/`**: Protocol extensions (discovery, timeout)
-- **`topology/`**: Deployment configuration, transport abstraction
-- **`runtime/`**: Platform abstraction (tokio/WASM), spawn utilities
-- **`heap/`**: Resource heap with Merkle proofs
-- **`testing/`**: Test infrastructure (clock, envelope, observer, state machine, transport)
 
 ## Lean Codebase Structure
 
@@ -163,16 +154,13 @@ The Lean formalization is in the `lean/` directory. See `lean/CODE_MAP.md` for d
 | Choreography | 19,308 | Projection from global to local types, harmony correctness |
 | Semantics | 2,359 | Operational semantics, typing, determinism, deadlock freedom |
 | Protocol | 40,077 | Async buffered MPST: coherence, preservation, monitoring, deployment |
-| Runtime | 28,283 | VM definition, Iris separation logic backend, WP rules, adequacy |
+| Runtime | 32,240 | Protocol machine, Iris separation logic backend, WP rules, adequacy |
 | Classical | 2,193 | Transported theorems (Foster-Lyapunov, mixing times, LDP) |
 | ClassicalAnalysis | 1,128 | Real-analysis-backed concrete models used by classical transport |
 | Distributed | 7,266 | Distributed assumptions, FLP/CAP theorem families |
 | IrisExtraction | 830 | Iris ghost-state/program-logic extraction support modules |
 
-**Key entry points:**
-- `lean/lakefile.lean` — Build configuration
-- `lean/` — Top-level facade imports for each library
-- `lean/CODE_MAP.md` — Complete module documentation
+Key entry points: `lean/lakefile.lean` (build configuration), `lean/CODE_MAP.md` (complete module documentation).
 
 ## Test Patterns
 
@@ -184,35 +172,37 @@ Tests use three patterns depending on platform requirements:
 | `#[cfg(not(target_arch = "wasm32"))]` + `#[test]` | Tests requiring native-only features (proptest, tokio) |
 | `#[cfg(target_arch = "wasm32")]` + `#[wasm_bindgen_test]` | Tests requiring WASM-only APIs |
 
-**Golden file tests:** Compare Rust/Lean outputs without requiring Lean build. Run `just test-golden` for fast CI, `just regenerate-golden` to update from Lean.
+Golden file tests compare Rust/Lean outputs without requiring Lean build. Run `just test-golden` for fast CI, `just regenerate-golden` to update from Lean.
 
-**Verification lanes:** CI uses `just verify-track-a` (behavior preservation) and `just verify-track-b` (semantic alignment) as gates.
+Verification lanes: CI uses `just verify-track-a` (behavior preservation) and `just verify-track-b` (semantic alignment) as gates.
 
 ## Key Concepts
 
-**Session Types**: Protocol states as Rust types. `Send<'q, Q, R, L, S>` encodes sending label L from role Q to R with continuation S.
+`tell!` is the canonical DSL entrypoint. `.tell` is the source file extension.
 
-**Choreography DSL**: Global protocol specification syntax:
-```
-choreography! {
-    protocol Simple = {
+```rust
+use telltale::tell;
+
+tell! {
+    protocol Simple =
         roles Alice, Bob
         Alice -> Bob : Message
-    }
 }
 ```
 
-**Effect Handlers**: `ChoreoHandler` (async, typed) abstracts transport. The VM has its own synchronous `EffectHandler` for simulation/runtime integration.
+Session types encode protocol states as Rust types. `Send<'q, Q, R, L, S>` encodes sending label L from role Q to R with continuation S.
 
-**Coherence**: The per-edge invariant that makes projection well-defined. `EdgeCoherent` checks buffer/type alignment without global re-derivation.
+The protocol machine (`ProtocolMachine`) is the single execution engine that commits all protocol-visible truth. `ProtocolMachineKernel` owns the step contract. Simulation layers are deterministic middleware wrapped around the protocol machine via `telltale-simulator`.
 
-**Consume Function**: Recursive buffer-compatibility check with `consume_append` (send) and `consume_cons` (receive) lemmas.
+Effect handlers: `ChoreoHandler` (async, typed) abstracts choreography-layer transport. `EffectHandler` (sync) is the protocol-machine host integration boundary.
 
-**Projection**: Transforms global choreographies to local session types (`rust/choreography/src/compiler/projection.rs`, `lean/Choreography/Projection/`).
+Coherence is the per-edge invariant that makes projection well-defined. `EdgeCoherent` checks buffer/type alignment without global re-derivation.
 
-**VM Execution**: The VM is the single execution engine. Simulation layers are deterministic middleware wrapped around the VM.
+Projection transforms global choreographies to local session types (`rust/parser/src/compiler/projection.rs`, `lean/Choreography/Projection/`).
 
-**Content Addressing**: Cryptographic identities for protocol artifacts (`rust/types/src/content_id.rs`).
+Content addressing assigns cryptographic identities to protocol artifacts (`rust/types/src/content_id.rs`).
+
+Conservation framework: the six conserved properties (evidence, authority, identity, commitment, structure, premise) organize all protocol-critical behavior. See `docs/37_conservation_framework.md`.
 
 ## Development Environment
 
@@ -233,18 +223,19 @@ The `docs/` directory contains mdbook documentation:
 - `docs/04_code_organization.md`: Crate and module structure
 - `docs/06_choreographic_dsl.md`: DSL syntax reference
 - `docs/09_effect_handlers.md`: Effect system guide
-- `docs/12_vm_architecture.md`: Bytecode VM architecture
+- `docs/12_protocol_machine_architecture.md`: Protocol machine architecture
 - `docs/19_rust_lean_parity.md`: Lean/Rust parity policy and deviation registry
 - `docs/23_lean_verification.md`: Formal verification pipeline
 - `docs/33_protocol_authority_scope.md`: Protocol authority boundary classification
 - `docs/34_authority_language_surface.md`: Authority and failure DSL constructs
 - `docs/35_protocol_authority_evidence.md`: Evidence and typed outcome semantics
+- `docs/37_conservation_framework.md`: Conservation framework and design philosophy
 
 The Lean codebase has its own documentation at `lean/CODE_MAP.md`.
 
 ## Local Working Directory
 
-The `work/` directory is **intentionally not tracked in git**.
+The `work/` directory is not tracked in git.
 
 It contains style guides: `work/style_guide_rust.md`, `work/style_guide_lean.md`, `work/style_guide_docs.md`
 
