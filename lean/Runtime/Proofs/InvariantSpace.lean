@@ -1,4 +1,6 @@
 import Runtime.Proofs.ProgressApi
+import Runtime.Proofs.ProtocolMachine.SemanticObjects.ProgressContracts
+import Runtime.Adequacy.EnvelopeCore.FailureTaxonomy.Core
 import Runtime.ProtocolMachine.Model.Effects
 import Runtime.ProtocolMachine.Model.OutputCondition
 import Runtime.ProtocolMachine.Model.SemanticObjects.AuthoritativeReadsPublication
@@ -98,8 +100,14 @@ structure ProgressContractWitness where
   operation : Runtime.ProtocolMachine.Model.OperationInstance
   contract : Runtime.ProtocolMachine.Model.ProgressContract
   operationMember : operation ∈ objects.operationInstances
+  contractMember : contract ∈ objects.progressContracts
+  parityCritical : operation.isParityCritical
   tracksOperation : contract.tracksOperation operation
+  explicitContractPresent : objects.progressContractForOperation operation
   trackedLiveness : objects.ownerInternalLivenessContract contract
+  schedulingBoundCompatible : contract.schedulingBoundCompatible
+  failureEvidence :
+    contract.failureEvidence?.isSome = true ∨ contract.failureEvidence?.isSome = false
 
 /-- Attachment surface for effect admissibility / reentrancy contracts. -/
 structure EffectContractWitness where
@@ -155,7 +163,7 @@ structure SemanticObjectWitnessBundle where
   semanticHandoffs? : Option SemanticHandoffWitness := none
   authoritativeReadsPublication? : Option AuthoritativeReadPublicationWitness := none
   materializationSuccess? : Option MaterializationSuccessWitness := none
-  progressContracts? : Option ProgressContractWitness := none
+  progressContracts : ProgressContractWitness
   effectContracts? : Option EffectContractWitness := none
   replayFailureExactness? : Option ReplayFailureExactnessWitness := none
   crossTargetProgressDependentWork? :

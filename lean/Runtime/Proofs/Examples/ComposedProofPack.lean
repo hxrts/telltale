@@ -168,10 +168,20 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
     , operation := replayFailedOp
     , contract := exactFailureContract
     , operationMember := by simp [replayFailureObjects]
+    , contractMember := by simp [replayFailureObjects]
+    , parityCritical := by
+        left
+        simp [replayFailedOp]
     , tracksOperation := by
         simp [Runtime.ProtocolMachine.Model.ProgressContract.tracksOperation,
           Runtime.ProtocolMachine.Model.ProgressState.expectedOperationPhase,
           exactFailureContract, replayFailedOp]
+    , explicitContractPresent := by
+        refine ⟨exactFailureContract, ?_, ?_⟩
+        · simp [replayFailureObjects]
+        · simp [Runtime.ProtocolMachine.Model.ProgressContract.tracksOperation,
+            Runtime.ProtocolMachine.Model.ProgressState.expectedOperationPhase,
+            exactFailureContract, replayFailedOp]
     , trackedLiveness := by
         constructor
         · simp [Runtime.ProtocolMachine.Model.ProgressContract.hasBudgetDiscipline,
@@ -183,6 +193,15 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
           · left
             simp [Runtime.ProtocolMachine.Model.ProgressContract.isTerminal,
               Runtime.ProtocolMachine.Model.ProgressState.isTerminal, exactFailureContract]
+    , schedulingBoundCompatible := by
+        exact Runtime.ProtocolMachine.Model.schedulingBoundCompatible_of_progressContract exactFailureContract
+    , failureEvidence := by
+        left
+        simp [Runtime.ProtocolMachine.Model.ProgressContract.failureEvidence?,
+          Runtime.Adequacy.failureClassOfProgressState,
+          Runtime.Adequacy.errorCodeOfProgressState,
+          Runtime.Adequacy.errorCodeOfFailureClass,
+          exactFailureContract]
     }
   let effectWitness : EffectContractWitness :=
     { metadata := boundedAuthoritativeEffect
@@ -236,7 +255,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
   { coreInvariants? := some coreSemanticObjectWitness
   , authoritativeReadsPublication? := some authoritativeReadWitness
   , materializationSuccess? := some materializationWitness
-  , progressContracts? := some progressWitness
+  , progressContracts := progressWitness
   , effectContracts? := some effectWitness
   , replayFailureExactness? := some replayWitness
   , crossTargetProgressDependentWork? := some crossTargetWitness

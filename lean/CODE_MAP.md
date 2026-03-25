@@ -700,7 +700,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean | 171 | Semantic-handoff theorems and delegation / envelope bridge lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean | 185 | Authoritative-read/publication theorems and observer-projection consequences |
 | Proofs/ProtocolMachine/SemanticObjects/MaterializationSuccess.lean | 156 | Success/materialization theorem layer |
-| Proofs/ProtocolMachine/SemanticObjects/ProgressContracts.lean | 189 | Progress-contract theorem layer and compatibility obligations |
+| Proofs/ProtocolMachine/SemanticObjects/ProgressContracts.lean | 189 | Progress-contract theorem layer, parity-critical contract discipline, and failure-evidence consequences |
 | Proofs/ProtocolMachine/SemanticObjects/ReplayFailureExactness.lean | 131 | Replay/failure exactness theorem layer |
 | Proofs/ProtocolMachine/SemanticObjects/CrossTargetProgressDependentWork.lean | 107 | Cross-target progress and dependent-work theorem layer |
 | Proofs/ProtocolMachine/SemanticObjects/TransformationLocalObligations.lean | 176 | Transformation-local obligation theorems and deployment/reconfiguration bridges |
@@ -751,7 +751,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence proofs for determinism envelope |
 | Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration with coherence |
 | Adequacy/EnvelopeCore/FailureTaxonomy.lean | 7 | V2: Failure taxonomy re-exports |
-| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification |
+| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification plus explicit progress-failure taxonomy mapping |
 | Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | 112 | V2: Protocol-specific failure handling |
 
 ### Proofs
@@ -769,11 +769,11 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Progress.lean | 7 | Re-export wrapper for Progress* modules |
 | Proofs/ProgressCore.lean | 395 | `CoherentVMState`, `ProgressVMState`, core progress definitions |
 | Proofs/ProgressTheorems.lean | 233 | `protocol_machine_progress`, instruction enablement theorems |
-| Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API and optional progress hypothesis surface |
+| Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API with required progress hypothesis and explicit scheduler/fairness linkage |
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
 | Proofs/ObserverProjectionEffectBisim.lean | 107 | Effect bisimulation for observer projection |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
-| Proofs/InvariantSpace.lean | 231 | Proof-carrying invariant-space bundle with integrated semantic-object witness families through replay and cross-target progress |
+| Proofs/InvariantSpace.lean | 231 | Proof-carrying invariant-space bundle with tightened progress-contract witnesses and integrated semantic-object families |
 | Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
 | Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
 | Proofs/Adapters/Distributed.lean | 87 | V2: Distributed adapter re-exports |

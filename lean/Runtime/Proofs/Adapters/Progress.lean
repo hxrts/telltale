@@ -35,19 +35,16 @@ theorem protocol_machine_termination_from_invariant_space
       n ≤ bundle.fairness.k * protocolMachineMeasure store₀ := by
   simpa using protocol_machine_termination_from_bundle (bundle := bundle)
 
-/-- If the invariant space includes liveness with optional progress evidence,
+/-- If the invariant space includes liveness evidence,
     derive enabledness at the initial state under non-terminality. -/
 theorem protocol_machine_progress_from_invariant_space
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpace (ν := ν) store₀ State)
     (bundle : ProtocolMachineLivenessBundle store₀)
     (hLiveness : space.liveness? = some bundle)
-    (hNonTerminal : ¬ AllSessionsComplete store₀)
-    (hHasProgress : bundle.progressHypothesis?.isSome = true) :
+    (hNonTerminal : ¬ AllSessionsComplete store₀) :
     ProgressEnabled store₀ := by
-  simpa using
-    protocol_machine_progress_from_optional_hypothesis (bundle := bundle)
-      hNonTerminal hHasProgress
+  simpa using protocol_machine_progress_from_bundle (bundle := bundle) hNonTerminal
 
 end
 

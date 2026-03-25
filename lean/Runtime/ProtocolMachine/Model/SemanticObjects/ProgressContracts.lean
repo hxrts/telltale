@@ -24,6 +24,9 @@ namespace Runtime.ProtocolMachine.Model
 
 /-! ## Core State Predicates -/
 
+def OperationInstance.isParityCritical (operation : OperationInstance) : Prop :=
+  operation.requiresProof ∨ operation.terminalPublication.isSome
+
 def ProgressState.isTerminal (state : ProgressState) : Prop :=
   match state with
   | .succeeded | .failed | .cancelled | .timedOut | .handedOff => True
@@ -90,6 +93,19 @@ def ProtocolMachineSemanticObjects.effectCompletionCountsAsProgress
     (contract : ProgressContract) : Prop :=
   ∃ effect ∈ objects.outstandingEffects,
     effect.completesProgressFor contract
+
+def ProtocolMachineSemanticObjects.progressContractForOperation
+    (objects : ProtocolMachineSemanticObjects)
+    (operation : OperationInstance) : Prop :=
+  ∃ contract ∈ objects.progressContracts,
+    contract.tracksOperation operation
+
+def ProtocolMachineSemanticObjects.parityCriticalOperationsHaveProgressContract
+    (objects : ProtocolMachineSemanticObjects) : Prop :=
+  ∀ operation,
+    operation ∈ objects.operationInstances →
+    operation.isParityCritical →
+    objects.progressContractForOperation operation
 
 def ProtocolMachineSemanticObjects.ownerInternalLivenessContract
     (objects : ProtocolMachineSemanticObjects)

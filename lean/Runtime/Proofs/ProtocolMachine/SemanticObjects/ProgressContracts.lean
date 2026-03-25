@@ -1,4 +1,5 @@
 import Runtime.ProtocolMachine.Model.SemanticObjects.ProgressContracts
+import Runtime.Adequacy.EnvelopeCore.FailureTaxonomy.Core
 
 set_option autoImplicit false
 
@@ -147,6 +148,42 @@ theorem ownerInternalLivenessContract_explicit
       contract.tracksOperation operation := by
   rcases hLiveness with ⟨hBudget, operation, hMem, hTracks, _rest⟩
   exact ⟨hBudget, operation, hMem, hTracks⟩
+
+theorem parityCriticalOperationsHaveProgressContract_explicit
+    {objects : ProtocolMachineSemanticObjects}
+    (hContracts : objects.parityCriticalOperationsHaveProgressContract) :
+    ∀ {operation : OperationInstance},
+      operation ∈ objects.operationInstances →
+      operation.isParityCritical →
+      ∃ contract ∈ objects.progressContracts,
+        contract.tracksOperation operation := by
+  intro operation hMember hCritical
+  exact hContracts operation hMember hCritical
+
+theorem progressContract_failureEvidence_explicit
+    (contract : ProgressContract)
+    (hFailure : contract.failureEvidence?.isSome = true) :
+    ∃ evidence,
+      contract.failureEvidence? = some evidence ∧
+      evidence.operationId = contract.operationId ∧
+      evidence.session = contract.session := by
+  cases contract with
+  | mk operationId session state lastOrderingKey bounded budgetTicks lastProgressTick escalatedAtTick reason =>
+      cases hClass : Runtime.Adequacy.failureClassOfProgressState state with
+      | none =>
+          cases hCode : Runtime.Adequacy.errorCodeOfProgressState state <;>
+            simp [ProgressContract.failureEvidence?, hClass, hCode] at hFailure
+      | some failureClass =>
+          cases hCode : Runtime.Adequacy.errorCodeOfProgressState state with
+          | none =>
+              simp [ProgressContract.failureEvidence?, hClass, hCode] at hFailure
+          | some errorCode =>
+              refine ⟨{ operationId := operationId
+                      , session := session
+                      , failureClass := failureClass
+                      , errorCode := errorCode
+                      , reason := reason
+                      }, by simp [ProgressContract.failureEvidence?, hClass, hCode], rfl, rfl⟩
 
 /-! ## Compatibility Predicates -/
 

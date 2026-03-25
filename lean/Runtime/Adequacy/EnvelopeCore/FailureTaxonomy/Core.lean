@@ -1,4 +1,5 @@
 import Runtime.Adequacy.EnvelopeCore.AdmissionLogic
+import Runtime.ProtocolMachine.Model.SemanticObjects.ProgressContracts
 
 /-! # Failure Taxonomy and Recovery
 
@@ -256,6 +257,58 @@ def errorCodeOfFaultClassTag (faultClass : String) : ErrorCode :=
   if faultClass = "transport_corruption" then .transportCorruption else
   if faultClass = "transport_timeout" then .transportTimeout else
   .unknown
+
+/-! ## Progress-Failure Taxonomy -/
+
+/-- Explicit mapping from progress-contract terminal/degradation states into the
+shared failure taxonomy. Non-failure progress states do not admit a failure
+classification. -/
+def failureClassOfProgressState : Runtime.ProtocolMachine.Model.ProgressState → Option FailureClass
+  | .pending => none
+  | .blocked => none
+  | .noProgress => some .noProgressToken
+  | .degraded => some .transportTimeout
+  | .succeeded => none
+  | .failed => some .invokeFault
+  | .cancelled => some .closeFault
+  | .timedOut => some .transportTimeout
+  | .handedOff => none
+
+/-- Machine-stable error code projection for progress-failure states. -/
+def errorCodeOfProgressState : Runtime.ProtocolMachine.Model.ProgressState → Option ErrorCode :=
+  Option.map errorCodeOfFailureClass ∘ failureClassOfProgressState
+
+/-- Structured failure-taxonomy evidence carried by one progress contract once
+it reaches a classified failure state. -/
+structure ProgressFailureEvidence where
+  operationId : String
+  session : Option Nat
+  failureClass : FailureClass
+  errorCode : ErrorCode
+  reason : Option String
+  deriving Repr, DecidableEq, Inhabited
+
+namespace _root_.Runtime.ProtocolMachine.Model
+
+/-- Build explicit failure-taxonomy evidence for one progress contract when its
+state is classified as a failure-visible progress outcome. -/
+def _root_.Runtime.ProtocolMachine.Model.ProgressContract.failureEvidence? :
+    _root_.Runtime.ProtocolMachine.Model.ProgressContract →
+      Option Runtime.Adequacy.ProgressFailureEvidence
+  | contract =>
+      match Runtime.Adequacy.failureClassOfProgressState contract.state,
+          Runtime.Adequacy.errorCodeOfProgressState contract.state with
+      | some failureClass, some errorCode =>
+          some
+            { operationId := contract.operationId
+            , session := contract.session
+            , failureClass := failureClass
+            , errorCode := errorCode
+            , reason := contract.reason
+            }
+      | _, _ => none
+
+end _root_.Runtime.ProtocolMachine.Model
 
 /-! ## Failure-Visible Snapshots -/
 

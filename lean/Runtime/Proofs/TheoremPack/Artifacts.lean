@@ -36,7 +36,7 @@ structure SemanticObjectArtifacts where
   semanticHandoffs? : Option SemanticHandoffWitness := none
   authoritativeReadsPublication? : Option AuthoritativeReadPublicationWitness := none
   materializationSuccess? : Option MaterializationSuccessWitness := none
-  progressContracts? : Option ProgressContractWitness := none
+  progressContracts : ProgressContractWitness
   effectContracts? : Option EffectContractWitness := none
   replayFailureExactness? : Option ReplayFailureExactnessWitness := none
   crossTargetProgressDependentWork? :
@@ -51,7 +51,7 @@ def SemanticObjectArtifacts.ofWitnessBundle
   , semanticHandoffs? := bundle.semanticHandoffs?
   , authoritativeReadsPublication? := bundle.authoritativeReadsPublication?
   , materializationSuccess? := bundle.materializationSuccess?
-  , progressContracts? := bundle.progressContracts?
+  , progressContracts := bundle.progressContracts
   , effectContracts? := bundle.effectContracts?
   , replayFailureExactness? := bundle.replayFailureExactness?
   , crossTargetProgressDependentWork? := bundle.crossTargetProgressDependentWork?
@@ -69,7 +69,7 @@ def SemanticObjectArtifacts.inventory
       , ("semantic_object_authoritative_reads_publication",
           artifacts.authoritativeReadsPublication?.isSome)
       , ("semantic_object_materialization_success", artifacts.materializationSuccess?.isSome)
-      , ("semantic_object_progress_contracts", artifacts.progressContracts?.isSome)
+      , ("semantic_object_progress_contracts", true)
       , ("semantic_object_effect_contracts", artifacts.effectContracts?.isSome)
       , ("semantic_object_replay_failure_exactness",
           artifacts.replayFailureExactness?.isSome)

@@ -7,7 +7,7 @@ set_option autoImplicit false
 
 Bundle-oriented liveness API mirroring the consensus validation style:
 - required assumptions (well-formedness, termination model, fairness witness)
-- optional progress hypothesis
+- required progress hypothesis
 - hypothesis validation summaries
 - theorem wrappers from bundled evidence -/
 
@@ -18,8 +18,8 @@ assumptions, optional hypotheses, validation summaries) provides a proven templa
 
 Solution Structure. Defines `HypothesisWitness` for carrying proofs as evidence,
 `ProgressFrontier` and `ProgressEnabled` predicates for instruction enablement,
-and `ProgressHypothesis` for optional initial-state assumptions. Provides theorem
-wrappers that discharge obligations from bundled evidence.
+and `ProgressHypothesis` for required initial-state assumptions. Provides
+theorem wrappers that discharge obligations from bundled evidence.
 -/
 
 section
@@ -30,7 +30,7 @@ variable {ν : Type u} [VerificationModel ν]
 
 /-! ## Core Liveness API -/
 
-/-- Type-level wrapper for carrying a proof as optional evidence. -/
+/-- Type-level wrapper for carrying a proof as explicit evidence. -/
 structure HypothesisWitness (P : Prop) : Type where
   proof : P
 
@@ -55,8 +55,8 @@ def ProgressEnabled (store : SessionStore ν) : Prop :=
   (∃ ep target ℓ, SelectEnabled store ep target ℓ) ∨
   (∃ ep source, BranchEnabled store ep source)
 
-/-- Optional progress hypothesis at the initial state.
-If provided, it discharges the frontier premise of `protocol_machine_progress`. -/
+/-- Required progress hypothesis at the initial state.
+It discharges the frontier premise of `protocol_machine_progress`. -/
 abbrev ProgressHypothesis (store : SessionStore ν) : Prop :=
   ¬ AllSessionsComplete store → ProgressFrontier store
 
@@ -69,12 +69,12 @@ structure FairnessWitness (model : ProtocolMachineTerminationModel (ν := ν)) w
   k_ge_numRoles : k ≥ model.numRoles
   fair : FairScheduler model.numRoles k sched
 
-/-- Bundle of liveness assumptions, with optional progress hypothesis. -/
+/-- Bundle of liveness assumptions, including an explicit progress hypothesis. -/
 structure ProtocolMachineLivenessBundle (store₀ : SessionStore ν) where
   wellFormed : WellFormedVMState store₀
   model : ProtocolMachineTerminationModel (ν := ν)
   fairness : FairnessWitness (ν := ν) model
-  progressHypothesis? : Option (HypothesisWitness (ProgressHypothesis store₀)) := none
+  progressHypothesis : HypothesisWitness (ProgressHypothesis store₀)
 
 /-- Built-in hypothesis labels for protocol-machine liveness bundle validation. -/
 inductive ProtocolMachineLivenessHypothesis where
@@ -97,16 +97,13 @@ structure ProtocolMachineLivenessSummary where
   allPassed : Bool
   deriving Repr, Inhabited
 
-/-- Built-in liveness core bundle (required assumptions only). -/
-def protocolMachineLivenessCoreHypotheses : List ProtocolMachineLivenessHypothesis :=
+/-- Built-in liveness hypothesis inventory required for the main proof path. -/
+def protocolMachineLivenessHypotheses : List ProtocolMachineLivenessHypothesis :=
   [ .wellFormedInitial
   , .terminationModel
   , .fairScheduler
+  , .progressHypothesis
   ]
-
-/-- Built-in bundle that also requires an explicit progress hypothesis. -/
-def protocolMachineLivenessWithProgressHypotheses : List ProtocolMachineLivenessHypothesis :=
-  protocolMachineLivenessCoreHypotheses ++ [.progressHypothesis]
 
 /-! ## Hypothesis Validation -/
 
@@ -132,8 +129,8 @@ def validateProtocolMachineLivenessHypothesis {store₀ : SessionStore ν}
       }
   | .progressHypothesis =>
       { hypothesis := h
-      , passed := bundle.progressHypothesis?.isSome
-      , detail := "Optional progress hypothesis (non-terminal implies frontier-enabled) is provided."
+      , passed := true
+      , detail := "Explicit progress hypothesis (non-terminal implies frontier-enabled) is provided."
       }
 
 /-- Validate an arbitrary liveness hypothesis bundle. -/
@@ -145,15 +142,10 @@ def validateProtocolMachineLivenessWithHypotheses {store₀ : SessionStore ν}
   , allPassed := rs.all (fun r => r.passed)
   }
 
-/-- Convenience validator for required liveness assumptions only. -/
-def validateProtocolMachineLivenessCore {store₀ : SessionStore ν}
+/-- Convenience validator for the main liveness/progress theorem path. -/
+def validateProtocolMachineLiveness {store₀ : SessionStore ν}
     (bundle : ProtocolMachineLivenessBundle store₀) : ProtocolMachineLivenessSummary :=
-  validateProtocolMachineLivenessWithHypotheses bundle protocolMachineLivenessCoreHypotheses
-
-/-- Convenience validator requiring optional progress hypothesis as well. -/
-def validateProtocolMachineLivenessWithProgress {store₀ : SessionStore ν}
-    (bundle : ProtocolMachineLivenessBundle store₀) : ProtocolMachineLivenessSummary :=
-  validateProtocolMachineLivenessWithHypotheses bundle protocolMachineLivenessWithProgressHypotheses
+  validateProtocolMachineLivenessWithHypotheses bundle protocolMachineLivenessHypotheses
 
 /-! ## Theorem Wrappers -/
 
@@ -169,18 +161,21 @@ theorem protocol_machine_termination_from_bundle {store₀ : SessionStore ν}
       (sched := bundle.fairness.sched) (k := bundle.fairness.k)
       bundle.wellFormed bundle.fairness.k_ge_numRoles bundle.fairness.fair)
 
-/-- If a progress hypothesis is provided, it can be used directly to derive
+/-- The required progress hypothesis can be used directly to derive
 initial-state enabledness. -/
-theorem protocol_machine_progress_from_optional_hypothesis {store₀ : SessionStore ν}
+theorem protocol_machine_progress_from_bundle {store₀ : SessionStore ν}
     (bundle : ProtocolMachineLivenessBundle store₀)
-    (hNonTerminal : ¬ AllSessionsComplete store₀)
-    (hHasProgress : bundle.progressHypothesis?.isSome = true) :
+    (hNonTerminal : ¬ AllSessionsComplete store₀) :
     ProgressEnabled store₀ := by
-  cases hOpt : bundle.progressHypothesis? with
-  | none =>
-      simp [hOpt] at hHasProgress
-  | some hProgress =>
-      simpa [ProgressEnabled] using
-        (protocol_machine_progress bundle.wellFormed hNonTerminal (hProgress.proof hNonTerminal))
+  simpa [ProgressEnabled] using
+    (protocol_machine_progress bundle.wellFormed hNonTerminal
+      (bundle.progressHypothesis.proof hNonTerminal))
+
+/-- Progress theorems are explicitly tied to the scheduler/fairness side of the
+bundle rather than an ambient assumption. -/
+theorem protocol_machine_progress_uses_scheduler_assumptions {store₀ : SessionStore ν}
+    (bundle : ProtocolMachineLivenessBundle store₀) :
+    bundle.fairness.k ≥ bundle.model.numRoles :=
+  bundle.fairness.k_ge_numRoles
 
 end

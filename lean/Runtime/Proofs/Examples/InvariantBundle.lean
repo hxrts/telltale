@@ -36,10 +36,9 @@ example (bundle : ProtocolMachineLivenessBundle store₀) :
     ).termination?.isSome = true := by
   simp [baseSpace, buildProtocolMachineTheoremPack]
 
-/-- Optional progress hypothesis can be recovered from invariant-space evidence. -/
+/-- The required progress hypothesis can be recovered from invariant-space evidence. -/
 example (bundle : ProtocolMachineLivenessBundle store₀)
-    (hNonTerminal : ¬ AllSessionsComplete store₀)
-    (hHasProgress : bundle.progressHypothesis?.isSome = true) :
+    (hNonTerminal : ¬ AllSessionsComplete store₀) :
     ProgressEnabled store₀ := by
   let space : ProtocolMachineInvariantSpace (ν := ν) store₀ State :=
     ProtocolMachineInvariantSpace.mk (some bundle) none none none
@@ -48,7 +47,6 @@ example (bundle : ProtocolMachineLivenessBundle store₀)
     (bundle := bundle)
     (hLiveness := rfl)
     hNonTerminal
-    hHasProgress
 
 /-- FLP/CAP profiles attached to one bundle auto-materialize both impossibility artifacts. -/
 example (bundle : ProtocolMachineLivenessBundle store₀)
