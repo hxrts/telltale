@@ -74,6 +74,7 @@ ci-dry-run lane="fast":
     just check-release-conformance
     just check-telltale-style
     just check-tooling-convergence
+    just check-semantic-name-parity
     just check-aura-borrowed-lints
     just check-doc-links-ci
     just check-doc-quality
@@ -202,6 +203,10 @@ check-ownership-contracts:
 # Enforce parity type ledger plus deviation registry presence/shape.
 check-parity-ledger:
     ./scripts/check/parity-ledger.sh
+
+# Enforce canonical Lean↔Rust protocol-machine semantic-object naming.
+check-semantic-name-parity:
+    ./scripts/check/lean-rust-semantic-name-parity.sh
 
 # Check for semantic drift in backticked identifiers, paths, crates, features, and versions.
 check-docs-semantic-drift:

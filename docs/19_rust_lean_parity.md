@@ -124,6 +124,18 @@ Parity on these objects covers owner identity, phase/status, budget/invalidation
 Bridge-side execution comparison reports these handoff and invalidation surfaces separately from raw trace equivalence.
 This prevents stale-owner and late-result mismatches from hiding inside otherwise equivalent instruction traces.
 
+Canonical layout mapping for this family is:
+
+- Lean executable spec:
+  `lean/Runtime/ProtocolMachine/Model/SemanticObjects/*.lean`
+- Rust runtime mirror:
+  `rust/machine/src/semantic_objects.rs`
+- Rust bridge mirror:
+  `rust/bridge/src/semantic_objects.rs`
+
+Region remains a choreography/topology identifier outside the protocol-machine semantic-object family.
+It must not be used as a substitute for the protocol-machine semantic-object vocabulary until the region proof/model layer lands.
+
 `ProgressContract` parity covers bounded-wait metadata, explicit no-progress and degraded states, and timeout escalation state.
 `ProgressTransition` parity makes those escalations replay-visible instead of leaving them as target-specific scheduling heuristics.
 
