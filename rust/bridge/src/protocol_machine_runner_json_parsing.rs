@@ -1,5 +1,71 @@
 use super::*;
 
+fn inject_field_if_missing(object: &mut serde_json::Map<String, Value>, key: &str, value: Value) {
+    object.entry(key.to_string()).or_insert(value);
+}
+
+fn normalize_protocol_machine_run_output_value(mut value: Value) -> Value {
+    let bridge_schema = Value::String(crate::schema::canonical_schema_version());
+    let semantic_objects_schema =
+        Value::String(crate::semantic_objects::canonical_semantic_objects_schema_version());
+
+    let Some(root) = value.as_object_mut() else {
+        return value;
+    };
+
+    inject_field_if_missing(root, "schema_version", bridge_schema.clone());
+
+    if let Some(Value::Array(trace)) = root.get_mut("trace") {
+        for event in trace.iter_mut() {
+            if let Some(obj) = event.as_object_mut() {
+                inject_field_if_missing(obj, "schema_version", bridge_schema.clone());
+            }
+        }
+    }
+
+    if let Some(Value::Array(sessions)) = root.get_mut("sessions") {
+        for session in sessions.iter_mut() {
+            if let Some(obj) = session.as_object_mut() {
+                inject_field_if_missing(obj, "schema_version", bridge_schema.clone());
+            }
+        }
+    }
+
+    if let Some(Value::Array(step_states)) = root.get_mut("step_states") {
+        for step in step_states.iter_mut() {
+            if let Some(step_obj) = step.as_object_mut() {
+                if let Some(event) = step_obj.get_mut("event") {
+                    if let Some(event_obj) = event.as_object_mut() {
+                        inject_field_if_missing(event_obj, "schema_version", bridge_schema.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    if let Some(semantic_objects) = root.get_mut("semantic_objects") {
+        if let Some(obj) = semantic_objects.as_object_mut() {
+            inject_field_if_missing(obj, "schema_version", semantic_objects_schema);
+        }
+    }
+
+    value
+}
+
+pub(super) fn parse_protocol_machine_run_output(
+    value: Value,
+) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
+    let normalized = normalize_protocol_machine_run_output_value(value);
+    let output: ProtocolMachineRunOutput = serde_json::from_value(normalized)
+        .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+    crate::schema::ensure_supported_schema_version(
+        &output.schema_version,
+        "ProtocolMachineRunOutput",
+    )
+    .map_err(ProtocolMachineRunnerError::ParseError)?;
+    Ok(output)
+}
+
 pub(super) fn parse_sim_run_output(
     value: Value,
 ) -> Result<SimRunOutput, ProtocolMachineRunnerError> {

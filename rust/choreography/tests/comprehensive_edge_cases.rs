@@ -24,18 +24,16 @@ fn test_namespace_conflicts_and_resolution() {
     // Test that identical protocol names in different namespaces don't conflict
     let protocol_a = r#"
         module service_a exposing (Protocol)
-        protocol Protocol = {
+        protocol Protocol =
             roles Client, Server
-            Client -> Server: Request
-        }
+            Client -> Server : Request
     "#;
 
     let protocol_b = r#"
         module service_b exposing (Protocol)
-        protocol Protocol = {
+        protocol Protocol =
             roles Client, Server
-            Client -> Server: Request
-        }
+            Client -> Server : Request
     "#;
 
     let choreo_a = parse_choreography_str(protocol_a).expect("Protocol A should parse");
@@ -55,10 +53,9 @@ fn test_namespace_validation_edge_cases() {
     let _result = parse_choreography_str(
         r#"
         module impl exposing (Test)
-        protocol Test = {
+        protocol Test =
             roles A, B
-            A -> B: Msg
-        }
+            A -> B : Msg
     "#,
     );
     // Note: The parser may accept this since it's just a string literal
@@ -67,10 +64,9 @@ fn test_namespace_validation_edge_cases() {
     let result = parse_choreography_str(
         r#"
         module test::namespace exposing (Test)
-        protocol Test = {
+        protocol Test =
             roles A, B
-            A -> B: Msg
-        }
+            A -> B : Msg
     "#,
     );
     assert!(
@@ -83,10 +79,9 @@ fn test_namespace_validation_edge_cases() {
     let protocol = format!(
         r#"
         module {} exposing (Test)
-        protocol Test = {{
+        protocol Test =
             roles A, B
-            A -> B: Msg
-        }}
+            A -> B : Msg
     "#,
         long_namespace
     );
@@ -104,10 +99,9 @@ fn test_namespace_with_unicode() {
     let result = parse_choreography_str(
         r#"
         module 测试 exposing (Test)
-        protocol Test = {
+        protocol Test =
             roles A, B
-            A -> B: Msg
-        }
+            A -> B : Msg
     "#,
     );
     assert!(
@@ -125,12 +119,11 @@ fn test_complex_dynamic_role_overflow_scenarios() {
     // Test nested dynamic roles with potential overflow
     let protocol = format!(
         r#"
-        protocol OverflowTest = {{
+        protocol OverflowTest =
             roles Controller, Workers[{}], Monitors[{}]
             
-            Controller -> Workers[*]: Start
-            Workers[0..{}] -> Monitors[*]: Status
-        }}
+            Controller -> Workers[*] : Start
+            Workers[0..{}] -> Monitors[*] : Status
     "#,
         MAX_ROLE_COUNT / 2,
         MAX_ROLE_COUNT / 2,
@@ -202,11 +195,10 @@ fn test_range_boundary_conditions() {
     // Test range at maximum boundary
     let protocol = format!(
         r#"
-        protocol RangeTest = {{
+        protocol RangeTest =
             roles Controller, Workers[{}]
             
-            Workers[0..{}] -> Controller: Status
-        }}
+            Workers[0..{}] -> Controller : Status
     "#,
         MAX_ROLE_COUNT,
         MAX_RANGE_COUNT - 1
@@ -218,11 +210,10 @@ fn test_range_boundary_conditions() {
     // Test range exceeding boundary
     let protocol = format!(
         r#"
-        protocol RangeTest = {{
+        protocol RangeTest =
             roles Controller, Workers[{}]
             
-            Workers[0..{}] -> Controller: Status
-        }}
+            Workers[0..{}] -> Controller : Status
     "#,
         MAX_ROLE_COUNT,
         MAX_RANGE_COUNT + 100
@@ -240,11 +231,10 @@ fn test_invalid_range_expressions() {
     // Test range with start > end
     let result = parse_choreography_str(
         r#"
-        protocol InvalidRange = {
+        protocol InvalidRange =
             roles Controller, Workers[10]
             
-            Workers[5..2] -> Controller: Status
-        }
+            Workers[5..2] -> Controller : Status
     "#,
     );
     assert!(result.is_err(), "Should reject range with start > end");
@@ -252,11 +242,10 @@ fn test_invalid_range_expressions() {
     // Test range with negative indices (if supported)
     let _result = parse_choreography_str(
         r#"
-        protocol NegativeRange = {
+        protocol NegativeRange =
             roles Controller, Workers[10]
             
-            Workers[-1..5] -> Controller: Status
-        }
+            Workers[-1..5] -> Controller : Status
     "#,
     );
     // Should either parse (if negative indices are supported) or reject consistently
@@ -264,11 +253,10 @@ fn test_invalid_range_expressions() {
     // Test range with symbolic bounds
     let result = parse_choreography_str(
         r#"
-        protocol SymbolicRange = {
+        protocol SymbolicRange =
             roles Controller, Workers[N]
             
-            Workers[start..end] -> Controller: Status
-        }
+            Workers[start..end] -> Controller : Status
     "#,
     );
     assert!(result.is_ok(), "Should accept symbolic range bounds");
@@ -279,11 +267,10 @@ fn test_nested_range_expressions() {
     // Test complex range expressions with nested references
     let result = parse_choreography_str(
         r#"
-        protocol NestedRange = {
+        protocol NestedRange =
             roles Coordinator, Workers[N], Monitors[M]
             
-            Workers[0..quorum] -> Monitors[i..j]: Data
-        }
+            Workers[0..quorum] -> Monitors[i..j] : Data
     "#,
     );
     assert!(result.is_ok(), "Should handle complex range expressions");
@@ -298,22 +285,18 @@ fn test_module_dynamic_roles_integration() {
     // Test module namespaces with dynamic roles and choices
     let protocol = r#"
         module integration_test exposing (CompleteIntegration)
-        protocol CompleteIntegration = {
+        protocol CompleteIntegration =
             roles Coordinator, Workers[*], Database
 
-            Coordinator -> Workers[*]: Initialize
-            Workers[i] -> Database: Query
-            Database -> Workers[i]: Response
+            Coordinator -> Workers[*] : Initialize
+            Workers[i] -> Database : Query
+            Database -> Workers[i] : Response
 
-            choice Coordinator at {
-                | success => {
-                    Coordinator -> Workers[*]: Success
-                }
-                | retry => {
-                    Coordinator -> Workers[active_set]: Retry
-                }
-            }
-        }
+            choice Coordinator at
+                | success =>
+                    Coordinator -> Workers[*] : Success
+                | retry =>
+                    Coordinator -> Workers[active_set] : Retry
     "#;
 
     let choreo = parse_choreography_str(protocol).expect("Complete integration should parse");
@@ -333,14 +316,13 @@ fn test_complex_projection_with_dynamic_roles() {
     // Test projection works with dynamic roles
     let protocol = r#"
         module projection_test exposing (ProjectionIntegration)
-        protocol ProjectionIntegration = {
+        protocol ProjectionIntegration =
             roles Client, Servers[N], LoadBalancer
 
-            Client -> LoadBalancer: Request
-            LoadBalancer -> Servers[target]: ForwardedRequest
-            Servers[target] -> LoadBalancer: Response
-            LoadBalancer -> Client: FinalResponse
-        }
+            Client -> LoadBalancer : Request
+            LoadBalancer -> Servers[target] : ForwardedRequest
+            Servers[target] -> LoadBalancer : Response
+            LoadBalancer -> Client : FinalResponse
     "#;
 
     let choreo = parse_choreography_str(protocol).expect("Should parse projection test");

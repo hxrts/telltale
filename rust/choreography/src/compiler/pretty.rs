@@ -512,7 +512,8 @@ protocol Demo =
   choice Client at
     | Buy =>
       Client -> Server : Purchase
-    | Cancel => {}
+    | Cancel =>
+      Client -> Server : Cancel
   loop repeat 2
     Client -> Server : Ping
     Server -> Client : Pong

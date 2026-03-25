@@ -24,7 +24,7 @@ use telltale_machine::EffectExchangeRecord;
 #[path = "protocol_machine_runner_json_parsing.rs"]
 mod parsing;
 use parsing::{
-    parse_required_valid, parse_sim_run_output, parse_sim_trace_validation,
+    parse_protocol_machine_run_output, parse_required_valid, parse_sim_run_output, parse_sim_trace_validation,
     parse_structured_errors, simulation_trace_payload,
 };
 
@@ -365,14 +365,9 @@ impl ProtocolMachineRunner {
             });
         }
 
-        let out: ProtocolMachineRunOutput = serde_json::from_slice(&output.stdout)
+        let out_value: Value = serde_json::from_slice(&output.stdout)
             .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
-        crate::schema::ensure_supported_schema_version(
-            &out.schema_version,
-            "ProtocolMachineRunOutput",
-        )
-        .map_err(ProtocolMachineRunnerError::ParseError)?;
-        Ok(out)
+        parse_protocol_machine_run_output(out_value)
     }
 
     /// Run the Lean protocol-machine execution entrypoint.

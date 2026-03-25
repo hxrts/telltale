@@ -716,7 +716,7 @@ mod tests {
         assert!(matches!(
             err,
             CompositionError::MissingCapability { capability, .. }
-            if capability == "output_condition_gating"
+            if capability == "execution_profile"
         ));
     }
 
@@ -756,7 +756,10 @@ mod tests {
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities {
                     determinism: vec![DeterminismCapability::Full],
-                    schedulers: vec![SchedulerCapability::Cooperative],
+                    schedulers: vec![
+                        SchedulerCapability::Cooperative,
+                        SchedulerCapability::ProgressAware,
+                    ],
                     output_condition_gating: true,
                 },
                 runtime_contracts: None,

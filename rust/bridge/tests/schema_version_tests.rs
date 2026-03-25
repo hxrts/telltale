@@ -204,9 +204,11 @@ fn vm_run_output_roundtrip_preserves_semantic_objects() {
                     "interface_name": "Transport",
                     "operation_name": "sendDecision",
                     "authority_class": "command",
+                    "semantic_class": "best_effort",
                     "admissibility": "declared_use_only",
                     "totality": "immediate",
                     "timeout_policy": "none",
+                    "retry_shape": "forbidden",
                     "reentrancy_policy": "allow",
                     "handler_domain": "external"
                 },

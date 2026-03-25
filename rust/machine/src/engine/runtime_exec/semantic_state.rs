@@ -783,7 +783,7 @@ mod runtime_effect_state_tests {
         let err = vm
             .ensure_effect_request_allowed(&request)
             .expect_err("same fragment reentrancy must fail");
-        assert!(err.message.contains("session fragment"));
+        assert!(err.message.contains("footprint session:9"));
     }
 
     #[test]

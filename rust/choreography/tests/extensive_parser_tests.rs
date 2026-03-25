@@ -371,10 +371,9 @@ mod extension_parser_tests {
         let mut parser = ExtensionParser::new();
 
         let input = r#"
-            protocol TestProtocol = {
+            protocol TestProtocol =
                 roles Alice, Bob
-                Alice -> Bob: Message
-            }
+                Alice -> Bob : Message
         "#;
 
         let result = parser.parse_with_extensions(input);
@@ -427,14 +426,13 @@ mod extension_parser_tests {
             .expect("extension should register");
 
         let input = r#"
-            protocol LargeProtocol = {
+            protocol LargeProtocol =
                 roles A, B, C, D, E
-                A -> B: Message1
-                B -> C: Message2
-                C -> D: Message3
-                D -> E: Message4
-                E -> A: Message5
-            }
+                A -> B : Message1
+                B -> C : Message2
+                C -> D : Message3
+                D -> E : Message4
+                E -> A : Message5
         "#;
 
         // Multiple parses to test buffer reuse
@@ -457,18 +455,14 @@ mod feature_inheritance_tests {
     fn test_choice_construct_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            protocol ChoiceExample = {
+            protocol ChoiceExample =
                 roles Alice, Bob, Charlie
 
-                choice Alice at {
-                    | path1 => {
-                        Alice -> Bob: Request
-                    }
-                    | path2 => {
-                        Alice -> Charlie: Alternative
-                    }
-                }
-            }
+                choice Alice at
+                    | path1 =>
+                        Alice -> Bob : Request
+                    | path2 =>
+                        Alice -> Charlie : Alternative
         "#,
         )
         .expect("Should parse choice construct");
@@ -491,12 +485,11 @@ mod feature_inheritance_tests {
     fn test_parameterized_roles_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            protocol ParameterizedExample = {
+            protocol ParameterizedExample =
                 roles Worker[N], Manager, Client[3]
 
-                Worker[*] -> Manager: Status
-                Manager -> Client[0]: Response
-            }
+                Worker[*] -> Manager : Status
+                Manager -> Client[0] : Response
         "#,
         )
         .expect("Should parse parameterized roles");
@@ -528,13 +521,11 @@ mod feature_inheritance_tests {
     fn test_loop_construct_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            protocol LoopExample = {
+            protocol LoopExample =
                 roles Producer, Consumer
 
-                loop forever {
-                    Producer -> Consumer: Data
-                }
-            }
+                loop forever
+                    Producer -> Consumer : Data
         "#,
         )
         .expect("Should parse loop construct");
@@ -558,11 +549,10 @@ mod feature_inheritance_tests {
     fn test_broadcast_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            protocol BroadcastExample = {
+            protocol BroadcastExample =
                 roles Server, Client1, Client2
 
-                Server ->*: Notification
-            }
+                Server ->* : Notification
         "#,
         )
         .expect("Should parse broadcast");
@@ -582,22 +572,17 @@ mod feature_inheritance_tests {
     fn test_complex_protocol_inheritance() {
         let choreography = parse_choreography_str(
             r#"
-            protocol ComplexExample = {
+            protocol ComplexExample =
                 roles Coordinator, Worker[N], Client
 
-                choice Coordinator at {
-                    | distribute => {
-                        loop forever {
-                            Coordinator -> Worker[*]: Task
-                            Worker[*] -> Coordinator: Result
-                        }
-                        Coordinator -> Client: Summary
-                    }
-                    | direct => {
-                        Coordinator -> Client: DirectResponse
-                    }
-                }
-            }
+                choice Coordinator at
+                    | distribute =>
+                        loop forever
+                            Coordinator -> Worker[*] : Task
+                            Worker[*] -> Coordinator : Result
+                        Coordinator -> Client : Summary
+                    | direct =>
+                        Coordinator -> Client : DirectResponse
         "#,
         )
         .expect("Should parse complex protocol");
@@ -638,9 +623,9 @@ mod error_handling_tests {
         let invalid_choreographies = vec![
             "not a protocol",
             "protocol { }",
-            "protocol Test = { roles }",
-            "protocol Test = { roles A, B A -> : Message }",
-            "protocol Test = { roles A A -> B: Message }", // B not declared
+            "protocol Test =\n  roles",
+            "protocol Test =\n  roles A, B\n  A -> : Message",
+            "protocol Test =\n  roles A\n  A -> B : Message", // B not declared
         ];
 
         for invalid in invalid_choreographies {
@@ -660,7 +645,7 @@ mod error_handling_tests {
             .register_extension(TestGrammarExtension, TestStatementParser)
             .expect("extension should register");
 
-        let invalid_input = "protocol Test = { invalid syntax }";
+        let invalid_input = "protocol Test =\n  invalid syntax";
         let result = parser.parse_with_extensions(invalid_input);
 
         assert!(result.is_err());
@@ -705,7 +690,7 @@ mod error_handling_tests {
             // Empty roles
             (
                 r#"
-                protocol Empty = {
+                protocol Empty =
                     roles }
             "#,
                 false,
@@ -713,18 +698,16 @@ mod error_handling_tests {
             // Single role
             (
                 r#"
-                protocol Single = {
+                protocol Single =
                     roles Alice
-                }
             "#,
                 true,
             ),
             // Role with special characters (should fail)
             (
                 r#"
-                protocol Special = {
+                protocol Special =
                     roles Role-With-Dashes
-                }
             "#,
                 false,
             ),
@@ -745,7 +728,7 @@ mod error_handling_tests {
         // Test parsing performance with large choreography
         let mut large_choreo = String::from(
             r#"
-            protocol LargeExample = {
+            protocol LargeExample =
                 roles "#,
         );
 
@@ -761,13 +744,12 @@ mod error_handling_tests {
         // Add many message exchanges
         for i in 0..100 {
             large_choreo.push_str(&format!(
-                "                Role{} -> Role{}: Message{}\n",
+                "                Role{} -> Role{} : Message{}\n",
                 i % 100,
                 (i + 1) % 100,
                 i
             ));
         }
-        large_choreo.push_str("            }");
 
         let start = Instant::now();
         let result = parse_choreography_str(&large_choreo);
@@ -791,10 +773,9 @@ mod error_handling_tests {
             .expect("extension should register");
 
         let test_input = r#"
-            protocol BufferTest = {
+            protocol BufferTest =
                 roles A, B
-                A -> B: Message
-            }
+                A -> B : Message
         "#;
 
         // Parse multiple times to ensure buffer reuse works correctly
@@ -852,11 +833,18 @@ mod performance_tests {
             .expect("extension should register");
 
         let medium_choreo = r#"
-            protocol MemoryTest = {
+            protocol MemoryTest =
                 roles A, B, C, D, E, F, G, H, I, J
-                A -> B: M1 B -> C: M2 C -> D: M3 D -> E: M4 E -> F: M5
-                F -> G: M6 G -> H: M7 H -> I: M8 I -> J: M9 J -> A: M10
-            }
+                A -> B : M1
+                B -> C : M2
+                C -> D : M3
+                D -> E : M4
+                E -> F : M5
+                F -> G : M6
+                G -> H : M7
+                H -> I : M8
+                I -> J : M9
+                J -> A : M10
         "#;
 
         // Parse many times - should not accumulate memory
@@ -905,19 +893,15 @@ mod regression_tests {
         // Regression test for complex feature combinations
         let choreography = parse_choreography_str(
             r#"
-            protocol Regression1 = {
+            protocol Regression1 =
                 roles Worker[N], Coordinator
 
-                choice Coordinator at {
-                    | parallel => {
-                        Worker[*] -> Coordinator: Status
-                    }
-                    | sequential => {
-                        Worker[0] -> Coordinator: FirstStatus
-                        Worker[1] -> Coordinator: SecondStatus
-                    }
-                }
-            }
+                choice Coordinator at
+                    | parallel =>
+                        Worker[*] -> Coordinator : Status
+                    | sequential =>
+                        Worker[0] -> Coordinator : FirstStatus
+                        Worker[1] -> Coordinator : SecondStatus
         "#,
         )
         .expect("Should parse complex regression case");
@@ -936,27 +920,19 @@ mod regression_tests {
         // Regression test for deeply nested structures
         let choreography = parse_choreography_str(
             r#"
-            protocol NestedExample = {
+            protocol NestedExample =
                 roles A, B, C
 
-                choice A at {
-                    | path1 => {
-                        loop forever {
-                            choice B at {
-                                | continue => {
-                                    B -> A: Continue
-                                }
-                                | stop => {
-                                    B -> A: Stop
-                                }
-                            }
-                        }
-                    }
-                    | path2 => {
-                        A -> C: Direct
-                    }
-                }
-            }
+                choice A at
+                    | path1 =>
+                        loop forever
+                            choice B at
+                                | continue =>
+                                    B -> A : Continue
+                                | stop =>
+                                    B -> A : Stop
+                    | path2 =>
+                        A -> C : Direct
         "#,
         )
         .expect("Should parse nested structures");

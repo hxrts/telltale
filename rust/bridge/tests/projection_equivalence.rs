@@ -127,10 +127,9 @@ fn validate_projection_equivalence(
 #[test]
 fn test_simple_send() {
     let dsl = r#"
-protocol Simple = {
+protocol Simple =
     roles A, B
-    A -> B: Msg
-}
+    A -> B : Msg
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -140,11 +139,10 @@ protocol Simple = {
 #[test]
 fn test_two_message_sequence() {
     let dsl = r#"
-protocol TwoMessages = {
+protocol TwoMessages =
     roles A, B
-    A -> B: First
-    B -> A: Second
-}
+    A -> B : First
+    B -> A : Second
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -154,12 +152,11 @@ protocol TwoMessages = {
 #[test]
 fn test_three_message_chain() {
     let dsl = r#"
-protocol Chain = {
+protocol Chain =
     roles A, B
-    A -> B: One
-    B -> A: Two
-    A -> B: Three
-}
+    A -> B : One
+    B -> A : Two
+    A -> B : Three
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -173,12 +170,11 @@ protocol Chain = {
 #[test]
 fn test_three_party_ring() {
     let dsl = r#"
-protocol Ring = {
+protocol Ring =
     roles A, B, C
-    A -> B: Msg1
-    B -> C: Msg2
-    C -> A: Msg3
-}
+    A -> B : Msg1
+    B -> C : Msg2
+    C -> A : Msg3
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -189,13 +185,12 @@ protocol Ring = {
 #[test]
 fn test_three_party_star() {
     let dsl = r#"
-protocol Star = {
+protocol Star =
     roles Hub, Spoke1, Spoke2
-    Spoke1 -> Hub: Request1
-    Hub -> Spoke1: Response1
-    Spoke2 -> Hub: Request2
-    Hub -> Spoke2: Response2
-}
+    Spoke1 -> Hub : Request1
+    Hub -> Spoke1 : Response1
+    Spoke2 -> Hub : Request2
+    Hub -> Spoke2 : Response2
     "#;
 
     validate_projection_equivalence(dsl, "Hub").expect("Hub projection should match");
@@ -210,17 +205,13 @@ protocol Star = {
 #[test]
 fn test_binary_choice() {
     let dsl = r#"
-protocol BinaryChoice = {
+protocol BinaryChoice =
     roles Client, Server
-    choice Client at {
-        | Accept => {
-            Client -> Server: Accept
-        }
-        | Reject => {
-            Client -> Server: Reject
-        }
-    }
-}
+    choice Client at
+      | Accept =>
+          Client -> Server : Accept
+      | Reject =>
+          Client -> Server : Reject
     "#;
 
     validate_projection_equivalence(dsl, "Client").expect("Client projection should match");
@@ -230,19 +221,15 @@ protocol BinaryChoice = {
 #[test]
 fn test_choice_with_continuation() {
     let dsl = r#"
-protocol ChoiceWithCont = {
+protocol ChoiceWithCont =
     roles Client, Server
-    choice Client at {
-        | Success => {
-            Client -> Server: Success
-            Server -> Client: Data
-        }
-        | Failure => {
-            Client -> Server: Failure
-            Server -> Client: Error
-        }
-    }
-}
+    choice Client at
+      | Success =>
+          Client -> Server : Success
+          Server -> Client : Data
+      | Failure =>
+          Client -> Server : Failure
+          Server -> Client : Error
     "#;
 
     validate_projection_equivalence(dsl, "Client").expect("Client projection should match");
@@ -252,20 +239,15 @@ protocol ChoiceWithCont = {
 #[test]
 fn test_three_way_choice() {
     let dsl = r#"
-protocol ThreeWayChoice = {
+protocol ThreeWayChoice =
     roles A, B
-    choice A at {
-        | Option1 => {
-            A -> B: Option1
-        }
-        | Option2 => {
-            A -> B: Option2
-        }
-        | Option3 => {
-            A -> B: Option3
-        }
-    }
-}
+    choice A at
+      | Option1 =>
+          A -> B : Option1
+      | Option2 =>
+          A -> B : Option2
+      | Option3 =>
+          A -> B : Option3
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -279,14 +261,12 @@ protocol ThreeWayChoice = {
 #[test]
 fn test_simple_recursion() {
     let dsl = r#"
-protocol SimpleRec = {
+protocol SimpleRec =
     roles A, B
-    rec Loop {
-        A -> B: Ping
-        B -> A: Pong
+    rec Loop
+        A -> B : Ping
+        B -> A : Pong
         continue Loop
-    }
-}
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -296,21 +276,16 @@ protocol SimpleRec = {
 #[test]
 fn test_recursion_with_choice() {
     let dsl = r#"
-protocol RecWithChoice = {
+protocol RecWithChoice =
     roles Client, Server
-    rec MainLoop {
-        choice Client at {
-            | Continue => {
-                Client -> Server: Continue
-                Server -> Client: Data
-                continue MainLoop
-            }
-            | Stop => {
-                Client -> Server: Stop
-            }
-        }
-    }
-}
+    rec MainLoop
+        choice Client at
+          | Continue =>
+              Client -> Server : Continue
+              Server -> Client : Data
+              continue MainLoop
+          | Stop =>
+              Client -> Server : Stop
     "#;
 
     validate_projection_equivalence(dsl, "Client").expect("Client projection should match");
@@ -324,25 +299,18 @@ protocol RecWithChoice = {
 #[test]
 fn test_nested_choice() {
     let dsl = r#"
-protocol NestedChoice = {
+protocol NestedChoice =
     roles A, B
-    choice A at {
-        | Outer1 => {
-            A -> B: Outer1
-            choice B at {
-                | Inner1 => {
-                    B -> A: Inner1
-                }
-                | Inner2 => {
-                    B -> A: Inner2
-                }
-            }
-        }
-        | Outer2 => {
-            A -> B: Outer2
-        }
-    }
-}
+    choice A at
+      | Outer1 =>
+          A -> B : Outer1
+          choice B at
+            | Inner1 =>
+                B -> A : Inner1
+            | Inner2 =>
+                B -> A : Inner2
+      | Outer2 =>
+          A -> B : Outer2
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -352,19 +320,15 @@ protocol NestedChoice = {
 #[test]
 fn test_three_party_choice() {
     let dsl = r#"
-protocol ThreePartyChoice = {
+protocol ThreePartyChoice =
     roles A, B, C
-    choice A at {
-        | Left => {
-            A -> B: Left
-            B -> C: Notify
-        }
-        | Right => {
-            A -> B: Right
-            B -> C: Notify
-        }
-    }
-}
+    choice A at
+      | Left =>
+          A -> B : Left
+          B -> C : Notify
+      | Right =>
+          A -> B : Right
+          B -> C : Notify
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -381,19 +345,15 @@ fn test_non_participant_mergeable() {
     // C is not involved in A->B choice, but sends the same message in both branches
     // This should be mergeable
     let dsl = r#"
-protocol Mergeable = {
+protocol Mergeable =
     roles A, B, C
-    choice A at {
-        | Left => {
-            A -> B: Left
-            C -> B: Status
-        }
-        | Right => {
-            A -> B: Right
-            C -> B: Status
-        }
-    }
-}
+    choice A at
+      | Left =>
+          A -> B : Left
+          C -> B : Status
+      | Right =>
+          A -> B : Right
+          C -> B : Status
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -408,19 +368,15 @@ protocol Mergeable = {
 #[test]
 fn test_single_role_in_choice_branch() {
     let dsl = r#"
-protocol SingleRoleBranch = {
+protocol SingleRoleBranch =
     roles A, B
-    A -> B: Start
-    choice A at {
-        | Done => {
-            A -> B: Done
-        }
-        | More => {
-            A -> B: More
-            A -> B: Extra
-        }
-    }
-}
+    A -> B : Start
+    choice A at
+      | Done =>
+          A -> B : Done
+      | More =>
+          A -> B : More
+          A -> B : Extra
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -430,14 +386,13 @@ protocol SingleRoleBranch = {
 #[test]
 fn test_deep_nesting() {
     let dsl = r#"
-protocol DeepNesting = {
+protocol DeepNesting =
     roles A, B
-    A -> B: Level1
-    B -> A: Level2
-    A -> B: Level3
-    B -> A: Level4
-    A -> B: Level5
-}
+    A -> B : Level1
+    B -> A : Level2
+    A -> B : Level3
+    B -> A : Level4
+    A -> B : Level5
     "#;
 
     validate_projection_equivalence(dsl, "A").expect("A projection should match");
@@ -466,11 +421,20 @@ fn validate_all_roles(dsl: &str) -> Vec<(String, Result<(), ProjectionValidation
 fn test_comprehensive_validation() {
     let test_cases = [
         // Simple protocols
-        r#"protocol T1 = { roles A, B  A -> B: M }"#,
+        r#"protocol T1 =
+  roles A, B
+  A -> B : M"#,
         // Request-response
-        r#"protocol T2 = { roles C, S  C -> S: Req  S -> C: Resp }"#,
+        r#"protocol T2 =
+  roles C, S
+  C -> S : Req
+  S -> C : Resp"#,
         // Three-party
-        r#"protocol T3 = { roles X, Y, Z  X -> Y: A  Y -> Z: B  Z -> X: C }"#,
+        r#"protocol T3 =
+  roles X, Y, Z
+  X -> Y : A
+  Y -> Z : B
+  Z -> X : C"#,
     ];
 
     for (i, dsl) in test_cases.iter().enumerate() {
