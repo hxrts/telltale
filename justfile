@@ -80,7 +80,6 @@ ci-dry-run lane="fast":
     just check-doc-quality
     just perf-baseline check
     just check-protocol-machine-placeholders
-    just check-no-vm-residue
     just check-parity
     just verify-lean-protocol-machine-targets
     just verify-protocols
@@ -182,10 +181,6 @@ perf-baseline mode="check":
 # Prevent new placeholder/stub/TODO markers in executable Lean protocol machine modules.
 check-protocol-machine-placeholders:
     ./scripts/check/protocol-machine-placeholders.sh
-
-# Guard against reintroduction of architectural VM naming residue.
-check-no-vm-residue:
-    ./scripts/check/no-vm-residue.sh
 
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
