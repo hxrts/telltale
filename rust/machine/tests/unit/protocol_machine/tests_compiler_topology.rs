@@ -229,7 +229,7 @@
         assert!(machine
             .output_condition_checks()
             .iter()
-            .any(|c| c.meta.predicate_ref == "machine.observable_output" && !c.passed));
+            .any(|c| c.meta.predicate_ref == "protocol_machine.observable_output" && !c.passed));
     }
 
     #[test]
@@ -240,7 +240,7 @@
 
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-                "machine.observable_output".to_string(),
+                "protocol_machine.observable_output".to_string(),
             ]),
             ..ProtocolMachineConfig::default()
         });
@@ -251,7 +251,7 @@
         assert!(machine
             .output_condition_checks()
             .iter()
-            .any(|c| c.meta.predicate_ref == "machine.observable_output" && c.passed));
+            .any(|c| c.meta.predicate_ref == "protocol_machine.observable_output" && c.passed));
     }
 
     #[test]

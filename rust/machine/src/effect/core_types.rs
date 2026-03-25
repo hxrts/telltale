@@ -317,8 +317,11 @@ pub enum EffectHandlerDomain {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectRegionScope {
+    /// The operation is scoped to one whole session.
     Session,
+    /// The operation is scoped to a session fragment or subregion.
     Fragment,
+    /// The operation is scoped globally across sessions.
     Global,
 }
 

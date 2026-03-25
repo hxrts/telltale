@@ -726,7 +726,7 @@ mod tests {
             sched_policy: SchedPolicy::RoundRobin,
             determinism_mode: DeterminismMode::ModuloEffects,
             output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-                "machine.observable_output".to_string(),
+                "protocol_machine.observable_output".to_string(),
             ]),
             ..ProtocolMachineConfig::default()
         };

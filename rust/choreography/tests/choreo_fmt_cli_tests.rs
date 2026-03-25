@@ -6,14 +6,27 @@ fn sample_protocol() -> &'static str {
 proof_bundle Spec requires [speculation]
 protocol Demo =
   roles A, B
-  fork ghost0
   A -> B : Ping
 "#
 }
 
+fn choreo_fmt_command() -> Command {
+    let mut cmd = Command::new("cargo");
+    cmd.arg("run")
+        .arg("-q")
+        .arg("-p")
+        .arg("telltale-choreography")
+        .arg("--features")
+        .arg("native-cli")
+        .arg("--bin")
+        .arg("choreo-fmt")
+        .arg("--");
+    cmd
+}
+
 #[test]
 fn test_choreo_fmt_explain_lowering_from_stdin() {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_choreo-fmt"))
+    let mut child = choreo_fmt_command()
         .arg("--explain-lowering")
         .arg("-")
         .stdin(Stdio::piped())
@@ -42,7 +55,7 @@ fn test_choreo_fmt_explain_lowering_from_stdin() {
 
 #[test]
 fn test_choreo_fmt_rejects_write_with_explain_lowering() {
-    let mut child = Command::new(env!("CARGO_BIN_EXE_choreo-fmt"))
+    let mut child = choreo_fmt_command()
         .arg("--write")
         .arg("--explain-lowering")
         .arg("-")

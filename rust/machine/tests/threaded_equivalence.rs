@@ -232,7 +232,7 @@ fn test_output_condition_outcomes_match_across_drivers() {
 
     let allow_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-            "machine.observable_output".to_string(),
+            "protocol_machine.observable_output".to_string(),
         ]),
         ..ProtocolMachineConfig::default()
     };
@@ -291,7 +291,7 @@ fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
     let coop_predicate = extract_output_condition_fault(coop_err);
     let threaded_predicate = extract_output_condition_fault(threaded_err);
     assert_eq!(coop_predicate, threaded_predicate);
-    assert_eq!(coop_predicate, "machine.observable_output");
+    assert_eq!(coop_predicate, "protocol_machine.observable_output");
 
     let coop_checks: Vec<(String, bool)> = coop
         .output_condition_checks()
@@ -341,7 +341,7 @@ fn test_output_condition_commit_pass_artifacts_match_across_drivers() {
 
     let allow_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-            "machine.observable_output".to_string(),
+            "protocol_machine.observable_output".to_string(),
         ]),
         ..ProtocolMachineConfig::default()
     };

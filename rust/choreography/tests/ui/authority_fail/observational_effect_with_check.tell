@@ -1,5 +1,12 @@
 effect Runtime
   observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol WatchFlow uses Runtime =
   roles Coordinator, Worker

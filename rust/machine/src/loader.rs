@@ -27,6 +27,7 @@ pub struct CodeImage {
 /// An unverified code image: program + global type, no validation proof.
 ///
 /// Must be validated before execution via `validate`.
+#[cfg(test)]
 #[derive(Debug, Clone)]
 pub(crate) struct UntrustedImage {
     /// Bytecode programs per role.
@@ -37,16 +38,24 @@ pub(crate) struct UntrustedImage {
     pub local_types: BTreeMap<String, LocalTypeR>,
 }
 
-/// Result of loading a code image.
+/// Result of validating an untrusted code image in tests.
+#[cfg(test)]
 #[derive(Debug)]
 pub(crate) enum LoadResult {
-    /// Image loaded successfully.
-    Ok,
     /// Validation failed.
     ValidationFailed {
         /// Description of the validation failure.
         reason: String,
     },
+}
+
+#[cfg(test)]
+impl LoadResult {
+    fn reason(&self) -> &str {
+        match self {
+            Self::ValidationFailed { reason } => reason,
+        }
+    }
 }
 
 impl CodeImage {
@@ -99,6 +108,7 @@ impl CodeImage {
     }
 }
 
+#[cfg(test)]
 impl UntrustedImage {
     /// Create an untrusted image from projected local types.
     #[must_use]
@@ -231,6 +241,8 @@ mod tests {
         let image = UntrustedImage::from_local_types(&locals, &global);
         let result = image.validate();
         assert!(result.is_err());
+        let err = result.expect_err("validation should fail");
+        assert!(err.reason().contains("local type mismatch"));
     }
 
     #[test]
@@ -242,6 +254,8 @@ mod tests {
         let image = UntrustedImage::from_local_types(&locals, &global);
         let result = image.validate();
         assert!(result.is_err());
+        let err = result.expect_err("validation should fail");
+        assert!(err.reason().contains("not well-formed"));
     }
 
     #[test]

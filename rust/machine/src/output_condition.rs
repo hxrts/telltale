@@ -62,7 +62,7 @@ impl OutputConditionMeta {
     #[must_use]
     pub fn default_observable(output_digest: String) -> Self {
         Self {
-            predicate_ref: "machine.observable_output".to_string(),
+            predicate_ref: "protocol_machine.observable_output".to_string(),
             witness_ref: None,
             output_digest,
         }

@@ -71,6 +71,13 @@ fn test_projection_rejects_authority_case_constructs_fail_closed() {
     let input = r#"
 effect Runtime
   authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol CommitFlow uses Runtime =
   roles Coordinator, Worker

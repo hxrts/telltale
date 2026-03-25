@@ -206,6 +206,8 @@ fn protocol_machine_run_output_roundtrip_preserves_semantic_objects() {
                     "operation_name": "sendDecision",
                     "authority_class": "command",
                     "semantic_class": "best_effort",
+                    "agreement_use": "forbidden",
+                    "region_scope": "session",
                     "admissibility": "declared_use_only",
                     "totality": "immediate",
                     "timeout_policy": "none",
