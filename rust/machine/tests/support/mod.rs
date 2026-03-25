@@ -15,7 +15,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 
 /// Deterministic seed for reproducibility.
 pub const SEED: [u8; 32] = [
-    0x56, 0x4D, 0x43, 0x6F, 0x6E, 0x66, 0x6F, 0x72, // "VMConfor"
+    0x56, 0x4D, 0x43, 0x6F, 0x6E, 0x66, 0x6F, 0x72, // "PMConfor"
     0x6D, 0x61, 0x6E, 0x63, 0x65, 0x54, 0x65, 0x73, // "manceTes"
     0x74, 0x53, 0x75, 0x69, 0x74, 0x65, 0x56, 0x31, // "tSuiteV1"
     0x52, 0x75, 0x73, 0x74, 0x56, 0x4D, 0x30, 0x31, // "RustVM01"
@@ -354,17 +354,17 @@ pub fn choice_image(sender: &str, receiver: &str, labels: &[&str]) -> CodeImage 
 
 /// Step a ProtocolMachine to completion, collecting the trace.
 pub fn run_to_completion(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     handler: &dyn EffectHandler,
     max_steps: usize,
 ) -> Result<Vec<ObsEvent>, ProtocolMachineError> {
     for _ in 0..max_steps {
-        match vm.step(handler)? {
+        match machine.step(handler)? {
             StepResult::AllDone | StepResult::Stuck => break,
             StepResult::Continue => {}
         }
     }
-    Ok(vm.trace().to_vec())
+    Ok(machine.trace().to_vec())
 }
 
 // ============================================================================

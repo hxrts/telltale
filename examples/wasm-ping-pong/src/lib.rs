@@ -1,147 +1,91 @@
-// WASM example: Simple ping-pong protocol
-//
-// Demonstrates how to use Telltale choreographic programming in WASM.
-// This is a minimal two-party protocol where Alice sends a ping and Bob responds with a pong.
+//! WASM example: canonical `tell!`-based ping-pong protocol.
+//!
+//! This is an effect-boundary example for browser integration: `tell!` owns the
+//! ping-pong protocol, and a generated effect trait models the host-side logic
+//! that turns a received ping into a pong payload.
 
+use futures::try_join;
+use serde::{Deserialize, Serialize};
+use telltale::{tell, try_session};
 use wasm_bindgen::prelude::*;
-use telltale_choreography::{
-    InMemoryHandler, Program, interpret, RoleId, LabelId, RoleName,
-};
-use serde::{Serialize, Deserialize};
-use std::sync::{Arc, Mutex};
-use std::collections::BTreeMap;
-use std::sync::Once;
 
-static INIT: Once = Once::new();
+tell! {
+    -- // Browser host transforms the received ping into a pong payload.
+    effect BrowserRuntime
+      command respond : String -> String
 
-/// Initialize panic hook for better error messages in browser console
+    -- // Alice sends a ping and Bob replies with a pong.
+    protocol PingPong uses BrowserRuntime =
+      roles Alice, Bob
+      Alice -> Bob : Ping(String)
+      Bob -> Alice : Pong(String)
+}
+
+use PingPong::effects;
+use PingPong::sessions::*;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PingPongResult {
+    pub sent_ping: String,
+    pub received_ping: String,
+    pub sent_pong: String,
+    pub received_pong: String,
+}
+
+#[derive(Default)]
+struct BrowserHost;
+
+impl effects::BrowserRuntime for BrowserHost {
+    fn respond(&mut self, input: String) -> String {
+        format!("Pong for: {input}")
+    }
+}
+
+async fn alice(role: &mut Alice, message: String) -> Result<String, JsValue> {
+    try_session(role, |s: AliceSession<'_, _>| async move {
+        let s = s.send(Ping(message)).await.map_err(to_js_error)?;
+        let (Pong(response), s) = s.receive().await.map_err(to_js_error)?;
+        Ok((response, s))
+    })
+    .await
+}
+
+async fn bob(role: &mut Bob, host: &mut BrowserHost) -> Result<(String, String), JsValue> {
+    try_session(role, |s: BobSession<'_, _>| async move {
+        let (Ping(received_ping), s) = s.receive().await.map_err(to_js_error)?;
+        let sent_pong = effects::BrowserRuntime::respond(host, received_ping.clone());
+        let s = s.send(Pong(sent_pong.clone())).await.map_err(to_js_error)?;
+        Ok(((received_ping, sent_pong), s))
+    })
+    .await
+}
+
+fn to_js_error<E: std::fmt::Display>(error: E) -> JsValue {
+    JsValue::from_str(&format!("Protocol error: {error}"))
+}
+
 #[wasm_bindgen(start)]
 pub fn init() {
-    INIT.call_once(|| {
-        console_error_panic_hook::set_once();
-        let _ = tracing_wasm::try_set_as_global_default();
-    });
+    console_error_panic_hook::set_once();
+    let _ = tracing_wasm::try_set_as_global_default();
 }
 
-/// Role definitions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum Role {
-    Alice,
-    Bob,
-}
-
-/// Label definitions for choice branches
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Label {
-    Ping,
-    Pong,
-}
-
-impl LabelId for Label {
-    fn as_str(&self) -> &'static str {
-        match self {
-            Label::Ping => "Ping",
-            Label::Pong => "Pong",
-        }
-    }
-
-    fn from_str(label: &str) -> Option<Self> {
-        match label {
-            "Ping" => Some(Label::Ping),
-            "Pong" => Some(Label::Pong),
-            _ => None,
-        }
-    }
-}
-
-impl RoleId for Role {
-    type Label = Label;
-
-    fn role_name(&self) -> RoleName {
-        match self {
-            Role::Alice => RoleName::from_static("Alice"),
-            Role::Bob => RoleName::from_static("Bob"),
-        }
-    }
-}
-
-/// Message types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Message {
-    Ping(String),
-    Pong(String),
-}
-
-/// Run the ping-pong protocol from Alice's perspective
 #[wasm_bindgen]
-pub async fn run_alice(message: String) -> Result<String, JsValue> {
-    tracing::info!("Alice: Starting ping-pong protocol");
+pub async fn run_ping_pong(message: String) -> Result<JsValue, JsValue> {
+    let Roles(mut alice_role, mut bob_role) = Roles::default();
+    let sent_ping = message.clone();
+    let mut browser_host = BrowserHost;
 
-    // Create shared channels for communication
-    let channels = Arc::new(Mutex::new(BTreeMap::new()));
-    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
+    let (received_pong, (received_ping, sent_pong)) =
+        try_join!(alice(&mut alice_role, message), bob(&mut bob_role, &mut browser_host))?;
 
-    // Create handler for Alice
-    let mut handler = InMemoryHandler::with_channels(
-        Role::Alice,
-        channels.clone(),
-        choice_channels.clone(),
-    );
-
-    // Define Alice's protocol: send ping to Bob
-    let program = Program::new()
-        .send(Role::Bob, Message::Ping(message.clone()))
-        .recv::<Message>(Role::Bob)
-        .end();
-
-    // Execute protocol
-    let mut endpoint = ();
-    let result = interpret(&mut handler, &mut endpoint, program)
-        .await
-        .map_err(|e| JsValue::from_str(&format!("Protocol error: {:?}", e)))?;
-
-    // Extract received message
-    if let Some(Message::Pong(response)) = result.received_values.first() {
-        Ok(response.clone())
-    } else {
-        Err(JsValue::from_str("Did not receive expected Pong message"))
-    }
-}
-
-/// Run the ping-pong protocol from Bob's perspective
-#[wasm_bindgen]
-pub async fn run_bob() -> Result<String, JsValue> {
-    tracing::info!("Bob: Starting ping-pong protocol");
-
-    // Create shared channels for communication
-    let channels = Arc::new(Mutex::new(BTreeMap::new()));
-    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
-
-    // Create handler for Bob
-    let mut handler = InMemoryHandler::with_channels(
-        Role::Bob,
-        channels.clone(),
-        choice_channels.clone(),
-    );
-
-    // Define Bob's protocol: receive ping from Alice, respond with pong
-    let program = Program::new()
-        .recv::<Message>(Role::Alice)
-        .send(Role::Alice, Message::Pong("Hello from Bob!".to_string()))
-        .end();
-
-    // Execute protocol
-    let mut endpoint = ();
-    let result = interpret(&mut handler, &mut endpoint, program)
-        .await
-        .map_err(|e| JsValue::from_str(&format!("Protocol error: {:?}", e)))?;
-
-    // Extract received message
-    if let Some(Message::Ping(ping_msg)) = result.received_values.first() {
-        Ok(ping_msg.clone())
-    } else {
-        Err(JsValue::from_str("Did not receive expected Ping message"))
-    }
+    serde_wasm_bindgen::to_value(&PingPongResult {
+        sent_ping,
+        received_ping,
+        sent_pong,
+        received_pong,
+    })
+    .map_err(|error| JsValue::from_str(&format!("Serialization error: {error}")))
 }
 
 #[cfg(test)]
@@ -149,79 +93,26 @@ mod tests {
     use super::*;
     use wasm_bindgen_test::*;
 
+    wasm_bindgen_test_configure!(run_in_browser);
+
     #[wasm_bindgen_test]
-    fn test_role_creation() {
-        init();
-
-        // Test role enum creation
-        let alice = Role::Alice;
-        let bob = Role::Bob;
-
-        // Roles can be compared
-        assert_ne!(alice, bob);
-        assert_eq!(alice, Role::Alice);
+    fn generated_protocol_surface_exists() {
+        let _roles = Roles::default();
     }
 
-    #[wasm_bindgen_test]
-    fn test_message_serialization() {
+    #[wasm_bindgen_test(async)]
+    async fn ping_pong_round_trip_succeeds() {
         init();
 
-        // Test that messages can be created
-        let ping = Message::Ping("test".to_string());
-        let pong = Message::Pong("response".to_string());
+        let value = run_ping_pong("Hello from Alice!".to_string())
+            .await
+            .expect("protocol should succeed");
+        let result: PingPongResult =
+            serde_wasm_bindgen::from_value(value).expect("result should deserialize");
 
-        // Verify message enum variants work
-        match ping {
-            Message::Ping(s) => assert_eq!(s, "test"),
-            _ => panic!("Expected Ping variant"),
-        }
-
-        match pong {
-            Message::Pong(s) => assert_eq!(s, "response"),
-            _ => panic!("Expected Pong variant"),
-        }
-    }
-
-    #[wasm_bindgen_test]
-    fn test_handler_creation() {
-        init();
-
-        // Test that handlers can be created with shared channels
-        let channels = Arc::new(Mutex::new(BTreeMap::new()));
-        let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
-
-        let alice = InMemoryHandler::with_channels(
-            Role::Alice,
-            channels.clone(),
-            choice_channels.clone(),
-        );
-
-        let bob = InMemoryHandler::with_channels(
-            Role::Bob,
-            channels.clone(),
-            choice_channels.clone(),
-        );
-
-        // Test passes if handlers can be created without panicking
-        drop(alice);
-        drop(bob);
-    }
-
-    #[wasm_bindgen_test]
-    async fn test_program_creation() {
-        init();
-
-        // Test that effect programs can be created
-        let _alice_program = Program::new()
-            .send(Role::Bob, Message::Ping("test".to_string()))
-            .recv::<Message>(Role::Bob)
-            .end();
-
-        let _bob_program = Program::new()
-            .recv::<Message>(Role::Alice)
-            .send(Role::Alice, Message::Pong("response".to_string()))
-            .end();
-
-        // Test passes if programs compile and can be created
+        assert_eq!(result.sent_ping, "Hello from Alice!");
+        assert_eq!(result.received_ping, "Hello from Alice!");
+        assert_eq!(result.sent_pong, "Pong for: Hello from Alice!");
+        assert_eq!(result.received_pong, "Pong for: Hello from Alice!");
     }
 }

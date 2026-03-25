@@ -133,7 +133,7 @@ cfg_if! {
 }
 
 fn run_stress(protocols: usize, workers: usize) -> StressReport {
-    let mut vm = ThreadedProtocolMachine::with_workers(
+    let mut machine = ThreadedProtocolMachine::with_workers(
         ProtocolMachineConfig {
             threaded_round_semantics: ThreadedRoundSemantics::WaveParallelExtension,
             ..ProtocolMachineConfig::default()
@@ -141,7 +141,7 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         workers,
     );
     for i in 0..protocols {
-        vm.load_choreography(&simple_image(&format!("m{i}")))
+        machine.load_choreography(&simple_image(&format!("m{i}")))
             .expect("load choreography");
     }
 
@@ -153,7 +153,7 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
     for _ in 0..max_rounds {
         rounds += 1;
         let t0 = Instant::now();
-        let outcome = vm
+        let outcome = machine
             .step_round(&handler, workers.max(1))
             .expect("threaded step");
         durations.push(t0.elapsed().as_nanos());
@@ -169,7 +169,7 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
     }
 
     let total_duration_ns: u128 = durations.iter().sum();
-    let trace_len = vm.trace().len() as f64;
+    let trace_len = machine.trace().len() as f64;
     let throughput = if total_duration_ns == 0 {
         0.0
     } else {
@@ -191,8 +191,8 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         bytes_per_protocol: peak.map(|rss| rss / protocols_u64.max(1)),
         bytes_per_session: peak.map(|rss| rss / sessions_u64.max(1)),
         bytes_per_coroutine: peak.map(|rss| rss / coroutines_u64.max(1)),
-        metrics: vm.contention_metrics().clone(),
-        faults: vm
+        metrics: machine.contention_metrics().clone(),
+        faults: machine
             .trace()
             .iter()
             .filter(|ev| matches!(ev, telltale_machine::ObsEvent::Faulted { .. }))

@@ -6,7 +6,7 @@ use crate::session::SessionId;
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn step_transfer(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
@@ -14,23 +14,23 @@ pub(crate) fn step_transfer(
     target: u16,
     bundle: u16,
 ) -> Result<StepPack, Fault> {
-    vm.step_transfer(coro_idx, role, sid, endpoint, target, bundle)
+    machine.step_transfer(coro_idx, role, sid, endpoint, target, bundle)
 }
 
 pub(crate) fn step_tag(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
     fact: u16,
     dst: u16,
 ) -> Result<StepPack, Fault> {
-    vm.step_tag(coro_idx, role, sid, fact, dst)
+    machine.step_tag(coro_idx, role, sid, fact, dst)
 }
 
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn step_check(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     sid: SessionId,
@@ -38,5 +38,5 @@ pub(crate) fn step_check(
     target: u16,
     dst: u16,
 ) -> Result<StepPack, Fault> {
-    vm.step_check(coro_idx, role, sid, knowledge, target, dst)
+    machine.step_check(coro_idx, role, sid, knowledge, target, dst)
 }

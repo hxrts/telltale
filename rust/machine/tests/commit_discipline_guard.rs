@@ -6,7 +6,7 @@
 
 use wasm_bindgen_test::wasm_bindgen_test;
 
-fn vm_impl_source() -> String {
+fn engine_impl_source() -> String {
     [
         include_str!("../src/engine/runtime_exec/mod.rs"),
         include_str!("../src/engine/validation.rs"),
@@ -34,7 +34,7 @@ fn span(src: &str, start: &str, end: &str) -> (usize, usize) {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn canonical_step_section_does_not_mutate_commit_owned_state() {
-    let src = vm_impl_source();
+    let src = engine_impl_source();
     let step_section = between(
         &src,
         "// ---- Per-instruction step functions",
@@ -68,7 +68,7 @@ fn canonical_step_section_does_not_mutate_commit_owned_state() {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_contains_commit_owned_mutation_sites() {
-    let src = vm_impl_source();
+    let src = engine_impl_source();
     let commit_section = between(&src, "fn commit_pack(", "\n    fn intern_obs_event(");
 
     let required_patterns = [
@@ -95,7 +95,7 @@ fn commit_pack_contains_commit_owned_mutation_sites() {
 
 #[wasm_bindgen_test(unsupported = test)]
 fn commit_pack_is_only_owner_of_type_state_mutations() {
-    let src = vm_impl_source();
+    let src = engine_impl_source();
     let (commit_start, commit_end) = span(&src, "fn commit_pack(", "\n    fn intern_obs_event(");
     let patterns = [
         "self.sessions.update_type(",

@@ -1,6 +1,6 @@
 # WASM Ping-Pong Example
 
-A minimal example demonstrating Telltale's choreographic programming in WebAssembly.
+A minimal example demonstrating Telltale's `tell!`-based choreographic programming in WebAssembly.
 
 ## Overview
 
@@ -8,7 +8,7 @@ This example implements a simple two-party protocol where:
 - Alice sends a "Ping" message to Bob
 - Bob receives the Ping and responds with a "Pong" message
 
-The protocol uses Telltale's choreographic effect system with the `InMemoryHandler` for communication.
+The protocol is declared with `tell!` and executed through the generated session types.
 
 ## Quick Start
 
@@ -64,7 +64,7 @@ Create an `index.html` file to test in the browser:
     <pre id="output"></pre>
     
     <script type="module">
-        import init, { run_alice, run_bob } from './pkg/wasm_ping_pong.js';
+        import init, { run_ping_pong } from './pkg/wasm_ping_pong.js';
         
         async function runProtocol() {
             await init();
@@ -73,12 +73,11 @@ Create an `index.html` file to test in the browser:
             output.textContent = 'Running protocol...\n';
             
             try {
-                // For demo purposes, we'll run these processes sequentially
-                const aliceResult = await run_alice("Hello from Alice!");
-                output.textContent += `Alice received: ${aliceResult}\n`;
-                
-                const bobResult = await run_bob();
-                output.textContent += `Bob received: ${bobResult}\n`;
+                const result = await run_ping_pong("Hello from Alice!");
+                output.textContent += `Alice sent: ${result.sent_ping}\n`;
+                output.textContent += `Bob received: ${result.received_ping}\n`;
+                output.textContent += `Bob sent: ${result.sent_pong}\n`;
+                output.textContent += `Alice received: ${result.received_pong}\n`;
                 
                 output.textContent += '\nProtocol completed successfully!';
             } catch (e) {
@@ -101,6 +100,6 @@ python3 -m http.server
 
 ## Limitations
 
-- Uses `InMemoryHandler` which works for single-context demos
-- For real distributed WASM applications, you'd need a network transport (WebSockets, WebRTC, etc.)
-- WASM is single-threaded, so parallel execution is limited
+- This example uses the generated in-memory session wiring from `Roles::default()`
+- For real distributed WASM applications, you'd plug the same protocol into a browser transport
+- WASM is single-threaded, so host execution remains constrained by the browser runtime

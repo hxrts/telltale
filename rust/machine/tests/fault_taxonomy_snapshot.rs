@@ -38,6 +38,6 @@ fn fault_taxonomy_mapping_snapshot_is_stable() {
     let encoded = serde_json::to_string(&snapshot).expect("serialize snapshot");
     assert_eq!(
         encoded,
-        "[\"vm.fault.type\",\"vm.fault.label\",\"vm.fault.channel\",\"vm.fault.verification\",\"vm.fault.transfer\",\"vm.fault.credits\"]"
+        "[\"machine.fault.type\",\"machine.fault.label\",\"machine.fault.channel\",\"machine.fault.verification\",\"machine.fault.transfer\",\"machine.fault.credits\"]"
     );
 }

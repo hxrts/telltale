@@ -46,10 +46,10 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale or lacks scope.
     pub fn apply_host_mutation(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         mutation: SessionHostMutation,
     ) -> Result<(), OwnershipError> {
-        vm.sessions_mut()
+        machine.sessions_mut()
             .apply_owned_session_mutation(&self.capability, mutation)
     }
 
@@ -60,10 +60,10 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale or lacks session scope.
     pub fn issue_readiness_witness(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         predicate_ref: impl Into<String>,
     ) -> Result<ReadinessWitness, OwnershipError> {
-        vm.sessions_mut()
+        machine.sessions_mut()
             .issue_readiness_witness(&self.capability, predicate_ref)
     }
 
@@ -74,10 +74,10 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the witness is stale, forged, mismatched, or reused.
     pub fn consume_readiness_witness(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         witness: &ReadinessWitness,
     ) -> Result<(), OwnershipError> {
-        vm.sessions_mut()
+        machine.sessions_mut()
             .consume_readiness_witness(&self.capability, witness)
     }
 
@@ -88,11 +88,11 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale.
     pub fn begin_transfer(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         new_owner_id: impl Into<String>,
         new_scope: OwnershipScope,
     ) -> Result<OwnershipReceipt, OwnershipError> {
-        vm.sessions_mut()
+        machine.sessions_mut()
             .begin_ownership_transfer(&self.capability, new_owner_id, new_scope)
     }
 
@@ -103,10 +103,10 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the receipt is stale or mismatched.
     pub fn commit_transfer(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         receipt: &OwnershipReceipt,
     ) -> Result<Self, OwnershipError> {
-        let capability = vm.sessions_mut().commit_ownership_transfer(receipt)?;
+        let capability = machine.sessions_mut().commit_ownership_transfer(receipt)?;
         Ok(Self::new(receipt.session_id, capability))
     }
 
@@ -117,10 +117,10 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the capability is stale or transfer-pending.
     pub fn attenuate_scope(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         new_scope: OwnershipScope,
     ) -> Result<Self, OwnershipError> {
-        let capability = vm
+        let capability = machine
             .sessions_mut()
             .attenuate_ownership_scope(&self.capability, new_scope)?;
         Ok(Self::new(self.session_id, capability))
@@ -131,8 +131,8 @@ impl OwnedSession {
     /// # Errors
     ///
     /// Returns an `OwnershipError` if the capability is stale.
-    pub fn release(&self, vm: &mut ProtocolMachine) -> Result<(), OwnershipError> {
-        vm.sessions_mut().release_ownership(&self.capability)
+    pub fn release(&self, machine: &mut ProtocolMachine) -> Result<(), OwnershipError> {
+        machine.sessions_mut().release_ownership(&self.capability)
     }
 
     /// Fault the session because the current owner died.
@@ -142,9 +142,9 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the live owner no longer matches this handle.
     pub fn mark_owner_died(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
     ) -> Result<CancellationWitness, OwnershipError> {
-        vm.mark_owner_died(self.session_id, &self.capability.owner_id)
+        machine.mark_owner_died(self.session_id, &self.capability.owner_id)
     }
 
     /// Cancel the session because this transfer was abandoned.
@@ -154,10 +154,10 @@ impl OwnedSession {
     /// Returns an `OwnershipError` if the receipt no longer matches the live staged transfer.
     pub fn cancel_abandoned_transfer(
         &self,
-        vm: &mut ProtocolMachine,
+        machine: &mut ProtocolMachine,
         receipt: &OwnershipReceipt,
     ) -> Result<CancellationWitness, OwnershipError> {
-        vm.cancel_abandoned_transfer(receipt)
+        machine.cancel_abandoned_transfer(receipt)
     }
 }
 

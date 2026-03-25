@@ -1,36 +1,39 @@
 //! Three-party shopping protocol demonstrating multiparty session types.
 //!
-//! This is a projection-surface example: `tell!` owns the confirm/quit branch,
-//! while Rust supplies Alice's requested item and contribution strategy plus
-//! Bob's local affordability calculation.
+//! This is an effect-boundary example: `tell!` owns the confirm/quit branch,
+//! while generated effect traits model Alice's plan, Seller's price quote, and
+//! Bob's affordability decision.
 
 use futures::{executor, try_join};
 use std::error::Error;
 use telltale::{tell, try_session};
 
-#[derive(Clone, Copy, Debug)]
-struct AlicePlan {
-    item: i32,
-    contribution: i32,
-}
-
-#[derive(Clone, Copy, Debug)]
-enum PurchaseDecision {
-    Confirm(i32),
-    Quit,
-}
-
-fn decide_purchase(seller_price: i32, alice_share: i32) -> PurchaseDecision {
-    if alice_share == seller_price {
-        PurchaseDecision::Confirm(alice_share)
-    } else {
-        PurchaseDecision::Quit
-    }
-}
-
 tell! {
+    -- // Alice-side shopping request provided by the host.
+    type alias BuyerPlan = { item : Int, contribution : Int }
+
+    -- // Bob decides whether the purchase proceeds.
+    type PurchaseDecision =
+      | Confirm(Int)
+      | Quit
+
+    -- // Seller quote and Alice contribution presented to Bob together.
+    type alias Offer = { sellerPrice : Int, aliceShare : Int }
+
+    -- // Alice host provides the requested item and intended contribution.
+    effect AlicePlanner
+      command request : Session -> BuyerPlan
+
+    -- // Seller host quotes one price for the requested item.
+    effect SellerPricing
+      command quote : Int -> Int
+
+    -- // Bob host evaluates the offer and decides whether to buy.
+    effect BobBudget
+      command decide : Offer -> PurchaseDecision
+
     -- // Alice asks for a quote, then Bob decides whether the purchase proceeds.
-    protocol ThreeBuyers =
+    protocol ThreeBuyers uses AlicePlanner, SellerPricing, BobBudget =
       roles Alice, Bob, Seller
       Alice -> Seller : Request(i32)
       Seller -> Alice : Quote(i32)
@@ -48,26 +51,54 @@ tell! {
           Bob -> Seller : Quit(i32)
 }
 
+use ThreeBuyers::effects;
 use ThreeBuyers::sessions::*;
 
-// ---------------------------------------------------------------------------
-// Endpoint implementations
-// ---------------------------------------------------------------------------
+struct AliceHost {
+    plan: effects::BuyerPlan,
+}
 
-async fn alice(role: &mut Alice, plan: AlicePlan) -> Result<(), Box<dyn Error>> {
+struct BobHost;
+
+struct SellerHost;
+
+impl effects::AlicePlanner for AliceHost {
+    fn request(&mut self, _input: effects::Session) -> effects::BuyerPlan {
+        self.plan.clone()
+    }
+}
+
+impl effects::SellerPricing for SellerHost {
+    fn quote(&mut self, input: i64) -> i64 {
+        input
+    }
+}
+
+impl effects::BobBudget for BobHost {
+    fn decide(&mut self, input: effects::Offer) -> effects::PurchaseDecision {
+        if input.alice_share == input.seller_price {
+            effects::PurchaseDecision::Confirm(input.alice_share)
+        } else {
+            effects::PurchaseDecision::Quit
+        }
+    }
+}
+
+async fn alice(role: &mut Alice, host: &mut AliceHost) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: AliceSession<'_, _>| async {
-        let s = s.send(Request(plan.item)).await?;
-        println!("Alice: requested item {}", plan.item);
+        let plan = effects::AlicePlanner::request(host, effects::Session::new("three-buyers"));
+        let item = i32::try_from(plan.item)?;
+        let contribution = i32::try_from(plan.contribution)?;
 
-        // Receive quote from Seller
+        let s = s.send(Request(item)).await?;
+        println!("Alice: requested item {item}");
+
         let (Quote(price), s) = s.receive().await?;
         println!("Alice: received quote of {price}");
 
-        // Tell Bob how much Alice will contribute
-        let s = s.send(Contribution(plan.contribution)).await?;
-        println!("Alice: told Bob contribution of {}", plan.contribution);
+        let s = s.send(Contribution(contribution)).await?;
+        println!("Alice: told Bob contribution of {contribution}");
 
-        // Wait for Bob's decision
         match s.branch().await? {
             AliceChoice1::Confirm(Confirm(amount), end) => {
                 println!("Alice: Bob confirmed, paying {amount}");
@@ -82,20 +113,24 @@ async fn alice(role: &mut Alice, plan: AlicePlan) -> Result<(), Box<dyn Error>> 
     .await
 }
 
-async fn bob(role: &mut Bob) -> Result<(), Box<dyn Error>> {
+async fn bob(role: &mut Bob, host: &mut BobHost) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: BobSession<'_, _>| async {
-        // Receive quote from Seller
         let (Quote(seller_price), s) = s.receive().await?;
         println!("Bob: received quote of {seller_price} from Seller");
 
-        // Receive Alice's contribution
         let (Contribution(alice_share), s) = s.receive().await?;
         println!("Bob: Alice will contribute {alice_share}");
 
-        // Decide based on whether quotes match
-        match decide_purchase(seller_price, alice_share) {
-            PurchaseDecision::Confirm(amount) => {
+        match effects::BobBudget::decide(
+            host,
+            effects::Offer {
+                seller_price: seller_price.into(),
+                alice_share: alice_share.into(),
+            },
+        ) {
+            effects::PurchaseDecision::Confirm(amount) => {
                 println!("Bob: quotes match, confirming purchase");
+                let amount = i32::try_from(amount)?;
 
                 let s = s.select(Confirm(amount)).await?;
                 let s = s.send(Confirm(amount)).await?;
@@ -104,7 +139,7 @@ async fn bob(role: &mut Bob) -> Result<(), Box<dyn Error>> {
 
                 Ok(((), end))
             }
-            PurchaseDecision::Quit => {
+            effects::PurchaseDecision::Quit => {
                 println!("Bob: quotes don't match, quitting");
 
                 let s = s.select(Quit(0)).await?;
@@ -117,21 +152,18 @@ async fn bob(role: &mut Bob) -> Result<(), Box<dyn Error>> {
     .await
 }
 
-async fn seller(role: &mut Seller) -> Result<(), Box<dyn Error>> {
+async fn seller(role: &mut Seller, host: &mut SellerHost) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: SellerSession<'_, _>| async {
-        // Receive request from Alice
         let (Request(item), s) = s.receive().await?;
         println!("Seller: received request for item {item}");
 
-        // Quote same price to both Alice and Bob
-        let price = item; // price equals item id for this example
+        let price = i32::try_from(effects::SellerPricing::quote(host, item.into()))?;
         let s = s.send(Quote(price)).await?;
         println!("Seller: quoted {price} to Alice");
 
         let s = s.send(Quote(price)).await?;
         println!("Seller: quoted {price} to Bob");
 
-        // Wait for Bob's decision
         match s.branch().await? {
             SellerChoice1::Confirm(Confirm(_), s) => {
                 println!("Seller: order confirmed, shipping in 7 days");
@@ -147,16 +179,22 @@ async fn seller(role: &mut Seller) -> Result<(), Box<dyn Error>> {
     .await
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut a, mut b, mut s) = Roles::default();
-    let alice_plan = AlicePlan {
-        item: 42,
-        contribution: 42,
+    let mut alice_host = AliceHost {
+        plan: effects::BuyerPlan {
+            item: 42,
+            contribution: 42,
+        },
     };
-    executor::block_on(async { try_join!(alice(&mut a, alice_plan), bob(&mut b), seller(&mut s)) })?;
+    let mut bob_host = BobHost;
+    let mut seller_host = SellerHost;
+    executor::block_on(async {
+        try_join!(
+            alice(&mut a, &mut alice_host),
+            bob(&mut b, &mut bob_host),
+            seller(&mut s, &mut seller_host)
+        )
+    })?;
     Ok(())
 }

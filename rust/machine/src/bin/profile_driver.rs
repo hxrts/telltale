@@ -102,16 +102,16 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
     let mut checksum = 0usize;
     for _ in 0..iterations {
         let image = yield_image(256, 8);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             observability_retention: capped_retention_config(),
             ..ProtocolMachineConfig::strict_large_fanout()
         });
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
         for idx in 1..256 {
-            vm.pause_role(&format!("R{idx}"));
+            machine.pause_role(&format!("R{idx}"));
         }
-        let status = vm.run(&handler, 10_000).expect("run vm");
-        checksum ^= black_box(vm.trace().len())
+        let status = machine.run(&handler, 10_000).expect("run machine");
+        checksum ^= black_box(machine.trace().len())
             ^ black_box(bool_to_usize(matches!(
                 status,
                 telltale_machine::RunStatus::Stuck
@@ -130,27 +130,27 @@ fn profile_repeated_load_reuse(iterations: usize) -> usize {
     config.max_coroutines = config
         .max_coroutines
         .max(iterations.saturating_mul(16).saturating_add(16));
-    let mut vm = ProtocolMachine::new(config);
+    let mut machine = ProtocolMachine::new(config);
     for _ in 0..iterations {
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
     }
-    black_box(vm.memory_usage().retained_bytes.total)
+    black_box(machine.memory_usage().retained_bytes.total)
 }
 
 fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
     let handler = ProfileHandler;
     let max_rounds = yields_per_role.max(1);
     let image = looping_yield_image(256);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
-    vm.load_choreography(&image).expect("load choreography");
+    machine.load_choreography(&image).expect("load choreography");
     for idx in 1..256 {
-        vm.pause_role(&format!("R{idx}"));
+        machine.pause_role(&format!("R{idx}"));
     }
-    let status = vm.run(&handler, max_rounds).expect("run vm");
-    black_box(vm.trace().len())
+    let status = machine.run(&handler, max_rounds).expect("run machine");
+    black_box(machine.trace().len())
         ^ black_box(bool_to_usize(matches!(
             status,
             telltale_machine::RunStatus::MaxRoundsExceeded
@@ -160,17 +160,17 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
 fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
     let handler = ProfileHandler;
     let image = typed_send_recv_image("A", "B", "msg", Some(ValType::Unit));
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         communication_replay_mode: CommunicationReplayMode::Nullifier,
         payload_validation_mode: PayloadValidationMode::Structural,
         ..ProtocolMachineConfig::strict_verified()
     });
     for _ in 0..iterations {
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
     }
-    let status = vm.run(&handler, 100_000).expect("run vm");
-    black_box(vm.trace().len())
+    let status = machine.run(&handler, 100_000).expect("run machine");
+    black_box(machine.trace().len())
         ^ black_box(bool_to_usize(matches!(
             status,
             telltale_machine::RunStatus::AllDone
@@ -187,11 +187,11 @@ fn profile_repeated_open_same_image(iterations: usize) -> usize {
     config.max_coroutines = config
         .max_coroutines
         .max(iterations.saturating_mul(16).saturating_add(16));
-    let mut vm = ProtocolMachine::new(config);
+    let mut machine = ProtocolMachine::new(config);
     let mut checksum = 0usize;
     for _ in 0..iterations {
-        let sid = vm.load_choreography(&image).expect("load choreography");
-        checksum ^= black_box(sid) ^ black_box(vm.session_coroutines(sid).len());
+        let sid = machine.load_choreography(&image).expect("load choreography");
+        checksum ^= black_box(sid) ^ black_box(machine.session_coroutines(sid).len());
     }
     checksum
 }

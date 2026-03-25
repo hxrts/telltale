@@ -200,9 +200,9 @@
                 m
             },
         };
-        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
-        vm.load_choreography(&image).expect("load choreography");
-        let status = vm
+        let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+        machine.load_choreography(&image).expect("load choreography");
+        let status = machine
             .run(&NoopHandler, 8)
             .expect("run should return bounded status");
         assert_eq!(status, RunStatus::MaxRoundsExceeded);
@@ -220,9 +220,9 @@
 
     #[test]
     fn threaded_replay_accessors_fail_fast_on_poisoned_locks() {
-        let vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
-        let replay = vm.communication_consumption.clone();
-        let artifacts = vm.communication_consumption_artifacts.clone();
+        let machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+        let replay = machine.communication_consumption.clone();
+        let artifacts = machine.communication_consumption_artifacts.clone();
 
         let replay_poison = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let _guard = replay.lock().expect("acquire replay lock");
@@ -237,7 +237,7 @@
         assert!(artifact_poison.is_err(), "poison setup should panic");
 
         let root_access = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let _ignored = vm.communication_replay_root();
+            let _ignored = machine.communication_replay_root();
         }));
         assert!(
             root_access.is_err(),
@@ -245,7 +245,7 @@
         );
 
         let artifacts_access = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let _ignored = vm.communication_consumption_artifacts();
+            let _ignored = machine.communication_consumption_artifacts();
         }));
         assert!(
             artifacts_access.is_err(),
@@ -341,8 +341,8 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+        let sid = machine.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
             role: "A".to_string(),
@@ -350,7 +350,7 @@
 
         let mut source = None;
         let mut target = None;
-        for coro in &vm.coroutines {
+        for coro in &machine.coroutines {
             let guard = coro.lock().expect("coroutine lock poisoned");
             if guard.role == "A" {
                 source = Some(guard.id);
@@ -361,7 +361,7 @@
         let source = source.expect("source coroutine");
         let target = target.expect("target coroutine");
         {
-            let target_arc = vm
+            let target_arc = machine
                 .coroutines
                 .get(target)
                 .cloned()
@@ -370,8 +370,8 @@
             target_guard.owned_endpoints.push(endpoint.clone());
         }
 
-        let err = vm
-            .enqueue_handoff(endpoint, source, target, vm.clock.tick)
+        let err = machine
+            .enqueue_handoff(endpoint, source, target, machine.clock.tick)
             .expect_err("ambiguous ownership must fail");
         match err {
             Fault::Transfer { message } => {
@@ -398,8 +398,8 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+        let sid = machine.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
             role: "A".to_string(),
@@ -407,7 +407,7 @@
 
         let mut source = None;
         let mut target = None;
-        for coro in &vm.coroutines {
+        for coro in &machine.coroutines {
             let guard = coro.lock().expect("coroutine lock poisoned");
             if guard.role == "A" {
                 source = Some(guard.id);
@@ -418,9 +418,9 @@
         let source = source.expect("source coroutine");
         let target = target.expect("target coroutine");
 
-        vm.enqueue_handoff(endpoint.clone(), source, target, vm.clock.tick)
+        machine.enqueue_handoff(endpoint.clone(), source, target, machine.clock.tick)
             .expect("enqueue handoff");
-        let receipt = &vm.handoff_trace().last().expect("handoff trace").receipt;
+        let receipt = &machine.handoff_trace().last().expect("handoff trace").receipt;
         assert_eq!(receipt.endpoint, endpoint);
         assert_eq!(receipt.from_coro, source);
         assert_eq!(receipt.to_coro, target);
@@ -445,8 +445,8 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 3);
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 3);
+        let sid = machine.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
             role: "A".to_string(),
@@ -455,7 +455,7 @@
         let mut source = None;
         let mut target = None;
         let mut third = None;
-        for coro in &vm.coroutines {
+        for coro in &machine.coroutines {
             let guard = coro.lock().expect("coroutine lock poisoned");
             match guard.role.as_str() {
                 "A" => source = Some(guard.id),
@@ -468,11 +468,11 @@
         let target = target.expect("target coroutine");
         let third = third.expect("third coroutine");
 
-        vm.enqueue_handoff(endpoint.clone(), source, target, vm.clock.tick)
+        machine.enqueue_handoff(endpoint.clone(), source, target, machine.clock.tick)
             .expect("enqueue handoff");
 
         {
-            let third_arc = vm
+            let third_arc = machine
                 .coroutines
                 .get(third)
                 .cloned()
@@ -481,7 +481,7 @@
             third_guard.owned_endpoints.push(endpoint.clone());
         }
 
-        let err = vm
+        let err = machine
             .apply_handoffs_deterministically()
             .expect_err("corrupted handoff apply must fail");
         match err {
@@ -494,10 +494,10 @@
             other => panic!("expected transfer fault, got {other:?}"),
         }
 
-        let source_guard = vm.coroutines[source]
+        let source_guard = machine.coroutines[source]
             .lock()
             .expect("source coroutine lock poisoned");
-        let target_guard = vm.coroutines[target]
+        let target_guard = machine.coroutines[target]
             .lock()
             .expect("target coroutine lock poisoned");
         assert!(
@@ -508,7 +508,7 @@
             !target_guard.owned_endpoints.contains(&endpoint),
             "rollback must remove any staged target ownership"
         );
-        let audit = vm
+        let audit = machine
             .delegation_audit_log()
             .last()
             .expect("rollback should be audited");
@@ -531,8 +531,8 @@
         let global = GlobalType::send("A", "B", Label::new("m"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+        let sid = machine.load_choreography(&image).expect("load choreography");
         let endpoint = Endpoint {
             sid,
             role: "A".to_string(),
@@ -540,7 +540,7 @@
 
         let mut source = None;
         let mut target = None;
-        for coro in &vm.coroutines {
+        for coro in &machine.coroutines {
             let guard = coro.lock().expect("coroutine lock poisoned");
             if guard.role == "A" {
                 source = Some(guard.id);
@@ -551,7 +551,7 @@
         let source = source.expect("source coroutine");
         let target = target.expect("target coroutine");
 
-        vm.outstanding_effects.push(OutstandingEffect {
+        machine.outstanding_effects.push(OutstandingEffect {
             effect_id: 11,
             operation_id: "effect:11".to_string(),
             session: Some(sid),
@@ -569,7 +569,7 @@
             inputs: serde_json::json!({ "session": sid }),
             outputs: serde_json::json!({ "status": "pending" }),
         });
-        vm.outstanding_effects.push(OutstandingEffect {
+        machine.outstanding_effects.push(OutstandingEffect {
             effect_id: 12,
             operation_id: "effect:12".to_string(),
             session: Some(sid),
@@ -587,7 +587,7 @@
             inputs: serde_json::json!({ "session": sid }),
             outputs: serde_json::json!({ "status": "blocked" }),
         });
-        vm.operation_instances.push(OperationInstance {
+        machine.operation_instances.push(OperationInstance {
             operation_id: "effect:11".to_string(),
             session: Some(sid),
             owner_id: Some("coro:0".to_string()),
@@ -600,7 +600,7 @@
             budget_ticks: Some(1),
             requires_proof: false,
         });
-        vm.operation_instances.push(OperationInstance {
+        machine.operation_instances.push(OperationInstance {
             operation_id: "effect:12".to_string(),
             session: Some(sid),
             owner_id: Some("coro:0".to_string()),
@@ -614,12 +614,12 @@
             requires_proof: false,
         });
 
-        vm.enqueue_handoff(endpoint, source, target, vm.clock.tick)
+        machine.enqueue_handoff(endpoint, source, target, machine.clock.tick)
             .expect("enqueue handoff");
-        vm.apply_handoffs_deterministically()
+        machine.apply_handoffs_deterministically()
             .expect("apply handoff");
 
-        let pending = vm
+        let pending = machine
             .outstanding_effects
             .iter()
             .find(|effect| effect.effect_id == 11)
@@ -627,7 +627,7 @@
         assert_eq!(pending.owner_id.as_deref(), Some("coro:1"));
         assert_eq!(pending.status, OutstandingEffectStatus::Pending);
 
-        let blocked = vm
+        let blocked = machine
             .outstanding_effects
             .iter()
             .find(|effect| effect.effect_id == 12)
@@ -638,20 +638,20 @@
 
     #[test]
     fn progress_contracts_escalate_consistently_in_threaded_runtime() {
-        let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
-        vm.clock.tick = 1;
-        let effect_id = vm.issue_runtime_effect(
+        let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+        machine.clock.tick = 1;
+        let effect_id = machine.issue_runtime_effect(
             "invoke_step",
             Some(7),
             "host/runtime",
             serde_json::json!({ "session": 7 }),
         );
 
-        vm.clock.tick = 2;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 2;
+        machine.evaluate_progress_contracts()
             .expect("blocked escalation should succeed");
         assert_eq!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
                 .expect("progress contract")
@@ -659,11 +659,11 @@
             ProgressState::Blocked
         );
 
-        vm.clock.tick = 3;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 3;
+        machine.evaluate_progress_contracts()
             .expect("no-progress escalation should succeed");
         assert_eq!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
                 .expect("progress contract")
@@ -671,11 +671,11 @@
             ProgressState::NoProgress
         );
 
-        vm.clock.tick = 4;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 4;
+        machine.evaluate_progress_contracts()
             .expect("degraded escalation should succeed");
         assert_eq!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
                 .expect("progress contract")
@@ -683,18 +683,18 @@
             ProgressState::Degraded
         );
 
-        vm.clock.tick = 5;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 5;
+        machine.evaluate_progress_contracts()
             .expect("timeout escalation should succeed");
         assert_eq!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
                 .expect("progress contract")
                 .state,
             ProgressState::TimedOut
         );
-        let err = vm
+        let err = machine
             .complete_runtime_effect(
                 effect_id,
                 OutstandingEffectStatus::Succeeded,

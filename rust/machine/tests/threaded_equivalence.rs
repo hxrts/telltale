@@ -68,13 +68,13 @@ fn run_cooperative(
     concurrency: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     for image in images {
-        vm.load_choreography(image).expect("load image");
+        machine.load_choreography(image).expect("load image");
     }
-    vm.run_concurrent(&handler, 200, concurrency)
+    machine.run_concurrent(&handler, 200, concurrency)
         .expect("cooperative run");
-    per_session(vm.trace())
+    per_session(machine.trace())
 }
 
 fn run_threaded(
@@ -82,13 +82,13 @@ fn run_threaded(
     workers: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
-    let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), workers);
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), workers);
     for image in images {
-        vm.load_choreography(image).expect("load image");
+        machine.load_choreography(image).expect("load image");
     }
-    vm.run_concurrent(&handler, 200, 1)
+    machine.run_concurrent(&handler, 200, 1)
         .expect("threaded run at canonical concurrency=1");
-    per_session(vm.trace())
+    per_session(machine.trace())
 }
 
 #[allow(clippy::type_complexity)]
@@ -229,7 +229,7 @@ fn test_output_condition_outcomes_match_across_drivers() {
 
     let allow_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-            "vm.observable_output".to_string(),
+            "machine.observable_output".to_string(),
         ]),
         ..ProtocolMachineConfig::default()
     };
@@ -288,7 +288,7 @@ fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
     let coop_predicate = extract_output_condition_fault(coop_err);
     let threaded_predicate = extract_output_condition_fault(threaded_err);
     assert_eq!(coop_predicate, threaded_predicate);
-    assert_eq!(coop_predicate, "vm.observable_output");
+    assert_eq!(coop_predicate, "machine.observable_output");
 
     let coop_checks: Vec<(String, bool)> = coop
         .output_condition_checks()
@@ -338,7 +338,7 @@ fn test_output_condition_commit_pass_artifacts_match_across_drivers() {
 
     let allow_cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-            "vm.observable_output".to_string(),
+            "machine.observable_output".to_string(),
         ]),
         ..ProtocolMachineConfig::default()
     };

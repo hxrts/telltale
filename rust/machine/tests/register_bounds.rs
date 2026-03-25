@@ -115,18 +115,18 @@ proptest! {
     fn cooperative_move_oob_register_faults(offset in 0u16..256) {
         let src = 16u16.saturating_add(offset);
         let image = single_role_move_image(src);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
-        assert_out_of_registers(vm.run(&NoopHandler, 8));
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        assert_out_of_registers(machine.run(&NoopHandler, 8));
     }
 
     #[test]
     fn cooperative_receive_dst_oob_register_faults(offset in 0u16..256) {
         let dst = 16u16.saturating_add(offset);
         let image = recv_oob_image(dst);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
-        assert_out_of_registers(vm.run(&NoopHandler, 16));
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        assert_out_of_registers(machine.run(&NoopHandler, 16));
     }
 }
 
@@ -137,20 +137,20 @@ cfg_if! {
             fn threaded_move_oob_register_faults(offset in 0u16..256) {
                 let src = 16u16.saturating_add(offset);
                 let image = single_role_move_image(src);
-                let mut vm = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
-                vm.load_choreography_owned(&image, "tests/register_bounds")
+                let mut machine = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
+                machine.load_choreography_owned(&image, "tests/register_bounds")
                     .expect("load choreography");
-                assert_out_of_registers(vm.run(&NoopHandler, 8));
+                assert_out_of_registers(machine.run(&NoopHandler, 8));
             }
 
             #[test]
             fn threaded_receive_dst_oob_register_faults(offset in 0u16..256) {
                 let dst = 16u16.saturating_add(offset);
                 let image = recv_oob_image(dst);
-                let mut vm = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
-                vm.load_choreography_owned(&image, "tests/register_bounds")
+                let mut machine = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
+                machine.load_choreography_owned(&image, "tests/register_bounds")
                     .expect("load choreography");
-                assert_out_of_registers(vm.run(&NoopHandler, 16));
+                assert_out_of_registers(machine.run(&NoopHandler, 16));
             }
         }
     }

@@ -1,41 +1,30 @@
 //! Elevator controller with three-way coordination.
 //!
-//! Three roles -- User (U), Door (D), and Elevator (E) -- coordinate
-//! open/close commands through a bounded request-response cycle:
-//!
-//! 1. The user selects **OpenDoor** or **CloseDoor** (communicated to the
-//!    elevator).
-//! 2. The elevator relays the same command label to the door.
-//! 3. The door executes the action and reports the result back to the
-//!    elevator.
-//! 4. The elevator confirms the outcome to the user.
-//! 5. On **OpenDoor**, the elevator automatically closes the door afterward
-//!    (the full open-wait-close cycle from the original protocol).
-//!
-//! This is a projection-surface example: `tell!` owns the command and relay
-//! structure, while Rust provides the user's local command input and the
-//! door/elevator host behavior.
+//! This is an effect-boundary example: `tell!` owns the relay structure, while
+//! generated effect traits model the user panel input and the physical door
+//! motor operations.
 
 use futures::{executor, try_join};
 use std::error::Error;
 use telltale::{tell, try_session};
 
-#[derive(Clone, Copy, Debug)]
-enum UserCommand {
-    OpenDoor,
-    CloseDoor,
-}
-
-fn user_command() -> UserCommand {
-    match std::env::var("ELEVATOR_COMMAND").ok().as_deref() {
-        Some("close") => UserCommand::CloseDoor,
-        _ => UserCommand::OpenDoor,
-    }
-}
-
 tell! {
+    -- // Host-side door action selected by the user.
+    type DoorAction =
+      | Open
+      | Close
+
+    -- // User-facing panel chooses one door action for this session.
+    effect UserPanel
+      command choose : Session -> DoorAction
+
+    -- // Door motor realizes the physical open/close operations.
+    effect DoorMotor
+      command open : Unit -> Unit
+      command close : Unit -> Unit
+
     -- // User chooses one door command and the elevator relays it to the door.
-    protocol Elevator =
+    protocol Elevator uses UserPanel, DoorMotor =
       roles U, D, E
       choice U at
         -- // Open the door, confirm it, then auto-close and confirm closure.
@@ -55,16 +44,46 @@ tell! {
           E -> U : DoorClosed
 }
 
+use Elevator::effects;
 use Elevator::sessions::*;
 
-// ---------------------------------------------------------------------------
-// User
-// ---------------------------------------------------------------------------
+#[derive(Clone, Debug)]
+struct UserHost {
+    command: effects::DoorAction,
+}
 
-async fn user(role: &mut U, command: UserCommand) -> Result<(), Box<dyn Error>> {
+#[derive(Default)]
+struct DoorHost {
+    actions: Vec<&'static str>,
+}
+
+impl effects::UserPanel for UserHost {
+    fn choose(&mut self, _input: effects::Session) -> effects::DoorAction {
+        self.command.clone()
+    }
+}
+
+impl effects::DoorMotor for DoorHost {
+    fn open(&mut self, _input: ()) {
+        self.actions.push("open");
+    }
+
+    fn close(&mut self, _input: ()) {
+        self.actions.push("close");
+    }
+}
+
+fn user_command() -> effects::DoorAction {
+    match std::env::var("ELEVATOR_COMMAND").ok().as_deref() {
+        Some("close") => effects::DoorAction::Close,
+        _ => effects::DoorAction::Open,
+    }
+}
+
+async fn user(role: &mut U, host: &mut UserHost) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: USession<'_, _>| async {
-        match command {
-            UserCommand::OpenDoor => {
+        match effects::UserPanel::choose(host, effects::Session::new("elevator")) {
+            effects::DoorAction::Open => {
                 println!("U: requesting door open");
                 let s = s.select(OpenDoor).await?;
                 let (DoorOpened, s) = s.receive().await?;
@@ -73,7 +92,7 @@ async fn user(role: &mut U, command: UserCommand) -> Result<(), Box<dyn Error>> 
                 println!("U: door has closed");
                 Ok(((), end))
             }
-            UserCommand::CloseDoor => {
+            effects::DoorAction::Close => {
                 println!("U: requesting door close");
                 let s = s.select(CloseDoor).await?;
                 let (DoorClosed, end) = s.receive().await?;
@@ -85,21 +104,18 @@ async fn user(role: &mut U, command: UserCommand) -> Result<(), Box<dyn Error>> 
     .await
 }
 
-// ---------------------------------------------------------------------------
-// Door
-// ---------------------------------------------------------------------------
-
-async fn door(role: &mut D) -> Result<(), Box<dyn Error>> {
+async fn door(role: &mut D, host: &mut DoorHost) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: DSession<'_, _>| async {
         match s.branch().await? {
             DChoice1::OpenDoor(OpenDoor, s) => {
                 println!("D: opening door");
+                effects::DoorMotor::open(host, ());
                 let s = s.send(DoorOpened).await?;
                 println!("D: door opened");
 
-                // Auto-close command from elevator
                 let (CloseDoor, s) = s.receive().await?;
                 println!("D: closing door (auto-close)");
+                effects::DoorMotor::close(host, ());
                 let end = s.send(DoorClosed).await?;
                 println!("D: door closed");
 
@@ -107,6 +123,7 @@ async fn door(role: &mut D) -> Result<(), Box<dyn Error>> {
             }
             DChoice1::CloseDoor(CloseDoor, s) => {
                 println!("D: closing door");
+                effects::DoorMotor::close(host, ());
                 let end = s.send(DoorClosed).await?;
                 println!("D: door closed");
 
@@ -117,24 +134,17 @@ async fn door(role: &mut D) -> Result<(), Box<dyn Error>> {
     .await
 }
 
-// ---------------------------------------------------------------------------
-// Elevator
-// ---------------------------------------------------------------------------
-
 async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
     try_session(role, |s: ESession<'_, _>| async {
         match s.branch().await? {
             EChoice1::OpenDoor(OpenDoor, s) => {
-                // Forward open command to door
                 println!("E: received open request");
                 let s = s.send(OpenDoor).await?;
 
-                // Wait for door to confirm opened
                 let (DoorOpened, s) = s.receive().await?;
                 println!("E: door opened, notifying user");
                 let s = s.send(DoorOpened).await?;
 
-                // Auto-close: tell door to close
                 println!("E: auto-closing door");
                 let s = s.send(CloseDoor).await?;
 
@@ -145,7 +155,6 @@ async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
                 Ok(((), end))
             }
             EChoice1::CloseDoor(CloseDoor, s) => {
-                // Forward close command to door
                 println!("E: received close request");
                 let s = s.send(CloseDoor).await?;
 
@@ -160,14 +169,15 @@ async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
     .await
 }
 
-// ---------------------------------------------------------------------------
-// Main
-// ---------------------------------------------------------------------------
-
 fn main() -> Result<(), Box<dyn Error>> {
     let Roles(mut u, mut d, mut e) = Roles::default();
-    let command = user_command();
-    executor::block_on(async { try_join!(user(&mut u, command), door(&mut d), elevator(&mut e)) })?;
+    let mut user_host = UserHost {
+        command: user_command(),
+    };
+    let mut door_host = DoorHost::default();
+    executor::block_on(async {
+        try_join!(user(&mut u, &mut user_host), door(&mut d, &mut door_host), elevator(&mut e))
+    })?;
     println!("\nElevator protocol completed successfully");
     Ok(())
 }

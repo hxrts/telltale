@@ -9,7 +9,7 @@ use crate::threaded::ThreadedProtocolMachine;
 /// Native threaded guest runtime backed by the threaded protocol machine.
 #[doc(alias = "ThreadedGuestRuntime")]
 pub struct NativeThreadedDriver {
-    vm: ThreadedProtocolMachine,
+    machine: ThreadedProtocolMachine,
 }
 
 impl NativeThreadedDriver {
@@ -17,7 +17,7 @@ impl NativeThreadedDriver {
     #[must_use]
     pub fn with_workers(config: ProtocolMachineConfig, workers: usize) -> Self {
         Self {
-            vm: ThreadedProtocolMachine::with_workers(config, workers),
+            machine: ThreadedProtocolMachine::with_workers(config, workers),
         }
     }
 
@@ -25,20 +25,20 @@ impl NativeThreadedDriver {
     #[must_use]
     pub fn auto(config: ProtocolMachineConfig) -> Self {
         Self {
-            vm: ThreadedProtocolMachine::auto(config),
+            machine: ThreadedProtocolMachine::auto(config),
         }
     }
 
     /// Wrap an existing threaded protocol-machine instance.
     #[must_use]
-    pub fn with_vm(vm: ThreadedProtocolMachine) -> Self {
-        Self { vm }
+    pub fn with_vm(machine: ThreadedProtocolMachine) -> Self {
+        Self { machine }
     }
 
     /// Access the inner threaded protocol machine.
     #[must_use]
-    pub fn vm(&self) -> &ThreadedProtocolMachine {
-        &self.vm
+    pub fn machine(&self) -> &ThreadedProtocolMachine {
+        &self.machine
     }
 
     /// Open a choreography and immediately bind host-runtime ownership.
@@ -51,7 +51,7 @@ impl NativeThreadedDriver {
         image: &CodeImage,
         owner_id: impl Into<String>,
     ) -> Result<OwnedSession, ProtocolMachineError> {
-        self.vm.load_choreography_owned(image, owner_id)
+        self.machine.load_choreography_owned(image, owner_id)
     }
 
     /// Execute one scheduler round in the guest runtime.
@@ -64,7 +64,7 @@ impl NativeThreadedDriver {
         handler: &dyn EffectHandler,
         n: usize,
     ) -> Result<StepResult, ProtocolMachineError> {
-        self.vm.step_round(handler, n)
+        self.machine.step_round(handler, n)
     }
 
     /// Run up to `max_rounds`.
@@ -77,12 +77,12 @@ impl NativeThreadedDriver {
         handler: &dyn EffectHandler,
         max_rounds: usize,
     ) -> Result<RunStatus, ProtocolMachineError> {
-        self.vm.run(handler, max_rounds)
+        self.machine.run(handler, max_rounds)
     }
 
     /// Borrow the observable trace.
     #[must_use]
     pub fn trace(&self) -> &[ObsEvent] {
-        self.vm.trace()
+        self.machine.trace()
     }
 }

@@ -69,22 +69,22 @@ pub fn classify_fault(fault: &Fault) -> FaultClass {
 #[must_use]
 pub fn fault_code(class: FaultClass) -> &'static str {
     match class {
-        FaultClass::Type => "vm.fault.type",
-        FaultClass::Label => "vm.fault.label",
-        FaultClass::Channel => "vm.fault.channel",
-        FaultClass::Verification => "vm.fault.verification",
-        FaultClass::Invoke => "vm.fault.invoke",
-        FaultClass::Acquire => "vm.fault.acquire",
-        FaultClass::Transfer => "vm.fault.transfer",
-        FaultClass::Speculation => "vm.fault.speculation",
-        FaultClass::Close => "vm.fault.close",
-        FaultClass::Flow => "vm.fault.flow",
-        FaultClass::Progress => "vm.fault.progress",
-        FaultClass::OutputCondition => "vm.fault.output_condition",
-        FaultClass::Register => "vm.fault.register",
-        FaultClass::ProgramCounter => "vm.fault.pc",
-        FaultClass::Buffer => "vm.fault.buffer",
-        FaultClass::Credits => "vm.fault.credits",
+        FaultClass::Type => "machine.fault.type",
+        FaultClass::Label => "machine.fault.label",
+        FaultClass::Channel => "machine.fault.channel",
+        FaultClass::Verification => "machine.fault.verification",
+        FaultClass::Invoke => "machine.fault.invoke",
+        FaultClass::Acquire => "machine.fault.acquire",
+        FaultClass::Transfer => "machine.fault.transfer",
+        FaultClass::Speculation => "machine.fault.speculation",
+        FaultClass::Close => "machine.fault.close",
+        FaultClass::Flow => "machine.fault.flow",
+        FaultClass::Progress => "machine.fault.progress",
+        FaultClass::OutputCondition => "machine.fault.output_condition",
+        FaultClass::Register => "machine.fault.register",
+        FaultClass::ProgramCounter => "machine.fault.pc",
+        FaultClass::Buffer => "machine.fault.buffer",
+        FaultClass::Credits => "machine.fault.credits",
     }
 }
 
@@ -193,11 +193,11 @@ mod tests {
         assert_eq!(
             codes,
             vec![
-                "vm.fault.type",
-                "vm.fault.label",
-                "vm.fault.channel",
-                "vm.fault.verification",
-                "vm.fault.credits",
+                "machine.fault.type",
+                "machine.fault.label",
+                "machine.fault.channel",
+                "machine.fault.verification",
+                "machine.fault.credits",
             ]
         );
     }

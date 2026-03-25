@@ -26,29 +26,29 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
 
     c.bench_function("protocol_machine_run_yield_small", |b| {
         b.iter(|| {
-            let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+            let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
                 observability_retention: capped_retention_config(),
                 ..ProtocolMachineConfig::strict_minimal()
             });
-            vm.load_choreography_owned(black_box(&image_small), "bench/runtime/small")
+            machine.load_choreography_owned(black_box(&image_small), "bench/runtime/small")
                 .expect("load choreography");
-            let status = vm.run(&handler, 10_000).expect("run vm");
+            let status = machine.run(&handler, 10_000).expect("run machine");
             assert!(matches!(status, RunStatus::AllDone));
-            black_box((vm.trace().len(), vm.memory_usage()));
+            black_box((machine.trace().len(), machine.memory_usage()));
         })
     });
 
     c.bench_function("protocol_machine_run_yield_wide", |b| {
         b.iter(|| {
-            let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+            let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
                 observability_retention: capped_retention_config(),
                 ..ProtocolMachineConfig::strict_large_fanout()
             });
-            vm.load_choreography_owned(black_box(&image_wide), "bench/runtime/wide")
+            machine.load_choreography_owned(black_box(&image_wide), "bench/runtime/wide")
                 .expect("load choreography");
-            let status = vm.run(&handler, 20_000).expect("run vm");
+            let status = machine.run(&handler, 20_000).expect("run machine");
             assert!(matches!(status, RunStatus::AllDone));
-            black_box((vm.trace().len(), vm.memory_usage()));
+            black_box((machine.trace().len(), machine.memory_usage()));
         })
     });
 
@@ -158,10 +158,10 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
     c.bench_function("protocol_machine_scheduler_many_paused_run_only", |b| {
         b.iter_batched(
             || setup_many_paused_scheduler_vm(black_box(256), black_box(8)),
-            |mut vm| {
-                let status = vm.run(&handler, 10_000).expect("run vm");
+            |mut machine| {
+                let status = machine.run(&handler, 10_000).expect("run machine");
                 assert!(matches!(status, RunStatus::Stuck));
-                black_box((status, vm.trace().len()));
+                black_box((status, machine.trace().len()));
             },
             BatchSize::SmallInput,
         )

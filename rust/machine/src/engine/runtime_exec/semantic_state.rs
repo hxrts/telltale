@@ -716,8 +716,8 @@ mod runtime_effect_state_tests {
 
     #[test]
     fn runtime_reentrancy_rejects_same_operation_requests() {
-        let mut vm = test_vm();
-        vm.outstanding_effects.push(
+        let mut machine = test_vm();
+        machine.outstanding_effects.push(
             OutstandingEffect {
                 effect_id: 1,
                 operation_id: "effect:1".to_string(),
@@ -736,7 +736,7 @@ mod runtime_effect_state_tests {
                 inputs: serde_json::json!({ "session": 7 }),
                 outputs: serde_json::json!({ "status": "pending" }),
             },
-            &vm.config.observability_retention,
+            &machine.config.observability_retention,
         );
 
         let mut request =
@@ -744,7 +744,7 @@ mod runtime_effect_state_tests {
         request.metadata.reentrancy_policy =
             crate::effect::EffectReentrancyPolicy::RejectSameOperation;
 
-        let err = vm
+        let err = machine
             .ensure_effect_request_allowed(&request)
             .expect_err("same operation reentrancy must fail");
         assert!(err.message.contains("reentrancy rejected"));
@@ -752,8 +752,8 @@ mod runtime_effect_state_tests {
 
     #[test]
     fn runtime_reentrancy_rejects_same_fragment_requests() {
-        let mut vm = test_vm();
-        vm.outstanding_effects.push(
+        let mut machine = test_vm();
+        machine.outstanding_effects.push(
             OutstandingEffect {
                 effect_id: 2,
                 operation_id: "effect:2".to_string(),
@@ -772,7 +772,7 @@ mod runtime_effect_state_tests {
                 inputs: serde_json::json!({ "session": 9 }),
                 outputs: serde_json::json!({ "status": "blocked" }),
             },
-            &vm.config.observability_retention,
+            &machine.config.observability_retention,
         );
 
         let mut request =
@@ -780,7 +780,7 @@ mod runtime_effect_state_tests {
         request.metadata.reentrancy_policy =
             crate::effect::EffectReentrancyPolicy::RejectSameFragment;
 
-        let err = vm
+        let err = machine
             .ensure_effect_request_allowed(&request)
             .expect_err("same fragment reentrancy must fail");
         assert!(err.message.contains("footprint session:9"));
@@ -789,9 +789,9 @@ mod runtime_effect_state_tests {
     #[test]
     #[allow(clippy::too_many_lines)]
     fn runtime_semantic_handoff_transfers_pending_effects_and_invalidates_blocked_effects() {
-        let mut vm = test_vm();
-        vm.clock.tick = 7;
-        vm.outstanding_effects.push(
+        let mut machine = test_vm();
+        machine.clock.tick = 7;
+        machine.outstanding_effects.push(
             OutstandingEffect {
                 effect_id: 11,
                 operation_id: "effect:11".to_string(),
@@ -810,9 +810,9 @@ mod runtime_effect_state_tests {
                 inputs: serde_json::json!({ "session": 5 }),
                 outputs: serde_json::json!({ "status": "pending" }),
             },
-            &vm.config.observability_retention,
+            &machine.config.observability_retention,
         );
-        vm.outstanding_effects.push(
+        machine.outstanding_effects.push(
             OutstandingEffect {
                 effect_id: 12,
                 operation_id: "effect:12".to_string(),
@@ -831,9 +831,9 @@ mod runtime_effect_state_tests {
                 inputs: serde_json::json!({ "session": 5 }),
                 outputs: serde_json::json!({ "status": "blocked" }),
             },
-            &vm.config.observability_retention,
+            &machine.config.observability_retention,
         );
-        vm.operation_instances.push(
+        machine.operation_instances.push(
             OperationInstance {
                 operation_id: "effect:11".to_string(),
                 session: Some(5),
@@ -847,9 +847,9 @@ mod runtime_effect_state_tests {
                 budget_ticks: Some(1),
                 requires_proof: false,
             },
-            &vm.config.observability_retention,
+            &machine.config.observability_retention,
         );
-        vm.operation_instances.push(
+        machine.operation_instances.push(
             OperationInstance {
                 operation_id: "effect:12".to_string(),
                 session: Some(5),
@@ -863,7 +863,7 @@ mod runtime_effect_state_tests {
                 budget_ticks: Some(1),
                 requires_proof: false,
             },
-            &vm.config.observability_retention,
+            &machine.config.observability_retention,
         );
 
         let receipt = delegation_receipt(
@@ -875,9 +875,9 @@ mod runtime_effect_state_tests {
             0,
             1,
         );
-        vm.apply_semantic_handoff_obligations(&receipt);
+        machine.apply_semantic_handoff_obligations(&receipt);
 
-        let pending = vm
+        let pending = machine
             .outstanding_effects
             .as_slice()
             .iter()
@@ -886,7 +886,7 @@ mod runtime_effect_state_tests {
         assert_eq!(pending.owner_id.as_deref(), Some("coro:1"));
         assert_eq!(pending.status, OutstandingEffectStatus::Pending);
 
-        let blocked = vm
+        let blocked = machine
             .outstanding_effects
             .as_slice()
             .iter()
@@ -895,7 +895,7 @@ mod runtime_effect_state_tests {
         assert_eq!(blocked.owner_id.as_deref(), Some("coro:1"));
         assert_eq!(blocked.status, OutstandingEffectStatus::Invalidated);
 
-        let err = vm
+        let err = machine
             .complete_runtime_effect(
                 12,
                 OutstandingEffectStatus::Succeeded,
@@ -907,20 +907,20 @@ mod runtime_effect_state_tests {
 
     #[test]
     fn runtime_progress_contract_escalates_and_invalidates_late_results() {
-        let mut vm = test_vm();
-        vm.clock.tick = 1;
-        let effect_id = vm.issue_runtime_effect(
+        let mut machine = test_vm();
+        machine.clock.tick = 1;
+        let effect_id = machine.issue_runtime_effect(
             "invoke_step",
             Some(7),
             "host/runtime",
             serde_json::json!({ "session": 7 }),
         );
 
-        vm.clock.tick = 2;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 2;
+        machine.evaluate_progress_contracts()
             .expect("blocked escalation should succeed");
         assert!(matches!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .as_slice()
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
@@ -929,11 +929,11 @@ mod runtime_effect_state_tests {
             ProgressState::Blocked
         ));
 
-        vm.clock.tick = 3;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 3;
+        machine.evaluate_progress_contracts()
             .expect("no-progress escalation should succeed");
         assert!(matches!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .as_slice()
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
@@ -942,11 +942,11 @@ mod runtime_effect_state_tests {
             ProgressState::NoProgress
         ));
 
-        vm.clock.tick = 4;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 4;
+        machine.evaluate_progress_contracts()
             .expect("degraded escalation should succeed");
         assert!(matches!(
-            vm.progress_contracts
+            machine.progress_contracts
                 .as_slice()
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
@@ -955,10 +955,10 @@ mod runtime_effect_state_tests {
             ProgressState::Degraded
         ));
 
-        vm.clock.tick = 5;
-        vm.evaluate_progress_contracts()
+        machine.clock.tick = 5;
+        machine.evaluate_progress_contracts()
             .expect("timeout escalation should succeed");
-        let contract = vm
+        let contract = machine
             .progress_contracts
             .as_slice()
             .iter()
@@ -969,7 +969,7 @@ mod runtime_effect_state_tests {
             contract.reason.as_deref(),
             Some("bounded wait exhausted; late results are invalid")
         );
-        let effect = vm
+        let effect = machine
             .outstanding_effects
             .as_slice()
             .iter()
@@ -977,7 +977,7 @@ mod runtime_effect_state_tests {
             .expect("effect");
         assert_eq!(effect.status, OutstandingEffectStatus::Invalidated);
 
-        let err = vm
+        let err = machine
             .complete_runtime_effect(
                 effect_id,
                 OutstandingEffectStatus::Succeeded,
@@ -989,22 +989,22 @@ mod runtime_effect_state_tests {
 
     #[test]
     fn runtime_progress_contract_requires_bounded_waits() {
-        let mut vm = test_vm();
-        vm.clock.tick = 1;
-        let effect_id = vm.issue_runtime_effect(
+        let mut machine = test_vm();
+        machine.clock.tick = 1;
+        let effect_id = machine.issue_runtime_effect(
             "invoke_step",
             Some(9),
             "host/runtime",
             serde_json::json!({ "session": 9 }),
         );
         let operation_id = format!("effect:{effect_id}");
-        vm.outstanding_effects
+        machine.outstanding_effects
             .as_mut_slice()
             .iter_mut()
             .find(|effect| effect.effect_id == effect_id)
             .expect("effect")
             .budget_ticks = None;
-        let contract = vm
+        let contract = machine
             .progress_contracts
             .as_mut_slice()
             .iter_mut()
@@ -1013,8 +1013,8 @@ mod runtime_effect_state_tests {
         contract.budget_ticks = None;
         contract.bounded = false;
 
-        vm.clock.tick = 2;
-        let err = vm
+        machine.clock.tick = 2;
+        let err = machine
             .evaluate_progress_contracts()
             .expect_err("unbounded semantic-path effect must be rejected");
         assert!(err.to_string().contains("bounded wait budget"));

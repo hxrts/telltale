@@ -20,7 +20,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 
 /// Canonical schema version identifier for ProtocolMachine replay/trace payloads.
-pub const SERIALIZATION_SCHEMA_VERSION: &str = "vm.serialization.v1";
+pub const SERIALIZATION_SCHEMA_VERSION: &str = "machine.serialization.v1";
 
 fn canonical_serialization_schema_version() -> String {
     SERIALIZATION_SCHEMA_VERSION.to_string()

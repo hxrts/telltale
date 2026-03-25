@@ -392,9 +392,9 @@ check_suite() {
   run_check "differential step corpus" \
     "cargo test -p telltale-machine --test differential_step_corpus"
   run_check "bridge protocol machine correspondence" \
-    "cargo test -p telltale-bridge --test vm_correspondence_tests"
+    "cargo test -p telltale-bridge --test protocol_machine_correspondence_tests"
   run_check "bridge protocol machine differential-step correspondence" \
-    "cargo test -p telltale-bridge --test vm_differential_steps"
+    "cargo test -p telltale-bridge --test protocol_machine_differential_steps"
   run_check "simulator lean-reference parity suite" \
     "cargo test -p telltale-simulator --test lean_reference_parity"
   run_check "simulator material parity fixtures (Rust handlers)" \

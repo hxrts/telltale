@@ -230,7 +230,7 @@ fn render_lowering_protocol(protocol: &Protocol, depth: usize, out: &mut String)
             ..
         } => {
             let kind = annotations
-                .custom("vm_core_op")
+                .custom("protocol_machine_core_op")
                 .or_else(|| annotations.custom("dsl_combinator"))
                 .unwrap_or("extension");
             writeln!(out, "{indent}- extension {kind}").unwrap();

@@ -3,21 +3,19 @@
 version = 4
 
 [[package]]
+name = "aho-corasick"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
-
-[[package]]
-name = "async-recursion"
-version = "1.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b43422f69d8ff38f95f1b2bb76517c91589a924d1559a0e935d7c8ce0274c11"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
 
 [[package]]
 name = "async-trait"
@@ -683,6 +681,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "regex"
+version = "1.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e10754a14b9137dd7b1e3e5b0493cc9171fdd105e0ab477f51b72e7f3ac0e276"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-automata",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-automata"
+version = "0.4.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e1dd4122fc1595e8162618945476892eefca7b88c52820e74af6262213cae8f"
+dependencies = [
+ "aho-corasick",
+ "memchr",
+ "regex-syntax",
+]
+
+[[package]]
+name = "regex-syntax"
+version = "0.8.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc897dd8d9e8bd1ed8cdad82b5966c3e0ecae09fb1907d58efaa013543185d0a"
+
+[[package]]
 name = "rustversion"
 version = "1.0.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -717,6 +744,17 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -844,49 +882,14 @@ dependencies = [
  "proc-macro2",
  "quote",
  "serde",
- "syn",
- "telltale-macros",
- "telltale-types",
- "thiserror",
- "time",
- "tokio",
- "tracing",
- "uuid",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-timer",
-]
-
-[[package]]
-name = "telltale-choreography"
-version = "6.0.0"
-dependencies = [
- "anyhow",
- "async-recursion",
- "async-trait",
- "base64",
- "bincode",
- "cfg-if",
- "futures",
- "getrandom 0.2.17",
- "hex",
- "parking_lot 0.12.5",
- "pest",
- "pest_derive",
- "proc-macro2",
- "quote",
- "serde",
  "serde_json",
- "sha2",
  "syn",
- "telltale",
  "telltale-macros",
- "telltale-theory",
+ "telltale-parser",
  "telltale-types",
  "thiserror",
  "time",
  "tokio",
- "toml",
  "tracing",
  "uuid",
  "wasm-bindgen",
@@ -901,14 +904,24 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+ "telltale-parser",
 ]
 
 [[package]]
-name = "telltale-theory"
+name = "telltale-parser"
 version = "6.0.0"
 dependencies = [
+ "pest",
+ "pest_derive",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "serde",
+ "serde_json",
+ "syn",
  "telltale-types",
  "thiserror",
+ "toml",
 ]
 
 [[package]]
@@ -1307,8 +1320,8 @@ dependencies = [
  "futures",
  "getrandom 0.2.17",
  "serde",
+ "serde-wasm-bindgen",
  "telltale",
- "telltale-choreography",
  "tracing",
  "tracing-wasm",
  "wasm-bindgen",

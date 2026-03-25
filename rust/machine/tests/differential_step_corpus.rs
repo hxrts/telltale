@@ -78,13 +78,13 @@ fn run_cooperative_snaps(
     handler: &dyn EffectHandler,
     max_steps: usize,
 ) -> Vec<StepSnap> {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(image).expect("load choreography");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(image).expect("load choreography");
     let mut snaps = Vec::new();
-    let mut prev_len = vm.trace().len();
+    let mut prev_len = machine.trace().len();
     for _ in 0..max_steps {
-        let result = vm.step(handler).expect("step");
-        let trace = vm.trace();
+        let result = machine.step(handler).expect("step");
+        let trace = machine.trace();
         let mut new_events = Vec::new();
         for ev in &trace[prev_len..] {
             if matches!(ev, ObsEvent::OutputConditionChecked { .. }) {
@@ -120,13 +120,13 @@ fn run_cooperative_snaps_with_config(
     max_steps: usize,
     config: ProtocolMachineConfig,
 ) -> Vec<StepSnap> {
-    let mut vm = ProtocolMachine::new(config);
-    vm.load_choreography(image).expect("load choreography");
+    let mut machine = ProtocolMachine::new(config);
+    machine.load_choreography(image).expect("load choreography");
     let mut snaps = Vec::new();
-    let mut prev_len = vm.trace().len();
+    let mut prev_len = machine.trace().len();
     for _ in 0..max_steps {
-        let result = vm.step(handler).expect("step");
-        let trace = vm.trace();
+        let result = machine.step(handler).expect("step");
+        let trace = machine.trace();
         let mut new_events = Vec::new();
         for ev in &trace[prev_len..] {
             if matches!(ev, ObsEvent::OutputConditionChecked { .. }) {
@@ -480,13 +480,13 @@ cfg_if! {
             handler: &dyn EffectHandler,
             max_steps: usize,
         ) -> Vec<StepSnap> {
-            let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
-            vm.load_choreography(image).expect("load choreography");
+            let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+            machine.load_choreography(image).expect("load choreography");
             let mut snaps = Vec::new();
-            let mut prev_len = vm.trace().len();
+            let mut prev_len = machine.trace().len();
             for _ in 0..max_steps {
-                let result = vm.step_round(handler, 1).expect("step round");
-                let trace = vm.trace();
+                let result = machine.step_round(handler, 1).expect("step round");
+                let trace = machine.trace();
                 let mut new_events = Vec::new();
                 for ev in &trace[prev_len..] {
                     if matches!(ev, ObsEvent::OutputConditionChecked { .. }) {

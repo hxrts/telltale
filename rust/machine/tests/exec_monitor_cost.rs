@@ -27,13 +27,13 @@ fn cooperative_monitor_precheck_catches_mismatched_instr_shape() {
         vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    let err = vm
+    let err = machine
         .run(&PassthroughHandler, 32)
         .expect_err("expected mismatch");
     assert_matches!(
@@ -62,16 +62,16 @@ fn cooperative_monitor_precheck_bypasses_control_flow_instrs() {
         ],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    vm.run(&PassthroughHandler, 1)
+    machine.run(&PassthroughHandler, 1)
         .expect("control-flow step should bypass monitor precheck");
     assert_eq!(
-        vm.last_sched_step()
+        machine.last_sched_step()
             .expect("expected at least one scheduled step")
             .selected_coro,
         0
@@ -92,13 +92,13 @@ fn cooperative_monitor_offer_passes_on_send_state() {
         ],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    vm.run(&PassthroughHandler, 1)
+    machine.run(&PassthroughHandler, 1)
         .expect("offer should pass monitor on send state");
 }
 
@@ -116,13 +116,13 @@ fn cooperative_monitor_offer_rejects_recv_state() {
         ],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    let err = vm
+    let err = machine
         .run(&PassthroughHandler, 1)
         .expect_err("offer should fail monitor on recv state");
     assert_matches!(
@@ -151,13 +151,13 @@ fn cooperative_monitor_choose_passes_on_recv_state() {
         ],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    vm.run(&PassthroughHandler, 1)
+    machine.run(&PassthroughHandler, 1)
         .expect("choose should pass monitor on recv state");
 }
 
@@ -175,13 +175,13 @@ fn cooperative_monitor_choose_rejects_send_state() {
         ],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         monitor_mode: MonitorMode::SessionTypePrecheck,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    let err = vm
+    let err = machine
         .run(&PassthroughHandler, 1)
         .expect_err("choose should fail monitor on send state");
     assert_matches!(
@@ -199,14 +199,14 @@ fn cooperative_monitor_choose_rejects_send_state() {
 #[test]
 fn cooperative_out_of_credits_faults_before_dispatch() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         initial_cost_budget: 0,
         instruction_cost: 1,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load image");
+    machine.load_choreography(&image).expect("load image");
 
-    let err = vm
+    let err = machine
         .run(&PassthroughHandler, 32)
         .expect_err("expected out-of-credits");
     assert_matches!(
@@ -223,7 +223,7 @@ cfg_if! {
         #[test]
         fn threaded_out_of_credits_faults_before_dispatch() {
             let image = test_support::simple_send_recv_image("A", "B", "msg");
-            let mut vm = ThreadedProtocolMachine::with_workers(
+            let mut machine = ThreadedProtocolMachine::with_workers(
                 ProtocolMachineConfig {
                     initial_cost_budget: 0,
                     instruction_cost: 1,
@@ -231,9 +231,9 @@ cfg_if! {
                 },
                 2,
             );
-            vm.load_choreography(&image).expect("load image");
+            machine.load_choreography(&image).expect("load image");
 
-            let err = vm
+            let err = machine
                 .run(&PassthroughHandler, 32)
                 .expect_err("expected out-of-credits");
             assert_matches!(
@@ -253,16 +253,16 @@ cfg_if! {
                 vec![Instr::Receive { chan: 0, dst: 0 }, Instr::Halt],
             );
 
-            let mut vm = ThreadedProtocolMachine::with_workers(
+            let mut machine = ThreadedProtocolMachine::with_workers(
                 ProtocolMachineConfig {
                     monitor_mode: MonitorMode::SessionTypePrecheck,
                     ..ProtocolMachineConfig::default()
                 },
                 2,
             );
-            vm.load_choreography(&image).expect("load image");
+            machine.load_choreography(&image).expect("load image");
 
-            let err = vm
+            let err = machine
                 .run(&PassthroughHandler, 32)
                 .expect_err("expected mismatch");
             assert_matches!(
@@ -291,16 +291,16 @@ cfg_if! {
                 ],
             );
 
-            let mut vm = ThreadedProtocolMachine::with_workers(
+            let mut machine = ThreadedProtocolMachine::with_workers(
                 ProtocolMachineConfig {
                     monitor_mode: MonitorMode::SessionTypePrecheck,
                     ..ProtocolMachineConfig::default()
                 },
                 2,
             );
-            vm.load_choreography(&image).expect("load image");
+            machine.load_choreography(&image).expect("load image");
 
-            vm.run(&PassthroughHandler, 1)
+            machine.run(&PassthroughHandler, 1)
                 .expect("control-flow step should bypass monitor precheck");
         }
     }

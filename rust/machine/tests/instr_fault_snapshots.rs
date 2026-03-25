@@ -58,9 +58,9 @@ fn expect_fault(
     config: ProtocolMachineConfig,
     max_steps: usize,
 ) -> &'static str {
-    let mut vm = ProtocolMachine::new(config);
-    vm.load_choreography(image).expect("load");
-    let result = vm.run(&PassthroughHandler, max_steps);
+    let mut machine = ProtocolMachine::new(config);
+    machine.load_choreography(image).expect("load");
+    let result = machine.run(&PassthroughHandler, max_steps);
     match result {
         Err(ProtocolMachineError::Fault { fault, .. }) => fault_name(&fault),
         other => panic!("expected fault, got {other:?}"),
@@ -304,8 +304,8 @@ fn snapshot_fault_tags_for_core_instruction_families() {
 fn snapshot_fault_api_shape_is_vm_fault_wrapper() {
     use assert_matches::assert_matches;
     let image = single_role_end_image(vec![Instr::Close { session: 0 }]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load");
-    let result = vm.run(&PassthroughHandler, 8);
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load");
+    let result = machine.run(&PassthroughHandler, 8);
     assert_matches!(result, Err(ProtocolMachineError::Fault { .. }));
 }

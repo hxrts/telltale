@@ -336,10 +336,10 @@ Most Lean-dependent tests skip when Lean binaries are missing.
 - `schema_version_tests.rs`
 - `semantic_object_roundtrip.rs`
 - `semantics_verification.rs`
-- `vm_composition_stress.rs`
-- `vm_correspondence_tests.rs`
-- `vm_cross_target_tests.rs`
-- `vm_differential_steps.rs`
+- `protocol_machine_composition_stress.rs`
+- `protocol_machine_correspondence_tests.rs`
+- `protocol_machine_cross_target_tests.rs`
+- `protocol_machine_differential_steps.rs`
 
 These lanes are aligned with repository parity and release-gate lanes.
 Examples include `just check-parity --types`, `just check-parity --suite`, and `just check-capability-gates`.

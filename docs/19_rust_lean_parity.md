@@ -21,7 +21,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/protocol machine/Model/TypeClasses.lean` | `rust/machine/src/buffer.rs` | Aligned |
 | Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/protocol machine/Model/Config.lean`, `Runtime/protocol machine/Semantics/ExecComm.lean` | `rust/machine/src/vm.rs` | Aligned |
 | Register bounds failure semantics (`OutOfRegisters`) | `Runtime/protocol machine/Semantics/ExecSteps.lean` | `rust/machine/src/vm`, `rust/machine/src/threaded` | Aligned |
-| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean`, `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | `rust/machine/src/vm/vm_config.rs`, `rust/machine/src/trace.rs` | Aligned |
+| Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean`, `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | `rust/machine/src/engine/protocol_machine_config.rs`, `rust/machine/src/trace.rs` | Aligned |
 
 These checks are automated by `just check-parity --types`.
 

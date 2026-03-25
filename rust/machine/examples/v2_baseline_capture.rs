@@ -205,7 +205,7 @@ cfg_if! {
         )?;
 
         let canonical_fragment = canonical_machine.canonical_replay_fragment();
-        let threaded_fragment = threaded_guest_runtime.vm().canonical_replay_fragment();
+        let threaded_fragment = threaded_guest_runtime.machine().canonical_replay_fragment();
 
         let envelope_diff_artifact = EnvelopeDiffArtifactV1::from_replay_fragments(
             "native_single_thread",
@@ -340,7 +340,7 @@ cfg_if! {
 
         for _ in 0..MAX_ROUNDS {
             rounds += 1;
-            let lane_trace_before = guest_runtime.vm().lane_trace().len();
+            let lane_trace_before = guest_runtime.machine().lane_trace().len();
 
             let round_started = Instant::now();
             let result = guest_runtime
@@ -349,7 +349,7 @@ cfg_if! {
             round_latencies_us.push(round_started.elapsed().as_micros());
 
             let wave_width = guest_runtime
-                .vm()
+                .machine()
                 .lane_trace()
                 .len()
                 .saturating_sub(lane_trace_before);
@@ -375,8 +375,8 @@ cfg_if! {
         let elapsed = started.elapsed();
         let elapsed_ms = elapsed.as_millis();
         let elapsed_secs = elapsed.as_secs_f64().max(f64::EPSILON);
-        let steps = guest_runtime.vm().lane_trace().len();
-        let contention = guest_runtime.vm().contention_metrics().clone();
+        let steps = guest_runtime.machine().lane_trace().len();
+        let contention = guest_runtime.machine().contention_metrics().clone();
         Ok(EngineMetrics {
             elapsed_ms,
             steps,

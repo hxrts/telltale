@@ -307,7 +307,7 @@ impl Choreography {
         }
 
         let required_caps = self.required_theorem_pack_capabilities();
-        for capability in self.required_vm_core_capabilities() {
+        for capability in self.required_protocol_machine_core_capabilities() {
             if !required_caps.contains(&capability) {
                 return Err(ValidationError::MissingCapability(capability));
             }
@@ -998,7 +998,7 @@ impl Choreography {
             .collect()
     }
 
-    fn required_vm_core_capabilities(&self) -> BTreeSet<String> {
+    fn required_protocol_machine_core_capabilities(&self) -> BTreeSet<String> {
         fn collect(protocol: &Protocol, out: &mut BTreeSet<String>) {
             if let Some(cap) = protocol.get_annotations().custom("required_capability") {
                 out.insert(cap.to_string());

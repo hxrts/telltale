@@ -108,22 +108,22 @@ fn threaded_wave_config() -> ProtocolMachineConfig {
 }
 
 fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
     for i in 0..protocols {
         let image = ScenarioSpec::simple("A", "B", &format!("m{i}")).to_code_image();
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
     }
 
     let handler = RuntimeHandler;
     let mut rounds = 0usize;
     for _ in 0..2048 {
         rounds += 1;
-        match vm
+        match machine
             .step_round(&handler, workers.max(1))
             .expect("threaded step_round")
         {
             StepResult::AllDone => {
-                return (rounds, vm.contention_metrics().clone());
+                return (rounds, machine.contention_metrics().clone());
             }
             StepResult::Continue => {}
             StepResult::Stuck => {
@@ -136,14 +136,14 @@ fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) 
 
 #[test]
 fn lane_assignment_and_single_lane_compatibility() {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for i in 0..6 {
         let image = ScenarioSpec::simple("A", "B", &format!("lane{i}")).to_code_image();
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
     }
-    vm.run(&RuntimeHandler, 512).expect("threaded run");
+    machine.run(&RuntimeHandler, 512).expect("threaded run");
 
-    let lane_trace = vm.lane_trace();
+    let lane_trace = machine.lane_trace();
     assert!(!lane_trace.is_empty(), "lane trace must be populated");
     assert!(
         lane_trace.iter().any(|entry| entry.lane > 0),
@@ -167,20 +167,20 @@ fn lane_assignment_and_single_lane_compatibility() {
 
 #[test]
 fn deterministic_transfer_handoff_uses_delegation_path() {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
-    vm.load_choreography(&transfer_image())
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
+    machine.load_choreography(&transfer_image())
         .expect("load choreography");
 
     // Stop as soon as the transfer handoff has been committed; the fixture
     // does not model a post-transfer continuation for the source coroutine.
     for _ in 0..16 {
-        vm.step_round(&RuntimeHandler, 2).expect("threaded step");
-        if !vm.handoff_trace().is_empty() {
+        machine.step_round(&RuntimeHandler, 2).expect("threaded step");
+        if !machine.handoff_trace().is_empty() {
             break;
         }
     }
 
-    let handoffs = vm.handoff_trace();
+    let handoffs = machine.handoff_trace();
     assert_eq!(handoffs.len(), 1, "expected one transfer handoff");
     let handoff = &handoffs[0];
     assert_eq!(handoff.from_coro, 0);
@@ -190,7 +190,7 @@ fn deterministic_transfer_handoff_uses_delegation_path() {
         "transfer should cross lanes in this test fixture"
     );
 
-    let metrics = vm.contention_metrics();
+    let metrics = machine.contention_metrics();
     assert_eq!(metrics.cross_lane_transfer_count, 1);
     assert_eq!(metrics.handoff_applied_count, 1);
 }
@@ -212,18 +212,18 @@ fn no_deadlock_livelock_and_scaling_proxy_hold() {
 
 #[test]
 fn disjoint_footprints_parallelize_in_same_wave() {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
-    let sid_a = vm
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
+    let sid_a = machine
         .load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
         .expect("load choreography A");
-    let sid_b = vm
+    let sid_b = machine
         .load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
         .expect("load choreography B");
 
-    vm.step_round(&RuntimeHandler, 2)
+    machine.step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
-    let tick = vm.clock().tick;
-    let wave0: Vec<_> = vm
+    let tick = machine.clock().tick;
+    let wave0: Vec<_> = machine
         .lane_trace()
         .iter()
         .filter(|entry| entry.tick == tick && entry.wave == 0)
@@ -241,16 +241,16 @@ fn disjoint_footprints_parallelize_in_same_wave() {
 
 #[test]
 fn overlapping_footprints_serialize_per_wave() {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
-    let sid = vm
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
+    let sid = machine
         .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");
 
-    vm.step_round(&RuntimeHandler, 2)
+    machine.step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
-    let tick = vm.clock().tick;
+    let tick = machine.clock().tick;
     let mut by_wave: BTreeMap<u64, usize> = BTreeMap::new();
-    for entry in vm
+    for entry in machine
         .lane_trace()
         .iter()
         .filter(|entry| entry.tick == tick && entry.session == sid)
@@ -267,13 +267,13 @@ fn overlapping_footprints_serialize_per_wave() {
 #[test]
 fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
     let run_once = || {
-        let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
+        let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
         for i in 0..8 {
             let image = ScenarioSpec::simple("A", "B", &format!("det{i}")).to_code_image();
-            vm.load_choreography(&image).expect("load choreography");
+            machine.load_choreography(&image).expect("load choreography");
         }
-        vm.run(&RuntimeHandler, 512).expect("threaded run");
-        vm.lane_trace().to_vec()
+        machine.run(&RuntimeHandler, 512).expect("threaded run");
+        machine.lane_trace().to_vec()
     };
 
     let first = run_once();
@@ -287,14 +287,14 @@ fn lane_selection_tie_break_is_repeatable_for_fixed_input() {
 #[test]
 fn planner_trace_is_worker_count_invariant_for_fixed_ready_set() {
     let run_once = |workers: usize| {
-        let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
+        let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), workers);
         for i in 0..2 {
             let image = ScenarioSpec::simple("A", "B", &format!("wc{i}")).to_code_image();
-            vm.load_choreography(&image).expect("load choreography");
+            machine.load_choreography(&image).expect("load choreography");
         }
-        vm.run_concurrent(&RuntimeHandler, 512, 4)
+        machine.run_concurrent(&RuntimeHandler, 512, 4)
             .expect("threaded run");
-        vm.lane_trace().to_vec()
+        machine.lane_trace().to_vec()
     };
 
     let workers4 = run_once(4);
@@ -307,15 +307,15 @@ fn planner_trace_is_worker_count_invariant_for_fixed_ready_set() {
 
 #[test]
 fn lane_scheduler_state_roundtrip_is_stable() {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 4);
     for i in 0..4 {
         let image = ScenarioSpec::simple("A", "B", &format!("state{i}")).to_code_image();
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
     }
-    vm.step_round(&RuntimeHandler, 4)
+    machine.step_round(&RuntimeHandler, 4)
         .expect("threaded step round");
 
-    let state = vm.lane_scheduler_state();
+    let state = machine.lane_scheduler_state();
     let encoded = serde_json::to_vec(&state).expect("serialize lane scheduler state");
     let decoded: telltale_machine::LaneSchedulerState =
         serde_json::from_slice(&encoded).expect("deserialize lane scheduler state");
@@ -327,18 +327,18 @@ fn lane_scheduler_state_roundtrip_is_stable() {
 
 #[test]
 fn invalid_wave_certificate_falls_back_to_single_step() {
-    let mut vm = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
-    vm.load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
+    let mut machine = ThreadedProtocolMachine::with_workers(threaded_wave_config(), 2);
+    machine.load_choreography(&ScenarioSpec::simple("A", "B", "m1").to_code_image())
         .expect("load choreography A");
-    vm.load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
+    machine.load_choreography(&ScenarioSpec::simple("A", "B", "m2").to_code_image())
         .expect("load choreography B");
 
-    vm.force_invalid_wave_certificate_once();
-    vm.step_round(&RuntimeHandler, 2)
+    machine.force_invalid_wave_certificate_once();
+    machine.step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
 
-    let tick = vm.clock().tick;
-    let scheduled_this_tick = vm
+    let tick = machine.clock().tick;
+    let scheduled_this_tick = machine
         .lane_trace()
         .iter()
         .filter(|entry| entry.tick == tick)
@@ -355,15 +355,15 @@ fn footprint_guided_wave_widening_allows_same_session_disjoint_roles() {
         footprint_guided_wave_widening: true,
         ..threaded_wave_config()
     };
-    let mut vm = ThreadedProtocolMachine::with_workers(cfg, 2);
-    let sid = vm
+    let mut machine = ThreadedProtocolMachine::with_workers(cfg, 2);
+    let sid = machine
         .load_choreography(&ScenarioSpec::simple("A", "B", "m").to_code_image())
         .expect("load choreography");
 
-    vm.step_round(&RuntimeHandler, 2)
+    machine.step_round(&RuntimeHandler, 2)
         .expect("threaded step round");
-    let tick = vm.clock().tick;
-    let count = vm
+    let tick = machine.clock().tick;
+    let count = machine
         .lane_trace()
         .iter()
         .filter(|entry| entry.tick == tick && entry.session == sid)

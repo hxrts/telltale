@@ -15,9 +15,9 @@ use test_support::PassthroughHandler;
 
 type CommEvent = (String, String, String, String);
 
-fn canonical_comm_trace(vm: &ProtocolMachine) -> Vec<Vec<CommEvent>> {
+fn canonical_comm_trace(machine: &ProtocolMachine) -> Vec<Vec<CommEvent>> {
     let mut per_session: BTreeMap<usize, Vec<CommEvent>> = BTreeMap::new();
-    for event in normalize_trace(vm.trace()) {
+    for event in normalize_trace(machine.trace()) {
         match event {
             ObsEvent::Sent {
                 session,
@@ -53,17 +53,17 @@ fn canonical_comm_trace(vm: &ProtocolMachine) -> Vec<Vec<CommEvent>> {
 }
 
 fn run_for_policy(policy: SchedPolicy) -> Vec<Vec<CommEvent>> {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         sched_policy: policy,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&test_support::simple_send_recv_image("A", "B", "m1"))
+    machine.load_choreography(&test_support::simple_send_recv_image("A", "B", "m1"))
         .expect("load image m1");
-    vm.load_choreography(&test_support::simple_send_recv_image("A", "B", "m2"))
+    machine.load_choreography(&test_support::simple_send_recv_image("A", "B", "m2"))
         .expect("load image m2");
-    vm.run_concurrent(&PassthroughHandler, 256, 2)
+    machine.run_concurrent(&PassthroughHandler, 256, 2)
         .expect("run under scheduler policy");
-    canonical_comm_trace(&vm)
+    canonical_comm_trace(&machine)
 }
 
 #[test]

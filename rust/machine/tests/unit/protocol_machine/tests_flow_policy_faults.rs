@@ -4,15 +4,15 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: FlowPolicy::PredicateExpr(FlowPredicate::FactContains(
                 "secret".to_string(),
             )),
             ..ProtocolMachineConfig::default()
         });
-        let sid = vm.load_choreography(&image).unwrap();
+        let sid = machine.load_choreography(&image).unwrap();
 
-        let a_idx = vm
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
@@ -22,20 +22,20 @@
             role: "A".to_string(),
         };
 
-        vm.coroutines[a_idx]
+        machine.coroutines[a_idx]
             .knowledge_set
             .push(crate::coroutine::KnowledgeFact {
                 endpoint: ep_a.clone(),
                 fact: "top_secret".to_string(),
             });
-        vm.coroutines[a_idx].regs[2] = Value::Prod(
+        machine.coroutines[a_idx].regs[2] = Value::Prod(
             Box::new(Value::Endpoint(ep_a)),
             Box::new(Value::Str("top_secret".to_string())),
         );
-        vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
+        machine.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
 
-        let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
@@ -45,8 +45,8 @@
         ]);
 
         let handler = PassthroughHandler;
-        let _ignored = vm.step(&handler).expect("check step should succeed");
-        assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(true));
+        let _ignored = machine.step(&handler).expect("check step should succeed");
+        assert_eq!(machine.coroutines[a_idx].regs[4], Value::Bool(true));
     }
 
     #[test]
@@ -55,15 +55,15 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: FlowPolicy::predicate(|knowledge: &KnowledgeFact, target: &str| {
                 knowledge.fact.contains("secret") && target == "Observer"
             }),
             ..ProtocolMachineConfig::default()
         });
-        let sid = vm.load_choreography(&image).unwrap();
+        let sid = machine.load_choreography(&image).unwrap();
 
-        let a_idx = vm
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
@@ -73,18 +73,18 @@
             role: "A".to_string(),
         };
 
-        vm.coroutines[a_idx].knowledge_set.push(KnowledgeFact {
+        machine.coroutines[a_idx].knowledge_set.push(KnowledgeFact {
             endpoint: ep_a.clone(),
             fact: "top_secret".to_string(),
         });
-        vm.coroutines[a_idx].regs[2] = Value::Prod(
+        machine.coroutines[a_idx].regs[2] = Value::Prod(
             Box::new(Value::Endpoint(ep_a)),
             Box::new(Value::Str("top_secret".to_string())),
         );
-        vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
+        machine.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
 
-        let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
@@ -94,8 +94,8 @@
         ]);
 
         let handler = PassthroughHandler;
-        let _ignored = vm.step(&handler).expect("check step should succeed");
-        assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(true));
+        let _ignored = machine.step(&handler).expect("check step should succeed");
+        assert_eq!(machine.coroutines[a_idx].regs[4], Value::Bool(true));
     }
 
     fn run_check_with_flow_policy(
@@ -109,12 +109,12 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: policy,
             ..ProtocolMachineConfig::default()
         });
-        let sid = vm.load_choreography(&image).expect("load choreography");
-        let a_idx = vm
+        let sid = machine.load_choreography(&image).expect("load choreography");
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
@@ -125,19 +125,19 @@
         };
 
         if insert_fact {
-            vm.coroutines[a_idx].knowledge_set.push(KnowledgeFact {
+            machine.coroutines[a_idx].knowledge_set.push(KnowledgeFact {
                 endpoint: ep_a.clone(),
                 fact: known_fact.to_string(),
             });
         }
-        vm.coroutines[a_idx].regs[2] = Value::Prod(
+        machine.coroutines[a_idx].regs[2] = Value::Prod(
             Box::new(Value::Endpoint(ep_a)),
             Box::new(Value::Str(query_fact.to_string())),
         );
-        vm.coroutines[a_idx].regs[3] = Value::Str(target_role.to_string());
+        machine.coroutines[a_idx].regs[3] = Value::Str(target_role.to_string());
 
-        let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
@@ -147,8 +147,8 @@
         ]);
 
         let handler = PassthroughHandler;
-        let _ignored = vm.step(&handler).expect("check step should execute");
-        matches!(vm.coroutines[a_idx].regs[4], Value::Bool(true))
+        let _ignored = machine.step(&handler).expect("check step should execute");
+        matches!(machine.coroutines[a_idx].regs[4], Value::Bool(true))
     }
 
     #[test]
@@ -227,14 +227,14 @@
                 m
             },
         };
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
-        let step = vm
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        let step = machine
             .step(&TimeoutOnTickOneHandler)
             .expect("timeout topology ingress should not fault");
         assert!(matches!(step, StepResult::Stuck));
-        assert!(!vm.timed_out_sites().is_empty());
-        let audit = vm.authority_audit_log();
+        assert!(!machine.timed_out_sites().is_empty());
+        let audit = machine.authority_audit_log();
         assert_eq!(audit.len(), 1);
         match &audit[0].artifact {
             AuthorityArtifact::Timeout(witness) => {
@@ -245,7 +245,7 @@
             other => panic!("expected timeout witness, got {other:?}"),
         }
         assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
-        assert!(vm.obs_trace().iter().any(|event| matches!(
+        assert!(machine.obs_trace().iter().any(|event| matches!(
             event,
             ObsEvent::TimeoutIssued {
                 site,
@@ -260,20 +260,20 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).expect("load choreography");
 
-        let a_idx = vm
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
             .expect("A coroutine exists");
-        vm.coroutines[a_idx].regs[1] = Value::Nat(10);
+        machine.coroutines[a_idx].regs[1] = Value::Nat(10);
 
-        let _ignored = vm
+        let _ignored = machine
             .step(&CorruptOnTickOneHandler)
             .expect("send step with corruption should execute");
-        let received = vm
+        let received = machine
             .sessions
             .get_mut(sid)
             .expect("session exists")
@@ -286,19 +286,19 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let owned = vm
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let owned = machine
             .load_choreography_owned(&image, "owner/a")
             .expect("load owned choreography");
 
         let receipt = owned
-            .begin_transfer(&mut vm, "owner/b", OwnershipScope::Session)
+            .begin_transfer(&mut machine, "owner/b", OwnershipScope::Session)
             .expect("stage transfer");
         let witness = owned
-            .cancel_abandoned_transfer(&mut vm, &receipt)
+            .cancel_abandoned_transfer(&mut machine, &receipt)
             .expect("cancel abandoned transfer");
 
-        assert!(vm.obs_trace().iter().any(|event| matches!(
+        assert!(machine.obs_trace().iter().any(|event| matches!(
             event,
             ObsEvent::CancellationRequested {
                 session,
@@ -306,7 +306,7 @@
                 ..
             } if session == &owned.session_id() && witness_id == &witness.witness_id
         )));
-        assert!(vm.obs_trace().iter().any(|event| matches!(
+        assert!(machine.obs_trace().iter().any(|event| matches!(
             event,
             ObsEvent::Cancelled {
                 session,
@@ -314,7 +314,7 @@
                 ..
             } if session == &owned.session_id() && witness_id == &witness.witness_id
         )));
-        assert!(vm.obs_trace().iter().any(|event| matches!(
+        assert!(machine.obs_trace().iter().any(|event| matches!(
             event,
             ObsEvent::SessionTerminal {
                 session,
@@ -329,23 +329,23 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).expect("load choreography");
 
-        assert!(vm.monitor.session_kinds.contains_key(&sid));
-        let _ignored = vm
+        assert!(machine.monitor.session_kinds.contains_key(&sid));
+        let _ignored = machine
             .step(&CrashOnTickOneHandler)
             .expect("crash topology ingress should not fault step");
-        let session = vm.sessions.get(sid).expect("session exists");
+        let session = machine.sessions.get(sid).expect("session exists");
         assert!(matches!(session.status, SessionStatus::Faulted { .. }));
-        assert!(!vm.monitor.session_kinds.contains_key(&sid));
-        assert!(vm.crashed_sites.contains("A"));
+        assert!(!machine.monitor.session_kinds.contains_key(&sid));
+        assert!(machine.crashed_sites.contains("A"));
     }
 
     #[test]
-    fn vm_state_serialization_contains_lean_aligned_fields() {
-        let vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let json = serde_json::to_value(&vm).expect("serialize ProtocolMachine state");
+    fn protocol_machine_state_serialization_contains_lean_aligned_fields() {
+        let machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let json = serde_json::to_value(&machine).expect("serialize ProtocolMachine state");
         let obj = json.as_object().expect("ProtocolMachine state must serialize as object");
         for key in [
             "config",
@@ -374,11 +374,11 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
 
-        vm.coroutines[0].session_id = usize::MAX - 1;
-        let err = vm
+        machine.coroutines[0].session_id = usize::MAX - 1;
+        let err = machine
             .wf_vm_state()
             .expect_err("dangling session reference should fail wf check");
         assert!(err.contains("references missing session"));
@@ -389,11 +389,11 @@
         let local_types = simple_send_recv_types();
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).expect("load choreography");
 
-        vm.monitor.remove_kind(sid);
-        let err = vm
+        machine.monitor.remove_kind(sid);
+        let err = machine
             .wf_vm_state()
             .expect_err("missing monitor kind should fail wf check");
         assert!(err.contains("monitor missing kind for active session"));

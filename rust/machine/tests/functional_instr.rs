@@ -32,18 +32,18 @@ use test_support::{FailingHandler, PassthroughHandler, RecordingHandler};
 #[test]
 fn test_send_success() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let sent = vm
+    let sent = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Sent { label, .. } if label == "msg"));
     assert!(sent, "expected Sent event");
-    assert!(vm.session_coroutines(sid).iter().all(|c| c.is_terminal()));
+    assert!(machine.session_coroutines(sid).iter().all(|c| c.is_terminal()));
 }
 
 #[test]
@@ -90,11 +90,11 @@ fn test_send_type_mismatch() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -108,17 +108,17 @@ fn test_send_type_mismatch() {
 fn test_send_no_type() {
     // Create image, then remove the type for A before stepping.
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let ep_a = Endpoint {
         sid,
         role: "A".into(),
     };
-    vm.sessions_mut().remove_type(&ep_a);
+    machine.sessions_mut().remove_type(&ep_a);
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -157,15 +157,15 @@ fn test_send_buffer_full_error() {
         },
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(config);
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(config);
+    let sid = machine.load_choreography(&image).unwrap();
 
     // Pre-fill the buffer so the next send fails.
-    let session = vm.sessions_mut().get_mut(sid).unwrap();
+    let session = machine.sessions_mut().get_mut(sid).unwrap();
     let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -204,18 +204,18 @@ fn test_send_buffer_full_block() {
         },
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(config);
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(config);
+    let sid = machine.load_choreography(&image).unwrap();
 
     // Pre-fill the buffer.
-    let session = vm.sessions_mut().get_mut(sid).unwrap();
+    let session = machine.sessions_mut().get_mut(sid).unwrap();
     let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
     // Step: A should try to send and block.
     // Step scheduler until A runs.
     for _ in 0..10 {
-        match vm.step(&handler) {
+        match machine.step(&handler) {
             Ok(StepResult::Continue) => {}
             Ok(StepResult::Stuck) => break,
             Ok(StepResult::AllDone) => break,
@@ -228,7 +228,7 @@ fn test_send_buffer_full_block() {
         sid,
         role: "A".into(),
     };
-    let ty = vm.sessions().lookup_type(&ep_a);
+    let ty = machine.sessions().lookup_type(&ep_a);
     assert_matches!(ty, Some(LocalTypeR::Send { .. }));
 }
 
@@ -261,16 +261,16 @@ fn test_send_buffer_full_drop() {
         },
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(config);
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(config);
+    let sid = machine.load_choreography(&image).unwrap();
 
     // Pre-fill.
-    let session = vm.sessions_mut().get_mut(sid).unwrap();
+    let session = machine.sessions_mut().get_mut(sid).unwrap();
     let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
     // Should not fault — message dropped, type advances.
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // A's type should have advanced past Send.
     let ep_a = Endpoint {
@@ -278,17 +278,17 @@ fn test_send_buffer_full_drop() {
         role: "A".into(),
     };
     // Type removed on Halt.
-    assert!(vm.sessions().lookup_type(&ep_a).is_none());
+    assert!(machine.sessions().lookup_type(&ep_a).is_none());
 }
 
 #[test]
 fn test_send_handler_error() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = FailingHandler::new("handler failed");
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -305,13 +305,13 @@ fn test_send_handler_error() {
 #[test]
 fn test_recv_success() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let recv = vm
+    let recv = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Received { label, .. } if label == "msg"));
@@ -321,8 +321,8 @@ fn test_recv_success() {
 #[test]
 fn test_recv_blocks_when_empty() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
 
@@ -332,11 +332,11 @@ fn test_recv_blocks_when_empty() {
         sid,
         role: "B".into(),
     };
-    let ty_before = vm.sessions().lookup_type(&ep_b).cloned();
+    let ty_before = machine.sessions().lookup_type(&ep_b).cloned();
     assert_matches!(ty_before, Some(LocalTypeR::Recv { .. }));
 
-    vm.run(&handler, 100).unwrap();
-    assert!(vm.session_coroutines(sid).iter().all(|c| c.is_terminal()));
+    machine.run(&handler, 100).unwrap();
+    assert!(machine.session_coroutines(sid).iter().all(|c| c.is_terminal()));
 }
 
 #[test]
@@ -377,11 +377,11 @@ fn test_recv_type_mismatch() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -395,15 +395,15 @@ fn test_recv_type_mismatch() {
 fn test_recv_unblocks_on_send() {
     // Standard send/recv: B blocks, A sends, B unblocks.
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    assert!(vm.session_coroutines(sid).iter().all(|c| c.is_terminal()));
+    assert!(machine.session_coroutines(sid).iter().all(|c| c.is_terminal()));
 
-    let recv = vm
+    let recv = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Received { .. }));
@@ -417,13 +417,13 @@ fn test_recv_unblocks_on_send() {
 #[test]
 fn test_choose_success() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let sent = vm
+    let sent = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Sent { label, .. } if label == "yes"));
@@ -493,11 +493,11 @@ fn test_choose_unknown_label() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -556,11 +556,11 @@ fn test_choose_type_not_send() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -577,13 +577,13 @@ fn test_choose_type_not_send() {
 #[test]
 fn test_offer_recv_mode_success() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let recv = vm
+    let recv = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Received { label, .. } if label == "yes"));
@@ -594,14 +594,14 @@ fn test_offer_recv_mode_success() {
 fn test_offer_recv_mode_blocks() {
     // B Choose before A Offer → B blocks until A sends label.
     let image = test_support::choice_image("A", "B", &["go"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // Both should complete.
-    assert!(vm
+    assert!(machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Received { .. })));
@@ -670,11 +670,11 @@ fn test_offer_unknown_label_in_table() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -712,11 +712,11 @@ fn test_offer_wrong_type() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -774,13 +774,13 @@ fn test_close_empty_buffers() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let closed = vm
+    let closed = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Closed { .. }));
@@ -790,10 +790,10 @@ fn test_close_empty_buffers() {
 #[test]
 fn test_open_creates_session() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
-    let opened = vm
+    let opened = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Opened { session, .. } if *session == sid));
@@ -807,11 +807,11 @@ fn test_open_creates_session() {
 #[test]
 fn test_invoke_calls_step() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = RecordingHandler::new();
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     assert!(
         !handler
@@ -845,12 +845,12 @@ fn test_invoke_handler_error() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let image = CodeImage::from_local_types(&local_types, &global);
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     // FailingHandler: handle_send returns Err.
     let handler = FailingHandler::new("invoke error");
-    let result = vm.run(&handler, 100);
+    let result = machine.run(&handler, 100);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -903,13 +903,13 @@ fn test_loadimm_all_types() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let coro = vm.coroutine(0).unwrap();
+    let coro = machine.coroutine(0).unwrap();
     assert_eq!(coro.regs[1], Value::Unit);
     assert_eq!(coro.regs[2], Value::Nat(42));
     assert_eq!(coro.regs[3], Value::Nat(314));
@@ -940,13 +940,13 @@ fn test_mov_copies_register() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let coro = vm.coroutine(0).unwrap();
+    let coro = machine.coroutine(0).unwrap();
     assert_eq!(coro.regs[2], Value::Nat(99));
 }
 
@@ -974,13 +974,13 @@ fn test_jmp_sets_pc() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let coro = vm.coroutine(0).unwrap();
+    let coro = machine.coroutine(0).unwrap();
     // Reg 1 should still be Unit because LoadImm was skipped.
     assert_eq!(coro.regs[1], Value::Unit);
 }
@@ -1008,13 +1008,13 @@ fn test_yield_advances_pc_and_reschedules() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let coro = vm.coroutine(0).unwrap();
+    let coro = machine.coroutine(0).unwrap();
     assert_eq!(coro.regs[1], Value::Nat(7));
     assert_matches!(coro.status, CoroStatus::Done);
 }
@@ -1022,11 +1022,11 @@ fn test_yield_advances_pc_and_reschedules() {
 #[test]
 fn test_halt_sets_done_removes_type() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // Both types should be removed.
     let ep_a = Endpoint {
@@ -1037,11 +1037,11 @@ fn test_halt_sets_done_removes_type() {
         sid,
         role: "B".into(),
     };
-    assert!(vm.sessions().lookup_type(&ep_a).is_none());
-    assert!(vm.sessions().lookup_type(&ep_b).is_none());
+    assert!(machine.sessions().lookup_type(&ep_a).is_none());
+    assert!(machine.sessions().lookup_type(&ep_b).is_none());
 
     // Both coroutines Done.
-    for c in vm.session_coroutines(sid) {
+    for c in machine.session_coroutines(sid) {
         assert_matches!(c.status, CoroStatus::Done);
     }
 }
@@ -1056,12 +1056,12 @@ fn test_max_sessions_exceeded() {
         max_sessions: 1,
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(config);
+    let mut machine = ProtocolMachine::new(config);
 
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    vm.load_choreography(&image).unwrap();
+    machine.load_choreography(&image).unwrap();
 
-    let result = vm.load_choreography(&image);
+    let result = machine.load_choreography(&image);
     assert_matches!(result, Err(ProtocolMachineError::TooManySessions { .. }));
 }
 
@@ -1071,10 +1071,10 @@ fn test_max_coroutines_exceeded() {
         max_coroutines: 1,
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(config);
+    let mut machine = ProtocolMachine::new(config);
 
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let result = vm.load_choreography(&image);
+    let result = machine.load_choreography(&image);
     assert_matches!(result, Err(ProtocolMachineError::TooManyCoroutines { .. }));
 }
 
@@ -1092,11 +1092,11 @@ fn test_pc_out_of_bounds() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 10);
+    let result = machine.run(&handler, 10);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {

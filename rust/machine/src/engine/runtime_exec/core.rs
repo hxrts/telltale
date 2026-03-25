@@ -57,7 +57,7 @@ pub struct ProtocolMachineRetainedBytes {
     pub total: usize,
 }
 
-fn vm_serialized_bytes<T: Serialize>(value: &T) -> usize {
+fn serialized_byte_size<T: Serialize>(value: &T) -> usize {
     crate::serialization::binary_size(value)
 }
 

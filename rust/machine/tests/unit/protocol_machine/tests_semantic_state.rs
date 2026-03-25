@@ -117,13 +117,13 @@
 
     #[test]
     fn runtime_semantic_state_records_completed_operations() {
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&simple_send_recv_image())
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&simple_send_recv_image())
             .expect("load simple image");
 
         for _ in 0..4 {
             if matches!(
-                vm.step(&SemanticStatePassthroughHandler),
+                machine.step(&SemanticStatePassthroughHandler),
                 Ok(StepResult::AllDone)
             ) {
                 break;
@@ -131,7 +131,7 @@
         }
 
         assert!(
-            vm.operation_instances()
+            machine.operation_instances()
                 .iter()
                 .any(|operation| operation.terminal_publication == Some("effect.succeeded".to_string())),
             "successful runtime effects should materialize terminal operation state"
@@ -140,40 +140,40 @@
 
     #[test]
     fn runtime_semantic_state_tracks_blocked_outstanding_effects() {
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&simple_send_recv_image())
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&simple_send_recv_image())
             .expect("load simple image");
 
-        let step = vm
+        let step = machine
             .step(&PartitionOnTickZeroHandler)
             .expect("step simple image");
         assert!(matches!(step, StepResult::Continue));
-        let blocked = vm
+        let blocked = machine
             .outstanding_effects()
             .iter()
             .find(|effect| effect.effect_kind == "send_decision")
             .expect("blocked send decision");
         assert_eq!(blocked.status, OutstandingEffectStatus::Blocked);
-        assert!(vm.effect_trace().iter().all(|effect| effect.effect_id != blocked.effect_id));
+        assert!(machine.effect_trace().iter().all(|effect| effect.effect_id != blocked.effect_id));
     }
 
     #[test]
     fn runtime_semantic_state_rejects_late_results_without_live_effect() {
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let effect_id = vm.issue_runtime_effect(
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let effect_id = machine.issue_runtime_effect(
             "invoke_step",
             None,
             "test/handler",
             serde_json::json!({ "session": 0 }),
         );
-        vm.complete_runtime_effect(
+        machine.complete_runtime_effect(
             effect_id,
             OutstandingEffectStatus::Succeeded,
             serde_json::json!({ "status": "success" }),
         )
         .expect("complete live effect");
 
-        let err = vm
+        let err = machine
             .complete_runtime_effect(
                 effect_id,
                 OutstandingEffectStatus::Succeeded,

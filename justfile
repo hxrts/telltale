@@ -371,10 +371,10 @@ wasm-test-all:
     #!/usr/bin/env bash
     set -euo pipefail
     shim_root="$(mktemp -d)"
-    vm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-vm.XXXXXX")"
+    machine_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-machine.XXXXXX")"
     choreo_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-choreo.XXXXXX")"
     example_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-example.XXXXXX")"
-    trap 'rm -rf "$shim_root" "$vm_target" "$choreo_target" "$example_target"' EXIT
+    trap 'rm -rf "$shim_root" "$machine_target" "$choreo_target" "$example_target"' EXIT
     mkdir -p "$shim_root/env"
     cat >"$shim_root/env/index.js" <<'EOF'
     module.exports = new Proxy(
@@ -389,7 +389,7 @@ wasm-test-all:
       },
     );
     EOF
-    CARGO_TARGET_DIR="$vm_target" NODE_PATH="$shim_root" wasm-pack test --node rust/machine --features wasm -- --nocapture
+    CARGO_TARGET_DIR="$machine_target" NODE_PATH="$shim_root" wasm-pack test --node rust/machine --features wasm -- --nocapture
     CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
     cd examples/wasm-ping-pong
     CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
@@ -575,8 +575,8 @@ export-protocol-bundles:
 
 # Rust/Lean protocol machine trace correspondence checks.
 verify-protocol-machine-correspondence:
-    cargo test -p telltale-bridge --test vm_correspondence_tests
-    cargo test -p telltale-bridge --test vm_differential_steps
+    cargo test -p telltale-bridge --test protocol_machine_correspondence_tests
+    cargo test -p telltale-bridge --test protocol_machine_differential_steps
 
 # Track A gate: naming/API changes must preserve behavior.
 verify-track-a:
@@ -617,12 +617,12 @@ verify-cross-target-matrix:
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence
     cargo test -p telltale-machine --test lean_vm_equivalence
     CARGO_TARGET_DIR="$wasm_target" wasm-pack test --node rust/machine --features wasm -- --nocapture
-    cargo test -p telltale-bridge --test vm_cross_target_matrix_tests
+    cargo test -p telltale-bridge --test protocol_machine_cross_target_tests
 
 # Composition/concurrency stress lane.
 verify-composition-stress:
     cargo test -p telltale-machine --features multi-thread --test threaded_lane_runtime -- --nocapture
-    cargo test -p telltale-bridge --test vm_composition_stress_tests -- --nocapture
+    cargo test -p telltale-bridge --test protocol_machine_composition_stress -- --nocapture
 
 # Property-based verification lane.
 verify-properties:
@@ -633,4 +633,4 @@ verify-properties:
 
 # Generate normalized traces for bridge-level protocol machine correspondence fixtures.
 generate-test-traces:
-    cargo test -p telltale-bridge --test vm_correspondence_tests -- --nocapture
+    cargo test -p telltale-bridge --test protocol_machine_correspondence_tests -- --nocapture

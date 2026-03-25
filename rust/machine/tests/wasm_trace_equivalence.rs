@@ -80,11 +80,11 @@ fn assert_wasm_trace_matches_vm(
 
     let image = CodeImage::from_local_types(&local_copy, &global);
     let handler = NoOpHandler;
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
-    vm.run(&handler, max_steps).unwrap();
-    let native_trace = normalize_trace(vm.trace());
-    let native_semantic_objects = vm.semantic_objects();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
+    machine.run(&handler, max_steps).unwrap();
+    let native_trace = normalize_trace(machine.trace());
+    let native_semantic_objects = machine.semantic_objects();
 
     assert_eq!(wasm_trace, native_trace);
     assert_eq!(

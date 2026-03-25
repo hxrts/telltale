@@ -73,7 +73,7 @@ const FORBIDDEN_TOPOLOGY_MUTATORS: &[&str] = &[
 const TOPOLOGY_CHECK_EXCLUDES: &[&str] = &["src/engine.rs"];
 
 #[wasm_bindgen_test(unsupported = test)]
-fn vm_kernel_has_no_direct_nondeterministic_calls() {
+fn protocol_machine_kernel_has_no_direct_nondeterministic_calls() {
     let mut violations = Vec::new();
     for (path, src) in KERNEL_SOURCES {
         for pattern in FORBIDDEN_PATTERNS {
@@ -91,7 +91,7 @@ fn vm_kernel_has_no_direct_nondeterministic_calls() {
 }
 
 #[wasm_bindgen_test(unsupported = test)]
-fn vm_kernel_has_no_direct_topology_mutation_paths() {
+fn protocol_machine_kernel_has_no_direct_topology_mutation_paths() {
     let mut violations = Vec::new();
     for (path, src) in KERNEL_SOURCES {
         // Skip files that are legitimate ingress points for topology events

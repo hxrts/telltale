@@ -66,17 +66,17 @@ fn choose_rejects_non_string_label_payload() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).expect("load choreography");
-    vm.sessions_mut()
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).expect("load choreography");
+    machine.sessions_mut()
         .get_mut(sid)
         .expect("session")
         .send("A", "B", Value::Nat(1))
         .expect("inject malformed payload");
-    vm.pause_role("A");
+    machine.pause_role("A");
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 16);
+    let result = machine.run(&handler, 16);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {
@@ -112,11 +112,11 @@ fn tag_rejects_non_fact_shape() {
         },
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load choreography");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load choreography");
 
     let handler = PassthroughHandler;
-    let result = vm.run(&handler, 8);
+    let result = machine.run(&handler, 8);
     assert_matches!(
         result,
         Err(ProtocolMachineError::Fault {

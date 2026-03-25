@@ -20,12 +20,12 @@ pub(crate) fn step_set(dst: u16, val: ImmValue) -> StepPack {
 
 /// Execute `move`.
 pub(crate) fn step_move(
-    vm: &ProtocolMachine,
+    machine: &ProtocolMachine,
     coro_idx: usize,
     dst: u16,
     src: u16,
 ) -> Result<StepPack, Fault> {
-    let value = vm.read_reg(coro_idx, src)?;
+    let value = machine.read_reg(coro_idx, src)?;
     Ok(write_reg_pack(dst, value))
 }
 
@@ -42,16 +42,16 @@ pub(crate) fn step_yield() -> StepPack {
 }
 
 /// Execute `halt`.
-pub(crate) fn step_halt(vm: &ProtocolMachine, ep: &Endpoint) -> Result<StepPack, Fault> {
-    vm.step_halt(ep)
+pub(crate) fn step_halt(machine: &ProtocolMachine, ep: &Endpoint) -> Result<StepPack, Fault> {
+    machine.step_halt(ep)
 }
 
 /// Execute `spawn`.
 pub(crate) fn step_spawn(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     coro_idx: usize,
     target: PC,
     args: &[u16],
 ) -> Result<StepPack, Fault> {
-    vm.step_spawn(coro_idx, target, args)
+    machine.step_spawn(coro_idx, target, args)
 }

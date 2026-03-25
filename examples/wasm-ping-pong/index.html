@@ -118,7 +118,7 @@
         </div>
 
         <script type="module">
-            import init, { run_alice, run_bob } from "./pkg/wasm_ping_pong.js";
+            import init, { run_ping_pong } from "./pkg/wasm_ping_pong.js";
 
             const output = document.getElementById("output");
             const runButton = document.getElementById("runButton");
@@ -143,23 +143,18 @@
                     log("Starting protocol execution...", "info");
                     log(`Alice will send: "${message}"`);
 
-                    // Note: In a real application, Alice and Bob would run in separate contexts
-                    // For this demo, we're running them sequentially to show the concept
-
-                    log("Running Alice's protocol...");
-                    const aliceResult = await run_alice(message);
-                    log(`Alice received response: "${aliceResult}"`);
-
-                    log("Running Bob's protocol...");
-                    const bobResult = await run_bob();
-                    log(`Bob received: "${bobResult}"`);
+                    const result = await run_ping_pong(message);
+                    log(`Alice sent: "${result.sent_ping}"`);
+                    log(`Bob received: "${result.received_ping}"`);
+                    log(`Bob sent: "${result.sent_pong}"`);
+                    log(`Alice received: "${result.received_pong}"`);
 
                     log("");
                     log("Protocol completed successfully!");
                     log("");
                     log("This demonstrates:");
                     log("  • Session types working in WASM");
-                    log("  • Effect handlers in the browser");
+                    log("  • Generated session types in the browser");
                     log("  • Type-safe message passing");
                     log("  • Choreographic programming");
                 } catch (error) {

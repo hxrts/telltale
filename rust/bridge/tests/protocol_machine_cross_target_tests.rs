@@ -329,11 +329,11 @@ fn run_single_thread(
     Vec<ObsEvent>,
     Vec<telltale_machine::model::effects::EffectTraceEntry>,
 ) {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(image).expect("load choreography");
-    vm.run(&DeterministicHandler, 256)
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(image).expect("load choreography");
+    machine.run(&DeterministicHandler, 256)
         .expect("single-thread run");
-    (vm.trace().to_vec(), vm.effect_trace().to_vec())
+    (machine.trace().to_vec(), machine.effect_trace().to_vec())
 }
 
 fn run_threaded(
@@ -355,17 +355,17 @@ fn run_threaded_with_concurrency(
     Vec<telltale_machine::model::effects::EffectTraceEntry>,
     Vec<telltale_machine::LaneSelection>,
 ) {
-    let mut vm =
+    let mut machine =
         ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), concurrency.max(1));
     for _ in 0..sessions {
-        vm.load_choreography(image).expect("load choreography");
+        machine.load_choreography(image).expect("load choreography");
     }
-    vm.run_concurrent(&DeterministicHandler, 256, concurrency)
+    machine.run_concurrent(&DeterministicHandler, 256, concurrency)
         .expect("threaded run");
     (
-        vm.trace().to_vec(),
-        vm.effect_trace().to_vec(),
-        vm.lane_trace().to_vec(),
+        machine.trace().to_vec(),
+        machine.effect_trace().to_vec(),
+        machine.lane_trace().to_vec(),
     )
 }
 

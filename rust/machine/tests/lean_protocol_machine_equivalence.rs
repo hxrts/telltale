@@ -71,11 +71,11 @@ fn test_lean_semantic_audit_matches_rust() {
 
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load image");
-    vm.run(&handler, 50).expect("run vm");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load image");
+    machine.run(&handler, 50).expect("run machine");
 
-    let rust_trace: Vec<(u64, String, String, String, String)> = normalize_trace(vm.trace())
+    let rust_trace: Vec<(u64, String, String, String, String)> = normalize_trace(machine.trace())
         .iter()
         .filter_map(|ev| match ev {
             ObsEvent::Sent {

@@ -280,7 +280,7 @@ fn exec_instr(
                 .ok()
                 .flatten()
                 .unwrap_or(OutputConditionHint {
-                    predicate_ref: "vm.observable_output".to_string(),
+                    predicate_ref: "protocol_machine.observable_output".to_string(),
                     witness_ref: None,
                 }),
         )

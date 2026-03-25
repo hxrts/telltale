@@ -53,8 +53,7 @@
         <script type="module">
             import init, {
                 init as wasmInit,
-                run_alice,
-                run_bob,
+                run_ping_pong,
             } from "./pkg/wasm_ping_pong.js";
 
             window.runPingPong = async function () {
@@ -70,15 +69,11 @@
 
                     output.innerHTML += "Starting ping-pong protocol...\n";
 
-                    // Run Alice's side
-                    output.innerHTML += "Alice: Sending ping...\n";
-                    const aliceResult = await run_alice("Hello from Alice!");
-                    output.innerHTML += `<span class="success">Alice received: ${aliceResult}</span>\n`;
-
-                    // Run Bob's side
-                    output.innerHTML += "\nBob: Waiting for ping...\n";
-                    const bobResult = await run_bob("Hello from Bob!");
-                    output.innerHTML += `<span class="success">Bob sent: ${bobResult}</span>\n`;
+                    const result = await run_ping_pong("Hello from Alice!");
+                    output.innerHTML += `Alice sent: ${result.sent_ping}\n`;
+                    output.innerHTML += `Bob received: ${result.received_ping}\n`;
+                    output.innerHTML += `Bob sent: ${result.sent_pong}\n`;
+                    output.innerHTML += `<span class="success">Alice received: ${result.received_pong}</span>\n`;
 
                     output.innerHTML +=
                         '\n<span class="success">Protocol completed successfully!</span>\n';

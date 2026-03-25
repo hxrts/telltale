@@ -4,14 +4,14 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
         // Both coroutines should be done.
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
     }
 
     #[test]
@@ -20,10 +20,10 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = CallbackAuditHandler::default();
-        vm.run(&handler, 100).expect("run should succeed");
+        machine.run(&handler, 100).expect("run should succeed");
 
         assert!(handler.send_decision_calls.load(Ordering::Relaxed) > 0);
         assert!(handler.handle_recv_calls.load(Ordering::Relaxed) > 0);
@@ -33,10 +33,10 @@
     #[test]
     fn test_canonical_dispatch_does_not_call_handle_choose() {
         let image = choice_image_with_explicit_offer_choose();
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = CallbackAuditHandler::default();
-        vm.run(&handler, 100).expect("run should succeed");
+        machine.run(&handler, 100).expect("run should succeed");
 
         assert_eq!(handler.handle_choose_calls.load(Ordering::Relaxed), 0);
         assert!(handler.send_decision_calls.load(Ordering::Relaxed) > 0);
@@ -49,13 +49,13 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             payload_validation_mode: PayloadValidationMode::Structural,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
 
-        let err = vm
+        let err = machine
             .run(&AdversarialBoolSendHandler, 100)
             .expect_err("annotated payload type mismatch should fault");
         match err {
@@ -79,12 +79,12 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             payload_validation_mode: PayloadValidationMode::Off,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
-        vm.run(&AdversarialBoolSendHandler, 100)
+        machine.load_choreography(&image).expect("load choreography");
+        machine.run(&AdversarialBoolSendHandler, 100)
             .expect("off mode preserves compatibility behavior");
     }
 
@@ -94,13 +94,13 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             payload_validation_mode: PayloadValidationMode::StrictSchema,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
 
-        let err = vm
+        let err = machine
             .run(&PassthroughHandler, 100)
             .expect_err("strict schema mode should require explicit payload annotations");
         match err {
@@ -120,13 +120,13 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             max_payload_bytes: 16,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
 
-        let err = vm
+        let err = machine
             .run(&OversizedPayloadSendHandler, 100)
             .expect_err("payload above max_payload_bytes should fault");
         match err {
@@ -156,25 +156,25 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        assert_eq!(vm.scheduler_step_count(), 0);
-        let first = vm.step_round(&handler, 8).expect("first round");
+        assert_eq!(machine.scheduler_step_count(), 0);
+        let first = machine.step_round(&handler, 8).expect("first round");
         assert!(matches!(first, StepResult::Continue));
-        assert_eq!(vm.scheduler_step_count(), 1);
+        assert_eq!(machine.scheduler_step_count(), 1);
         assert_eq!(
-            vm.coroutines
+            machine.coroutines
                 .iter()
                 .filter(|c| matches!(c.status, CoroStatus::Done))
                 .count(),
             1
         );
 
-        let second = vm.step_round(&handler, 8).expect("second round");
+        let second = machine.step_round(&handler, 8).expect("second round");
         assert!(matches!(second, StepResult::AllDone));
-        assert_eq!(vm.scheduler_step_count(), 2);
+        assert_eq!(machine.scheduler_step_count(), 2);
     }
 
     #[test]
@@ -191,15 +191,15 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
-        vm.pause_role("A");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        machine.pause_role("A");
         let handler = PassthroughHandler;
 
-        assert_eq!(vm.scheduler_step_count(), 0);
-        let result = vm.step_round(&handler, 1).expect("step round");
+        assert_eq!(machine.scheduler_step_count(), 0);
+        let result = machine.step_round(&handler, 1).expect("step round");
         assert!(matches!(result, StepResult::Stuck));
-        assert_eq!(vm.scheduler_step_count(), 0);
+        assert_eq!(machine.scheduler_step_count(), 0);
     }
 
     #[test]
@@ -216,19 +216,19 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
-        vm.pause_role("A");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        machine.pause_role("A");
         let handler = PassthroughHandler;
 
-        let stuck = vm.step_round(&handler, 1).expect("paused step round");
+        let stuck = machine.step_round(&handler, 1).expect("paused step round");
         assert!(matches!(stuck, StepResult::Stuck));
-        assert_eq!(vm.scheduler_step_count(), 0);
+        assert_eq!(machine.scheduler_step_count(), 0);
 
-        vm.resume_role("A");
-        let resumed = vm.step_round(&handler, 1).expect("resumed step round");
+        machine.resume_role("A");
+        let resumed = machine.step_round(&handler, 1).expect("resumed step round");
         assert!(matches!(resumed, StepResult::AllDone));
-        assert_eq!(vm.scheduler_step_count(), 1);
+        assert_eq!(machine.scheduler_step_count(), 1);
     }
 
     #[test]
@@ -245,20 +245,20 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        let first = vm.step_round(&handler, 1).expect("yield step");
+        let first = machine.step_round(&handler, 1).expect("yield step");
         assert!(matches!(first, StepResult::Continue));
-        let coro = vm.coroutine(0).expect("coroutine exists");
+        let coro = machine.coroutine(0).expect("coroutine exists");
         assert_eq!(coro.pc, 1);
         assert!(matches!(
             coro.status,
             CoroStatus::Blocked(BlockReason::Spawn)
         ));
 
-        let second = vm.step_round(&handler, 1).expect("halt step");
+        let second = machine.step_round(&handler, 1).expect("halt step");
         assert!(matches!(second, StepResult::AllDone));
     }
 
@@ -395,11 +395,11 @@
             dsts: vec![("B".to_string(), 0)],
         });
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        let err = vm
+        let err = machine
             .step_round(&handler, 1)
             .expect_err("expected open arity fault");
         match err {
@@ -429,11 +429,11 @@
             dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
         });
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        let err = vm
+        let err = machine
             .step_round(&handler, 1)
             .expect_err("expected handler coverage fault");
         match err {
@@ -466,14 +466,14 @@
             dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
         });
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        let result = vm.step_round(&handler, 1).expect("open step");
+        let result = machine.step_round(&handler, 1).expect("open step");
         assert!(matches!(result, StepResult::Continue));
 
-        let sid = match vm
+        let sid = match machine
             .trace()
             .iter()
             .rev()
@@ -484,25 +484,25 @@
             _ => unreachable!(),
         };
         assert!(
-            vm.trace().iter().any(|event| matches!(
+            machine.trace().iter().any(|event| matches!(
                 event,
                 ObsEvent::Opened { roles, .. }
                     if roles == &vec!["A".to_string(), "B".to_string()]
             )),
             "opened event must preserve canonical role strings at the trace boundary"
         );
-        let session = vm.sessions().get(sid).expect("opened session exists");
+        let session = machine.sessions().get(sid).expect("opened session exists");
         assert_eq!(session.local_types.len(), 2);
         for ((sender, receiver), handler_id) in reachable_handlers {
             let edge = Edge::new(sid, sender, receiver);
             assert_eq!(session.edge_handlers.get(&edge), Some(&handler_id));
         }
-        assert_eq!(vm.role_symbol_count(), 2);
-        assert_eq!(vm.label_symbol_count(), 0);
-        assert_eq!(vm.handler_symbol_count(), 2);
-        assert_eq!(vm.edge_symbol_count(), 1);
+        assert_eq!(machine.role_symbol_count(), 2);
+        assert_eq!(machine.label_symbol_count(), 0);
+        assert_eq!(machine.handler_symbol_count(), 2);
+        assert_eq!(machine.edge_symbol_count(), 1);
 
-        let coro = vm.coroutine(0).expect("coroutine exists");
+        let coro = machine.coroutine(0).expect("coroutine exists");
         assert!(matches!(coro.regs[0], Value::Endpoint(_)));
         assert!(matches!(coro.regs[1], Value::Endpoint(_)));
     }
@@ -518,9 +518,9 @@
             },
             ..ProtocolMachineConfig::default()
         };
-        let mut vm = ProtocolMachine::new(cfg);
-        vm.load_choreography(&image).expect("load choreography");
-        let err = vm
+        let mut machine = ProtocolMachine::new(cfg);
+        machine.load_choreography(&image).expect("load choreography");
+        let err = machine
             .run(&PassthroughHandler, 32)
             .expect_err("second open-session send must fault with capacity=1,error policy");
         match err {
@@ -544,15 +544,15 @@
             dsts: vec![("A".to_string(), 0), ("B".to_string(), 1)],
         });
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid0 = vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid0 = machine.load_choreography(&image).expect("load choreography");
         assert_eq!(sid0, 0);
 
         let handler = PassthroughHandler;
-        let result = vm.step_round(&handler, 1).expect("open step");
+        let result = machine.step_round(&handler, 1).expect("open step");
         assert!(matches!(result, StepResult::Continue));
 
-        let opened: Vec<SessionId> = vm
+        let opened: Vec<SessionId> = machine
             .trace()
             .iter()
             .filter_map(|event| match event {
@@ -562,14 +562,14 @@
             .collect();
         assert_eq!(opened, vec![0, 1], "expected monotonic opened sessions");
         assert!(
-            vm.sessions().get(0).is_some(),
+            machine.sessions().get(0).is_some(),
             "bootstrap session must remain"
         );
         assert!(
-            vm.sessions().get(1).is_some(),
+            machine.sessions().get(1).is_some(),
             "runtime-open session must exist"
         );
-        assert_eq!(vm.next_session_id(), 2);
+        assert_eq!(machine.next_session_id(), 2);
     }
 
     #[test]
@@ -578,11 +578,11 @@
             chan: 0,
             table: vec![("L".to_string(), 0), ("L".to_string(), 1)],
         });
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        let err = vm
+        let err = machine
             .step_round(&handler, 1)
             .expect_err("duplicate labels must fail monitor precheck");
         match err {

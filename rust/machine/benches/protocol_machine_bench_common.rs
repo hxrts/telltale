@@ -294,16 +294,16 @@ pub(crate) fn run_yield_workload(
     image: &CodeImage,
     max_rounds: usize,
 ) -> ProtocolMachineMemoryUsage {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_minimal()
     });
-    let _owned = vm
+    let _owned = machine
         .load_choreography_owned(image, "bench/yield")
         .expect("load choreography");
-    let status = vm.run(&BenchHandler, max_rounds).expect("run vm");
+    let status = machine.run(&BenchHandler, max_rounds).expect("run machine");
     assert!(matches!(status, RunStatus::AllDone));
-    vm.memory_usage()
+    machine.memory_usage()
 }
 
 pub(crate) fn run_short_lived_session_churn(iterations: usize) -> ProtocolMachineMemoryUsage {
@@ -311,28 +311,28 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> ProtocolMachin
     let mut last_usage = ProtocolMachineMemoryUsage::default();
 
     for idx in 0..iterations {
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             observability_retention: capped_retention_config(),
             ..ProtocolMachineConfig::strict_churn()
         });
-        let owned = vm
+        let owned = machine
             .load_choreography_owned(&image, format!("bench/churn/{idx}"))
             .expect("load choreography");
         let sid = owned.session_id();
-        let status = vm.run(&BenchHandler, 10_000).expect("run vm");
+        let status = machine.run(&BenchHandler, 10_000).expect("run machine");
         assert!(matches!(status, RunStatus::AllDone));
-        vm.sessions_mut().close(sid).expect("close session");
-        let coro_ids: Vec<usize> = vm
+        machine.sessions_mut().close(sid).expect("close session");
+        let coro_ids: Vec<usize> = machine
             .session_coroutines(sid)
             .iter()
             .map(|coro| coro.id)
             .collect();
         for coro_id in coro_ids {
-            vm.coroutine_mut(coro_id).expect("coroutine exists").status =
+            machine.coroutine_mut(coro_id).expect("coroutine exists").status =
                 telltale_machine::CoroStatus::Done;
         }
-        let _ = vm.reap_closed_sessions();
-        last_usage = vm.memory_usage();
+        let _ = machine.reap_closed_sessions();
+        last_usage = machine.memory_usage();
     }
 
     last_usage
@@ -340,18 +340,18 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> ProtocolMachin
 
 pub(crate) fn run_repeated_load_reuse(iterations: usize) -> ProtocolMachineMemoryUsage {
     let image = yield_image(16, 16);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
 
     for idx in 0..iterations {
-        let _owned = vm
+        let _owned = machine
             .load_choreography_owned(&image, format!("bench/reuse/{idx}"))
             .expect("load choreography");
     }
 
-    vm.memory_usage()
+    machine.memory_usage()
 }
 
 pub(crate) fn run_repeated_open_same_image(
@@ -367,13 +367,13 @@ pub(crate) fn run_repeated_open_same_image(
     config.max_coroutines = config
         .max_coroutines
         .max(iterations.saturating_mul(num_roles).saturating_add(16));
-    let mut vm = ProtocolMachine::new(config);
+    let mut machine = ProtocolMachine::new(config);
     for idx in 0..iterations {
-        let _owned = vm
+        let _owned = machine
             .load_choreography_owned(&image, format!("bench/open/{idx}"))
             .expect("load choreography");
     }
-    vm.memory_usage()
+    machine.memory_usage()
 }
 
 pub(crate) fn run_repeated_open_wide_roles(
@@ -388,17 +388,17 @@ pub(crate) fn run_send_recv_workload(
     config: ProtocolMachineConfig,
     iterations: usize,
 ) -> ProtocolMachineMemoryUsage {
-    let mut vm = ProtocolMachine::new(config);
+    let mut machine = ProtocolMachine::new(config);
 
     for idx in 0..iterations {
-        let _owned = vm
+        let _owned = machine
             .load_choreography_owned(image, format!("bench/send_recv/{idx}"))
             .expect("load choreography");
     }
 
-    let status = vm.run(&BenchHandler, 100_000).expect("run vm");
+    let status = machine.run(&BenchHandler, 100_000).expect("run machine");
     assert!(matches!(status, RunStatus::AllDone));
-    vm.memory_usage()
+    machine.memory_usage()
 }
 
 pub(crate) fn run_choice_workload(
@@ -413,10 +413,10 @@ pub(crate) fn run_many_paused_scheduler_workload(
     num_roles: usize,
     yields_per_role: usize,
 ) -> ProtocolMachineMemoryUsage {
-    let mut vm = setup_many_paused_scheduler_vm(num_roles, yields_per_role);
-    let status = vm.run(&BenchHandler, 10_000).expect("run vm");
+    let mut machine = setup_many_paused_scheduler_vm(num_roles, yields_per_role);
+    let status = machine.run(&BenchHandler, 10_000).expect("run machine");
     assert!(matches!(status, RunStatus::Stuck));
-    vm.memory_usage()
+    machine.memory_usage()
 }
 
 pub(crate) fn setup_many_paused_scheduler_vm(
@@ -424,17 +424,17 @@ pub(crate) fn setup_many_paused_scheduler_vm(
     yields_per_role: usize,
 ) -> ProtocolMachine {
     let image = yield_image(num_roles, yields_per_role);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
-    let _owned = vm
+    let _owned = machine
         .load_choreography_owned(&image, "bench/many_paused")
         .expect("load choreography");
     for idx in 1..num_roles {
-        vm.pause_role(&format!("R{idx}"));
+        machine.pause_role(&format!("R{idx}"));
     }
-    vm
+    machine
 }
 
 pub(crate) fn run_pause_resume_churn_workload(
@@ -442,21 +442,21 @@ pub(crate) fn run_pause_resume_churn_workload(
     iterations: usize,
 ) -> ProtocolMachineMemoryUsage {
     let image = yield_image(num_roles, 4);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: capped_retention_config(),
         ..ProtocolMachineConfig::strict_large_fanout()
     });
-    let _owned = vm
+    let _owned = machine
         .load_choreography_owned(&image, "bench/pause_resume")
         .expect("load choreography");
     for idx in 1..num_roles {
-        vm.pause_role(&format!("R{idx}"));
+        machine.pause_role(&format!("R{idx}"));
     }
     for _ in 0..iterations {
-        vm.resume_role("R1");
-        vm.pause_role("R1");
+        machine.resume_role("R1");
+        machine.pause_role("R1");
     }
-    vm.memory_usage()
+    machine.memory_usage()
 }
 
 pub(crate) fn session_open_allocation_count(num_roles: usize) -> usize {
@@ -479,11 +479,11 @@ pub(crate) fn choreography_load_allocation_count(
 ) -> usize {
     let image = yield_image(num_roles, yields_per_role);
     let (_, allocations) = count_allocations(|| {
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::strict_large_fanout());
-        let _owned = vm
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::strict_large_fanout());
+        let _owned = machine
             .load_choreography_owned(&image, "bench/alloc")
             .expect("load choreography");
-        vm
+        machine
     });
     allocations
 }

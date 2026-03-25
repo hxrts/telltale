@@ -92,42 +92,42 @@ fn canonical_replay_fragment_is_stable_for_identical_runs() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = PassthroughHandler;
 
-    let mut vm_a = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm_a.load_choreography(&image).expect("load vm_a");
-    vm_a.run(&handler, 64).expect("run vm_a");
+    let mut machine_a = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine_a.load_choreography(&image).expect("load machine_a");
+    machine_a.run(&handler, 64).expect("run machine_a");
 
-    let mut vm_b = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm_b.load_choreography(&image).expect("load vm_b");
-    vm_b.run(&handler, 64).expect("run vm_b");
+    let mut machine_b = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine_b.load_choreography(&image).expect("load machine_b");
+    machine_b.run(&handler, 64).expect("run machine_b");
 
-    let lhs = serde_json::to_string(&vm_a.canonical_replay_fragment())
+    let lhs = serde_json::to_string(&machine_a.canonical_replay_fragment())
         .expect("serialize canonical replay fragment lhs");
-    let rhs = serde_json::to_string(&vm_b.canonical_replay_fragment())
+    let rhs = serde_json::to_string(&machine_b.canonical_replay_fragment())
         .expect("serialize canonical replay fragment rhs");
     assert_eq!(lhs, rhs, "canonical replay fragments should match");
     assert!(
-        vm_a.canonical_replay_fragment()
+        machine_a.canonical_replay_fragment()
             .semantic_audit_log
             .iter()
             .any(|record| matches!(record, SemanticAuditRecord::EffectObservation { .. })),
         "canonical replay fragments should retain structured semantic audit records"
     );
     assert!(
-        vm_a.canonical_replay_fragment()
+        machine_a.canonical_replay_fragment()
             .semantic_audit_log
             .iter()
             .any(|record| matches!(record, SemanticAuditRecord::Publication { .. })),
         "canonical replay fragments should retain canonical publication records"
     );
     assert!(
-        vm_a.canonical_replay_fragment()
+        machine_a.canonical_replay_fragment()
             .semantic_objects
             .schema_version
             == telltale_machine::SEMANTIC_OBJECTS_SCHEMA_VERSION,
         "canonical replay fragments should retain canonical semantic-object bundles"
     );
     assert!(
-        !vm_a
+        !machine_a
             .canonical_replay_fragment()
             .semantic_objects
             .publication_events
@@ -158,12 +158,12 @@ fn canonical_replay_fragment_sorts_topology_state() {
     );
     let handler = OrderedTopologyHandler::new(events);
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load vm");
-    vm.step_round(&handler, 1)
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load machine");
+    machine.step_round(&handler, 1)
         .expect("step with topology events");
 
-    let fragment = vm.canonical_replay_fragment();
+    let fragment = machine.canonical_replay_fragment();
     assert_eq!(
         fragment.schema_version,
         telltale_machine::serialization::SERIALIZATION_SCHEMA_VERSION
@@ -195,7 +195,7 @@ fn canonical_replay_fragment_sorts_topology_state() {
 }
 
 #[test]
-fn vm_config_schema_versions_remain_compatible() {
+fn protocol_machine_config_schema_versions_remain_compatible() {
     let default_cfg = serde_json::to_value(ProtocolMachineConfig::default())
         .expect("serialize default ProtocolMachine config");
 
@@ -217,8 +217,8 @@ fn vm_config_schema_versions_remain_compatible() {
         serde_json::from_value(v2_cfg).expect("decode schema version 2");
     assert_eq!(decoded_v2.config_schema_version, 2);
 
-    let vm = ProtocolMachine::new(decoded_v2);
-    assert_eq!(vm.config().config_schema_version, 2);
+    let machine = ProtocolMachine::new(decoded_v2);
+    assert_eq!(machine.config().config_schema_version, 2);
 }
 
 #[test]
@@ -292,11 +292,11 @@ fn semantic_object_bundle_roundtrips_through_replay_fragment() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = PassthroughHandler;
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load vm");
-    vm.run(&handler, 64).expect("run vm");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load machine");
+    machine.run(&handler, 64).expect("run machine");
 
-    let fragment = vm.canonical_replay_fragment();
+    let fragment = machine.canonical_replay_fragment();
     let encoded = serde_json::to_string(&fragment).expect("serialize replay fragment");
     let decoded: telltale_machine::CanonicalReplayFragmentV1 =
         serde_json::from_str(&encoded).expect("deserialize replay fragment");
@@ -306,7 +306,7 @@ fn semantic_object_bundle_roundtrips_through_replay_fragment() {
         telltale_machine::SEMANTIC_OBJECTS_SCHEMA_VERSION
     );
     assert!(
-        decoded.semantic_objects == vm.semantic_objects(),
+        decoded.semantic_objects == machine.semantic_objects(),
         "semantic object bundle should roundtrip exactly through replay-fragment serialization"
     );
     assert!(

@@ -127,7 +127,7 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
         ),
         (
             "../benches/protocol_machine_bench_runtime.rs",
-            "\"vm_run_yield_small\"",
+            "\"protocol_machine_run_yield_small\"",
         ),
         (
             "../benches/protocol_machine_bench_runtime.rs",

@@ -57,6 +57,10 @@ check_pattern "no VM struct/type names in Rust" \
   '\bVMConfig\b|\bVMState\b|\bVMError\b|\bVMKernel\b|\bThreadedVM\b' \
   rust/ --type rust
 
+check_pattern "no vm_ prefixed identifiers in Rust" \
+  '\bvm_[a-z]' \
+  rust/ --type rust
+
 # Cargo manifests
 check_pattern "no telltale-vm in Cargo manifests" \
   '\btelltale-vm\b' \

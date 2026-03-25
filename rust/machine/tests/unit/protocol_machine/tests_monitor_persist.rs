@@ -7,11 +7,11 @@
             dsts: vec![("A".to_string(), 0)],
         });
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        let err = vm
+        let err = machine
             .step_round(&handler, 1)
             .expect_err("open monitor precheck should fail");
         match err {
@@ -28,21 +28,21 @@
         let image = open_test_image(Instr::Invoke {
             action: InvokeAction::Reg(0),
         });
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).expect("load choreography");
-        vm.sessions_mut()
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).expect("load choreography");
+        machine.sessions_mut()
             .get_mut(sid)
             .expect("session exists")
             .edge_handlers
             .clear();
-        vm.sessions_mut()
+        machine.sessions_mut()
             .get_mut(sid)
             .expect("session exists")
             .default_handler
             .clear();
         let handler = PassthroughHandler;
 
-        let err = vm
+        let err = machine
             .step_round(&handler, 1)
             .expect_err("invoke should fault without default handler");
         match err {
@@ -56,17 +56,17 @@
 
     #[test]
     fn test_invoke_applies_persistence_delta_when_model_provides_one() {
-        let mut vm: ProtocolMachine<(), (), RecordingPersistence, DefaultVerificationModel> =
+        let mut machine: ProtocolMachine<(), (), RecordingPersistence, DefaultVerificationModel> =
             ProtocolMachine::new_with_models(ProtocolMachineConfig::default());
-        vm.apply_open_delta(0).expect("open delta");
-        vm.apply_invoke_delta(0, "Nat(7)").expect("invoke delta");
+        machine.apply_open_delta(0).expect("open delta");
+        machine.apply_invoke_delta(0, "Nat(7)").expect("invoke delta");
 
         assert!(
-            vm.persistent_state().iter().any(|d| d.starts_with("open:")),
+            machine.persistent_state().iter().any(|d| d.starts_with("open:")),
             "expected open delta to be applied"
         );
         assert!(
-            vm.persistent_state()
+            machine.persistent_state()
                 .iter()
                 .any(|d| d.starts_with("invoke:0:Nat(7)")),
             "expected invoke delta with action witness"
@@ -75,11 +75,11 @@
 
     #[test]
     fn test_close_applies_persistence_delta_when_model_provides_one() {
-        let mut vm: ProtocolMachine<(), (), RecordingPersistence, DefaultVerificationModel> =
+        let mut machine: ProtocolMachine<(), (), RecordingPersistence, DefaultVerificationModel> =
             ProtocolMachine::new_with_models(ProtocolMachineConfig::default());
-        vm.apply_close_delta(0).expect("close delta");
+        machine.apply_close_delta(0).expect("close delta");
         assert!(
-            vm.persistent_state()
+            machine.persistent_state()
                 .iter()
                 .any(|d| d.starts_with("close:0")),
             "expected close delta to be applied"
@@ -91,16 +91,16 @@
         let image = open_test_image(Instr::Invoke {
             action: InvokeAction::Reg(0),
         });
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
         let handler = PassthroughHandler;
 
-        vm.step_round(&handler, 1).expect("invoke step");
-        let check = vm
+        machine.step_round(&handler, 1).expect("invoke step");
+        let check = machine
             .output_condition_checks()
             .last()
             .expect("output-condition check recorded");
-        assert_eq!(check.meta.output_digest, "vm.output_digest.unspecified");
+        assert_eq!(check.meta.output_digest, "machine.output_digest.unspecified");
     }
 
     #[test]
@@ -153,15 +153,15 @@
         );
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
         // Run for enough steps to exercise several loop iterations.
-        vm.run(&handler, 200).unwrap();
+        machine.run(&handler, 200).unwrap();
 
         // Should not fault — recursive protocol with blocking should work.
-        assert!(vm
+        assert!(machine
             .coroutines
             .iter()
             .all(|c| !matches!(c.status, CoroStatus::Faulted(_))));
@@ -191,8 +191,8 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
 
@@ -203,11 +203,11 @@
             sid,
             role: "B".into(),
         };
-        let type_before = vm.sessions.lookup_type(&ep_b).cloned();
+        let type_before = machine.sessions.lookup_type(&ep_b).cloned();
 
         // Run to completion.
-        vm.run(&handler, 100).unwrap();
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+        machine.run(&handler, 100).unwrap();
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
 
         // Verify B's type was Recv before execution.
         assert!(matches!(type_before, Some(LocalTypeR::Recv { .. })));
@@ -219,17 +219,17 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
-        vm.pause_role("A");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
+        machine.pause_role("A");
 
         let ep_b = Endpoint {
             sid,
             role: "B".to_string(),
         };
-        let type_before = vm.sessions.lookup_type(&ep_b).cloned();
-        let trace_len_before = vm.obs_trace().len();
-        let b_pc_before = vm
+        let type_before = machine.sessions.lookup_type(&ep_b).cloned();
+        let trace_len_before = machine.obs_trace().len();
+        let b_pc_before = machine
             .coroutines
             .iter()
             .find(|c| c.role == "B")
@@ -237,11 +237,11 @@
             .pc;
 
         let handler = PassthroughHandler;
-        let step_result = vm.step(&handler).expect("step should succeed");
+        let step_result = machine.step(&handler).expect("step should succeed");
         assert!(matches!(step_result, StepResult::Continue));
 
-        let type_after = vm.sessions.lookup_type(&ep_b).cloned();
-        let b_coro_after = vm
+        let type_after = machine.sessions.lookup_type(&ep_b).cloned();
+        let b_coro_after = machine
             .coroutines
             .iter()
             .find(|c| c.role == "B")
@@ -255,7 +255,7 @@
         );
         assert_eq!(
             trace_len_before,
-            vm.obs_trace().len(),
+            machine.obs_trace().len(),
             "blocked step emitted observable events"
         );
     }
@@ -266,30 +266,30 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
-        vm.pause_role("B");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
+        machine.pause_role("B");
 
         let ep_a = Endpoint {
             sid,
             role: "A".to_string(),
         };
-        let type_before = vm.sessions.lookup_type(&ep_a).cloned();
+        let type_before = machine.sessions.lookup_type(&ep_a).cloned();
 
         let handler = FailingSendHandler;
-        let result = vm.step(&handler);
+        let result = machine.step(&handler);
         assert!(matches!(result, Err(ProtocolMachineError::Fault { .. })));
 
-        let type_after = vm.sessions.lookup_type(&ep_a).cloned();
+        let type_after = machine.sessions.lookup_type(&ep_a).cloned();
         assert_eq!(type_before, type_after, "faulted step advanced type state");
         assert!(
-            vm.obs_trace()
+            machine.obs_trace()
                 .iter()
                 .any(|event| matches!(event, ObsEvent::FailureBranchEntered { .. })),
             "faulted step must emit explicit failure-branch event"
         );
         assert!(
-            vm.obs_trace()
+            machine.obs_trace()
                 .iter()
                 .any(|event| matches!(event, ObsEvent::Faulted { .. })),
             "faulted step must emit Faulted trace event"
@@ -302,9 +302,9 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
-        vm.pause_role("B");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
+        machine.pause_role("B");
 
         let ep_a = Endpoint {
             sid,
@@ -312,15 +312,15 @@
         };
 
         let handler = PassthroughHandler;
-        vm.step(&handler).expect("single send step should succeed");
+        machine.step(&handler).expect("single send step should succeed");
 
-        let session = vm.sessions().get(sid).expect("session should exist");
+        let session = machine.sessions().get(sid).expect("session should exist");
         assert!(
             session.has_message("A", "B"),
             "committed send must enqueue message"
         );
         assert!(
-            vm.obs_trace().iter().any(|event| {
+            machine.obs_trace().iter().any(|event| {
                 matches!(
                     event,
                     ObsEvent::Sent {
@@ -335,7 +335,7 @@
             "committed send must emit matching Sent trace event"
         );
         assert!(
-            matches!(vm.sessions.lookup_type(&ep_a), Some(LocalTypeR::End)),
+            matches!(machine.sessions.lookup_type(&ep_a), Some(LocalTypeR::End)),
             "committed send must advance sender type"
         );
     }
@@ -348,16 +348,16 @@
         let image1 = CodeImage::from_local_types(&local_types, &global);
         let image2 = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid1 = vm.load_choreography(&image1).unwrap();
-        let sid2 = vm.load_choreography(&image2).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid1 = machine.load_choreography(&image1).unwrap();
+        let sid2 = machine.load_choreography(&image2).unwrap();
 
         assert_ne!(sid1, sid2);
-        assert_eq!(vm.coroutines.len(), 4);
+        assert_eq!(machine.coroutines.len(), 4);
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 200).unwrap();
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+        machine.run(&handler, 200).unwrap();
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
     }
 
     #[test]
@@ -424,20 +424,20 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
 
         // Verify events include Sent (from Choose) and Received (from Offer).
-        let sent = vm
+        let sent = machine
             .obs_trace
             .iter()
             .any(|e| matches!(e, ObsEvent::Sent { label, .. } if label == "yes"));
-        let recv = vm
+        let recv = machine
             .obs_trace
             .iter()
             .any(|e| matches!(e, ObsEvent::Received { label, .. } if label == "yes"));
@@ -486,12 +486,12 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+        machine.run(&handler, 100).unwrap();
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
     }
 
     #[test]
@@ -538,21 +538,21 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
-        let closed_count = vm
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
+        let closed_count = machine
             .obs_trace
             .iter()
             .filter(|e| matches!(e, ObsEvent::Closed { .. }))
             .count();
         assert!(closed_count >= 1, "expected at least one Closed event");
         assert!(
-            vm.obs_trace.iter().any(|event| matches!(
+            machine.obs_trace.iter().any(|event| matches!(
                 event,
                 ObsEvent::SessionTerminal {
                     reason: SessionTerminalReason::Closed { .. },

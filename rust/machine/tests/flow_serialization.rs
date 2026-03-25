@@ -77,7 +77,7 @@ fn dynamic_flow_predicate_is_not_serializable() {
 }
 
 #[test]
-fn vm_config_with_dynamic_flow_predicate_is_not_serializable() {
+fn protocol_machine_config_with_dynamic_flow_predicate_is_not_serializable() {
     let cfg = ProtocolMachineConfig {
         flow_policy: FlowPolicy::predicate(|knowledge, target| {
             knowledge.fact.contains("secret") && target.starts_with("Obs")
@@ -95,7 +95,7 @@ fn vm_config_with_dynamic_flow_predicate_is_not_serializable() {
 }
 
 #[test]
-fn vm_config_schema_version_defaults_when_missing() {
+fn protocol_machine_config_schema_version_defaults_when_missing() {
     let mut encoded = serde_json::to_value(ProtocolMachineConfig::default())
         .expect("serialize default ProtocolMachine config");
     let obj = encoded
@@ -109,7 +109,7 @@ fn vm_config_schema_version_defaults_when_missing() {
 }
 
 #[test]
-fn vm_config_optional_hooks_have_deterministic_defaults() {
+fn protocol_machine_config_optional_hooks_have_deterministic_defaults() {
     let mut encoded = serde_json::to_value(ProtocolMachineConfig::default())
         .expect("serialize default ProtocolMachine config");
     let obj = encoded
@@ -175,7 +175,7 @@ fn named_strict_profiles_encode_explicit_runtime_modes() {
 
 #[test]
 #[should_panic(expected = "max_sessions must be > 0")]
-fn vm_new_rejects_invalid_config() {
+fn protocol_machine_new_rejects_invalid_config() {
     let cfg = ProtocolMachineConfig {
         max_sessions: 0,
         ..ProtocolMachineConfig::default()

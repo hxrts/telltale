@@ -79,10 +79,10 @@ struct RustStepState {
     session_type_deltas: BTreeMap<u64, i64>,
 }
 
-fn session_type_counts(vm: &ProtocolMachine) -> BTreeMap<u64, u64> {
+fn session_type_counts(machine: &ProtocolMachine) -> BTreeMap<u64, u64> {
     let mut out = BTreeMap::new();
-    for sid in vm.sessions().session_ids() {
-        if let Some(sess) = vm.sessions().get(sid) {
+    for sid in machine.sessions().session_ids() {
+        if let Some(sess) = machine.sessions().get(sid) {
             if !matches!(sess.status, SessionStatus::Cancelled) {
                 out.insert(sid as u64, sess.local_types.len() as u64);
             }
@@ -228,17 +228,17 @@ fn run_rust_step_states(
     max_steps: usize,
 ) -> Result<Vec<RustStepState>, String> {
     let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).map_err(|e| e.to_string())?;
+    machine.load_choreography(&image).map_err(|e| e.to_string())?;
 
     let mut out = Vec::new();
     for step_index in 0..max_steps {
-        let old_len = vm.trace().len();
-        let before_counts = session_type_counts(&vm);
-        let status = vm.step(&PassthroughHandler).map_err(|e| e.to_string())?;
+        let old_len = machine.trace().len();
+        let before_counts = session_type_counts(&machine);
+        let status = machine.step(&PassthroughHandler).map_err(|e| e.to_string())?;
         let status = match status {
             StepResult::Continue => "continue",
             StepResult::Stuck => "stuck",
@@ -246,7 +246,7 @@ fn run_rust_step_states(
         }
         .to_string();
 
-        let event = vm
+        let event = machine
             .trace()
             .get(old_len)
             .and_then(obs_to_semantic_audit_event)
@@ -255,9 +255,9 @@ fn run_rust_step_states(
                 event,
             });
 
-        let after_counts = session_type_counts(&vm);
+        let after_counts = session_type_counts(&machine);
         let deltas = session_type_deltas(&before_counts, &after_counts);
-        let step_meta = vm.last_sched_step().cloned();
+        let step_meta = machine.last_sched_step().cloned();
 
         out.push(RustStepState {
             step_index: step_index as u64,

@@ -12,7 +12,7 @@ use crate::owned::OwnedSession;
 #[doc(alias = "GuestRuntime")]
 #[derive(Debug)]
 pub struct NativeSingleThreadDriver {
-    vm: ProtocolMachine,
+    machine: ProtocolMachine,
 }
 
 impl NativeSingleThreadDriver {
@@ -20,20 +20,20 @@ impl NativeSingleThreadDriver {
     #[must_use]
     pub fn new(config: ProtocolMachineConfig) -> Self {
         Self {
-            vm: ProtocolMachine::new(config),
+            machine: ProtocolMachine::new(config),
         }
     }
 
     /// Wrap an existing protocol-machine instance inside this guest runtime.
     #[must_use]
-    pub fn with_vm(vm: ProtocolMachine) -> Self {
-        Self { vm }
+    pub fn with_vm(machine: ProtocolMachine) -> Self {
+        Self { machine }
     }
 
     /// Access the inner protocol machine.
     #[must_use]
-    pub fn vm(&self) -> &ProtocolMachine {
-        &self.vm
+    pub fn machine(&self) -> &ProtocolMachine {
+        &self.machine
     }
 
     /// Preferred choreography open path that returns an ownership-bearing handle.
@@ -46,7 +46,7 @@ impl NativeSingleThreadDriver {
         image: &CodeImage,
         owner_id: impl Into<String>,
     ) -> Result<OwnedSession, ProtocolMachineError> {
-        self.vm.load_choreography_owned(image, owner_id)
+        self.machine.load_choreography_owned(image, owner_id)
     }
 
     /// Execute one scheduler round via the protocol-machine kernel.
@@ -59,7 +59,7 @@ impl NativeSingleThreadDriver {
         handler: &dyn EffectHandler,
         n: usize,
     ) -> Result<StepResult, ProtocolMachineError> {
-        ProtocolMachineKernel::step_round(&mut self.vm, handler, n)
+        ProtocolMachineKernel::step_round(&mut self.machine, handler, n)
     }
 
     /// Run up to `max_rounds` with concurrency `n` via the protocol-machine kernel.
@@ -73,12 +73,12 @@ impl NativeSingleThreadDriver {
         max_rounds: usize,
         n: usize,
     ) -> Result<RunStatus, ProtocolMachineError> {
-        ProtocolMachineKernel::run_concurrent(&mut self.vm, handler, max_rounds, n)
+        ProtocolMachineKernel::run_concurrent(&mut self.machine, handler, max_rounds, n)
     }
 
     /// Borrow the observable trace.
     #[must_use]
     pub fn trace(&self) -> &[ObsEvent] {
-        self.vm.trace()
+        self.machine.trace()
     }
 }

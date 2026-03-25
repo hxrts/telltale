@@ -136,7 +136,7 @@ impl WasmProtocolMachine {
 
     /// Get canonical semantic objects as JSON.
     pub fn semantic_objects_json(&self) -> Result<String, JsValue> {
-        serde_json::to_string(&self.inner.vm().semantic_objects())
+        serde_json::to_string(&self.inner.machine().semantic_objects())
             .map_err(|e| JsValue::from_str(&e.to_string()))
     }
 }

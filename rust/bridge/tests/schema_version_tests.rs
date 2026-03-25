@@ -8,7 +8,7 @@ use telltale_bridge::{
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[test]
-fn vm_run_input_roundtrip_preserves_schema_version() {
+fn protocol_machine_run_input_roundtrip_preserves_schema_version() {
     let input = ProtocolMachineRunInput {
         schema_version: LEAN_BRIDGE_SCHEMA_VERSION.to_string(),
         choreographies: vec![ChoreographyJson {
@@ -183,7 +183,7 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
 }
 
 #[test]
-fn vm_run_output_roundtrip_preserves_semantic_objects() {
+fn protocol_machine_run_output_roundtrip_preserves_semantic_objects() {
     let payload = json!({
         "schema_version": LEAN_BRIDGE_SCHEMA_VERSION,
         "trace": [],

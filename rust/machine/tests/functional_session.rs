@@ -43,14 +43,14 @@ fn simple_send_recv_types() -> BTreeMap<String, LocalTypeR> {
 #[test]
 fn test_session_active_to_closed() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // After completion, session should still be accessible.
-    let session = vm.sessions().get(sid).unwrap();
+    let session = machine.sessions().get(sid).unwrap();
     // Status is Active since we didn't explicitly close.
     assert_matches!(session.status, SessionStatus::Active);
 }
@@ -124,22 +124,22 @@ fn test_active_count_tracks_sessions() {
 
 #[test]
 fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_state() {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
         .load_choreography(&test_support::simple_send_recv_image("A", "B", "msg"))
         .expect("load choreography");
 
-    vm.sessions_mut().close(sid).expect("close session");
-    let coro_ids: Vec<usize> = vm
+    machine.sessions_mut().close(sid).expect("close session");
+    let coro_ids: Vec<usize> = machine
         .session_coroutines(sid)
         .iter()
         .map(|coro| coro.id)
         .collect();
     for coro_id in &coro_ids {
-        vm.coroutine_mut(*coro_id).expect("coroutine exists").status = CoroStatus::Done;
+        machine.coroutine_mut(*coro_id).expect("coroutine exists").status = CoroStatus::Done;
     }
 
-    let before = vm.memory_usage();
+    let before = machine.memory_usage();
     assert_eq!(before.session_store.live_sessions, 1);
     assert_eq!(before.session_store.live_closed_sessions, 1);
     assert_eq!(before.coroutine_records, coro_ids.len());
@@ -147,14 +147,14 @@ fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_sta
     assert!(before.retained_bytes.session_store > 0);
     assert!(before.retained_bytes.coroutines > 0);
 
-    let reaped = vm.reap_closed_sessions();
+    let reaped = machine.reap_closed_sessions();
     assert_eq!(reaped.len(), 1);
     assert_eq!(reaped[0].sid, sid);
-    assert_eq!(vm.live_session_count(), 0);
-    assert_eq!(vm.coroutine_count(), 0);
-    assert!(vm.wf_vm_state().is_ok());
+    assert_eq!(machine.live_session_count(), 0);
+    assert_eq!(machine.coroutine_count(), 0);
+    assert!(machine.wf_vm_state().is_ok());
 
-    let after = vm.memory_usage();
+    let after = machine.memory_usage();
     assert_eq!(after.session_store.live_sessions, 0);
     assert_eq!(after.session_store.live_closed_sessions, 0);
     assert_eq!(after.session_store.archived_closed_sessions, 1);
@@ -166,15 +166,15 @@ fn test_vm_reap_closed_sessions_removes_terminal_coroutines_and_live_session_sta
 
 #[test]
 fn test_vm_reap_closed_sessions_skips_nonterminal_coroutines() {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
         .load_choreography(&test_support::simple_send_recv_image("A", "B", "msg"))
         .expect("load choreography");
 
-    vm.sessions_mut().close(sid).expect("close session");
-    let reaped = vm.reap_closed_sessions();
+    machine.sessions_mut().close(sid).expect("close session");
+    let reaped = machine.reap_closed_sessions();
     assert!(reaped.is_empty());
-    assert_eq!(vm.live_session_count(), 1);
+    assert_eq!(machine.live_session_count(), 1);
 }
 
 #[test]
@@ -222,22 +222,22 @@ fn test_vm_observability_retention_capped_keeps_latest_suffix_in_order() {
 #[test]
 fn test_vm_observability_retention_disabled_drops_storage_without_changing_faults() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: ObservabilityRetentionConfig {
             mode: ObservabilityRetentionMode::Disabled,
             capacity: 1,
         },
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image).expect("load choreography");
-    vm.run(&PassthroughHandler, 100).expect("run choreography");
+    machine.load_choreography(&image).expect("load choreography");
+    machine.run(&PassthroughHandler, 100).expect("run choreography");
 
-    assert!(vm.trace().is_empty());
-    assert!(vm.effect_trace().is_empty());
-    assert!(vm.output_condition_checks().is_empty());
-    assert!(vm.communication_consumption_artifacts().is_empty());
+    assert!(machine.trace().is_empty());
+    assert!(machine.effect_trace().is_empty());
+    assert!(machine.output_condition_checks().is_empty());
+    assert!(machine.communication_consumption_artifacts().is_empty());
 
-    let usage = vm.memory_usage();
+    let usage = machine.memory_usage();
     assert_eq!(usage.obs_events, 0);
     assert_eq!(usage.effect_trace_entries, 0);
     assert_eq!(usage.output_condition_checks, 0);
@@ -249,31 +249,31 @@ fn test_vm_observability_retention_disabled_drops_storage_without_changing_fault
 #[test]
 fn test_vm_reuses_immutable_program_storage_across_identical_loads() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 
-    let sid1 = vm.load_choreography(&image).expect("load choreography");
-    let usage_after_first = vm.memory_usage();
-    assert_eq!(vm.unique_program_count(), 2);
+    let sid1 = machine.load_choreography(&image).expect("load choreography");
+    let usage_after_first = machine.memory_usage();
+    assert_eq!(machine.unique_program_count(), 2);
     let program_instruction_count = usage_after_first.program_instruction_count;
     assert!(program_instruction_count > 0);
 
-    let sid2 = vm.load_choreography(&image).expect("load choreography");
-    let usage_after_second = vm.memory_usage();
+    let sid2 = machine.load_choreography(&image).expect("load choreography");
+    let usage_after_second = machine.memory_usage();
 
     assert_ne!(sid1, sid2);
-    assert_eq!(vm.unique_program_count(), 2);
+    assert_eq!(machine.unique_program_count(), 2);
     assert_eq!(
         usage_after_second.program_instruction_count,
         program_instruction_count
     );
-    assert_eq!(vm.coroutine_count(), 4);
+    assert_eq!(machine.coroutine_count(), 4);
 }
 
 #[test]
 fn test_vm_session_churn_with_reaping_and_capped_retention_stays_bounded() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
     let cap = 8;
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         observability_retention: ObservabilityRetentionConfig {
             mode: ObservabilityRetentionMode::Capped,
             capacity: cap,
@@ -283,22 +283,22 @@ fn test_vm_session_churn_with_reaping_and_capped_retention_stays_bounded() {
     let handler = PassthroughHandler;
 
     for _ in 0..32 {
-        let sid = vm.load_choreography(&image).expect("load choreography");
-        vm.run(&handler, 100).expect("run choreography");
-        vm.sessions_mut().close(sid).expect("close session");
-        let coro_ids: Vec<usize> = vm
+        let sid = machine.load_choreography(&image).expect("load choreography");
+        machine.run(&handler, 100).expect("run choreography");
+        machine.sessions_mut().close(sid).expect("close session");
+        let coro_ids: Vec<usize> = machine
             .session_coroutines(sid)
             .iter()
             .map(|coro| coro.id)
             .collect();
         for coro_id in coro_ids {
-            vm.coroutine_mut(coro_id).expect("coroutine exists").status = CoroStatus::Done;
+            machine.coroutine_mut(coro_id).expect("coroutine exists").status = CoroStatus::Done;
         }
 
-        let reaped = vm.reap_closed_sessions();
+        let reaped = machine.reap_closed_sessions();
         assert_eq!(reaped.len(), 1);
 
-        let usage = vm.memory_usage();
+        let usage = machine.memory_usage();
         assert_eq!(usage.session_store.live_sessions, 0);
         assert_eq!(usage.session_store.live_closed_sessions, 0);
         assert_eq!(usage.coroutine_records, 0);
@@ -439,9 +439,9 @@ fn test_two_sessions_independent_types() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid1 = vm.load_choreography(&image1).unwrap();
-    let sid2 = vm.load_choreography(&image2).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid1 = machine.load_choreography(&image1).unwrap();
+    let sid2 = machine.load_choreography(&image2).unwrap();
 
     let ep1a = Endpoint {
         sid: sid1,
@@ -453,18 +453,18 @@ fn test_two_sessions_independent_types() {
     };
 
     // Types should be independent.
-    let t1 = vm.sessions().lookup_type(&ep1a).cloned();
-    let t2 = vm.sessions().lookup_type(&ep2a).cloned();
+    let t1 = machine.sessions().lookup_type(&ep1a).cloned();
+    let t2 = machine.sessions().lookup_type(&ep2a).cloned();
 
     assert_matches!(t1, Some(LocalTypeR::Send { .. }));
     assert_matches!(t2, Some(LocalTypeR::Send { .. }));
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 200).unwrap();
+    machine.run(&handler, 200).unwrap();
 
     // Both completed independently.
-    assert!(vm.sessions().lookup_type(&ep1a).is_none());
-    assert!(vm.sessions().lookup_type(&ep2a).is_none());
+    assert!(machine.sessions().lookup_type(&ep1a).is_none());
+    assert!(machine.sessions().lookup_type(&ep2a).is_none());
 }
 
 #[test]
@@ -496,17 +496,17 @@ fn test_two_sessions_independent_buffers() {
 fn test_three_sessions_complete_independently() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid1 = vm.load_choreography(&image).unwrap();
-    let sid2 = vm.load_choreography(&image).unwrap();
-    let sid3 = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid1 = machine.load_choreography(&image).unwrap();
+    let sid2 = machine.load_choreography(&image).unwrap();
+    let sid3 = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 500).unwrap();
+    machine.run(&handler, 500).unwrap();
 
     for sid in [sid1, sid2, sid3] {
         assert!(
-            vm.session_coroutines(sid).iter().all(|c| c.is_terminal()),
+            machine.session_coroutines(sid).iter().all(|c| c.is_terminal()),
             "session {sid} should have all terminal coroutines"
         );
     }

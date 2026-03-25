@@ -101,16 +101,16 @@ impl EffectHandler for TopologyBurstHandler {
 fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
     let image = simple_send_recv_image("A", "B", "m");
     let handler = TopologyBurstHandler::new();
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load choreography");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load choreography");
 
-    vm.step_round(&handler, 1).expect("step round");
+    machine.step_round(&handler, 1).expect("step round");
 
-    assert!(vm.crashed_sites().iter().any(|site| site == "A"));
-    assert!(vm
+    assert!(machine.crashed_sites().iter().any(|site| site == "A"));
+    assert!(machine
         .partitioned_edges()
         .contains(&("A".to_string(), "B".to_string())));
-    let effects = vm.effect_trace();
+    let effects = machine.effect_trace();
     assert!(
         effects
             .first()
@@ -184,16 +184,16 @@ cfg_if! {
         fn threaded_vm_ingests_topology_events_before_instruction_effects() {
             let image = simple_send_recv_image("A", "B", "m");
             let handler = TopologyBurstHandler::new();
-            let mut vm = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
-            vm.load_choreography(&image).expect("load choreography");
+            let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+            machine.load_choreography(&image).expect("load choreography");
 
-            vm.step_round(&handler, 1).expect("step round");
+            machine.step_round(&handler, 1).expect("step round");
 
-            assert!(vm.crashed_sites().contains("A"));
-            assert!(vm
+            assert!(machine.crashed_sites().contains("A"));
+            assert!(machine
                 .partitioned_edges()
                 .contains(&("A".to_string(), "B".to_string())));
-            let effects = vm.effect_trace();
+            let effects = machine.effect_trace();
             assert!(
                 effects
                     .first()

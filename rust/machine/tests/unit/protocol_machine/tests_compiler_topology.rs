@@ -128,13 +128,13 @@
             local_types,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
-        assert!(vm.coroutines.iter().all(|c| c.is_terminal()));
+        assert!(machine.coroutines.iter().all(|c| c.is_terminal()));
     }
 
     #[test]
@@ -186,14 +186,14 @@
         };
         let image = CodeImage::from_local_types(&projected, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
         // Don't unwrap — just run to completion
-        let _ignored = vm.run(&handler, 500);
+        let _ignored = machine.run(&handler, 500);
 
-        let faults: Vec<_> = vm
+        let faults: Vec<_> = machine
             .obs_trace
             .iter()
             .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -207,14 +207,14 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             output_condition_policy: OutputConditionPolicy::DenyAll,
             ..ProtocolMachineConfig::default()
         });
-        let _sid = vm.load_choreography(&image).unwrap();
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        let result = vm.run(&handler, 10);
+        let result = machine.run(&handler, 10);
         assert!(result.is_err());
         assert!(
             matches!(
@@ -226,10 +226,10 @@
             ),
             "expected output-condition fault, got: {result:?}"
         );
-        assert!(vm
+        assert!(machine
             .output_condition_checks()
             .iter()
-            .any(|c| c.meta.predicate_ref == "vm.observable_output" && !c.passed));
+            .any(|c| c.meta.predicate_ref == "machine.observable_output" && !c.passed));
     }
 
     #[test]
@@ -238,20 +238,20 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-                "vm.observable_output".to_string(),
+                "machine.observable_output".to_string(),
             ]),
             ..ProtocolMachineConfig::default()
         });
-        let _sid = vm.load_choreography(&image).unwrap();
+        let _sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
-        assert!(vm
+        machine.run(&handler, 100).unwrap();
+        assert!(machine
             .output_condition_checks()
             .iter()
-            .any(|c| c.meta.predicate_ref == "vm.observable_output" && c.passed));
+            .any(|c| c.meta.predicate_ref == "machine.observable_output" && c.passed));
     }
 
     #[test]
@@ -260,12 +260,12 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let _sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let _sid = machine.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
-        let kinds: Vec<_> = vm
+        let kinds: Vec<_> = machine
             .effect_trace()
             .iter()
             .map(|e| e.effect_kind.as_str())
@@ -280,15 +280,15 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             effect_trace_capture_mode: EffectTraceCaptureMode::Disabled,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
-        vm.run(&PassthroughHandler, 100)
+        machine.load_choreography(&image).expect("load choreography");
+        machine.run(&PassthroughHandler, 100)
             .expect("run should succeed");
 
-        assert!(vm.effect_trace().is_empty());
+        assert!(machine.effect_trace().is_empty());
     }
 
     #[test]
@@ -297,16 +297,16 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             effect_trace_capture_mode: EffectTraceCaptureMode::TopologyOnly,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
-        vm.run(&TimeoutOnTickOneHandler, 100)
+        machine.load_choreography(&image).expect("load choreography");
+        machine.run(&TimeoutOnTickOneHandler, 100)
             .expect("run should succeed");
 
-        assert!(!vm.effect_trace().is_empty());
-        assert!(vm
+        assert!(!machine.effect_trace().is_empty());
+        assert!(machine
             .effect_trace()
             .iter()
             .all(|entry| entry.effect_kind == "topology_event"));
@@ -318,13 +318,13 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             host_contract_assertions: true,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
 
-        let err = vm
+        let err = machine
             .step(&IdentityFlappingHandler::new())
             .expect_err("identity change should fail with assertions enabled");
         match err {
@@ -347,13 +347,13 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             host_contract_assertions: true,
             ..ProtocolMachineConfig::default()
         });
-        vm.load_choreography(&image).expect("load choreography");
+        machine.load_choreography(&image).expect("load choreography");
 
-        let err = vm
+        let err = machine
             .step(&UnsortedTopologyHandler)
             .expect_err("unsorted topology events should fail with assertions enabled");
         match err {
@@ -371,15 +371,15 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
 
-        let a_idx = vm
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
             .expect("A coroutine exists");
-        let b_idx = vm
+        let b_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "B")
@@ -389,15 +389,15 @@
             sid,
             role: "A".to_string(),
         };
-        vm.coroutines[a_idx]
+        machine.coroutines[a_idx]
             .progress_tokens
             .push(ProgressToken::for_endpoint(ep_a.clone()));
-        vm.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a.clone());
-        vm.coroutines[a_idx].regs[3] =
-            Value::Nat(u64::try_from(vm.coroutines[b_idx].id).expect("coroutine id fits in u64"));
+        machine.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a.clone());
+        machine.coroutines[a_idx].regs[3] =
+            Value::Nat(u64::try_from(machine.coroutines[b_idx].id).expect("coroutine id fits in u64"));
 
-        let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Transfer {
                 endpoint: 2,
                 target: 3,
@@ -408,21 +408,21 @@
 
         let handler = PassthroughHandler;
         // Intentionally discard StepResult: we only care that the step executes without panic
-        let _ignored = vm.step(&handler).expect("transfer step should succeed");
+        let _ignored = machine.step(&handler).expect("transfer step should succeed");
 
-        assert!(vm.coroutines[a_idx].progress_tokens.is_empty());
-        assert!(vm.coroutines[b_idx]
+        assert!(machine.coroutines[a_idx].progress_tokens.is_empty());
+        assert!(machine.coroutines[b_idx]
             .progress_tokens
             .iter()
             .any(|t| t.sid == sid && t.endpoint == ep_a));
-        let audit = vm
+        let audit = machine
             .delegation_audit_log()
             .last()
             .expect("delegation audit should be recorded");
         assert_eq!(audit.status, DelegationStatus::Committed);
         assert_eq!(audit.receipt.session, sid);
-        assert_eq!(audit.receipt.from_coro, vm.coroutines[a_idx].id);
-        assert_eq!(audit.receipt.to_coro, vm.coroutines[b_idx].id);
+        assert_eq!(audit.receipt.from_coro, machine.coroutines[a_idx].id);
+        assert_eq!(audit.receipt.to_coro, machine.coroutines[b_idx].id);
         assert_eq!(
             audit.receipt.scope,
             OwnershipScope::Fragments(BTreeSet::from(["A".to_string()]))
@@ -435,15 +435,15 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
 
-        let a_idx = vm
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
             .expect("A coroutine exists");
-        let b_idx = vm
+        let b_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "B")
@@ -453,13 +453,13 @@
             sid,
             role: "A".to_string(),
         };
-        vm.coroutines[b_idx].owned_endpoints.push(ep_a.clone());
-        vm.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a);
-        vm.coroutines[a_idx].regs[3] =
-            Value::Nat(u64::try_from(vm.coroutines[b_idx].id).expect("coroutine id fits in u64"));
+        machine.coroutines[b_idx].owned_endpoints.push(ep_a.clone());
+        machine.coroutines[a_idx].regs[2] = Value::Endpoint(ep_a);
+        machine.coroutines[a_idx].regs[3] =
+            Value::Nat(u64::try_from(machine.coroutines[b_idx].id).expect("coroutine id fits in u64"));
 
-        let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Transfer {
                 endpoint: 2,
                 target: 3,
@@ -468,7 +468,7 @@
             Instr::Halt,
         ]);
 
-        let err = vm
+        let err = machine
             .step(&PassthroughHandler)
             .expect_err("transfer must fail");
         match err {
@@ -491,16 +491,16 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid1 = vm.load_choreography(&image).unwrap();
-        let sid2 = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid1 = machine.load_choreography(&image).unwrap();
+        let sid2 = machine.load_choreography(&image).unwrap();
 
-        let a1_idx = vm
+        let a1_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A" && c.session_id == sid1)
             .expect("A coroutine for session 1 exists");
-        let b2_idx = vm
+        let b2_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "B" && c.session_id == sid2)
@@ -510,12 +510,12 @@
             sid: sid1,
             role: "A".to_string(),
         };
-        vm.coroutines[a1_idx].regs[2] = Value::Endpoint(ep_a.clone());
-        vm.coroutines[a1_idx].regs[3] =
-            Value::Nat(u64::try_from(vm.coroutines[b2_idx].id).expect("coroutine id fits in u64"));
+        machine.coroutines[a1_idx].regs[2] = Value::Endpoint(ep_a.clone());
+        machine.coroutines[a1_idx].regs[3] =
+            Value::Nat(u64::try_from(machine.coroutines[b2_idx].id).expect("coroutine id fits in u64"));
 
-        let a_program_id = vm.coroutines[a1_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a1_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Transfer {
                 endpoint: 2,
                 target: 3,
@@ -524,7 +524,7 @@
             Instr::Halt,
         ]);
 
-        let err = vm
+        let err = machine
             .step(&PassthroughHandler)
             .expect_err("cross-session transfer must fail");
         match err {
@@ -541,15 +541,15 @@
         }
 
         assert!(
-            vm.coroutines[a1_idx].owned_endpoints.contains(&ep_a),
+            machine.coroutines[a1_idx].owned_endpoints.contains(&ep_a),
             "source endpoint ownership must remain intact on failed validation"
         );
         assert!(
-            !vm.coroutines[b2_idx].owned_endpoints.contains(&ep_a),
+            !machine.coroutines[b2_idx].owned_endpoints.contains(&ep_a),
             "cross-session target must not receive endpoint ownership"
         );
         assert!(
-            vm.delegation_audit_log().is_empty(),
+            machine.delegation_audit_log().is_empty(),
             "failed prevalidation should not emit a committed delegation record"
         );
     }
@@ -560,8 +560,8 @@
         let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let owned = vm
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let owned = machine
             .load_choreography_owned(&image, "runtime/owner")
             .expect("owned open should succeed");
         assert_eq!(owned.capability().owner_id, "runtime/owner");
@@ -570,7 +570,7 @@
         let edge = Edge::new(owned.session_id(), "A", "B");
         owned
             .apply_host_mutation(
-                &mut vm,
+                &mut machine,
                 SessionHostMutation::UpdateTrace {
                     edge: edge.clone(),
                     trace: vec![ValType::Nat],
@@ -578,18 +578,18 @@
             )
             .expect("owned mutation should succeed");
         assert_eq!(
-            vm.sessions().lookup_trace(&edge),
+            machine.sessions().lookup_trace(&edge),
             Some([ValType::Nat].as_slice())
         );
     }
 
     #[test]
     fn test_host_contract_assertions_reject_unaudited_transfer_events() {
-        let vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let machine = ProtocolMachine::new(ProtocolMachineConfig {
             host_contract_assertions: true,
             ..ProtocolMachineConfig::default()
         });
-        let err = vm
+        let err = machine
             .assert_delegation_events_audited(&[ObsEvent::Transferred {
                 tick: 0,
                 session: 9,
@@ -619,13 +619,13 @@
 
         let mut denied_roles = BTreeSet::new();
         denied_roles.insert("Observer".to_string());
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
             flow_policy: FlowPolicy::DenyRoles(denied_roles),
             ..ProtocolMachineConfig::default()
         });
-        let sid = vm.load_choreography(&image).unwrap();
+        let sid = machine.load_choreography(&image).unwrap();
 
-        let a_idx = vm
+        let a_idx = machine
             .coroutines
             .iter()
             .position(|c| c.role == "A")
@@ -635,20 +635,20 @@
             role: "A".to_string(),
         };
 
-        vm.coroutines[a_idx]
+        machine.coroutines[a_idx]
             .knowledge_set
             .push(crate::coroutine::KnowledgeFact {
                 endpoint: ep_a.clone(),
                 fact: "secret".to_string(),
             });
-        vm.coroutines[a_idx].regs[2] = Value::Prod(
+        machine.coroutines[a_idx].regs[2] = Value::Prod(
             Box::new(Value::Endpoint(ep_a)),
             Box::new(Value::Str("secret".to_string())),
         );
-        vm.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
+        machine.coroutines[a_idx].regs[3] = Value::Str("Observer".to_string());
 
-        let a_program_id = vm.coroutines[a_idx].program_id;
-        vm.replace_program_for_test(a_program_id, vec![
+        let a_program_id = machine.coroutines[a_idx].program_id;
+        machine.replace_program_for_test(a_program_id, vec![
             Instr::Check {
                 knowledge: 2,
                 target: 3,
@@ -659,6 +659,6 @@
 
         let handler = PassthroughHandler;
         // Intentionally discard StepResult: we only care that the step executes without panic
-        let _ignored = vm.step(&handler).expect("check step should succeed");
-        assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(false));
+        let _ignored = machine.step(&handler).expect("check step should succeed");
+        assert_eq!(machine.coroutines[a_idx].regs[4], Value::Bool(false));
     }

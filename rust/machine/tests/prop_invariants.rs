@@ -70,15 +70,15 @@ fn prop_send_advances_to_continuation() {
         let global = GlobalType::send(&s, &r, Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
         // After send, sender's type should have been removed (advanced to End, then Halt removed it).
         let ep = Endpoint { sid, role: s };
-        assert!(vm.sessions().lookup_type(&ep).is_none());
+        assert!(machine.sessions().lookup_type(&ep).is_none());
     }
 }
 
@@ -110,48 +110,48 @@ fn prop_recv_advances_to_continuation() {
         let global = GlobalType::send(&s, &r, Label::new("msg"), GlobalType::End);
         let image = CodeImage::from_local_types(&local_types, &global);
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid = machine.load_choreography(&image).unwrap();
 
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
         let ep = Endpoint { sid, role: r };
-        assert!(vm.sessions().lookup_type(&ep).is_none());
+        assert!(machine.sessions().lookup_type(&ep).is_none());
     }
 }
 
 #[test]
 fn prop_choose_advances_to_selected_branch() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // A chose "yes", type removed after Halt.
     let ep = Endpoint {
         sid,
         role: "A".into(),
     };
-    assert!(vm.sessions().lookup_type(&ep).is_none());
+    assert!(machine.sessions().lookup_type(&ep).is_none());
 }
 
 #[test]
 fn prop_offer_advances_to_received_label() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     let ep = Endpoint {
         sid,
         role: "B".into(),
     };
-    assert!(vm.sessions().lookup_type(&ep).is_none());
+    assert!(machine.sessions().lookup_type(&ep).is_none());
 }
 
 // ============================================================================
@@ -176,16 +176,16 @@ fn prop_compile_execute_reaches_end() {
         }
 
         if let Some(image) = code_image_from_global(&global) {
-            let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-            if vm.load_choreography(&image).is_err() {
+            let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+            if machine.load_choreography(&image).is_err() {
                 continue;
             }
 
             let handler = PassthroughHandler;
-            let _ = vm.run(&handler, 500);
+            let _ = machine.run(&handler, 500);
 
             // No faults should have occurred.
-            let faults: Vec<_> = vm
+            let faults: Vec<_> = machine
                 .trace()
                 .iter()
                 .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -325,15 +325,15 @@ fn prop_multi_session_no_cross_talk() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid1 = vm.load_choreography(&image1).unwrap();
-    let sid2 = vm.load_choreography(&image2).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid1 = machine.load_choreography(&image1).unwrap();
+    let sid2 = machine.load_choreography(&image2).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 200).unwrap();
+    machine.run(&handler, 200).unwrap();
 
     // Events for session 1 should not reference session 2 labels and vice versa.
-    for event in vm.trace() {
+    for event in machine.trace() {
         match event {
             ObsEvent::Sent { session, label, .. } | ObsEvent::Received { session, label, .. } => {
                 if *session == sid1 {
@@ -352,25 +352,25 @@ fn prop_session_type_independence() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let _sid1 = vm.load_choreography(&image1).unwrap();
-    let sid2 = vm.load_choreography(&image2).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let _sid1 = machine.load_choreography(&image1).unwrap();
+    let sid2 = machine.load_choreography(&image2).unwrap();
 
     let ep2a = Endpoint {
         sid: sid2,
         role: "A".into(),
     };
-    let ty_before = vm.sessions().lookup_type(&ep2a).cloned();
+    let ty_before = machine.sessions().lookup_type(&ep2a).cloned();
 
     // Step only a few times (session 1 may advance).
     let handler = PassthroughHandler;
     for _ in 0..5 {
-        let _ = vm.step(&handler);
+        let _ = machine.step(&handler);
     }
 
     // Session 2 type should be unchanged if session 2 hasn't been scheduled yet,
     // or advanced only by its own instructions.
-    let ty_after = vm.sessions().lookup_type(&ep2a).cloned();
+    let ty_after = machine.sessions().lookup_type(&ep2a).cloned();
 
     // At minimum, session 2's type is either same as before or advanced by session 2's own execution.
     // Not affected by session 1.
@@ -395,21 +395,21 @@ fn prop_session_type_independence() {
 fn prop_block_preserves_type() {
     // B tries to recv before A sends → blocks → type unchanged.
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let ep_b = Endpoint {
         sid,
         role: "B".into(),
     };
-    let ty_before = vm.sessions().lookup_type(&ep_b).cloned();
+    let ty_before = machine.sessions().lookup_type(&ep_b).cloned();
 
     let handler = PassthroughHandler;
     // Step once — might schedule B first (blocks) or A first.
-    let _ = vm.step(&handler);
+    let _ = machine.step(&handler);
 
     // If B was scheduled and blocked, type should be unchanged.
-    if let Some(ty_after) = vm.sessions().lookup_type(&ep_b) {
+    if let Some(ty_after) = machine.sessions().lookup_type(&ep_b) {
         assert!(matches!(ty_after, LocalTypeR::Recv { .. }));
     }
 
@@ -420,27 +420,27 @@ fn prop_block_preserves_type() {
 #[test]
 fn prop_block_preserves_pc() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     // Find B's coroutine.
-    let b_coro_id = vm
+    let b_coro_id = machine
         .session_coroutines(sid)
         .iter()
         .find(|c| c.role == "B")
         .unwrap()
         .id;
 
-    let pc_before = vm.coroutine(b_coro_id).unwrap().pc;
+    let pc_before = machine.coroutine(b_coro_id).unwrap().pc;
 
     let handler = PassthroughHandler;
     // Step a few times.
     for _ in 0..3 {
-        let _ = vm.step(&handler);
+        let _ = machine.step(&handler);
     }
 
     // If B is blocked, PC should be same as before.
-    let coro = vm.coroutine(b_coro_id).unwrap();
+    let coro = machine.coroutine(b_coro_id).unwrap();
     if matches!(coro.status, telltale_machine::CoroStatus::Blocked(_)) {
         assert_eq!(coro.pc, pc_before);
     }

@@ -140,7 +140,7 @@ fn scan_canonical_bincode(file: &Path, syntax: &syn::File) -> Vec<String> {
 
 fn scan_serialized_usize(file: &Path, syntax: &syn::File) -> Vec<String> {
     const SERIALIZED_USIZE_SCOPE: &[&str] = &[
-        "rust/bridge/src/vm_export.rs",
+        "rust/bridge/src/protocol_machine_export.rs",
         "rust/simulator/src/bin/run.rs",
     ];
 

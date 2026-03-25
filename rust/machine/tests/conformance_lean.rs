@@ -165,7 +165,7 @@ impl EffectHandler for HintedInvokeHandler {
         _state: &[telltale_machine::coroutine::Value],
     ) -> Option<OutputConditionHint> {
         Some(OutputConditionHint {
-            predicate_ref: "vm.custom.observable".to_string(),
+            predicate_ref: "machine.custom.observable".to_string(),
             witness_ref: Some(format!("sid:{sid}:role:{role}")),
         })
     }
@@ -240,8 +240,8 @@ impl EffectHandler for TimeoutAtTickOneHandler {
 #[test]
 fn test_lean_session_coherent() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
 
@@ -256,20 +256,20 @@ fn test_lean_session_coherent() {
 
     // Before execution: A has Send, B has Recv.
     assert_matches!(
-        vm.sessions().lookup_type(&ep_a),
+        machine.sessions().lookup_type(&ep_a),
         Some(LocalTypeR::Send { .. })
     );
     assert_matches!(
-        vm.sessions().lookup_type(&ep_b),
+        machine.sessions().lookup_type(&ep_b),
         Some(LocalTypeR::Recv { .. })
     );
 
     // Run to completion.
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // After: types removed (endpoints completed).
-    assert!(vm.sessions().lookup_type(&ep_a).is_none());
-    assert!(vm.sessions().lookup_type(&ep_b).is_none());
+    assert!(machine.sessions().lookup_type(&ep_a).is_none());
+    assert!(machine.sessions().lookup_type(&ep_b).is_none());
 }
 
 /// Lean: `session_ns_disjoint`
@@ -279,9 +279,9 @@ fn test_lean_session_ns_disjoint() {
     let image1 = test_support::simple_send_recv_image("A", "B", "msg");
     let image2 = test_support::simple_send_recv_image("A", "B", "data");
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid1 = vm.load_choreography(&image1).unwrap();
-    let sid2 = vm.load_choreography(&image2).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid1 = machine.load_choreography(&image1).unwrap();
+    let sid2 = machine.load_choreography(&image2).unwrap();
 
     let ep1 = Endpoint {
         sid: sid1,
@@ -293,8 +293,8 @@ fn test_lean_session_ns_disjoint() {
     };
 
     // Both have Send types but in separate namespaces.
-    assert!(vm.sessions().lookup_type(&ep1).is_some());
-    assert!(vm.sessions().lookup_type(&ep2).is_some());
+    assert!(machine.sessions().lookup_type(&ep1).is_some());
+    assert!(machine.sessions().lookup_type(&ep2).is_some());
     assert_ne!(sid1, sid2);
 }
 
@@ -303,21 +303,21 @@ fn test_lean_session_ns_disjoint() {
 #[test]
 fn test_lean_conservation_inv_preserved() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
 
     // Count type entries before.
-    let count_before = vm.sessions().get(sid).unwrap().local_types.len();
+    let count_before = machine.sessions().get(sid).unwrap().local_types.len();
     assert_eq!(count_before, 2);
 
     // Step until A sends (but before Halt).
     // After send, both type entries still exist (just advanced).
-    let _ = vm.step(&handler); // may schedule A or B
+    let _ = machine.step(&handler); // may schedule A or B
 
     // Type entries are preserved by send/recv (removed only by Halt).
-    let session = vm.sessions().get(sid).unwrap();
+    let session = machine.sessions().get(sid).unwrap();
     // Still 1 or 2 entries (Halt may have run for one).
     assert!(session.local_types.len() <= count_before);
 }
@@ -347,15 +347,15 @@ fn test_lean_close_empty() {
 #[test]
 fn test_lean_leave_preserves_coherent() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // A halted: type removed. B halted: type removed.
     // Session still accessible.
-    let session = vm.sessions().get(sid).unwrap();
+    let session = machine.sessions().get(sid).unwrap();
     assert!(session.local_types.is_empty());
 }
 
@@ -368,17 +368,17 @@ fn test_lean_leave_preserves_coherent() {
 #[test]
 fn test_lean_transport_fifo() {
     let image = test_support::recursive_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let _ = vm.run(&handler, 200);
+    let _ = machine.run(&handler, 200);
 
     // Collect send/recv events per edge.
     let mut sent_order: Vec<String> = Vec::new();
     let mut recv_order: Vec<String> = Vec::new();
 
-    for event in vm.trace() {
+    for event in machine.trace() {
         match event {
             ObsEvent::Sent {
                 session,
@@ -413,18 +413,18 @@ fn test_lean_transport_fifo() {
 #[test]
 fn test_lean_transport_no_dup() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let sent_count = vm
+    let sent_count = machine
         .trace()
         .iter()
         .filter(|e| matches!(e, ObsEvent::Sent { session, .. } if *session == sid))
         .count();
-    let recv_count = vm
+    let recv_count = machine
         .trace()
         .iter()
         .filter(|e| matches!(e, ObsEvent::Received { session, .. } if *session == sid))
@@ -438,16 +438,16 @@ fn test_lean_transport_no_dup() {
 #[test]
 fn test_lean_transport_no_create() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     let mut sent_edges: Vec<(String, String, String)> = Vec::new();
     let mut recv_edges: Vec<(String, String, String)> = Vec::new();
 
-    for event in vm.trace() {
+    for event in machine.trace() {
         match event {
             ObsEvent::Sent {
                 session,
@@ -481,15 +481,15 @@ fn test_lean_transport_no_create() {
 #[test]
 fn test_lean_send_receive_signature_verification() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
     let handler = PassthroughHandler;
 
     // Advance until A->B has one queued signed payload.
     let mut has_payload = false;
     for _ in 0..8 {
-        let _ = vm.step(&handler).expect("step before tamper");
-        let queued = vm
+        let _ = machine.step(&handler).expect("step before tamper");
+        let queued = machine
             .sessions()
             .get(sid)
             .expect("session exists")
@@ -502,7 +502,7 @@ fn test_lean_send_receive_signature_verification() {
     assert!(has_payload, "expected queued A->B payload before tamper");
 
     // Tamper signature in-flight; B's receive must reject it.
-    let sess = vm.sessions_mut().get_mut(sid).expect("session exists");
+    let sess = machine.sessions_mut().get_mut(sid).expect("session exists");
     let mut signed = sess
         .recv_signed("A", "B")
         .expect("signed payload must exist");
@@ -511,7 +511,7 @@ fn test_lean_send_receive_signature_verification() {
         .send_signed("A", "B", &signed)
         .expect("re-enqueue tampered payload");
 
-    let result = vm.run(&handler, 32);
+    let result = machine.run(&handler, 32);
     assert_matches!(
         result,
         Err(telltale_machine::ProtocolMachineError::Fault {
@@ -525,13 +525,13 @@ fn test_lean_send_receive_signature_verification() {
 #[test]
 fn test_lean_offer_choose_label_alignment() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let offered: Vec<String> = vm
+    let offered: Vec<String> = machine
         .trace()
         .iter()
         .filter_map(|e| match e {
@@ -539,7 +539,7 @@ fn test_lean_offer_choose_label_alignment() {
             _ => None,
         })
         .collect();
-    let chose: Vec<String> = vm
+    let chose: Vec<String> = machine
         .trace()
         .iter()
         .filter_map(|e| match e {
@@ -629,12 +629,12 @@ fn test_lean_transfer_endpoint_movement() {
         local_types,
     };
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
-    vm.run(&PassthroughHandler, 100).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
+    machine.run(&PassthroughHandler, 100).unwrap();
 
     assert!(
-        vm.trace().iter().any(
+        machine.trace().iter().any(
             |e| matches!(e, ObsEvent::Transferred { session, from, to, .. }
                 if *session == sid && *from == 0 && *to == 1)
         ),
@@ -645,7 +645,7 @@ fn test_lean_transfer_endpoint_movement() {
         sid,
         role: "A".to_string(),
     };
-    let coros = vm.session_coroutines(sid);
+    let coros = machine.session_coroutines(sid);
     let source = coros
         .iter()
         .find(|c| c.id == 0)
@@ -693,26 +693,26 @@ fn test_lean_tag_check_epistemic_behavior() {
         ],
     );
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
-    vm.run(&KnowledgePayloadHandler, 100).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
+    machine.run(&KnowledgePayloadHandler, 100).unwrap();
 
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Tagged { session, fact, .. }
                 if *session == sid && fact == "secret")),
         "expected tagged event with transported fact"
     );
     assert!(
-        vm.trace().iter().any(
+        machine.trace().iter().any(
             |e| matches!(e, ObsEvent::Checked { session, target, permitted, .. }
                 if *session == sid && target == "Observer" && *permitted)
         ),
         "expected permitted checked event"
     );
 
-    let b = vm.coroutine(1).expect("B coroutine exists");
+    let b = machine.coroutine(1).expect("B coroutine exists");
     assert_eq!(b.regs[4], Value::Bool(true));
 }
 
@@ -732,18 +732,18 @@ fn test_lean_acquire_release_guard_behavior() {
         },
         Instr::Halt,
     ]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
-    vm.run(&PassthroughHandler, 100).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
+    machine.run(&PassthroughHandler, 100).unwrap();
 
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Acquired { layer, .. } if layer == "auth")),
         "expected acquired event"
     );
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Released { layer, .. } if layer == "auth")),
         "expected released event"
@@ -764,24 +764,24 @@ fn test_lean_invoke_and_output_condition_hint_behavior() {
     ]);
     let cfg = ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-            "vm.custom.observable".to_string(),
+            "machine.custom.observable".to_string(),
         ]),
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(cfg);
-    vm.load_choreography(&image).unwrap();
-    vm.run(&HintedInvokeHandler, 100).unwrap();
+    let mut machine = ProtocolMachine::new(cfg);
+    machine.load_choreography(&image).unwrap();
+    machine.run(&HintedInvokeHandler, 100).unwrap();
 
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Invoked { .. })),
         "expected invoked event"
     );
 
-    let checks = vm.output_condition_checks();
+    let checks = machine.output_condition_checks();
     assert!(!checks.is_empty(), "expected output-condition checks");
-    assert_eq!(checks[0].meta.predicate_ref, "vm.custom.observable");
+    assert_eq!(checks[0].meta.predicate_ref, "machine.custom.observable");
     assert_eq!(
         checks[0].meta.witness_ref.as_deref(),
         Some("sid:0:role:A"),
@@ -806,20 +806,20 @@ fn test_lean_failure_branch_and_terminal_fault_ordering() {
         },
         Instr::Halt,
     ]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
-    let err = vm.step(&PassthroughHandler);
+    let err = machine.step(&PassthroughHandler);
     assert!(err.is_err(), "register-bounds violation must fault");
 
-    let failure_idx = vm
+    let failure_idx = machine
         .trace()
         .iter()
         .position(|event| {
             matches!(event, ObsEvent::FailureBranchEntered { session, .. } if *session == sid)
         })
         .expect("failure branch event");
-    let fault_idx = vm
+    let fault_idx = machine
         .trace()
         .iter()
         .position(|event| matches!(event, ObsEvent::Faulted { .. }))
@@ -837,12 +837,12 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
     use telltale_machine::instr::Instr;
 
     let image = single_role_end_image(vec![Instr::Halt]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let owned = vm
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = machine
         .load_choreography_owned(&image, "owner/a")
         .expect("load owned choreography");
 
-    let step = vm
+    let step = machine
         .step(&TimeoutAtTickOneHandler)
         .expect("timeout ingress should not fault");
     assert!(
@@ -850,20 +850,20 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
         "timeout ingress should block scheduling"
     );
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|event| matches!(event, ObsEvent::TimeoutIssued { site, .. } if site == "A")),
         "expected explicit timeout event"
     );
     assert!(
-        vm.authority_audit_log().iter().any(|record| matches!(
+        machine.authority_audit_log().iter().any(|record| matches!(
             (&record.artifact, record.event),
             (AuthorityArtifact::Timeout(_), AuthorityAuditEvent::Issued)
         )),
         "expected issued timeout witness in authority audit log"
     );
     assert!(
-        vm.semantic_objects()
+        machine.semantic_objects()
             .outstanding_effects
             .iter()
             .any(|effect| effect.effect_kind == "topology_event"),
@@ -872,13 +872,13 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
 
     let sid = owned.session_id();
     let receipt = owned
-        .begin_transfer(&mut vm, "owner/b", OwnershipScope::Session)
+        .begin_transfer(&mut machine, "owner/b", OwnershipScope::Session)
         .expect("stage transfer");
     let cancellation = owned
-        .cancel_abandoned_transfer(&mut vm, &receipt)
+        .cancel_abandoned_transfer(&mut machine, &receipt)
         .expect("cancel abandoned transfer");
 
-    let trace = vm.trace();
+    let trace = machine.trace();
     let requested_idx = trace
         .iter()
         .position(|event| {
@@ -997,11 +997,11 @@ fn test_lean_control_and_spawn_behavior() {
         Instr::Halt,
     ]);
 
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
-    vm.run(&PassthroughHandler, 100).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
+    machine.run(&PassthroughHandler, 100).unwrap();
 
-    let coros = vm.session_coroutines(sid);
+    let coros = machine.session_coroutines(sid);
     assert_eq!(coros.len(), 2, "spawn should create one child coroutine");
     assert!(
         coros.iter().all(|c| c.is_terminal()),
@@ -1039,24 +1039,24 @@ fn test_lean_fork_join_abort_speculation_behavior() {
         speculation_enabled: true,
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(cfg);
-    vm.load_choreography(&image).unwrap();
-    vm.run(&PassthroughHandler, 100).unwrap();
+    let mut machine = ProtocolMachine::new(cfg);
+    machine.load_choreography(&image).unwrap();
+    machine.run(&PassthroughHandler, 100).unwrap();
 
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Forked { ghost, .. } if *ghost == 9)),
         "expected forked event"
     );
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Joined { .. })),
         "expected joined event"
     );
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|e| matches!(e, ObsEvent::Aborted { .. })),
         "expected aborted event"
@@ -1075,10 +1075,10 @@ fn test_lean_fork_requires_speculation_enabled() {
         },
         Instr::Fork { ghost: 1 },
     ]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
-    let result = vm.run(&PassthroughHandler, 16);
+    let result = machine.run(&PassthroughHandler, 16);
     assert_matches!(
         result,
         Err(telltale_machine::ProtocolMachineError::Fault {
@@ -1098,10 +1098,10 @@ fn test_lean_join_requires_active_speculation() {
         speculation_enabled: true,
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(cfg);
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(cfg);
+    machine.load_choreography(&image).unwrap();
 
-    let result = vm.run(&PassthroughHandler, 16);
+    let result = machine.run(&PassthroughHandler, 16);
     assert_matches!(
         result,
         Err(telltale_machine::ProtocolMachineError::Fault {
@@ -1121,10 +1121,10 @@ fn test_lean_abort_requires_active_speculation() {
         speculation_enabled: true,
         ..ProtocolMachineConfig::default()
     };
-    let mut vm = ProtocolMachine::new(cfg);
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(cfg);
+    machine.load_choreography(&image).unwrap();
 
-    let result = vm.run(&PassthroughHandler, 16);
+    let result = machine.run(&PassthroughHandler, 16);
     assert_matches!(
         result,
         Err(telltale_machine::ProtocolMachineError::Fault {
@@ -1154,31 +1154,31 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
             speculation_enabled: true,
             ..ProtocolMachineConfig::default()
         };
-        let mut vm = ProtocolMachine::new(cfg);
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(cfg);
+        let sid = machine.load_choreography(&image).unwrap();
 
         assert_matches!(
-            vm.step(&PassthroughHandler),
+            machine.step(&PassthroughHandler),
             Ok(telltale_machine::StepResult::Continue)
         ); // set
         assert_matches!(
-            vm.step(&PassthroughHandler),
+            machine.step(&PassthroughHandler),
             Ok(telltale_machine::StepResult::Continue)
         ); // fork
 
-        let before_effect_len = vm.effect_trace().len();
-        let before_crashed = vm.crashed_sites().clone();
-        let before_partitioned = vm.partitioned_edges().clone();
-        let before_corrupted = vm.corrupted_edges().clone();
-        let before_timed_out = vm.timed_out_sites().clone();
-        let before_trace_len = vm.trace().len();
+        let before_effect_len = machine.effect_trace().len();
+        let before_crashed = machine.crashed_sites().clone();
+        let before_partitioned = machine.partitioned_edges().clone();
+        let before_corrupted = machine.corrupted_edges().clone();
+        let before_timed_out = machine.timed_out_sites().clone();
+        let before_trace_len = machine.trace().len();
 
         assert_matches!(
-            vm.step(&PassthroughHandler),
+            machine.step(&PassthroughHandler),
             Ok(telltale_machine::StepResult::Continue)
         ); // abort
 
-        let coros = vm.session_coroutines(sid);
+        let coros = machine.session_coroutines(sid);
         assert_eq!(
             coros.len(),
             1,
@@ -1189,27 +1189,27 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
             "abort should clear speculation state"
         );
         assert_eq!(
-            vm.effect_trace().len(),
+            machine.effect_trace().len(),
             before_effect_len,
             "abort should not mutate effect trace"
         );
-        assert_eq!(vm.crashed_sites(), &before_crashed);
-        assert_eq!(vm.partitioned_edges(), &before_partitioned);
-        assert_eq!(vm.corrupted_edges(), &before_corrupted);
-        assert_eq!(vm.timed_out_sites(), &before_timed_out);
+        assert_eq!(machine.crashed_sites(), &before_crashed);
+        assert_eq!(machine.partitioned_edges(), &before_partitioned);
+        assert_eq!(machine.corrupted_edges(), &before_corrupted);
+        assert_eq!(machine.timed_out_sites(), &before_timed_out);
         assert!(
-            vm.trace().len() > before_trace_len,
+            machine.trace().len() > before_trace_len,
             "abort step should append at least one observable event"
         );
         assert!(
-            vm.trace()[before_trace_len..]
+            machine.trace()[before_trace_len..]
                 .iter()
                 .any(|event| matches!(event, ObsEvent::Aborted { .. })),
             "abort step should append an Aborted event"
         );
 
-        vm.run(&PassthroughHandler, 16).unwrap();
-        vm.canonical_replay_fragment()
+        machine.run(&PassthroughHandler, 16).unwrap();
+        machine.canonical_replay_fragment()
     };
 
     let left = run_once();
@@ -1237,12 +1237,12 @@ fn test_lean_schedule_confluence() {
             sched_policy: policy,
             ..ProtocolMachineConfig::default()
         };
-        let mut vm = ProtocolMachine::new(config);
-        vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(config);
+        machine.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
+        machine.run(&handler, 100).unwrap();
 
-        vm.trace()
+        machine.trace()
             .iter()
             .filter_map(|e| match e {
                 ObsEvent::Sent { label, .. } => Some(format!("sent:{label}")),
@@ -1271,11 +1271,11 @@ fn test_lean_cooperative_refines_concurrent() {
             sched_policy: policy,
             ..ProtocolMachineConfig::default()
         };
-        let mut vm = ProtocolMachine::new(config);
-        let sid = vm.load_choreography(&image).unwrap();
+        let mut machine = ProtocolMachine::new(config);
+        let sid = machine.load_choreography(&image).unwrap();
         let handler = PassthroughHandler;
-        vm.run(&handler, 100).unwrap();
-        vm.session_coroutines(sid).iter().all(|c| c.is_terminal())
+        machine.run(&handler, 100).unwrap();
+        machine.session_coroutines(sid).iter().all(|c| c.is_terminal())
     };
 
     assert!(run_with_policy(SchedPolicy::Cooperative));
@@ -1291,13 +1291,13 @@ fn test_lean_cooperative_refines_concurrent() {
 #[test]
 fn test_lean_monitor_sound_send() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm
+    let faults: Vec<_> = machine
         .trace()
         .iter()
         .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -1310,13 +1310,13 @@ fn test_lean_monitor_sound_send() {
 #[test]
 fn test_lean_monitor_sound_recv() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm
+    let faults: Vec<_> = machine
         .trace()
         .iter()
         .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -1329,13 +1329,13 @@ fn test_lean_monitor_sound_recv() {
 #[test]
 fn test_lean_monitor_sound_choose() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm
+    let faults: Vec<_> = machine
         .trace()
         .iter()
         .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -1348,13 +1348,13 @@ fn test_lean_monitor_sound_choose() {
 #[test]
 fn test_lean_monitor_sound_offer() {
     let image = test_support::choice_image("A", "B", &["yes", "no"]);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
-    let faults: Vec<_> = vm
+    let faults: Vec<_> = machine
         .trace()
         .iter()
         .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -1371,16 +1371,16 @@ fn test_lean_monitor_sound_offer() {
 #[test]
 fn test_lean_causal_consistency() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // Causal: receives cannot exceed sends at any prefix.
     let mut running_sent = 0;
     let mut running_recv = 0;
-    for event in vm.trace() {
+    for event in machine.trace() {
         match event {
             ObsEvent::Sent { session, .. } if *session == sid => running_sent += 1,
             ObsEvent::Received { session, .. } if *session == sid => {
@@ -1397,16 +1397,16 @@ fn test_lean_causal_consistency() {
 #[test]
 fn test_lean_fifo_consistency() {
     let image = test_support::recursive_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    let _ = vm.run(&handler, 200);
+    let _ = machine.run(&handler, 200);
 
     let mut sent_labels: Vec<String> = Vec::new();
     let mut recv_labels: Vec<String> = Vec::new();
 
-    for event in vm.trace() {
+    for event in machine.trace() {
         match event {
             ObsEvent::Sent {
                 session,
@@ -1442,14 +1442,14 @@ fn test_lean_fifo_consistency() {
 #[test]
 fn test_lean_no_phantom_events() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
-    vm.run(&handler, 100).unwrap();
+    machine.run(&handler, 100).unwrap();
 
     // Every event should be one of our known event types.
-    for event in vm.trace() {
+    for event in machine.trace() {
         match event {
             ObsEvent::Sent { .. }
             | ObsEvent::Received { .. }
@@ -1463,19 +1463,19 @@ fn test_lean_no_phantom_events() {
     }
 
     // Verify we got the expected events for a simple send/recv.
-    let has_opened = vm
+    let has_opened = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Opened { .. }));
-    let has_sent = vm
+    let has_sent = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Sent { .. }));
-    let has_recv = vm
+    let has_recv = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Received { .. }));
-    let has_halted = vm
+    let has_halted = machine
         .trace()
         .iter()
         .any(|e| matches!(e, ObsEvent::Halted { .. }));
@@ -1495,17 +1495,17 @@ fn test_lean_no_phantom_events() {
 #[test]
 fn test_lean_wf_pc_bounds() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
 
     let handler = PassthroughHandler;
 
     for _ in 0..50 {
         // Check PC bounds for all ready coroutines.
         for coro_id in 0..10 {
-            if let Some(coro) = vm.coroutine(coro_id) {
+            if let Some(coro) = machine.coroutine(coro_id) {
                 if coro.status == CoroStatus::Ready {
-                    let program_len = vm
+                    let program_len = machine
                         .coroutine_program_len(coro.id)
                         .expect("ready coroutine must reference a valid program");
                     assert!(
@@ -1518,7 +1518,7 @@ fn test_lean_wf_pc_bounds() {
             }
         }
 
-        match vm.step(&handler) {
+        match machine.step(&handler) {
             Ok(
                 telltale_machine::StepResult::AllDone
                 | telltale_machine::StepResult::Stuck,
@@ -1534,11 +1534,11 @@ fn test_lean_wf_pc_bounds() {
 #[test]
 fn test_lean_endpoint_ownership_unique() {
     let image = test_support::simple_send_recv_image("A", "B", "msg");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let sid = vm.load_choreography(&image).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine.load_choreography(&image).unwrap();
 
     let mut seen_endpoints = HashSet::new();
-    for coro in vm.session_coroutines(sid) {
+    for coro in machine.session_coroutines(sid) {
         for ep in &coro.owned_endpoints {
             assert!(
                 seen_endpoints.insert(ep.clone()),

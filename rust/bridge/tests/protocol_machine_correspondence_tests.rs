@@ -17,9 +17,9 @@ use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, thiserror::Error)]
 enum ProtocolMachineCorrespondenceError {
-    #[error("vm load failed: {0}")]
+    #[error("machine load failed: {0}")]
     Load(String),
-    #[error("vm run failed: {0}")]
+    #[error("machine run failed: {0}")]
     Run(String),
 }
 
@@ -168,28 +168,28 @@ fn run_rust_vm(
     max_steps: usize,
 ) -> Result<ProtocolMachineRunOutput, ProtocolMachineCorrespondenceError> {
     let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..ProtocolMachineConfig::default()
     });
-    vm.load_choreography(&image)
+    machine.load_choreography(&image)
         .map_err(|e| ProtocolMachineCorrespondenceError::Load(e.to_string()))?;
-    vm.run(&PassthroughHandler, max_steps)
+    machine.run(&PassthroughHandler, max_steps)
         .map_err(|e| ProtocolMachineCorrespondenceError::Run(e.to_string()))?;
 
-    let trace = vm
+    let trace = machine
         .trace()
         .iter()
         .filter_map(obs_to_semantic_audit_event)
         .collect();
-    let sessions = vm
+    let sessions = machine
         .sessions()
         .session_ids()
         .into_iter()
         .map(|sid| ProtocolMachineSessionStatus {
             schema_version: canonical_schema_version(),
             sid: sid as u64,
-            terminal: vm
+            terminal: machine
                 .sessions()
                 .get(sid)
                 .map(|s| !matches!(s.status, telltale_machine::model::state::SessionStatus::Active))
@@ -197,7 +197,7 @@ fn run_rust_vm(
         })
         .collect();
 
-    let effect_trace = vm
+    let effect_trace = machine
         .effect_trace()
         .iter()
         .map(|e| EffectTraceEvent {
@@ -210,9 +210,9 @@ fn run_rust_vm(
             topology: None,
         })
         .collect();
-    let effect_exchanges = vm.effect_exchanges().to_vec();
+    let effect_exchanges = machine.effect_exchanges().to_vec();
 
-    let output_condition_trace = vm
+    let output_condition_trace = machine
         .output_condition_checks()
         .iter()
         .map(|c| OutputConditionTraceEvent {
@@ -224,7 +224,7 @@ fn run_rust_vm(
         .collect();
 
     let semantic_objects = semantic_objects_from_json(
-        serde_json::to_value(vm.semantic_objects()).expect("encode semantic objects"),
+        serde_json::to_value(machine.semantic_objects()).expect("encode semantic objects"),
     )
     .expect("decode semantic objects into bridge schema");
 

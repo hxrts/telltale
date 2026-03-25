@@ -110,25 +110,25 @@ fn transfer_image() -> CodeImage {
 #[test]
 fn ownership_owned_session_transfer_invalidates_stale_handles() {
     let image = simple_send_recv_image("A", "B", "m");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let owned = vm
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = machine
         .load_choreography_owned(&image, "runtime/owner")
         .expect("owned open should succeed");
     let receipt = owned
         .begin_transfer(
-            &mut vm,
+            &mut machine,
             "runtime/owner",
             OwnershipScope::Fragments(BTreeSet::from(["A".to_string()])),
         )
         .expect("transfer staging should succeed");
     let narrowed = owned
-        .commit_transfer(&mut vm, &receipt)
+        .commit_transfer(&mut machine, &receipt)
         .expect("transfer commit should succeed");
     let edge = Edge::new(owned.session_id(), "A", "B");
 
     let stale = owned
         .apply_host_mutation(
-            &mut vm,
+            &mut machine,
             SessionHostMutation::UpdateTrace {
                 edge: edge.clone(),
                 trace: vec![ValType::Nat],
@@ -147,7 +147,7 @@ fn ownership_owned_session_transfer_invalidates_stale_handles() {
 
     let scope = narrowed
         .apply_host_mutation(
-            &mut vm,
+            &mut machine,
             SessionHostMutation::UpdateTrace {
                 edge,
                 trace: vec![ValType::Bool],
@@ -166,22 +166,22 @@ fn ownership_owned_session_transfer_invalidates_stale_handles() {
 
 #[test]
 fn ownership_transfer_record_replay_preserves_observable_handoff() {
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&transfer_image())
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&transfer_image())
         .expect("load transfer fixture");
 
-    let report = run_loaded_protocol_machine_record_replay_conformance(&mut vm, &NoopHandler, 32)
+    let report = run_loaded_protocol_machine_record_replay_conformance(&mut machine, &NoopHandler, 32)
         .expect("record/replay harness should succeed");
 
     assert!(report.replay_consistent);
     assert!(report.exact_trace_match);
     assert!(
-        vm.trace()
+        machine.trace()
             .iter()
             .any(|event| matches!(event, ObsEvent::Transferred { role, from, to, .. } if role == "A" && from == &0 && to == &1)),
         "transfer fixture must emit an observable handoff"
     );
-    let audit = vm
+    let audit = machine
         .delegation_audit_log()
         .last()
         .expect("transfer fixture should emit a delegation audit");
@@ -191,14 +191,14 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
         OwnershipScope::Fragments(BTreeSet::from(["A".to_string()]))
     );
     assert!(
-        vm.semantic_audit_log().iter().any(|record| matches!(
+        machine.semantic_audit_log().iter().any(|record| matches!(
             record,
             SemanticAuditRecord::Delegation { status, .. } if *status == DelegationStatus::Committed
         )),
         "semantic audit surface should retain committed delegation records"
     );
     assert!(
-        vm.semantic_audit_log().iter().any(|record| matches!(
+        machine.semantic_audit_log().iter().any(|record| matches!(
             record,
             SemanticAuditRecord::TransformationObligation { obligation, .. }
                 if obligation.handoff_id == audit.receipt.receipt_id
@@ -207,7 +207,7 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
         )),
         "semantic audit surface should retain handoff obligation bundles"
     );
-    let semantic_objects = vm.semantic_objects();
+    let semantic_objects = machine.semantic_objects();
     assert!(
         semantic_objects
             .semantic_handoffs
@@ -252,19 +252,19 @@ fn ownership_transfer_record_replay_preserves_observable_handoff() {
 #[test]
 fn ownership_semantic_objects_expose_authoritative_reads() {
     let image = simple_send_recv_image("A", "B", "m");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    let owned = vm
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = machine
         .load_choreography_owned(&image, "runtime/owner")
         .expect("owned open should succeed");
 
     let witness = owned
-        .issue_readiness_witness(&mut vm, "session.ready")
+        .issue_readiness_witness(&mut machine, "session.ready")
         .expect("issue readiness witness");
     owned
-        .consume_readiness_witness(&mut vm, &witness)
+        .consume_readiness_witness(&mut machine, &witness)
         .expect("consume readiness witness");
 
-    let semantic_objects = vm.semantic_objects();
+    let semantic_objects = machine.semantic_objects();
     assert!(
         semantic_objects
             .authoritative_reads
@@ -277,17 +277,17 @@ fn ownership_semantic_objects_expose_authoritative_reads() {
 #[test]
 fn ownership_observed_reads_are_rejected_on_semantic_paths() {
     let image = simple_send_recv_image("A", "B", "m");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load image");
-    vm.run(&NoopHandler, 32).expect("run image");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load image");
+    machine.run(&NoopHandler, 32).expect("run image");
 
-    let observed = vm
+    let observed = machine
         .semantic_objects()
         .observed_reads
         .first()
         .cloned()
         .expect("runtime should surface at least one observed read");
-    let err = vm
+    let err = machine
         .require_authoritative_read(&observed.read_id)
         .expect_err("observational reads must be rejected on semantic paths");
     assert!(err.to_string().contains("observed read"));
@@ -331,21 +331,21 @@ fn ownership_proof_bearing_success_is_enforced_for_publication() {
 #[test]
 fn ownership_canonical_handle_is_required_on_parity_critical_paths() {
     let image = simple_send_recv_image("A", "B", "m");
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).expect("load image");
-    vm.run(&NoopHandler, 32).expect("run image");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load image");
+    machine.run(&NoopHandler, 32).expect("run image");
 
-    let semantic_objects = vm.semantic_objects();
+    let semantic_objects = machine.semantic_objects();
     let handle = semantic_objects
         .canonical_handles
         .first()
         .expect("successful output-condition checks should yield a canonical handle");
-    let bound = vm
+    let bound = machine
         .require_canonical_handle(&handle.handle_id)
         .expect("existing canonical handle must bind");
     assert_eq!(bound.handle_id, handle.handle_id);
 
-    let err = vm
+    let err = machine
         .require_canonical_handle("materialization:missing")
         .expect_err("missing canonical handles must be rejected");
     assert!(err.to_string().contains("canonical handle"));
@@ -465,7 +465,7 @@ cfg_if! {
                 .last()
                 .expect("cooperative transfer should emit audit");
             let threaded_audit = threaded
-                .vm()
+                .machine()
                 .delegation_audit_log()
                 .last()
                 .expect("threaded transfer should emit audit");

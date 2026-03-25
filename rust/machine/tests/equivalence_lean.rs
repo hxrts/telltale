@@ -120,14 +120,14 @@ fn run_rust(
     max_rounds: usize,
 ) -> Result<Vec<NormalizedEvent>, ProtocolMachineError> {
     let handler = PassthroughHandler;
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     let mut session_ids = Vec::new();
     for image in images {
-        let sid = vm.load_choreography(image)?;
+        let sid = machine.load_choreography(image)?;
         session_ids.push(sid);
     }
-    vm.run_concurrent(&handler, max_rounds, concurrency)?;
-    Ok(normalize_rust_trace(vm.trace(), &session_ids))
+    machine.run_concurrent(&handler, max_rounds, concurrency)?;
+    Ok(normalize_rust_trace(machine.trace(), &session_ids))
 }
 
 fn run_lean(
@@ -185,7 +185,7 @@ fn equivalence_lean_basic() {
     let mut rust_traces: BTreeMap<usize, Vec<NormalizedEvent>> = BTreeMap::new();
 
     for &n in &concurrencies {
-        let rust_trace = run_rust(&images, n, 200).expect("rust vm run failed");
+        let rust_trace = run_rust(&images, n, 200).expect("rust machine run failed");
         rust_traces.insert(n, rust_trace);
     }
 

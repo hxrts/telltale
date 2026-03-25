@@ -45,36 +45,36 @@ impl ProtocolMachine {
     fn retained_bytes(&self, session_store_bytes: usize) -> ProtocolMachineRetainedBytes {
         let mut retained_bytes = ProtocolMachineRetainedBytes {
             session_store: session_store_bytes,
-            coroutines: self.coroutines.iter().map(vm_serialized_bytes).sum(),
-            programs: vm_serialized_bytes(&self.programs)
-                .saturating_add(vm_serialized_bytes(&self.code)),
-            resource_states: vm_serialized_bytes(&self.resource_states),
-            traces: vm_serialized_bytes(&self.obs_trace)
-                .saturating_add(vm_serialized_bytes(&self.effect_trace))
-                .saturating_add(vm_serialized_bytes(&self.delegation_audit_log))
-                .saturating_add(vm_serialized_bytes(&self.authority_audit_log)),
-            replay: vm_serialized_bytes(&self.communication_consumption)
-                .saturating_add(vm_serialized_bytes(&self.communication_consumption_artifacts)),
-            output_condition_checks: vm_serialized_bytes(&self.output_condition_checks),
-            scheduler_and_control: vm_serialized_bytes(&self.sched)
-                .saturating_add(vm_serialized_bytes(&self.eligible_ready))
-                .saturating_add(vm_serialized_bytes(&self.paused_roles))
-                .saturating_add(vm_serialized_bytes(&self.crashed_sites))
-                .saturating_add(vm_serialized_bytes(&self.partitioned_edges))
-                .saturating_add(vm_serialized_bytes(&self.corrupted_edges))
-                .saturating_add(vm_serialized_bytes(&self.timed_out_sites))
-                .saturating_add(vm_serialized_bytes(&self.clock))
-                .saturating_add(vm_serialized_bytes(&self.last_sched_step))
-                .saturating_add(vm_serialized_bytes(&self.handler_identity_anchor))
-                .saturating_add(vm_serialized_bytes(&self.next_coro_id))
-                .saturating_add(vm_serialized_bytes(&self.next_session_id)),
-            symbols: vm_serialized_bytes(&self.role_symbols)
-                .saturating_add(vm_serialized_bytes(&self.label_symbols))
-                .saturating_add(vm_serialized_bytes(&self.handler_symbols))
-                .saturating_add(vm_serialized_bytes(&self.edge_symbols)),
-            guard_layer: vm_serialized_bytes(&self.guard_layer),
-            monitor: vm_serialized_bytes(&self.monitor),
-            arena: vm_serialized_bytes(&self.arena),
+            coroutines: self.coroutines.iter().map(serialized_byte_size).sum(),
+            programs: serialized_byte_size(&self.programs)
+                .saturating_add(serialized_byte_size(&self.code)),
+            resource_states: serialized_byte_size(&self.resource_states),
+            traces: serialized_byte_size(&self.obs_trace)
+                .saturating_add(serialized_byte_size(&self.effect_trace))
+                .saturating_add(serialized_byte_size(&self.delegation_audit_log))
+                .saturating_add(serialized_byte_size(&self.authority_audit_log)),
+            replay: serialized_byte_size(&self.communication_consumption)
+                .saturating_add(serialized_byte_size(&self.communication_consumption_artifacts)),
+            output_condition_checks: serialized_byte_size(&self.output_condition_checks),
+            scheduler_and_control: serialized_byte_size(&self.sched)
+                .saturating_add(serialized_byte_size(&self.eligible_ready))
+                .saturating_add(serialized_byte_size(&self.paused_roles))
+                .saturating_add(serialized_byte_size(&self.crashed_sites))
+                .saturating_add(serialized_byte_size(&self.partitioned_edges))
+                .saturating_add(serialized_byte_size(&self.corrupted_edges))
+                .saturating_add(serialized_byte_size(&self.timed_out_sites))
+                .saturating_add(serialized_byte_size(&self.clock))
+                .saturating_add(serialized_byte_size(&self.last_sched_step))
+                .saturating_add(serialized_byte_size(&self.handler_identity_anchor))
+                .saturating_add(serialized_byte_size(&self.next_coro_id))
+                .saturating_add(serialized_byte_size(&self.next_session_id)),
+            symbols: serialized_byte_size(&self.role_symbols)
+                .saturating_add(serialized_byte_size(&self.label_symbols))
+                .saturating_add(serialized_byte_size(&self.handler_symbols))
+                .saturating_add(serialized_byte_size(&self.edge_symbols)),
+            guard_layer: serialized_byte_size(&self.guard_layer),
+            monitor: serialized_byte_size(&self.monitor),
+            arena: serialized_byte_size(&self.arena),
             total: 0,
         };
         retained_bytes.total = Self::retained_bytes_total(&retained_bytes);

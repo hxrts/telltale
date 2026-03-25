@@ -77,11 +77,11 @@ fn test_trace_corpus_send_recv() {
 
     let image = CodeImage::from_local_types(&locals, &global);
     let handler = NoOpHandler;
-    let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-    vm.load_choreography(&image).unwrap();
-    vm.run(&handler, 50).unwrap();
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).unwrap();
+    machine.run(&handler, 50).unwrap();
 
-    let trace: Vec<(u64, String, String, String, String)> = normalize_trace(vm.trace())
+    let trace: Vec<(u64, String, String, String, String)> = normalize_trace(machine.trace())
         .iter()
         .filter_map(|ev| match ev {
             ObsEvent::Sent {

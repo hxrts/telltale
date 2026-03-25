@@ -4,15 +4,15 @@ use crate::coroutine::Fault;
 use crate::engine::{ProtocolMachine, StepPack};
 
 pub(crate) fn step_close(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     coro_idx: usize,
     session: u16,
 ) -> Result<StepPack, Fault> {
-    vm.step_close(coro_idx, session)
+    machine.step_close(coro_idx, session)
 }
 
 pub(crate) fn step_open(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     coro_idx: usize,
     role: &str,
     roles: &[String],
@@ -20,5 +20,5 @@ pub(crate) fn step_open(
     handlers: &[((String, String), String)],
     dsts: &[(String, u16)],
 ) -> Result<StepPack, Fault> {
-    vm.step_open(coro_idx, role, roles, local_types, handlers, dsts)
+    machine.step_open(coro_idx, role, roles, local_types, handlers, dsts)
 }

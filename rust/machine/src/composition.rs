@@ -262,7 +262,7 @@ pub enum CompositionError {
 /// Runtime wrapper for composed protocol execution.
 #[derive(Debug)]
 pub struct ComposedRuntime {
-    vm: ProtocolMachine,
+    machine: ProtocolMachine,
     bundles: Vec<ProtocolBundle>,
     budget: MemoryBudget,
     usage: MemoryUsage,
@@ -272,9 +272,9 @@ impl ComposedRuntime {
     /// Create an empty composed runtime.
     #[must_use]
     pub fn new(config: ProtocolMachineConfig, budget: MemoryBudget) -> Self {
-        let vm = ProtocolMachine::new(config);
+        let machine = ProtocolMachine::new(config);
         Self {
-            vm,
+            machine,
             bundles: Vec::new(),
             budget,
             usage: MemoryUsage {
@@ -327,7 +327,7 @@ impl ComposedRuntime {
                     reason: "bundle index out of range".to_string(),
                 })?;
 
-        let sid = self.vm.load_choreography(&bundle.code)?;
+        let sid = self.machine.load_choreography(&bundle.code)?;
         self.refresh_usage();
         self.assert_budget(bundle_idx)?;
         Ok(sid)
@@ -360,7 +360,7 @@ impl ComposedRuntime {
         handler: &dyn EffectHandler,
         max_steps: usize,
     ) -> Result<(), CompositionError> {
-        self.vm.run(handler, max_steps)?;
+        self.machine.run(handler, max_steps)?;
         self.refresh_usage();
         Ok(())
     }
@@ -379,13 +379,13 @@ impl ComposedRuntime {
 
     /// Access underlying ProtocolMachine.
     #[must_use]
-    pub fn vm(&self) -> &ProtocolMachine {
-        &self.vm
+    pub fn machine(&self) -> &ProtocolMachine {
+        &self.machine
     }
 
     fn refresh_usage(&mut self) {
-        self.usage.session_count = self.vm.session_count();
-        self.usage.coroutine_count = self.vm.coroutine_count();
+        self.usage.session_count = self.machine.session_count();
+        self.usage.coroutine_count = self.machine.coroutine_count();
         self.usage.protocol_count = self.bundles.len();
     }
 
@@ -417,7 +417,7 @@ impl ComposedRuntime {
         let caps = &cert.theorem_pack;
         let runtime_contracts = cert.runtime_contracts.as_ref();
 
-        match enforce_protocol_machine_runtime_gates(self.vm.config(), runtime_contracts) {
+        match enforce_protocol_machine_runtime_gates(self.machine.config(), runtime_contracts) {
             RuntimeGateResult::Admitted => {}
             RuntimeGateResult::RejectedMissingContracts => {
                 return Err(CompositionError::MissingRuntimeContracts {
@@ -429,13 +429,13 @@ impl ComposedRuntime {
                     artifact_id: cert.artifact_id.clone(),
                     capability: format!(
                         "determinism_profile::{:?}",
-                        self.vm.config().determinism_mode
+                        self.machine.config().determinism_mode
                     ),
                 });
             }
         }
 
-        let required_sched = match self.vm.config().sched_policy {
+        let required_sched = match self.machine.config().sched_policy {
             SchedPolicy::Cooperative => SchedulerCapability::Cooperative,
             SchedPolicy::RoundRobin => SchedulerCapability::RoundRobin,
             SchedPolicy::Priority(_) => SchedulerCapability::Priority,
@@ -448,7 +448,7 @@ impl ComposedRuntime {
             });
         }
 
-        let required_det = match self.vm.config().determinism_mode {
+        let required_det = match self.machine.config().determinism_mode {
             DeterminismMode::Full => DeterminismCapability::Full,
             DeterminismMode::ModuloEffects => DeterminismCapability::ModuloEffects,
             DeterminismMode::ModuloCommutativity => DeterminismCapability::ModuloCommutativity,
@@ -462,7 +462,7 @@ impl ComposedRuntime {
         }
         if !execution_profile_supported(
             &caps.execution_profile(),
-            self.vm.config(),
+            self.machine.config(),
             runtime_contracts,
         ) {
             return Err(CompositionError::MissingCapability {
@@ -471,7 +471,7 @@ impl ComposedRuntime {
             });
         }
         if !matches!(
-            self.vm.config().output_condition_policy,
+            self.machine.config().output_condition_policy,
             OutputConditionPolicy::Disabled
         ) && !caps.output_condition_gating
         {
@@ -726,7 +726,7 @@ mod tests {
             sched_policy: SchedPolicy::RoundRobin,
             determinism_mode: DeterminismMode::ModuloEffects,
             output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
-                "vm.observable_output".to_string(),
+                "machine.observable_output".to_string(),
             ]),
             ..ProtocolMachineConfig::default()
         };

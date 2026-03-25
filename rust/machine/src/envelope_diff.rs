@@ -12,7 +12,7 @@ use crate::trace::obs_session;
 use crate::verification::{DefaultVerificationModel, HashTag, VerificationModel};
 
 /// Canonical schema version identifier for envelope differential artifacts.
-pub const ENVELOPE_DIFF_SCHEMA_VERSION: &str = "vm.envelope_diff.v1";
+pub const ENVELOPE_DIFF_SCHEMA_VERSION: &str = "protocol_machine.envelope_diff.v1";
 
 fn canonical_schema_version() -> String {
     ENVELOPE_DIFF_SCHEMA_VERSION.to_string()

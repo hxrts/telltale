@@ -61,16 +61,16 @@ fn fuzz_random_protocol_compile_execute() {
             None => continue,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        if vm.load_choreography(&image).is_err() {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        if machine.load_choreography(&image).is_err() {
             continue;
         }
 
         let handler = PassthroughHandler;
-        let _ = vm.run(&handler, 1000);
+        let _ = machine.run(&handler, 1000);
 
         // No faults.
-        let faults: Vec<_> = vm
+        let faults: Vec<_> = machine
             .trace()
             .iter()
             .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -81,7 +81,7 @@ fn fuzz_random_protocol_compile_execute() {
         let mut sent_by_edge: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
         let mut recv_by_edge: BTreeMap<(String, String), Vec<String>> = BTreeMap::new();
 
-        for event in vm.trace() {
+        for event in machine.trace() {
             match event {
                 ObsEvent::Sent {
                     from, to, label, ..
@@ -183,21 +183,21 @@ fn fuzz_multi_session_interleave() {
             None => continue,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        let sid1 = match vm.load_choreography(&img1) {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        let sid1 = match machine.load_choreography(&img1) {
             Ok(s) => s,
             Err(_) => continue,
         };
-        let sid2 = match vm.load_choreography(&img2) {
+        let sid2 = match machine.load_choreography(&img2) {
             Ok(s) => s,
             Err(_) => continue,
         };
 
         let handler = PassthroughHandler;
-        let _ = vm.run(&handler, 1000);
+        let _ = machine.run(&handler, 1000);
 
         // No faults.
-        let faults: Vec<_> = vm
+        let faults: Vec<_> = machine
             .trace()
             .iter()
             .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -205,7 +205,7 @@ fn fuzz_multi_session_interleave() {
         assert!(faults.is_empty(), "faults in multi-session: {faults:?}");
 
         // Session events are grouped by session ID.
-        for event in vm.trace() {
+        for event in machine.trace() {
             match event {
                 ObsEvent::Sent { session, .. } | ObsEvent::Received { session, .. } => {
                     assert!(
@@ -239,17 +239,17 @@ fn fuzz_recursive_protocols_bounded() {
             None => continue,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        if vm.load_choreography(&image).is_err() {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        if machine.load_choreography(&image).is_err() {
             continue;
         }
 
         let handler = PassthroughHandler;
         // Run for bounded steps — recursive protocols don't terminate.
-        let _ = vm.run(&handler, 500);
+        let _ = machine.run(&handler, 500);
 
         // No faults.
-        let faults: Vec<_> = vm
+        let faults: Vec<_> = machine
             .trace()
             .iter()
             .filter(|e| matches!(e, ObsEvent::Faulted { .. }))
@@ -280,13 +280,13 @@ fn fuzz_handler_errors_dont_panic() {
             None => continue,
         };
 
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        if vm.load_choreography(&image).is_err() {
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        if machine.load_choreography(&image).is_err() {
             continue;
         }
 
         let handler = FailingHandler::new("deliberate test error");
         // Should not panic — should return errors cleanly.
-        let _ = vm.run(&handler, 100);
+        let _ = machine.run(&handler, 100);
     }
 }

@@ -11,7 +11,7 @@ use crate::effect::{EffectFailure, EffectHandler, EffectResult};
 use crate::engine::{ObsEvent, ProtocolMachine, ProtocolMachineError, StepResult};
 
 struct SiteRunner {
-    vm: Mutex<ProtocolMachine>,
+    machine: Mutex<ProtocolMachine>,
     handler: Box<dyn EffectHandler>,
 }
 
@@ -48,13 +48,13 @@ impl NestedProtocolMachineHandler {
     pub fn add_site(
         &mut self,
         name: impl Into<String>,
-        vm: ProtocolMachine,
+        machine: ProtocolMachine,
         handler: Box<dyn EffectHandler>,
     ) {
         self.sites.insert(
             name.into(),
             SiteRunner {
-                vm: Mutex::new(vm),
+                machine: Mutex::new(machine),
                 handler,
             },
         );
@@ -68,7 +68,7 @@ impl NestedProtocolMachineHandler {
     #[must_use]
     pub fn site_trace(&self, name: &str) -> Option<Vec<ObsEvent>> {
         self.sites.get(name).map(|site| {
-            site.vm
+            site.machine
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .trace()
@@ -84,7 +84,7 @@ impl NestedProtocolMachineHandler {
     #[must_use]
     pub fn site_all_done(&self, name: &str) -> Option<bool> {
         self.sites.get(name).map(|site| {
-            site.vm
+            site.machine
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .all_done()
@@ -97,18 +97,18 @@ impl NestedProtocolMachineHandler {
             .get(name)
             .ok_or_else(|| format!("unknown site: {name}"))?;
 
-        let mut vm = site
-            .vm
+        let mut machine = site
+            .machine
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         let handler = site.handler.as_ref();
 
         for _ in 0..self.max_rounds_per_step {
-            match vm.step_round(handler, 1) {
+            match machine.step_round(handler, 1) {
                 Ok(StepResult::Continue) => {}
                 Ok(StepResult::AllDone | StepResult::Stuck) => break,
                 Err(ProtocolMachineError::Fault { fault, .. }) => {
-                    return Err(format!("inner vm fault: {fault}"));
+                    return Err(format!("inner machine fault: {fault}"));
                 }
                 Err(e) => return Err(e.to_string()),
             }

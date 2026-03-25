@@ -59,11 +59,11 @@ impl ProtocolMachineKernel {
     ///
     /// Returns a `ProtocolMachineError` if a coroutine faults.
     pub fn step_round<M: KernelMachine>(
-        vm: &mut M,
+        machine: &mut M,
         handler: &dyn EffectHandler,
         n: usize,
     ) -> Result<StepResult, ProtocolMachineError> {
-        vm.kernel_step_round(handler, n)
+        machine.kernel_step_round(handler, n)
     }
 
     /// Run until completion/stuck or `max_rounds` is reached via the kernel.
@@ -72,13 +72,13 @@ impl ProtocolMachineKernel {
     ///
     /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run_concurrent<M: KernelMachine>(
-        vm: &mut M,
+        machine: &mut M,
         handler: &dyn EffectHandler,
         max_rounds: usize,
         concurrency: usize,
     ) -> Result<RunStatus, ProtocolMachineError> {
         for _ in 0..max_rounds {
-            match Self::step_round(vm, handler, concurrency)? {
+            match Self::step_round(machine, handler, concurrency)? {
                 StepResult::AllDone => return Ok(RunStatus::AllDone),
                 StepResult::Stuck => return Ok(RunStatus::Stuck),
                 StepResult::Continue => {}
@@ -93,10 +93,10 @@ impl ProtocolMachineKernel {
     ///
     /// Returns a `ProtocolMachineError` if any coroutine faults.
     pub fn run<M: KernelMachine>(
-        vm: &mut M,
+        machine: &mut M,
         handler: &dyn EffectHandler,
         max_steps: usize,
     ) -> Result<RunStatus, ProtocolMachineError> {
-        Self::run_concurrent(vm, handler, max_steps, 1)
+        Self::run_concurrent(machine, handler, max_steps, 1)
     }
 }

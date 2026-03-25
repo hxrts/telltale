@@ -33,27 +33,27 @@ pub struct LoadedProtocolMachineReplayConformance {
 ///
 /// The helper snapshots the provided ProtocolMachine, executes a baseline run with
 /// `RecordingEffectHandler`, then replays the recorded effect trace from the
-/// snapshot state. The input `vm` is left in the baseline post-run state.
+/// snapshot state. The input `machine` is left in the baseline post-run state.
 ///
 /// # Errors
 ///
 /// Returns `ProtocolMachineError` if baseline run, replay run, or snapshot encode/decode fails.
 pub fn run_loaded_protocol_machine_record_replay_conformance(
-    vm: &mut ProtocolMachine,
+    machine: &mut ProtocolMachine,
     handler: &dyn EffectHandler,
     max_steps: usize,
 ) -> Result<LoadedProtocolMachineReplayConformance, ProtocolMachineError> {
-    let snapshot = serde_yaml::to_string(vm).map_err(|e| {
+    let snapshot = serde_yaml::to_string(machine).map_err(|e| {
         ProtocolMachineError::PersistenceError(format!("integration snapshot encode failed: {e}"))
     })?;
 
     let recording = RecordingEffectHandler::new(handler);
-    vm.run(&recording, max_steps)?;
+    machine.run(&recording, max_steps)?;
 
     let recorded_effects = recording.effect_trace();
-    let baseline_trace = vm.trace().to_vec();
-    let baseline_effect_trace = vm.effect_trace().to_vec();
-    let determinism_mode = vm.config().determinism_mode;
+    let baseline_trace = machine.trace().to_vec();
+    let baseline_effect_trace = machine.effect_trace().to_vec();
+    let determinism_mode = machine.config().determinism_mode;
 
     let mut replay_vm: ProtocolMachine = serde_yaml::from_str(&snapshot).map_err(|e| {
         ProtocolMachineError::PersistenceError(format!("integration snapshot decode failed: {e}"))
@@ -169,11 +169,11 @@ mod tests {
     #[test]
     fn loaded_protocol_machine_harness_reports_replay_conformance() {
         let image = simple_send_recv_image();
-        let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
-        vm.load_choreography(&image).expect("load choreography");
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
 
         let report = run_loaded_protocol_machine_record_replay_conformance(
-            &mut vm,
+            &mut machine,
             &DeterministicHandler,
             100,
         )

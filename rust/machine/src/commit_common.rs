@@ -22,7 +22,7 @@ where
     RecordCheck: FnMut(OutputConditionCheck),
     RecordEvent: FnMut(ObsEvent),
 {
-    let digest = "vm.output_digest.unspecified".to_string();
+    let digest = "machine.output_digest.unspecified".to_string();
     let meta = match output_hint {
         Some(h) => OutputConditionMeta::from_hint(h, digest),
         None => OutputConditionMeta::default_observable(digest),

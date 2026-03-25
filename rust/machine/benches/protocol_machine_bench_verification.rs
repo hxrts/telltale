@@ -72,15 +72,15 @@ fn legacy_nullifier_consume(
 #[allow(clippy::too_many_lines)]
 pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
     eprintln!(
-        "vm benchmark snapshot session_open_allocations: {}",
+        "machine benchmark snapshot session_open_allocations: {}",
         session_open_allocation_count(64)
     );
     eprintln!(
-        "vm benchmark snapshot choreography_load_allocations: {}",
+        "machine benchmark snapshot choreography_load_allocations: {}",
         choreography_load_allocation_count(64, 8)
     );
 
-    c.bench_function("vm_sign_value_only", |b| {
+    c.bench_function("protocol_machine_sign_value_only", |b| {
         let endpoint = Endpoint {
             sid: 7,
             role: "A".to_string(),
@@ -95,7 +95,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("vm_verify_signed_value_only", |b| {
+    c.bench_function("protocol_machine_verify_signed_value_only", |b| {
         let endpoint = Endpoint {
             sid: 7,
             role: "A".to_string(),
@@ -111,7 +111,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("vm_auth_tree_append_only", |b| {
+    c.bench_function("protocol_machine_auth_tree_append_only", |b| {
         let (payload, signature) = signing_fixture();
         let signed = telltale_machine::buffer::SignedValue {
             payload,
@@ -134,7 +134,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("vm_replay_identity_build_binary", |b| {
+    c.bench_function("protocol_machine_replay_identity_build_binary", |b| {
         let edge = Edge::new(7, "A", "B");
         let payload = Value::Prod(Box::new(Value::Nat(7)), Box::new(Value::Bool(true)));
         b.iter(|| {
@@ -148,7 +148,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("vm_replay_identity_build_json_legacy", |b| {
+    c.bench_function("protocol_machine_replay_identity_build_json_legacy", |b| {
         let edge = Edge::new(7, "A", "B");
         let payload = Value::Prod(Box::new(Value::Nat(7)), Box::new(Value::Bool(true)));
         b.iter(|| {
@@ -162,7 +162,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         });
     });
 
-    c.bench_function("vm_replay_nullifier_consume_binary", |b| {
+    c.bench_function("protocol_machine_replay_nullifier_consume_binary", |b| {
         let identity = CommunicationIdentity::from_payload(
             &Edge::new(7, "A", "B"),
             CommunicationStepKind::Receive,
@@ -183,7 +183,7 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("vm_replay_nullifier_consume_json_legacy", |b| {
+    c.bench_function("protocol_machine_replay_nullifier_consume_json_legacy", |b| {
         let identity = legacy_identity_build(
             &Edge::new(7, "A", "B"),
             CommunicationStepKind::Receive,
@@ -203,11 +203,11 @@ pub(crate) fn bench_verification_and_allocations(c: &mut Criterion) {
         );
     });
 
-    c.bench_function("vm_session_open_allocation_count", |b| {
+    c.bench_function("protocol_machine_session_open_allocation_count", |b| {
         b.iter(|| black_box(session_open_allocation_count(black_box(64))));
     });
 
-    c.bench_function("vm_choreography_load_allocation_count", |b| {
+    c.bench_function("protocol_machine_choreography_load_allocation_count", |b| {
         b.iter(|| {
             black_box(choreography_load_allocation_count(
                 black_box(64),
