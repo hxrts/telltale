@@ -599,6 +599,8 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | Config.lean | 85 | VMConfig, VMState, ResourcePool |
 | State.lean | 304 | Full machine state, session table, buffer management |
 | Program.lean | 137 | Program representation and code segments |
+| Effects.lean | 167 | Effect-interface metadata, request/outcome exchange objects, and reentrancy primitives |
+| EffectAlgebra.lean | 111 | Effect classification, immediate-effect discipline, and multi-effect composition semantics |
 | SemanticObjects/Core.lean | 241 | Canonical protocol-machine semantic object implementation layer |
 | SemanticObjects/Discipline.lean | 96 | Semantic-object predicate surface for identity, ownership, and observed-read discipline |
 | SemanticObjects/OutstandingEffects.lean | 132 | Deferred-effect lifecycle model: issuance, blocking, completion, timeout, cancellation, invalidation, retry |
@@ -688,7 +690,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | File | Lines | Description |
 |------|------:|-------------|
 | Proofs/ProtocolMachine/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
-| Proofs/ProtocolMachine/Effects.lean | 101 | Effect admissibility and reentrancy theorem layer moved out of the protocol-machine model tree |
+| Proofs/ProtocolMachine/Effects.lean | 247 | Effect admissibility, classification, immediate-effect, and multi-effect composition theorem layer |
 | Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
 | Proofs/ProtocolMachine/MonitorContracts.lean | 23 | Proof-only monitor contract predicates moved out of `Runtime/ProtocolMachine/Runtime/Monitor.lean` |
 | Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |

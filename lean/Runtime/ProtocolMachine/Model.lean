@@ -9,6 +9,7 @@ import Runtime.ProtocolMachine.Model.Config
 import Runtime.ProtocolMachine.Model.CompileLocalTypeR
 import Runtime.ProtocolMachine.Model.Program
 import Runtime.ProtocolMachine.Model.Effects
+import Runtime.ProtocolMachine.Model.EffectAlgebra
 import Runtime.ProtocolMachine.Model.SemanticObjects.Core
 import Runtime.ProtocolMachine.Model.SemanticObjects.Discipline
 import Runtime.ProtocolMachine.Model.SemanticObjects.OutstandingEffects
