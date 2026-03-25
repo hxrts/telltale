@@ -14,7 +14,6 @@
 /// - Host-managed session-local mutation should flow through an explicit
 ///   ownership capability such as `OwnedSession`, not through ad hoc access to
 ///   the session store while handlers are executing.
-#[doc(alias = "ExternalHandler")]
 pub trait EffectHandler: Send + Sync {
     /// Stable identifier for effect-trace attribution.
     fn handler_identity(&self) -> String {

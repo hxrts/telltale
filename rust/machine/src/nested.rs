@@ -16,12 +16,12 @@ struct SiteRunner {
 }
 
 /// Effect handler that dispatches to inner ProtocolMachines keyed by outer role name.
-pub struct NestedVMHandler {
+pub struct NestedProtocolMachineHandler {
     sites: BTreeMap<String, SiteRunner>,
     max_rounds_per_step: usize,
 }
 
-impl NestedVMHandler {
+impl NestedProtocolMachineHandler {
     /// Create an empty nested handler.
     #[must_use]
     pub fn new() -> Self {
@@ -118,13 +118,13 @@ impl NestedVMHandler {
     }
 }
 
-impl Default for NestedVMHandler {
+impl Default for NestedProtocolMachineHandler {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl EffectHandler for NestedVMHandler {
+impl EffectHandler for NestedProtocolMachineHandler {
     fn handle_send(
         &self,
         role: &str,

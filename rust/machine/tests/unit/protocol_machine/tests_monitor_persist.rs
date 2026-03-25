@@ -238,7 +238,7 @@
 
         let handler = PassthroughHandler;
         let step_result = vm.step(&handler).expect("step should succeed");
-        assert!(matches!(step_result, ProtocolMachineStepResult::Continue));
+        assert!(matches!(step_result, StepResult::Continue));
 
         let type_after = vm.sessions.lookup_type(&ep_b).cloned();
         let b_coro_after = vm

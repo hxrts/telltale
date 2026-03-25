@@ -6,10 +6,10 @@ use telltale_types::FixedQ32;
 
 use telltale_machine::buffer::EnqueueResult;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_machine::session::SessionId;
+use telltale_machine::model::state::SessionId;
 use telltale_machine::ObsEvent;
 
 use crate::rng::SimRng;

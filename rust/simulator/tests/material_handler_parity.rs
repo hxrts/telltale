@@ -1,7 +1,7 @@
 //! Material-handler parity fixtures mirrored by Lean `Runtime.Tests.SimulatorParity`.
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_simulator::handler_from_material;
 use telltale_simulator::material::{
     ContinuumFieldParams, HamiltonianParams, MaterialParams, MeanFieldParams,

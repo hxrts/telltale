@@ -9,11 +9,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cfg_if::cfg_if;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::instr::{ImmValue, Instr};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
     protocol_machine_semantic_objects_v1, run_loaded_protocol_machine_record_replay_conformance,

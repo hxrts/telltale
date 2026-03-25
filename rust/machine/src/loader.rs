@@ -28,7 +28,7 @@ pub struct CodeImage {
 ///
 /// Must be validated before execution via `validate`.
 #[derive(Debug, Clone)]
-pub struct UntrustedImage {
+pub(crate) struct UntrustedImage {
     /// Bytecode programs per role.
     pub programs: BTreeMap<String, Vec<Instr>>,
     /// The global type this image was derived from.
@@ -39,7 +39,7 @@ pub struct UntrustedImage {
 
 /// Result of loading a code image.
 #[derive(Debug)]
-pub enum LoadResult {
+pub(crate) enum LoadResult {
     /// Image loaded successfully.
     Ok,
     /// Validation failed.
@@ -102,7 +102,7 @@ impl CodeImage {
 impl UntrustedImage {
     /// Create an untrusted image from projected local types.
     #[must_use]
-    pub fn from_local_types(
+    pub(crate) fn from_local_types(
         local_types: &BTreeMap<String, LocalTypeR>,
         global_type: &GlobalType,
     ) -> Self {
@@ -128,7 +128,7 @@ impl UntrustedImage {
     /// # Errors
     ///
     /// Returns `LoadResult::ValidationFailed` if any check fails.
-    pub fn validate(self) -> Result<CodeImage, LoadResult> {
+    pub(crate) fn validate(self) -> Result<CodeImage, LoadResult> {
         if !self.global_type.well_formed() {
             return Err(LoadResult::ValidationFailed {
                 reason: "global type is not well-formed".into(),

@@ -162,7 +162,7 @@
 
         assert_eq!(vm.scheduler_step_count(), 0);
         let first = vm.step_round(&handler, 8).expect("first round");
-        assert!(matches!(first, ProtocolMachineStepResult::Continue));
+        assert!(matches!(first, StepResult::Continue));
         assert_eq!(vm.scheduler_step_count(), 1);
         assert_eq!(
             vm.coroutines
@@ -173,7 +173,7 @@
         );
 
         let second = vm.step_round(&handler, 8).expect("second round");
-        assert!(matches!(second, ProtocolMachineStepResult::AllDone));
+        assert!(matches!(second, StepResult::AllDone));
         assert_eq!(vm.scheduler_step_count(), 2);
     }
 
@@ -198,7 +198,7 @@
 
         assert_eq!(vm.scheduler_step_count(), 0);
         let result = vm.step_round(&handler, 1).expect("step round");
-        assert!(matches!(result, ProtocolMachineStepResult::Stuck));
+        assert!(matches!(result, StepResult::Stuck));
         assert_eq!(vm.scheduler_step_count(), 0);
     }
 
@@ -222,12 +222,12 @@
         let handler = PassthroughHandler;
 
         let stuck = vm.step_round(&handler, 1).expect("paused step round");
-        assert!(matches!(stuck, ProtocolMachineStepResult::Stuck));
+        assert!(matches!(stuck, StepResult::Stuck));
         assert_eq!(vm.scheduler_step_count(), 0);
 
         vm.resume_role("A");
         let resumed = vm.step_round(&handler, 1).expect("resumed step round");
-        assert!(matches!(resumed, ProtocolMachineStepResult::AllDone));
+        assert!(matches!(resumed, StepResult::AllDone));
         assert_eq!(vm.scheduler_step_count(), 1);
     }
 
@@ -250,7 +250,7 @@
         let handler = PassthroughHandler;
 
         let first = vm.step_round(&handler, 1).expect("yield step");
-        assert!(matches!(first, ProtocolMachineStepResult::Continue));
+        assert!(matches!(first, StepResult::Continue));
         let coro = vm.coroutine(0).expect("coroutine exists");
         assert_eq!(coro.pc, 1);
         assert!(matches!(
@@ -259,7 +259,7 @@
         ));
 
         let second = vm.step_round(&handler, 1).expect("halt step");
-        assert!(matches!(second, ProtocolMachineStepResult::AllDone));
+        assert!(matches!(second, StepResult::AllDone));
     }
 
     #[test]
@@ -284,7 +284,7 @@
         let all_done = all_done_vm
             .run(&PassthroughHandler, 8)
             .expect("all-done run must succeed");
-        assert_eq!(all_done, ProtocolMachineRunStatus::AllDone);
+        assert_eq!(all_done, RunStatus::AllDone);
 
         let stuck_image = CodeImage {
             programs: {
@@ -309,7 +309,7 @@
         let stuck = stuck_vm
             .run(&PassthroughHandler, 8)
             .expect("stuck run must return status, not fault");
-        assert_eq!(stuck, ProtocolMachineRunStatus::Stuck);
+        assert_eq!(stuck, RunStatus::Stuck);
 
         let max_image = CodeImage {
             programs: {
@@ -331,7 +331,7 @@
         let exhausted = max_vm
             .run(&PassthroughHandler, 8)
             .expect("bounded loop run must return status");
-        assert_eq!(exhausted, ProtocolMachineRunStatus::MaxRoundsExceeded);
+        assert_eq!(exhausted, RunStatus::MaxRoundsExceeded);
     }
 
     fn open_test_image(open_instr: Instr) -> CodeImage {
@@ -471,7 +471,7 @@
         let handler = PassthroughHandler;
 
         let result = vm.step_round(&handler, 1).expect("open step");
-        assert!(matches!(result, ProtocolMachineStepResult::Continue));
+        assert!(matches!(result, StepResult::Continue));
 
         let sid = match vm
             .trace()
@@ -550,7 +550,7 @@
 
         let handler = PassthroughHandler;
         let result = vm.step_round(&handler, 1).expect("open step");
-        assert!(matches!(result, ProtocolMachineStepResult::Continue));
+        assert!(matches!(result, StepResult::Continue));
 
         let opened: Vec<SessionId> = vm
             .trace()

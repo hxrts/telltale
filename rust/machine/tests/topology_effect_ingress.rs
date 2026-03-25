@@ -9,7 +9,7 @@ use cfg_if::cfg_if;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
     TopologyPerturbation,
 };
@@ -203,7 +203,7 @@ cfg_if! {
         }
 
         fn topology_trace(
-            entries: &[telltale_machine::effect::EffectTraceEntry],
+            entries: &[telltale_machine::model::effects::EffectTraceEntry],
         ) -> Vec<TopologyPerturbation> {
             entries
                 .iter()

@@ -11,12 +11,12 @@ use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use telltale_machine::coroutine::{Fault, Value};
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
     TopologyPerturbation,
 };
 use telltale_machine::instr::{ImmValue, Instr};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ThreadedProtocolMachine;
 use telltale_machine::{
     CommunicationReplayMode, EffectDeterminismTier, EnvelopeDiffArtifactV1,

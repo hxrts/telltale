@@ -10,11 +10,11 @@ mod test_support;
 use std::collections::BTreeMap;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ContentionMetrics, ThreadedProtocolMachine};
-use telltale_machine::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
+use telltale_machine::{ProtocolMachineConfig, StepResult, ThreadedRoundSemantics};
 use telltale_types::{GlobalType, LocalTypeR};
 use test_support::ScenarioSpec;
 
@@ -122,11 +122,11 @@ fn run_composed(workers: usize, protocols: usize) -> (usize, ContentionMetrics) 
             .step_round(&handler, workers.max(1))
             .expect("threaded step_round")
         {
-            ProtocolMachineStepResult::AllDone => {
+            StepResult::AllDone => {
                 return (rounds, vm.contention_metrics().clone());
             }
-            ProtocolMachineStepResult::Continue => {}
-            ProtocolMachineStepResult::Stuck => {
+            StepResult::Continue => {}
+            StepResult::Stuck => {
                 panic!("composed workload got stuck");
             }
         }

@@ -92,7 +92,7 @@ Rust-only wrappers, so they are not expected to have direct Lean theorem peers.
 
 - `GuestRuntime`
 - `ThreadedGuestRuntime`
-- `ExternalHandler`
+- `EffectHandler`
 - `ProtocolMachine`
 - `ProtocolMachineConfig`
 - `ProtocolMachineState`

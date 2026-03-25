@@ -12,13 +12,13 @@ use cfg_if::cfg_if;
 use std::collections::BTreeMap;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult,
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult,
 };
 use telltale_types::{GlobalType, LocalTypeR};
 
@@ -36,11 +36,11 @@ struct StepSnap {
     new_events: Vec<&'static str>,
 }
 
-fn result_name(result: &ProtocolMachineStepResult) -> &'static str {
+fn result_name(result: &StepResult) -> &'static str {
     match result {
-        ProtocolMachineStepResult::Continue => "continue",
-        ProtocolMachineStepResult::Stuck => "stuck",
-        ProtocolMachineStepResult::AllDone => "all_done",
+        StepResult::Continue => "continue",
+        StepResult::Stuck => "stuck",
+        StepResult::AllDone => "all_done",
     }
 }
 
@@ -99,7 +99,7 @@ fn run_cooperative_snaps(
         });
         if matches!(
             result,
-            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck
+            StepResult::AllDone | StepResult::Stuck
         ) {
             break;
         }
@@ -141,7 +141,7 @@ fn run_cooperative_snaps_with_config(
         });
         if matches!(
             result,
-            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck
+            StepResult::AllDone | StepResult::Stuck
         ) {
             break;
         }
@@ -499,7 +499,7 @@ cfg_if! {
                     result: result_name(&result),
                     new_events,
                 });
-                if matches!(result, ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) {
+                if matches!(result, StepResult::AllDone | StepResult::Stuck) {
                     break;
                 }
             }

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{Instr, ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, LocalTypeR};
 

@@ -9,7 +9,7 @@ use telltale_bridge::{
     ProtocolMachineTraceEvent, SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent,
 };
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_machine::ObsEvent;
 use telltale_simulator::runner::{run_with_scenario, ScenarioResult};
 use telltale_simulator::scenario::Scenario;

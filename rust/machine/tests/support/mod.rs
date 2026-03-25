@@ -6,10 +6,10 @@ use std::sync::Mutex;
 use proptest::prelude::*;
 use telltale_machine::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineError, ProtocolMachineStepResult,
+    ObsEvent, ProtocolMachine, ProtocolMachineError, StepResult,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -360,8 +360,8 @@ pub fn run_to_completion(
 ) -> Result<Vec<ObsEvent>, ProtocolMachineError> {
     for _ in 0..max_steps {
         match vm.step(handler)? {
-            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck => break,
-            ProtocolMachineStepResult::Continue => {}
+            StepResult::AllDone | StepResult::Stuck => break,
+            StepResult::Continue => {}
         }
     }
     Ok(vm.trace().to_vec())

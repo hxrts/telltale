@@ -230,7 +230,7 @@ impl ProtocolMachineRunner {
     pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 
     fn process_timeout() -> Duration {
-        let ms = std::env::var("TELLTALE_VM_TIMEOUT_MS")
+        let ms = std::env::var("TELLTALE_PROTOCOL_MACHINE_TIMEOUT_MS")
             .ok()
             .and_then(|raw| raw.parse::<u64>().ok())
             .unwrap_or(Self::DEFAULT_TIMEOUT_MS);

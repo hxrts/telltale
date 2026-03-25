@@ -194,8 +194,8 @@ entrypoints remain.
 | protocol-machine config | `Runtime/protocol machine/Model/Config.lean` | `telltale_machine::ProtocolMachineConfig` | `telltale_bridge::ProtocolMachineRunInput` | Aligned |
 | protocol-machine state | `Runtime/protocol machine/Model/State.lean` | `telltale_machine::ProtocolMachineState` | `telltale_bridge::ProtocolMachineRunOutput` | Aligned |
 | protocol-machine executor | `Runtime/protocol machine/API.lean`, `Runtime/protocol machine/Runtime/Runner.lean` | `telltale_machine::ProtocolMachine` | `telltale_bridge::ProtocolMachineRunner` | Aligned |
-| protocol-machine step result | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::ProtocolMachineStepResult` | `telltale_bridge::ProtocolMachineStepState` | Aligned |
-| protocol-machine run status | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::ProtocolMachineRunStatus` | `telltale_bridge::ProtocolMachineRunOutput.status` | Aligned |
+| protocol-machine step result | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::StepResult` | `telltale_bridge::ProtocolMachineStepState` | Aligned |
+| protocol-machine run status | `Runtime/protocol machine/Model/ExecResult.lean` | `telltale_machine::RunStatus` | `telltale_bridge::ProtocolMachineRunOutput.status` | Aligned |
 | protocol-machine error surface | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean` | `telltale_machine::ProtocolMachineError` | `telltale_bridge::LeanStructuredError` | Aligned |
 | protocol-machine memory accounting | `Runtime/protocol machine/Model/State.lean` | `telltale_machine::ProtocolMachineMemoryUsage`, `telltale_machine::ProtocolMachineRetainedBytes` | n/a | Aligned |
 | guest runtime driver | `Runtime/protocol machine/API.lean` | `telltale_machine::GuestRuntime`, `telltale_machine::ThreadedGuestRuntime` | n/a | Aligned |

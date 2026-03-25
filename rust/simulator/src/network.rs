@@ -7,10 +7,10 @@ use telltale_types::FixedQ32;
 
 use telltale_machine::buffer::EnqueueResult;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_machine::session::SessionId;
+use telltale_machine::model::state::SessionId;
 
 use crate::rng::SimRng;
 
@@ -363,7 +363,7 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use telltale_machine::effect::{EffectFailure, EffectResult};
+    use telltale_machine::model::effects::{EffectFailure, EffectResult};
 
     struct PassthroughHandler;
 

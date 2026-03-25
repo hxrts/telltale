@@ -61,15 +61,15 @@ Protocol-machine and guest-runtime surfaces for executing projected local types.
 
 Canonical public modules:
 
-- `telltale_machine::protocol_machine`
-- `telltale_machine::guest_runtime`
-- `telltale_machine::host_runtime`
+- `telltale_machine::model`
+- `telltale_machine::runtime`
+- `telltale_machine::semantics`
 
 Key exports:
 
 - `ProtocolMachine`, `ProtocolMachineConfig`, `GuestRuntime`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
-- `OwnedSession`, `ExternalHandler`, and `NestedVMHandler`
+- `OwnedSession`, `EffectHandler`, and `NestedProtocolMachineHandler`
 - canonical semantic objects:
   `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
   `TransformationObligation`,
@@ -85,15 +85,17 @@ Key exports:
   `canonical_replay_fragment()`
 
 `GuestRuntime` is the Telltale-owned runtime instantiated around the protocol
-machine. `ExternalHandler` is the host-runtime boundary implemented by
-embedders and simulators.
+machine. `EffectHandler` is the host-runtime boundary implemented by embedders
+and simulators.
 
 Module access (not re-exported at crate root):
 - Effect boundary:
-  `telltale_machine::effect::EffectHandler`, `EffectRequest`, `EffectOutcome`,
+  `telltale_machine::model::effects::EffectHandler`, `EffectRequest`, `EffectOutcome`,
   `EffectInterfaceMetadata`, `EffectExchangeRecord`, `SendDecision`, `SendDecisionInput`
-- Effect trace: `telltale_machine::effect::RecordingEffectHandler`, `ReplayEffectHandler`
-- Loader: `telltale_machine::loader::CodeImage`
+- Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
+- Loader: `telltale_machine::runtime::loader::CodeImage`
+- Runtime runner: `telltale_machine::runtime::runner::{ProtocolMachine, GuestRuntime, StepResult, RunStatus}`
+- Semantics: `telltale_machine::semantics::exec::{ExecResult, ExecStatus, StepPack}`
 
 See `rust/machine/src/lib.rs` for the full API.
 See [Effect Handlers and Session Types](11_effect_session_bridge.md) for integration-boundary guidance.

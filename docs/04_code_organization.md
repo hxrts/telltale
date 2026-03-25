@@ -161,10 +161,10 @@ These commands generate samples, validate round-trips, and import JSON respectiv
 
 This crate is located in `rust/machine/`. It provides the protocol machine and guest-runtime surfaces for executing session type protocols. The protocol machine is the canonical semantic core used by the simulator and by direct embeddings.
 
-The canonical public entry modules are `telltale_machine::protocol_machine`,
-`telltale_machine::guest_runtime`, and `telltale_machine::host_runtime`. The historical
-`engine` and `threaded` modules still exist as implementation modules, but they are
-not the architectural front door.
+The canonical public entry modules are `telltale_machine::model`,
+`telltale_machine::runtime`, and `telltale_machine::semantics`. Internal
+implementation modules still exist behind those facades, but they are not the
+architectural front door.
 
 #### Instruction Set and Modules
 
@@ -176,15 +176,24 @@ The `coroutine` module defines lightweight execution units. Each coroutine has a
 
 #### Scheduling, Sessions, and Loading
 
-The `scheduler` module implements scheduling policies. Available policies are `Cooperative`, `RoundRobin`, `Priority`, and `ProgressAware`.
+`telltale_machine::model::scheduler_types` exposes scheduling policies.
+Available policies are `Cooperative`, `RoundRobin`, `Priority`, and
+`ProgressAware`.
 
-The `session` module manages session state and type advancement. The `buffer` module provides bounded message buffers. Buffer modes include `Fifo` and `LatestValue`. Backpressure policies include `Block`, `Drop`, `Error`, and `Resize`.
+`telltale_machine::model::state` manages session state and type advancement.
+The `buffer` module provides bounded message buffers. Buffer modes include
+`Fifo` and `LatestValue`. Backpressure policies include `Block`, `Drop`,
+`Error`, and `Resize`.
 
-The `loader` module handles dynamic choreography loading. The `CodeImage` struct packages local types for loading. The preferred host-facing open path is `load_choreography_owned(...)`, which binds explicit guest-runtime ownership at open.
+`telltale_machine::runtime::loader` handles dynamic choreography loading. The
+`CodeImage` struct packages local types for loading. The preferred host-facing
+open path is `load_choreography_owned(...)`, which binds explicit guest-runtime
+ownership at open.
 
 ```rust
-use telltale_machine::{GuestRuntime, OwnedSession, ProtocolMachine, ProtocolMachineConfig};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::runtime::runner::{GuestRuntime, OwnedSession, ProtocolMachine};
+use telltale_machine::model::config::ProtocolMachineConfig;
 
 let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 let image = CodeImage::from_local_types(&local_types, &global_type);

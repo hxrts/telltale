@@ -407,7 +407,7 @@
         ]);
 
         let handler = PassthroughHandler;
-        // Intentionally discard ProtocolMachineStepResult: we only care that the step executes without panic
+        // Intentionally discard StepResult: we only care that the step executes without panic
         let _ignored = vm.step(&handler).expect("transfer step should succeed");
 
         assert!(vm.coroutines[a_idx].progress_tokens.is_empty());
@@ -658,7 +658,7 @@
         ]);
 
         let handler = PassthroughHandler;
-        // Intentionally discard ProtocolMachineStepResult: we only care that the step executes without panic
+        // Intentionally discard StepResult: we only care that the step executes without panic
         let _ignored = vm.step(&handler).expect("check step should succeed");
         assert_eq!(vm.coroutines[a_idx].regs[4], Value::Bool(false));
     }

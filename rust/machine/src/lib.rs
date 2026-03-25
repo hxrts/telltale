@@ -23,13 +23,13 @@
 //! middleware for network latency, faults, property monitoring, and
 //! checkpointing.
 //!
-//! **Nested simulation** is supported via [`nested::NestedVMHandler`], which
+//! **Nested simulation** is supported via [`runtime::runner::NestedProtocolMachineHandler`], which
 //! allows a protocol-machine coroutine to host an inner protocol machine for
 //! distributed or hierarchical simulations.
 //!
 //! # Effect Handler Contract
 //!
-//! The protocol machine's [`ExternalHandler`] is synchronous, deterministic, and
+//! The protocol machine's [`EffectHandler`] is synchronous, deterministic, and
 //! **session-local**. It must not depend on global time or shared mutable
 //! state across sessions. This is distinct from the async, typed
 //! `telltale_choreography::ChoreoHandler` used by generated choreography code.
@@ -68,11 +68,11 @@ pub mod composition;
 pub mod coroutine;
 pub mod determinism;
 pub mod driver;
-pub mod effect;
+mod effect;
 mod engine;
 pub mod envelope_diff;
 pub mod exec;
-pub mod exec_api;
+mod exec_api;
 pub mod faults;
 pub mod guard;
 pub mod identity;
@@ -81,17 +81,17 @@ pub mod instruction_semantics;
 pub mod integration;
 pub mod intern;
 pub mod kernel;
-pub mod loader;
-pub mod nested;
+mod loader;
+mod nested;
 pub mod output_condition;
 pub mod owned;
 pub mod persistence;
 pub mod runtime_contracts;
-pub mod scheduler;
+mod scheduler;
 pub mod semantic_objects;
 pub mod serialization;
 /// Session store and role/session bookkeeping used by protocol execution.
-pub mod session;
+mod session;
 pub mod trace;
 pub mod transfer_semantics;
 pub mod verification;
@@ -104,41 +104,143 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
-        pub mod wasm;
+        mod wasm;
     }
 }
 
-/// Canonical protocol-machine public surface.
-pub mod protocol_machine {
-    pub use crate::engine::{
-        EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
-        ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, ProtocolMachine,
-        ProtocolMachineConfig, ProtocolMachineError, ProtocolMachineMemoryUsage,
-        ProtocolMachineRetainedBytes, ProtocolMachineState, RunStatus, RuntimeTuningProfile,
-        SchedExecStatus, SchedStepDebug, StepResult, ThreadedRoundSemantics,
-    };
-    pub use crate::kernel::ProtocolMachineKernel;
-    pub use crate::semantic_objects::{
-        AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-        CanonicalHandleKind, ObservedRead, OperationInstance, OperationPhase, OutstandingEffect,
-        OutstandingEffectStatus, ProgressContract, ProgressState, ProgressTransition,
-        ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
-        PublicationStatus, SemanticHandoff, SEMANTIC_OBJECTS_SCHEMA_VERSION,
-    };
-    #[cfg(feature = "multi-thread")]
-    pub use crate::threaded::ThreadedProtocolMachine;
+/// Canonical protocol-machine model surface aligned with Lean `Runtime.ProtocolMachine.Model`.
+pub mod model {
+    /// Core execution objects and instruction vocabulary.
+    pub mod core {
+        pub use crate::coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
+        pub use crate::instr::Instr;
+    }
+
+    /// Protocol-machine configuration and retained-state metadata.
+    pub mod config {
+        pub use crate::engine::{
+            EffectTraceCaptureMode, MonitorMode, ObservabilityRetentionConfig,
+            ObservabilityRetentionMode, PayloadValidationMode, ProtocolMachineConfig,
+            ProtocolMachineMemoryUsage, ProtocolMachineRetainedBytes, ResourceState,
+            RuntimeTuningProfile, ThreadedRoundSemantics,
+        };
+    }
+
+    /// Program and compiled-code objects.
+    pub mod program {
+        pub use crate::engine::{Program, ProgramStore};
+    }
+
+    /// Effect boundary and effect algebra objects.
+    pub mod effects {
+        pub use crate::bridge::EffectGuardBridge;
+        pub use crate::effect::{
+            CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectExchangeRecord,
+            EffectFailure, EffectFailureKind, EffectHandler, EffectHandlerDomain,
+            EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus,
+            EffectReentrancyPolicy, EffectRequest, EffectRequestBody, EffectResponse,
+            EffectResult, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry,
+            EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler, SendDecision,
+            SendDecisionInput, TopologyPerturbation,
+        };
+    }
+
+    /// Scheduler policy and scheduling-state vocabulary.
+    pub mod scheduler_types {
+        pub use crate::scheduler::{
+            CrossLaneHandoff, LaneId, PriorityPolicy, SchedPolicy, SchedState, Scheduler,
+            StepUpdate,
+        };
+    }
+
+    /// State-level session, ownership, and edge objects.
+    pub mod state {
+        pub use crate::engine::{ObsEvent, ProtocolMachineState};
+        pub use crate::session::{
+            decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
+            AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
+            HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
+            OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
+            SessionHostMutation, SessionId, SessionStatus, SessionStore, SessionStoreMemoryUsage,
+            SessionStoreRetainedBytes, TimeoutWitness,
+        };
+        pub use crate::session::{unfold_if_var, unfold_mu};
+    }
+
+    /// Output-condition model surfaces.
+    pub mod output_condition {
+        pub use crate::output_condition::{
+            verify_output_condition, OutputConditionCheck, OutputConditionHint,
+            OutputConditionMeta, OutputConditionPolicy,
+        };
+    }
+
+    /// Canonical protocol-machine semantic-object family.
+    pub mod semantic_objects {
+        pub use crate::semantic_objects::{
+            protocol_machine_semantic_objects_v1, AuthoritativeRead, AuthoritativeReadKind,
+            AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, MaterializationProof,
+            ObservedRead, OperationInstance, OperationPhase, OutstandingEffect,
+            OutstandingEffectStatus, ProgressContract, ProgressState, ProgressTransition,
+            ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
+            PublicationStatus, SemanticHandoff, TransformationObligation,
+            SEMANTIC_OBJECTS_SCHEMA_VERSION,
+        };
+    }
 }
 
-/// Canonical guest-runtime public surface.
-pub mod guest_runtime {
-    pub use crate::driver::NativeSingleThreadDriver as GuestRuntime;
-    #[cfg(feature = "multi-thread")]
-    pub use crate::driver::NativeThreadedDriver as ThreadedGuestRuntime;
+/// Canonical runtime surface aligned with Lean `Runtime.ProtocolMachine.Runtime`.
+pub mod runtime {
+    /// Runtime loading surface.
+    pub mod loader {
+        pub use crate::loader::CodeImage;
+    }
+
+    /// Runtime failure and admission surfaces.
+    pub mod failure {
+        pub use crate::faults::{classify_fault, fault_code, fault_code_of, FaultClass};
+        pub use crate::runtime_contracts::{
+            admit_protocol_machine_runtime, determinism_profile_supported,
+            enforce_protocol_machine_runtime_gates, request_determinism_profile,
+            requires_protocol_machine_runtime_contracts, runtime_capability_snapshot,
+            DeterminismArtifacts, RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts,
+            RuntimeGateResult,
+        };
+    }
+
+    /// Runtime runner and guest-runtime surfaces.
+    pub mod runner {
+        pub use crate::driver::NativeSingleThreadDriver as GuestRuntime;
+        pub use crate::engine::{
+            ProtocolMachine, ProtocolMachineError, RunStatus, SchedExecStatus, SchedStepDebug,
+            StepResult,
+        };
+        pub use crate::kernel::ProtocolMachineKernel;
+        pub use crate::nested::NestedProtocolMachineHandler;
+        pub use crate::owned::OwnedSession;
+        #[cfg(target_arch = "wasm32")]
+        pub use crate::wasm::WasmProtocolMachine;
+    }
+
+    /// Multi-threaded runtime surface.
+    pub mod threaded_runner {
+        #[cfg(feature = "multi-thread")]
+        pub use crate::driver::NativeThreadedDriver as ThreadedGuestRuntime;
+        #[cfg(feature = "multi-thread")]
+        pub use crate::threaded::ThreadedProtocolMachine;
+    }
 }
 
-/// Canonical host-runtime boundary surface.
-pub mod host_runtime {
-    pub use crate::effect::EffectHandler as ExternalHandler;
+/// Canonical semantics surface aligned with Lean `Runtime.ProtocolMachine.Semantics`.
+pub mod semantics {
+    /// Instruction-step execution surfaces.
+    pub mod exec {
+        pub use crate::exec_api::{ExecResult, ExecStatus, StepEvent, StepPack};
+        pub use crate::integration::{
+            run_loaded_protocol_machine_record_replay_conformance,
+            LoadedProtocolMachineReplayConformance,
+        };
+    }
 }
 
 pub use architecture::{
@@ -163,7 +265,6 @@ pub use composition::{
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
-pub use effect::EffectHandler as ExternalHandler;
 pub use effect::{
     CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectExchangeRecord, EffectFailure,
     EffectFailureKind, EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome,
@@ -175,9 +276,9 @@ pub use engine::{
     EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
     ObservabilityRetentionMode, PayloadValidationMode, Program, ProgramStore, ProtocolMachine,
     ProtocolMachineConfig, ProtocolMachineError, ProtocolMachineMemoryUsage,
-    ProtocolMachineRetainedBytes, ProtocolMachineState, ResourceState,
-    RunStatus as ProtocolMachineRunStatus, RuntimeTuningProfile, SchedExecStatus, SchedStepDebug,
-    StepResult as ProtocolMachineStepResult, ThreadedRoundSemantics,
+    ProtocolMachineRetainedBytes, ProtocolMachineState, ResourceState, RunStatus,
+    RuntimeTuningProfile, SchedExecStatus, SchedStepDebug, StepResult,
+    ThreadedRoundSemantics,
 };
 pub use engine::{FlowPolicy, FlowPredicate};
 pub use envelope_diff::{
@@ -194,7 +295,7 @@ pub use integration::{
 };
 pub use intern::{EdgeId, EdgeSymbol, EdgeSymbolTable, StringId, SymbolTable};
 pub use kernel::ProtocolMachineKernel;
-pub use nested::NestedVMHandler;
+pub use nested::NestedProtocolMachineHandler;
 pub use output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
@@ -256,6 +357,6 @@ cfg_if! {
 
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
-        pub use wasm::WasmVM;
+        pub use wasm::WasmProtocolMachine;
     }
 }

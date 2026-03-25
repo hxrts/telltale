@@ -92,13 +92,6 @@ include!("engine/instruction_choice.rs");
 include!("engine/open_commit.rs");
 include!("engine/kernel_impl.rs");
 
-// Test convenience aliases for types that were renamed during the
-// telltale-vm -> telltale-machine migration.
-#[cfg(test)]
-pub(crate) type ProtocolMachineStepResult = StepResult;
-#[cfg(test)]
-pub(crate) type ProtocolMachineRunStatus = RunStatus;
-
 #[cfg(test)]
 mod tests {
     include!("../tests/unit/protocol_machine/tests_handlers_core.rs");

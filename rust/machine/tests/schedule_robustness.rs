@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use telltale_machine::scheduler::{PriorityPolicy, SchedPolicy};
+use telltale_machine::model::scheduler_types::{PriorityPolicy, SchedPolicy};
 use telltale_machine::trace::normalize_trace;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 

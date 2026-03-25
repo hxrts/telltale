@@ -232,7 +232,7 @@
         let step = vm
             .step(&TimeoutOnTickOneHandler)
             .expect("timeout topology ingress should not fault");
-        assert!(matches!(step, ProtocolMachineStepResult::Stuck));
+        assert!(matches!(step, StepResult::Stuck));
         assert!(!vm.timed_out_sites().is_empty());
         let audit = vm.authority_audit_log();
         assert_eq!(audit.len(), 1);

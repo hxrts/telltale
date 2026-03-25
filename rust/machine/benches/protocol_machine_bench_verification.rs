@@ -9,7 +9,7 @@ use telltale_machine::communication_replay::{
 };
 use telltale_machine::coroutine::Value;
 use telltale_machine::instr::Endpoint;
-use telltale_machine::session::Edge;
+use telltale_machine::model::state::Edge;
 use telltale_machine::verification::{
     signing_key_for_endpoint, verifying_key_for_endpoint, AuthTree, DefaultVerificationModel, Hash,
     HashTag, Nullifier, VerificationModel,

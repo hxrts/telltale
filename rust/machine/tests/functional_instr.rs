@@ -16,10 +16,10 @@ use assert_matches::assert_matches;
 use telltale_machine::buffer::{BackpressurePolicy, BufferConfig, BufferMode};
 use telltale_machine::coroutine::{CoroStatus, Fault, Value};
 use telltale_machine::instr::{Endpoint, ImmValue, Instr, InvokeAction};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
     ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
-    ProtocolMachineStepResult,
+    StepResult,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -216,9 +216,9 @@ fn test_send_buffer_full_block() {
     // Step scheduler until A runs.
     for _ in 0..10 {
         match vm.step(&handler) {
-            Ok(ProtocolMachineStepResult::Continue) => {}
-            Ok(ProtocolMachineStepResult::Stuck) => break,
-            Ok(ProtocolMachineStepResult::AllDone) => break,
+            Ok(StepResult::Continue) => {}
+            Ok(StepResult::Stuck) => break,
+            Ok(StepResult::AllDone) => break,
             Err(_) => break,
         }
     }

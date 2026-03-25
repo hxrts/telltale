@@ -10,7 +10,7 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, EffectTraceEntry, RecordingEffectHandler,
     SendDecision, SendDecisionInput, TopologyPerturbation,
 };
@@ -322,7 +322,7 @@ fn semantic_object_bundle_roundtrips_through_replay_fragment() {
     );
 }
 
-fn transfer_image() -> telltale_machine::loader::CodeImage {
+fn transfer_image() -> telltale_machine::runtime::loader::CodeImage {
     let mut local_types = BTreeMap::new();
     local_types.insert("A".to_string(), LocalTypeR::End);
     local_types.insert("B".to_string(), LocalTypeR::End);
@@ -345,7 +345,7 @@ fn transfer_image() -> telltale_machine::loader::CodeImage {
     );
     programs.insert("B".to_string(), vec![telltale_machine::instr::Instr::Halt]);
 
-    telltale_machine::loader::CodeImage {
+    telltale_machine::runtime::loader::CodeImage {
         programs,
         global_type: GlobalType::End,
         local_types,

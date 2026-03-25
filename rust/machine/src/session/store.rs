@@ -998,7 +998,7 @@ pub fn unfold_if_var(cont: &LocalTypeR, original: &LocalTypeR) -> LocalTypeR {
 /// for subsequent `Var` resolution. Returns `(resolved_type, Some(mu))` when
 /// entering a new Mu scope, `(resolved_type, None)` otherwise.
 #[must_use]
-pub fn unfold_if_var_with_scope(
+pub(crate) fn unfold_if_var_with_scope(
     cont: &LocalTypeR,
     original: &LocalTypeR,
 ) -> (LocalTypeR, Option<LocalTypeR>) {

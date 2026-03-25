@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 
 use criterion::{black_box, BatchSize, Criterion};
-use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRunStatus};
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, RunStatus};
 use telltale_types::ValType;
 
 use crate::common::{
@@ -33,7 +33,7 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
             vm.load_choreography_owned(black_box(&image_small), "bench/runtime/small")
                 .expect("load choreography");
             let status = vm.run(&handler, 10_000).expect("run vm");
-            assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+            assert!(matches!(status, RunStatus::AllDone));
             black_box((vm.trace().len(), vm.memory_usage()));
         })
     });
@@ -47,7 +47,7 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
             vm.load_choreography_owned(black_box(&image_wide), "bench/runtime/wide")
                 .expect("load choreography");
             let status = vm.run(&handler, 20_000).expect("run vm");
-            assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+            assert!(matches!(status, RunStatus::AllDone));
             black_box((vm.trace().len(), vm.memory_usage()));
         })
     });
@@ -160,7 +160,7 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
             || setup_many_paused_scheduler_vm(black_box(256), black_box(8)),
             |mut vm| {
                 let status = vm.run(&handler, 10_000).expect("run vm");
-                assert!(matches!(status, ProtocolMachineRunStatus::Stuck));
+                assert!(matches!(status, RunStatus::Stuck));
                 black_box((status, vm.trace().len()));
             },
             BatchSize::SmallInput,
@@ -178,9 +178,9 @@ pub(crate) fn bench_runtime(c: &mut Criterion) {
 }
 
 fn emit_runtime_snapshots(
-    image_small: &telltale_machine::loader::CodeImage,
-    image_wide: &telltale_machine::loader::CodeImage,
-    send_recv: &telltale_machine::loader::CodeImage,
+    image_small: &telltale_machine::runtime::loader::CodeImage,
+    image_wide: &telltale_machine::runtime::loader::CodeImage,
+    send_recv: &telltale_machine::runtime::loader::CodeImage,
 ) {
     eprintln!(
         "protocol-machine benchmark snapshot small: {:?}",

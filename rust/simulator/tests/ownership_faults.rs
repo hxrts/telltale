@@ -4,11 +4,11 @@ use std::collections::BTreeMap;
 
 use telltale_machine::buffer::EnqueueResult;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
 use telltale_machine::instr::{ImmValue, Instr};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
-    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineStepResult,
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult,
 };
 use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
 use telltale_simulator::rng::SimRng;
@@ -131,8 +131,8 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolM
             .step_round(&fault, 1)
             .expect("step transfer fixture")
         {
-            ProtocolMachineStepResult::Continue => {}
-            ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck => break,
+            StepResult::Continue => {}
+            StepResult::AllDone | StepResult::Stuck => break,
         }
     }
 

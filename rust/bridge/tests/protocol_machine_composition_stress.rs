@@ -9,10 +9,10 @@ use cfg_if::cfg_if;
 use std::time::Instant;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ContentionMetrics, ThreadedProtocolMachine};
-use telltale_machine::{ProtocolMachineConfig, ProtocolMachineStepResult, ThreadedRoundSemantics};
+use telltale_machine::{ProtocolMachineConfig, StepResult, ThreadedRoundSemantics};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -162,9 +162,9 @@ fn run_stress(protocols: usize, workers: usize) -> StressReport {
         }
 
         match outcome {
-            ProtocolMachineStepResult::AllDone => break,
-            ProtocolMachineStepResult::Continue => {}
-            ProtocolMachineStepResult::Stuck => panic!("stress workload became stuck"),
+            StepResult::AllDone => break,
+            StepResult::Continue => {}
+            StepResult::Stuck => panic!("stress workload became stuck"),
         }
     }
 

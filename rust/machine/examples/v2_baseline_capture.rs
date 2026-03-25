@@ -12,13 +12,13 @@ cfg_if! {
     use telltale_types::{GlobalType, Label, LocalTypeR};
     use telltale_machine::coroutine::Value;
     use telltale_machine::determinism::{DeterminismMode, EffectDeterminismTier};
-    use telltale_machine::effect::{
+    use telltale_machine::model::effects::{
         EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody,
         EffectResponse, SendDecision,
     };
     use telltale_machine::envelope_diff::EnvelopeDiffArtifactV1;
-    use telltale_machine::loader::CodeImage;
-    use telltale_machine::{RuntimeTuningProfile, ProtocolMachineStepResult as ProtocolMachineStepResult};
+    use telltale_machine::runtime::loader::CodeImage;
+    use telltale_machine::{RuntimeTuningProfile, StepResult as StepResult};
     use telltale_machine::verification::{DefaultVerificationModel, HashTag, VerificationModel};
     use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ThreadedGuestRuntime};
 
@@ -85,8 +85,8 @@ cfg_if! {
             _partner: &str,
             _label: &str,
             _state: &[Value],
-        ) -> telltale_machine::effect::EffectResult<Value> {
-            telltale_machine::effect::EffectResult::success(Value::Nat(1))
+        ) -> telltale_machine::model::effects::EffectResult<Value> {
+            telltale_machine::model::effects::EffectResult::success(Value::Nat(1))
         }
 
         fn handle_recv(
@@ -96,8 +96,8 @@ cfg_if! {
             _label: &str,
             _state: &mut Vec<Value>,
             _payload: &Value,
-        ) -> telltale_machine::effect::EffectResult<()> {
-            telltale_machine::effect::EffectResult::success(())
+        ) -> telltale_machine::model::effects::EffectResult<()> {
+            telltale_machine::model::effects::EffectResult::success(())
         }
 
         fn handle_choose(
@@ -106,10 +106,10 @@ cfg_if! {
             _partner: &str,
             labels: &[String],
             _state: &[Value],
-        ) -> telltale_machine::effect::EffectResult<String> {
+        ) -> telltale_machine::model::effects::EffectResult<String> {
             match labels.first().cloned() {
-                Some(label) => telltale_machine::effect::EffectResult::success(label),
-                None => telltale_machine::effect::EffectResult::failure(
+                Some(label) => telltale_machine::model::effects::EffectResult::success(label),
+                None => telltale_machine::model::effects::EffectResult::failure(
                     EffectFailure::invalid_input("no labels available"),
                 ),
             }
@@ -119,8 +119,8 @@ cfg_if! {
             &self,
             _role: &str,
             _state: &mut Vec<Value>,
-        ) -> telltale_machine::effect::EffectResult<()> {
-            telltale_machine::effect::EffectResult::success(())
+        ) -> telltale_machine::model::effects::EffectResult<()> {
+            telltale_machine::model::effects::EffectResult::success(())
         }
     }
 
@@ -287,12 +287,12 @@ cfg_if! {
             max_wave_width = max_wave_width.max(wave_width);
 
             match result {
-                ProtocolMachineStepResult::AllDone => {
+                StepResult::AllDone => {
                     completed = true;
                     break;
                 }
-                ProtocolMachineStepResult::Continue => {}
-                ProtocolMachineStepResult::Stuck => {
+                StepResult::Continue => {}
+                StepResult::Stuck => {
                     return Err("canonical run became stuck".to_string())
                 }
             }
@@ -357,12 +357,12 @@ cfg_if! {
             max_wave_width = max_wave_width.max(wave_width);
 
             match result {
-                ProtocolMachineStepResult::AllDone => {
+                StepResult::AllDone => {
                     completed = true;
                     break;
                 }
-                ProtocolMachineStepResult::Continue => {}
-                ProtocolMachineStepResult::Stuck => {
+                StepResult::Continue => {}
+                StepResult::Stuck => {
                     return Err("threaded run became stuck".to_string())
                 }
             }

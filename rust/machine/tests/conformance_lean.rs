@@ -15,12 +15,12 @@ use std::time::Duration;
 use assert_matches::assert_matches;
 use telltale_machine::buffer::BufferConfig;
 use telltale_machine::coroutine::{CoroStatus, Fault};
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectHandler, EffectResult, SendDecision, SendDecisionInput, TopologyPerturbation,
 };
 use telltale_machine::instr::Endpoint;
-use telltale_machine::output_condition::OutputConditionHint;
-use telltale_machine::session::{
+use telltale_machine::model::output_condition::OutputConditionHint;
+use telltale_machine::model::state::{
     AuthorityArtifact, AuthorityAuditEvent, OwnershipScope, SessionStatus, SessionStore,
 };
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
@@ -30,9 +30,9 @@ use test_support::PassthroughHandler;
 
 fn single_role_end_image(
     program: Vec<telltale_machine::instr::Instr>,
-) -> telltale_machine::loader::CodeImage {
+) -> telltale_machine::runtime::loader::CodeImage {
     use telltale_types::GlobalType;
-    telltale_machine::loader::CodeImage {
+    telltale_machine::runtime::loader::CodeImage {
         programs: {
             let mut m = BTreeMap::new();
             m.insert("A".to_string(), program);
@@ -95,7 +95,7 @@ impl EffectHandler for KnowledgePayloadHandler {
     ) -> EffectResult<String> {
         match labels.first().cloned() {
             Some(label) => EffectResult::success(label),
-            None => EffectResult::failure(telltale_machine::effect::EffectFailure::invalid_input(
+            None => EffectResult::failure(telltale_machine::model::effects::EffectFailure::invalid_input(
                 "no labels available",
             )),
         }
@@ -144,7 +144,7 @@ impl EffectHandler for HintedInvokeHandler {
     ) -> EffectResult<String> {
         match labels.first().cloned() {
             Some(label) => EffectResult::success(label),
-            None => EffectResult::failure(telltale_machine::effect::EffectFailure::invalid_input(
+            None => EffectResult::failure(telltale_machine::model::effects::EffectFailure::invalid_input(
                 "no labels available",
             )),
         }
@@ -205,7 +205,7 @@ impl EffectHandler for TimeoutAtTickOneHandler {
     ) -> EffectResult<String> {
         match labels.first().cloned() {
             Some(label) => EffectResult::success(label),
-            None => EffectResult::failure(telltale_machine::effect::EffectFailure::invalid_input(
+            None => EffectResult::failure(telltale_machine::model::effects::EffectFailure::invalid_input(
                 "no labels available",
             )),
         }
@@ -599,7 +599,7 @@ fn test_lean_open_close_session_state_transitions() {
 #[test]
 fn test_lean_transfer_endpoint_movement() {
     use telltale_machine::instr::{ImmValue, Instr};
-    use telltale_machine::loader::CodeImage;
+    use telltale_machine::runtime::loader::CodeImage;
     use telltale_types::GlobalType;
 
     let mut local_types = BTreeMap::new();
@@ -754,7 +754,7 @@ fn test_lean_acquire_release_guard_behavior() {
 #[test]
 fn test_lean_invoke_and_output_condition_hint_behavior() {
     use telltale_machine::instr::{Instr, InvokeAction};
-    use telltale_machine::output_condition::OutputConditionPolicy;
+    use telltale_machine::model::output_condition::OutputConditionPolicy;
 
     let image = single_role_end_image(vec![
         Instr::Invoke {
@@ -846,7 +846,7 @@ fn test_lean_authority_timeout_and_cancellation_trace_behavior() {
         .step(&TimeoutAtTickOneHandler)
         .expect("timeout ingress should not fault");
     assert!(
-        matches!(step, telltale_machine::ProtocolMachineStepResult::Stuck),
+        matches!(step, telltale_machine::StepResult::Stuck),
         "timeout ingress should block scheduling"
     );
     assert!(
@@ -925,7 +925,7 @@ fn test_lean_authority_evidence_rejection_behavior() {
     let witness = store
         .issue_readiness_witness(&owner, "commit.ready")
         .expect("issue readiness witness");
-    let forged = telltale_machine::session::ReadinessWitness {
+    let forged = telltale_machine::model::state::ReadinessWitness {
         predicate_ref: "forged.ready".to_string(),
         ..witness.clone()
     };
@@ -935,7 +935,7 @@ fn test_lean_authority_evidence_rejection_behavior() {
     assert!(
         matches!(
             forged_err,
-            telltale_machine::session::OwnershipError::InvalidWitness { .. }
+            telltale_machine::model::state::OwnershipError::InvalidWitness { .. }
         ),
         "forged witness must fail with InvalidWitness"
     );
@@ -949,7 +949,7 @@ fn test_lean_authority_evidence_rejection_behavior() {
     assert!(
         matches!(
             reused,
-            telltale_machine::session::OwnershipError::WitnessConsumed { .. }
+            telltale_machine::model::state::OwnershipError::WitnessConsumed { .. }
         ),
         "double-consume must fail with WitnessConsumed"
     );
@@ -1159,11 +1159,11 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
 
         assert_matches!(
             vm.step(&PassthroughHandler),
-            Ok(telltale_machine::ProtocolMachineStepResult::Continue)
+            Ok(telltale_machine::StepResult::Continue)
         ); // set
         assert_matches!(
             vm.step(&PassthroughHandler),
-            Ok(telltale_machine::ProtocolMachineStepResult::Continue)
+            Ok(telltale_machine::StepResult::Continue)
         ); // fork
 
         let before_effect_len = vm.effect_trace().len();
@@ -1175,7 +1175,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
 
         assert_matches!(
             vm.step(&PassthroughHandler),
-            Ok(telltale_machine::ProtocolMachineStepResult::Continue)
+            Ok(telltale_machine::StepResult::Continue)
         ); // abort
 
         let coros = vm.session_coroutines(sid);
@@ -1520,10 +1520,10 @@ fn test_lean_wf_pc_bounds() {
 
         match vm.step(&handler) {
             Ok(
-                telltale_machine::ProtocolMachineStepResult::AllDone
-                | telltale_machine::ProtocolMachineStepResult::Stuck,
+                telltale_machine::StepResult::AllDone
+                | telltale_machine::StepResult::Stuck,
             ) => break,
-            Ok(telltale_machine::ProtocolMachineStepResult::Continue) => {}
+            Ok(telltale_machine::StepResult::Continue) => {}
             Err(_) => break,
         }
     }

@@ -4,7 +4,7 @@
 use telltale_machine::coroutine::Fault;
 use telltale_machine::fault_code_of;
 use telltale_machine::instr::Endpoint;
-use telltale_machine::session::Edge;
+use telltale_machine::model::state::Edge;
 use telltale_types::ValType;
 
 #[test]

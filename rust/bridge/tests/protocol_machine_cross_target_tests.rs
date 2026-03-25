@@ -7,10 +7,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use serde::Serialize;
 use serde_json::json;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectHandler, EffectResult, RecordingEffectHandler, SendDecision, SendDecisionInput,
 };
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ThreadedProtocolMachine;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -174,7 +174,7 @@ fn scheduler_signature(trace: &[ObsEvent]) -> Vec<(usize, String)> {
         .collect()
 }
 
-fn effect_signature(effect_trace: &[telltale_machine::effect::EffectTraceEntry]) -> Vec<String> {
+fn effect_signature(effect_trace: &[telltale_machine::model::effects::EffectTraceEntry]) -> Vec<String> {
     effect_trace
         .iter()
         .map(|entry| entry.effect_kind.clone())
@@ -327,7 +327,7 @@ fn run_single_thread(
     image: &CodeImage,
 ) -> (
     Vec<ObsEvent>,
-    Vec<telltale_machine::effect::EffectTraceEntry>,
+    Vec<telltale_machine::model::effects::EffectTraceEntry>,
 ) {
     let mut vm = ProtocolMachine::new(ProtocolMachineConfig::default());
     vm.load_choreography(image).expect("load choreography");
@@ -340,7 +340,7 @@ fn run_threaded(
     image: &CodeImage,
 ) -> (
     Vec<ObsEvent>,
-    Vec<telltale_machine::effect::EffectTraceEntry>,
+    Vec<telltale_machine::model::effects::EffectTraceEntry>,
     Vec<telltale_machine::LaneSelection>,
 ) {
     run_threaded_with_concurrency(image, 1, 4)
@@ -352,7 +352,7 @@ fn run_threaded_with_concurrency(
     concurrency: usize,
 ) -> (
     Vec<ObsEvent>,
-    Vec<telltale_machine::effect::EffectTraceEntry>,
+    Vec<telltale_machine::model::effects::EffectTraceEntry>,
     Vec<telltale_machine::LaneSelection>,
 ) {
     let mut vm =

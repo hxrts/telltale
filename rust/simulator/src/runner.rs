@@ -6,13 +6,13 @@
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
-use telltale_machine::effect::{EffectHandler, EffectTraceEntry};
-use telltale_machine::loader::CodeImage;
-use telltale_machine::output_condition::OutputConditionCheck;
+use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::model::output_condition::OutputConditionCheck;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
     ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
-    ProtocolMachineStepResult, SemanticAuditRecord,
+    StepResult, SemanticAuditRecord,
 };
 use telltale_types::{GlobalType, LocalTypeR};
 
@@ -221,8 +221,8 @@ pub fn run_concurrent(
         }
 
         match machine.step(handler) {
-            Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
-            Ok(ProtocolMachineStepResult::Continue) => {}
+            Ok(StepResult::AllDone | StepResult::Stuck) => break,
+            Ok(StepResult::Continue) => {}
             Err(e) => return Err(format!("protocol machine error: {e}")),
         }
 
@@ -311,8 +311,8 @@ pub fn run(
         }
 
         match machine.step(handler) {
-            Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
-            Ok(ProtocolMachineStepResult::Continue) => {}
+            Ok(StepResult::AllDone | StepResult::Stuck) => break,
+            Ok(StepResult::Continue) => {}
             Err(e) => return Err(format!("protocol machine error: {e}")),
         }
 
@@ -503,8 +503,8 @@ pub fn run_with_scenario(
                 .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
             machine.set_paused_roles(&paused_roles);
             match machine.step_round(net, concurrency) {
-                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
-                Ok(ProtocolMachineStepResult::Continue) => {}
+                Ok(StepResult::AllDone | StepResult::Stuck) => break,
+                Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("protocol machine error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);
@@ -527,8 +527,8 @@ pub fn run_with_scenario(
                 .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
             machine.set_paused_roles(&paused_roles);
             match machine.step_round(fault, concurrency) {
-                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
-                Ok(ProtocolMachineStepResult::Continue) => {}
+                Ok(StepResult::AllDone | StepResult::Stuck) => break,
+                Ok(StepResult::Continue) => {}
                 Err(e) => return Err(format!("protocol machine error: {e}")),
             }
             rounds_executed = rounds_executed.saturating_add(1);

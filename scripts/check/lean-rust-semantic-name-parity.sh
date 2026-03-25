@@ -73,6 +73,48 @@ if ! rg -q '\bProtocolMachine\b' "${RUST_MACHINE_LIB}"; then
   exit 1
 fi
 
+for module_name in model runtime semantics; do
+  if ! rg -q "^pub mod ${module_name} \\{" "${RUST_MACHINE_LIB}"; then
+    echo "[semantic-name-parity] Rust machine lib is missing canonical public module '${module_name}'" >&2
+    exit 1
+  fi
+done
+
+removed_public_modules=(
+  "protocol_machine"
+  "guest_runtime"
+  "host_runtime"
+)
+
+for module_name in "${removed_public_modules[@]}"; do
+  if rg -q "^pub mod ${module_name} \\{" "${RUST_MACHINE_LIB}"; then
+    echo "[semantic-name-parity] Rust machine lib still exposes removed public module '${module_name}'" >&2
+    exit 1
+  fi
+done
+
+removed_names=(
+  "NestedVMHandler"
+  "WasmVM"
+  "ExternalHandler"
+  "ProtocolMachineRunStatus"
+  "ProtocolMachineStepResult"
+)
+
+for name in "${removed_names[@]}"; do
+  if rg -q "\\b${name}\\b" "${RUST_MACHINE_LIB}" "${ROOT_DIR}/rust/machine/src/nested.rs" \
+    "${ROOT_DIR}/rust/machine/src/wasm.rs" "${ROOT_DIR}/docs/04_code_organization.md" \
+    "${ROOT_DIR}/docs/30_api_reference.md"; then
+    echo "[semantic-name-parity] removed runtime name '${name}' is still present" >&2
+    exit 1
+  fi
+done
+
+if rg -q 'TELLTALE_VM_TIMEOUT_MS' "${ROOT_DIR}/rust/bridge/src/protocol_machine_runner.rs"; then
+  echo "[semantic-name-parity] old VM timeout env var name is still present" >&2
+  exit 1
+fi
+
 if ! rg -q '^pub const SEMANTIC_OBJECTS_SCHEMA_VERSION' "${RUST_MACHINE_SEMANTIC_OBJECTS}"; then
   echo "[semantic-name-parity] rust machine semantic objects missing schema version marker" >&2
   exit 1
@@ -88,5 +130,14 @@ if ! rg -q 'Region remains a choreography/topology identifier outside the protoc
   echo "[semantic-name-parity] docs/19_rust_lean_parity.md is missing the Region boundary note" >&2
   exit 1
 fi
+
+for doc_path in "${ROOT_DIR}/docs/04_code_organization.md" "${ROOT_DIR}/docs/30_api_reference.md"; do
+  if ! rg -q 'telltale_machine::model' "${doc_path}" || \
+     ! rg -q 'telltale_machine::runtime' "${doc_path}" || \
+     ! rg -q 'telltale_machine::semantics' "${doc_path}"; then
+    echo "[semantic-name-parity] ${doc_path} is missing canonical Rust module references" >&2
+    exit 1
+  fi
+done
 
 echo "[semantic-name-parity] Lean and Rust protocol-machine semantic-object names are aligned"

@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_machine::coroutine::Fault;
 use telltale_machine::coroutine::Value;
 use telltale_machine::determinism::{replay_consistent, DeterminismMode};
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, RecordingEffectHandler, SendDecision,
     SendDecisionInput,
 };
@@ -64,7 +64,7 @@ fn per_session(trace: &[ObsEvent]) -> BTreeMap<usize, Vec<Normalized>> {
 }
 
 fn run_cooperative(
-    images: &[telltale_machine::loader::CodeImage],
+    images: &[telltale_machine::runtime::loader::CodeImage],
     concurrency: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
@@ -78,7 +78,7 @@ fn run_cooperative(
 }
 
 fn run_threaded(
-    images: &[telltale_machine::loader::CodeImage],
+    images: &[telltale_machine::runtime::loader::CodeImage],
     workers: usize,
 ) -> BTreeMap<usize, Vec<Normalized>> {
     let handler = PassthroughHandler;
@@ -93,7 +93,7 @@ fn run_threaded(
 
 #[allow(clippy::type_complexity)]
 fn run_progress_states(
-    image: &telltale_machine::loader::CodeImage,
+    image: &telltale_machine::runtime::loader::CodeImage,
 ) -> (
     Vec<(String, ProgressState, Option<String>)>,
     Vec<(String, ProgressState, Option<String>)>,

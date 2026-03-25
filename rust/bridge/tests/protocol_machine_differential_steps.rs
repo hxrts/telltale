@@ -11,11 +11,11 @@ use telltale_bridge::{
     ProtocolMachineRunInput, ProtocolMachineRunner, ProtocolMachineTraceEvent, TickedObsEvent,
 };
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
-use telltale_machine::loader::CodeImage;
-use telltale_machine::output_condition::OutputConditionPolicy;
-use telltale_machine::session::SessionStatus;
-use telltale_machine::{ObsEvent, ProtocolMachineStepResult};
+use telltale_machine::model::effects::{EffectHandler, EffectResult, SendDecision, SendDecisionInput};
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::model::output_condition::OutputConditionPolicy;
+use telltale_machine::model::state::SessionStatus;
+use telltale_machine::{ObsEvent, StepResult};
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
 #[derive(Debug, Clone, Copy)]
@@ -240,9 +240,9 @@ fn run_rust_step_states(
         let before_counts = session_type_counts(&vm);
         let status = vm.step(&PassthroughHandler).map_err(|e| e.to_string())?;
         let status = match status {
-            ProtocolMachineStepResult::Continue => "continue",
-            ProtocolMachineStepResult::Stuck => "stuck",
-            ProtocolMachineStepResult::AllDone => "all_done",
+            StepResult::Continue => "continue",
+            StepResult::Stuck => "stuck",
+            StepResult::AllDone => "all_done",
         }
         .to_string();
 

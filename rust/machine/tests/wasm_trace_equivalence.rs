@@ -6,10 +6,10 @@ use std::collections::BTreeMap;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::trace::normalize_trace;
-use telltale_machine::wasm::WasmVM;
+use telltale_machine::runtime::runner::WasmProtocolMachine;
 use telltale_machine::ProtocolMachineSemanticObjects;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -69,7 +69,7 @@ fn assert_wasm_trace_matches_vm(
     });
     let spec_json = serde_json::to_string(&spec).unwrap();
 
-    let mut wasm_vm = WasmVM::new();
+    let mut wasm_vm = WasmProtocolMachine::new();
     wasm_vm.load_choreography_json(&spec_json).unwrap();
     wasm_vm.run(max_steps, 1).unwrap();
     let wasm_trace_json = wasm_vm.trace_normalized_json().unwrap();

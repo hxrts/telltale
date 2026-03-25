@@ -16,7 +16,7 @@ use std::path::PathBuf;
 use telltale_bridge::export::global_to_json;
 use telltale_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
 use telltale_bridge::{canonical_schema_version, partition_by_session, NormalizedEvent};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,

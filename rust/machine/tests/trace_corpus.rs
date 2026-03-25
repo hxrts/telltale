@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::trace::normalize_trace;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};

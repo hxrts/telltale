@@ -248,7 +248,7 @@ pub(crate) struct CachedBranch {
 }
 
 /// Built-in fallback handler id used when no edge-specific binding exists.
-pub const DEFAULT_HANDLER_ID: &str = "default_handler";
+pub(crate) const DEFAULT_HANDLER_ID: &str = "default_handler";
 
 fn default_handler_id() -> HandlerId {
     DEFAULT_HANDLER_ID.to_string()

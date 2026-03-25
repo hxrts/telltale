@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 use std::env;
 use std::hint::black_box;
 
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
     CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig,
@@ -84,7 +84,7 @@ fn main() {
 
 fn usage_and_exit() -> ! {
     eprintln!(
-        "usage: cargo run -p telltale-machine --release --bin vm_profile_driver -- \\\n\
+        "usage: cargo run -p telltale-machine --release --bin profile_driver -- \\\n\
          <scheduler-many-paused|scheduler-many-paused-run-only|repeated-load-reuse|send-recv-replay-nullifier|repeated-open-same-image> [iterations]"
     );
     std::process::exit(2);
@@ -114,7 +114,7 @@ fn profile_scheduler_many_paused(iterations: usize) -> usize {
         checksum ^= black_box(vm.trace().len())
             ^ black_box(bool_to_usize(matches!(
                 status,
-                telltale_machine::ProtocolMachineRunStatus::Stuck
+                telltale_machine::RunStatus::Stuck
             )));
     }
     checksum
@@ -153,7 +153,7 @@ fn profile_scheduler_many_paused_run_only(yields_per_role: usize) -> usize {
     black_box(vm.trace().len())
         ^ black_box(bool_to_usize(matches!(
             status,
-            telltale_machine::ProtocolMachineRunStatus::MaxRoundsExceeded
+            telltale_machine::RunStatus::MaxRoundsExceeded
         )))
 }
 
@@ -173,7 +173,7 @@ fn profile_send_recv_replay_nullifier(iterations: usize) -> usize {
     black_box(vm.trace().len())
         ^ black_box(bool_to_usize(matches!(
             status,
-            telltale_machine::ProtocolMachineRunStatus::AllDone
+            telltale_machine::RunStatus::AllDone
         )))
 }
 

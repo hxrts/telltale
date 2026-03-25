@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::trace::normalize_trace as normalize_ticks;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use telltale_simulator::distributed::DistributedSimBuilder;

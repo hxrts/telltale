@@ -174,7 +174,7 @@ pub struct EffectTraceEntry {
 
 /// Infer a nominal interface/operation pair from one runtime effect kind.
 #[must_use]
-pub fn infer_effect_interface_and_operation(
+pub(crate) fn infer_effect_interface_and_operation(
     effect_kind: &str,
 ) -> (Option<String>, Option<String>) {
     match effect_kind {

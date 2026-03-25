@@ -64,16 +64,16 @@ impl EffectHandler for NoOpHandler {
 
 /// Wasm wrapper for the protocol machine guest runtime.
 #[wasm_bindgen]
-pub struct WasmVM {
+pub struct WasmProtocolMachine {
     inner: WasmCooperativeDriver,
 }
 
 #[wasm_bindgen]
-impl WasmVM {
+impl WasmProtocolMachine {
     /// Create a new guest runtime with default configuration.
     #[wasm_bindgen(constructor)]
-    pub fn new() -> WasmVM {
-        WasmVM {
+    pub fn new() -> WasmProtocolMachine {
+        WasmProtocolMachine {
             inner: WasmCooperativeDriver::new(ProtocolMachineConfig::default()),
         }
     }

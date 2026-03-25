@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use telltale_machine::{ProtocolMachine, ProtocolMachineStepResult};
+use telltale_machine::{ProtocolMachine, StepResult};
 use telltale_simulator::fault::FaultInjector;
 use telltale_simulator::handler_from_material;
 use telltale_simulator::network::NetworkModel;
@@ -85,8 +85,8 @@ fn main() {
                 .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
             machine.set_paused_roles(&paused_roles);
             match machine.step_round(net, concurrency) {
-                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
-                Ok(ProtocolMachineStepResult::Continue) => {}
+                Ok(StepResult::AllDone | StepResult::Stuck) => break,
+                Ok(StepResult::Continue) => {}
                 Err(e) => fatal(&format!("machine error: {e}")),
             }
         } else {
@@ -108,8 +108,8 @@ fn main() {
                 .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
             machine.set_paused_roles(&paused_roles);
             match machine.step_round(fault, concurrency) {
-                Ok(ProtocolMachineStepResult::AllDone | ProtocolMachineStepResult::Stuck) => break,
-                Ok(ProtocolMachineStepResult::Continue) => {}
+                Ok(StepResult::AllDone | StepResult::Stuck) => break,
+                Ok(StepResult::Continue) => {}
                 Err(e) => fatal(&format!("machine error: {e}")),
             }
         }

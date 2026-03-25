@@ -6,17 +6,17 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use telltale_machine::buffer::BufferConfig;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse,
     SendDecision,
 };
 use telltale_machine::instr::Endpoint;
-use telltale_machine::loader::CodeImage;
-use telltale_machine::session::SessionStore;
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::model::state::SessionStore;
 use telltale_machine::{
     CommunicationReplayMode, Instr, ObservabilityRetentionConfig, ObservabilityRetentionMode,
     PayloadValidationMode, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineMemoryUsage,
-    ProtocolMachineRunStatus,
+    RunStatus,
 };
 use telltale_types::{GlobalType, Label, LocalTypeR, ValType};
 
@@ -99,8 +99,8 @@ impl EffectHandler for BenchHandler {
         _partner: &str,
         _label: &str,
         _state: &[Value],
-    ) -> telltale_machine::effect::EffectResult<Value> {
-        telltale_machine::effect::EffectResult::success(Value::Unit)
+    ) -> telltale_machine::model::effects::EffectResult<Value> {
+        telltale_machine::model::effects::EffectResult::success(Value::Unit)
     }
 
     fn handle_recv(
@@ -110,8 +110,8 @@ impl EffectHandler for BenchHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> telltale_machine::effect::EffectResult<()> {
-        telltale_machine::effect::EffectResult::success(())
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        telltale_machine::model::effects::EffectResult::success(())
     }
 
     fn handle_choose(
@@ -120,8 +120,8 @@ impl EffectHandler for BenchHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> telltale_machine::effect::EffectResult<String> {
-        telltale_machine::effect::EffectResult::success(
+    ) -> telltale_machine::model::effects::EffectResult<String> {
+        telltale_machine::model::effects::EffectResult::success(
             labels
                 .first()
                 .cloned()
@@ -133,8 +133,8 @@ impl EffectHandler for BenchHandler {
         &self,
         _role: &str,
         _state: &mut Vec<Value>,
-    ) -> telltale_machine::effect::EffectResult<()> {
-        telltale_machine::effect::EffectResult::success(())
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        telltale_machine::model::effects::EffectResult::success(())
     }
 }
 
@@ -302,7 +302,7 @@ pub(crate) fn run_yield_workload(
         .load_choreography_owned(image, "bench/yield")
         .expect("load choreography");
     let status = vm.run(&BenchHandler, max_rounds).expect("run vm");
-    assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+    assert!(matches!(status, RunStatus::AllDone));
     vm.memory_usage()
 }
 
@@ -320,7 +320,7 @@ pub(crate) fn run_short_lived_session_churn(iterations: usize) -> ProtocolMachin
             .expect("load choreography");
         let sid = owned.session_id();
         let status = vm.run(&BenchHandler, 10_000).expect("run vm");
-        assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+        assert!(matches!(status, RunStatus::AllDone));
         vm.sessions_mut().close(sid).expect("close session");
         let coro_ids: Vec<usize> = vm
             .session_coroutines(sid)
@@ -397,7 +397,7 @@ pub(crate) fn run_send_recv_workload(
     }
 
     let status = vm.run(&BenchHandler, 100_000).expect("run vm");
-    assert!(matches!(status, ProtocolMachineRunStatus::AllDone));
+    assert!(matches!(status, RunStatus::AllDone));
     vm.memory_usage()
 }
 
@@ -415,7 +415,7 @@ pub(crate) fn run_many_paused_scheduler_workload(
 ) -> ProtocolMachineMemoryUsage {
     let mut vm = setup_many_paused_scheduler_vm(num_roles, yields_per_role);
     let status = vm.run(&BenchHandler, 10_000).expect("run vm");
-    assert!(matches!(status, ProtocolMachineRunStatus::Stuck));
+    assert!(matches!(status, RunStatus::Stuck));
     vm.memory_usage()
 }
 

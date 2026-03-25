@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 
 use serde_json::json;
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{
+use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::SemanticAuditRecord;

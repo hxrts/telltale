@@ -124,7 +124,7 @@
         for _ in 0..4 {
             if matches!(
                 vm.step(&SemanticStatePassthroughHandler),
-                Ok(ProtocolMachineStepResult::AllDone)
+                Ok(StepResult::AllDone)
             ) {
                 break;
             }
@@ -147,7 +147,7 @@
         let step = vm
             .step(&PartitionOnTickZeroHandler)
             .expect("step simple image");
-        assert!(matches!(step, ProtocolMachineStepResult::Continue));
+        assert!(matches!(step, StepResult::Continue));
         let blocked = vm
             .outstanding_effects()
             .iter()

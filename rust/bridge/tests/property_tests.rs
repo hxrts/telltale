@@ -8,8 +8,8 @@ use telltale_bridge::{
     ProtocolMachineTraceEvent, SchedulerKind,
 };
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectHandler, SendDecision, SendDecisionInput};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectHandler, SendDecision, SendDecisionInput};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -185,15 +185,15 @@ impl EffectHandler for PropertyHandler {
         _partner: &str,
         label: &str,
         _state: &[Value],
-    ) -> telltale_machine::effect::EffectResult<Value> {
-        telltale_machine::effect::EffectResult::success(Value::Str(label.to_string()))
+    ) -> telltale_machine::model::effects::EffectResult<Value> {
+        telltale_machine::model::effects::EffectResult::success(Value::Str(label.to_string()))
     }
 
     fn send_decision(
         &self,
         input: SendDecisionInput<'_>,
-    ) -> telltale_machine::effect::EffectResult<SendDecision> {
-        telltale_machine::effect::EffectResult::success(SendDecision::Deliver(
+    ) -> telltale_machine::model::effects::EffectResult<SendDecision> {
+        telltale_machine::model::effects::EffectResult::success(SendDecision::Deliver(
             input.payload.unwrap_or(Value::Unit),
         ))
     }
@@ -205,8 +205,8 @@ impl EffectHandler for PropertyHandler {
         _label: &str,
         _state: &mut Vec<Value>,
         _payload: &Value,
-    ) -> telltale_machine::effect::EffectResult<()> {
-        telltale_machine::effect::EffectResult::success(())
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        telltale_machine::model::effects::EffectResult::success(())
     }
 
     fn handle_choose(
@@ -215,8 +215,8 @@ impl EffectHandler for PropertyHandler {
         _partner: &str,
         labels: &[String],
         _state: &[Value],
-    ) -> telltale_machine::effect::EffectResult<String> {
-        telltale_machine::effect::EffectResult::success(
+    ) -> telltale_machine::model::effects::EffectResult<String> {
+        telltale_machine::model::effects::EffectResult::success(
             labels
                 .first()
                 .cloned()
@@ -228,8 +228,8 @@ impl EffectHandler for PropertyHandler {
         &self,
         _role: &str,
         _state: &mut Vec<Value>,
-    ) -> telltale_machine::effect::EffectResult<()> {
-        telltale_machine::effect::EffectResult::success(())
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        telltale_machine::model::effects::EffectResult::success(())
     }
 }
 

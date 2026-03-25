@@ -3,9 +3,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use telltale_machine::coroutine::Value;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
-use telltale_machine::nested::NestedVMHandler;
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::runtime::runner::NestedProtocolMachineHandler;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 /// Builder for distributed simulations with nested inner ProtocolMachines.
@@ -95,7 +95,7 @@ impl DistributedSimBuilder {
             .load_choreography(&inter_site)
             .map_err(|e| format!("outer load error: {e}"))?;
 
-        let mut nested = NestedVMHandler::new().with_rounds_per_step(self.inner_rounds_per_step);
+        let mut nested = NestedProtocolMachineHandler::new().with_rounds_per_step(self.inner_rounds_per_step);
 
         for (site, protocols) in self.sites {
             let mut inner_vm = ProtocolMachine::new(config.clone());
@@ -125,7 +125,7 @@ impl Default for DistributedSimBuilder {
 /// A distributed simulation with an outer ProtocolMachine and nested handler.
 pub struct DistributedSimulation {
     outer_vm: ProtocolMachine,
-    handler: NestedVMHandler,
+    handler: NestedProtocolMachineHandler,
     outer_concurrency: usize,
 }
 
@@ -149,7 +149,7 @@ impl DistributedSimulation {
 
     /// Access the nested handler.
     #[must_use]
-    pub fn handler(&self) -> &NestedVMHandler {
+    pub fn handler(&self) -> &NestedProtocolMachineHandler {
         &self.handler
     }
 

@@ -277,7 +277,7 @@ pub trait ChoreoHandler: Send {
 }
 ```
 
-Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_machine::effect::EffectHandler` used by the protocol machine.
+Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_machine::model::effects::EffectHandler` used by the protocol machine.
 
 Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for protocol-machine integration guidance.
 

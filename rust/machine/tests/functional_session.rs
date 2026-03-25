@@ -14,7 +14,7 @@ use telltale_machine::buffer::{
 };
 use telltale_machine::coroutine::{CoroStatus, Value};
 use telltale_machine::instr::Endpoint;
-use telltale_machine::session::{SessionStatus, SessionStore};
+use telltale_machine::model::state::{SessionStatus, SessionStore};
 use telltale_machine::{
     ObservabilityRetentionConfig, ObservabilityRetentionMode, ProtocolMachine,
     ProtocolMachineConfig,

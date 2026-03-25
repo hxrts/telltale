@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 
 use telltale_machine::instr::{ImmValue, Instr};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use telltale_types::{GlobalType, LocalTypeR};
 

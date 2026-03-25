@@ -6,10 +6,10 @@ use std::collections::BTreeMap;
 
 use proptest::prelude::*;
 use telltale_machine::coroutine::Fault;
-use telltale_machine::effect::{EffectFailure, EffectHandler, EffectResult};
-use telltale_machine::loader::CodeImage;
+use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{Instr, ProtocolMachine, ProtocolMachineConfig};
-use telltale_machine::{ProtocolMachineError, ProtocolMachineRunStatus};
+use telltale_machine::{ProtocolMachineError, RunStatus};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 cfg_if! {
@@ -60,7 +60,7 @@ impl EffectHandler for NoopHandler {
     }
 }
 
-fn assert_out_of_registers(result: Result<ProtocolMachineRunStatus, ProtocolMachineError>) {
+fn assert_out_of_registers(result: Result<RunStatus, ProtocolMachineError>) {
     match result {
         Err(ProtocolMachineError::Fault { fault, .. }) => {
             assert!(matches!(fault, Fault::OutOfRegisters))
