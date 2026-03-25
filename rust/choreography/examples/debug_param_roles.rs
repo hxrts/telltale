@@ -10,7 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     protocol TestParamRoles =
       roles Coordinator, Worker[3]
 
-      Coordinator { shard = 0 }
+      Coordinator { shard : 0 }
         -> Worker[0] : Task of jobs.Task
       Worker[0]
         -> Coordinator : Result of jobs.Result

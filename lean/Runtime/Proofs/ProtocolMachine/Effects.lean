@@ -182,28 +182,13 @@ theorem firstSuccess_resolves_commitment
     EffectCompositionPolicy.commitmentResolved .firstSuccess records :=
   ⟨record, hMem, hSuccess⟩
 
-theorem quorum_resolves_commitment
+theorem thresholdSuccess_resolves_commitment
     (records : List EffectExchangeRecord)
     (requiredSuccesses : Nat)
     (hPositive : requiredSuccesses > 0)
     (hEnough : countSuccessfulEffects records ≥ requiredSuccesses) :
-    EffectCompositionPolicy.commitmentResolved (.quorum requiredSuccesses) records :=
+    EffectCompositionPolicy.commitmentResolved (.thresholdSuccess requiredSuccesses) records :=
   ⟨hPositive, hEnough⟩
-
-theorem fallback_resolves_commitment_of_success
-    (records : List EffectExchangeRecord)
-    {record : EffectExchangeRecord}
-    (hMem : record ∈ records)
-    (hSuccess : record.succeeded) :
-    EffectCompositionPolicy.commitmentResolved .fallback records :=
-  Or.inl ⟨record, hMem, hSuccess⟩
-
-theorem fallback_resolves_commitment_of_terminal_failover
-    (records : List EffectExchangeRecord)
-    (hNonEmpty : records ≠ [])
-    (hTerminal : ∀ record ∈ records, record.terminal) :
-    EffectCompositionPolicy.commitmentResolved .fallback records :=
-  Or.inr ⟨hNonEmpty, hTerminal⟩
 
 /-! ## Commitment / Progress Links -/
 
@@ -219,18 +204,12 @@ theorem firstSuccess_commitment_compatible
   intro hResolved
   exact hResolved
 
-theorem quorum_commitment_compatible
+theorem thresholdSuccess_commitment_compatible
     (records : List EffectExchangeRecord)
     (requiredSuccesses : Nat) :
-    EffectCompositionPolicy.commitmentCompatible (.quorum requiredSuccesses) records := by
+    EffectCompositionPolicy.commitmentCompatible (.thresholdSuccess requiredSuccesses) records := by
   intro hResolved
   exact hResolved.2
-
-theorem fallback_commitment_compatible
-    (records : List EffectExchangeRecord) :
-    EffectCompositionPolicy.commitmentCompatible .fallback records := by
-  intro hResolved
-  exact hResolved
 
 theorem composition_progress_of_schedulingBoundCompatible
     (policy : EffectCompositionPolicy)

@@ -7,10 +7,11 @@
 use proc_macro::{Delimiter, TokenStream as MacroTokenStream, TokenTree as MacroTokenTree};
 use proc_macro2::{Delimiter as TokenDelimiter, Group, Ident, Span, TokenStream, TokenTree};
 use quote::{format_ident, quote, ToTokens};
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use syn::{Error, LitStr, Result};
 use telltale_parser::ast::{
-    AuthorityBindingMode, AuthorityExpr, Branch, Choreography, EffectInterfaceDeclaration,
+    AgreementProfileDeclaration, AuthorityBindingMode, AuthorityExpr, Branch,
+    ChildEffectAggregationPolicy, Choreography, EffectInterfaceDeclaration,
     EffectOperationDeclaration, LocalType, MessageType, OperationDeclaration, Protocol, Role,
     TypeDeclaration,
 };
@@ -73,6 +74,7 @@ fn normalize_macro_indentation(source: String) -> String {
         "protocol ",
         "proof_bundle ",
         "profile ",
+        "agreement_profile ",
         "role_set ",
         "topology ",
         "type ",
@@ -261,10 +263,33 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
         .into_iter()
         .map(|name| LitStr::new(&name, Span::call_site()))
         .collect::<Vec<_>>();
+    let agreement_profile_names = choreography
+        .agreement_profile_declarations()
+        .into_iter()
+        .map(|profile| LitStr::new(&profile.name, Span::call_site()))
+        .collect::<Vec<_>>();
+    let finalization_profile_names = choreography
+        .agreement_profile_declarations()
+        .into_iter()
+        .filter(|profile| profile.finalized_at != "none")
+        .map(|profile| LitStr::new(&profile.name, Span::call_site()))
+        .collect::<Vec<_>>();
+    let parity_critical_operations = choreography
+        .operation_declarations()
+        .iter()
+        .map(|operation| LitStr::new(&operation.name, Span::call_site()))
+        .collect::<Vec<_>>();
+    let agreement_bound_operations = choreography
+        .operation_declarations()
+        .iter()
+        .filter(|operation| operation.agreement.is_some())
+        .map(|operation| LitStr::new(&operation.name, Span::call_site()))
+        .collect::<Vec<_>>();
     let type_decls = generate_type_declarations(choreography)?;
     let effects_module = generate_effects_module(choreography)?;
     let authority_module = generate_authority_module(choreography)?;
     let commitments_module = generate_commitments_module(choreography)?;
+    let agreements_module = generate_agreements_module(choreography)?;
     let (projectable, projection_error, sessions_module) = match project_local_types(choreography) {
         Ok(local_types) => (
             quote!(true),
@@ -312,6 +337,39 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
 
             #[allow(dead_code)]
             pub const EXECUTION_PROFILES: &[&str] = &[#(#execution_profiles),*];
+
+            #[allow(dead_code)]
+            pub const AGREEMENT_PROFILE_NAMES: &[&str] = &[#(#agreement_profile_names),*];
+
+            #[allow(dead_code)]
+            pub const FINALIZATION_PROFILE_NAMES: &[&str] = &[#(#finalization_profile_names),*];
+
+            #[allow(dead_code)]
+            pub const PARITY_CRITICAL_OPERATIONS: &[&str] = &[#(#parity_critical_operations),*];
+
+            #[allow(dead_code)]
+            pub const AGREEMENT_BOUND_OPERATIONS: &[&str] = &[#(#agreement_bound_operations),*];
+
+            #[allow(dead_code)]
+            pub fn agreement_profile(
+                name: &str,
+            ) -> Option<&'static super::agreements::AgreementProfileMetadata> {
+                super::agreements::profile(name)
+            }
+
+            #[allow(dead_code)]
+            pub fn agreement_operation(
+                name: &str,
+            ) -> Option<&'static super::agreements::OperationAgreementMetadata> {
+                super::agreements::operation(name)
+            }
+
+            #[allow(dead_code)]
+            pub fn commitment_operation(
+                name: &str,
+            ) -> Option<&'static super::commitments::CommitmentMetadata> {
+                super::commitments::operation(name)
+            }
         }
 
         #type_decls
@@ -321,6 +379,8 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
         #authority_module
 
         #commitments_module
+
+        #agreements_module
 
         #sessions_module
     };
@@ -470,6 +530,7 @@ fn generate_record_field(field: &DslRecordField) -> Result<TokenStream> {
 }
 
 fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
+    let used_effects = choreography.protocol_uses().into_iter().collect::<BTreeSet<_>>();
     let type_exports = choreography
         .type_declarations()
         .iter()
@@ -478,7 +539,7 @@ fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
     let effect_surfaces = choreography
         .effect_interface_declarations()
         .iter()
-        .map(generate_effect_surface)
+        .map(|effect| generate_effect_surface(effect, used_effects.contains(effect.name.as_str())))
         .collect::<Result<Vec<_>>>()?;
 
     let type_exports = if type_exports.is_empty() {
@@ -490,14 +551,99 @@ fn generate_effects_module(choreography: &Choreography) -> Result<TokenStream> {
     Ok(quote! {
         pub mod effects {
             pub use ::telltale::dsl::{AuditEvent, PresenceView, Role, Session};
+            pub use ::telltale::dsl::semantic::{
+                EffectAdmissibility,
+                EffectAgreementUse,
+                EffectAuthorityClass,
+                EffectHandlerDomain,
+                EffectInterfaceMetadata,
+                EffectReentrancyPolicy,
+                EffectRegionScope,
+                EffectRetryShape,
+                EffectSemanticClass,
+                EffectTimeoutPolicy,
+                EffectTotality,
+            };
+
+            #[derive(Clone, Debug, PartialEq, Eq)]
+            pub struct EffectOperationMetadata {
+                pub interface_name: &'static str,
+                pub operation_name: &'static str,
+                pub authority_class: EffectAuthorityClass,
+                pub semantic_class: EffectSemanticClass,
+                pub agreement_use: EffectAgreementUse,
+                pub region_scope: EffectRegionScope,
+                pub admissibility: EffectAdmissibility,
+                pub totality: EffectTotality,
+                pub timeout_policy: EffectTimeoutPolicy,
+                pub retry_shape: EffectRetryShape,
+                pub reentrancy_policy: EffectReentrancyPolicy,
+                pub handler_domain: EffectHandlerDomain,
+            }
+
+            impl EffectOperationMetadata {
+                #[must_use]
+                pub fn runtime_metadata(&self) -> EffectInterfaceMetadata {
+                    EffectInterfaceMetadata {
+                        interface_name: self.interface_name.to_string(),
+                        operation_name: self.operation_name.to_string(),
+                        authority_class: self.authority_class,
+                        semantic_class: self.semantic_class,
+                        agreement_use: self.agreement_use,
+                        region_scope: self.region_scope,
+                        admissibility: self.admissibility,
+                        totality: self.totality,
+                        timeout_policy: self.timeout_policy.clone(),
+                        retry_shape: self.retry_shape.clone(),
+                        reentrancy_policy: self.reentrancy_policy,
+                        handler_domain: self.handler_domain,
+                    }
+                }
+
+                #[must_use]
+                pub fn architecturally_legal(&self) -> bool {
+                    self.runtime_metadata().architecturally_legal()
+                }
+            }
+
+            #[derive(Clone, Debug, PartialEq, Eq)]
+            pub struct EffectInterfaceSurfaceMetadata {
+                pub interface_name: &'static str,
+                pub operations: &'static [EffectOperationMetadata],
+            }
+
+            impl EffectInterfaceSurfaceMetadata {
+                #[must_use]
+                pub fn operation(&self, name: &str) -> Option<&'static EffectOperationMetadata> {
+                    self.operations.iter().find(|entry| entry.operation_name == name)
+                }
+
+                #[must_use]
+                pub fn runtime_metadata(&self) -> ::std::vec::Vec<EffectInterfaceMetadata> {
+                    self.operations
+                        .iter()
+                        .map(EffectOperationMetadata::runtime_metadata)
+                        .collect()
+                }
+
+                #[must_use]
+                pub fn runtime_legal(&self) -> bool {
+                    self.operations.iter().all(EffectOperationMetadata::architecturally_legal)
+                }
+            }
+
             #type_exports
             #(#effect_surfaces)*
         }
     })
 }
 
-fn generate_effect_surface(effect: &EffectInterfaceDeclaration) -> Result<TokenStream> {
+fn generate_effect_surface(
+    effect: &EffectInterfaceDeclaration,
+    is_used: bool,
+) -> Result<TokenStream> {
     let trait_name = format_ident!("{}", effect.name);
+    let metadata_module_name = format_ident!("{}", to_snake_identifier(&effect.name));
     let request_name = format_ident!("{}Request", effect.name);
     let outcome_name = format_ident!("{}Outcome", effect.name);
     let request_variants = effect
@@ -520,8 +666,54 @@ fn generate_effect_surface(effect: &EffectInterfaceDeclaration) -> Result<TokenS
         .iter()
         .map(|op| generate_effect_handle_arm(op, &request_name, &outcome_name))
         .collect::<Result<Vec<_>>>()?;
+    let metadata_entries = effect
+        .operations
+        .iter()
+        .map(|op| generate_effect_operation_metadata_entry(effect, op, is_used))
+        .collect::<Result<Vec<_>>>()?;
+    let operation_lookup_entries = effect
+        .operations
+        .iter()
+        .map(generate_effect_operation_lookup_entry)
+        .collect::<Vec<_>>();
+    let request_metadata_arms = effect
+        .operations
+        .iter()
+        .map(|op| generate_effect_request_metadata_arm(op, &request_name))
+        .collect::<Vec<_>>();
+    let interface_name = LitStr::new(&effect.name, Span::call_site());
 
     Ok(quote! {
+        pub mod #metadata_module_name {
+            use super::*;
+
+            #(#metadata_entries)*
+
+            pub const OPERATIONS: &[EffectOperationMetadata] = &[#(#operation_lookup_entries),*];
+
+            pub const INTERFACE: EffectInterfaceSurfaceMetadata = EffectInterfaceSurfaceMetadata {
+                interface_name: #interface_name,
+                operations: OPERATIONS,
+            };
+
+            #[must_use]
+            pub fn metadata() -> &'static EffectInterfaceSurfaceMetadata {
+                &INTERFACE
+            }
+
+            #[must_use]
+            pub fn operation(name: &str) -> Option<&'static EffectOperationMetadata> {
+                INTERFACE.operation(name)
+            }
+
+            #[must_use]
+            pub fn request_metadata(request: &#request_name) -> &'static EffectOperationMetadata {
+                match request {
+                    #(#request_metadata_arms),*
+                }
+            }
+        }
+
         #[derive(Clone, Debug, PartialEq, ::telltale::serde::Serialize, ::telltale::serde::Deserialize)]
         #[serde(crate = "::telltale::serde")]
         pub enum #request_name {
@@ -985,7 +1177,6 @@ fn generate_commitments_module(choreography: &Choreography) -> Result<TokenStrea
                 pub operation_name: &'static str,
                 pub owner_role: &'static str,
                 pub region: Option<&'static str>,
-                pub composition_policy: Option<&'static str>,
                 pub progress: ProgressMetadata,
             }
 
@@ -1060,13 +1251,6 @@ fn generate_commitment_metadata(operation: &OperationDeclaration) -> Result<Toke
             quote!(::std::option::Option::Some(#value))
         },
     );
-    let composition_policy = operation.composition_policy.as_deref().map_or_else(
-        || quote!(::std::option::Option::None),
-        |value| {
-            let value = LitStr::new(value, Span::call_site());
-            quote!(::std::option::Option::Some(#value))
-        },
-    );
     let contract_name = LitStr::new(&progress.contract_name, Span::call_site());
     let requires_profile = progress.requires_profile.as_deref().map_or_else(
         || quote!(::std::option::Option::None),
@@ -1102,7 +1286,6 @@ fn generate_commitment_metadata(operation: &OperationDeclaration) -> Result<Toke
             operation_name: #operation_name,
             owner_role: #owner_role,
             region: #region,
-            composition_policy: #composition_policy,
             progress: ProgressMetadata {
                 contract_name: #contract_name,
                 requires_profile: #requires_profile,
@@ -1112,6 +1295,431 @@ fn generate_commitment_metadata(operation: &OperationDeclaration) -> Result<Toke
             },
         }
     })
+}
+
+fn generate_agreements_module(choreography: &Choreography) -> Result<TokenStream> {
+    let profile_entries = choreography
+        .agreement_profile_declarations()
+        .iter()
+        .map(generate_agreement_profile_metadata)
+        .collect::<Result<Vec<_>>>()?;
+    let operation_entries = choreography
+        .operation_declarations()
+        .iter()
+        .filter(|operation| operation.agreement.is_some())
+        .map(|operation| generate_operation_agreement_metadata(choreography, operation))
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(quote! {
+        pub mod agreements {
+            pub use ::telltale::dsl::semantic::{
+                AgreementContract,
+                AgreementEvidenceKind,
+                AgreementLevel,
+                AgreementProfile,
+                AgreementRule,
+                EffectCompositionPolicy,
+                OperationVisibility,
+                PrestateBinding,
+            };
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct AgreementProfileMetadata {
+                pub profile_name: &'static str,
+                pub visibility: OperationVisibility,
+                pub rule_name: &'static str,
+                pub usable_at: AgreementLevel,
+                pub finalized_at: AgreementLevel,
+                pub required_evidence_kind: AgreementEvidenceKind,
+            }
+
+            impl AgreementProfileMetadata {
+                #[must_use]
+                pub fn agreement_rule(&self) -> AgreementRule {
+                    match self.rule_name {
+                        "no_agreement" => AgreementRule::NoAgreement,
+                        "any_participant" => AgreementRule::AnyParticipant,
+                        "unanimous" => AgreementRule::Unanimous,
+                        other => AgreementRule::Named {
+                            rule_name: other.to_string(),
+                        },
+                    }
+                }
+
+                #[must_use]
+                pub fn agreement_profile(&self) -> AgreementProfile {
+                    AgreementProfile {
+                        profile_name: self.profile_name.to_string(),
+                        visibility: self.visibility,
+                        rule: self.agreement_rule(),
+                        usable_at: self.usable_at,
+                        finalized_at: self.finalized_at,
+                        required_evidence_kind: self.required_evidence_kind,
+                    }
+                }
+            }
+
+            #[derive(Clone, Debug, PartialEq, Eq)]
+            pub struct OperationAgreementMetadata {
+                pub operation_name: &'static str,
+                pub profile_name: &'static str,
+                pub prestate: Option<&'static str>,
+                pub child_effect_aggregation: Option<EffectCompositionPolicy>,
+                pub visibility: OperationVisibility,
+                pub rule_name: &'static str,
+                pub usable_at: AgreementLevel,
+                pub finalized_at: AgreementLevel,
+                pub required_evidence_kind: AgreementEvidenceKind,
+            }
+
+            impl OperationAgreementMetadata {
+                #[must_use]
+                pub fn agreement_rule(&self) -> AgreementRule {
+                    match self.rule_name {
+                        "no_agreement" => AgreementRule::NoAgreement,
+                        "any_participant" => AgreementRule::AnyParticipant,
+                        "unanimous" => AgreementRule::Unanimous,
+                        other => AgreementRule::Named {
+                            rule_name: other.to_string(),
+                        },
+                    }
+                }
+
+                #[must_use]
+                pub fn agreement_contract(
+                    &self,
+                    operation_id: impl Into<::std::string::String>,
+                ) -> AgreementContract {
+                    AgreementContract {
+                        contract_name: format!("agreement:{}", self.operation_name),
+                        operation_id: operation_id.into(),
+                        session: None,
+                        owner_id: None,
+                        profile_name: Some(self.profile_name.to_string()),
+                        visibility: self.visibility,
+                        rule: self.agreement_rule(),
+                        usable_at: self.usable_at,
+                        finalized_at: self.finalized_at,
+                        required_evidence_kind: self.required_evidence_kind,
+                    }
+                }
+
+                #[must_use]
+                pub fn prestate_binding(
+                    &self,
+                    operation_id: impl Into<::std::string::String>,
+                    state_digest: impl Into<::std::string::String>,
+                ) -> Option<PrestateBinding> {
+                    self.prestate.map(|prestate| {
+                        let operation_id = operation_id.into();
+                        PrestateBinding {
+                            binding_id: format!("prestate:{operation_id}"),
+                            operation_id,
+                            session: None,
+                            state_digest: state_digest.into(),
+                            epoch_ref: Some(prestate.to_string()),
+                            participant_digest: None,
+                        }
+                    })
+                }
+            }
+
+            #[allow(dead_code)]
+            pub const PROFILES: &[AgreementProfileMetadata] = &[#(#profile_entries),*];
+
+            #[allow(dead_code)]
+            pub const OPERATIONS: &[OperationAgreementMetadata] = &[#(#operation_entries),*];
+
+            #[must_use]
+            pub fn profile(name: &str) -> Option<&'static AgreementProfileMetadata> {
+                PROFILES.iter().find(|entry| entry.profile_name == name)
+            }
+
+            #[must_use]
+            pub fn operation(name: &str) -> Option<&'static OperationAgreementMetadata> {
+                OPERATIONS.iter().find(|entry| entry.operation_name == name)
+            }
+        }
+    })
+}
+
+fn generate_agreement_profile_metadata(profile: &AgreementProfileDeclaration) -> Result<TokenStream> {
+    let profile_name = LitStr::new(&profile.name, Span::call_site());
+    let visibility = lower_operation_visibility(&profile.visibility)?;
+    let rule_name = LitStr::new(&profile.rule, Span::call_site());
+    let usable_at = lower_agreement_level(&profile.usable_at)?;
+    let finalized_at = lower_agreement_level(&profile.finalized_at)?;
+    let required_evidence_kind = lower_agreement_evidence_kind(&profile.evidence)?;
+
+    Ok(quote! {
+        AgreementProfileMetadata {
+            profile_name: #profile_name,
+            visibility: #visibility,
+            rule_name: #rule_name,
+            usable_at: #usable_at,
+            finalized_at: #finalized_at,
+            required_evidence_kind: #required_evidence_kind,
+        }
+    })
+}
+
+fn generate_operation_agreement_metadata(
+    choreography: &Choreography,
+    operation: &OperationDeclaration,
+) -> Result<TokenStream> {
+    let attachment = operation.agreement.as_ref().ok_or_else(|| {
+        Error::new(
+            Span::call_site(),
+            format!(
+                "operation `{}` is missing a named agreement attachment",
+                operation.name
+            ),
+        )
+    })?;
+    let operation_name = LitStr::new(&operation.name, Span::call_site());
+    let profile_name = LitStr::new(&attachment.profile_name, Span::call_site());
+    let prestate = attachment.prestate.as_deref().map_or_else(
+        || quote!(::std::option::Option::None),
+        |value| {
+            let value = LitStr::new(value, Span::call_site());
+            quote!(::std::option::Option::Some(#value))
+        },
+    );
+    let child_effect_aggregation = operation
+        .child_effect_aggregation
+        .as_ref()
+        .map(|aggregation| lower_child_effect_aggregation_policy(&aggregation.policy))
+        .transpose()?
+        .map_or_else(
+            || quote!(::std::option::Option::None),
+            |value| quote!(::std::option::Option::Some(#value)),
+        );
+
+    let profile_decl = choreography_profile_for_operation(
+        choreography,
+        operation,
+        attachment.profile_name.as_str(),
+    )?;
+    let visibility = lower_operation_visibility(&profile_decl.visibility)?;
+    let rule_name = LitStr::new(&profile_decl.rule, Span::call_site());
+    let usable_at = lower_agreement_level(&profile_decl.usable_at)?;
+    let finalized_at = lower_agreement_level(&profile_decl.finalized_at)?;
+    let required_evidence_kind = lower_agreement_evidence_kind(&profile_decl.evidence)?;
+
+    Ok(quote! {
+        OperationAgreementMetadata {
+            operation_name: #operation_name,
+            profile_name: #profile_name,
+            prestate: #prestate,
+            child_effect_aggregation: #child_effect_aggregation,
+            visibility: #visibility,
+            rule_name: #rule_name,
+            usable_at: #usable_at,
+            finalized_at: #finalized_at,
+            required_evidence_kind: #required_evidence_kind,
+        }
+    })
+}
+
+fn choreography_profile_for_operation(
+    choreography: &Choreography,
+    operation: &OperationDeclaration,
+    profile_name: &str,
+) -> Result<AgreementProfileDeclaration> {
+    choreography
+        .agreement_profile_declarations()
+        .iter()
+        .find(|profile| profile.name == profile_name)
+        .cloned()
+        .ok_or_else(|| {
+            Error::new(
+                Span::call_site(),
+                format!(
+                    "operation `{}` references unknown agreement profile `{profile_name}`",
+                    operation.name
+                ),
+            )
+        })
+}
+
+fn lower_operation_visibility(value: &str) -> Result<TokenStream> {
+    match value {
+        "immediate" => Ok(quote!(OperationVisibility::Immediate)),
+        "pending" => Ok(quote!(OperationVisibility::Pending)),
+        "blocked_until_finalized" => Ok(quote!(OperationVisibility::BlockedUntilFinalized)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported agreement visibility `{other}`; use `immediate`, `pending`, or `blocked_until_finalized`"
+            ),
+        )),
+    }
+}
+
+fn lower_agreement_level(value: &str) -> Result<TokenStream> {
+    match value {
+        "none" => Ok(quote!(AgreementLevel::None)),
+        "provisional" => Ok(quote!(AgreementLevel::Provisional)),
+        "soft_safe" => Ok(quote!(AgreementLevel::SoftSafe)),
+        "finalized" => Ok(quote!(AgreementLevel::Finalized)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported agreement level `{other}`; use `none`, `provisional`, `soft_safe`, or `finalized`"
+            ),
+        )),
+    }
+}
+
+fn lower_agreement_evidence_kind(value: &str) -> Result<TokenStream> {
+    match value {
+        "witness" => Ok(quote!(AgreementEvidenceKind::Witness)),
+        "certificate" => Ok(quote!(AgreementEvidenceKind::Certificate)),
+        "commit_fact" => Ok(quote!(AgreementEvidenceKind::CommitFact)),
+        "publication" => Ok(quote!(AgreementEvidenceKind::Publication)),
+        "materialization" => Ok(quote!(AgreementEvidenceKind::Materialization)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported agreement evidence kind `{other}`; use `witness`, `certificate`, `commit_fact`, `publication`, or `materialization`"
+            ),
+        )),
+    }
+}
+
+fn lower_child_effect_aggregation_policy(policy: &ChildEffectAggregationPolicy) -> Result<TokenStream> {
+    Ok(match policy {
+        ChildEffectAggregationPolicy::AllSuccess => {
+            quote!(EffectCompositionPolicy::AllSuccess)
+        }
+        ChildEffectAggregationPolicy::FirstSuccess => {
+            quote!(EffectCompositionPolicy::FirstSuccess)
+        }
+        ChildEffectAggregationPolicy::ThresholdSuccess { required_successes } => {
+            let required_successes = *required_successes;
+            quote!(EffectCompositionPolicy::ThresholdSuccess {
+                required_successes: #required_successes
+            })
+        }
+    })
+}
+
+fn lower_effect_authority_class(
+    value: telltale_parser::ast::EffectAuthorityClass,
+) -> TokenStream {
+    match value {
+        telltale_parser::ast::EffectAuthorityClass::Authoritative => {
+            quote!(EffectAuthorityClass::Authoritative)
+        }
+        telltale_parser::ast::EffectAuthorityClass::Command => {
+            quote!(EffectAuthorityClass::Command)
+        }
+        telltale_parser::ast::EffectAuthorityClass::Observe => {
+            quote!(EffectAuthorityClass::Observe)
+        }
+    }
+}
+
+fn lower_effect_semantic_class(value: &str) -> Result<TokenStream> {
+    match value {
+        "authoritative" => Ok(quote!(EffectSemanticClass::Authoritative)),
+        "observational" => Ok(quote!(EffectSemanticClass::Observational)),
+        "best_effort" => Ok(quote!(EffectSemanticClass::BestEffort)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported effect semantic class `{other}`; use `authoritative`, `observational`, or `best_effort`"
+            ),
+        )),
+    }
+}
+
+fn lower_effect_agreement_use(value: &str) -> Result<TokenStream> {
+    match value {
+        "required" => Ok(quote!(EffectAgreementUse::Required)),
+        "none" => Ok(quote!(EffectAgreementUse::None)),
+        "forbidden" => Ok(quote!(EffectAgreementUse::Forbidden)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported effect agreement_use `{other}`; use `required`, `none`, or `forbidden`"
+            ),
+        )),
+    }
+}
+
+fn lower_effect_region_scope(value: &str) -> Result<TokenStream> {
+    match value {
+        "session" => Ok(quote!(EffectRegionScope::Session)),
+        "fragment" => Ok(quote!(EffectRegionScope::Fragment)),
+        "global" => Ok(quote!(EffectRegionScope::Global)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported effect region `{other}`; use `session`, `fragment`, or `global`"
+            ),
+        )),
+    }
+}
+
+fn lower_effect_admissibility(is_used: bool) -> TokenStream {
+    if is_used {
+        quote!(EffectAdmissibility::DeclaredUseOnly)
+    } else {
+        quote!(EffectAdmissibility::InternalOnly)
+    }
+}
+
+fn lower_effect_totality(value: &str) -> Result<TokenStream> {
+    match value {
+        "immediate" => Ok(quote!(EffectTotality::Immediate)),
+        "may_block" => Ok(quote!(EffectTotality::MayBlock)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported effect progress `{other}`; use `immediate` or `may_block`"
+            ),
+        )),
+    }
+}
+
+fn lower_effect_timeout_policy(value: &str) -> Result<TokenStream> {
+    match value {
+        "immediate" => Ok(quote!(EffectTimeoutPolicy::None)),
+        "may_block" => Ok(quote!(EffectTimeoutPolicy::Required { budget_ticks: None })),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported effect progress `{other}`; use `immediate` or `may_block`"
+            ),
+        )),
+    }
+}
+
+fn lower_effect_retry_shape() -> TokenStream {
+    quote!(EffectRetryShape::Forbidden)
+}
+
+fn lower_effect_reentrancy_policy(value: &str) -> Result<TokenStream> {
+    match value {
+        "allow" => Ok(quote!(EffectReentrancyPolicy::Allow)),
+        "reject_same_operation" => Ok(quote!(EffectReentrancyPolicy::RejectSameOperation)),
+        "reject_same_fragment" => Ok(quote!(EffectReentrancyPolicy::RejectSameFragment)),
+        other => Err(Error::new(
+            Span::call_site(),
+            format!(
+                "unsupported effect reentrancy `{other}`; use `allow`, `reject_same_operation`, or `reject_same_fragment`"
+            ),
+        )),
+    }
+}
+
+fn lower_effect_handler_domain(is_used: bool) -> TokenStream {
+    if is_used {
+        quote!(EffectHandlerDomain::External)
+    } else {
+        quote!(EffectHandlerDomain::Internal)
+    }
 }
 
 fn generate_effect_request_variant(op: &EffectOperationDeclaration) -> Result<TokenStream> {
@@ -1145,6 +1753,56 @@ fn generate_effect_handle_arm(
     Ok(quote! {
         #request_name::#variant(input) => #outcome_name::#variant(self.#method(input))
     })
+}
+
+fn generate_effect_operation_metadata_entry(
+    effect: &EffectInterfaceDeclaration,
+    op: &EffectOperationDeclaration,
+    is_used: bool,
+) -> Result<TokenStream> {
+    let const_name = format_ident!("{}", to_upper_snake_identifier(&op.name));
+    let interface_name = LitStr::new(&effect.name, Span::call_site());
+    let operation_name = LitStr::new(&op.name, Span::call_site());
+    let authority_class = lower_effect_authority_class(op.authority_class);
+    let semantic_class = lower_effect_semantic_class(&op.semantic_class)?;
+    let agreement_use = lower_effect_agreement_use(&op.agreement_use)?;
+    let region_scope = lower_effect_region_scope(&op.region)?;
+    let admissibility = lower_effect_admissibility(is_used);
+    let totality = lower_effect_totality(&op.progress)?;
+    let timeout_policy = lower_effect_timeout_policy(&op.progress)?;
+    let retry_shape = lower_effect_retry_shape();
+    let reentrancy_policy = lower_effect_reentrancy_policy(&op.reentrancy)?;
+    let handler_domain = lower_effect_handler_domain(is_used);
+    Ok(quote! {
+        pub const #const_name: EffectOperationMetadata = EffectOperationMetadata {
+            interface_name: #interface_name,
+            operation_name: #operation_name,
+            authority_class: #authority_class,
+            semantic_class: #semantic_class,
+            agreement_use: #agreement_use,
+            region_scope: #region_scope,
+            admissibility: #admissibility,
+            totality: #totality,
+            timeout_policy: #timeout_policy,
+            retry_shape: #retry_shape,
+            reentrancy_policy: #reentrancy_policy,
+            handler_domain: #handler_domain,
+        };
+    })
+}
+
+fn generate_effect_operation_lookup_entry(op: &EffectOperationDeclaration) -> TokenStream {
+    let const_name = format_ident!("{}", to_upper_snake_identifier(&op.name));
+    quote!(#const_name)
+}
+
+fn generate_effect_request_metadata_arm(
+    op: &EffectOperationDeclaration,
+    request_name: &Ident,
+) -> TokenStream {
+    let variant = format_ident!("{}", to_upper_camel_identifier(&op.name));
+    let const_name = format_ident!("{}", to_upper_snake_identifier(&op.name));
+    quote!(#request_name::#variant(_) => &#const_name)
 }
 
 fn lower_dsl_type_expr(ty: &DslTypeExpr, allow_inline_record: bool) -> Result<TokenStream> {
@@ -1536,6 +2194,10 @@ fn to_upper_camel_identifier(input: &str) -> String {
         }
     }
     out
+}
+
+fn to_upper_snake_identifier(input: &str) -> String {
+    to_snake_identifier(input).to_ascii_uppercase()
 }
 
 fn collect_label_surfaces(

@@ -28,9 +28,10 @@ pub use lints::{
 };
 
 use crate::ast::{
-    Choreography, EffectInterfaceDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration,
-    OperationDeclaration, RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration,
-    TopologyDeclaration, TypeDeclaration,
+    AgreementProfileDeclaration, Choreography, EffectInterfaceDeclaration,
+    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration,
+    RegionDeclaration, RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
+    TypeDeclaration,
 };
 use crate::compiler::layout::preprocess_layout;
 use crate::extensions::{ExtensionRegistry, ProtocolExtension};
@@ -43,10 +44,11 @@ use std::collections::{HashMap, HashSet};
 
 use conversion::{convert_statements_to_protocol, inline_calls};
 use declarations::{
-    enforce_same_line_equals, parse_effect_decl, parse_fragment_decl, parse_guest_runtime_decl,
-    parse_module_decl, parse_operation_decl, parse_profile_decl, parse_proof_bundle_decl,
-    parse_protocol_profiles, parse_protocol_requires, parse_protocol_uses, parse_role_set_decl,
-    parse_topology_decl, parse_type_decl,
+    enforce_same_line_equals, parse_agreement_profile_decl, parse_effect_decl,
+    parse_fragment_decl, parse_guest_runtime_decl, parse_module_decl, parse_operation_decl,
+    parse_profile_decl, parse_proof_bundle_decl, parse_protocol_profiles,
+    parse_protocol_requires, parse_protocol_uses, parse_role_set_decl, parse_topology_decl,
+    parse_type_decl,
 };
 use linear::{infer_required_proof_bundles, validate_authority_surface, validate_linear_vm_assets};
 use role::parse_roles_from_pair;
@@ -99,6 +101,7 @@ pub fn parse_choreography_str_with_extensions(
     let mut operation_declarations: Vec<OperationDeclaration> = Vec::new();
     let mut guest_runtime_declarations: Vec<GuestRuntimeDeclaration> = Vec::new();
     let mut execution_profile_declarations: Vec<ExecutionProfileDeclaration> = Vec::new();
+    let mut agreement_profile_declarations: Vec<AgreementProfileDeclaration> = Vec::new();
 
     for pair in pairs {
         if pair.as_rule() == Rule::choreography {
@@ -115,6 +118,10 @@ pub fn parse_choreography_str_with_extensions(
                     }
                     Rule::profile_decl => {
                         execution_profile_declarations.push(parse_profile_decl(inner, &layout)?);
+                    }
+                    Rule::agreement_profile_decl => {
+                        agreement_profile_declarations
+                            .push(parse_agreement_profile_decl(inner, &layout)?);
                     }
                     Rule::role_set_decl => {
                         role_sets.push(parse_role_set_decl(inner, &layout)?);
@@ -326,6 +333,12 @@ pub fn parse_choreography_str_with_extensions(
         })?;
     choreography
         .set_execution_profile_declarations(&execution_profile_declarations)
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, &layout),
+            message,
+        })?;
+    choreography
+        .set_agreement_profile_declarations(&agreement_profile_declarations)
         .map_err(|message| ParseError::Syntax {
             span: ErrorSpan::from_line_col(1, 1, &layout),
             message,
@@ -545,7 +558,7 @@ fn reject_removed_legacy_surfaces(input: &str) -> std::result::Result<(), ParseE
         ),
         (
             Regex::new(r"(?m)^\s*quorum_collect\b").expect("quorum regex"),
-            "legacy DSL construct `quorum_collect` was removed from the proof-backed language surface; express quorum behavior through operation composition metadata and explicit protocol steps",
+            "legacy DSL construct `quorum_collect` was removed from the proof-backed language surface; express threshold participation through named agreement profiles plus explicit protocol steps or child-effect aggregation",
         ),
         (
             Regex::new(r"(?m)^\s*(acquire|release|fork|join|abort|delegate|tag)\b")
@@ -1582,7 +1595,7 @@ protocol FastHeartbeat =
         let input = r#"
 protocol TimedRequest =
   roles Client, Server
-  Client { runtime_timeout = 5s } -> Server : Request
+  Client { runtime_timeout : 5s } -> Server : Request
   Server -> Client : Response
 "#;
 
@@ -1623,7 +1636,7 @@ protocol TimedRequest =
 protocol TimedRequest =
   roles Client, Server
   Client {
-    runtime_timeout = 5s,
+    runtime_timeout : 5s,
   }
     -> Server : Request
   Server -> Client : Response
@@ -1654,7 +1667,7 @@ protocol TimedRequest =
         let input = r#"
 protocol QuickCheck =
   roles A, B
-  A { runtime_timeout = 100ms } -> B : Ping
+  A { runtime_timeout : 100ms } -> B : Ping
 "#;
 
         let result = parse_choreography_str(input);
@@ -1680,7 +1693,7 @@ protocol QuickCheck =
         let input = r#"
 protocol Broadcast =
   roles Coordinator, Worker
-  Coordinator { parallel = true } -> Worker : Task
+  Coordinator { parallel : true } -> Worker : Task
 "#;
 
         let result = parse_choreography_str(input);
@@ -1812,9 +1825,9 @@ protocol ParallelMissingBars =
 protocol RoleAnnotatedSend =
   roles Role, OtherRole
   Role {
-    annotation1 = "value",
-    annotation2 = 100,
-    annotation3 = another,
+    annotation1 : "value",
+    annotation2 : 100,
+    annotation3 : another,
   } -> OtherRole : Message of crate.Type
 "#;
 
@@ -1854,7 +1867,7 @@ protocol RoleAnnotatedSend =
         let input = r#"
 protocol StyledSend =
   roles Buyer, Seller
-  Buyer { priority = high }
+  Buyer { priority : high }
     -> Seller : Request of shop.Order
 "#;
 
@@ -1888,7 +1901,7 @@ protocol StyledSend =
 protocol RoleAnnotatedIndexedSend =
   roles Worker[N], Coordinator
   Worker[0] {
-    shard = 0,
+    shard : 0,
   } -> Coordinator : Result
 "#;
 
@@ -1923,7 +1936,7 @@ protocol RoleAnnotatedIndexedSend =
 protocol RoleAnnotatedBroadcast =
   roles Coordinator, Worker
   Coordinator {
-    batch_size = 100,
+    batch_size : 100,
   } ->* : Task
 "#;
 
@@ -1953,7 +1966,7 @@ protocol RoleAnnotatedBroadcast =
         let input = r#"
 protocol InvalidRoleMetadata =
   roles Role, OtherRole
-  Role[annotation1 = "value"] -> OtherRole : Message
+  Role[annotation1 : "value"] -> OtherRole : Message
 "#;
 
         let result = parse_choreography_str(input);
@@ -1968,7 +1981,7 @@ protocol InvalidRoleMetadata =
         let input = r#"
 protocol OrderedCollect =
   roles Coordinator, Worker
-  Worker { ordered = true } -> Coordinator : Result
+  Worker { ordered : true } -> Coordinator : Result
 "#;
 
         let result = parse_choreography_str(input);
@@ -1994,7 +2007,7 @@ protocol OrderedCollect =
         let input = r#"
 protocol ThresholdSign =
   roles Coordinator, Signer
-  Signer { min_responses = 3 } -> Coordinator : Signature
+  Signer { min_responses : 3 } -> Coordinator : Signature
 "#;
 
         let result = parse_choreography_str(input);
@@ -2023,7 +2036,7 @@ protocol ThresholdSign =
 protocol ThresholdSign =
   roles Coordinator, Signer
   Signer {
-    min_responses = 3,
+    min_responses : 3,
   }
     -> Coordinator : Signature
 "#;
@@ -2054,8 +2067,8 @@ protocol ThresholdSign =
 protocol ParallelThreshold =
   roles Coordinator, Worker
   Worker {
-    parallel = true,
-    min_responses = 2,
+    parallel : true,
+    min_responses : 2,
   } -> Coordinator : Vote
 "#;
 
@@ -2209,6 +2222,13 @@ protocol LoopTypeCheck =
         let input = r#"
 effect Runtime
   authoritative ready : Session -> Session
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol ExtensionProjection uses Runtime =
   roles A, B
@@ -2273,6 +2293,46 @@ protocol Inferred under Replay =
             choreo.protocol_execution_profiles(),
             vec!["Replay".to_string()]
         );
+        assert!(choreo.validate().is_ok());
+    }
+
+    #[test]
+    fn test_parse_agreement_profiles_and_operation_attachment() {
+        let input = r#"
+agreement_profile SoftSafe
+  visibility pending
+  rule aura_soft_safe
+  usable_at soft_safe
+  finalized_at finalized
+  evidence commit_fact
+
+profile Replay fairness eventual admissibility replay escalation_window bounded
+
+operation syncLedger(entryId : Int) at Coordinator progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose agreement SoftSafe prestate ContactContext compose first_success =
+  publish SyncQueued(entryId)
+
+protocol CommitLifecycle under Replay =
+  roles Coordinator, Worker
+  begin syncLedger(42) progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose
+  Coordinator -> Worker : Prepare
+"#;
+
+        let choreo = parse_choreography_str(input).expect("parse should succeed");
+        assert_eq!(choreo.agreement_profile_declarations().len(), 1);
+        let agreement = &choreo.agreement_profile_declarations()[0];
+        assert_eq!(agreement.name, "SoftSafe");
+        assert_eq!(agreement.visibility, "pending");
+        assert_eq!(agreement.rule, "aura_soft_safe");
+        assert_eq!(agreement.usable_at, "soft_safe");
+        assert_eq!(agreement.finalized_at, "finalized");
+        assert_eq!(agreement.evidence, "commit_fact");
+
+        let attachment = choreo.operation_declarations()[0]
+            .agreement
+            .clone()
+            .expect("operation should carry agreement metadata");
+        assert_eq!(attachment.profile_name, "SoftSafe");
+        assert_eq!(attachment.prestate.as_deref(), Some("ContactContext"));
         assert!(choreo.validate().is_ok());
     }
 
@@ -2463,14 +2523,39 @@ type CommitError =
   | NotReady
   | TimedOut
 
-type alias ReadyWitness = { epoch : Int, issuedBy : Role }
+type alias ReadyWitness =
+{
+  epoch : Int
+  issuedBy : Role
+}
 
 effect Runtime
   authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
   command transfer : TransferRequest -> Result TransferError TransferReceipt
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : none
+    reentrancy : allow
+  }
 
 effect Audit
   observe record : AuditEvent -> Unit
+  {
+    class : observational
+    progress : immediate
+    region : global
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol CommitFlow uses Runtime, Audit =
   roles Coordinator, Worker, Client
@@ -2506,6 +2591,10 @@ protocol CommitFlow uses Runtime, Audit =
                 op.interface_name == "Runtime"
                     && op.operation_name == "ready"
                     && op.authority_class == crate::ast::EffectAuthorityClass::Authoritative
+                    && op.semantic_class == "authoritative"
+                    && op.progress == "may_block"
+                    && op.region == "fragment"
+                    && op.agreement_use == "required"
             }),
             "runtime effect metadata should carry effect authority class"
         );
@@ -2517,10 +2606,20 @@ protocol CommitFlow uses Runtime, Audit =
     #[test]
     fn test_parse_let_in_and_maybe_surface() {
         let input = r#"
-type alias InviteHandle = { id : Int }
+type alias InviteHandle =
+{
+  id : Int
+}
 
 effect Runtime
   lookupInvite : Session -> Maybe InviteHandle
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : none
+    reentrancy : allow
+  }
 
 protocol InviteFlow uses Runtime =
   roles Coordinator, Worker
@@ -2544,6 +2643,13 @@ protocol InviteFlow uses Runtime =
         let input = r#"
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol CommitFlow uses Runtime =
   roles Coordinator, Worker
@@ -2605,6 +2711,13 @@ protocol CommitFlow uses Runtime =
         let input = r#"
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol CommitFlow uses Runtime =
   roles Coordinator, Worker
@@ -2628,9 +2741,23 @@ protocol CommitFlow uses Runtime =
         let input = r#"
 effect Runtime
   ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 effect Runtime
   transfer : TransferRequest -> Result TransferError TransferReceipt
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : none
+    reentrancy : allow
+  }
 
 protocol CommitFlow uses Runtime =
   roles Coordinator, Worker
@@ -2651,6 +2778,13 @@ protocol CommitFlow uses Runtime =
         let input = r#"
 effect Runtime
   observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol WatchFlow uses Runtime =
   roles Coordinator, Worker
@@ -2671,8 +2805,14 @@ protocol WatchFlow uses Runtime =
 fragment ChannelMembership(channel)
 
 profile Replay fairness eventual admissibility replay escalation_window bounded
+agreement_profile PendingPublication
+  visibility pending
+  rule no_agreement
+  usable_at provisional
+  finalized_at finalized
+  evidence publication
 
-operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) progress MembershipProgress compose all_success =
+operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) progress MembershipProgress agreement PendingPublication prestate ChannelMembership compose threshold_success(2) =
   publish SyncQueued(channel)
 
 guest runtime MessagingGuest =
@@ -2710,7 +2850,20 @@ protocol CommitFlow uses Runtime, Audit under Replay =
                 .map(|progress| progress.contract_name.as_str()),
             Some("MembershipProgress")
         );
-        assert_eq!(operation.composition_policy.as_deref(), Some("all_success"));
+        assert_eq!(
+            operation
+                .agreement
+                .as_ref()
+                .map(|agreement| agreement.profile_name.as_str()),
+            Some("PendingPublication")
+        );
+        assert_eq!(
+            operation
+                .child_effect_aggregation
+                .as_ref()
+                .map(|composition| composition.dsl_name()),
+            Some("threshold_success(2)".to_string())
+        );
         assert_eq!(operation.params.len(), 1);
         assert!(operation
             .body_source
@@ -2732,8 +2885,14 @@ protocol CommitFlow uses Runtime, Audit under Replay =
     fn test_parse_commitment_lifecycle_and_structured_progress_metadata() {
         let input = r#"
 profile Replay fairness eventual admissibility replay escalation_window bounded
+agreement_profile SoftSafe
+  visibility pending
+  rule aura_soft_safe
+  usable_at soft_safe
+  finalized_at finalized
+  evidence commit_fact
 
-operation syncLedger(entryId : Int) at Coordinator progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose compose fallback =
+operation syncLedger(entryId : Int) at Coordinator progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose agreement SoftSafe prestate LedgerState compose first_success =
   publish SyncQueued(entryId)
 
 protocol CommitLifecycle under Replay =
@@ -2767,8 +2926,14 @@ protocol CommitLifecycle under Replay =
         let input = r#"
 profile Replay fairness eventual admissibility replay escalation_window bounded
 fragment ChannelMembership(channel)
+agreement_profile PendingPublication
+  visibility pending
+  rule no_agreement
+  usable_at provisional
+  finalized_at finalized
+  evidence publication
 
-operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) progress MembershipProgress compose all_success =
+operation syncMembership(channel : ChannelId) at Worker within ChannelMembership(channel) progress MembershipProgress agreement PendingPublication prestate ChannelMembership compose threshold_success(2) =
   publish SyncQueued(channel)
 
 protocol CommitFlow under Replay =
@@ -2830,5 +2995,41 @@ protocol AcceptFlow =
             rendered.contains(".tell"),
             "error should point to canonical .tell extension: {rendered}"
         );
+    }
+
+    #[test]
+    fn reject_legacy_child_effect_aggregation_keywords() {
+        for keyword in ["race", "fallback", "quorum(2)"] {
+            let input = format!(
+                r#"
+agreement_profile SoftSafe
+  visibility pending
+  rule aura_soft_safe
+  usable_at soft_safe
+  finalized_at finalized
+  evidence commit_fact
+
+profile Replay fairness eventual admissibility replay escalation_window bounded
+
+operation syncLedger(entryId : Int) at Coordinator progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose agreement SoftSafe prestate ContactContext compose {keyword} =
+  publish SyncQueued(entryId)
+
+protocol CommitLifecycle under Replay =
+  roles Coordinator, Worker
+  begin syncLedger(42) progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose
+  Coordinator -> Worker : Prepare
+"#
+            );
+
+            let err = parse_choreography_str(&input)
+                .expect_err("legacy child-effect aggregation keyword should fail");
+            let message = err.to_string();
+            assert!(
+                message.contains("all_success")
+                    || message.contains("first_success")
+                    || message.contains("threshold_success"),
+                "unexpected parser error for `{keyword}`: {message}"
+            );
+        }
     }
 }

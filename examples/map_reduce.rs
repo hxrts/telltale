@@ -11,19 +11,42 @@ use telltale::{tell, try_session};
 type Result<T> = result::Result<T, Box<dyn Error>>;
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Work items assigned by the coordinator host.
-    type alias WorkAssignment = { w1 : Int, w2 : Int, w3 : Int, w4 : Int }
+    type alias WorkAssignment =
+    {
+      w1 : Int
+      w2 : Int
+      w3 : Int
+      w4 : Int
+    }
 
     -- // Coordinator host provides one batch of work items.
     effect CoordinatorPlan
       command assign : Session -> WorkAssignment
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Worker host computes one partial result from one work item.
     effect WorkerCompute
       command process : Int -> Int
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Coordinator fans work out to all workers, then collects partial results.
-    protocol MapReduce uses CoordinatorPlan, WorkerCompute =
+    protocol MapReduce uses CoordinatorPlan, WorkerCompute under Replay =
       roles Coordinator, W1, W2, W3, W4
       -- // Fan-out stage distributes one work item per worker.
       Coordinator -> W1 : Work(i32)
@@ -144,6 +167,14 @@ fn main() -> Result<()> {
     let mut worker_2_host = WorkerHost;
     let mut worker_3_host = WorkerHost;
     let mut worker_4_host = WorkerHost;
+    println!(
+        "execution profiles = {:?}",
+        MapReduce::proof_status::EXECUTION_PROFILES
+    );
+    println!(
+        "session projectable = {}",
+        MapReduce::proof_status::SESSION_PROJECTABLE
+    );
 
     let (total, _, _, _, _) = executor::block_on(async {
         try_join!(

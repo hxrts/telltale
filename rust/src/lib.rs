@@ -65,11 +65,20 @@ pub mod dsl {
     /// surfaces.
     pub mod semantic {
         pub use telltale_machine::model::semantic_objects::{
-            AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-            CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead,
-            OperationInstance, OperationPhase, OutstandingEffectStatus, OwnershipScope,
-            ProgressContract, ProgressState, PublicationEvent, PublicationObserverClass,
-            PublicationStatus, SemanticHandoff,
+            AgreementContract, AgreementEvidence, AgreementEvidenceKind, AgreementLevel,
+            AgreementProfile, AgreementRule, AgreementState, AuthoritativeRead,
+            AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
+            CanonicalHandleKind, DelegationStatus, FinalizationOutcome, MaterializationProof,
+            ObservedRead, OperationInstance, OperationPhase, OperationVisibility,
+            OutstandingEffectStatus, OwnershipScope, PrestateBinding, ProgressContract,
+            ProgressState, PublicationEvent, PublicationObserverClass, PublicationStatus,
+            SemanticHandoff,
+        };
+        pub use telltale_machine::model::effects::{
+            EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,
+            EffectCompositionPolicy, EffectHandlerDomain, EffectInterfaceMetadata,
+            EffectReentrancyPolicy, EffectRegionScope, EffectRetryShape, EffectSemanticClass,
+            EffectTimeoutPolicy, EffectTotality,
         };
     }
 

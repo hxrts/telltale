@@ -126,9 +126,15 @@ fn collect_branch_requirements_from_protocol(
         Protocol::Rec { body, .. } => {
             collect_branch_requirements_from_protocol(body, requirements);
         }
-        Protocol::Extension { continuation, .. }
+        Protocol::Begin { continuation, .. }
+        | Protocol::Await { continuation, .. }
+        | Protocol::Resolve { continuation, .. }
+        | Protocol::Invalidate { continuation, .. }
+        | Protocol::Extension { continuation, .. }
         | Protocol::Let { continuation, .. }
         | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. }
         | Protocol::Handoff { continuation, .. }
         | Protocol::DependentWork { continuation, .. } => {
             collect_branch_requirements_from_protocol(continuation, requirements);

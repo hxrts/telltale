@@ -53,6 +53,49 @@ pub fn format_choreography_str(input: &str) -> Result<String, crate::compiler::p
 fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, out: &mut String) {
     match protocol {
         Protocol::End => {}
+        Protocol::Begin {
+            operation,
+            args,
+            progress,
+            continuation,
+        } => {
+            let mut line = if args.is_empty() {
+                format!("begin {}", operation)
+            } else {
+                format!("begin {}({})", operation, args.join(", "))
+            };
+            if let Some(progress) = progress {
+                line.push_str(&format!(" {}", format_progress_attachment(progress)));
+            }
+            write_line(out, indent, &line);
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::Await {
+            operation,
+            continuation,
+        } => {
+            write_line(out, indent, &format!("await {}", operation));
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::Resolve {
+            operation,
+            outcome,
+            continuation,
+        } => {
+            write_line(
+                out,
+                indent,
+                &format!("resolve {} as {}", operation, format_commitment_outcome(outcome)),
+            );
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::Invalidate {
+            operation,
+            continuation,
+        } => {
+            write_line(out, indent, &format!("invalidate {}", operation));
+            format_protocol(continuation, indent, config, out);
+        }
         Protocol::Send {
             from,
             to,
@@ -157,6 +200,30 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             }
             format_protocol(continuation, indent, config, out);
         }
+        Protocol::PublishAuthority {
+            witness,
+            publication_name,
+            continuation,
+        } => {
+            write_line(
+                out,
+                indent,
+                &format!("publish {} as {}", witness, publication_name),
+            );
+            format_protocol(continuation, indent, config, out);
+        }
+        Protocol::Materialize {
+            proof,
+            publication,
+            continuation,
+        } => {
+            write_line(
+                out,
+                indent,
+                &format!("materialize {} from {}", proof, publication),
+            );
+            format_protocol(continuation, indent, config, out);
+        }
         Protocol::Handoff {
             operation,
             target,
@@ -196,6 +263,47 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             continuation,
             ..
         } => format_extension_protocol(extension.type_name(), continuation, indent, config, out),
+    }
+}
+
+fn format_progress_attachment(progress: &crate::ast::ProgressAttachment) -> String {
+    let mut parts = vec![format!("progress {}", progress.contract_name)];
+    if let Some(profile) = &progress.requires_profile {
+        parts.push(format!("requires {}", profile));
+    }
+    if let Some(window) = &progress.within_window {
+        parts.push(format!("within {}", window));
+    }
+    if let Some(timeout) = &progress.on_timeout {
+        parts.push(format!("on timeout => {}", timeout));
+    }
+    if let Some(stall) = &progress.on_stall {
+        parts.push(format!("on stall => {}", stall));
+    }
+    parts.join(" ")
+}
+
+fn format_commitment_outcome(outcome: &crate::ast::CommitmentOutcome) -> String {
+    match outcome {
+        crate::ast::CommitmentOutcome::Success(payload) => {
+            payload.as_ref().map_or_else(
+                || "Success".to_string(),
+                |payload| format!("Success({payload})"),
+            )
+        }
+        crate::ast::CommitmentOutcome::Failure(payload) => {
+            payload.as_ref().map_or_else(
+                || "Failure".to_string(),
+                |payload| format!("Failure({payload})"),
+            )
+        }
+        crate::ast::CommitmentOutcome::Timeout(payload) => {
+            payload.as_ref().map_or_else(
+                || "Timeout".to_string(),
+                |payload| format!("Timeout({payload})"),
+            )
+        }
+        crate::ast::CommitmentOutcome::Cancelled => "Cancelled".to_string(),
     }
 }
 
@@ -438,7 +546,7 @@ fn format_sender_term(role: &Role, annotations: &Annotations) -> String {
     if !entries.is_empty() {
         let formatted = entries
             .into_iter()
-            .map(|(key, value)| format!("{key} = {value}"))
+            .map(|(key, value)| format!("{key} : {value}"))
             .collect::<Vec<_>>()
             .join(", ");
         out.push_str(" { ");
@@ -530,7 +638,7 @@ protocol Demo =
         let input = r#"
 protocol Styled =
   roles A, B, C, D
-  A { priority = high } -> B : Request of shop.Order
+  A { priority : high } -> B : Request of shop.Order
   par
     | C -> D : Left
     | D -> C : Right
@@ -538,7 +646,7 @@ protocol Styled =
 
         let choreo = parse_choreography_str(input).expect("should parse");
         let formatted = format_choreography(&choreo);
-        assert!(formatted.contains("A { priority = high }\n    -> B : Request of shop.Order"));
+        assert!(formatted.contains("A { priority : high }\n    -> B : Request of shop.Order"));
         assert!(formatted.contains("par\n    |\n      C\n        -> D : Left"));
         assert!(parse_choreography_str(&formatted).is_ok());
     }
@@ -548,7 +656,7 @@ protocol Styled =
         let input = r#"
 protocol Stable =
   roles A, B
-  A { priority = high } -> B : Request of shop.Order
+  A { priority : high } -> B : Request of shop.Order
 "#;
 
         let first = format_choreography_str(input).expect("first format should succeed");

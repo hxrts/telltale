@@ -7,15 +7,47 @@ type CommitError =
   | NotReady
   | TimedOut
 
-type alias ReadyWitness = { epoch : Int, issuedBy : Role }
+type alias ReadyWitness =
+{
+  epoch : Int
+  issuedBy : Role
+}
 
 effect Runtime
   authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
   command transfer : TransferRequest -> Result TransferError TransferReceipt
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : none
+    reentrancy : allow
+  }
   observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 effect Audit
   observe record : AuditEvent -> Unit
+  {
+    class : observational
+    progress : immediate
+    region : global
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol CommitFlow uses Runtime, Audit =
   roles Coordinator, Worker, Client

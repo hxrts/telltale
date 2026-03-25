@@ -355,16 +355,9 @@ type Alice_Protocol = Send<Bob, Request, Receive<Bob, Response, End>>;
 
 This session type enforces the protocol at compile time.
 
-At runtime, effect programs execute using handlers.
-
-```rust
-Program::new()
-    .send(Bob, Request)
-    .recv::<Response>(Bob)
-    .end()
-```
-
-The handler interprets this program into actual communication.
+At runtime, the protocol-machine and generated effect boundary drive actual
+communication. The older choreography-layer effect-program builder remains an
+internal implementation technique, not the canonical public architecture story.
 
 ## Design Decisions
 

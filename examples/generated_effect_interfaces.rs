@@ -1,8 +1,6 @@
-//! Generated effect-interface example.
-//!
-//! This shows the primary developer path: `tell!` emits typed algebraic
-//! effect traits and request/outcome enums directly, and host code implements
-//! those traits without any intermediate file export step.
+//! This is an effect-boundary example: `tell!` emits typed algebraic effect
+//! traits, request/outcome enums, and semantic metadata directly, and host
+//! code implements those traits without any intermediate file export step.
 
 use serde_json::json;
 use telltale::tell;
@@ -17,18 +15,54 @@ tell! {
       | TimedOut
 
     -- // Effect-domain data: evidence and receipts moved between Runtime operations.
-    type alias ReadyWitness = { epoch : Int, issuedBy : Role }
-    type alias CommitReceipt = { commitId : String, publishedBy : Role }
+    type alias ReadyWitness =
+    {
+      epoch : Int
+      issuedBy : Role
+    }
+    type alias CommitReceipt =
+    {
+      commitId : String
+      publishedBy : Role
+    }
 
     -- // Effects declare capabilities; the surrounding types are the data those capabilities use.
     effect Runtime
       authoritative ready : Session -> Result CommitError ReadyWitness
+      {
+        class : authoritative
+        progress : may_block
+        region : fragment
+        agreement_use : required
+        reentrancy : reject_same_fragment
+      }
       command publish : ReadyWitness -> Result CommitError CommitReceipt
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : required
+        reentrancy : allow
+      }
       observe watchPresence : Session -> PresenceView
+      {
+        class : observational
+        progress : immediate
+        region : session
+        agreement_use : forbidden
+        reentrancy : allow
+      }
 
     -- // Audit capability used to record externally visible milestones.
     effect Audit
       observe record : AuditEvent -> Unit
+      {
+        class : observational
+        progress : immediate
+        region : global
+        agreement_use : forbidden
+        reentrancy : allow
+      }
 
     -- // Minimal commit flow used to generate effect-facing Rust interfaces.
     protocol CommitFlow uses Runtime, Audit under Replay =
@@ -104,6 +138,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "execution profiles = {:?}",
         CommitFlow::proof_status::EXECUTION_PROFILES
     );
+    println!(
+        "agreement profiles = {:?}",
+        CommitFlow::proof_status::AGREEMENT_PROFILE_NAMES
+    );
+
+    let runtime_surface = effects::runtime::metadata();
+    let ready_metadata = effects::runtime::operation("ready")
+        .ok_or("missing generated runtime metadata for Runtime.ready")?;
+    let watch_request = effects::RuntimeRequest::WatchPresence(session.clone());
+    let watch_metadata = effects::runtime::request_metadata(&watch_request);
+    println!("runtime operations = {}", runtime_surface.operations.len());
+    println!("ready legal = {}", ready_metadata.architecturally_legal());
+    println!("watch dispatch = {}", watch_metadata.operation_name);
 
     // Direct trait calls are the primary developer path for effectful work.
     let witness = effects::Runtime::ready(&mut host, session.clone())?;
@@ -128,7 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let handle = materialization.canonical_handle("handle#1", &proof);
 
     // The generated request/outcome enums are the typed dispatch form of the same effect surface.
-    match effects::Runtime::handle(&mut host, effects::RuntimeRequest::WatchPresence(session)) {
+    match effects::Runtime::handle(&mut host, watch_request) {
         effects::RuntimeOutcome::WatchPresence(view) => {
             println!("presence visible: {}", view["visible"]);
         }

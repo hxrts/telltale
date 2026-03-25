@@ -12,22 +12,34 @@ want to inspect session projection and endpoint code. Use the
 generated-interface examples when you want to follow the target architecture:
 protocol-visible orchestration in Telltale, host realization in Rust.
 
-Top level examples in `examples/`:
+Projection examples in `examples/`:
 
-- `three_adder.rs` — three-party sum via `tell!`
-- `ring.rs` — three-node ring topology via `tell!`
-- `double_buffering.rs` — producer-consumer coordination via `tell!`
 - `adder.rs` — recursive two-party adder
 - `alternating_bit.rs` — reliable delivery with ACK branching
-- `oauth.rs` — three-party authentication with nested choices
-- `ring_choice.rs` — ring with per-hop branching and infinite types
-- `client_server_log.rs` — three-party protocol with infinite logging loop
-- `elevator.rs` — three-role infinite state machine
+- `double_buffering.rs` — producer-consumer coordination via `tell!`
 - `fft.rs` — eight-role FFT butterfly network
-- `generated_effect_interfaces.rs` — use canonical Rust handler traits and request/outcome enums emitted from `effect` declarations
+- `ring.rs` — three-node ring topology via `tell!`
+- `ring_choice.rs` — ring with per-hop branching and infinite types
+- `ring_max.rs` — linear ring maximum propagation
+- `three_adder.rs` — three-party sum via `tell!`
+
+Effect-boundary examples in `examples/`:
+
+- `client_server_log.rs` — logging decisions at the host boundary
+- `commitment_lifecycle.rs` — commitment, profile-driven progress, and Aura-shaped agreement/finality metadata
+- `elevator.rs` — host-driven door/elevator capabilities
+- `generated_effect_interfaces.rs` — canonical generated Rust effect traits and semantic metadata
+- `map_reduce.rs` — structured fan-out/fan-in work with host compute boundaries
+- `oauth.rs` — authentication and authorization decisions at the effect boundary
+- `reactive_signal.rs` — reactive signal subscription/current-value/publish interface
+- `three_buyers.rs` — pricing and affordability decisions at the host boundary
+- `travel_agency.rs` — quote/schedule capabilities behind one protocol boundary
+- `wasm-ping-pong/` — browser integration via generated effects
+
+Theory examples in `examples/`:
+
 - `async_subtyping.rs` — async-subtyping checks and subtype relation examples
 - `bounded_recursion.rs` — bounded recursion strategies with configurable depth
-- `wasm-ping-pong/` — browser builds using `wasm-pack`
 
 Generated-interface examples in `rust/choreography/examples/`:
 
@@ -122,12 +134,34 @@ tell! {
       | NotReady
       | TimedOut
 
-    type alias ReadyWitness = { epoch : Int, issuedBy : Role }
-    type alias CommitReceipt = { commitId : String, publishedBy : Role }
+    type alias ReadyWitness =
+    {
+      epoch : Int
+      issuedBy : Role
+    }
+    type alias CommitReceipt =
+    {
+      commitId : String
+      publishedBy : Role
+    }
 
     effect Runtime
       authoritative ready : Session -> Result CommitError ReadyWitness
+      {
+        class : authoritative
+        progress : may_block
+        region : fragment
+        agreement_use : required
+        reentrancy : reject_same_fragment
+      }
       command publish : ReadyWitness -> Result CommitError CommitReceipt
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : required
+        reentrancy : allow
+      }
 
     protocol CommitFlow uses Runtime =
       roles Coordinator, Worker
@@ -153,6 +187,8 @@ impl effects::Runtime for Host {
 
 let mut host = Host;
 assert_eq!(CommitFlow::proof_status::STRONGEST_TIER, "session_projectable");
+let ready = effects::runtime::operation("ready").unwrap();
+assert!(ready.architecturally_legal());
 let presence = effects::Runtime::handle(
     &mut host,
     effects::RuntimeRequest::Ready(effects::Session::new("commit-7")),
@@ -160,72 +196,48 @@ let presence = effects::Runtime::handle(
 assert!(matches!(presence, effects::RuntimeOutcome::Ready(Ok(_))));
 ```
 
-This produces canonical host-facing request/outcome enums and handler traits
-directly from the declared `effect` surface. `Protocol::proof_status` reports
-which generated surfaces are available. File export remains tooling-only and is
-no longer the primary developer path.
+This produces canonical host-facing request/outcome enums, handler traits, and
+generated semantic metadata directly from the declared `effect` surface. Use
+`Protocol::effects` as the single import boundary; per-interface metadata lives
+under `Protocol::effects::<effect_name_in_snake_case>`. `Protocol::proof_status`
+reports which generated proof-backed surfaces are available. File export
+remains tooling-only and is no longer the primary developer path.
+
+## Semantic Highlights
+
+When you want a concrete semantic feature, start here:
+
+- commitment: `examples/commitment_lifecycle.rs`
+- authority, publication, and materialization: `examples/generated_effect_interfaces.rs`
+- structured concurrency: `examples/map_reduce.rs`
+- profile-driven progress: `examples/commitment_lifecycle.rs`
+- reusable domain agreement profiles: `examples/commitment_lifecycle.rs`
+- reactive host boundaries: `examples/reactive_signal.rs`
+
+`commitment_lifecycle.rs` is the repo's explicit example of a domain-defined
+agreement scheme similar in shape to Aura's provisional / soft-safe /
+finalized model. It demonstrates how downstream systems can keep their own
+agreement vocabulary while lowering onto Telltale's generic agreement,
+evidence, visibility, and progress core.
 
 ## Testing Patterns
 
-Three handler types support different test scenarios. `InMemoryHandler` is the simplest, operating with in-process channels. `TelltaleHandler` uses `TelltaleSession` pairs for typed bidirectional communication. `RecordingHandler` captures events without executing real transport.
+For canonical tests, exercise the generated `tell!` surface directly:
 
-### Unit Test With InMemoryHandler
+- compile-time checks:
+  assert on `Protocol::proof_status`
+- effect-boundary checks:
+  implement `Protocol::effects::*` traits against deterministic host fixtures
+- semantic checks:
+  assert over `Protocol::commitments`, `Protocol::agreements`, and
+  `Protocol::authority`
+- protocol-machine checks:
+  use the protocol-machine and bridge test suites for replay/parity/runtime
+  behavior
 
-```rust
-#[tokio::test]
-async fn test_send_only() {
-    let mut handler = InMemoryHandler::new(Role::Alice);
-    let program = Program::new()
-        .send(Role::Bob, TestMessage)
-        .end();
-
-    let mut endpoint = ();
-    let result = interpret(&mut handler, &mut endpoint, program).await;
-    assert!(result.is_ok());
-}
-```
-
-`InMemoryHandler::new` creates isolated channels for send-only tests. Use `InMemoryHandler::with_channels` and shared channel maps when a test needs both send and receive. The `interpret` function drives each effect step through the handler.
-
-### Integration Test With TelltaleHandler
-
-```rust
-#[tokio::test]
-async fn test_session_types() {
-    let (alice_session, bob_session) = TelltaleSession::pair();
-
-    let mut alice_ep = TelltaleEndpoint::new(Role::Alice);
-    alice_ep.register_session(Role::Bob, alice_session);
-
-    let mut bob_ep = TelltaleEndpoint::new(Role::Bob);
-    bob_ep.register_session(Role::Alice, bob_session);
-
-    let mut handler = TelltaleHandler::<Role, Message>::new();
-    // run protocol on both endpoints
-}
-```
-
-This pattern validates the session-based handler without custom transports. The role type must implement both `telltale::Role` and `RoleId`. `TelltaleSession::pair` returns two linked endpoints that relay messages in both directions.
-
-### RecordingHandler
-
-```rust
-let handler = RecordingHandler::new(Role::Alice);
-let events = handler.events();
-```
-
-`RecordingHandler` captures send, recv, choose, and offer events for assertions. It does not generate values, so use it for structural tests.
-
-### Fault Injection
-
-Fault injection is available behind the `test-utils` feature.
-
-```rust
-let base = InMemoryHandler::new(Role::Alice);
-let mut handler = FaultInjection::new(base, 0.1);
-```
-
-Use this to validate retry behavior and error handling. The second argument is the failure probability per operation. Enable this by adding `features = ["test-utils"]` on `telltale-choreography` in test builds.
+Low-level choreography-interpreter tests still exist inside
+`rust/choreography/tests/` as implementation coverage for that crate, but they
+are not the public testing model that examples should teach.
 
 ## Running Examples
 

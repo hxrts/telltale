@@ -112,7 +112,7 @@ fn demo_dynamic_roles() -> Result<(), Box<dyn std::error::Error>> {
         protocol DynamicWorkflow =
             roles Coordinator, Workers[*], Database
 
-            Coordinator { priority = high }
+            Coordinator { priority : high }
               -> Workers[*] : StartWork of work.Start
             Workers[i]
               -> Database : QueryData of work.Query

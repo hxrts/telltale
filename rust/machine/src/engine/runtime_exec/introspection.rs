@@ -189,6 +189,36 @@ impl ProtocolMachine {
         self.semantic_objects().publication_events
     }
 
+    /// Get canonical prestate bindings.
+    #[must_use]
+    pub fn prestate_bindings(&self) -> Vec<crate::semantic_objects::PrestateBinding> {
+        self.semantic_objects().prestate_bindings
+    }
+
+    /// Get canonical named agreement profiles.
+    #[must_use]
+    pub fn agreement_profiles(&self) -> Vec<crate::semantic_objects::AgreementProfile> {
+        self.semantic_objects().agreement_profiles
+    }
+
+    /// Get canonical agreement contracts.
+    #[must_use]
+    pub fn agreement_contracts(&self) -> Vec<crate::semantic_objects::AgreementContract> {
+        self.semantic_objects().agreement_contracts
+    }
+
+    /// Get canonical agreement evidence objects.
+    #[must_use]
+    pub fn agreement_evidence(&self) -> Vec<crate::semantic_objects::AgreementEvidence> {
+        self.semantic_objects().agreement_evidence
+    }
+
+    /// Get canonical agreement states.
+    #[must_use]
+    pub fn agreement_states(&self) -> Vec<crate::semantic_objects::AgreementState> {
+        self.semantic_objects().agreement_states
+    }
+
     /// Require that one semantic-path read be authoritative.
     ///
     /// # Errors

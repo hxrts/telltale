@@ -137,32 +137,21 @@ scenarios requiring runtime parsing, see [Choreographic DSL](06_choreographic_ds
 Run the protocol using the effect system.
 
 ```rust
-use telltale_choreography::{InMemoryHandler, Program, interpret};
-use serde::{Serialize, Deserialize};
+use telltale::tell;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum Role {
-    Alice,
-    Bob,
+tell! {
+  protocol PingPong =
+    roles Alice, Bob
+    Alice -> Bob : Ping
+    Bob -> Alice : Pong
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-enum Message {
-    Ping,
-    Pong,
-}
-
-let mut handler = InMemoryHandler::new(Role::Alice);
-let program = Program::new()
-    .send(Role::Bob, Message::Ping)
-    .recv::<Message>(Role::Bob)
-    .end();
-
-let mut endpoint = ();
-let result = interpret(&mut handler, &mut endpoint, program).await?;
+assert!(PingPong::proof_status::SESSION_PROJECTABLE);
 ```
 
-The `InMemoryHandler` provides local message passing for testing. See [Using Telltale Handlers](10_telltale_handler.md) for production handlers.
+Start from `tell!` and the generated protocol/effect surfaces. The older
+effect-program builder APIs still exist inside `telltale-choreography`, but
+they are no longer the recommended public entrypoint.
 
 ## Core Concepts
 

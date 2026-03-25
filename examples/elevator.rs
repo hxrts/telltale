@@ -9,6 +9,9 @@ use std::error::Error;
 use telltale::{tell, try_session};
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Host-side door action selected by the user.
     type DoorAction =
       | Open
@@ -17,14 +20,35 @@ tell! {
     -- // User-facing panel chooses one door action for this session.
     effect UserPanel
       command choose : Session -> DoorAction
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Door motor realizes the physical open/close operations.
     effect DoorMotor
       command open : Unit -> Unit
+      {
+        class : best_effort
+        progress : immediate
+        region : fragment
+        agreement_use : none
+        reentrancy : allow
+      }
       command close : Unit -> Unit
+      {
+        class : best_effort
+        progress : immediate
+        region : fragment
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // User chooses one door command and the elevator relays it to the door.
-    protocol Elevator uses UserPanel, DoorMotor =
+    protocol Elevator uses UserPanel, DoorMotor under Replay =
       roles U, D, E
       choice U at
         -- // Open the door, confirm it, then auto-close and confirm closure.
@@ -175,6 +199,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         command: user_command(),
     };
     let mut door_host = DoorHost::default();
+    println!(
+        "execution profiles = {:?}",
+        Elevator::proof_status::EXECUTION_PROFILES
+    );
+    println!(
+        "session projectable = {}",
+        Elevator::proof_status::SESSION_PROJECTABLE
+    );
     executor::block_on(async {
         try_join!(
             user(&mut u, &mut user_host),

@@ -314,15 +314,8 @@ Run this check before execution to ensure the concrete participant set matches d
 
 ## Effect Interpretation
 
-Handlers interpret effect programs.
-
-```rust
-let program = Program::new()
-    .send(Role::Bob, msg)
-    .recv::<Response>(Role::Bob)
-    .end();
-
-let result = interpret(&mut handler, &mut endpoint, program).await?;
-```
-
-The `interpret` function walks the effect tree. It calls handler methods for each operation. The result contains received messages and execution status.
+Handlers interpret the protocol-machine and generated effect boundary. For
+normal application code, start from `tell!`, implement the generated
+`Protocol::effects::*` traits, and let the protocol-machine/runtime drive the
+requests. The lower-level choreography interpreter remains an internal
+implementation surface.

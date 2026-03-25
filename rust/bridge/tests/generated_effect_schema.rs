@@ -7,8 +7,29 @@ fn generated_effect_family_schema_roundtrips_with_simulation_metadata() {
         r#"
 effect Runtime
   authoritative readChannel : ChannelRef -> Result ReadError ChannelSnapshot
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
   command acceptInvite : InviteRef -> Result AcceptError MaterializedChannel
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : none
+    reentrancy : allow
+  }
   observe watchPresence : ChannelId -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol Flow uses Runtime =
   roles Coordinator

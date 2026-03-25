@@ -187,8 +187,14 @@ fn generate_program_effects(protocol: &Protocol, role: &Role) -> TokenStream {
         Protocol::End => {
             quote! {}
         }
-        Protocol::Let { continuation, .. }
+        Protocol::Begin { continuation, .. }
+        | Protocol::Await { continuation, .. }
+        | Protocol::Resolve { continuation, .. }
+        | Protocol::Invalidate { continuation, .. }
+        | Protocol::Let { continuation, .. }
         | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. }
         | Protocol::Handoff { continuation, .. }
         | Protocol::DependentWork { continuation, .. } => {
             generate_program_effects(continuation, role)

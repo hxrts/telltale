@@ -13,23 +13,69 @@ tell! {
     profile Replay fairness eventual admissibility replay escalation_window bounded
 
     -- // Effect-domain data for one signal update request.
-    type alias SignalUpdate = { signalName : String, nextValue : Int, publisher : Role }
+    type alias SignalUpdate =
+    {
+      signalName : String
+      nextValue : Int
+      publisher : Role
+    }
 
     -- // Effect-domain data for the current state of one signal.
-    type alias SignalSnapshot = { signalName : String, value : Int, version : Int }
+    type alias SignalSnapshot =
+    {
+      signalName : String
+      value : Int
+      version : Int
+    }
 
     -- // Effect-domain data for one subscription registration.
-    type alias SignalSubscription = { signalName : String, subscriber : Role }
+    type alias SignalSubscription =
+    {
+      signalName : String
+      subscriber : Role
+    }
 
     -- // Effect-domain data for one delivered notification.
-    type alias SignalNotification = { subscriber : Role, snapshot : SignalSnapshot }
+    type alias SignalNotification =
+    {
+      subscriber : Role
+      snapshot : SignalSnapshot
+    }
 
     -- // Reactive signal runtime boundary.
     effect SignalRuntime
       command subscribe : SignalSubscription -> Unit
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
       observe current : String -> Maybe SignalSnapshot
+      {
+        class : observational
+        progress : immediate
+        region : session
+        agreement_use : forbidden
+        reentrancy : allow
+      }
       command publish : SignalUpdate -> SignalSnapshot
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
       observe notify : SignalNotification -> Unit
+      {
+        class : observational
+        progress : immediate
+        region : session
+        agreement_use : forbidden
+        reentrancy : allow
+      }
 
     -- // Minimal protocol showing that one publisher update becomes one observer-visible change.
     protocol ReactiveSignal uses SignalRuntime under Replay =
@@ -129,7 +175,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         _ => unreachable!("current must produce the matching outcome variant"),
     };
 
-    let current = after.expect("published signal must now be observable");
+    let current = after.ok_or("published signal must now be observable")?;
 
     println!("signal = {}", current.signal_name);
     println!("value = {}", current.value);

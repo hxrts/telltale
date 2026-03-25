@@ -248,7 +248,7 @@ The parser supports proof-bundle declarations with enriched fields (`version`, `
 
 Protocol-machine-core statements such as `acquire`, `transfer`, `fork`, and `check` lower to `Protocol::Extension` nodes. Annotations record operation kind, operands, and required capability. A linear usage checker rejects double-consume, consume-before-acquire, and branch divergence for delegation assets.
 
-First-class combinators (`handshake`, `retry`, `quorum_collect`) and typed metadata for role-set and topology declarations (`role_set`, `cluster`, `ring`, `mesh`) are supported. Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`.
+Named agreement profiles, explicit operation/progress metadata, and typed metadata for role-set and topology declarations (`role_set`, `cluster`, `ring`, `mesh`) are supported. Child-effect aggregation is secondary metadata on operations, not the primary agreement model. Lowering diagnostics are exposed through `explain_lowering` and `choreo-fmt --explain-lowering`.
 
 #### Validation and Submodules
 

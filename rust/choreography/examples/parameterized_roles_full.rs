@@ -29,7 +29,7 @@ fn test_concrete_array() -> Result<(), Box<dyn std::error::Error>> {
     protocol ConcreteArray =
       roles Master, Worker[3]
 
-      Master { shard = 0 }
+      Master { shard : 0 }
         -> Worker[0] : Task of jobs.Task
       Worker[0]
         -> Master : Result of jobs.Result
@@ -54,11 +54,11 @@ fn test_multiple_workers() -> Result<(), Box<dyn std::error::Error>> {
       roles Coordinator, Worker[5]
 
       par
-        | Coordinator { shard = 0 }
+        | Coordinator { shard : 0 }
             -> Worker[0] : Init of jobs.Init
-        | Coordinator { shard = 1 }
+        | Coordinator { shard : 1 }
             -> Worker[1] : Init of jobs.Init
-        | Coordinator { shard = 2 }
+        | Coordinator { shard : 2 }
             -> Worker[2] : Init of jobs.Init
     ";
 

@@ -10,12 +10,22 @@ use telltale::{tell, try_session};
 use wasm_bindgen::prelude::*;
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Browser host transforms the received ping into a pong payload.
     effect BrowserRuntime
       command respond : String -> String
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Alice sends a ping and Bob replies with a pong.
-    protocol PingPong uses BrowserRuntime =
+    protocol PingPong uses BrowserRuntime under Replay =
       roles Alice, Bob
       Alice -> Bob : Ping(String)
       Bob -> Alice : Pong(String)
@@ -104,11 +114,14 @@ mod tests {
     async fn ping_pong_round_trip_succeeds() {
         init();
 
-        let value = run_ping_pong("Hello from Alice!".to_string())
-            .await
-            .expect("protocol should succeed");
-        let result: PingPongResult =
-            serde_wasm_bindgen::from_value(value).expect("result should deserialize");
+        let value = match run_ping_pong("Hello from Alice!".to_string()).await {
+            Ok(value) => value,
+            Err(error) => panic!("protocol should succeed: {error:?}"),
+        };
+        let result: PingPongResult = match serde_wasm_bindgen::from_value(value) {
+            Ok(result) => result,
+            Err(error) => panic!("result should deserialize: {error}"),
+        };
 
         assert_eq!(result.sent_ping, "Hello from Alice!");
         assert_eq!(result.received_ping, "Hello from Alice!");

@@ -134,23 +134,15 @@ let mut endpoint = ();
 let result = interpret_extensible(&mut handler, &mut endpoint, program).await?;
 ```
 
-The non-extensible `interpret` function does not dispatch extensions. The interpreter only logs a warning when it encounters an extension effect.
+The non-extensible `interpret` function does not dispatch extensions. That
+runtime is now an internal choreography-layer surface, not the primary public
+entrypoint for application code.
 
 ### Using Extensions in Programs
 
-Extensions are inserted into programs with `Program::ext`.
-
-```rust
-let program = Program::new()
-    .ext(ValidateCapability {
-        role: Role::Alice,
-        capability: "send".into(),
-    })
-    .send(Role::Bob, Message::Ping)
-    .end();
-```
-
-The extension appears before the send in the projected program for Alice. Other roles do not receive this extension because it is scoped to a single role.
+Extensions should be introduced from the DSL/parser side so they remain part of
+the validated semantic surface. Do not teach or depend on manual
+`Program::ext` construction as the public modeling path.
 
 ## Syntax Extensions
 
@@ -342,23 +334,10 @@ impl DomainHandler {
 
 ### Step 4: Build and Run a Program
 
-Insert extensions with `Program::ext` and interpret with `interpret_extensible`.
-
-```rust
-let program = Program::new()
-    .ext(ValidateCapability {
-        role: Role::Client,
-        capability: "send".into(),
-    })
-    .send(Role::Server, Message::Ping)
-    .end();
-
-let mut handler = DomainHandler::new();
-let mut endpoint = ();
-let _ = interpret_extensible(&mut handler, &mut endpoint, program).await?;
-```
-
-Extensions appear in the projected program for participating roles. Use `interpret_extensible` whenever a program contains extensions.
+Extensions remain available in the low-level choreography runtime via
+`interpret_extensible`, but that path is internal. The public modeling path is
+to parse/validate extension-bearing DSL and lower it through the canonical
+semantic surface rather than hand-assembling extension programs.
 
 ## Testing
 

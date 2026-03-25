@@ -9,12 +9,24 @@ const TOOLING_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../docs/02_getting_started.md"),
     ),
     (
+        "../../../docs/03_architecture.md",
+        include_str!("../../../docs/03_architecture.md"),
+    ),
+    (
         "../../../docs/04_code_organization.md",
         include_str!("../../../docs/04_code_organization.md"),
     ),
     (
         "../../../docs/06_choreographic_dsl.md",
         include_str!("../../../docs/06_choreographic_dsl.md"),
+    ),
+    (
+        "../../../docs/08_extensions.md",
+        include_str!("../../../docs/08_extensions.md"),
+    ),
+    (
+        "../../../docs/09_effect_handlers.md",
+        include_str!("../../../docs/09_effect_handlers.md"),
     ),
     (
         "../../../docs/11_effect_session_bridge.md",
@@ -75,8 +87,20 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
         ),
         ("../../../docs/02_getting_started.md", "use telltale::tell;"),
         ("../../../docs/02_getting_started.md", "PingPong::proof_status"),
+        (
+            "../../../docs/03_architecture.md",
+            "protocol-machine and generated effect boundary",
+        ),
         ("../../../docs/04_code_organization.md", "generated surfaces & tooling"),
         ("../../../docs/06_choreographic_dsl.md", "Protocol::proof_status"),
+        (
+            "../../../docs/08_extensions.md",
+            "not the primary public",
+        ),
+        (
+            "../../../docs/09_effect_handlers.md",
+            "Protocol::effects::*",
+        ),
         (
             "../../../docs/11_effect_session_bridge.md",
             "interfaces emitted directly by `tell!`",
@@ -127,12 +151,14 @@ fn tooling_surfaces_use_generated_effect_and_owned_open_paths() {
         ),
         (
             "../benches/protocol_machine_bench_runtime.rs",
-            "\"protocol_machine_run_yield_small\"",
-        ),
-        (
-            "../benches/protocol_machine_bench_runtime.rs",
             "load_choreography(",
         ),
+        ("../../../docs/02_getting_started.md", "Program::new()"),
+        ("../../../docs/03_architecture.md", "Program::new()"),
+        ("../../../docs/08_extensions.md", "Program::new()"),
+        ("../../../docs/09_effect_handlers.md", "Program::new()"),
+        ("../../../docs/28_examples.md", "Program::new()"),
+        ("../../../docs/29_wasm_guide.md", "Program::new()"),
         ("../../../docs/02_getting_started.md", "choreography!("),
         ("../../../docs/06_choreographic_dsl.md", "choreography!("),
         ("../../../docs/22_topology.md", "`choreography!`"),

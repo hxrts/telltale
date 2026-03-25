@@ -9,6 +9,9 @@ use std::error::Error;
 use telltale::{tell, try_session};
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Server-side intent for one authentication session.
     type LoginPlan =
       | Cancel(Int)
@@ -22,13 +25,27 @@ tell! {
     -- // Server host decides whether this session should log in or cancel.
     effect ServerControl
       command plan : Session -> LoginPlan
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Authenticator host decides whether the provided password is accepted.
     effect AuthService
       command verify : Int -> AuthDecision
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Server first decides whether authentication proceeds or is cancelled.
-    protocol OAuth uses ServerControl, AuthService =
+    protocol OAuth uses ServerControl, AuthService under Replay =
       roles S, C, A
       choice S at
         -- // Login asks the client for credentials, then relays the auth result.
@@ -187,6 +204,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let (plan, decision) = login_configuration();
     let mut server_host = ServerHost { plan };
     let mut auth_host = AuthHost { decision };
+    println!(
+        "execution profiles = {:?}",
+        OAuth::proof_status::EXECUTION_PROFILES
+    );
+    println!(
+        "session projectable = {}",
+        OAuth::proof_status::SESSION_PROJECTABLE
+    );
     executor::block_on(async {
         try_join!(
             client(&mut c),

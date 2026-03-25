@@ -102,9 +102,15 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.analyze_protocol(body, choices, parent_choice);
             }
-            Protocol::Extension { continuation, .. }
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. }
+            | Protocol::Extension { continuation, .. }
             | Protocol::Let { continuation, .. }
             | Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 self.analyze_protocol(continuation, choices, parent_choice);
@@ -271,9 +277,15 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_messages_from_protocol(body, messages);
             }
-            Protocol::Extension { continuation, .. }
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. }
+            | Protocol::Extension { continuation, .. }
             | Protocol::Let { continuation, .. }
             | Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 self.collect_messages_from_protocol(continuation, messages);
@@ -508,9 +520,15 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_roles_from_protocol(body, roles);
             }
-            Protocol::Extension { continuation, .. }
+            Protocol::Begin { continuation, .. }
+            | Protocol::Await { continuation, .. }
+            | Protocol::Resolve { continuation, .. }
+            | Protocol::Invalidate { continuation, .. }
+            | Protocol::Extension { continuation, .. }
             | Protocol::Let { continuation, .. }
             | Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
             | Protocol::Handoff { continuation, .. }
             | Protocol::DependentWork { continuation, .. } => {
                 self.collect_roles_from_protocol(continuation, roles);

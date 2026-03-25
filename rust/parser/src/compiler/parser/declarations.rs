@@ -1,9 +1,11 @@
 use super::*;
 use crate::ast::{
+    AgreementProfileDeclaration, ChildEffectAggregation, ChildEffectAggregationPolicy,
     EffectAuthorityClass, EffectInterfaceDeclaration, EffectOperationDeclaration,
-    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration,
-    OperationParameterDeclaration, ProgressAttachment, RegionDeclaration, RoleSetDeclaration,
-    TheoremPackDeclaration, TopologyDeclaration, TypeConstructorDeclaration, TypeDeclaration,
+    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationAgreementAttachment,
+    OperationDeclaration, OperationParameterDeclaration, ProgressAttachment, RegionDeclaration,
+    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
+    TypeConstructorDeclaration, TypeDeclaration,
 };
 
 pub(super) fn enforce_same_line_equals(
@@ -198,6 +200,84 @@ pub(super) fn parse_profile_decl(
         fairness,
         admissibility,
         escalation_window,
+    })
+}
+
+pub(super) fn parse_agreement_profile_decl(
+    pair: pest::iterators::Pair<Rule>,
+    input: &str,
+) -> std::result::Result<AgreementProfileDeclaration, ParseError> {
+    let span = pair.as_span();
+    let mut inner = pair.into_inner();
+    let name = inner
+        .next()
+        .ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "agreement_profile declaration is missing name".to_string(),
+        })?
+        .as_str()
+        .to_string();
+
+    let mut visibility = None;
+    let mut rule_name = None;
+    let mut usable_at = None;
+    let mut finalized_at = None;
+    let mut evidence = None;
+
+    for item in inner {
+        if item.as_rule() != Rule::agreement_profile_body {
+            continue;
+        }
+        for meta_item in item.into_inner() {
+            if meta_item.as_rule() != Rule::agreement_profile_meta {
+                continue;
+            }
+            let Some(meta) = meta_item.into_inner().next() else {
+                continue;
+            };
+            let rule = meta.as_rule();
+            let value = meta
+                .into_inner()
+                .next()
+                .ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "agreement_profile metadata is missing value".to_string(),
+                })?
+                .as_str()
+                .to_string();
+            match rule {
+                Rule::agreement_profile_visibility => visibility = Some(value),
+                Rule::agreement_profile_rule => rule_name = Some(value),
+                Rule::agreement_profile_usable_at => usable_at = Some(value),
+                Rule::agreement_profile_finalized_at => finalized_at = Some(value),
+                Rule::agreement_profile_evidence => evidence = Some(value),
+                _ => {}
+            }
+        }
+    }
+
+    Ok(AgreementProfileDeclaration {
+        name,
+        visibility: visibility.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "agreement_profile declaration is missing visibility".to_string(),
+        })?,
+        rule: rule_name.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "agreement_profile declaration is missing rule".to_string(),
+        })?,
+        usable_at: usable_at.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "agreement_profile declaration is missing usable_at".to_string(),
+        })?,
+        finalized_at: finalized_at.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "agreement_profile declaration is missing finalized_at".to_string(),
+        })?,
+        evidence: evidence.ok_or_else(|| ParseError::Syntax {
+            span: ErrorSpan::from_pest_span(span, input),
+            message: "agreement_profile declaration is missing evidence".to_string(),
+        })?,
     })
 }
 
@@ -444,18 +524,22 @@ pub(super) fn parse_effect_decl(
         };
         for op in op_pairs {
             let mut op_inner = op.into_inner();
-            let first = op_inner.next().ok_or_else(|| ParseError::Syntax {
+            let head = op_inner.next().ok_or_else(|| ParseError::Syntax {
+                span: ErrorSpan::from_pest_span(span, input),
+                message: "effect operation is missing signature".to_string(),
+            })?;
+            let mut head_inner = head.into_inner();
+            let first = head_inner.next().ok_or_else(|| ParseError::Syntax {
                 span: ErrorSpan::from_pest_span(span, input),
                 message: "effect operation is missing name".to_string(),
             })?;
-            let (authority_class, op_name_pair) =
-                if first.as_rule() == Rule::effect_op_authority_class {
+            let (authority_class, op_name_pair) = if first.as_rule() == Rule::effect_op_authority_class {
                     let authority_class = match first.as_str() {
                         "authoritative" => EffectAuthorityClass::Authoritative,
                         "observe" => EffectAuthorityClass::Observe,
                         _ => EffectAuthorityClass::Command,
                     };
-                    let op_name = op_inner.next().ok_or_else(|| ParseError::Syntax {
+                    let op_name = head_inner.next().ok_or_else(|| ParseError::Syntax {
                         span: ErrorSpan::from_pest_span(span, input),
                         message: "effect operation is missing name".to_string(),
                     })?;
@@ -464,7 +548,7 @@ pub(super) fn parse_effect_decl(
                     (EffectAuthorityClass::Command, first)
                 };
             let op_name = op_name_pair.as_str().to_string();
-            let input_type = op_inner
+            let input_type = head_inner
                 .next()
                 .ok_or_else(|| ParseError::Syntax {
                     span: ErrorSpan::from_pest_span(span, input),
@@ -473,7 +557,7 @@ pub(super) fn parse_effect_decl(
                 .as_str()
                 .trim()
                 .to_string();
-            let output_type = op_inner
+            let output_type = head_inner
                 .next()
                 .ok_or_else(|| ParseError::Syntax {
                     span: ErrorSpan::from_pest_span(span, input),
@@ -482,9 +566,71 @@ pub(super) fn parse_effect_decl(
                 .as_str()
                 .trim()
                 .to_string();
+            let mut semantic_class = None;
+            let mut progress = None;
+            let mut region = None;
+            let mut agreement_use = None;
+            let mut reentrancy = None;
+            if let Some(meta_body) = op_inner.next() {
+                for meta in meta_body.into_inner() {
+                    match meta.as_rule() {
+                        Rule::effect_op_semantic_class => {
+                            semantic_class = meta
+                                .into_inner()
+                                .find(|item| item.as_rule() == Rule::ident)
+                                .map(|item| item.as_str().to_string());
+                        }
+                        Rule::effect_op_progress => {
+                            progress = meta
+                                .into_inner()
+                                .find(|item| item.as_rule() == Rule::ident)
+                                .map(|item| item.as_str().to_string());
+                        }
+                        Rule::effect_op_region => {
+                            region = meta
+                                .into_inner()
+                                .find(|item| item.as_rule() == Rule::ident)
+                                .map(|item| item.as_str().to_string());
+                        }
+                        Rule::effect_op_agreement_use => {
+                            agreement_use = meta
+                                .into_inner()
+                                .find(|item| item.as_rule() == Rule::ident)
+                                .map(|item| item.as_str().to_string());
+                        }
+                        Rule::effect_op_reentrancy => {
+                            reentrancy = meta
+                                .into_inner()
+                                .find(|item| item.as_rule() == Rule::ident)
+                                .map(|item| item.as_str().to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
             operations.push(EffectOperationDeclaration {
                 name: op_name,
                 authority_class,
+                semantic_class: semantic_class.ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing `class` metadata".to_string(),
+                })?,
+                progress: progress.ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing `progress` metadata".to_string(),
+                })?,
+                region: region.ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing `region` metadata".to_string(),
+                })?,
+                agreement_use: agreement_use.ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing `agreement_use` metadata".to_string(),
+                })?,
+                reentrancy: reentrancy.ok_or_else(|| ParseError::Syntax {
+                    span: ErrorSpan::from_pest_span(span, input),
+                    message: "effect operation is missing `reentrancy` metadata".to_string(),
+                })?,
                 input_type,
                 output_type,
             });
@@ -631,7 +777,8 @@ pub(super) fn parse_operation_decl(
     let mut owner_role = None;
     let mut within = None;
     let mut progress_contract = None;
-    let mut composition_policy = None;
+    let mut agreement = None;
+    let mut child_effect_aggregation = None;
     let mut body_source = None;
 
     for item in inner {
@@ -696,17 +843,56 @@ pub(super) fn parse_operation_decl(
             Rule::operation_progress => {
                 progress_contract = Some(parse_progress_attachment(item, input)?);
             }
-            Rule::operation_compose => {
-                composition_policy = Some(
-                    item.into_inner()
+            Rule::operation_agreement => {
+                let mut agreement_inner = item.into_inner();
+                let profile_name = agreement_inner
+                    .next()
+                    .ok_or_else(|| ParseError::Syntax {
+                        span: ErrorSpan::from_pest_span(span, input),
+                        message: "operation agreement clause is missing profile name".to_string(),
+                    })?
+                    .as_str()
+                    .to_string();
+                let prestate = agreement_inner.next().map(|prestate| {
+                    prestate
+                        .into_inner()
                         .next()
-                        .ok_or_else(|| ParseError::Syntax {
-                            span: ErrorSpan::from_pest_span(span, input),
-                            message: "operation compose clause is missing policy".to_string(),
-                        })?
+                        .map(|ident| ident.as_str().to_string())
+                        .unwrap_or_default()
+                });
+                agreement = Some(OperationAgreementAttachment {
+                    profile_name,
+                    prestate,
+                });
+            }
+            Rule::operation_compose => {
+                let compose_span = ErrorSpan::from_pest_span(item.as_span(), input);
+                let mut compose_inner = item.into_inner();
+                let policy_name = compose_inner
+                    .next()
+                    .ok_or_else(|| ParseError::Syntax {
+                        span: compose_span.clone(),
+                        message: "operation compose clause is missing policy".to_string(),
+                    })?
+                    .as_str()
+                    .to_string();
+                let threshold = compose_inner.next().map(|value| {
+                    value
                         .as_str()
-                        .to_string(),
-                );
+                        .parse::<u64>()
+                        .map_err(|err| ParseError::Syntax {
+                            span: compose_span.clone(),
+                            message: format!(
+                                "invalid threshold_success count `{}`: {err}",
+                                value.as_str()
+                            ),
+                        })
+                }).transpose()?;
+                child_effect_aggregation = Some(parse_operation_composition(
+                    &policy_name,
+                    threshold,
+                    compose_span,
+                )?);
             }
             Rule::protocol_body => {
                 body_source = Some(item.as_str().trim().to_string());
@@ -724,11 +910,66 @@ pub(super) fn parse_operation_decl(
         })?,
         within,
         progress_contract,
-        composition_policy,
+        agreement,
+        child_effect_aggregation,
         body_source: body_source.ok_or_else(|| ParseError::Syntax {
             span: ErrorSpan::from_pest_span(span, input),
             message: "operation declaration is missing body".to_string(),
         })?,
+    })
+}
+
+fn parse_operation_composition(
+    policy_name: &str,
+    threshold: Option<u64>,
+    span: ErrorSpan,
+) -> std::result::Result<ChildEffectAggregation, ParseError> {
+    let policy = match policy_name {
+        "all" | "all_success" => {
+            if threshold.is_some() {
+                return Err(ParseError::Syntax {
+                    span,
+                    message: "`all_success` does not take a threshold argument".to_string(),
+                });
+            }
+            ChildEffectAggregationPolicy::AllSuccess
+        }
+        "first" | "first_success" => {
+            if threshold.is_some() {
+                return Err(ParseError::Syntax {
+                    span,
+                    message: "`first_success` does not take a threshold argument".to_string(),
+                });
+            }
+            ChildEffectAggregationPolicy::FirstSuccess
+        }
+        "threshold_success" => {
+            let required_successes = threshold.ok_or_else(|| ParseError::Syntax {
+                span: span.clone(),
+                message:
+                    "`threshold_success` requires an explicit success count, for example `compose threshold_success(2)`"
+                        .to_string(),
+            })?;
+            if required_successes == 0 {
+                return Err(ParseError::Syntax {
+                    span,
+                    message: "`threshold_success` requires a positive success count".to_string(),
+                });
+            }
+            ChildEffectAggregationPolicy::ThresholdSuccess { required_successes }
+        }
+        _ => {
+            return Err(ParseError::Syntax {
+                span,
+                message: format!(
+                    "unsupported operation compose policy `{policy_name}`; use `all_success`, `first_success`, or `threshold_success(n)`"
+                ),
+            });
+        }
+    };
+
+    Ok(ChildEffectAggregation {
+        policy,
     })
 }
 

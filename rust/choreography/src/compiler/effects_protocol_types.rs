@@ -173,9 +173,15 @@ fn collect_message_types(protocol: &Protocol, message_types: &mut HashSet<Messag
         }
         Protocol::Var(_) | Protocol::End => {}
 
-        Protocol::Extension { continuation, .. }
+        Protocol::Begin { continuation, .. }
+        | Protocol::Await { continuation, .. }
+        | Protocol::Resolve { continuation, .. }
+        | Protocol::Invalidate { continuation, .. }
+        | Protocol::Extension { continuation, .. }
         | Protocol::Let { continuation, .. }
         | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. }
         | Protocol::Handoff { continuation, .. }
         | Protocol::DependentWork { continuation, .. } => {
             collect_message_types(continuation, message_types);
@@ -210,11 +216,17 @@ fn collect_choice_labels(protocol: &Protocol, labels: &mut HashSet<String>) {
                 collect_choice_labels(on_cancel, labels);
             }
         }
-        Protocol::Send { continuation, .. }
+        Protocol::Begin { continuation, .. }
+        | Protocol::Await { continuation, .. }
+        | Protocol::Resolve { continuation, .. }
+        | Protocol::Invalidate { continuation, .. }
+        | Protocol::Send { continuation, .. }
         | Protocol::Broadcast { continuation, .. }
         | Protocol::Extension { continuation, .. }
         | Protocol::Let { continuation, .. }
         | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. }
         | Protocol::Handoff { continuation, .. }
         | Protocol::DependentWork { continuation, .. } => {
             collect_choice_labels(continuation, labels);

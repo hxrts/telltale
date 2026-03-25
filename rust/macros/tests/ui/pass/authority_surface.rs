@@ -3,12 +3,30 @@ use telltale::tell;
 tell! {
     effect Runtime
       authoritative ready : Session -> Result ReadyErr ReadyWitness
+      {
+        class : authoritative
+        progress : may_block
+        region : fragment
+        agreement_use : required
+        reentrancy : reject_same_fragment
+      }
       observe watchPresence : Session -> PresenceView
+      {
+        class : observational
+        progress : immediate
+        region : session
+        agreement_use : forbidden
+        reentrancy : allow
+      }
 
     type ReadyErr =
       | NotReady
 
-    type alias ReadyWitness = { epoch : Int, issuedBy : Role }
+    type alias ReadyWitness =
+    {
+      epoch : Int
+      issuedBy : Role
+    }
 
     protocol AuthorityFlow uses Runtime =
       roles Coordinator, Worker
@@ -35,5 +53,17 @@ fn main() {
     assert_eq!(publication.publication_name, "AcceptedPublication");
     assert_eq!(handle.proof_ref.as_deref(), Some("proof#1"));
     assert_eq!(handoff.target_role, "Worker");
+    let ready = AuthorityFlow::effects::runtime::operation("ready").unwrap();
+    assert_eq!(
+        ready.semantic_class,
+        telltale::dsl::semantic::EffectSemanticClass::Authoritative
+    );
+    assert!(ready.architecturally_legal());
+    let watch_request =
+        AuthorityFlow::effects::RuntimeRequest::WatchPresence(AuthorityFlow::effects::Session::new(
+            "authority-flow#1",
+        ));
+    let watch = AuthorityFlow::effects::runtime::request_metadata(&watch_request);
+    assert_eq!(watch.operation_name, "watchPresence");
     assert!(!AuthorityFlow::proof_status::SESSION_PROJECTABLE);
 }

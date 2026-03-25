@@ -227,6 +227,18 @@ pub enum EffectSemanticClass {
     BestEffort,
 }
 
+/// Agreement-use discipline attached to one effect operation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectAgreementUse {
+    /// The effect does not itself require an enclosing agreement object.
+    None,
+    /// The effect may only be used beneath an explicit agreement/commitment path.
+    Required,
+    /// The effect must stay outside authoritative agreement paths.
+    Forbidden,
+}
+
 /// Admission policy for one effect operation.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -301,6 +313,15 @@ pub enum EffectHandlerDomain {
     External,
 }
 
+/// Region scope classification declared for one effect operation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectRegionScope {
+    Session,
+    Fragment,
+    Global,
+}
+
 /// Runtime metadata for one effect interface operation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct EffectInterfaceMetadata {
@@ -312,6 +333,10 @@ pub struct EffectInterfaceMetadata {
     pub authority_class: EffectAuthorityClass,
     /// Semantic class for this operation.
     pub semantic_class: EffectSemanticClass,
+    /// Agreement-use discipline for this operation.
+    pub agreement_use: EffectAgreementUse,
+    /// Region scope for this operation.
+    pub region_scope: EffectRegionScope,
     /// Admission policy for this operation.
     pub admissibility: EffectAdmissibility,
     /// Totality contract for this operation.
@@ -424,6 +449,9 @@ impl EffectInterfaceMetadata {
             || !self.is_authoritative())
             && (!matches!(self.semantic_class, EffectSemanticClass::BestEffort)
                 || !self.is_authoritative())
+            && (!matches!(self.agreement_use, EffectAgreementUse::Required) || !self.is_observe())
+            && (!matches!(self.agreement_use, EffectAgreementUse::Required)
+                || !matches!(self.semantic_class, EffectSemanticClass::Observational))
             && (!matches!(self.totality, EffectTotality::MayBlock) || self.timeout_required())
             && (!self.has_explicit_retry_rule() || self.timeout_required())
             && (!matches!(self.admissibility, EffectAdmissibility::InternalOnly)
@@ -473,6 +501,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "sendDecision".to_string()),
                 authority_class: EffectAuthorityClass::Command,
                 semantic_class: EffectSemanticClass::BestEffort,
+                agreement_use: EffectAgreementUse::Forbidden,
+                region_scope: EffectRegionScope::Session,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -485,6 +515,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "handleRecv".to_string()),
                 authority_class: EffectAuthorityClass::Command,
                 semantic_class: EffectSemanticClass::BestEffort,
+                agreement_use: EffectAgreementUse::Forbidden,
+                region_scope: EffectRegionScope::Session,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -497,6 +529,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "handleChoose".to_string()),
                 authority_class: EffectAuthorityClass::Command,
                 semantic_class: EffectSemanticClass::BestEffort,
+                agreement_use: EffectAgreementUse::Forbidden,
+                region_scope: EffectRegionScope::Session,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -509,6 +543,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "invoke".to_string()),
                 authority_class: EffectAuthorityClass::Command,
                 semantic_class: EffectSemanticClass::BestEffort,
+                agreement_use: EffectAgreementUse::Forbidden,
+                region_scope: EffectRegionScope::Fragment,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::InheritOperationBudget,
@@ -521,6 +557,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "acquire".to_string()),
                 authority_class: EffectAuthorityClass::Authoritative,
                 semantic_class: EffectSemanticClass::Authoritative,
+                agreement_use: EffectAgreementUse::Required,
+                region_scope: EffectRegionScope::Fragment,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::MayBlock,
                 timeout_policy: EffectTimeoutPolicy::Required { budget_ticks: None },
@@ -533,6 +571,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "release".to_string()),
                 authority_class: EffectAuthorityClass::Authoritative,
                 semantic_class: EffectSemanticClass::Authoritative,
+                agreement_use: EffectAgreementUse::Required,
+                region_scope: EffectRegionScope::Fragment,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -545,6 +585,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| "topologyEvents".to_string()),
                 authority_class: EffectAuthorityClass::Authoritative,
                 semantic_class: EffectSemanticClass::Authoritative,
+                agreement_use: EffectAgreementUse::Required,
+                region_scope: EffectRegionScope::Fragment,
                 admissibility: EffectAdmissibility::InternalOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -557,6 +599,8 @@ impl EffectInterfaceMetadata {
                 operation_name: "outputConditionHint".to_string(),
                 authority_class: EffectAuthorityClass::Authoritative,
                 semantic_class: EffectSemanticClass::Authoritative,
+                agreement_use: EffectAgreementUse::Required,
+                region_scope: EffectRegionScope::Fragment,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -569,6 +613,8 @@ impl EffectInterfaceMetadata {
                 operation_name: operation_name.unwrap_or_else(|| effect_kind.to_string()),
                 authority_class: EffectAuthorityClass::Command,
                 semantic_class: EffectSemanticClass::BestEffort,
+                agreement_use: EffectAgreementUse::Forbidden,
+                region_scope: EffectRegionScope::Session,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
@@ -1091,7 +1137,7 @@ impl EffectExchangeRecord {
     }
 }
 
-/// Composition policy for combining many effect exchanges into one commitment.
+/// Secondary child-effect aggregation policy attached below one parent agreement.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum EffectCompositionPolicy {
@@ -1100,21 +1146,15 @@ pub enum EffectCompositionPolicy {
     /// Any successful effect exchange resolves the commitment.
     FirstSuccess,
     /// A fixed number of successful exchanges is required.
-    Quorum {
+    ThresholdSuccess {
         /// Required success count.
         required_successes: u64,
     },
-    /// Prefer success, otherwise accept full terminal exhaustion.
-    Fallback,
 }
 
 impl EffectCompositionPolicy {
     fn count_successful_effects(records: &[EffectExchangeRecord]) -> usize {
         records.iter().filter(|record| record.succeeded()).count()
-    }
-
-    fn count_terminal_effects(records: &[EffectExchangeRecord]) -> usize {
-        records.iter().filter(|record| record.terminal()).count()
     }
 
     /// Whether the composition policy resolves the combined commitment.
@@ -1125,14 +1165,9 @@ impl EffectCompositionPolicy {
                 !records.is_empty() && records.iter().all(EffectExchangeRecord::succeeded)
             }
             Self::FirstSuccess => records.iter().any(EffectExchangeRecord::succeeded),
-            Self::Quorum { required_successes } => {
+            Self::ThresholdSuccess { required_successes } => {
                 *required_successes > 0
                     && Self::count_successful_effects(records) >= *required_successes as usize
-            }
-            Self::Fallback => {
-                records.iter().any(EffectExchangeRecord::succeeded)
-                    || (!records.is_empty()
-                        && Self::count_terminal_effects(records) == records.len())
             }
         }
     }
@@ -1146,13 +1181,8 @@ impl EffectCompositionPolicy {
         match self {
             Self::AllSuccess => records.iter().all(EffectExchangeRecord::succeeded),
             Self::FirstSuccess => records.iter().any(EffectExchangeRecord::succeeded),
-            Self::Quorum { required_successes } => {
+            Self::ThresholdSuccess { required_successes } => {
                 Self::count_successful_effects(records) >= *required_successes as usize
-            }
-            Self::Fallback => {
-                records.iter().any(EffectExchangeRecord::succeeded)
-                    || (!records.is_empty()
-                        && Self::count_terminal_effects(records) == records.len())
             }
         }
     }
@@ -1386,6 +1416,8 @@ mod effect_contract_tests {
             operation_name: "watch".to_string(),
             authority_class: EffectAuthorityClass::Observe,
             semantic_class: EffectSemanticClass::Observational,
+            agreement_use: EffectAgreementUse::Forbidden,
+            region_scope: EffectRegionScope::Session,
             admissibility: EffectAdmissibility::DeclaredUseOnly,
             totality: EffectTotality::MayBlock,
             timeout_policy: EffectTimeoutPolicy::Required {
@@ -1408,6 +1440,8 @@ mod effect_contract_tests {
             operation_name: "topologyEvents".to_string(),
             authority_class: EffectAuthorityClass::Authoritative,
             semantic_class: EffectSemanticClass::Authoritative,
+            agreement_use: EffectAgreementUse::Required,
+            region_scope: EffectRegionScope::Fragment,
             admissibility: EffectAdmissibility::InternalOnly,
             totality: EffectTotality::Immediate,
             timeout_policy: EffectTimeoutPolicy::None,
@@ -1466,6 +1500,12 @@ mod effect_contract_tests {
         let first_success = EffectCompositionPolicy::FirstSuccess;
         assert!(first_success.commitment_resolved(&[success.clone(), blocked.clone()]));
         assert!(first_success.commitment_compatible(&[success.clone(), blocked.clone()]));
-        assert!(first_success.progress_compatible(&[success, blocked], &contract));
+        assert!(first_success.progress_compatible(&[success.clone(), blocked.clone()], &contract));
+
+        let threshold = EffectCompositionPolicy::ThresholdSuccess {
+            required_successes: 1,
+        };
+        assert!(threshold.commitment_resolved(&[success.clone(), blocked.clone()]));
+        assert!(threshold.commitment_compatible(&[success, blocked]));
     }
 }

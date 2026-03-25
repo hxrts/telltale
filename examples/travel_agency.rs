@@ -9,8 +9,16 @@ use std::error::Error;
 use telltale::{tell, try_session};
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Customer-side travel request and budget.
-    type alias TravelRequest = { distance : Int, maxBudget : Int, address : Int }
+    type alias TravelRequest =
+    {
+      distance : Int
+      maxBudget : Int
+      address : Int
+    }
 
     -- // Customer's decision after receiving a quote.
     type QuoteDecision =
@@ -20,15 +28,43 @@ tell! {
     -- // Customer host provides the request and accepts or rejects one quote.
     effect CustomerPreferences
       command request : Session -> TravelRequest
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
       command decide : Int -> QuoteDecision
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Agency host computes a quote and schedules fulfillment.
     effect AgencyRuntime
       command quote : Int -> Int
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
       command schedule : Int -> Int
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Customer places one order, receives a quote, then accepts or rejects it.
-    protocol TravelAgency uses CustomerPreferences, AgencyRuntime =
+    protocol TravelAgency uses CustomerPreferences, AgencyRuntime under Replay =
       roles Customer, Agency
       Customer -> Agency : Order(i32)
       Agency -> Customer : Quote(i32)
@@ -139,6 +175,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         },
     };
     let mut agency_host = AgencyHost;
+    println!(
+        "execution profiles = {:?}",
+        TravelAgency::proof_status::EXECUTION_PROFILES
+    );
+    println!(
+        "session projectable = {}",
+        TravelAgency::proof_status::SESSION_PROJECTABLE
+    );
     executor::block_on(async {
         try_join!(
             customer(&mut c, &mut customer_host),

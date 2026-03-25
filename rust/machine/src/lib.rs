@@ -135,12 +135,12 @@ pub mod model {
     pub mod effects {
         pub use crate::bridge::EffectGuardBridge;
         pub use crate::effect::{
-            CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectCompositionPolicy,
-            EffectExchangeRecord, EffectFailure, EffectFailureKind, EffectHandler,
-            EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus,
-            EffectReentrancyPolicy, EffectRequest, EffectRequestBody, EffectResponse,
-            EffectResponsibilityDomain, EffectResult, EffectRetryShape, EffectSemanticClass,
-            EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
+            CorruptionType, EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,
+            EffectCompositionPolicy, EffectExchangeRecord, EffectFailure, EffectFailureKind,
+            EffectHandler, EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome,
+            EffectOutcomeStatus, EffectReentrancyPolicy, EffectRegionScope, EffectRequest,
+            EffectRequestBody, EffectResponse, EffectResponsibilityDomain, EffectResult,
+            EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
             RecordingEffectHandler, ReplayEffectHandler, SendDecision, SendDecisionInput,
             TopologyPerturbation,
         };
@@ -179,13 +179,16 @@ pub mod model {
     /// Canonical protocol-machine semantic-object family.
     pub mod semantic_objects {
         pub use crate::semantic_objects::{
-            protocol_machine_semantic_objects, AuthoritativeRead, AuthoritativeReadKind,
+            protocol_machine_semantic_objects, AgreementContract, AgreementEvidence,
+            AgreementEvidenceKind, AgreementLevel, AgreementProfile, AgreementRule,
+            AgreementState, AuthoritativeRead, AuthoritativeReadKind,
             AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, DelegationStatus,
-            MaterializationProof, ObservedRead, OperationInstance, OperationPhase,
-            OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
-            ProgressState, ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent,
-            PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
-            TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+            FinalizationOutcome, MaterializationProof, ObservedRead, OperationInstance,
+            OperationPhase, OperationVisibility, OutstandingEffect, OutstandingEffectStatus,
+            OwnershipScope, PrestateBinding, ProgressContract, ProgressState, ProgressTransition,
+            ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
+            PublicationStatus, Region, SemanticHandoff, TransformationObligation,
+            SEMANTIC_OBJECTS_SCHEMA_VERSION,
         };
     }
 }
@@ -269,12 +272,13 @@ pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use effect::{
-    CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectCompositionPolicy,
-    EffectExchangeRecord, EffectFailure, EffectFailureKind, EffectHandlerDomain,
-    EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus, EffectReentrancyPolicy,
-    EffectRequest, EffectRequestBody, EffectResponse, EffectResponsibilityDomain, EffectResult,
-    EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry,
-    EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler, TopologyPerturbation,
+    CorruptionType, EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,
+    EffectCompositionPolicy, EffectExchangeRecord, EffectFailure, EffectFailureKind,
+    EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus,
+    EffectReentrancyPolicy, EffectRegionScope, EffectRequest, EffectRequestBody, EffectResponse,
+    EffectResponsibilityDomain, EffectResult, EffectRetryShape, EffectSemanticClass,
+    EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler,
+    ReplayEffectHandler, TopologyPerturbation,
 };
 pub use engine::{
     EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
@@ -319,9 +323,11 @@ pub use scheduler::{
     Scheduler, StepUpdate,
 };
 pub use semantic_objects::{
-    protocol_machine_semantic_objects, AuthoritativeRead, AuthoritativeReadKind,
-    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, MaterializationProof,
-    ObservedRead, OperationInstance, OperationPhase, OutstandingEffect, OutstandingEffectStatus,
+    protocol_machine_semantic_objects, AgreementContract, AgreementEvidence, AgreementEvidenceKind,
+    AgreementLevel, AgreementProfile, AgreementRule, AgreementState, AuthoritativeRead,
+    AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind,
+    FinalizationOutcome, MaterializationProof, ObservedRead, OperationInstance, OperationPhase,
+    OperationVisibility, OutstandingEffect, OutstandingEffectStatus, PrestateBinding,
     ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
     PublicationEvent, PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
     TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,

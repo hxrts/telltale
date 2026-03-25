@@ -4,12 +4,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as Json;
 
 pub use telltale_machine::model::semantic_objects::{
-    AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-    CanonicalHandleKind, DelegationStatus, MaterializationProof, ObservedRead, OperationInstance,
-    OperationPhase, OutstandingEffect, OutstandingEffectStatus, OwnershipScope, ProgressContract,
-    ProgressState, ProgressTransition, ProtocolMachineSemanticObjects, PublicationEvent,
-    PublicationObserverClass, PublicationStatus, Region, SemanticHandoff, TransformationObligation,
-    SEMANTIC_OBJECTS_SCHEMA_VERSION,
+    AgreementContract, AgreementEvidence, AgreementEvidenceKind, AgreementLevel, AgreementProfile,
+    AgreementRule, AgreementState, AuthoritativeRead, AuthoritativeReadKind,
+    AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind, DelegationStatus,
+    FinalizationOutcome, MaterializationProof, ObservedRead, OperationInstance, OperationPhase,
+    OperationVisibility, OutstandingEffect, OutstandingEffectStatus, OwnershipScope,
+    PrestateBinding, ProgressContract, ProgressState, ProgressTransition,
+    ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass, PublicationStatus,
+    Region, SemanticHandoff, TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
 
 /// Schema version for protocol-machine semantic-object payloads.
@@ -154,6 +156,60 @@ mod tests {
                 status: PublicationStatus::Published,
                 proof_ref: Some("session.ready:digest".to_string()),
                 handle_ref: Some("materialization:digest".to_string()),
+                reason: None,
+            }],
+            prestate_bindings: vec![PrestateBinding {
+                binding_id: "prestate:effect:1".to_string(),
+                operation_id: "effect:1".to_string(),
+                session: Some(1),
+                state_digest: "readChannel:Succeeded:effect.succeeded".to_string(),
+                epoch_ref: Some("ticks:1".to_string()),
+                participant_digest: None,
+            }],
+            agreement_profiles: vec![AgreementProfile {
+                profile_name: "PendingPublication".to_string(),
+                visibility: OperationVisibility::Pending,
+                rule: AgreementRule::NoAgreement,
+                usable_at: AgreementLevel::Provisional,
+                finalized_at: AgreementLevel::Finalized,
+                required_evidence_kind: AgreementEvidenceKind::Publication,
+            }],
+            agreement_contracts: vec![AgreementContract {
+                contract_name: "agreement:effect:1".to_string(),
+                operation_id: "effect:1".to_string(),
+                session: Some(1),
+                owner_id: None,
+                profile_name: Some("PendingPublication".to_string()),
+                visibility: OperationVisibility::Pending,
+                rule: AgreementRule::NoAgreement,
+                usable_at: AgreementLevel::Provisional,
+                finalized_at: AgreementLevel::Finalized,
+                required_evidence_kind: AgreementEvidenceKind::Publication,
+            }],
+            agreement_evidence: vec![AgreementEvidence {
+                evidence_id: "publication:materialization:session.ready:digest:materialization.succeeded"
+                    .to_string(),
+                operation_id: "materialization:session.ready:digest".to_string(),
+                session: None,
+                owner_id: None,
+                level: AgreementLevel::Finalized,
+                kind: AgreementEvidenceKind::Publication,
+                reference: "materialization:session.ready:digest:materialization.succeeded"
+                    .to_string(),
+                authoritative: false,
+            }],
+            agreement_states: vec![AgreementState {
+                operation_id: "effect:1".to_string(),
+                session: Some(1),
+                owner_id: None,
+                contract_name: "agreement:effect:1".to_string(),
+                level: AgreementLevel::Finalized,
+                finalization: Some(FinalizationOutcome::Finalized),
+                evidence_ids: vec![
+                    "publication:materialization:session.ready:digest:materialization.succeeded"
+                        .to_string(),
+                ],
+                last_updated_tick: Some(1),
                 reason: None,
             }],
             regions: vec![Region {

@@ -18,6 +18,7 @@ const ATTR_OPERATION_DECLARATIONS: &str = "dsl.operation_decls";
 const ATTR_GUEST_RUNTIME_DECLARATIONS: &str = "dsl.guest_runtime_decls";
 const ATTR_EXECUTION_PROFILE_DECLARATIONS: &str = "dsl.execution_profile_decls";
 const ATTR_PROTOCOL_EXECUTION_PROFILES: &str = "dsl.protocol_execution_profiles";
+const ATTR_AGREEMENT_PROFILE_DECLARATIONS: &str = "dsl.agreement_profile_decls";
 
 /// Typed proof-bundle declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +126,16 @@ pub struct EffectOperationDeclaration {
     /// Authority class attached to this operation.
     #[serde(default)]
     pub authority_class: EffectAuthorityClass,
+    /// Semantic class declared for this operation.
+    pub semantic_class: String,
+    /// Progress class declared for this operation.
+    pub progress: String,
+    /// Region scope declared for this operation.
+    pub region: String,
+    /// Agreement-use discipline declared for this operation.
+    pub agreement_use: String,
+    /// Reentrancy policy declared for this operation.
+    pub reentrancy: String,
     /// Input type as declared in DSL surface syntax.
     pub input_type: String,
     /// Output type as declared in DSL surface syntax.
@@ -140,6 +151,14 @@ pub struct EffectContractDeclaration {
     pub operation_name: String,
     /// Authority class attached to this operation.
     pub authority_class: EffectAuthorityClass,
+    /// Semantic class attached to this operation.
+    pub semantic_class: String,
+    /// Progress class attached to this operation.
+    pub progress: String,
+    /// Region scope attached to this operation.
+    pub region: String,
+    /// Agreement-use discipline attached to this operation.
+    pub agreement_use: String,
     /// Runtime admissibility policy name.
     pub admissibility: String,
     /// Runtime totality policy name.
@@ -190,6 +209,33 @@ pub struct ProgressAttachment {
     pub on_stall: Option<String>,
 }
 
+/// Named reusable agreement-profile declaration metadata from DSL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgreementProfileDeclaration {
+    /// Stable profile name.
+    pub name: String,
+    /// Visibility timing fixed by this profile.
+    pub visibility: String,
+    /// Agreement/decision rule name.
+    pub rule: String,
+    /// Minimum agreement level required for provisional usability.
+    pub usable_at: String,
+    /// Minimum agreement level required for finalization.
+    pub finalized_at: String,
+    /// Required evidence kind for this profile.
+    pub evidence: String,
+}
+
+/// Operation-level attachment of one named agreement profile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct OperationAgreementAttachment {
+    /// Referenced agreement-profile name.
+    pub profile_name: String,
+    /// Optional named prestate binding required by the operation.
+    #[serde(default)]
+    pub prestate: Option<String>,
+}
+
 /// Operation declaration metadata from DSL.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OperationDeclaration {
@@ -206,11 +252,57 @@ pub struct OperationDeclaration {
     /// Required progress contract for parity-critical execution.
     #[serde(default)]
     pub progress_contract: Option<ProgressAttachment>,
-    /// Declared effect-composition policy for the operation.
+    /// Named agreement/finality attachment for the operation.
     #[serde(default)]
-    pub composition_policy: Option<String>,
+    pub agreement: Option<OperationAgreementAttachment>,
+    /// Declared child-effect aggregation for the operation.
+    #[serde(default)]
+    pub child_effect_aggregation: Option<ChildEffectAggregation>,
     /// Raw operation body source.
     pub body_source: String,
+}
+
+/// Canonical child-effect aggregation policy attached below one agreement boundary.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ChildEffectAggregationPolicy {
+    /// All child effects must succeed.
+    AllSuccess,
+    /// The first successful child effect resolves the aggregation.
+    FirstSuccess,
+    /// A fixed number of successful child effects is required.
+    ThresholdSuccess {
+        /// Required success count.
+        required_successes: u64,
+    },
+}
+
+/// One declared child-effect aggregation attached to an operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChildEffectAggregation {
+    /// Canonical aggregation policy.
+    pub policy: ChildEffectAggregationPolicy,
+}
+
+impl ChildEffectAggregationPolicy {
+    /// Canonical DSL spelling for this child-effect aggregation policy.
+    #[must_use]
+    pub fn dsl_name(&self) -> String {
+        match self {
+            Self::AllSuccess => "all_success".to_string(),
+            Self::FirstSuccess => "first_success".to_string(),
+            Self::ThresholdSuccess { required_successes } => {
+                format!("threshold_success({required_successes})")
+            }
+        }
+    }
+}
+
+impl ChildEffectAggregation {
+    /// Canonical DSL spelling for this child-effect aggregation declaration.
+    #[must_use]
+    pub fn dsl_name(&self) -> String {
+        self.policy.dsl_name()
+    }
 }
 
 /// Guest-runtime declaration metadata from DSL.
@@ -348,6 +440,76 @@ impl Choreography {
             }
             let mut ops = HashMap::new();
             for op in effect.operations {
+                let semantic_class_ok = matches!(
+                    op.semantic_class.as_str(),
+                    "authoritative" | "observational" | "best_effort"
+                );
+                if !semantic_class_ok {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` has unsupported `class {}`",
+                        effect.name, op.name, op.semantic_class
+                    )));
+                }
+                let progress_ok = matches!(op.progress.as_str(), "immediate" | "may_block");
+                if !progress_ok {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` has unsupported `progress {}`",
+                        effect.name, op.name, op.progress
+                    )));
+                }
+                if !matches!(op.region.as_str(), "session" | "fragment" | "global") {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` has unsupported `region {}`",
+                        effect.name, op.name, op.region
+                    )));
+                }
+                if !matches!(op.agreement_use.as_str(), "required" | "none" | "forbidden") {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` has unsupported `agreement_use {}`",
+                        effect.name, op.name, op.agreement_use
+                    )));
+                }
+                if !matches!(
+                    op.reentrancy.as_str(),
+                    "allow" | "reject_same_operation" | "reject_same_fragment"
+                ) {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` has unsupported `reentrancy {}`",
+                        effect.name, op.name, op.reentrancy
+                    )));
+                }
+                if matches!(op.authority_class, EffectAuthorityClass::Observe)
+                    && op.semantic_class != "observational"
+                {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` is observational and must declare `class : observational`",
+                        effect.name, op.name
+                    )));
+                }
+                if matches!(op.authority_class, EffectAuthorityClass::Authoritative)
+                    && op.semantic_class != "authoritative"
+                {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` is authoritative and must declare `class : authoritative`",
+                        effect.name, op.name
+                    )));
+                }
+                if op.progress == "immediate"
+                    && matches!(op.authority_class, EffectAuthorityClass::Authoritative)
+                {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` may not be both `authoritative` and `progress immediate`",
+                        effect.name, op.name
+                    )));
+                }
+                if op.agreement_use == "required"
+                    && matches!(op.authority_class, EffectAuthorityClass::Observe)
+                {
+                    return Err(ValidationError::ExtensionError(format!(
+                        "effect operation `{}.{}` may not require agreement use on an observational surface",
+                        effect.name, op.name
+                    )));
+                }
                 if ops.insert(op.name.clone(), op.clone()).is_some() {
                     return Err(ValidationError::ExtensionError(format!(
                         "duplicate effect operation `{}.{}`",
@@ -560,6 +722,12 @@ impl Choreography {
     }
 
     fn validate_operation_surface(&self) -> Result<(), ValidationError> {
+        let declared_agreement_profiles = self
+            .agreement_profile_declarations()
+            .into_iter()
+            .map(|profile| profile.name)
+            .collect::<BTreeSet<_>>();
+
         for operation in self.operation_declarations() {
             if operation.progress_contract.is_none() {
                 return Err(ValidationError::ExtensionError(format!(
@@ -575,6 +743,18 @@ impl Choreography {
                 return Err(ValidationError::ExtensionError(format!(
                     "operation `{}` must declare explicit progress metadata using `requires`, `within`, `on timeout`, or `on stall`",
                     operation.name
+                )));
+            }
+            let Some(agreement) = operation.agreement.as_ref() else {
+                return Err(ValidationError::ExtensionError(format!(
+                    "operation `{}` must attach a named agreement profile",
+                    operation.name
+                )));
+            };
+            if !declared_agreement_profiles.contains(&agreement.profile_name) {
+                return Err(ValidationError::ExtensionError(format!(
+                    "operation `{}` references undeclared agreement profile `{}`",
+                    operation.name, agreement.profile_name
                 )));
             }
         }
@@ -872,55 +1052,29 @@ impl Choreography {
             .flat_map(|effect| {
                 let is_used = used.contains(effect.name.as_str());
                 effect.operations.into_iter().map(move |op| {
-                    let (
-                        admissibility,
-                        totality,
-                        timeout_policy,
-                        reentrancy_policy,
-                        handler_domain,
-                    ) = match op.authority_class {
-                        EffectAuthorityClass::Authoritative => (
-                            if is_used {
-                                "declared_use_only"
-                            } else {
-                                "internal_only"
-                            },
-                            "may_block",
-                            "inherit_operation_budget",
-                            "reject_same_fragment",
-                            if is_used { "external" } else { "internal" },
-                        ),
-                        EffectAuthorityClass::Command => (
-                            if is_used {
-                                "declared_use_only"
-                            } else {
-                                "internal_only"
-                            },
-                            "immediate",
-                            "none",
-                            "allow",
-                            if is_used { "external" } else { "internal" },
-                        ),
-                        EffectAuthorityClass::Observe => (
-                            if is_used {
-                                "declared_use_only"
-                            } else {
-                                "internal_only"
-                            },
-                            "immediate",
-                            "none",
-                            "allow",
-                            if is_used { "external" } else { "internal" },
-                        ),
+                    let admissibility = if is_used {
+                        "declared_use_only"
+                    } else {
+                        "internal_only"
                     };
+                    let (totality, timeout_policy) = match op.progress.as_str() {
+                        "immediate" => ("immediate", "none"),
+                        "may_block" => ("may_block", "required"),
+                        _ => ("may_block", "required"),
+                    };
+                    let handler_domain = if is_used { "external" } else { "internal" };
                     EffectContractDeclaration {
                         interface_name: effect.name.clone(),
                         operation_name: op.name,
                         authority_class: op.authority_class,
+                        semantic_class: op.semantic_class.clone(),
+                        progress: op.progress.clone(),
+                        region: op.region.clone(),
+                        agreement_use: op.agreement_use.clone(),
                         admissibility: admissibility.to_string(),
                         totality: totality.to_string(),
                         timeout_policy: timeout_policy.to_string(),
-                        reentrancy_policy: reentrancy_policy.to_string(),
+                        reentrancy_policy: op.reentrancy,
                         handler_domain: handler_domain.to_string(),
                     }
                 })
@@ -1041,6 +1195,27 @@ impl Choreography {
         self.attrs
             .get(ATTR_PROTOCOL_EXECUTION_PROFILES)
             .and_then(|s| serde_json::from_str::<Vec<String>>(s).ok())
+            .unwrap_or_default()
+    }
+
+    /// Set reusable agreement-profile declarations for this choreography.
+    pub fn set_agreement_profile_declarations(
+        &mut self,
+        decls: &[AgreementProfileDeclaration],
+    ) -> Result<(), String> {
+        let encoded = serde_json::to_string(decls)
+            .map_err(|e| format!("encode agreement profile declarations: {e}"))?;
+        self.attrs
+            .insert(ATTR_AGREEMENT_PROFILE_DECLARATIONS.to_string(), encoded);
+        Ok(())
+    }
+
+    /// Get reusable agreement-profile declarations.
+    #[must_use]
+    pub fn agreement_profile_declarations(&self) -> Vec<AgreementProfileDeclaration> {
+        self.attrs
+            .get(ATTR_AGREEMENT_PROFILE_DECLARATIONS)
+            .and_then(|s| serde_json::from_str::<Vec<AgreementProfileDeclaration>>(s).ok())
             .unwrap_or_default()
     }
 

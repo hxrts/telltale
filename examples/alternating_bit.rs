@@ -1,4 +1,6 @@
-//! Alternating bit protocol using the `tell!` macro.
+//! This is a projection-surface example: `tell!` owns the protocol-visible
+//! alternating-bit ack/nack branches, while Rust only supplies the receiver's
+//! local test plan.
 //!
 //! The alternating bit protocol is a simple reliable-transfer scheme:
 //!   - Sender transmits data frames tagged with alternating bits (D0, D1).

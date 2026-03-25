@@ -20,6 +20,7 @@ choreography = {
 top_level_decl = _{
     proof_bundle_decl
     | profile_decl
+    | agreement_profile_decl
     | role_set_decl
     | topology_decl
     | type_decl
@@ -58,6 +59,21 @@ profile_fairness = { "fairness" ~ ident }
 profile_admissibility = { "admissibility" ~ ident }
 profile_escalation_window = { "escalation_window" ~ ident }
 
+agreement_profile_decl = { "agreement_profile" ~ ident ~ agreement_profile_body }
+agreement_profile_body = { "{" ~ agreement_profile_meta+ ~ "}" | agreement_profile_meta+ }
+agreement_profile_meta = {
+    agreement_profile_visibility
+    | agreement_profile_rule
+    | agreement_profile_usable_at
+    | agreement_profile_finalized_at
+    | agreement_profile_evidence
+}
+agreement_profile_visibility = { "visibility" ~ ident }
+agreement_profile_rule = { "rule" ~ ident }
+agreement_profile_usable_at = { "usable_at" ~ ident }
+agreement_profile_finalized_at = { "finalized_at" ~ ident }
+agreement_profile_evidence = { "evidence" ~ ident }
+
 type_decl = { type_alias_decl | union_type_decl }
 type_alias_decl = { "type" ~ "alias" ~ ident ~ "=" ~ type_expr }
 union_type_decl = { "type" ~ ident ~ "=" ~ union_ctor_block }
@@ -67,8 +83,22 @@ ctor_type_payload = { "(" ~ type_expr ~ ")" }
 
 effect_decl = { "effect" ~ ident ~ effect_body }
 effect_body = { "{" ~ effect_op_decl+ ~ "}" | effect_op_decl+ }
-effect_op_decl = { effect_op_authority_class? ~ ident ~ ":" ~ type_expr ~ "->" ~ type_expr }
+effect_op_decl = { effect_op_head ~ effect_op_meta_body? }
+effect_op_head = { effect_op_authority_class? ~ ident ~ ":" ~ type_expr ~ "->" ~ type_expr }
 effect_op_authority_class = { "authoritative" | "command" | "observe" }
+effect_op_meta_body = { "{" ~ effect_op_meta* ~ "}" }
+effect_op_meta = _{
+    effect_op_semantic_class
+    | effect_op_progress
+    | effect_op_region
+    | effect_op_agreement_use
+    | effect_op_reentrancy
+}
+effect_op_semantic_class = { "class" ~ ":" ~ ident ~ ","? }
+effect_op_progress = { "progress" ~ ":" ~ ident ~ ","? }
+effect_op_region = { "region" ~ ":" ~ ident ~ ","? }
+effect_op_agreement_use = { "agreement_use" ~ ":" ~ ident ~ ","? }
+effect_op_reentrancy = { "reentrancy" ~ ":" ~ ident ~ ","? }
 type_expr = { type_record | type_result | type_maybe | type_unit | type_path }
 type_record = { "{" ~ (!"}" ~ ANY)* ~ "}" }
 type_result = { "Result" ~ type_expr ~ type_expr }
@@ -86,12 +116,14 @@ topology_kind = { "cluster" | "ring" | "mesh" }
 topology_members = { ident ~ ("," ~ ident)* }
 fragment_decl = { "fragment" ~ ident ~ ident_list? }
 ident_list = { "(" ~ ident ~ ("," ~ ident)* ~ ")" }
-operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ operation_within? ~ operation_progress? ~ operation_compose? ~ "=" ~ protocol_body }
+operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ operation_within? ~ operation_progress? ~ operation_agreement? ~ operation_compose? ~ "=" ~ protocol_body }
 operation_params = { "(" ~ operation_param_decl ~ ("," ~ operation_param_decl)* ~ ")" }
 operation_param_decl = { ident ~ ":" ~ type_expr }
 operation_within = { "within" ~ ident ~ ident_list? }
 operation_progress = { progress_attachment }
-operation_compose = { "compose" ~ ident }
+operation_agreement = { "agreement" ~ ident ~ operation_prestate? }
+operation_prestate = { "prestate" ~ ident }
+operation_compose = { "compose" ~ ident ~ ("(" ~ integer ~ ")")? }
 guest_runtime_decl = { "guest" ~ "runtime" ~ ident ~ "=" ~ guest_runtime_body }
 guest_runtime_body = { "{" ~ guest_runtime_stmt+ ~ "}" | guest_runtime_stmt+ }
 guest_runtime_stmt = { guest_runtime_uses | guest_runtime_entry }
@@ -215,7 +247,7 @@ broadcast_stmt = { annotated_sender_ref ~ "->*" ~ ":" ~ message }
 annotated_sender_ref = { role_ref ~ role_metadata_record? }
 role_metadata_record = { "{" ~ role_annotation_entries? ~ "}" }
 role_annotation_entries = { role_annotation_entry ~ ("," ~ role_annotation_entry)* ~ ","? }
-role_annotation_entry = { ident ~ "=" ~ role_annotation_value }
+role_annotation_entry = { ident ~ ":" ~ role_annotation_value }
 role_annotation_value = { string | duration | integer | ident }
 
 // Role reference (can be simple or indexed)

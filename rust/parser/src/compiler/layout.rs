@@ -290,16 +290,16 @@ mod tests {
     #[test]
     fn layout_does_not_insert_braces_inside_multiline_sender_records() {
         let input =
-            "protocol Test =\n  roles A, B\n  A {\n    priority = high,\n  }\n    -> B : Msg\n";
+            "protocol Test =\n  roles A, B\n  A {\n    priority : high,\n  }\n    -> B : Msg\n";
         let out = preprocess_layout(input).unwrap();
-        assert!(!out.contains("{     priority = high,"));
+        assert!(!out.contains("{     priority : high,"));
         assert!(out.contains("A {"));
         assert!(out.contains("}\n    -> B : Msg"));
     }
 
     #[test]
     fn layout_treats_arrow_line_as_continuation() {
-        let input = "protocol Test =\n  roles A, B\n  A { priority = high }\n    -> B : Msg\n";
+        let input = "protocol Test =\n  roles A, B\n  A { priority : high }\n    -> B : Msg\n";
         let out = preprocess_layout(input).unwrap();
         assert!(!out.contains("{     -> B : Msg"));
         assert!(out.contains("-> B : Msg"));

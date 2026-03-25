@@ -16,6 +16,16 @@ Key exports:
 
 See `rust/src/lib.rs` for the full list of re-exports.
 
+Generated `tell!` APIs use one canonical effect-boundary import style:
+
+- `use Protocol::effects;`
+- `effects::Runtime` for host traits
+- `effects::RuntimeRequest` / `effects::RuntimeOutcome` for typed dispatch
+- `effects::runtime::operation("ready")` or `effects::runtime::READY` for
+  generated per-operation semantic metadata
+- `Protocol::proof_status` for theorem-pack, tier, parity, and
+  agreement/finality metadata
+
 ### `telltale-types`
 
 Type definitions shared across the stack.
@@ -71,7 +81,7 @@ Key exports:
 - `Instr`, `Value`, `SessionStore`, `SessionId`
 - `OwnedSession`, `EffectHandler`, and `NestedProtocolMachineHandler`
 - proof-aligned effect algebra:
-  `EffectSemanticClass`, `EffectRetryShape`, `EffectCompositionPolicy`,
+  `EffectSemanticClass`, `EffectRetryShape`, `EffectCompositionPolicy`
   `EffectResponsibilityDomain`
 - canonical semantic objects:
   `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
@@ -98,10 +108,11 @@ and simulators.
 Module access (not re-exported at crate root):
 - Effect boundary:
   `telltale_machine::model::effects::EffectHandler`, `EffectRequest`, `EffectOutcome`,
-  `EffectInterfaceMetadata`, `EffectExchangeRecord`, `EffectCompositionPolicy`,
+  `EffectInterfaceMetadata`, `EffectExchangeRecord`, `EffectCompositionPolicy`
   `EffectSemanticClass`, `EffectRetryShape`, `EffectResponsibilityDomain`,
   `SendDecision`, `SendDecisionInput`
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
+- Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`
 - Runtime contracts:
   `telltale_machine::runtime::failure::{RuntimeContracts, ProtocolMachineExecutionProfile}`

@@ -108,45 +108,11 @@ enum Message {
 }
 ```
 
-The `run_once` function creates shared channel maps and builds one handler per role. Each handler receives the same `Arc<Mutex<BTreeMap>>` pair so that sends from one role are visible to the other.
-
-`Program::new()` starts a builder chain. The client sends a `Ping` and receives a response. The server receives first and replies with `Pong`. Both programs call `.end()` to close the session.
-
-The `interpret` function drives each program through its handler. `futures::join!` runs both concurrently on the same async executor, which is compatible with both Tokio and WASM runtimes.
-
-```rust
-async fn run_once() -> Result<(), Box<dyn std::error::Error>> {
-    use futures::join;
-    use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
-
-    let channels = Arc::new(Mutex::new(BTreeMap::new()));
-    let choice_channels = Arc::new(Mutex::new(BTreeMap::new()));
-
-    let mut client =
-        InMemoryHandler::with_channels(Role::Client, channels.clone(), choice_channels.clone());
-    let mut server =
-        InMemoryHandler::with_channels(Role::Server, channels.clone(), choice_channels.clone());
-
-    let client_program = Program::new()
-        .send(Role::Server, Message::Ping("hi".into()))
-        .recv::<Message>(Role::Server)
-        .end();
-
-    let server_program = Program::new()
-        .recv::<Message>(Role::Client)
-        .send(Role::Client, Message::Pong("ok".into()))
-        .end();
-
-    let mut client_ep = ();
-    let mut server_ep = ();
-
-    let client_fut = interpret(&mut client, &mut client_ep, client_program);
-    let server_fut = interpret(&mut server, &mut server_ep, server_program);
-    let (_c, _s) = join!(client_fut, server_fut);
-    Ok(())
-}
-```
+The canonical WASM example now lives in `examples/wasm-ping-pong/` and uses
+`tell!` plus generated effect traits as the public surface. Browser-facing
+code should keep protocol structure in the DSL and host integration in the
+generated `Protocol::effects` boundary, rather than manually assembling
+low-level effect programs.
 
 For multi role tests, share channels by using `InMemoryHandler::with_channels` and a shared channel map. The WASM test suite in `rust/choreography/tests/wasm_integration.rs` shows larger examples. Each handler must reference the same `Arc<Mutex<BTreeMap>>` instances for messages to route correctly. The unit endpoint `()` is sufficient when no external state is needed.
 

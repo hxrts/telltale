@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
 LEAN_SEMANTIC_CORE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean"
+LEAN_AGREEMENT_CORE="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/SemanticObjects/AgreementCore.lean"
 LEAN_SEMANTIC_OBJECTS_BARREL="${ROOT_DIR}/lean/Runtime/ProtocolMachine/Model/SemanticObjects.lean"
 LEAN_PROTOCOL_MACHINE_API="${ROOT_DIR}/lean/Runtime/ProtocolMachine/API.lean"
 RUST_MACHINE_SEMANTIC_OBJECTS="${ROOT_DIR}/rust/machine/src/semantic_objects.rs"
@@ -13,6 +14,7 @@ RUST_BRIDGE_SEMANTIC_OBJECTS="${ROOT_DIR}/rust/bridge/src/semantic_objects.rs"
 
 required_surfaces=(
   "${LEAN_SEMANTIC_CORE}"
+  "${LEAN_AGREEMENT_CORE}"
   "${LEAN_SEMANTIC_OBJECTS_BARREL}"
   "${LEAN_PROTOCOL_MACHINE_API}"
   "${RUST_MACHINE_SEMANTIC_OBJECTS}"
@@ -44,15 +46,38 @@ required_types=(
   "Region"
   "ProgressContract"
   "ProgressTransition"
+  "OperationVisibility"
+  "AgreementLevel"
+  "AgreementRule"
+  "AgreementEvidenceKind"
+  "FinalizationOutcome"
+  "PrestateBinding"
+  "AgreementProfile"
+  "AgreementContract"
+  "AgreementEvidence"
+  "AgreementState"
   "ProtocolMachineSemanticObjects"
+)
+
+agreement_types=(
+  "OperationVisibility"
+  "AgreementLevel"
+  "FinalizationOutcome"
+  "PrestateBinding"
+  "AgreementProfile"
+  "AgreementContract"
+  "AgreementEvidence"
+  "AgreementState"
 )
 
 check_type_surface() {
   local label="$1"
   local file="$2"
+  shift 2
+  local names=("$@")
   local missing=()
 
-  for name in "${required_types[@]}"; do
+  for name in "${names[@]}"; do
     if ! rg -q "\\b${name}\\b" "${file}"; then
       missing+=("${name}")
     fi
@@ -65,9 +90,10 @@ check_type_surface() {
   fi
 }
 
-check_type_surface "Lean semantic-object core" "${LEAN_SEMANTIC_CORE}"
-check_type_surface "Rust machine semantic objects" "${RUST_MACHINE_SEMANTIC_OBJECTS}"
-check_type_surface "Rust bridge semantic objects" "${RUST_BRIDGE_SEMANTIC_OBJECTS}"
+check_type_surface "Lean semantic-object core" "${LEAN_SEMANTIC_CORE}" "${required_types[@]}"
+check_type_surface "Lean agreement semantic-object core" "${LEAN_AGREEMENT_CORE}" "${agreement_types[@]}"
+check_type_surface "Rust machine semantic objects" "${RUST_MACHINE_SEMANTIC_OBJECTS}" "${required_types[@]}"
+check_type_surface "Rust bridge semantic objects" "${RUST_BRIDGE_SEMANTIC_OBJECTS}" "${required_types[@]}"
 
 if ! rg -q '\bProtocolMachine\b' "${LEAN_PROTOCOL_MACHINE_API}"; then
   echo "[semantic-name-parity] Lean protocol-machine API is missing ProtocolMachine" >&2

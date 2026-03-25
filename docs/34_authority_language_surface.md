@@ -12,7 +12,10 @@ It is intentionally narrower than a full generalized effect language.
 Top-level declarations:
 
 - `type Name = | Ctor | Ctor(Payload)`
-- `type alias Name = { ... }`
+- `type alias Name =`
+- `  {`
+- `    field : Type`
+- `  }`
 - `effect Runtime`
 - `  authoritative ready : Session -> Result CommitError ReadyWitness`
 - `protocol Flow uses Runtime, Audit = ...`
@@ -37,7 +40,21 @@ additions.
 ```tell
 effect Runtime
   authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
   observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol Flow uses Runtime =
   ...

@@ -17,7 +17,8 @@ The preferred surface style mixes MPST operators with a small functional-languag
 - reserve `=>` for branch/result bodies
 - use indentation to make control flow visually obvious
 - keep braces for record/data layout instead of general structural blocks
-- use sender records like `Role { priority = high }`
+- format standalone records and effect-semantics records as multiline brace blocks with `key : value` fields
+- use sender records like `Role { priority : high }`
 - use `Message of module.Type` with dotted paths instead of Rust-style `::`
 
 ### Scope
@@ -93,7 +94,7 @@ The parser recognizes `import` declarations for completeness. Import resolution 
 #### 1) Send Statement
 
 ```tell
-Buyer { priority = high }
+Buyer { priority : high }
   -> Seller : Request of shop.Order
 
 Seller
@@ -280,9 +281,18 @@ tell! {
   profile Replay
     fairness strong
 
-  operation MembershipCheck
-    progress MembershipProgress
-    compose all_success
+  agreement_profile MembershipSoftSafe
+    visibility pending
+    rule threshold_participants
+    usable_at provisional
+    finalized_at finalized
+    evidence commit_fact
+
+  operation MembershipCheck at Coordinator
+    progress MembershipProgress requires Replay within bounded
+    agreement MembershipSoftSafe
+    compose first_success =
+      publish MembershipQueued
 
   protocol Membership under Replay =
     roles Coordinator, Member
@@ -296,6 +306,11 @@ assert!(Membership::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
 Profiles, theorem-pack requirements, and language-tier diagnostics are surfaced
 as generated metadata because they are part of the verified model, not an
 afterthought layered on top.
+
+For effect interfaces, the canonical Rust import is `use Protocol::effects;`.
+Traits, request/outcome enums, effect-domain data, and per-operation semantic
+metadata all live under that one boundary. Interface metadata is exposed under
+snake-case effect modules such as `Protocol::effects::runtime`.
 
 This example mixes a named count with index variables. It enables parameterized protocols.
 
@@ -371,7 +386,7 @@ Record metadata can carry transport-level timeout hints:
 ```tell
 protocol TimedOps =
   roles Client, Server
-  Client { runtime_timeout = 5s }
+  Client { runtime_timeout : 5s }
     -> Server : Request
   Server -> Client : Response
 ```
@@ -557,27 +572,66 @@ queries. It is the user-facing surface that later lowers to the same typed proto
 
 ##### Choosing Between Timeout Metadata and Timeout Branching
 
-Use `runtime_timeout = 5s` sender metadata for operational transport hints that
+Use `runtime_timeout : 5s` sender metadata for operational transport hints that
 do not change the protocol. Use `timeout ... on timeout ... on cancel ...` when
 the timeout result must be explicit in the protocol and replay/audit surface.
 
 This lowering preserves statement order and continuation structure. Projection skips extension-local behavior for now and continues projecting the remaining protocol.
 
-#### 13) First-Class Combinators
+#### 13) Child-Effect Aggregation
 
-The DSL includes first-class combinators for common patterns.
+`compose ...` is a secondary child-effect aggregation clause on an operation.
+It does not define distributed agreement by itself. Agreement lives in named
+agreement profiles; child-effect aggregation only says how sibling child
+effects roll up underneath that parent agreement.
 
 ```tell
-protocol Combinators =
-  roles A, B
-  handshake A <-> B : Hello
-  quorum_collect A -> B min 2 : Vote
-  retry 3 {
-    A -> B : Ping
-  }
+agreement_profile PendingPublication
+  visibility pending
+  rule threshold_participants
+  usable_at provisional
+  finalized_at finalized
+  evidence publication
+
+operation syncMembership(channel : ChannelId) at Worker
+  progress MembershipProgress requires Replay within bounded
+  agreement PendingPublication prestate ChannelMembership
+  compose threshold_success(2) =
+    publish SyncQueued(channel)
 ```
 
-`handshake` lowers to a two-message exchange (`Hello` and `HelloAck`). `retry` lowers to a bounded loop. `quorum_collect` lowers to a protocol extension node with combinator annotations.
+##### Reusable Domain Agreement Profiles
+
+Domain systems should define their own agreement vocabulary as named profiles
+over Telltale's generic core instead of expecting core built-ins such as
+`quorum` or `fallback` to carry all the meaning.
+
+```tell
+agreement_profile ContactCeremonySoftSafe
+  visibility pending
+  rule aura_soft_safe
+  usable_at soft_safe
+  finalized_at finalized
+  evidence commit_fact
+
+operation addContact(contactId : String) at Coordinator
+  progress ContactProgress requires Replay within bounded
+  agreement ContactCeremonySoftSafe prestate ContactContext
+  compose threshold_success(3) =
+    publish ContactQueued(contactId)
+```
+
+This keeps Telltale generic:
+
+- `visibility`, `usable_at`, `finalized_at`, and `evidence` are the core
+  semantic vocabulary
+- `ContactCeremonySoftSafe` and `aura_soft_safe` are domain-defined names
+- `compose ...` only describes child-effect rollup below the agreement
+  contract; it is not the agreement contract itself
+
+The generated Rust surface preserves those domain names through
+`Protocol::agreements` and `Protocol::proof_status`, so downstream host code
+can keep a natural domain vocabulary without forking the core language model.
 
 #### 14) Role Sets and Topologies
 
@@ -641,7 +695,7 @@ The parser builds the AST for projection, validation, and code generation.
 ### Parser Stack
 
 - Layout preprocessor converts indentation into explicit block delimiters.
-- Pest grammar parses the canonical brace based syntax.
+- Pest grammar parses the canonical indentation-based syntax after layout normalization.
 - Parser module constructs the AST and runs validation.
 
 ### Parse Pipeline
@@ -718,7 +772,7 @@ This pattern matches common parse errors. It formats diagnostics with the report
   `decide`, `by`, `repeat`, `while`, `forever`, `par`, `rec`, `continue`, `call`, `where`,
   `module`, `import`, `exposing`, `proof_bundle`, `requires`, `acquire`, `release`,
   `fork`, `join`, `abort`, `transfer`, `delegate`, `tag`, `check`, `using`, `into`, `as`, `to`, `from`, `with`, `bundle`,
-  `version`, `issuer`, `constraint`, `handshake`, `retry`, `quorum_collect`, `min`,
+  `version`, `issuer`, `constraint`,
   `role_set`, `subset`, `cluster`, `ring`, `mesh`,
   `let`, `in`, `type`, `alias`, `effect`, `uses`, `timeout`, `on`, `cancel`,
   `when`, `yields`, `heartbeat`, `every`, `on_missing`, `body`,

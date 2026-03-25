@@ -9,8 +9,15 @@ use std::error::Error;
 use telltale::{tell, try_session};
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Alice-side shopping request provided by the host.
-    type alias BuyerPlan = { item : Int, contribution : Int }
+    type alias BuyerPlan =
+    {
+      item : Int
+      contribution : Int
+    }
 
     -- // Bob decides whether the purchase proceeds.
     type PurchaseDecision =
@@ -18,22 +25,47 @@ tell! {
       | Quit
 
     -- // Seller quote and Alice contribution presented to Bob together.
-    type alias Offer = { sellerPrice : Int, aliceShare : Int }
+    type alias Offer =
+    {
+      sellerPrice : Int
+      aliceShare : Int
+    }
 
     -- // Alice host provides the requested item and intended contribution.
     effect AlicePlanner
       command request : Session -> BuyerPlan
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Seller host quotes one price for the requested item.
     effect SellerPricing
       command quote : Int -> Int
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Bob host evaluates the offer and decides whether to buy.
     effect BobBudget
       command decide : Offer -> PurchaseDecision
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Alice asks for a quote, then Bob decides whether the purchase proceeds.
-    protocol ThreeBuyers uses AlicePlanner, SellerPricing, BobBudget =
+    protocol ThreeBuyers uses AlicePlanner, SellerPricing, BobBudget under Replay =
       roles Alice, Bob, Seller
       Alice -> Seller : Request(i32)
       Seller -> Alice : Quote(i32)
@@ -189,6 +221,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     };
     let mut bob_host = BobHost;
     let mut seller_host = SellerHost;
+    println!(
+        "execution profiles = {:?}",
+        ThreeBuyers::proof_status::EXECUTION_PROFILES
+    );
+    println!(
+        "session projectable = {}",
+        ThreeBuyers::proof_status::SESSION_PROJECTABLE
+    );
     executor::block_on(async {
         try_join!(
             alice(&mut a, &mut alice_host),

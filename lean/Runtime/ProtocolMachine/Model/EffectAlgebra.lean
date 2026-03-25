@@ -38,8 +38,7 @@ def EffectInterfaceMetadata.immediateAdmissible (metadata : EffectInterfaceMetad
 inductive EffectCompositionPolicy where
   | allSuccess
   | firstSuccess
-  | quorum (requiredSuccesses : Nat)
-  | fallback
+  | thresholdSuccess (requiredSuccesses : Nat)
   deriving Repr, DecidableEq
 
 def EffectOutcomeStatus.isSuccess : EffectOutcomeStatus → Prop
@@ -70,12 +69,6 @@ def countSuccessfulEffects (records : List EffectExchangeRecord) : Nat :=
       if record.outcome.status.isSuccessB then acc + 1 else acc)
     0
 
-def countTerminalEffects (records : List EffectExchangeRecord) : Nat :=
-  records.foldl
-    (fun acc record =>
-      if record.outcome.status.isTerminalB then acc + 1 else acc)
-    0
-
 def EffectCompositionPolicy.commitmentResolved
     (policy : EffectCompositionPolicy)
     (records : List EffectExchangeRecord) : Prop :=
@@ -84,11 +77,8 @@ def EffectCompositionPolicy.commitmentResolved
       records ≠ [] ∧ ∀ record ∈ records, record.succeeded
   | .firstSuccess =>
       ∃ record ∈ records, record.succeeded
-  | .quorum requiredSuccesses =>
+  | .thresholdSuccess requiredSuccesses =>
       requiredSuccesses > 0 ∧ countSuccessfulEffects records ≥ requiredSuccesses
-  | .fallback =>
-      (∃ record ∈ records, record.succeeded) ∨
-      (records ≠ [] ∧ ∀ record ∈ records, record.terminal)
 
 def EffectCompositionPolicy.commitmentCompatible
     (policy : EffectCompositionPolicy)
@@ -99,11 +89,8 @@ def EffectCompositionPolicy.commitmentCompatible
         ∀ record ∈ records, record.succeeded
     | .firstSuccess =>
         ∃ record ∈ records, record.succeeded
-    | .quorum requiredSuccesses =>
+    | .thresholdSuccess requiredSuccesses =>
         countSuccessfulEffects records ≥ requiredSuccesses
-    | .fallback =>
-        (∃ record ∈ records, record.succeeded) ∨
-        (records ≠ [] ∧ ∀ record ∈ records, record.terminal)
 
 def EffectCompositionPolicy.progressCompatible
     (policy : EffectCompositionPolicy)

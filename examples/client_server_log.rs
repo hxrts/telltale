@@ -10,6 +10,9 @@ use std::error::Error;
 use telltale::{tell, try_session};
 
 tell! {
+    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    profile Replay fairness eventual admissibility replay escalation_window bounded
+
     -- // Host-side server execution policy.
     type ServerDecision =
       | Fault
@@ -19,13 +22,27 @@ tell! {
     -- // Runtime decides how one request attempt resolves.
     effect ServerRuntime
       command decide : Int -> ServerDecision
+      {
+        class : best_effort
+        progress : immediate
+        region : session
+        agreement_use : none
+        reentrancy : allow
+      }
 
     -- // Logger sink records externally visible audit events.
     effect Audit
       observe record : AuditEvent -> Unit
+      {
+        class : observational
+        progress : immediate
+        region : global
+        agreement_use : forbidden
+        reentrancy : allow
+      }
 
     -- // Client submits one request and the server decides the outcome.
-    protocol ClientServerLog uses ServerRuntime, Audit =
+    protocol ClientServerLog uses ServerRuntime, Audit under Replay =
       roles C, S, L
       C -> S : Request(i32)
       choice S at
@@ -174,6 +191,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         decision: server_outcome(),
     };
     let mut logger_host = LoggerHost::default();
+    println!(
+        "execution profiles = {:?}",
+        ClientServerLog::proof_status::EXECUTION_PROFILES
+    );
+    println!(
+        "session projectable = {}",
+        ClientServerLog::proof_status::SESSION_PROJECTABLE
+    );
     executor::block_on(async {
         try_join!(
             client(&mut c),

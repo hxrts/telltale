@@ -40,4 +40,18 @@ check_no_match 'load_choreography\(' rust/machine/examples rust/machine/benches
 
 check_no_match 'EffectHandler stubs plus simulator harness test templates' Justfile
 
+# ── Legacy Public Teaching Surfaces ──────────────────────────────────
+
+check_no_match 'Program::new\(' \
+  docs/02_getting_started.md \
+  docs/03_architecture.md \
+  docs/08_extensions.md \
+  docs/09_effect_handlers.md \
+  docs/28_examples.md \
+  docs/29_wasm_guide.md
+
+check_no_match 'compose race\b' docs examples
+check_no_match 'compose fallback\b' docs examples
+check_no_match 'compose quorum\(' docs examples
+
 echo "tooling-convergence: ok"

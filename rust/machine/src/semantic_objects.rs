@@ -121,6 +121,57 @@ pub enum ProgressState {
     HandedOff,
 }
 
+/// Visibility timing for one semantic operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationVisibility {
+    Immediate,
+    Pending,
+    BlockedUntilFinalized,
+}
+
+/// Agreement grade reached for one operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgreementLevel {
+    None,
+    Provisional,
+    SoftSafe,
+    Finalized,
+}
+
+/// Decision rule attached to one agreement contract.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgreementRule {
+    NoAgreement,
+    AnyParticipant,
+    Unanimous,
+    Threshold { required_participants: u64 },
+    Named { rule_name: String },
+}
+
+/// Evidence class attached to one agreement path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AgreementEvidenceKind {
+    Witness,
+    Certificate,
+    CommitFact,
+    Publication,
+    Materialization,
+}
+
+/// Terminal outcome for one agreement/finalization path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinalizationOutcome {
+    Finalized,
+    Aborted,
+    Rejected,
+    TimedOut,
+}
+
 /// Ownership scope carried by the canonical semantic-object family.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OwnershipScope {
@@ -145,6 +196,34 @@ fn default_progress_contract_escalated_at_tick() -> Option<u64> {
 
 fn default_progress_contract_reason() -> Option<String> {
     None
+}
+
+impl AgreementLevel {
+    #[must_use]
+    pub const fn rank(self) -> u8 {
+        match self {
+            Self::None => 0,
+            Self::Provisional => 1,
+            Self::SoftSafe => 2,
+            Self::Finalized => 3,
+        }
+    }
+
+    #[must_use]
+    pub const fn at_least(self, required: Self) -> bool {
+        self.rank() >= required.rank()
+    }
+}
+
+impl OperationVisibility {
+    #[must_use]
+    pub const fn permits_use_at(self, level: AgreementLevel) -> bool {
+        match self {
+            Self::Immediate => true,
+            Self::Pending => level.at_least(AgreementLevel::Provisional),
+            Self::BlockedUntilFinalized => level.at_least(AgreementLevel::Finalized),
+        }
+    }
 }
 
 /// First-class view of one operation instance.
@@ -283,6 +362,70 @@ pub struct PublicationEvent {
     pub reason: Option<String>,
 }
 
+/// Stable prestate binding for one agreement-sensitive operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrestateBinding {
+    pub binding_id: String,
+    pub operation_id: String,
+    pub session: Option<SessionId>,
+    pub state_digest: String,
+    pub epoch_ref: Option<String>,
+    pub participant_digest: Option<String>,
+}
+
+/// Reusable named agreement profile over the generic semantic core.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgreementProfile {
+    pub profile_name: String,
+    pub visibility: OperationVisibility,
+    pub rule: AgreementRule,
+    pub usable_at: AgreementLevel,
+    pub finalized_at: AgreementLevel,
+    pub required_evidence_kind: AgreementEvidenceKind,
+}
+
+/// Attached agreement contract for one operation instance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgreementContract {
+    pub contract_name: String,
+    pub operation_id: String,
+    pub session: Option<SessionId>,
+    pub owner_id: Option<FragmentOwnerId>,
+    pub profile_name: Option<String>,
+    pub visibility: OperationVisibility,
+    pub rule: AgreementRule,
+    pub usable_at: AgreementLevel,
+    pub finalized_at: AgreementLevel,
+    pub required_evidence_kind: AgreementEvidenceKind,
+}
+
+/// Explicit evidence object carried on one agreement path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgreementEvidence {
+    pub evidence_id: String,
+    pub operation_id: String,
+    pub session: Option<SessionId>,
+    pub owner_id: Option<FragmentOwnerId>,
+    pub level: AgreementLevel,
+    pub kind: AgreementEvidenceKind,
+    pub reference: String,
+    pub authoritative: bool,
+}
+
+/// Replay-visible agreement/finalization state for one operation.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgreementState {
+    pub operation_id: String,
+    pub session: Option<SessionId>,
+    pub owner_id: Option<FragmentOwnerId>,
+    pub contract_name: String,
+    pub level: AgreementLevel,
+    pub finalization: Option<FinalizationOutcome>,
+    pub evidence_ids: Vec<String>,
+    pub last_updated_tick: Option<u64>,
+    pub reason: Option<String>,
+}
+
 /// Canonical framing and locality domain for one session-scoped semantic slice.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Region {
@@ -326,11 +469,157 @@ pub struct ProgressTransition {
     pub reason: Option<String>,
 }
 
+impl PrestateBinding {
+    #[must_use]
+    pub fn binds_operation(&self, operation: &OperationInstance) -> bool {
+        self.operation_id == operation.operation_id && self.session == operation.session
+    }
+}
+
+impl AgreementProfile {
+    #[must_use]
+    pub fn supports_contract(&self, contract: &AgreementContract) -> bool {
+        contract.profile_name.as_deref() == Some(self.profile_name.as_str())
+            && contract.visibility == self.visibility
+            && contract.rule == self.rule
+            && contract.usable_at == self.usable_at
+            && contract.finalized_at == self.finalized_at
+            && contract.required_evidence_kind == self.required_evidence_kind
+    }
+}
+
+impl AgreementContract {
+    #[must_use]
+    pub fn tracks_operation(&self, operation: &OperationInstance) -> bool {
+        self.operation_id == operation.operation_id
+            && self.session == operation.session
+            && self.owner_id == operation.owner_id
+    }
+
+    #[must_use]
+    pub fn provisional_usable(&self, state: &AgreementState) -> bool {
+        state.tracks_contract(self)
+            && state.level.at_least(self.usable_at)
+            && self.visibility.permits_use_at(state.level)
+            && !matches!(
+                state.finalization,
+                Some(FinalizationOutcome::Aborted)
+                    | Some(FinalizationOutcome::Rejected)
+                    | Some(FinalizationOutcome::TimedOut)
+            )
+    }
+
+    #[must_use]
+    pub fn finalization_admissible(
+        &self,
+        binding: &PrestateBinding,
+        evidence: &AgreementEvidence,
+        state: &AgreementState,
+    ) -> bool {
+        state.tracks_contract(self)
+            && binding.operation_id == self.operation_id
+            && binding.session == self.session
+            && evidence.satisfies_contract(self)
+            && evidence.level.at_least(self.finalized_at)
+            && state.level == self.finalized_at
+            && state.finalization == Some(FinalizationOutcome::Finalized)
+    }
+
+    #[must_use]
+    pub fn aborted_state(&self, state: &AgreementState) -> bool {
+        state.tracks_contract(self) && state.finalization == Some(FinalizationOutcome::Aborted)
+    }
+}
+
+impl AgreementEvidence {
+    #[must_use]
+    pub fn satisfies_contract(&self, contract: &AgreementContract) -> bool {
+        self.operation_id == contract.operation_id
+            && self.session == contract.session
+            && self.owner_id == contract.owner_id
+            && self.kind == contract.required_evidence_kind
+            && self.authoritative
+    }
+}
+
+impl AgreementState {
+    #[must_use]
+    pub fn tracks_contract(&self, contract: &AgreementContract) -> bool {
+        self.operation_id == contract.operation_id
+            && self.session == contract.session
+            && self.owner_id == contract.owner_id
+            && self.contract_name == contract.contract_name
+    }
+
+    #[must_use]
+    pub fn is_terminal(&self) -> bool {
+        self.finalization.is_some()
+    }
+}
+
+impl PublicationEvent {
+    #[must_use]
+    pub fn supports_agreement_evidence(&self, evidence: &AgreementEvidence) -> bool {
+        evidence.kind == AgreementEvidenceKind::Publication
+            && evidence.reference == self.publication_id
+            && evidence.operation_id == self.operation_id
+            && evidence.session == self.session
+            && evidence.owner_id == self.owner_id
+            && evidence.authoritative == (self.proof_ref.is_some() && self.handle_ref.is_some())
+    }
+}
+
+impl MaterializationProof {
+    #[must_use]
+    pub fn supports_agreement_evidence(&self, evidence: &AgreementEvidence) -> bool {
+        evidence.kind == AgreementEvidenceKind::Materialization
+            && evidence.reference == self.proof_id
+            && evidence.session == self.session
+            && evidence.authoritative == self.passed
+    }
+}
+
+impl CanonicalHandle {
+    #[must_use]
+    pub fn supports_agreement_evidence(&self, evidence: &AgreementEvidence) -> bool {
+        evidence.reference == self.handle_id
+            && evidence.session == self.session
+            && evidence.owner_id == self.owner_id
+    }
+}
+
+impl SemanticHandoff {
+    #[must_use]
+    pub fn relocates_agreement_state(&self, state: &AgreementState) -> bool {
+        state.session == Some(self.session)
+            && state.owner_id.as_deref() == Some(self.activated_owner_id.as_str())
+    }
+}
+
 impl OperationInstance {
     /// Whether the operation is parity-critical.
     #[must_use]
     pub fn is_parity_critical(&self) -> bool {
         self.requires_proof || self.terminal_publication.is_some()
+    }
+
+    /// Whether commitment state and agreement state align on terminal truth.
+    #[must_use]
+    pub fn commitment_aligned_with_agreement_state(&self, state: &AgreementState) -> bool {
+        self.operation_id == state.operation_id
+            && self.session == state.session
+            && (self.phase != OperationPhase::Succeeded
+                || state.finalization == Some(FinalizationOutcome::Finalized))
+            && (state.finalization != Some(FinalizationOutcome::Finalized)
+                || matches!(
+                    self.phase,
+                    OperationPhase::Succeeded | OperationPhase::HandedOff
+                ))
+            && (state.finalization != Some(FinalizationOutcome::Aborted)
+                || matches!(
+                    self.phase,
+                    OperationPhase::Failed | OperationPhase::Cancelled | OperationPhase::TimedOut
+                ))
     }
 }
 
@@ -448,6 +737,16 @@ pub struct ProtocolMachineSemanticObjects {
     pub canonical_handles: Vec<CanonicalHandle>,
     #[serde(default)]
     pub publication_events: Vec<PublicationEvent>,
+    #[serde(default)]
+    pub prestate_bindings: Vec<PrestateBinding>,
+    #[serde(default)]
+    pub agreement_profiles: Vec<AgreementProfile>,
+    #[serde(default)]
+    pub agreement_contracts: Vec<AgreementContract>,
+    #[serde(default)]
+    pub agreement_evidence: Vec<AgreementEvidence>,
+    #[serde(default)]
+    pub agreement_states: Vec<AgreementState>,
     pub regions: Vec<Region>,
     pub progress_contracts: Vec<ProgressContract>,
     #[serde(default)]
@@ -467,6 +766,11 @@ impl Default for ProtocolMachineSemanticObjects {
             materialization_proofs: Vec::new(),
             canonical_handles: Vec::new(),
             publication_events: Vec::new(),
+            prestate_bindings: Vec::new(),
+            agreement_profiles: Vec::new(),
+            agreement_contracts: Vec::new(),
+            agreement_evidence: Vec::new(),
+            agreement_states: Vec::new(),
             regions: Vec::new(),
             progress_contracts: Vec::new(),
             progress_transitions: Vec::new(),
@@ -525,6 +829,73 @@ impl ProtocolMachineSemanticObjects {
                     .iter()
                     .any(|contract| contract.tracks_operation(operation))
             })
+    }
+
+    /// Whether one named agreement profile is present in the semantic bundle.
+    #[must_use]
+    pub fn named_agreement_profile_available(&self, profile_name: &str) -> bool {
+        self.agreement_profiles
+            .iter()
+            .any(|profile| profile.profile_name == profile_name)
+    }
+
+    /// Whether one operation has a matching agreement contract.
+    #[must_use]
+    pub fn agreement_contract_for_operation(&self, operation: &OperationInstance) -> bool {
+        self.agreement_contracts
+            .iter()
+            .any(|contract| contract.tracks_operation(operation))
+    }
+
+    /// Whether one operation has a matching agreement state.
+    #[must_use]
+    pub fn agreement_state_for_operation(&self, operation: &OperationInstance) -> bool {
+        self.agreement_states.iter().any(|state| {
+            state.operation_id == operation.operation_id && state.session == operation.session
+        })
+    }
+
+    /// Whether one operation has a stable prestate binding.
+    #[must_use]
+    pub fn prestate_binding_for_operation(&self, operation: &OperationInstance) -> bool {
+        self.prestate_bindings
+            .iter()
+            .any(|binding| binding.binds_operation(operation))
+    }
+
+    /// Whether one operation has explicit agreement evidence.
+    #[must_use]
+    pub fn agreement_evidence_for_operation(&self, operation: &OperationInstance) -> bool {
+        self.agreement_evidence.iter().any(|evidence| {
+            evidence.operation_id == operation.operation_id && evidence.session == operation.session
+        })
+    }
+
+    /// Whether one operation is usable under its current agreement state.
+    #[must_use]
+    pub fn provisional_agreement_usable(&self, operation: &OperationInstance) -> bool {
+        self.agreement_contracts.iter().any(|contract| {
+            contract.tracks_operation(operation)
+                && self
+                    .agreement_states
+                    .iter()
+                    .any(|state| contract.provisional_usable(state))
+        })
+    }
+
+    /// Whether one operation has explicit finalization backing.
+    #[must_use]
+    pub fn finalization_backed(&self, operation: &OperationInstance) -> bool {
+        self.agreement_contracts.iter().any(|contract| {
+            contract.tracks_operation(operation)
+                && self.prestate_bindings.iter().any(|binding| {
+                    self.agreement_evidence.iter().any(|evidence| {
+                        self.agreement_states.iter().any(|state| {
+                            contract.finalization_admissible(binding, evidence, state)
+                        })
+                    })
+                })
+        })
     }
 }
 
@@ -652,6 +1023,71 @@ fn progress_state_rank(state: ProgressState) -> u8 {
     }
 }
 
+fn agreement_level_rank(level: AgreementLevel) -> u8 {
+    level.rank()
+}
+
+fn operation_visibility(operation: &OperationInstance) -> OperationVisibility {
+    if operation.requires_proof {
+        OperationVisibility::BlockedUntilFinalized
+    } else if operation.terminal_publication.is_some() {
+        OperationVisibility::Pending
+    } else {
+        OperationVisibility::Immediate
+    }
+}
+
+fn agreement_rule(operation: &OperationInstance) -> AgreementRule {
+    if operation.requires_proof {
+        AgreementRule::Named {
+            rule_name: "proof_finalization".to_string(),
+        }
+    } else if !operation.dependent_operation_ids.is_empty() {
+        AgreementRule::Named {
+            rule_name: "dependent_work".to_string(),
+        }
+    } else {
+        AgreementRule::NoAgreement
+    }
+}
+
+fn agreement_profile_name(operation: &OperationInstance) -> String {
+    if operation.requires_proof {
+        "ProofFinalization".to_string()
+    } else if !operation.dependent_operation_ids.is_empty() {
+        "DependentWork".to_string()
+    } else if operation.terminal_publication.is_some() {
+        "PendingPublication".to_string()
+    } else {
+        "ImmediateLocal".to_string()
+    }
+}
+
+fn required_agreement_evidence_kind(operation: &OperationInstance) -> AgreementEvidenceKind {
+    if operation.requires_proof || operation.terminal_publication.is_some() {
+        AgreementEvidenceKind::Publication
+    } else {
+        AgreementEvidenceKind::Witness
+    }
+}
+
+fn usable_agreement_level(operation: &OperationInstance) -> AgreementLevel {
+    match operation_visibility(operation) {
+        OperationVisibility::Immediate => AgreementLevel::None,
+        OperationVisibility::Pending => AgreementLevel::Provisional,
+        OperationVisibility::BlockedUntilFinalized => AgreementLevel::Finalized,
+    }
+}
+
+fn finalized_agreement_level(operation: &OperationInstance) -> AgreementLevel {
+    match operation_visibility(operation) {
+        OperationVisibility::Immediate => AgreementLevel::None,
+        OperationVisibility::Pending | OperationVisibility::BlockedUntilFinalized => {
+            AgreementLevel::Finalized
+        }
+    }
+}
+
 fn push_unique<T: PartialEq>(items: &mut Vec<T>, item: T) {
     if !items.iter().any(|existing| existing == &item) {
         items.push(item);
@@ -768,6 +1204,28 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
         .sort_by(|lhs, rhs| lhs.handle_id.cmp(&rhs.handle_id));
     out.publication_events
         .sort_by(|lhs, rhs| lhs.publication_id.cmp(&rhs.publication_id));
+    out.prestate_bindings
+        .sort_by(|lhs, rhs| lhs.binding_id.cmp(&rhs.binding_id));
+    out.agreement_profiles
+        .sort_by(|lhs, rhs| lhs.profile_name.cmp(&rhs.profile_name));
+    out.agreement_contracts
+        .sort_by(|lhs, rhs| lhs.contract_name.cmp(&rhs.contract_name));
+    out.agreement_evidence
+        .sort_by(|lhs, rhs| lhs.evidence_id.cmp(&rhs.evidence_id));
+    out.agreement_states.sort_by(|lhs, rhs| {
+        (
+            &lhs.operation_id,
+            &lhs.contract_name,
+            agreement_level_rank(lhs.level),
+            lhs.last_updated_tick.unwrap_or(0),
+        )
+            .cmp(&(
+                &rhs.operation_id,
+                &rhs.contract_name,
+                agreement_level_rank(rhs.level),
+                rhs.last_updated_tick.unwrap_or(0),
+            ))
+    });
     out.regions
         .sort_by(|lhs, rhs| lhs.region_id.cmp(&rhs.region_id));
     for region in &mut out.regions {
@@ -1066,6 +1524,148 @@ pub fn protocol_machine_semantic_objects(
             });
     }
 
+    let mut agreement_evidence: Vec<_> = publication_events
+        .values()
+        .map(|event| AgreementEvidence {
+            evidence_id: format!("publication:{}", event.publication_id),
+            operation_id: event.operation_id.clone(),
+            session: event.session,
+            owner_id: event.owner_id.clone(),
+            level: if event.proof_ref.is_some() && event.handle_ref.is_some() {
+                AgreementLevel::Finalized
+            } else {
+                AgreementLevel::Provisional
+            },
+            kind: AgreementEvidenceKind::Publication,
+            reference: event.publication_id.clone(),
+            authoritative: event.owner_id.is_some()
+                && event.proof_ref.is_some()
+                && event.handle_ref.is_some(),
+        })
+        .collect();
+    agreement_evidence.extend(materialization_proofs.iter().map(|proof| AgreementEvidence {
+        evidence_id: format!("materialization:{}", proof.proof_id),
+        operation_id: format!("materialization:{}", proof.proof_id),
+        session: proof.session,
+        owner_id: None,
+        level: if proof.passed {
+            AgreementLevel::Finalized
+        } else {
+            AgreementLevel::Provisional
+        },
+        kind: AgreementEvidenceKind::Materialization,
+        reference: proof.proof_id.clone(),
+        authoritative: proof.passed,
+    }));
+
+    let mut agreement_profiles_by_name = BTreeMap::<String, AgreementProfile>::new();
+    let mut agreement_contracts = Vec::new();
+    let mut agreement_states = Vec::new();
+    let mut prestate_bindings = Vec::new();
+
+    for operation in &operation_instances {
+        let visibility = operation_visibility(operation);
+        let rule = agreement_rule(operation);
+        let profile_name = agreement_profile_name(operation);
+        let usable_at = usable_agreement_level(operation);
+        let finalized_at = finalized_agreement_level(operation);
+        let required_evidence_kind = required_agreement_evidence_kind(operation);
+
+        agreement_profiles_by_name
+            .entry(profile_name.clone())
+            .or_insert_with(|| AgreementProfile {
+                profile_name: profile_name.clone(),
+                visibility,
+                rule: rule.clone(),
+                usable_at,
+                finalized_at,
+                required_evidence_kind,
+            });
+
+        let contract_name = format!("agreement:{}", operation.operation_id);
+        agreement_contracts.push(AgreementContract {
+            contract_name: contract_name.clone(),
+            operation_id: operation.operation_id.clone(),
+            session: operation.session,
+            owner_id: operation.owner_id.clone(),
+            profile_name: Some(profile_name),
+            visibility,
+            rule,
+            usable_at,
+            finalized_at,
+            required_evidence_kind,
+        });
+
+        prestate_bindings.push(PrestateBinding {
+            binding_id: format!("prestate:{}", operation.operation_id),
+            operation_id: operation.operation_id.clone(),
+            session: operation.session,
+            state_digest: format!(
+                "{}:{:?}:{}",
+                operation.kind,
+                operation.phase,
+                operation
+                    .terminal_publication
+                    .as_deref()
+                    .unwrap_or("none")
+            ),
+            epoch_ref: operation.budget_ticks.map(|ticks| format!("ticks:{ticks}")),
+            participant_digest: operation.owner_id.clone(),
+        });
+
+        let evidence_ids: Vec<_> = agreement_evidence
+            .iter()
+            .filter(|evidence| {
+                evidence.operation_id == operation.operation_id
+                    && evidence.session == operation.session
+            })
+            .map(|evidence| evidence.evidence_id.clone())
+            .collect();
+        let finalized = agreement_evidence.iter().any(|evidence| {
+            evidence.operation_id == operation.operation_id
+                && evidence.session == operation.session
+                && evidence.level.at_least(finalized_at)
+                && evidence.authoritative
+        });
+        let (level, finalization) = match operation.phase {
+            OperationPhase::Pending => (AgreementLevel::None, None),
+            OperationPhase::Blocked => (AgreementLevel::Provisional, None),
+            OperationPhase::Succeeded => {
+                if finalized {
+                    (
+                        AgreementLevel::Finalized,
+                        Some(FinalizationOutcome::Finalized),
+                    )
+                } else if matches!(visibility, OperationVisibility::Immediate) {
+                    (AgreementLevel::None, None)
+                } else {
+                    (AgreementLevel::SoftSafe, None)
+                }
+            }
+            OperationPhase::Failed | OperationPhase::Cancelled => {
+                (AgreementLevel::Provisional, Some(FinalizationOutcome::Aborted))
+            }
+            OperationPhase::TimedOut => {
+                (AgreementLevel::Provisional, Some(FinalizationOutcome::TimedOut))
+            }
+            OperationPhase::HandedOff => (AgreementLevel::SoftSafe, None),
+        };
+
+        agreement_states.push(AgreementState {
+            operation_id: operation.operation_id.clone(),
+            session: operation.session,
+            owner_id: operation.owner_id.clone(),
+            contract_name,
+            level,
+            finalization,
+            evidence_ids,
+            last_updated_tick: operation.budget_ticks,
+            reason: None,
+        });
+    }
+
+    let agreement_profiles = agreement_profiles_by_name.into_values().collect();
+
     let mut progress_contracts: Vec<_> = progress_contracts.to_vec();
     for effect in &outstanding_effects {
         if progress_contracts
@@ -1147,6 +1747,11 @@ pub fn protocol_machine_semantic_objects(
         materialization_proofs,
         canonical_handles,
         publication_events: publication_events.into_values().collect(),
+        prestate_bindings,
+        agreement_profiles,
+        agreement_contracts,
+        agreement_evidence,
+        agreement_states,
         regions,
         progress_contracts,
         progress_transitions: progress_transitions.to_vec(),

@@ -383,6 +383,26 @@ pub fn canonicalize_protocol_machine_semantic_objects(
         .sort_by(|lhs, rhs| lhs.handle_id.cmp(&rhs.handle_id));
     out.publication_events
         .sort_by(|lhs, rhs| lhs.publication_id.cmp(&rhs.publication_id));
+    out.prestate_bindings
+        .sort_by(|lhs, rhs| lhs.binding_id.cmp(&rhs.binding_id));
+    out.agreement_profiles
+        .sort_by(|lhs, rhs| lhs.profile_name.cmp(&rhs.profile_name));
+    out.agreement_contracts
+        .sort_by(|lhs, rhs| lhs.contract_name.cmp(&rhs.contract_name));
+    out.agreement_evidence
+        .sort_by(|lhs, rhs| lhs.evidence_id.cmp(&rhs.evidence_id));
+    out.agreement_states.sort_by(|lhs, rhs| {
+        (
+            &lhs.operation_id,
+            &lhs.contract_name,
+            lhs.last_updated_tick.unwrap_or(0),
+        )
+            .cmp(&(
+                &rhs.operation_id,
+                &rhs.contract_name,
+                rhs.last_updated_tick.unwrap_or(0),
+            ))
+    });
     out.progress_contracts
         .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
     out
