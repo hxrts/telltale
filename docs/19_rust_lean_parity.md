@@ -12,15 +12,15 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 
 | Area | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
-| `FlowPolicy` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/machine/src/vm.rs` | Aligned |
-| `FlowPredicate` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/machine/src/vm.rs` | Aligned |
+| `FlowPolicy` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/machine/src/engine/` | Aligned |
+| `FlowPredicate` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/machine/src/engine/` | Aligned |
 | `OutputConditionPolicy` | `Runtime/protocol machine/Model/OutputCondition.lean` | `rust/machine/src/output_condition.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/machine/src/coroutine.rs` | Aligned |
 | `ProgressToken` fields | `Runtime/protocol machine/Model/State.lean` | `rust/machine/src/coroutine.rs` | Aligned |
 | `CommunicationReplayMode` variants | `Runtime/protocol machine/Model/Config.lean` | `rust/machine/src/communication_replay/mod.rs` | Aligned |
 | `SignedValue` transport fields (`payload`, `signature`, `sequence_no`) | `Runtime/protocol machine/Model/TypeClasses.lean` | `rust/machine/src/buffer.rs` | Aligned |
-| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/protocol machine/Model/Config.lean`, `Runtime/protocol machine/Semantics/ExecComm.lean` | `rust/machine/src/vm.rs` | Aligned |
-| Register bounds failure semantics (`OutOfRegisters`) | `Runtime/protocol machine/Semantics/ExecSteps.lean` | `rust/machine/src/vm`, `rust/machine/src/threaded` | Aligned |
+| Payload hardening controls (`payload_validation_mode`, `max_payload_bytes`) | `Runtime/protocol machine/Model/Config.lean`, `Runtime/protocol machine/Semantics/ExecComm.lean` | `rust/machine/src/engine/` | Aligned |
+| Register bounds failure semantics (`OutOfRegisters`) | `Runtime/protocol machine/Semantics/ExecSteps.lean` | `rust/machine/src/engine/`, `rust/machine/src/threaded/` | Aligned |
 | Explicit failure/timeout observable event inventory (`TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, `SessionTerminal`) | `Runtime/protocol machine/Model/State.lean`, `Runtime/protocol machine/Runtime/Json.lean`, `Runtime/Proofs/TheoremPack/ReleaseConformance.lean` | `rust/machine/src/engine/protocol_machine_config.rs`, `rust/machine/src/trace.rs` | Aligned |
 
 These checks are automated by `just check-parity --types`.
@@ -172,11 +172,11 @@ Source: `lean/Runtime/protocol machine/Model/State.lean`
 
 `CoroutineState` contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
 
-The Lean protocol-machine state structure (`VMState`) contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
+The Lean protocol-machine state structure (`ProtocolMachineState`) contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
 
 ### Rust Protocol Machine
 
-Source: `rust/machine/src/vm.rs`
+Source: `rust/machine/src/engine/`
 
 The Rust protocol-machine structure (`ProtocolMachine`, exported as an alias for `protocol machine`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
 
@@ -294,14 +294,14 @@ Resolved deviations move to history after one stable release cycle with no regre
 **Lean:** `Runtime/protocol machine/Runtime/Runner.lean`
 **Rust:** `rust/machine/src/threaded.rs`
 
-**Resolution:** VMConfig exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
+**Resolution:** `ProtocolMachineConfig` exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
 
 **Covers:** `threaded.round.wave.parallelism`
 
 #### payload-hardening-extension
 
 **Lean:** `lean/Runtime/protocol machine/Model/Config.lean`, `lean/Runtime/protocol machine/Semantics/ExecComm.lean`
-**Rust:** `rust/machine/src/vm.rs`, `rust/machine/src/threaded.rs`, `rust/machine/tests/parity_fixtures_v2.rs`
+**Rust:** `rust/machine/src/engine/`, `rust/machine/src/threaded.rs`, `rust/machine/tests/parity_fixtures_v2.rs`
 
 **Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes. Parity fixtures cover oversized payload rejection behavior at canonical concurrency.
 
@@ -310,7 +310,7 @@ Resolved deviations move to history after one stable release cycle with no regre
 #### comm-replay-label-context
 
 **Lean:** `Runtime/protocol machine/Semantics/ExecComm.lean`, `Runtime/protocol machine/Model/State.lean`
-**Rust:** `rust/machine/src/vm/instruction_effects.rs`, `rust/machine/src/threaded/instructions_send_recv.rs`, `rust/machine/src/communication_replay/identity.rs`
+**Rust:** `rust/machine/src/engine/instruction_effects.rs`, `rust/machine/src/threaded/instructions_send_recv.rs`, `rust/machine/src/communication_replay/identity.rs`
 
 **Resolution:** Rust receive replay identity now canonicalizes to typed-context replay labels (`recv:<ValType>`) when expected payload annotations are present, matching Lean receive identity construction.
 

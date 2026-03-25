@@ -107,7 +107,7 @@ Additional ownership split:
 
 ## Typed Effect Boundary
 
-The protocol-machine dispatch path is in `rust/machine/src/vm.rs`.
+The protocol-machine dispatch path is in `rust/machine/src/engine/`.
 The trait surface is in `rust/machine/src/effect.rs`.
 The normative contract is documented in that trait module.
 
@@ -279,16 +279,16 @@ This lane validates runtime behavior without reimplementing protocol-machine che
 
 ## Performance and Diagnostics Controls
 
-`VMConfig.effect_trace_capture_mode` controls effect trace overhead.
+`ProtocolMachineConfig.effect_trace_capture_mode` controls effect trace overhead.
 Default mode is `full`.
 
-`VMConfig.payload_validation_mode` controls runtime payload hardening.
+`ProtocolMachineConfig.payload_validation_mode` controls runtime payload hardening.
 Use `off` for trusted benchmarks, `structural` for standard deployments, and `strict_schema` for adversarial inputs.
 
-`VMConfig.max_payload_bytes` bounds payload size in protocol-machine message validation.
+`ProtocolMachineConfig.max_payload_bytes` bounds payload size in protocol-machine message validation.
 Default is `65536`.
 
-`VMConfig.host_contract_assertions` enables runtime checks for handler identity stability, topology ordering inputs, and transfer-event auditability.
+`ProtocolMachineConfig.host_contract_assertions` enables runtime checks for handler identity stability, topology ordering inputs, and transfer-event auditability.
 Default value is `false`.
 
 ## Integration Checklist
@@ -299,7 +299,7 @@ Default value is `false`.
 - Ownership: route session-local host mutation through a current ownership capability, not ad hoc session-store access.
 - Canonical ingress: surface async work by later ingress calls rather than performing it inside synchronous request handling.
 - Replayability: validate traces with `RecordingEffectHandler` and `ReplayEffectHandler`.
-- Admission: keep protocol-machine runtime gates and profile settings explicit in `VMConfig`.
+- Admission: keep protocol-machine runtime gates and profile settings explicit in `ProtocolMachineConfig`.
 
 ## Lean Correspondence
 

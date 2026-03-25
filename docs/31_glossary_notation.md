@@ -38,6 +38,17 @@ It serves as the stable lookup for terminology and notation.
 | typed outcome | Structured success/failure result at the effect boundary using `EffectResult` and `EffectFailure` rather than raw strings. | [Protocol-Critical Authority Scope](33_protocol_authority_scope.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 | content addressing | Cryptographic identity scheme (`ContentId`) for protocol artifacts enabling deduplication and integrity checks. | [API Reference](30_api_reference.md) |
 | nominal effect interface | Named effect declaration (`effect Name`) that makes host dependencies explicit and typed at the language level. | [Authority Language Surface](34_authority_language_surface.md), [Protocol-Critical Authority Scope](33_protocol_authority_scope.md) |
+| conservation framework | The organizing design principle: all semantically meaningful behavior is expressed in terms of six conserved quantities. | [Conservation Framework](37_conservation_framework.md) |
+| evidence (conserved property) | The integrity of what has been established. Witnesses, proofs, and attestations are its concrete forms. | [Conservation Framework](37_conservation_framework.md) |
+| authority (conserved property) | The exclusivity of who may act. Ownership is its concrete form. | [Conservation Framework](37_conservation_framework.md) |
+| identity (conserved property) | The definiteness of object references across retries, effects, and handoffs. | [Conservation Framework](37_conservation_framework.md) |
+| commitment (conserved property) | The account of outstanding obligations. Outstanding effects are its concrete form. | [Conservation Framework](37_conservation_framework.md) |
+| structure (conserved property) | The essential shape of the protocol. Multiparty session types are its concrete form. | [Conservation Framework](37_conservation_framework.md), [Theory](05_theory.md) |
+| premise (conserved property) | The explicitness of environmental assumptions. Failure models and fairness assumptions are its concrete forms. | [Conservation Framework](37_conservation_framework.md) |
+| erasure principle | Behavior not part of the conserved quantities is not part of the programming model. | [Conservation Framework](37_conservation_framework.md) |
+| reduction principle | All runtime behavior must reduce to the conservation framework. | [Conservation Framework](37_conservation_framework.md) |
+| region | Locality and framing domain for structured coordination with lifecycle, authority, and observation boundaries. | [Conservation Framework](37_conservation_framework.md) |
+| semantic core objects | The closed set of protocol-visible objects: `Region`, `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`, `AuthoritativeRead`, `ObservedRead`, `MaterializationProof`, `CanonicalHandle`, `ProgressContract`. | [Conservation Framework](37_conservation_framework.md), [Protocol Machine Architecture](12_protocol_machine_architecture.md) |
 
 ## Symbol and Notation Index
 
@@ -72,6 +83,7 @@ Prefer existing symbols from this index unless precision requires a different on
 
 ## Related Docs
 
+- [Conservation Framework](37_conservation_framework.md)
 - [Theory](05_theory.md)
 - [Protocol Machine Architecture](12_protocol_machine_architecture.md)
 - [Rust-Lean Parity](19_rust_lean_parity.md)

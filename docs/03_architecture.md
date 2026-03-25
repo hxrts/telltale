@@ -2,7 +2,7 @@
 
 ## Overview
 
-Telltale implements choreographic programming for Rust. The system compiles global protocol specifications into local session types for each participant.
+Telltale compiles global protocol specifications into local session types for each participant. The system is organized as a conservation system over protocol semantics. All protocol-critical behavior reduces to six conserved properties: evidence, authority, identity, commitment, structure, and premise. See [Conservation Framework](37_conservation_framework.md) for the full design philosophy.
 
 The architecture has three compile-time stages and two runtime paths:
 
@@ -11,6 +11,12 @@ The architecture has three compile-time stages and two runtime paths:
 3. Code generation (local types to Rust code and effect programs)
 4. Effect handler execution (async interpreter with pluggable transports)
 5. Protocol-machine execution and simulation (protocol machine with scheduler and deterministic middleware)
+
+### Runtime Layering
+
+The execution architecture separates three concerns. The protocol machine is a deterministic small-step reducer that is the sole authority over semantic progression. The guest runtime wraps the protocol machine with typed effect interfaces and concrete handlers. The host runtime is the surrounding system that provides time, storage, network, and process lifecycle.
+
+Typed effect interfaces form the operational vocabulary between the protocol machine and the world. Internal handlers realize scheduling, dispatch, replay, and simulation. External handlers realize storage, network, and domain-specific host integrations. Both handler domains interpret the same typed interfaces.
 
 ## Component Diagram
 
@@ -361,47 +367,37 @@ internal implementation technique, not the canonical public architecture story.
 
 ## Design Decisions
 
+### Why Conservation
+
+Telltale treats protocol semantics as conserved quantities rather than emergent properties. Every runtime phenomenon reduces to the conservation framework. Async execution reduces to commitment lifecycle. Race conditions reduce to authority violations. Retry logic reduces to identity and commitment. See the full reduction table in [Conservation Framework](37_conservation_framework.md).
+
+This design eliminates classes of bugs by construction. Hidden concurrency, authority ambiguity, silent failure, late result races, and unbounded waiting all map to violations of specific conserved properties. The erasure principle removes everything that is not part of the conserved system from the programming model.
+
 ### Why Choreographic Programming
 
-Creating distributed programs typically requires writing separate implementations for each participant. This approach is error-prone and hard to verify.
-
-Choreographies specify the global protocol once. Automatic projection generates local code for each role. This approach prevents protocol mismatches by construction.
+Choreographies specify the global protocol once and projection generates local code for each role. This realizes structure conservation: the compositional structure of the protocol is defined entirely by its type, and no runtime behavior can alter the protocol shape.
 
 ### Why Effect Handlers
 
-Separating protocol logic from transport enables testing and composition. The same protocol can run with different handlers without code changes.
-
-Effect handlers provide transport independence. Test handlers use in-memory communication. Production handlers use network transports.
+Effect handlers are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. Internal handlers realize scheduling, dispatch, and replay. External handlers realize storage, network, and domain-specific integrations. See [Choreography Effect Handlers](09_effect_handlers.md) for the async surface and [Effect Handlers and Session Types](11_effect_session_bridge.md) for the protocol-machine boundary.
 
 ### Why Session Types
 
-Session types provide compile-time guarantees about protocol compliance. The Rust type system enforces that each role follows their protocol correctly.
-
-Type checking prevents common distributed systems errors. Message ordering and payload-shape violations are caught at compile time. Global deadlock claims remain assumption-scoped in the theory results.
+Session types provide compile-time guarantees about protocol compliance. The Rust type system enforces that each role follows their protocol correctly. Type checking prevents message ordering and payload-shape violations at compile time. Global deadlock claims remain assumption-scoped in the theory results.
 
 ### Platform Abstraction
 
-The runtime module provides platform-specific async primitives. Native targets use tokio. WASM uses `wasm-bindgen-futures`.
-
-This abstraction makes the core library portable. The same code runs on servers and in browsers.
+The runtime module provides platform-specific async primitives. Native targets use tokio. WASM uses `wasm-bindgen-futures`. The same code runs on servers and in browsers.
 
 ## Extension Points
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` to add new transport mechanisms. See [Choreography Effect Handlers](09_effect_handlers.md) for details.
+Implement `ChoreoHandler` for choreography-layer transports. Implement `EffectHandler` for protocol-machine host integration. See [Choreography Effect Handlers](09_effect_handlers.md) and [Effect Handlers and Session Types](11_effect_session_bridge.md) for details.
 
 ### Middleware
 
 Wrap handlers with middleware for cross-cutting concerns. Logging, metrics, and retry logic can be added as middleware. Multiple middleware layers can be stacked on a single handler.
-
-### Custom Projections
-
-The projection algorithm can be extended for domain-specific optimizations. Override default projection rules by implementing custom projection functions.
-
-### Code Generation Backends
-
-Add new code generation backends to target different session type libraries. The AST and `LocalType` representations are language-agnostic. Backends for other languages can be added.
 
 ## Implementation Organization
 

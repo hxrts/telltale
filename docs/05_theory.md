@@ -328,6 +328,14 @@ Key libraries include:
 
 See [Lean Verification Code Map](../lean/CODE_MAP.md) for detailed documentation of the proof structure.
 
+## Conservation and Session Structure
+
+Session types realize one of six conserved properties in Telltale: structure conservation. The compositional structure of a protocol is defined entirely by its type. Local behavior must remain a valid projection of the global protocol. No runtime behavior can alter the protocol shape. Coherence, projection, and harmony are the theorems that back this conservation law.
+
+The other five conserved properties extend the guarantees beyond what session types alone provide. Evidence conservation governs the integrity of witnesses and attestations. Authority conservation enforces single-owner exclusivity over resources. Identity conservation tracks stable object references across retries and handoffs. Commitment conservation ensures that all outstanding effects resolve to a terminal class. Premise conservation makes environmental assumptions explicit and triggers escalation on violation.
+
+These six properties are mutually constitutive. A violation in any one property can manifest as a failure in any other. The conservation framework is the organizing principle that connects session-type theory to the full runtime architecture. See [Conservation Framework](37_conservation_framework.md) for the conservation laws, reduction principle, and eliminated bug classes.
+
 ## Further Reading
 
 For deeper study of session type theory:

@@ -6,10 +6,13 @@ This page documents the choreography-layer handler surface in `telltale-choreogr
 This surface is `ChoreoHandler`.
 For protocol-machine host integration, see [Effect Handlers and Session Types](11_effect_session_bridge.md).
 
-`ChoreoHandler` decouples protocol logic from transport implementation.
-Handlers interpret choreographic effects into concrete communication operations.
-Protocol code remains unchanged across handlers.
-The effect runtime normalizes `Parallel` effects to deterministic declaration order.
+Effect interfaces are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. See [Conservation Framework](37_conservation_framework.md) for the full design philosophy.
+
+`ChoreoHandler` decouples protocol logic from transport implementation at the choreography layer. Handlers interpret choreographic effects into concrete communication operations. Protocol code remains unchanged across handlers. The effect runtime normalizes `Parallel` effects to deterministic declaration order.
+
+## Handler Domains
+
+The effect system distinguishes two handler domains. Internal handlers are Telltale-owned and realize scheduling, dispatch, batching, replay, and simulation. External handlers are guest-runtime-facing and realize storage, network, domain checks, and other host integrations. Both domains interpret the same typed effect interfaces. Handlers may realize operational behavior, but they do not directly mutate semantic state.
 
 ## Boundary Selection
 

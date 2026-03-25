@@ -1,10 +1,12 @@
 # Protocol Machine Architecture
 
-This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces. The file keeps the historical `protocol machine` filename only because the current crate/module paths still use it. The canonical public abstraction is the protocol machine.
+This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces.
 
 ## Architecture Overview
 
-The canonical semantic authority is `VMKernel`. The cooperative `ProtocolMachine` (currently implemented by `protocol machine`) and threaded `ThreadedGuestRuntime` (currently implemented by `NativeThreadedDriver` wrapping `ThreadedVM`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
+The protocol machine is the sole authority over semantic progression. It realizes structure conservation and authority conservation from the [Conservation Framework](37_conservation_framework.md). All protocol-visible truth is committed through the protocol machine. Handlers may stage and return effect outcomes, but they do not mutate semantic state directly.
+
+The canonical semantic authority is `ProtocolMachineKernel`. The cooperative `ProtocolMachine` and threaded `ThreadedProtocolMachine` (backed by `NativeThreadedDriver`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
 The runtime keeps a single state model across targets. Core state includes coroutines, sessions, scheduler queues, observable trace, and effect trace. It also includes live operation-instance state, live outstanding-effect state, delegation audit records, and failure-topology snapshot fields.
 The canonical exported semantic surface is the semantic-object family:
@@ -25,7 +27,7 @@ The canonical round model is one semantic step when concurrency is nonzero. Thre
 
 ## Scheduler Semantics
 
-Canonical scheduling is one semantic step when concurrency is nonzero. `VMKernel` owns the selection and step contract. For cooperative execution, this gives exact behavior for deterministic replay and baseline parity.
+Canonical scheduling is one semantic step when concurrency is nonzero. `ProtocolMachineKernel` owns the selection and step contract. For cooperative execution, this gives exact behavior for deterministic replay and baseline parity.
 
 The canonical Lean runner is `runScheduled` in `Runtime/protocol machine/Runtime/Runner.lean`. For nonzero concurrency, canonical round semantics normalize to one scheduler step. This model is the semantic reference for parity at concurrency `1`.
 
@@ -74,7 +76,7 @@ Runtime mode admission and profile selection are capability gated.
 
 The guest-runtime adapters now enforce explicit runtime hardening at load and startup boundaries.
 
-- `ThreadedGuestRuntime` (currently backed by `NativeThreadedDriver`) provides `with_workers` for initialization. The inner `ThreadedVM` also provides `try_with_workers` (fallible initialization with `VMError`).
+- `ThreadedProtocolMachine` (backed by `NativeThreadedDriver`) provides `with_workers` for initialization. The inner driver also provides `try_with_workers` for fallible initialization.
 - Cooperative and threaded `load_choreography` paths validate trusted `CodeImage` runtime shape before session allocation.
 - Preferred host integration uses `load_choreography_owned(...)` and `OwnedSession` when the embedding runtime needs explicit session ownership after open.
 - Register-bound violations are fail-closed through `Fault::OutOfRegisters` rather than unchecked index panic in executable instruction paths.
@@ -202,7 +204,7 @@ This path is the runtime realization of delegation/reconfiguration. It should no
 
 ## Determinism Profiles
 
-`VMConfig.determinism_mode` includes `Full`, `ModuloEffects`, `ModuloCommutativity`, and `Replay`.
+`ProtocolMachineConfig.determinism_mode` includes `Full`, `ModuloEffects`, `ModuloCommutativity`, and `Replay`.
 
 | Profile | Lean Profile | Rust Profile | Gate Requirement |
 |---|---|---|---|
