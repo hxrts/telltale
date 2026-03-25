@@ -135,12 +135,14 @@ pub mod model {
     pub mod effects {
         pub use crate::bridge::EffectGuardBridge;
         pub use crate::effect::{
-            CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectExchangeRecord,
-            EffectFailure, EffectFailureKind, EffectHandler, EffectHandlerDomain,
-            EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus, EffectReentrancyPolicy,
-            EffectRequest, EffectRequestBody, EffectResponse, EffectResult, EffectTimeoutPolicy,
-            EffectTotality, EffectTraceEntry, EffectTraceTape, RecordingEffectHandler,
-            ReplayEffectHandler, SendDecision, SendDecisionInput, TopologyPerturbation,
+            CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectCompositionPolicy,
+            EffectExchangeRecord, EffectFailure, EffectFailureKind, EffectHandler,
+            EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus,
+            EffectReentrancyPolicy, EffectRequest, EffectRequestBody, EffectResponse,
+            EffectResponsibilityDomain, EffectResult, EffectRetryShape, EffectSemanticClass,
+            EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
+            RecordingEffectHandler, ReplayEffectHandler, SendDecision, SendDecisionInput,
+            TopologyPerturbation,
         };
     }
 
@@ -200,10 +202,12 @@ pub mod runtime {
         pub use crate::faults::{classify_fault, fault_code, fault_code_of, FaultClass};
         pub use crate::runtime_contracts::{
             admit_protocol_machine_runtime, determinism_profile_supported,
-            enforce_protocol_machine_runtime_gates, request_determinism_profile,
-            requires_protocol_machine_runtime_contracts, runtime_capability_snapshot,
-            DeterminismArtifacts, RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts,
-            RuntimeGateResult,
+            enforce_protocol_machine_runtime_gates, execution_profile_supported,
+            request_determinism_profile, requires_protocol_machine_runtime_contracts,
+            runtime_capability_snapshot, runtime_execution_profile, DeterminismArtifacts,
+            ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+            ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption,
+            RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts, RuntimeGateResult,
         };
     }
 
@@ -265,11 +269,12 @@ pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use effect::{
-    CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectExchangeRecord, EffectFailure,
-    EffectFailureKind, EffectHandlerDomain, EffectInterfaceMetadata, EffectOutcome,
-    EffectOutcomeStatus, EffectReentrancyPolicy, EffectRequest, EffectRequestBody, EffectResponse,
-    EffectResult, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry, EffectTraceTape,
-    RecordingEffectHandler, ReplayEffectHandler, TopologyPerturbation,
+    CorruptionType, EffectAdmissibility, EffectAuthorityClass, EffectCompositionPolicy,
+    EffectExchangeRecord, EffectFailure, EffectFailureKind, EffectHandlerDomain,
+    EffectInterfaceMetadata, EffectOutcome, EffectOutcomeStatus, EffectReentrancyPolicy,
+    EffectRequest, EffectRequestBody, EffectResponse, EffectResponsibilityDomain, EffectResult,
+    EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy, EffectTotality, EffectTraceEntry,
+    EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler, TopologyPerturbation,
 };
 pub use engine::{
     EffectTraceCaptureMode, MonitorMode, ObsEvent, ObservabilityRetentionConfig,
@@ -302,9 +307,12 @@ pub use owned::OwnedSession;
 pub use persistence::{NoopPersistence, PersistenceModel};
 pub use runtime_contracts::{
     admit_protocol_machine_runtime, determinism_profile_supported,
-    enforce_protocol_machine_runtime_gates, request_determinism_profile,
-    requires_protocol_machine_runtime_contracts, runtime_capability_snapshot, DeterminismArtifacts,
-    RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts, RuntimeGateResult,
+    enforce_protocol_machine_runtime_gates, execution_profile_supported,
+    request_determinism_profile, requires_protocol_machine_runtime_contracts,
+    runtime_capability_snapshot, runtime_execution_profile, DeterminismArtifacts,
+    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+    ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeAdmissionResult,
+    RuntimeCapability, RuntimeContracts, RuntimeGateResult,
 };
 pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,

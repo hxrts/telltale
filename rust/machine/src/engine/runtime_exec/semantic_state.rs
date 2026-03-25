@@ -5,37 +5,35 @@ impl ProtocolMachine {
 
     fn ensure_effect_request_allowed(&self, request: &EffectRequest) -> Result<(), EffectFailure> {
         request.metadata.validate()?;
-        match request.metadata.reentrancy_policy {
-            crate::effect::EffectReentrancyPolicy::Allow => {}
-            crate::effect::EffectReentrancyPolicy::RejectSameOperation => {
-                if let Some(operation_id) = &request.operation_id {
-                    if self.outstanding_effects.as_slice().iter().any(|effect| {
-                        effect.operation_id == *operation_id
-                            && matches!(
-                                effect.status,
-                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
-                            )
-                    }) {
-                        return Err(EffectFailure::contract_violation(format!(
-                            "reentrancy rejected for operation `{operation_id}`"
-                        )));
-                    }
-                }
-            }
-            crate::effect::EffectReentrancyPolicy::RejectSameFragment => {
-                if let Some(session) = request.session {
-                    if self.outstanding_effects.as_slice().iter().any(|effect| {
-                        effect.session == Some(session)
-                            && matches!(
-                                effect.status,
-                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
-                            )
-                    }) {
-                        return Err(EffectFailure::contract_violation(format!(
-                            "reentrancy rejected for session fragment `{session}`"
-                        )));
-                    }
-                }
+        let incoming = crate::effect::EffectResponsibilityDomain {
+            footprint_key: request
+                .session
+                .map(|session| format!("session:{session}"))
+                .unwrap_or_else(|| request.metadata.interface_name.clone()),
+            operation_id: request.operation_id.clone(),
+            fragment_id: request.session.map(|session| format!("session:{session}")),
+            owner_id: None,
+        };
+        for effect in self.outstanding_effects.as_slice().iter().filter(|effect| {
+            matches!(
+                effect.status,
+                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+            )
+        }) {
+            let active = crate::effect::EffectResponsibilityDomain {
+                footprint_key: effect
+                    .session
+                    .map(|session| format!("session:{session}"))
+                    .unwrap_or_else(|| effect.handler_identity.clone()),
+                operation_id: Some(effect.operation_id.clone()),
+                fragment_id: effect.session.map(|session| format!("session:{session}")),
+                owner_id: effect.owner_id.clone(),
+            };
+            if !request.metadata.reentrancy_admissible(&active, &incoming) {
+                return Err(EffectFailure::contract_violation(format!(
+                    "reentrancy rejected for effect {} on footprint {}",
+                    effect.effect_id, active.footprint_key
+                )));
             }
         }
         Ok(())
@@ -225,12 +223,12 @@ impl ProtocolMachine {
                 .iter()
                 .find(|contract| contract.operation_id == effect.operation_id)
             else {
-                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
-                    format!(
+                return Err(ProtocolMachineError::HandlerError(
+                    EffectFailure::contract_violation(format!(
                         "[host-contract] outstanding effect {} requires a live progress contract",
                         effect.effect_id
-                    ),
-                )));
+                    )),
+                ));
             };
             let since = contract
                 .escalated_at_tick
@@ -255,7 +253,9 @@ impl ProtocolMachine {
 
             let reason = match target_state {
                 ProgressState::Pending => None,
-                ProgressState::Blocked => Some("waiting on bounded semantic-path effect".to_string()),
+                ProgressState::Blocked => {
+                    Some("waiting on bounded semantic-path effect".to_string())
+                }
                 ProgressState::NoProgress => {
                     Some("no progress observed within bounded wait budget".to_string())
                 }
@@ -271,7 +271,9 @@ impl ProtocolMachine {
                 | ProgressState::HandedOff => None,
             };
 
-            if matches!(target_state, ProgressState::Blocked) && effect.status == OutstandingEffectStatus::Pending {
+            if matches!(target_state, ProgressState::Blocked)
+                && effect.status == OutstandingEffectStatus::Pending
+            {
                 if let Some(effect_mut) = self
                     .outstanding_effects
                     .as_mut_slice()
@@ -296,7 +298,10 @@ impl ProtocolMachine {
                 }
             }
 
-            if matches!(target_state, ProgressState::NoProgress | ProgressState::Degraded) {
+            if matches!(
+                target_state,
+                ProgressState::NoProgress | ProgressState::Degraded
+            ) {
                 if let Some(operation) = self
                     .operation_instances
                     .as_mut_slice()
@@ -438,7 +443,11 @@ impl ProtocolMachine {
             });
         let owner_id = self.current_operation_owner(session);
         let operation_id = Self::effect_operation_id(entry.effect_id);
-        let status = match entry.outputs.get("status").and_then(serde_json::Value::as_str) {
+        let status = match entry
+            .outputs
+            .get("status")
+            .and_then(serde_json::Value::as_str)
+        {
             Some("blocked") => OutstandingEffectStatus::Blocked,
             Some("failure") => OutstandingEffectStatus::Failed,
             Some("cancelled") => OutstandingEffectStatus::Cancelled,
@@ -523,12 +532,12 @@ impl ProtocolMachine {
             self.outstanding_effects.as_slice()[effect_index].status,
             OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
         ) {
-            return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
-                format!(
+            return Err(ProtocolMachineError::HandlerError(
+                EffectFailure::contract_violation(format!(
                     "[host-contract] late result for effect {effect_id} rejected after {:?}",
                     self.outstanding_effects.as_slice()[effect_index].status
-                ),
-            )));
+                )),
+            ));
         }
 
         let operation_id;
@@ -573,11 +582,7 @@ impl ProtocolMachine {
         Ok(())
     }
 
-    fn invalidate_outstanding_effects_for_session(
-        &mut self,
-        session: SessionId,
-        reason: &str,
-    ) {
+    fn invalidate_outstanding_effects_for_session(&mut self, session: SessionId, reason: &str) {
         let mut invalidated = Vec::new();
         for effect in self.outstanding_effects.as_mut_slice().iter_mut() {
             if effect.session != Some(session) {
@@ -734,8 +739,10 @@ mod runtime_effect_state_tests {
             &vm.config.observability_retention,
         );
 
-        let mut request = EffectRequest::invoke_step(5, Some(7), Some("effect:1".to_string()), "A", &[]);
-        request.metadata.reentrancy_policy = crate::effect::EffectReentrancyPolicy::RejectSameOperation;
+        let mut request =
+            EffectRequest::invoke_step(5, Some(7), Some("effect:1".to_string()), "A", &[]);
+        request.metadata.reentrancy_policy =
+            crate::effect::EffectReentrancyPolicy::RejectSameOperation;
 
         let err = vm
             .ensure_effect_request_allowed(&request)
@@ -768,8 +775,10 @@ mod runtime_effect_state_tests {
             &vm.config.observability_retention,
         );
 
-        let mut request = EffectRequest::acquire(6, 9, Some("effect:3".to_string()), "A", "Guard", &[]);
-        request.metadata.reentrancy_policy = crate::effect::EffectReentrancyPolicy::RejectSameFragment;
+        let mut request =
+            EffectRequest::acquire(6, 9, Some("effect:3".to_string()), "A", "Guard", &[]);
+        request.metadata.reentrancy_policy =
+            crate::effect::EffectReentrancyPolicy::RejectSameFragment;
 
         let err = vm
             .ensure_effect_request_allowed(&request)

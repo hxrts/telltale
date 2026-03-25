@@ -14,7 +14,10 @@ use crate::engine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError
 use crate::loader::CodeImage;
 use crate::output_condition::OutputConditionPolicy;
 use crate::runtime_contracts::{
-    enforce_protocol_machine_runtime_gates, RuntimeContracts, RuntimeGateResult,
+    enforce_protocol_machine_runtime_gates, execution_profile_supported,
+    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+    ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeContracts,
+    RuntimeGateResult,
 };
 use crate::scheduler::SchedPolicy;
 
@@ -73,6 +76,81 @@ impl TheoremPackCapabilities {
                 SchedulerCapability::ProgressAware,
             ],
             output_condition_gating: true,
+        }
+    }
+
+    /// Proof-carrying execution profile derived from theorem-pack capabilities.
+    #[must_use]
+    pub fn execution_profile(&self) -> ProtocolMachineExecutionProfile {
+        let mut fairness_assumptions: std::collections::BTreeSet<_> =
+            [ProtocolMachineFairnessAssumption::ScheduleConfluence]
+                .into_iter()
+                .collect();
+        if self.schedulers.iter().any(|scheduler| {
+            matches!(
+                scheduler,
+                SchedulerCapability::RoundRobin
+                    | SchedulerCapability::Priority
+                    | SchedulerCapability::ProgressAware
+            )
+        }) {
+            fairness_assumptions.insert(ProtocolMachineFairnessAssumption::StarvationFreedom);
+        }
+        if self
+            .schedulers
+            .iter()
+            .any(|scheduler| matches!(scheduler, SchedulerCapability::ProgressAware))
+        {
+            fairness_assumptions.insert(ProtocolMachineFairnessAssumption::LivenessFairness);
+        }
+
+        let mut admissibility_classes: std::collections::BTreeSet<_> = [
+            ProtocolMachineAdmissibilityClass::LocalEnvelope,
+            ProtocolMachineAdmissibilityClass::ShardedEnvelope,
+        ]
+        .into_iter()
+        .collect();
+        let mut escalation_window_classes: std::collections::BTreeSet<_> =
+            [ProtocolMachineEscalationWindowClass::ProgressContractBounded]
+                .into_iter()
+                .collect();
+        if self.output_condition_gating {
+            admissibility_classes.insert(ProtocolMachineAdmissibilityClass::ProtocolEnvelopeBridge);
+            escalation_window_classes
+                .insert(ProtocolMachineEscalationWindowClass::ProtocolBridgeBounded);
+        }
+        if self
+            .determinism
+            .iter()
+            .any(|capability| !matches!(capability, DeterminismCapability::Full))
+        {
+            escalation_window_classes
+                .insert(ProtocolMachineEscalationWindowClass::AdmissionComplexityBounded);
+        }
+
+        ProtocolMachineExecutionProfile {
+            fairness_assumptions,
+            admissibility_classes,
+            escalation_window_classes,
+            theorem_pack_eligibility: vec![
+                ("protocol_machine_envelope_adherence".to_string(), true),
+                (
+                    "protocol_machine_envelope_admission".to_string(),
+                    self.determinism.iter().any(|capability| {
+                        matches!(
+                            capability,
+                            DeterminismCapability::Full
+                                | DeterminismCapability::Replay
+                                | DeterminismCapability::ModuloEffects
+                                | DeterminismCapability::ModuloCommutativity
+                        )
+                    }),
+                ),
+                (
+                    "protocol_envelope_bridge".to_string(),
+                    self.output_condition_gating,
+                ),
+            ],
         }
     }
 }
@@ -380,6 +458,16 @@ impl ComposedRuntime {
             return Err(CompositionError::MissingCapability {
                 artifact_id: cert.artifact_id.clone(),
                 capability: format!("determinism::{required_det:?}"),
+            });
+        }
+        if !execution_profile_supported(
+            &caps.execution_profile(),
+            self.vm.config(),
+            runtime_contracts,
+        ) {
+            return Err(CompositionError::MissingCapability {
+                artifact_id: cert.artifact_id.clone(),
+                capability: "execution_profile".to_string(),
             });
         }
         if !matches!(

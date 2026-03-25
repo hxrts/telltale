@@ -178,15 +178,25 @@ pub(crate) fn infer_effect_interface_and_operation(
     effect_kind: &str,
 ) -> (Option<String>, Option<String>) {
     match effect_kind {
-        "send_decision" => (Some("Transport".to_string()), Some("sendDecision".to_string())),
-        "handle_recv" => (Some("Transport".to_string()), Some("handleRecv".to_string())),
-        "handle_choose" => (Some("Transport".to_string()), Some("handleChoose".to_string())),
+        "send_decision" => (
+            Some("Transport".to_string()),
+            Some("sendDecision".to_string()),
+        ),
+        "handle_recv" => (
+            Some("Transport".to_string()),
+            Some("handleRecv".to_string()),
+        ),
+        "handle_choose" => (
+            Some("Transport".to_string()),
+            Some("handleChoose".to_string()),
+        ),
         "invoke_step" => (Some("Runtime".to_string()), Some("invoke".to_string())),
         "handle_acquire" => (Some("Guard".to_string()), Some("acquire".to_string())),
         "handle_release" => (Some("Guard".to_string()), Some("release".to_string())),
-        "topology_events" | "topology_event" => {
-            (Some("Runtime".to_string()), Some("topologyEvents".to_string()))
-        }
+        "topology_events" | "topology_event" => (
+            Some("Runtime".to_string()),
+            Some("topologyEvents".to_string()),
+        ),
         _ => (None, None),
     }
 }
@@ -203,6 +213,18 @@ pub enum EffectAuthorityClass {
     /// The outcome is observational only and must not be treated as
     /// authoritative semantic truth.
     Observe,
+}
+
+/// Semantic class attached to one effect operation.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectSemanticClass {
+    /// The effect can directly support authoritative semantic truth.
+    Authoritative,
+    /// The effect is observational only.
+    Observational,
+    /// The effect is best-effort host/runtime work.
+    BestEffort,
 }
 
 /// Admission policy for one effect operation.
@@ -254,6 +276,21 @@ pub enum EffectReentrancyPolicy {
     RejectSameFragment,
 }
 
+/// Retry shape attached to one effect operation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectRetryShape {
+    /// Retries are forbidden.
+    Forbidden,
+    /// Retries are permitted up to a fixed bound.
+    Bounded {
+        /// Maximum retry count.
+        max_retries: u64,
+    },
+    /// Retries are permitted until the timeout budget expires.
+    UntilTimeout,
+}
+
 /// Handler-domain classification for one effect operation.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -273,19 +310,142 @@ pub struct EffectInterfaceMetadata {
     pub operation_name: String,
     /// Authority class for this operation.
     pub authority_class: EffectAuthorityClass,
+    /// Semantic class for this operation.
+    pub semantic_class: EffectSemanticClass,
     /// Admission policy for this operation.
     pub admissibility: EffectAdmissibility,
     /// Totality contract for this operation.
     pub totality: EffectTotality,
     /// Timeout contract for this operation.
     pub timeout_policy: EffectTimeoutPolicy,
+    /// Retry shape for this operation.
+    pub retry_shape: EffectRetryShape,
     /// Reentrancy policy for this operation.
     pub reentrancy_policy: EffectReentrancyPolicy,
     /// Handler domain expected to interpret this operation.
     pub handler_domain: EffectHandlerDomain,
 }
 
+/// Responsibility domain for reentrancy and footprint checks.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EffectResponsibilityDomain {
+    /// Canonical semantic footprint key.
+    pub footprint_key: String,
+    /// Optional operation instance id.
+    #[serde(default)]
+    pub operation_id: Option<String>,
+    /// Optional fragment id.
+    #[serde(default)]
+    pub fragment_id: Option<String>,
+    /// Optional owner id.
+    #[serde(default)]
+    pub owner_id: Option<String>,
+}
+
+impl EffectResponsibilityDomain {
+    /// Whether the two domains describe the same semantic footprint.
+    #[must_use]
+    pub fn same_semantic_footprint(&self, other: &Self) -> bool {
+        self.footprint_key == other.footprint_key
+    }
+
+    /// Whether the two domains refer to the same operation.
+    #[must_use]
+    pub fn same_operation(&self, other: &Self) -> bool {
+        self.operation_id.is_some() && self.operation_id == other.operation_id
+    }
+
+    /// Whether the two domains refer to the same fragment.
+    #[must_use]
+    pub fn same_fragment(&self, other: &Self) -> bool {
+        self.fragment_id.is_some() && self.fragment_id == other.fragment_id
+    }
+}
+
+impl EffectReentrancyPolicy {
+    /// Whether one incoming request is admitted relative to one active request.
+    #[must_use]
+    pub fn admits(
+        self,
+        active: &EffectResponsibilityDomain,
+        incoming: &EffectResponsibilityDomain,
+    ) -> bool {
+        match self {
+            Self::Allow => true,
+            Self::RejectSameOperation => !active.same_operation(incoming),
+            Self::RejectSameFragment => !active.same_semantic_footprint(incoming),
+        }
+    }
+}
+
 impl EffectInterfaceMetadata {
+    /// Whether the effect is authoritative.
+    #[must_use]
+    pub fn is_authoritative(&self) -> bool {
+        matches!(self.authority_class, EffectAuthorityClass::Authoritative)
+    }
+
+    /// Whether the effect is a command surface.
+    #[must_use]
+    pub fn is_command(&self) -> bool {
+        matches!(self.authority_class, EffectAuthorityClass::Command)
+    }
+
+    /// Whether the effect is observational.
+    #[must_use]
+    pub fn is_observe(&self) -> bool {
+        matches!(self.authority_class, EffectAuthorityClass::Observe)
+    }
+
+    /// Whether the effect must complete immediately.
+    #[must_use]
+    pub fn is_immediate(&self) -> bool {
+        matches!(self.totality, EffectTotality::Immediate)
+            && matches!(self.timeout_policy, EffectTimeoutPolicy::None)
+            && matches!(self.retry_shape, EffectRetryShape::Forbidden)
+    }
+
+    /// Whether the effect requires an explicit timeout contract.
+    #[must_use]
+    pub fn timeout_required(&self) -> bool {
+        matches!(self.timeout_policy, EffectTimeoutPolicy::Required { .. })
+    }
+
+    /// Whether the effect declares an explicit retry rule.
+    #[must_use]
+    pub fn has_explicit_retry_rule(&self) -> bool {
+        !matches!(self.retry_shape, EffectRetryShape::Forbidden)
+    }
+
+    /// Whether the metadata combination is architecturally legal.
+    #[must_use]
+    pub fn architecturally_legal(&self) -> bool {
+        (!matches!(self.semantic_class, EffectSemanticClass::Observational)
+            || !self.is_authoritative())
+            && (!matches!(self.semantic_class, EffectSemanticClass::BestEffort)
+                || !self.is_authoritative())
+            && (!matches!(self.totality, EffectTotality::MayBlock) || self.timeout_required())
+            && (!self.has_explicit_retry_rule() || self.timeout_required())
+            && (!matches!(self.admissibility, EffectAdmissibility::InternalOnly)
+                || matches!(self.handler_domain, EffectHandlerDomain::Internal))
+    }
+
+    /// Whether an immediate effect is admissible on the semantic path.
+    #[must_use]
+    pub fn immediate_admissible(&self) -> bool {
+        self.architecturally_legal() && self.is_immediate() && !self.is_authoritative()
+    }
+
+    /// Whether one incoming request is admissible relative to one active request.
+    #[must_use]
+    pub fn reentrancy_admissible(
+        &self,
+        active: &EffectResponsibilityDomain,
+        incoming: &EffectResponsibilityDomain,
+    ) -> bool {
+        self.architecturally_legal() && self.reentrancy_policy.admits(active, incoming)
+    }
+
     /// Validate one metadata combination.
     ///
     /// # Errors
@@ -293,38 +453,9 @@ impl EffectInterfaceMetadata {
     /// Returns a contract error when the metadata encodes an illegal
     /// combination.
     pub fn validate(&self) -> Result<(), EffectFailure> {
-        if matches!(self.admissibility, EffectAdmissibility::InternalOnly)
-            && !matches!(self.handler_domain, EffectHandlerDomain::Internal)
-        {
+        if !self.architecturally_legal() {
             return Err(EffectFailure::contract_violation(format!(
-                "effect {}.{} is internal-only but is marked for external handling",
-                self.interface_name, self.operation_name
-            )));
-        }
-
-        if matches!(self.authority_class, EffectAuthorityClass::Observe)
-            && !matches!(self.totality, EffectTotality::Immediate)
-        {
-            return Err(EffectFailure::contract_violation(format!(
-                "observational effect {}.{} may not use blocking totality",
-                self.interface_name, self.operation_name
-            )));
-        }
-
-        if matches!(self.authority_class, EffectAuthorityClass::Observe)
-            && matches!(self.timeout_policy, EffectTimeoutPolicy::Required { .. })
-        {
-            return Err(EffectFailure::contract_violation(format!(
-                "observational effect {}.{} may not require a dedicated timeout budget",
-                self.interface_name, self.operation_name
-            )));
-        }
-
-        if matches!(self.totality, EffectTotality::Immediate)
-            && matches!(self.timeout_policy, EffectTimeoutPolicy::Required { .. })
-        {
-            return Err(EffectFailure::contract_violation(format!(
-                "immediate effect {}.{} may not require a dedicated timeout budget",
+                "effect {}.{} violates the protocol-machine effect algebra",
                 self.interface_name, self.operation_name
             )));
         }
@@ -341,9 +472,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "sendDecision".to_string()),
                 authority_class: EffectAuthorityClass::Command,
+                semantic_class: EffectSemanticClass::BestEffort,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::Allow,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -351,9 +484,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "handleRecv".to_string()),
                 authority_class: EffectAuthorityClass::Command,
+                semantic_class: EffectSemanticClass::BestEffort,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::Allow,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -361,9 +496,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Transport".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "handleChoose".to_string()),
                 authority_class: EffectAuthorityClass::Command,
+                semantic_class: EffectSemanticClass::BestEffort,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::Allow,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -371,9 +508,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "invoke".to_string()),
                 authority_class: EffectAuthorityClass::Command,
+                semantic_class: EffectSemanticClass::BestEffort,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::InheritOperationBudget,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::RejectSameOperation,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -381,9 +520,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Guard".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "acquire".to_string()),
                 authority_class: EffectAuthorityClass::Authoritative,
+                semantic_class: EffectSemanticClass::Authoritative,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::MayBlock,
-                timeout_policy: EffectTimeoutPolicy::InheritOperationBudget,
+                timeout_policy: EffectTimeoutPolicy::Required { budget_ticks: None },
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::RejectSameFragment,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -391,9 +532,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Guard".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "release".to_string()),
                 authority_class: EffectAuthorityClass::Authoritative,
+                semantic_class: EffectSemanticClass::Authoritative,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::RejectSameFragment,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -401,9 +544,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| "topologyEvents".to_string()),
                 authority_class: EffectAuthorityClass::Authoritative,
+                semantic_class: EffectSemanticClass::Authoritative,
                 admissibility: EffectAdmissibility::InternalOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::Allow,
                 handler_domain: EffectHandlerDomain::Internal,
             },
@@ -411,9 +556,11 @@ impl EffectInterfaceMetadata {
                 interface_name: "Runtime".to_string(),
                 operation_name: "outputConditionHint".to_string(),
                 authority_class: EffectAuthorityClass::Authoritative,
+                semantic_class: EffectSemanticClass::Authoritative,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::Allow,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -421,9 +568,11 @@ impl EffectInterfaceMetadata {
                 interface_name: interface_name.unwrap_or_else(|| "Runtime".to_string()),
                 operation_name: operation_name.unwrap_or_else(|| effect_kind.to_string()),
                 authority_class: EffectAuthorityClass::Command,
+                semantic_class: EffectSemanticClass::BestEffort,
                 admissibility: EffectAdmissibility::DeclaredUseOnly,
                 totality: EffectTotality::Immediate,
                 timeout_policy: EffectTimeoutPolicy::None,
+                retry_shape: EffectRetryShape::Forbidden,
                 reentrancy_policy: EffectReentrancyPolicy::Allow,
                 handler_domain: EffectHandlerDomain::External,
             },
@@ -704,6 +853,20 @@ pub enum EffectOutcomeStatus {
     Failure { failure: EffectFailure },
 }
 
+impl EffectOutcomeStatus {
+    /// Whether the outcome is successful.
+    #[must_use]
+    pub fn is_success(&self) -> bool {
+        matches!(self, Self::Success)
+    }
+
+    /// Whether the outcome is terminal.
+    #[must_use]
+    pub fn is_terminal(&self) -> bool {
+        !matches!(self, Self::Blocked)
+    }
+}
+
 /// Typed response payload families.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "kind", rename_all = "snake_case")]
@@ -914,6 +1077,102 @@ pub struct EffectExchangeRecord {
     pub outcome: EffectOutcome,
 }
 
+impl EffectExchangeRecord {
+    /// Whether this exchange completed successfully.
+    #[must_use]
+    pub fn succeeded(&self) -> bool {
+        self.outcome.status.is_success()
+    }
+
+    /// Whether this exchange reached a terminal outcome.
+    #[must_use]
+    pub fn terminal(&self) -> bool {
+        self.outcome.status.is_terminal()
+    }
+}
+
+/// Composition policy for combining many effect exchanges into one commitment.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectCompositionPolicy {
+    /// Every effect exchange must succeed.
+    AllSuccess,
+    /// Any successful effect exchange resolves the commitment.
+    FirstSuccess,
+    /// A fixed number of successful exchanges is required.
+    Quorum {
+        /// Required success count.
+        required_successes: u64,
+    },
+    /// Prefer success, otherwise accept full terminal exhaustion.
+    Fallback,
+}
+
+impl EffectCompositionPolicy {
+    fn count_successful_effects(records: &[EffectExchangeRecord]) -> usize {
+        records.iter().filter(|record| record.succeeded()).count()
+    }
+
+    fn count_terminal_effects(records: &[EffectExchangeRecord]) -> usize {
+        records.iter().filter(|record| record.terminal()).count()
+    }
+
+    /// Whether the composition policy resolves the combined commitment.
+    #[must_use]
+    pub fn commitment_resolved(&self, records: &[EffectExchangeRecord]) -> bool {
+        match self {
+            Self::AllSuccess => {
+                !records.is_empty() && records.iter().all(EffectExchangeRecord::succeeded)
+            }
+            Self::FirstSuccess => records.iter().any(EffectExchangeRecord::succeeded),
+            Self::Quorum { required_successes } => {
+                *required_successes > 0
+                    && Self::count_successful_effects(records) >= *required_successes as usize
+            }
+            Self::Fallback => {
+                records.iter().any(EffectExchangeRecord::succeeded)
+                    || (!records.is_empty()
+                        && Self::count_terminal_effects(records) == records.len())
+            }
+        }
+    }
+
+    /// Whether the resolved commitment is compatible with the policy semantics.
+    #[must_use]
+    pub fn commitment_compatible(&self, records: &[EffectExchangeRecord]) -> bool {
+        if !self.commitment_resolved(records) {
+            return true;
+        }
+        match self {
+            Self::AllSuccess => records.iter().all(EffectExchangeRecord::succeeded),
+            Self::FirstSuccess => records.iter().any(EffectExchangeRecord::succeeded),
+            Self::Quorum { required_successes } => {
+                Self::count_successful_effects(records) >= *required_successes as usize
+            }
+            Self::Fallback => {
+                records.iter().any(EffectExchangeRecord::succeeded)
+                    || (!records.is_empty()
+                        && Self::count_terminal_effects(records) == records.len())
+            }
+        }
+    }
+
+    /// Whether a resolved commitment makes progress relative to one contract.
+    #[must_use]
+    pub fn progress_compatible(
+        &self,
+        records: &[EffectExchangeRecord],
+        contract: &crate::semantic_objects::ProgressContract,
+    ) -> bool {
+        !self.commitment_resolved(records)
+            || contract.is_terminal()
+            || contract
+                .synthetic_step()
+                .map(|next| next.progress_measure() < contract.progress_measure())
+                .unwrap_or(false)
+    }
+}
+
 /// Decision returned by [`EffectHandler::send_decision`].
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum SendDecision {
@@ -941,7 +1200,6 @@ pub struct SendDecisionInput<'a> {
     /// Optional precomputed payload.
     pub payload: Option<Value>,
 }
-
 
 /// Typed failure kinds at the ProtocolMachine effect boundary.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -1127,17 +1385,20 @@ mod effect_contract_tests {
             interface_name: "Runtime".to_string(),
             operation_name: "watch".to_string(),
             authority_class: EffectAuthorityClass::Observe,
+            semantic_class: EffectSemanticClass::Observational,
             admissibility: EffectAdmissibility::DeclaredUseOnly,
             totality: EffectTotality::MayBlock,
-            timeout_policy: EffectTimeoutPolicy::None,
+            timeout_policy: EffectTimeoutPolicy::Required {
+                budget_ticks: Some(4),
+            },
+            retry_shape: EffectRetryShape::Forbidden,
             reentrancy_policy: EffectReentrancyPolicy::Allow,
             handler_domain: EffectHandlerDomain::External,
         };
 
-        let err = metadata
+        metadata
             .validate()
-            .expect_err("observational effects must not block");
-        assert!(err.message.contains("observational effect"));
+            .expect("observational effects may block when the timeout contract is explicit");
     }
 
     #[test]
@@ -1146,9 +1407,11 @@ mod effect_contract_tests {
             interface_name: "Runtime".to_string(),
             operation_name: "topologyEvents".to_string(),
             authority_class: EffectAuthorityClass::Authoritative,
+            semantic_class: EffectSemanticClass::Authoritative,
             admissibility: EffectAdmissibility::InternalOnly,
             totality: EffectTotality::Immediate,
             timeout_policy: EffectTimeoutPolicy::None,
+            retry_shape: EffectRetryShape::Forbidden,
             reentrancy_policy: EffectReentrancyPolicy::Allow,
             handler_domain: EffectHandlerDomain::External,
         };
@@ -1156,6 +1419,53 @@ mod effect_contract_tests {
         let err = metadata
             .validate()
             .expect_err("internal-only effects must not be external");
-        assert!(err.message.contains("internal-only"));
+        assert!(err
+            .message
+            .contains("effect Runtime.topologyEvents violates"));
+    }
+
+    #[test]
+    fn immediate_admissible_matches_lean_effect_algebra() {
+        let metadata = EffectInterfaceMetadata::for_effect_kind("send_decision");
+        assert!(metadata.immediate_admissible());
+
+        let authoritative = EffectInterfaceMetadata::for_effect_kind("handle_release");
+        assert!(!authoritative.immediate_admissible());
+    }
+
+    #[test]
+    fn composition_policy_tracks_commitment_and_progress() {
+        let request =
+            EffectRequest::invoke_step(1, Some(1), Some("effect:1".to_string()), "A", &[]);
+        let success = EffectExchangeRecord {
+            effect_id: 1,
+            handler_identity: "host/runtime".to_string(),
+            ordering_key: 1,
+            request: request.clone(),
+            outcome: EffectOutcome::success(EffectResponse::InvokeStep { state: Vec::new() }),
+        };
+        let blocked = EffectExchangeRecord {
+            effect_id: 2,
+            handler_identity: "host/runtime".to_string(),
+            ordering_key: 2,
+            request,
+            outcome: EffectOutcome::blocked(),
+        };
+        let contract = crate::semantic_objects::ProgressContract {
+            operation_id: "effect:1".to_string(),
+            session: Some(1),
+            state: crate::semantic_objects::ProgressState::Blocked,
+            last_ordering_key: Some(1),
+            bounded: true,
+            budget_ticks: Some(1),
+            last_progress_tick: Some(1),
+            escalated_at_tick: None,
+            reason: None,
+        };
+
+        let first_success = EffectCompositionPolicy::FirstSuccess;
+        assert!(first_success.commitment_resolved(&[success.clone(), blocked.clone()]));
+        assert!(first_success.commitment_compatible(&[success.clone(), blocked.clone()]));
+        assert!(first_success.progress_compatible(&[success, blocked], &contract));
     }
 }

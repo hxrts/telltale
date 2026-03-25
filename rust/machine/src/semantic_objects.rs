@@ -312,6 +312,112 @@ pub struct ProgressTransition {
     pub reason: Option<String>,
 }
 
+impl OperationInstance {
+    /// Whether the operation is parity-critical.
+    #[must_use]
+    pub fn is_parity_critical(&self) -> bool {
+        self.requires_proof || self.terminal_publication.is_some()
+    }
+}
+
+impl ProgressState {
+    /// Whether the progress state is terminal.
+    #[must_use]
+    pub fn is_terminal(self) -> bool {
+        matches!(
+            self,
+            Self::Succeeded | Self::Failed | Self::Cancelled | Self::TimedOut | Self::HandedOff
+        )
+    }
+
+    /// Expected operation phase for this progress state.
+    #[must_use]
+    pub fn expected_operation_phase(self) -> OperationPhase {
+        match self {
+            Self::Pending => OperationPhase::Pending,
+            Self::Blocked | Self::NoProgress | Self::Degraded => OperationPhase::Blocked,
+            Self::Succeeded => OperationPhase::Succeeded,
+            Self::Failed => OperationPhase::Failed,
+            Self::Cancelled => OperationPhase::Cancelled,
+            Self::TimedOut => OperationPhase::TimedOut,
+            Self::HandedOff => OperationPhase::HandedOff,
+        }
+    }
+}
+
+impl ProgressContract {
+    /// Whether the contract is terminal.
+    #[must_use]
+    pub fn is_terminal(&self) -> bool {
+        self.state.is_terminal()
+    }
+
+    /// Whether the contract carries bounded-wait discipline.
+    #[must_use]
+    pub fn has_budget_discipline(&self) -> bool {
+        !self.bounded || self.budget_ticks.is_some()
+    }
+
+    /// Whether the contract tracks the given operation.
+    #[must_use]
+    pub fn tracks_operation(&self, operation: &OperationInstance) -> bool {
+        self.operation_id == operation.operation_id
+            && self.session == operation.session
+            && operation.phase == self.state.expected_operation_phase()
+    }
+
+    /// Weighted progress measure aligned with the Lean synthetic-step model.
+    #[must_use]
+    pub fn progress_measure(&self) -> u64 {
+        match self.state {
+            ProgressState::Pending => 4,
+            ProgressState::Blocked => 3,
+            ProgressState::NoProgress => 2,
+            ProgressState::Degraded => 1,
+            ProgressState::Succeeded
+            | ProgressState::Failed
+            | ProgressState::Cancelled
+            | ProgressState::TimedOut
+            | ProgressState::HandedOff => 0,
+        }
+    }
+
+    /// Synthetic progress escalation step used by the proof-aligned runtime model.
+    #[must_use]
+    pub fn synthetic_step(&self) -> Option<Self> {
+        match self.state {
+            ProgressState::Pending => Some(Self {
+                state: ProgressState::Blocked,
+                ..self.clone()
+            }),
+            ProgressState::Blocked => Some(Self {
+                state: ProgressState::NoProgress,
+                escalated_at_tick: self.escalated_at_tick.or(self.last_progress_tick),
+                ..self.clone()
+            }),
+            ProgressState::NoProgress => Some(Self {
+                state: ProgressState::Degraded,
+                escalated_at_tick: self.escalated_at_tick.or(self.last_progress_tick),
+                ..self.clone()
+            }),
+            ProgressState::Degraded => Some(Self {
+                state: if self.bounded {
+                    ProgressState::TimedOut
+                } else {
+                    ProgressState::Failed
+                },
+                escalated_at_tick: self.escalated_at_tick.or(self.last_progress_tick),
+                ..self.clone()
+            }),
+            ProgressState::Succeeded
+            | ProgressState::Failed
+            | ProgressState::Cancelled
+            | ProgressState::TimedOut
+            | ProgressState::HandedOff => None,
+        }
+    }
+}
+
 /// Canonical bundle of semantic objects exported by the protocol machine.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProtocolMachineSemanticObjects {
@@ -391,6 +497,19 @@ impl ProtocolMachineSemanticObjects {
                 format!("canonical handle `{handle_id}` is required on this parity-critical path")
             })
     }
+
+    /// Whether every parity-critical operation has a matching progress contract.
+    #[must_use]
+    pub fn parity_critical_operations_have_progress_contracts(&self) -> bool {
+        self.operation_instances
+            .iter()
+            .filter(|operation| operation.is_parity_critical())
+            .all(|operation| {
+                self.progress_contracts
+                    .iter()
+                    .any(|contract| contract.tracks_operation(operation))
+            })
+    }
 }
 
 fn progress_state(status: OutstandingEffectStatus) -> ProgressState {
@@ -401,6 +520,18 @@ fn progress_state(status: OutstandingEffectStatus) -> ProgressState {
         OutstandingEffectStatus::Failed => ProgressState::Failed,
         OutstandingEffectStatus::Cancelled => ProgressState::Cancelled,
         OutstandingEffectStatus::Invalidated => ProgressState::TimedOut,
+    }
+}
+
+fn progress_state_for_operation_phase(phase: OperationPhase) -> ProgressState {
+    match phase {
+        OperationPhase::Pending => ProgressState::Pending,
+        OperationPhase::Blocked => ProgressState::Blocked,
+        OperationPhase::Succeeded => ProgressState::Succeeded,
+        OperationPhase::Failed => ProgressState::Failed,
+        OperationPhase::Cancelled => ProgressState::Cancelled,
+        OperationPhase::TimedOut => ProgressState::TimedOut,
+        OperationPhase::HandedOff => ProgressState::HandedOff,
     }
 }
 
@@ -809,23 +940,35 @@ pub fn protocol_machine_semantic_objects_v1(
     }
 
     let mut progress_contracts: Vec<_> = progress_contracts.to_vec();
-    if progress_contracts.is_empty() {
-        progress_contracts = outstanding_effects
+    for effect in &outstanding_effects {
+        if progress_contracts
             .iter()
-            .map(|effect| ProgressContract {
-                operation_id: effect.operation_id.clone(),
-                session: effect.session,
-                state: progress_state(effect.status),
-                last_ordering_key: Some(effect.ordering_key),
-                bounded: true,
-                budget_ticks: effect.budget_ticks,
-                last_progress_tick: Some(effect.ordering_key),
-                escalated_at_tick: None,
-                reason: None,
-            })
-            .collect();
-        progress_contracts.extend(semantic_handoffs.iter().map(|handoff| ProgressContract {
-            operation_id: format!("handoff:{}", handoff.handoff_id),
+            .any(|contract| contract.operation_id == effect.operation_id)
+        {
+            continue;
+        }
+        progress_contracts.push(ProgressContract {
+            operation_id: effect.operation_id.clone(),
+            session: effect.session,
+            state: progress_state(effect.status),
+            last_ordering_key: Some(effect.ordering_key),
+            bounded: true,
+            budget_ticks: effect.budget_ticks,
+            last_progress_tick: Some(effect.ordering_key),
+            escalated_at_tick: None,
+            reason: None,
+        });
+    }
+    for handoff in &semantic_handoffs {
+        let operation_id = format!("handoff:{}", handoff.handoff_id);
+        if progress_contracts
+            .iter()
+            .any(|contract| contract.operation_id == operation_id)
+        {
+            continue;
+        }
+        progress_contracts.push(ProgressContract {
+            operation_id,
             session: Some(handoff.session),
             state: ProgressState::HandedOff,
             last_ordering_key: Some(handoff.tick),
@@ -834,7 +977,27 @@ pub fn protocol_machine_semantic_objects_v1(
             last_progress_tick: Some(handoff.tick),
             escalated_at_tick: None,
             reason: handoff.reason.clone(),
-        }));
+        });
+    }
+    for operation in &operation_instances {
+        if !operation.is_parity_critical()
+            || progress_contracts
+                .iter()
+                .any(|contract| contract.tracks_operation(operation))
+        {
+            continue;
+        }
+        progress_contracts.push(ProgressContract {
+            operation_id: operation.operation_id.clone(),
+            session: operation.session,
+            state: progress_state_for_operation_phase(operation.phase),
+            last_ordering_key: None,
+            bounded: operation.budget_ticks.is_some(),
+            budget_ticks: operation.budget_ticks,
+            last_progress_tick: None,
+            escalated_at_tick: None,
+            reason: None,
+        });
     }
 
     canonicalize(ProtocolMachineSemanticObjects {
@@ -851,4 +1014,62 @@ pub fn protocol_machine_semantic_objects_v1(
         progress_contracts,
         progress_transitions: progress_transitions.to_vec(),
     })
+}
+
+#[cfg(test)]
+mod semantic_object_tests {
+    use super::*;
+
+    #[test]
+    fn parity_critical_operations_synthesize_progress_contracts() {
+        let objects = protocol_machine_semantic_objects_v1(
+            &[],
+            &[],
+            &[OperationInstance {
+                operation_id: "materialization:proof".to_string(),
+                session: Some(1),
+                owner_id: None,
+                kind: "materialization".to_string(),
+                phase: OperationPhase::Succeeded,
+                handler_identity: None,
+                effect_ids: Vec::new(),
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: Some("materialization.succeeded".to_string()),
+                budget_ticks: Some(1),
+                requires_proof: true,
+            }],
+            &[],
+            &[],
+            &[],
+            &[],
+        );
+
+        assert!(objects.parity_critical_operations_have_progress_contracts());
+        assert!(objects
+            .progress_contracts
+            .iter()
+            .any(|contract| contract.operation_id == "materialization:proof"
+                && contract.state == ProgressState::Succeeded));
+    }
+
+    #[test]
+    fn synthetic_step_descends_progress_measure() {
+        let contract = ProgressContract {
+            operation_id: "effect:1".to_string(),
+            session: Some(1),
+            state: ProgressState::Blocked,
+            last_ordering_key: Some(1),
+            bounded: true,
+            budget_ticks: Some(1),
+            last_progress_tick: Some(1),
+            escalated_at_tick: None,
+            reason: None,
+        };
+
+        let next = contract
+            .synthetic_step()
+            .expect("blocked contract should take a synthetic step");
+        assert_eq!(next.state, ProgressState::NoProgress);
+        assert!(next.progress_measure() < contract.progress_measure());
+    }
 }

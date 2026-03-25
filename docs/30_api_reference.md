@@ -70,6 +70,9 @@ Key exports:
 - `ProtocolMachine`, `ProtocolMachineConfig`, `GuestRuntime`, `SchedPolicy`, `SimClock`
 - `Instr`, `Value`, `SessionStore`, `SessionId`
 - `OwnedSession`, `EffectHandler`, and `NestedProtocolMachineHandler`
+- proof-aligned effect algebra:
+  `EffectSemanticClass`, `EffectRetryShape`, `EffectCompositionPolicy`,
+  `EffectResponsibilityDomain`
 - canonical semantic objects:
   `OperationInstance`, `OutstandingEffect`, `SemanticHandoff`,
   `TransformationObligation`,
@@ -77,6 +80,10 @@ Key exports:
   `CanonicalHandle`, `PublicationEvent`, `ProgressContract`,
   `ProgressTransition`,
   `ProtocolMachineSemanticObjects`
+- proof-carrying runtime profiles:
+  `ProtocolMachineExecutionProfile`, `ProtocolMachineFairnessAssumption`,
+  `ProtocolMachineAdmissibilityClass`,
+  `ProtocolMachineEscalationWindowClass`
 - runtime introspection:
   `operation_instances()`, `outstanding_effects()`, `semantic_objects()`,
   `progress_contracts()`, `progress_transitions()`, `publication_events()`,
@@ -91,9 +98,13 @@ and simulators.
 Module access (not re-exported at crate root):
 - Effect boundary:
   `telltale_machine::model::effects::EffectHandler`, `EffectRequest`, `EffectOutcome`,
-  `EffectInterfaceMetadata`, `EffectExchangeRecord`, `SendDecision`, `SendDecisionInput`
+  `EffectInterfaceMetadata`, `EffectExchangeRecord`, `EffectCompositionPolicy`,
+  `EffectSemanticClass`, `EffectRetryShape`, `EffectResponsibilityDomain`,
+  `SendDecision`, `SendDecisionInput`
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
 - Loader: `telltale_machine::runtime::loader::CodeImage`
+- Runtime contracts:
+  `telltale_machine::runtime::failure::{RuntimeContracts, ProtocolMachineExecutionProfile}`
 - Runtime runner: `telltale_machine::runtime::runner::{ProtocolMachine, GuestRuntime, StepResult, RunStatus}`
 - Semantics: `telltale_machine::semantics::exec::{ExecResult, ExecStatus, StepPack}`
 

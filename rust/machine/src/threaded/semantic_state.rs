@@ -5,37 +5,35 @@ impl ThreadedProtocolMachine {
 
     fn ensure_effect_request_allowed(&self, request: &EffectRequest) -> Result<(), EffectFailure> {
         request.metadata.validate()?;
-        match request.metadata.reentrancy_policy {
-            crate::effect::EffectReentrancyPolicy::Allow => {}
-            crate::effect::EffectReentrancyPolicy::RejectSameOperation => {
-                if let Some(operation_id) = &request.operation_id {
-                    if self.outstanding_effects.iter().any(|effect| {
-                        effect.operation_id == *operation_id
-                            && matches!(
-                                effect.status,
-                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
-                            )
-                    }) {
-                        return Err(EffectFailure::contract_violation(format!(
-                            "reentrancy rejected for operation `{operation_id}`"
-                        )));
-                    }
-                }
-            }
-            crate::effect::EffectReentrancyPolicy::RejectSameFragment => {
-                if let Some(session) = request.session {
-                    if self.outstanding_effects.iter().any(|effect| {
-                        effect.session == Some(session)
-                            && matches!(
-                                effect.status,
-                                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
-                            )
-                    }) {
-                        return Err(EffectFailure::contract_violation(format!(
-                            "reentrancy rejected for session fragment `{session}`"
-                        )));
-                    }
-                }
+        let incoming = crate::effect::EffectResponsibilityDomain {
+            footprint_key: request
+                .session
+                .map(|session| format!("session:{session}"))
+                .unwrap_or_else(|| request.metadata.interface_name.clone()),
+            operation_id: request.operation_id.clone(),
+            fragment_id: request.session.map(|session| format!("session:{session}")),
+            owner_id: None,
+        };
+        for effect in self.outstanding_effects.iter().filter(|effect| {
+            matches!(
+                effect.status,
+                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+            )
+        }) {
+            let active = crate::effect::EffectResponsibilityDomain {
+                footprint_key: effect
+                    .session
+                    .map(|session| format!("session:{session}"))
+                    .unwrap_or_else(|| effect.handler_identity.clone()),
+                operation_id: Some(effect.operation_id.clone()),
+                fragment_id: effect.session.map(|session| format!("session:{session}")),
+                owner_id: effect.owner_id.clone(),
+            };
+            if !request.metadata.reentrancy_admissible(&active, &incoming) {
+                return Err(EffectFailure::contract_violation(format!(
+                    "reentrancy rejected for effect {} on footprint {}",
+                    effect.effect_id, active.footprint_key
+                )));
             }
         }
         Ok(())
@@ -61,16 +59,14 @@ impl ThreadedProtocolMachine {
 
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<String> {
         session.and_then(|sid| {
-            self.sessions
-                .get(sid)
-                .and_then(|session| {
-                    let session = session.lock().ok()?;
-                    session
-                        .ownership()
-                        .current
-                        .as_ref()
-                        .map(|capability| capability.owner_id.clone())
-                })
+            self.sessions.get(sid).and_then(|session| {
+                let session = session.lock().ok()?;
+                session
+                    .ownership()
+                    .current
+                    .as_ref()
+                    .map(|capability| capability.owner_id.clone())
+            })
         })
     }
 
@@ -218,12 +214,12 @@ impl ThreadedProtocolMachine {
                 .iter()
                 .find(|contract| contract.operation_id == effect.operation_id)
             else {
-                return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
-                    format!(
+                return Err(ProtocolMachineError::HandlerError(
+                    EffectFailure::contract_violation(format!(
                         "[host-contract] outstanding effect {} requires a live progress contract",
                         effect.effect_id
-                    ),
-                )));
+                    )),
+                ));
             };
             let since = contract
                 .escalated_at_tick
@@ -248,7 +244,9 @@ impl ThreadedProtocolMachine {
 
             let reason = match target_state {
                 ProgressState::Pending => None,
-                ProgressState::Blocked => Some("waiting on bounded semantic-path effect".to_string()),
+                ProgressState::Blocked => {
+                    Some("waiting on bounded semantic-path effect".to_string())
+                }
                 ProgressState::NoProgress => {
                     Some("no progress observed within bounded wait budget".to_string())
                 }
@@ -289,7 +287,10 @@ impl ThreadedProtocolMachine {
                 }
             }
 
-            if matches!(target_state, ProgressState::NoProgress | ProgressState::Degraded) {
+            if matches!(
+                target_state,
+                ProgressState::NoProgress | ProgressState::Degraded
+            ) {
                 if let Some(operation) = self
                     .operation_instances
                     .iter_mut()
@@ -422,7 +423,11 @@ impl ThreadedProtocolMachine {
             });
         let owner_id = self.current_operation_owner(session);
         let operation_id = Self::effect_operation_id(entry.effect_id);
-        let status = match entry.outputs.get("status").and_then(serde_json::Value::as_str) {
+        let status = match entry
+            .outputs
+            .get("status")
+            .and_then(serde_json::Value::as_str)
+        {
             Some("blocked") => OutstandingEffectStatus::Blocked,
             Some("failure") => OutstandingEffectStatus::Failed,
             Some("cancelled") => OutstandingEffectStatus::Cancelled,
@@ -501,12 +506,12 @@ impl ThreadedProtocolMachine {
             self.outstanding_effects[effect_index].status,
             OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
         ) {
-            return Err(ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
-                format!(
+            return Err(ProtocolMachineError::HandlerError(
+                EffectFailure::contract_violation(format!(
                     "[host-contract] late result for effect {effect_id} rejected after {:?}",
                     self.outstanding_effects[effect_index].status
-                ),
-            )));
+                )),
+            ));
         }
         let operation_id;
         let session;
