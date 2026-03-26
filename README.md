@@ -12,13 +12,13 @@ Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Art
 
 ### 1. Rust Library
 
-The Rust project implements the operational model from the paper series. The `tell!` macro is the canonical entry point for protocol specification.
+The Rust project implements the operational model from the paper series. Protocols are written once with the `tell!` macro and projected to local session types and typed effect interfaces for each role.
 
-- `tell!` DSL with projection, compiler pipeline, and typed effect interface generation
-- Protocol machine for deterministic execution of asynchronous buffered protocols
-- Generated effect boundaries with internal and external handler domains
-- Capability-gated admission, semantic object export, and structured audit surfaces
-- Simulation and cross-target conformance tooling against Lean reference traces
+- `tell!` DSL with projection, typed effect generation, and authority/evidence constructs
+- Protocol machine for deterministic execution with session type enforcement
+- Declared effect boundaries where host logic implements generated Rust traits
+- Native and WASM targets from the same protocol specification
+- Simulation, replay, and cross-target conformance tooling against Lean reference traces
 
 Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical health check is `cargo test --workspace --all-targets --all-features`.
 
