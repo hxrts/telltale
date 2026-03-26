@@ -108,7 +108,7 @@ enum Message {
 }
 ```
 
-The canonical WASM example now lives in `examples/wasm-ping-pong/` and uses
+The canonical WASM example now lives in `examples/wasm/` and uses
 `tell!` plus generated effect traits as the public surface. Browser-facing
 code should keep protocol structure in the DSL and host integration in the
 generated `Protocol::effects` boundary, rather than manually assembling

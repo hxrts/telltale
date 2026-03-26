@@ -34,7 +34,7 @@ Effect-boundary examples in `examples/effects/`:
 - `reactive_signal.rs`: reactive signal subscription/current-value/publish interface
 - `three_buyers.rs`: pricing and affordability decisions at the host boundary
 - `travel_agency.rs`: quote/schedule capabilities behind one protocol boundary
-- `wasm-ping-pong/`: browser integration via generated effects
+- `wasm/`: browser integration via generated effects
 
 Theory examples in `examples/theory/`:
 
@@ -249,10 +249,10 @@ cargo run --example adder
 
 This compiles and runs the `adder` example, which demonstrates a simple two-party request response protocol.
 
-The `wasm-ping-pong` example uses its own build script. It produces a browser-loadable WASM module.
+The `wasm` example crate uses its own build script. It produces a browser-loadable WASM module.
 
 ```bash
-cd examples/wasm-ping-pong
+cd examples/wasm
 ./build.sh
 ```
 

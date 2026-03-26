@@ -1,4 +1,4 @@
-# WASM Ping-Pong Example
+# WASM Examples
 
 A minimal example demonstrating Telltale's `tell!`-based choreographic programming in WebAssembly.
 
@@ -15,7 +15,7 @@ The protocol is declared with `tell!` and executed through the generated session
 Build and run the example:
 
 ```bash
-cd examples/wasm-ping-pong
+cd examples/wasm
 ./build.sh
 ```
 
@@ -34,7 +34,7 @@ To build for WASM manually:
 cargo install wasm-pack --version 0.14.0 --locked
 
 # Build the WASM module
-cd examples/wasm-ping-pong
+cd examples/wasm
 wasm-pack build --target web
 ```
 
@@ -64,7 +64,7 @@ Create an `index.html` file to test in the browser:
     <pre id="output"></pre>
     
     <script type="module">
-        import init, { run_ping_pong } from './pkg/wasm_ping_pong.js';
+        import init, { run_ping_pong } from './pkg/wasm_examples.js';
         
         async function runProtocol() {
             await init();

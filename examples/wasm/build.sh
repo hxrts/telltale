@@ -25,7 +25,7 @@ fi
 # Check if we're in the right directory
 if [ ! -f "Cargo.toml" ]; then
     echo -e "${RED}Error: Cargo.toml not found${NC}"
-    echo "Please run this script from the examples/wasm-ping-pong directory"
+    echo "Please run this script from the examples/wasm directory"
     exit 1
 fi
 
@@ -140,7 +140,7 @@ cat > index.html << 'EOF'
     </div>
 
     <script type="module">
-        import init, { run_ping_pong } from './pkg/wasm_ping_pong.js';
+        import init, { run_ping_pong } from './pkg/wasm_examples.js';
 
         const output = document.getElementById('output');
         const runButton = document.getElementById('runButton');

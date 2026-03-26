@@ -334,7 +334,7 @@ wasm-build:
     set -euo pipefail
     wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-build.XXXXXX")"
     trap 'rm -rf "$wasm_target"' EXIT
-    cd examples/wasm-ping-pong
+    cd examples/wasm
     CARGO_TARGET_DIR="$wasm_target" wasm-pack build --target web
 
 # Run the example WASM tests under Node.
@@ -358,7 +358,7 @@ wasm-test:
       },
     );
     EOF
-    cd examples/wasm-ping-pong
+    cd examples/wasm
     CARGO_TARGET_DIR="$wasm_target" NODE_PATH="$shim_root" wasm-pack test --node
 
 # Run all repository-managed WASM tests without requiring a browser driver.
@@ -386,7 +386,7 @@ wasm-test-all:
     EOF
     CARGO_TARGET_DIR="$machine_target" NODE_PATH="$shim_root" wasm-pack test --node rust/machine --features wasm -- --nocapture
     CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
-    cd examples/wasm-ping-pong
+    cd examples/wasm
     CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
 
 # Format choreography DSL files (prints to stdout unless --write is used)

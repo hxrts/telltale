@@ -93,7 +93,7 @@ jobs:
           args: --package telltale --target wasm32-unknown-unknown --features wasm
       - name: Build WASM example
         run: |
-          cd examples/wasm-ping-pong
+          cd examples/wasm
           wasm-pack build --target web
       - name: Test WASM suites
         run: |

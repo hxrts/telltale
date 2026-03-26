@@ -201,7 +201,7 @@ incremental = false
 
 [workspace]
 members = ["rust/parser", "rust/macros", "rust/parser", "rust/choreography", "rust/types", "rust/theory", "rust/bridge", "rust/machine", "rust/simulator", "rust/transport", "rust/lints"]
-exclude = ["examples/wasm-ping-pong", "external-demo", "external-demo-macros"]
+exclude = ["examples/wasm", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members
 [workspace.dependencies]

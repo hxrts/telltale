@@ -1,5 +1,5 @@
 [package]
-name = "wasm-ping-pong"
+name = "wasm-examples"
 version = "0.1.0"
 edition = "2021"
 

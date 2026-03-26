@@ -31,7 +31,7 @@ VERSION=""
 TAG_PREFIX="v"
 TAG_NAME=""
 TRANSIENT_RELEASE_PATHS=(
-  "examples/wasm-ping-pong/Cargo.lock"
+  "examples/wasm/Cargo.lock"
   "lean/CODE_MAP.md"
 )
 RESTORE_ON_EXIT=()
