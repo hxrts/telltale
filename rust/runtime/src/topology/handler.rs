@@ -392,6 +392,7 @@ mod tests {
         );
     }
 
+    #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn local_handlers_share_deterministic_message_routing() {
         let topology = TopologyBuilder::new()
