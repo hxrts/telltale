@@ -1862,7 +1862,7 @@ mod semantic_object_tests {
     fn agreement_state<'a>(
         objects: &'a ProtocolMachineSemanticObjects,
         operation_id: &str,
-    ) -> &'a AgreementEvidence {
+    ) -> &'a AgreementState {
         objects
             .agreement_states
             .iter()
