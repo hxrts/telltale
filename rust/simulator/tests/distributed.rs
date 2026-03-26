@@ -1,12 +1,16 @@
 //! Distributed simulation tests using nested ProtocolMachines.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{EffectHandler, EffectResult};
 use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::semantic_objects::ProtocolMachineSemanticObjects;
 use telltale_machine::trace::normalize_trace as normalize_ticks;
-use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, PublicationStatus,
+    SEMANTIC_OBJECTS_SCHEMA_VERSION,
+};
 use telltale_simulator::distributed::DistributedSimBuilder;
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -203,6 +207,45 @@ fn per_session(trace: &[ObsEvent], sid: usize) -> Vec<(u64, String, String, Stri
         .collect()
 }
 
+fn assert_site_semantics(objects: &ProtocolMachineSemanticObjects) {
+    assert_eq!(objects.schema_version, SEMANTIC_OBJECTS_SCHEMA_VERSION);
+    assert!(
+        objects.parity_critical_operations_have_progress_contracts(),
+        "site semantic objects must carry progress contracts for parity-critical operations"
+    );
+    assert!(
+        objects
+            .progress_contracts
+            .iter()
+            .all(|contract| contract.is_terminal()),
+        "distributed fixture should drive all site-local operations to terminal progress"
+    );
+    assert!(
+        !objects.publication_events.is_empty(),
+        "site semantic objects should expose canonical publications"
+    );
+    let publication_ids = objects
+        .publication_events
+        .iter()
+        .map(|publication| publication.publication_id.clone())
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        publication_ids.len(),
+        objects.publication_events.len(),
+        "site publication identifiers must remain canonical and unique"
+    );
+    assert!(
+        objects.publication_events.iter().all(|publication| match publication.status {
+            PublicationStatus::Published => publication.reason.is_none(),
+            PublicationStatus::Rejected => publication
+                .reason
+                .as_deref()
+                .is_some_and(|reason| reason.contains("proof-bearing success required")),
+        }),
+        "site publication outcomes should retain stable success/rejection diagnostics"
+    );
+}
+
 #[test]
 fn test_distributed_two_site() {
     let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
@@ -299,4 +342,91 @@ fn test_distributed_concurrency_configuration() {
     sim.run(50).expect("run outer machine");
     assert_eq!(sim.handler().site_all_done("site_A"), Some(true));
     assert_eq!(sim.handler().site_all_done("site_B"), Some(true));
+}
+
+#[test]
+fn nested_distributed_sites_export_semantic_objects_not_just_traces() {
+    let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
+    let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
+
+    let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
+    let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
+
+    let builder = DistributedSimBuilder::new()
+        .add_site("site_A", vec![inner_image.clone()])
+        .add_site("site_B", vec![inner_image])
+        .inter_site(outer_image)
+        .outer_concurrency(2)
+        .inner_rounds_per_step(2);
+
+    let mut sim = builder
+        .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
+        .expect("build distributed sim");
+
+    sim.run(50).expect("run outer machine");
+
+    let site_a = sim
+        .handler()
+        .site_semantic_objects("site_A")
+        .expect("site A semantic objects");
+    let site_b = sim
+        .handler()
+        .site_semantic_objects("site_B")
+        .expect("site B semantic objects");
+
+    assert_site_semantics(&site_a);
+    assert_site_semantics(&site_b);
+    assert_eq!(
+        site_a.operation_instances.len(),
+        site_b.operation_instances.len(),
+        "symmetric distributed sites should expose the same semantic object shape"
+    );
+}
+
+#[test]
+fn distributed_harness_replays_identical_semantic_outcomes_for_identical_inputs() {
+    let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
+    let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
+
+    let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
+    let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
+
+    let run_once = || {
+        let builder = DistributedSimBuilder::new()
+            .add_site("site_A", vec![inner_image.clone()])
+            .add_site("site_B", vec![inner_image.clone()])
+            .inter_site(outer_image.clone())
+            .outer_concurrency(2)
+            .inner_rounds_per_step(2);
+
+        let mut sim = builder
+            .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
+            .expect("build distributed sim");
+        sim.run(50).expect("run outer machine");
+
+        (
+            normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace")),
+            normalized_pairs(&sim.handler().site_trace("site_B").expect("site B trace")),
+            sim.handler()
+                .site_semantic_objects("site_A")
+                .expect("site A semantic objects"),
+            sim.handler()
+                .site_semantic_objects("site_B")
+                .expect("site B semantic objects"),
+        )
+    };
+
+    let first = run_once();
+    let second = run_once();
+
+    assert_eq!(first.0, second.0, "site A traces should replay identically");
+    assert_eq!(first.1, second.1, "site B traces should replay identically");
+    assert_eq!(
+        first.2, second.2,
+        "site A semantic objects should replay identically"
+    );
+    assert_eq!(
+        first.3, second.3,
+        "site B semantic objects should replay identically"
+    );
 }

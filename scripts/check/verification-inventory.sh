@@ -82,6 +82,40 @@ simulator_semantic_contract_categories=(
   semantic_object_coherence
 )
 
+theorem_pack_admission_suites=(
+  rust/bridge/tests/protocol_bundle_admission_contracts.rs
+  rust/bridge/tests/invariant_verification.rs
+  rust/tests/dsl_runtime_semantics_tests.rs
+)
+
+distributed_topology_semantic_harness_suites=(
+  rust/simulator/tests/distributed.rs
+  rust/machine/tests/topology_effect_ingress.rs
+  rust/runtime/tests/generated_topology_public_path.rs
+)
+
+agreement_composition_runtime_semantic_suites=(
+  rust/machine/src/effect/core_types.rs
+  rust/machine/src/semantic_objects.rs
+  rust/machine/tests/threaded_equivalence.rs
+  rust/tests/dsl_runtime_semantics_tests.rs
+)
+
+extension_middleware_semantic_hardening_suites=(
+  rust/runtime/tests/extension_integration.rs
+  rust/runtime/tests/middleware_semantic_hardening.rs
+)
+
+generated_topology_transport_public_path_suites=(
+  rust/runtime/tests/generated_topology_public_path.rs
+)
+
+explicit_unsupported_fail_closed_notes=(
+  extension_statement_runtime_dispatch
+  topology_region_constraint_execution
+  remote_transport_realization
+)
+
 # ── Helpers ───────────────────────────────────────────────────────────
 
 # Extract the documented value for a named metric from the inventory doc.
@@ -206,18 +240,29 @@ actual_semantic_lifecycle_invariant_suites=$(count_list "${semantic_lifecycle_in
 actual_adversarial_lifecycle_scenarios=$(count_list "${adversarial_lifecycle_cases[@]}")
 actual_dsl_runtime_semantics_suites=$(count_list "${dsl_runtime_semantics_suites[@]}")
 actual_simulator_semantic_contract_categories=$(count_list "${simulator_semantic_contract_categories[@]}")
+actual_theorem_pack_admission_suites=$(count_list "${theorem_pack_admission_suites[@]}")
+actual_distributed_topology_semantic_harness_suites=$(count_list "${distributed_topology_semantic_harness_suites[@]}")
+actual_agreement_composition_runtime_semantic_suites=$(count_list "${agreement_composition_runtime_semantic_suites[@]}")
+actual_extension_middleware_semantic_hardening_suites=$(count_list "${extension_middleware_semantic_hardening_suites[@]}")
+actual_generated_topology_transport_public_path_suites=$(count_list "${generated_topology_transport_public_path_suites[@]}")
+actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupported_fail_closed_notes[@]}")
 
 actual_executable_property_buckets=$(
   (
-    bucket_has_coverage 2
     bucket_has_coverage "$actual_authority_ownership"
     bucket_has_coverage "$actual_identity_replay"
     bucket_has_coverage "$actual_commitment_progress"
-    bucket_has_coverage "$actual_structure_reconfiguration"
+    bucket_has_coverage "$actual_cross_mode_semantic_parity"
     bucket_has_coverage "$actual_fail_closed_lowering_admission"
+    bucket_has_coverage "$actual_structure_reconfiguration"
+    bucket_has_coverage "$actual_theorem_pack_admission_suites"
+    bucket_has_coverage "$actual_distributed_topology_semantic_harness_suites"
+    bucket_has_coverage "$actual_agreement_composition_runtime_semantic_suites"
+    bucket_has_coverage "$actual_extension_middleware_semantic_hardening_suites"
+    bucket_has_coverage "$actual_generated_topology_transport_public_path_suites"
   ) | awk '{sum += $1} END {print sum + 0}'
 )
-actual_lacking_property_buckets=$((6 - actual_executable_property_buckets))
+actual_lacking_property_buckets=$((11 - actual_executable_property_buckets))
 
 check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
 check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
@@ -231,6 +276,12 @@ check_metric "Semantic lifecycle invariant suites" "$actual_semantic_lifecycle_i
 check_metric "Deterministic adversarial lifecycle scenarios" "$actual_adversarial_lifecycle_scenarios"
 check_metric "End-to-end DSL runtime semantic conformance suites" "$actual_dsl_runtime_semantics_suites"
 check_metric "Simulator semantic contract categories enforced automatically" "$actual_simulator_semantic_contract_categories"
+check_metric "Theorem-pack and admission executable assurance suites" "$actual_theorem_pack_admission_suites"
+check_metric "Distributed and topology semantic harness suites" "$actual_distributed_topology_semantic_harness_suites"
+check_metric "Agreement and composition runtime semantic suites" "$actual_agreement_composition_runtime_semantic_suites"
+check_metric "Extension and middleware semantic hardening suites" "$actual_extension_middleware_semantic_hardening_suites"
+check_metric "Generated topology and transport public-path suites" "$actual_generated_topology_transport_public_path_suites"
+check_metric "Explicit unsupported or fail-closed property notes" "$actual_explicit_unsupported_fail_closed_notes"
 
 # ── Report ────────────────────────────────────────────────────────────
 

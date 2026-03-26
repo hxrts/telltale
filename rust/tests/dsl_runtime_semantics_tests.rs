@@ -4,15 +4,26 @@
 
 use std::collections::BTreeMap;
 
+use proc_macro2::{Ident, Span};
 use telltale::tell;
 use telltale_language::ast::convert::{choreography_to_global, local_to_local_r};
+use telltale_language::ast::{
+    annotation::{Annotations, ProtocolAnnotation},
+    choreography::TheoremPackDeclaration,
+    Choreography, LocalType, MessageType, Protocol, Role, ValidationError,
+};
 use telltale_language::compiler::parser::parse_choreography_file;
+use telltale_language::extensions::{CodegenContext, ExtensionValidationError, ProtocolExtension};
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::runtime::loader::CodeImage;
-use telltale_machine::{ProgressState, ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::{
+    AgreementEvidence, AgreementEvidenceKind, AgreementLevel, AgreementState,
+    EffectCompositionPolicy, FinalizationOutcome, ProgressState, ProtocolMachine,
+    ProtocolMachineConfig,
+};
 use tempfile::NamedTempFile;
 
 const SIMPLE_DSL: &str = r#"
@@ -82,6 +93,15 @@ protocol AuthorityFlow uses Runtime =
   Coordinator -> Worker : Commit
 "#;
 
+const PROOF_BUNDLE_DSL: &str = r#"
+proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
+proof_bundle KnowledgeBase requires [knowledge_flow]
+
+protocol BundledFlow requires DelegationBase, KnowledgeBase =
+  roles A, B
+  A -> B : Ping
+"#;
+
 tell! {
     profile Replay fairness eventual admissibility replay escalation_window bounded
     agreement_profile SoftSafe
@@ -139,6 +159,15 @@ tell! {
       let receipt = transfer Session from Coordinator to Worker
       handoff acceptInvite to Worker with receipt
       Coordinator -> Worker : Commit
+}
+
+tell! {
+    proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
+    proof_bundle KnowledgeBase requires [knowledge_flow]
+
+    protocol MacroBundledFlow requires DelegationBase, KnowledgeBase =
+      roles A, B
+      A -> B : Ping
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -204,6 +233,101 @@ fn code_image_from_choreography(choreography: &telltale_language::ast::Choreogra
     CodeImage::from_local_types(&locals, &global)
 }
 
+#[derive(Debug)]
+struct DummyCapabilityExtension;
+
+impl ProtocolExtension for DummyCapabilityExtension {
+    fn type_name(&self) -> &'static str {
+        "DummyCapabilityExtension"
+    }
+
+    fn mentions_role(&self, _role: &Role) -> bool {
+        false
+    }
+
+    fn validate(&self, _roles: &[Role]) -> Result<(), ExtensionValidationError> {
+        Ok(())
+    }
+
+    fn project(
+        &self,
+        _role: &Role,
+        _context: &telltale_language::extensions::ProjectionContext,
+    ) -> Result<LocalType, telltale_language::compiler::projection::ProjectionError> {
+        Ok(LocalType::End)
+    }
+
+    fn generate_code(&self, _context: &CodegenContext) -> proc_macro2::TokenStream {
+        proc_macro2::TokenStream::new()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+
+    fn type_id(&self) -> std::any::TypeId {
+        std::any::TypeId::of::<Self>()
+    }
+}
+
+fn ident(name: &str) -> Ident {
+    Ident::new(name, Span::call_site())
+}
+
+fn role(name: &str) -> Role {
+    Role::new(ident(name)).expect("valid role")
+}
+
+fn message(name: &str) -> MessageType {
+    MessageType {
+        name: ident(name),
+        type_annotation: None,
+        payload: None,
+    }
+}
+
+fn capability_annotated_choreography(required_capability: &str) -> Choreography {
+    let mut choreography = Choreography {
+        name: ident("CapabilityGuard"),
+        namespace: None,
+        roles: vec![role("A"), role("B")],
+        protocol: Protocol::Extension {
+            extension: Box::new(DummyCapabilityExtension),
+            continuation: Box::new(Protocol::Send {
+                from: role("A"),
+                to: role("B"),
+                message: message("Ping"),
+                continuation: Box::new(Protocol::End),
+                annotations: Annotations::new(),
+                from_annotations: Annotations::new(),
+                to_annotations: Annotations::new(),
+            }),
+            annotations: Annotations::single(ProtocolAnnotation::custom(
+                "required_capability",
+                required_capability,
+            )),
+        },
+        attrs: Default::default(),
+    };
+    choreography
+        .set_theorem_packs(&[TheoremPackDeclaration {
+            name: "Base".to_string(),
+            capabilities: vec!["guard_tokens".to_string()],
+            version: Some("1.0.0".to_string()),
+            issuer: Some("did:example:issuer".to_string()),
+            constraints: vec!["fresh_nonce".to_string()],
+        }])
+        .expect("set theorem packs");
+    choreography
+        .set_required_theorem_packs(&["Base".to_string()])
+        .expect("set required theorem packs");
+    choreography
+}
+
 #[test]
 fn supported_dsl_surface_lowers_to_runtime_semantic_objects() {
     let image = code_image_from_dsl(SIMPLE_DSL);
@@ -259,6 +383,61 @@ fn supported_tell_file_surface_lowers_to_runtime_semantic_objects() {
 }
 
 #[test]
+fn proof_bundle_dsl_surface_resolves_required_bundles_and_lowers() {
+    let choreography = telltale_language::parse_choreography_str(PROOF_BUNDLE_DSL)
+        .expect("parse proof-bundle DSL");
+    choreography.validate().expect("validate proof-bundle DSL");
+
+    let theorem_packs = choreography.theorem_packs();
+    assert_eq!(theorem_packs.len(), 2, "expected both proof bundles to parse");
+    assert_eq!(theorem_packs[0].name, "DelegationBase");
+    assert_eq!(
+        theorem_packs[0].capabilities,
+        vec!["delegation".to_string(), "guard_tokens".to_string()]
+    );
+    assert_eq!(theorem_packs[0].version.as_deref(), Some("1.0.0"));
+    assert_eq!(
+        theorem_packs[0].issuer.as_deref(),
+        Some("did:example:issuer")
+    );
+    assert_eq!(
+        theorem_packs[0].constraints,
+        vec!["fresh_nonce".to_string()]
+    );
+    assert_eq!(
+        choreography.required_theorem_packs(),
+        vec!["DelegationBase".to_string(), "KnowledgeBase".to_string()]
+    );
+
+    let image = code_image_from_choreography(&choreography);
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load bundled image");
+    machine.run(&NoopHandler, 32).expect("run bundled image");
+}
+
+#[test]
+fn generated_proof_status_exposes_required_theorem_packs() {
+    assert_eq!(
+        MacroBundledFlow::proof_status::REQUIRED_THEOREM_PACKS,
+        ["DelegationBase", "KnowledgeBase"]
+    );
+    const _: () = assert!(MacroBundledFlow::proof_status::SESSION_PROJECTABLE);
+    const _: () = assert!(MacroBundledFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+}
+
+#[test]
+fn validation_rejects_missing_required_capability_coverage() {
+    let choreography = capability_annotated_choreography("delegation");
+    let err = choreography
+        .validate()
+        .expect_err("missing theorem-pack capability should fail validation");
+    assert!(matches!(
+        err,
+        ValidationError::MissingCapability(ref capability) if capability == "delegation"
+    ));
+}
+
+#[test]
 fn generated_commitment_metadata_matches_declared_semantic_contracts() {
     let choreography =
         telltale_language::parse_choreography_str(COMMITMENT_DSL).expect("parse DSL");
@@ -302,6 +481,10 @@ fn generated_commitment_metadata_matches_declared_semantic_contracts() {
     );
     assert_eq!(metadata.progress.on_timeout, progress.on_timeout.as_deref());
     assert_eq!(metadata.progress.on_stall, progress.on_stall.as_deref());
+    assert_eq!(
+        agreement_metadata.child_effect_aggregation,
+        Some(EffectCompositionPolicy::First)
+    );
     assert_eq!(operation_instance.kind, operation.name);
     assert!(operation_instance.requires_proof);
     assert!(progress_contract.bounded);
@@ -321,6 +504,56 @@ fn generated_commitment_metadata_matches_declared_semantic_contracts() {
     );
     const _: () = assert!(MacroCommitLifecycle::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
     const _: () = assert!(!MacroCommitLifecycle::proof_status::SESSION_PROJECTABLE);
+}
+
+#[test]
+fn declared_agreement_metadata_admits_runtime_semantic_finalization_shapes() {
+    let agreement_metadata = MacroCommitLifecycle::agreements::operation("syncLedger")
+        .expect("macro agreement metadata");
+    let agreement_contract = agreement_metadata.agreement_contract("syncLedger#1");
+    let agreement_profile =
+        MacroCommitLifecycle::agreements::profile("SoftSafe").expect("macro agreement profile");
+    let prestate_binding = agreement_metadata
+        .prestate_binding("syncLedger#1", "digest:ledger")
+        .expect("prestate binding");
+
+    assert!(agreement_profile
+        .agreement_profile()
+        .supports_contract(&agreement_contract));
+
+    let provisional = AgreementState {
+        operation_id: "syncLedger#1".to_string(),
+        session: None,
+        owner_id: None,
+        contract_name: agreement_contract.contract_name.clone(),
+        level: AgreementLevel::SoftSafe,
+        finalization: None,
+        evidence_ids: vec!["publication:syncLedger#1:SyncQueued".to_string()],
+        last_updated_tick: Some(7),
+        reason: None,
+    };
+    assert!(agreement_contract.provisional_usable(&provisional));
+
+    let evidence = AgreementEvidence {
+        evidence_id: "publication:syncLedger#1:SyncQueued".to_string(),
+        operation_id: "syncLedger#1".to_string(),
+        session: None,
+        owner_id: None,
+        level: AgreementLevel::Finalized,
+        kind: AgreementEvidenceKind::CommitFact,
+        reference: "syncLedger#1:SyncQueued".to_string(),
+        authoritative: true,
+    };
+    let finalized = AgreementState {
+        level: AgreementLevel::Finalized,
+        finalization: Some(FinalizationOutcome::Finalized),
+        ..provisional.clone()
+    };
+    assert!(agreement_contract.finalization_admissible(
+        &prestate_binding,
+        &evidence,
+        &finalized
+    ));
 }
 
 #[test]
@@ -460,6 +693,57 @@ protocol CommitLifecycle under Replay =
             "unexpected parser error for `{keyword}`: {message}"
         );
     }
+}
+
+#[test]
+fn threshold_child_effect_aggregation_requires_positive_success_count() {
+    let input = r#"
+agreement_profile SoftSafe
+  visibility pending
+  rule aura_soft_safe
+  usable_at soft_safe
+  finalized_at finalized
+  evidence commit_fact
+
+operation syncLedger(entryId : Int) at Coordinator agreement SoftSafe compose threshold_success(0) =
+  publish SyncQueued(entryId)
+
+protocol CommitLifecycle =
+  roles Coordinator, Worker
+  begin syncLedger(42)
+  Coordinator -> Worker : Prepare
+"#;
+
+    let err =
+        telltale_language::parse_choreography_str(input).expect_err("threshold_success(0)");
+    assert!(err.to_string().contains("positive success count"));
+}
+
+#[test]
+fn unknown_agreement_profile_fails_closed_during_validation() {
+    let input = r#"
+profile Replay fairness eventual admissibility replay escalation_window bounded
+agreement_profile SoftSafe
+  visibility pending
+  rule aura_soft_safe
+  usable_at soft_safe
+  finalized_at finalized
+  evidence commit_fact
+
+operation syncLedger(entryId : Int) at Coordinator progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose agreement MissingProfile =
+  publish SyncQueued(entryId)
+
+protocol CommitLifecycle under Replay =
+  roles Coordinator, Worker
+  begin syncLedger(42) progress LedgerProgress requires Replay within bounded on timeout => escalate on stall => diagnose
+  Coordinator -> Worker : Prepare
+"#;
+
+    let choreography = telltale_language::parse_choreography_str(input).expect("parse DSL");
+    let err = choreography
+        .validate()
+        .expect_err("unknown agreement profile must fail validation");
+    assert!(err.to_string().contains("MissingProfile"));
 }
 
 #[test]

@@ -38,4 +38,4 @@ impl ProtocolFixture {
 }
 
 pub use tier1_minimal::{chain, ping_pong, singleton};
-pub use tier5_negative::{bad_quorum, deadlock, unbounded_wait};
+pub use tier5_negative::{bad_quorum, bridge_without_admission, deadlock, unbounded_wait};

@@ -30,6 +30,7 @@ pub use transport::{
 pub use validation_types::{TopologyError, TopologyLoadError, TopologyValidation};
 
 use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
@@ -229,6 +230,115 @@ pub struct Topology {
 }
 
 impl Topology {
+    fn resolved_location(
+        &self,
+        role: &RoleName,
+        visiting: &mut BTreeSet<RoleName>,
+    ) -> Result<Location, String> {
+        if !visiting.insert(role.clone()) {
+            return Err(format!("cyclic colocated placement involving role {role}"));
+        }
+
+        let resolved = match self.get_location(role) {
+            Ok(Location::Colocated(peer)) => self.resolved_location(&peer, visiting),
+            Ok(location) => Ok(location),
+            Err(TopologyError::UnknownRole(missing)) => {
+                Err(format!("role {role} refers to unknown colocated peer {missing}"))
+            }
+        };
+
+        visiting.remove(role);
+        resolved
+    }
+
+    fn resolve_constraint_location(&self, location: &Location) -> Result<Location, String> {
+        match location {
+            Location::Colocated(peer) => self.resolved_location(peer, &mut BTreeSet::new()),
+            other => Ok(other.clone()),
+        }
+    }
+
+    fn validate_constraint(&self, constraint: &TopologyConstraint) -> Option<TopologyValidation> {
+        let resolved = |role: &RoleName| match self.resolved_location(role, &mut BTreeSet::new()) {
+            Ok(location) => Ok(location),
+            Err(reason) => Err(TopologyValidation::ConstraintViolation(
+                constraint.clone(),
+                reason,
+            )),
+        };
+        let resolve_expected = |location: &Location| match self.resolve_constraint_location(location) {
+            Ok(location) => Ok(location),
+            Err(reason) => Err(TopologyValidation::ConstraintViolation(
+                constraint.clone(),
+                reason,
+            )),
+        };
+
+        match constraint {
+            TopologyConstraint::Colocated(left, right) => {
+                let left_location = match resolved(left) {
+                    Ok(location) => location,
+                    Err(validation) => return Some(validation),
+                };
+                let right_location = match resolved(right) {
+                    Ok(location) => location,
+                    Err(validation) => return Some(validation),
+                };
+                if left_location == right_location {
+                    None
+                } else {
+                    Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!(
+                            "roles {left} and {right} resolve to different locations ({left_location} vs {right_location})"
+                        ),
+                    ))
+                }
+            }
+            TopologyConstraint::Separated(left, right) => {
+                let left_location = match resolved(left) {
+                    Ok(location) => location,
+                    Err(validation) => return Some(validation),
+                };
+                let right_location = match resolved(right) {
+                    Ok(location) => location,
+                    Err(validation) => return Some(validation),
+                };
+                if left_location != right_location {
+                    None
+                } else {
+                    Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!(
+                            "roles {left} and {right} resolve to the same location ({left_location})"
+                        ),
+                    ))
+                }
+            }
+            TopologyConstraint::Pinned(role, expected) => {
+                let actual = match resolved(role) {
+                    Ok(location) => location,
+                    Err(validation) => return Some(validation),
+                };
+                let expected = match resolve_expected(expected) {
+                    Ok(location) => location,
+                    Err(validation) => return Some(validation),
+                };
+                if actual == expected {
+                    None
+                } else {
+                    Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!(
+                            "role {role} resolved to {actual}, expected pinned location {expected}"
+                        ),
+                    ))
+                }
+            }
+            TopologyConstraint::Region(_, _) => None,
+        }
+    }
+
     /// Create an empty topology
     pub fn new() -> Self {
         Self::default()
@@ -334,9 +444,24 @@ impl Topology {
     /// Validate a topology against choreography roles
     pub fn validate(&self, choreo_roles: &[RoleName]) -> TopologyValidation {
         // Check all topology roles exist
-        for role in self.locations.keys() {
+        for (role, location) in &self.locations {
             if !choreo_roles.contains(role) {
                 return TopologyValidation::UnknownRole(role.clone());
+            }
+
+            if let Location::Colocated(peer) = location {
+                if !choreo_roles.contains(peer) {
+                    return TopologyValidation::UnknownRole(peer.clone());
+                }
+            }
+        }
+
+        // Custom topologies must provide an explicit placement for each role.
+        if !matches!(self.mode, Some(TopologyMode::Local)) {
+            for role in choreo_roles {
+                if !self.locations.contains_key(role) {
+                    return TopologyValidation::MissingRole(role.clone());
+                }
             }
         }
 
@@ -366,6 +491,12 @@ impl Topology {
                         return TopologyValidation::UnknownRole(r.clone());
                     }
                 }
+            }
+        }
+
+        for constraint in &self.constraints {
+            if let Some(validation) = self.validate_constraint(constraint) {
+                return validation;
             }
         }
 
@@ -600,10 +731,26 @@ mod tests {
             RoleName::from_static("Bob"),
             RoleName::from_static("Carol"),
         ];
-        assert!(topology.validate(&roles).is_valid());
+        match topology.validate(&roles) {
+            TopologyValidation::MissingRole(role) => {
+                assert_eq!(role, RoleName::from_static("Carol"))
+            }
+            other => panic!("Expected MissingRole, got {other:?}"),
+        }
 
         let limited_roles = vec![RoleName::from_static("Alice")];
         assert!(!topology.validate(&limited_roles).is_valid());
+    }
+
+    #[test]
+    fn test_local_mode_allows_implicit_role_coverage() {
+        let topology = Topology::builder().mode(TopologyMode::Local).build();
+        let roles = vec![
+            RoleName::from_static("Alice"),
+            RoleName::from_static("Bob"),
+            RoleName::from_static("Carol"),
+        ];
+        assert!(topology.validate(&roles).is_valid());
     }
 
     #[test]
@@ -686,6 +833,56 @@ mod tests {
                 assert_eq!(role, RoleName::from_static("Unknown"))
             }
             _ => panic!("Expected UnknownRole"),
+        }
+    }
+
+    #[test]
+    fn test_constraint_validation_enforces_placement_requirements() {
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
+
+        let separated = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .separated(RoleName::from_static("Alice"), RoleName::from_static("Bob"))
+            .build();
+        match separated.validate(&roles) {
+            TopologyValidation::ConstraintViolation(TopologyConstraint::Separated(left, right), _) => {
+                assert_eq!(left, RoleName::from_static("Alice"));
+                assert_eq!(right, RoleName::from_static("Bob"));
+            }
+            other => panic!("Expected separated placement violation, got {other:?}"),
+        }
+
+        let pinned = Topology::builder()
+            .remote_role(
+                RoleName::from_static("Alice"),
+                TopologyEndpoint::new("localhost:9000").unwrap(),
+            )
+            .local_role(RoleName::from_static("Bob"))
+            .pinned(RoleName::from_static("Bob"), Location::Remote(TopologyEndpoint::new("localhost:9001").unwrap()))
+            .build();
+        match pinned.validate(&roles) {
+            TopologyValidation::ConstraintViolation(TopologyConstraint::Pinned(role, _), _) => {
+                assert_eq!(role, RoleName::from_static("Bob"));
+            }
+            other => panic!("Expected pinned placement violation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_colocated_roles_require_known_peers() {
+        let topology = Topology::builder()
+            .colocated_role(
+                RoleName::from_static("Bob"),
+                RoleName::from_static("Carol"),
+            )
+            .build();
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
+        match topology.validate(&roles) {
+            TopologyValidation::UnknownRole(role) => {
+                assert_eq!(role, RoleName::from_static("Carol"));
+            }
+            other => panic!("Expected missing colocated peer role, got {other:?}"),
         }
     }
 

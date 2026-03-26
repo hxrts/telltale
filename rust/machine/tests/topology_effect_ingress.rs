@@ -6,6 +6,7 @@
 mod test_support;
 
 use cfg_if::cfg_if;
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use telltale_machine::coroutine::Value;
@@ -18,7 +19,7 @@ use test_support::simple_send_recv_image;
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use std::{collections::BTreeMap, time::Duration};
+        use std::time::Duration;
 
         use telltale_machine::ThreadedProtocolMachine;
         use telltale_machine::CorruptionType;
@@ -97,6 +98,65 @@ impl EffectHandler for TopologyBurstHandler {
     }
 }
 
+#[derive(Debug, Clone)]
+struct ScriptedTopologyHandler {
+    events_by_tick: BTreeMap<u64, Vec<TopologyPerturbation>>,
+}
+
+impl ScriptedTopologyHandler {
+    fn new(events_by_tick: BTreeMap<u64, Vec<TopologyPerturbation>>) -> Self {
+        Self { events_by_tick }
+    }
+}
+
+impl EffectHandler for ScriptedTopologyHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        label: &str,
+        _state: &[Value],
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Str(label.to_string()))
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels")),
+        }
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        EffectResult::success(self.events_by_tick.get(&tick).cloned().unwrap_or_default())
+    }
+}
+
 #[test]
 fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
     let image = simple_send_recv_image("A", "B", "m");
@@ -121,67 +181,51 @@ fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
     );
 }
 
+#[test]
+fn cooperative_vm_canonicalizes_unsorted_topology_events_by_ordering_key() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut scripted = BTreeMap::new();
+    let unsorted = vec![
+        TopologyPerturbation::Timeout {
+            site: "B".to_string(),
+            duration: std::time::Duration::from_millis(5),
+        },
+        TopologyPerturbation::Crash {
+            site: "A".to_string(),
+        },
+        TopologyPerturbation::Partition {
+            from: "A".to_string(),
+            to: "B".to_string(),
+        },
+        TopologyPerturbation::Heal {
+            from: "A".to_string(),
+            to: "B".to_string(),
+        },
+    ];
+    scripted.insert(1, unsorted.clone());
+    let handler = ScriptedTopologyHandler::new(scripted);
+
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine
+        .load_choreography(&image)
+        .expect("load cooperative image");
+    machine.step_round(&handler, 1).expect("cooperative step round");
+
+    let actual: Vec<_> = machine
+        .effect_trace()
+        .iter()
+        .filter_map(|entry| entry.topology.clone())
+        .collect();
+    let mut expected = unsorted;
+    expected.sort_by_key(TopologyPerturbation::ordering_key);
+    assert_eq!(
+        actual, expected,
+        "topology ingress should canonicalize unsorted host events"
+    );
+}
+
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        #[derive(Debug, Clone)]
-        struct ScriptedTopologyHandler {
-            events_by_tick: BTreeMap<u64, Vec<TopologyPerturbation>>,
-        }
-
-        impl ScriptedTopologyHandler {
-            fn new(events_by_tick: BTreeMap<u64, Vec<TopologyPerturbation>>) -> Self {
-                Self { events_by_tick }
-            }
-        }
-
-        impl EffectHandler for ScriptedTopologyHandler {
-            fn handle_send(
-                &self,
-                _role: &str,
-                _partner: &str,
-                label: &str,
-                _state: &[Value],
-            ) -> EffectResult<Value> {
-                EffectResult::success(Value::Str(label.to_string()))
-            }
-
-            fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
-                EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
-            }
-
-            fn handle_recv(
-                &self,
-                _role: &str,
-                _partner: &str,
-                _label: &str,
-                _state: &mut Vec<Value>,
-                _payload: &Value,
-            ) -> EffectResult<()> {
-                EffectResult::success(())
-            }
-
-            fn handle_choose(
-                &self,
-                _role: &str,
-                _partner: &str,
-                labels: &[String],
-                _state: &[Value],
-            ) -> EffectResult<String> {
-                match labels.first().cloned() {
-                    Some(label) => EffectResult::success(label),
-                    None => EffectResult::failure(EffectFailure::invalid_input("no labels")),
-                }
-            }
-
-            fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
-                EffectResult::success(())
-            }
-
-            fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
-                EffectResult::success(self.events_by_tick.get(&tick).cloned().unwrap_or_default())
-            }
-        }
-
         #[test]
         fn threaded_vm_ingests_topology_events_before_instruction_effects() {
             let image = simple_send_recv_image("A", "B", "m");
@@ -272,6 +316,53 @@ cfg_if! {
                 .trace()
                 .iter()
                 .any(|ev| matches!(ev, telltale_machine::ObsEvent::Faulted { .. })));
+        }
+
+        #[test]
+        fn threaded_vm_matches_cooperative_topology_event_ordering() {
+            let image = simple_send_recv_image("A", "B", "m");
+            let mut script = BTreeMap::new();
+            script.insert(
+                1,
+                vec![
+                    TopologyPerturbation::Timeout {
+                        site: "B".to_string(),
+                        duration: Duration::from_millis(5),
+                    },
+                    TopologyPerturbation::Crash {
+                        site: "A".to_string(),
+                    },
+                    TopologyPerturbation::Partition {
+                        from: "A".to_string(),
+                        to: "B".to_string(),
+                    },
+                    TopologyPerturbation::Heal {
+                        from: "A".to_string(),
+                        to: "B".to_string(),
+                    },
+                ],
+            );
+            let handler = ScriptedTopologyHandler::new(script);
+
+            let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
+            coop.load_choreography(&image)
+                .expect("load cooperative image");
+            coop.step_round(&handler, 1)
+                .expect("cooperative step round");
+
+            let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+            threaded
+                .load_choreography(&image)
+                .expect("load threaded image");
+            threaded
+                .step_round(&handler, 1)
+                .expect("threaded step round");
+
+            assert_eq!(
+                topology_trace(coop.effect_trace()),
+                topology_trace(threaded.effect_trace()),
+                "topology event ordering should remain canonical across runtimes"
+            );
         }
 
         #[test]

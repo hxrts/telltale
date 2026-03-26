@@ -4,14 +4,73 @@
 //! transports based on the topology configuration.
 
 use super::{
-    Location, Topology, TopologyError, Transport, TransportError, TransportFactory, TransportResult,
+    InMemoryChannelTransport, Location, Topology, TopologyError, Transport, TransportError,
+    TransportResult,
 };
 use crate::identifiers::RoleName;
 use crate::runtime::sync::RwLock;
 use crate::{read_lock, write_lock};
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::collections::{BTreeMap, BTreeSet};
+use std::sync::{Arc, Mutex, OnceLock};
 use thiserror::Error;
+
+#[derive(Default)]
+struct SharedLocalTopologyState {
+    transports: BTreeMap<RoleName, Arc<InMemoryChannelTransport>>,
+    connected_pairs: BTreeSet<(RoleName, RoleName)>,
+}
+
+type SharedLocalRegistry = BTreeMap<String, SharedLocalTopologyState>;
+
+fn shared_local_registry() -> &'static Mutex<SharedLocalRegistry> {
+    static REGISTRY: OnceLock<Mutex<SharedLocalRegistry>> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+fn topology_signature(topology: &Topology) -> String {
+    let mut parts = Vec::new();
+    parts.push(format!("mode:{:?}", topology.mode));
+    for (role, location) in &topology.locations {
+        parts.push(format!("role:{role}:{location}"));
+    }
+    for ((sender, receiver), capacity) in &topology.channel_capacities {
+        parts.push(format!("capacity:{sender}:{receiver}:{}", capacity.get()));
+    }
+    for constraint in &topology.constraints {
+        parts.push(format!("constraint:{constraint}"));
+    }
+    parts.join("|")
+}
+
+#[derive(Clone)]
+struct SharedInMemoryTransport {
+    inner: Arc<InMemoryChannelTransport>,
+}
+
+impl SharedInMemoryTransport {
+    fn new(inner: Arc<InMemoryChannelTransport>) -> Self {
+        Self { inner }
+    }
+}
+
+#[async_trait::async_trait]
+impl Transport for SharedInMemoryTransport {
+    async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
+        self.inner.send(to_role, message).await
+    }
+
+    async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
+        self.inner.recv(from_role).await
+    }
+
+    fn is_connected(&self, role: &RoleName) -> bool {
+        self.inner.is_connected(role)
+    }
+
+    async fn close(&self) -> TransportResult<()> {
+        Ok(())
+    }
+}
 
 /// A topology-aware protocol handler.
 ///
@@ -40,6 +99,8 @@ use thiserror::Error;
 pub struct TopologyHandler {
     /// The topology configuration.
     topology: Topology,
+    /// Stable signature used to share deterministic local transports.
+    topology_signature: String,
     /// The role this handler represents.
     role: RoleName,
     /// Transports for each peer role.
@@ -51,8 +112,10 @@ pub struct TopologyHandler {
 impl TopologyHandler {
     /// Create a new topology handler.
     pub fn new(topology: Topology, role: RoleName) -> Self {
+        let topology_signature = topology_signature(&topology);
         Self {
             topology,
+            topology_signature,
             role,
             transports: Arc::new(RwLock::new(BTreeMap::new())),
             initialized: Arc::new(RwLock::new(false)),
@@ -74,6 +137,46 @@ impl TopologyHandler {
         &self.topology
     }
 
+    async fn ensure_connected_transport(&self, peer: &RoleName) -> Arc<InMemoryChannelTransport> {
+        let (local, remote, should_connect) = {
+            let mut registry = shared_local_registry()
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let entry = registry
+                .entry(self.topology_signature.clone())
+                .or_default();
+
+            let local = entry
+                .transports
+                .entry(self.role.clone())
+                .or_insert_with(|| Arc::new(InMemoryChannelTransport::new(self.role.clone())))
+                .clone();
+            let remote = entry
+                .transports
+                .entry(peer.clone())
+                .or_insert_with(|| Arc::new(InMemoryChannelTransport::new(peer.clone())))
+                .clone();
+
+            let pair = if self.role <= *peer {
+                (self.role.clone(), peer.clone())
+            } else {
+                (peer.clone(), self.role.clone())
+            };
+            let should_connect = entry.connected_pairs.insert(pair);
+            (local, remote, should_connect)
+        };
+
+        if should_connect {
+            local.connect(&remote).await;
+        }
+        local
+    }
+
+    async fn ensure_transport(&self, role: &RoleName) -> Box<dyn Transport> {
+        let shared = self.ensure_connected_transport(role).await;
+        Box::new(SharedInMemoryTransport::new(shared))
+    }
+
     /// Initialize transports for all roles.
     pub async fn initialize(&self) -> TransportResult<()> {
         let mut transports = write_lock!(self.transports);
@@ -86,7 +189,7 @@ impl TopologyHandler {
         // Create transports for each role in the topology
         for role in self.topology.locations.keys() {
             if role != &self.role {
-                let transport = TransportFactory::create(&self.topology, role);
+                let transport = self.ensure_transport(role).await;
                 transports.insert(role.clone(), transport);
             }
         }
@@ -107,7 +210,7 @@ impl TopologyHandler {
 
             // Create transport on-demand
             let mut transports = write_lock!(self.transports);
-            let transport = TransportFactory::create(&self.topology, to_role);
+            let transport = self.ensure_transport(to_role).await;
             transports.insert(to_role.clone(), transport);
 
             transports
@@ -125,7 +228,17 @@ impl TopologyHandler {
         if let Some(transport) = transports.get(from_role) {
             transport.recv(from_role).await
         } else {
-            Err(TransportError::UnknownRole(from_role.clone()))
+            drop(transports);
+
+            let mut transports = write_lock!(self.transports);
+            let transport = self.ensure_transport(from_role).await;
+            transports.insert(from_role.clone(), transport);
+
+            transports
+                .get(from_role)
+                .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?
+                .recv(from_role)
+                .await
         }
     }
 
@@ -216,6 +329,7 @@ impl TopologyHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::TopologyBuilder;
 
     #[test]
     fn test_topology_handler_creation() {
@@ -277,6 +391,36 @@ mod tests {
         assert_eq!(
             handler.get_location(&RoleName::from_static("Bob")).unwrap(),
             Location::Remote(crate::identifiers::Endpoint::new("localhost:8080").unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn local_handlers_share_deterministic_message_routing() {
+        let topology = TopologyBuilder::new()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .build();
+        let alice = TopologyHandler::new(topology.clone(), RoleName::from_static("Alice"));
+        let bob = TopologyHandler::new(topology, RoleName::from_static("Bob"));
+
+        alice.initialize().await.unwrap();
+        bob.initialize().await.unwrap();
+
+        alice
+            .send(&RoleName::from_static("Bob"), b"ping".to_vec())
+            .await
+            .unwrap();
+        assert_eq!(
+            bob.recv(&RoleName::from_static("Alice")).await.unwrap(),
+            b"ping".to_vec()
+        );
+
+        bob.send(&RoleName::from_static("Alice"), b"pong".to_vec())
+            .await
+            .unwrap();
+        assert_eq!(
+            alice.recv(&RoleName::from_static("Bob")).await.unwrap(),
+            b"pong".to_vec()
         );
     }
 }

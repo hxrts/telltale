@@ -21,7 +21,7 @@ When one of these values changes legitimately:
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 8 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 8 | `rust/macros/tests/macro_ui.rs` |
-| Property buckets with executable assurance suites | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Property buckets with executable assurance suites | 11 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Identity and replay semantic assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -33,6 +33,12 @@ When one of these values changes legitimately:
 | Deterministic adversarial lifecycle scenarios | 10 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | End-to-end DSL runtime semantic conformance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Simulator semantic contract categories enforced automatically | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Theorem-pack and admission executable assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Distributed and topology semantic harness suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Agreement and composition runtime semantic suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Extension and middleware semantic hardening suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Generated topology and transport public-path suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Explicit unsupported or fail-closed property notes | 3 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
 ## Property Coverage Baseline
 
@@ -51,6 +57,23 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Structure | Deterministic runtime structure suite | `rust/machine/src/engine/runtime_exec/semantic_state.rs` | Region locality, structural handoff transfer, and transformation obligations are now checked on executable runtime paths. Reconfiguration remains fail-closed elsewhere |
 | Premise | Fail-closed + admission checks | `rust/machine/src/runtime_contracts.rs`, `rust/machine/src/composition.rs`, `rust/language/src/compiler/parser/mod.rs`, `rust/runtime/tests/authority_compile_fail.rs` | Assumption-heavy paths are rejected or gated, but not yet deeply scenario-tested |
 | Premise | End-to-end supported/fail-closed lowering | `rust/tests/dsl_runtime_semantics_tests.rs` | Supported DSL forms now run through parser -> projection -> theory conversion -> protocol machine, while unsupported commitment lifecycle lowering fails closed |
+| Admission | Theorem-pack and bundle assurance | `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/bridge/tests/invariant_verification.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Proof-bundle declarations, capability drops, and admission-gated runtime requests are now exercised end to end with stable diagnostics |
+| Distributed topology | Deterministic harness | `rust/simulator/tests/distributed.rs`, `rust/machine/tests/topology_effect_ingress.rs`, `rust/runtime/tests/generated_topology_public_path.rs` | Distributed replay, ordered topology ingress, generated helpers, and invalid placement rejection now run through executable runtime paths without ambient network dependency |
+| Agreement | Runtime commitment semantics | `rust/machine/src/effect/core_types.rs`, `rust/machine/src/semantic_objects.rs`, `rust/machine/tests/threaded_equivalence.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Agreement profiles and child-effect rollups are checked as runtime semantics across scenario tables, lowering, and cross-driver parity |
+| Extension boundary | Fail-closed + deterministic middleware stacks | `rust/runtime/tests/extension_integration.rs`, `rust/runtime/tests/middleware_semantic_hardening.rs` | Registered extension paths span parse -> codegen -> runtime, while retry, metrics, trace, and seeded fault injection remain explicit and deterministic |
+| Generated deployment path | Public helper end-to-end execution | `rust/runtime/tests/generated_topology_public_path.rs` | `handler(...)`, `with_topology(...)`, and named inline topology helpers are exercised as public surfaces with transport intent checks and negative validation coverage |
+
+## Explicit Unsupported / Fail-Closed Notes
+
+These surfaces are intentionally not counted as executable support yet.
+They remain visible here so the inventory does not overstate what the system
+currently guarantees.
+
+| Surface | Current status | Why it is not counted as executable support yet |
+|---|---|---|
+| Extension statement runtime dispatch | Fail-closed | Timeout-extension statement parsing is covered, but runtime statement dispatch remains intentionally unsupported and must reject clearly |
+| Topology region constraints | Not yet executable | Placement validation now enforces colocated, separated, and pinned constraints, but region constraints still lack an executable runtime check and are therefore not counted |
+| Remote transport realization | Intent checked only | Generated topology/transport public-path tests assert transport intent and deterministic routing through `TopologyHandler`, but real remote transport backends are still placeholder surfaces |
 
 The inventory deliberately does not track raw unit-test totals, assertion
 counts, or line counts for tests.

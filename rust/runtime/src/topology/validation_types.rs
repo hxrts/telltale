@@ -29,6 +29,8 @@ pub enum TopologyValidation {
     Valid,
     /// A role referenced in topology doesn't exist in choreography.
     UnknownRole(RoleName),
+    /// A choreography role was not assigned a placement in a custom topology.
+    MissingRole(RoleName),
     /// A constraint is violated (with reason).
     ConstraintViolation(TopologyConstraint, String),
     /// Channel capacity is insufficient for a branching requirement.

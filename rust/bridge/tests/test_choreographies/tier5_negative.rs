@@ -1,6 +1,8 @@
 use telltale_bridge::{
     AvailabilityLevel, CAPConfig, DistributedClaims, FLPConfig, InvariantClaims, LivenessConfig,
-    PartitionModel, QuorumGeometryConfig, QuorumSystemKind, SchedulerKind, TimingModel,
+    PartitionModel, ProtocolEnvelopeBridgeConfig, ProtocolMachineEnvelopeAdherenceConfig,
+    ProtocolMachineEnvelopeAdmissionConfig, QuorumGeometryConfig, QuorumSystemKind,
+    SchedulerKind, TimingModel,
 };
 
 use super::{tier1_minimal, ProtocolFixture};
@@ -62,6 +64,23 @@ pub fn unbounded_wait() -> ProtocolFixture {
                 leader_based: false,
                 requires_stable_period: false,
             }),
+            ..DistributedClaims::default()
+        },
+        ..InvariantClaims::default()
+    })
+}
+
+#[must_use]
+pub fn bridge_without_admission() -> ProtocolFixture {
+    tier1_minimal::ping_pong().with_claims(InvariantClaims {
+        distributed: DistributedClaims {
+            protocol_machine_envelope_adherence: Some(ProtocolMachineEnvelopeAdherenceConfig {
+                enabled: true,
+            }),
+            protocol_machine_envelope_admission: Some(ProtocolMachineEnvelopeAdmissionConfig {
+                enabled: false,
+            }),
+            protocol_envelope_bridge: Some(ProtocolEnvelopeBridgeConfig { enabled: true }),
             ..DistributedClaims::default()
         },
         ..InvariantClaims::default()

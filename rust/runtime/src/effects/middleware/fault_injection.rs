@@ -35,6 +35,16 @@ impl<H> FaultInjection<H> {
         }
     }
 
+    pub fn with_seed(inner: H, failure_rate: f32, seed: u64) -> Self {
+        use rand::SeedableRng;
+        Self {
+            inner,
+            failure_rate,
+            delay_range: None,
+            rng: rand::rngs::StdRng::seed_from_u64(seed),
+        }
+    }
+
     pub fn with_delays(mut self, min: Duration, max: Duration) -> Self {
         self.delay_range = Some((min, max));
         self

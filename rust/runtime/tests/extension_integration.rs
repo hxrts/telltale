@@ -6,7 +6,9 @@
 
 use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
+use telltale_language::extensions::timeout::{TimeoutGrammarExtension, TimeoutStatementParser};
 use telltale_runtime::effects::*;
+use telltale_runtime::{parse_and_generate_with_extensions, ExtensionParserBuilder};
 use telltale_runtime::RoleName;
 
 // Simple test extension
@@ -85,37 +87,47 @@ struct TestHandler {
 impl TestHandler {
     fn new(_role: TestRole) -> Self {
         let executed_extensions = Arc::new(Mutex::new(Vec::new()));
-        let mut registry = ExtensionRegistry::new();
-
-        // Register TestExtension handler
-        let executed = executed_extensions.clone();
-        registry
-            .register::<TestExtension, _>(move |_ep, ext| {
-                let executed = executed.clone();
-                Box::pin(async move {
-                    let test_ext =
-                        ext.as_any()
-                            .downcast_ref::<TestExtension>()
-                            .ok_or_else(|| ExtensionError::TypeMismatch {
-                                expected: "TestExtension",
-                                actual: ext.type_name(),
-                            })?;
-
-                    executed.lock().unwrap().push(test_ext.value);
-                    Ok(())
-                })
-            })
-            .expect("register test extension");
-
         Self {
-            registry,
+            registry: registered_test_registry(executed_extensions.clone()),
             executed_extensions,
+        }
+    }
+
+    fn without_extensions(_role: TestRole) -> Self {
+        Self {
+            registry: ExtensionRegistry::new(),
+            executed_extensions: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
     fn executed_values(&self) -> Vec<u32> {
         self.executed_extensions.lock().unwrap().clone()
     }
+}
+
+fn registered_test_registry(
+    executed_extensions: Arc<Mutex<Vec<u32>>>,
+) -> ExtensionRegistry<(), TestRole> {
+    let mut registry = ExtensionRegistry::new();
+    let executed = executed_extensions.clone();
+    registry
+        .register::<TestExtension, _>(move |_ep, ext| {
+            let executed = executed.clone();
+            Box::pin(async move {
+                let test_ext = ext
+                    .as_any()
+                    .downcast_ref::<TestExtension>()
+                    .ok_or_else(|| ExtensionError::TypeMismatch {
+                        expected: "TestExtension",
+                        actual: ext.type_name(),
+                    })?;
+
+                executed.lock().unwrap().push(test_ext.value);
+                Ok(())
+            })
+        })
+        .expect("register test extension");
+    registry
 }
 
 #[async_trait::async_trait]
@@ -253,4 +265,90 @@ fn test_extension_type_checking() {
     }
 
     assert!(!effect.is_extension::<OtherExtension>());
+}
+
+#[tokio::test]
+async fn test_unregistered_extension_fails_closed_without_side_effects() {
+    let mut handler = TestHandler::without_extensions(TestRole::Alice);
+    let mut endpoint = ();
+    let program: Program<TestRole, ()> = Program::new().ext(TestExtension { value: 99 }).end();
+
+    let result = interpret_extensible(&mut handler, &mut endpoint, program)
+        .await
+        .expect("interpreter should surface extension failure as failed state");
+
+    match result.final_state {
+        InterpreterState::Failed(message) => {
+            assert!(message.contains("Extension handler not registered"));
+        }
+        other => panic!("expected failed state, got {other:?}"),
+    }
+    assert!(
+        handler.executed_values().is_empty(),
+        "unregistered extension must not mutate semantic state out of band"
+    );
+}
+
+#[test]
+fn extension_pipeline_generates_code_for_standard_protocols_with_registered_extensions() {
+    let registry = telltale_runtime::ExtensionRegistry::with_builtin_extensions();
+    let tokens = parse_and_generate_with_extensions(
+        r#"
+protocol Ping =
+  roles A, B
+  A -> B : Msg
+"#,
+        &registry,
+    )
+    .expect("registered extensions should not break standard parse/codegen");
+
+    let code = tokens.to_string();
+    assert!(code.contains("Ping"));
+    assert!(code.contains("A"));
+    assert!(code.contains("B"));
+}
+
+#[test]
+fn timeout_extension_statement_dispatch_remains_fail_closed_until_runtime_support_exists() {
+    let mut parser = ExtensionParserBuilder::new()
+        .with_extension(TimeoutGrammarExtension, TimeoutStatementParser)
+        .expect("register timeout extension")
+        .build();
+
+    assert!(parser.can_handle_statement("timeout_stmt"));
+    let stats = parser.extension_stats();
+    assert_eq!(stats.grammar_extensions, 1);
+    assert_eq!(
+        stats.statement_parsers, 0,
+        "statement parser registration remains reserved until dispatch support lands"
+    );
+
+    let standard = parser
+        .parse_with_extensions(
+            r#"
+protocol Ping =
+  roles A, B
+  A -> B : Msg
+"#,
+        )
+        .expect("registered extensions should preserve standard parsing");
+    assert_eq!(standard.roles.len(), 2);
+
+    let err = parser
+        .parse_with_extensions(
+            r#"
+protocol Timed =
+  roles A, B
+  timeout 10ms A {
+    A -> B : Msg
+  }
+"#,
+        )
+        .expect_err("timeout statement dispatch should fail closed until implemented");
+    let message = err.to_string();
+    assert!(
+        message.contains("Standard parsing failed")
+            || message.contains("Unknown extension statement"),
+        "unexpected extension failure mode: {message}"
+    );
 }

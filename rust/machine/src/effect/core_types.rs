@@ -1497,22 +1497,37 @@ mod effect_contract_tests {
 
     #[test]
     fn composition_policy_tracks_commitment_and_progress() {
-        let request =
-            EffectRequest::invoke_step(1, Some(1), Some("effect:1".to_string()), "A", &[]);
-        let success = EffectExchangeRecord {
-            effect_id: 1,
-            handler_identity: "host/runtime".to_string(),
-            ordering_key: 1,
-            request: request.clone(),
-            outcome: EffectOutcome::success(EffectResponse::InvokeStep { state: Vec::new() }),
-        };
-        let blocked = EffectExchangeRecord {
-            effect_id: 2,
-            handler_identity: "host/runtime".to_string(),
-            ordering_key: 2,
-            request,
-            outcome: EffectOutcome::blocked(),
-        };
+        fn exchange(
+            effect_id: u64,
+            outcome: EffectOutcome,
+            operation_id: &str,
+        ) -> EffectExchangeRecord {
+            EffectExchangeRecord {
+                effect_id,
+                handler_identity: "host/runtime".to_string(),
+                ordering_key: effect_id,
+                request: EffectRequest::invoke_step(
+                    effect_id,
+                    Some(1),
+                    Some(operation_id.to_string()),
+                    "A",
+                    &[],
+                ),
+                outcome,
+            }
+        }
+
+        let success = exchange(
+            1,
+            EffectOutcome::success(EffectResponse::InvokeStep { state: Vec::new() }),
+            "effect:1",
+        );
+        let blocked = exchange(2, EffectOutcome::blocked(), "effect:1");
+        let cancelled = exchange(
+            3,
+            EffectOutcome::failure(EffectFailure::cancelled("scripted cancellation")),
+            "effect:1",
+        );
         let contract = crate::semantic_objects::ProgressContract {
             operation_id: "effect:1".to_string(),
             session: Some(1),
@@ -1524,16 +1539,65 @@ mod effect_contract_tests {
             escalated_at_tick: None,
             reason: None,
         };
+        let cases = vec![
+            (
+                "all_success requires every child effect to succeed",
+                EffectCompositionPolicy::All,
+                vec![success.clone(), blocked.clone()],
+                false,
+                true,
+            ),
+            (
+                "first_success resolves on the first successful child effect",
+                EffectCompositionPolicy::First,
+                vec![success.clone(), blocked.clone(), cancelled.clone()],
+                true,
+                true,
+            ),
+            (
+                "threshold_success(2) stays unresolved below the threshold",
+                EffectCompositionPolicy::Threshold {
+                    required_successes: 2,
+                },
+                vec![success.clone(), blocked.clone(), cancelled.clone()],
+                false,
+                true,
+            ),
+            (
+                "threshold_success(2) resolves when the second success lands",
+                EffectCompositionPolicy::Threshold {
+                    required_successes: 2,
+                },
+                vec![
+                    success.clone(),
+                    blocked.clone(),
+                    exchange(
+                        4,
+                        EffectOutcome::success(EffectResponse::InvokeStep { state: Vec::new() }),
+                        "effect:1",
+                    ),
+                ],
+                true,
+                true,
+            ),
+        ];
 
-        let first_success = EffectCompositionPolicy::First;
-        assert!(first_success.commitment_resolved(&[success.clone(), blocked.clone()]));
-        assert!(first_success.commitment_compatible(&[success.clone(), blocked.clone()]));
-        assert!(first_success.progress_compatible(&[success.clone(), blocked.clone()], &contract));
-
-        let threshold = EffectCompositionPolicy::Threshold {
-            required_successes: 1,
-        };
-        assert!(threshold.commitment_resolved(&[success.clone(), blocked.clone()]));
-        assert!(threshold.commitment_compatible(&[success, blocked]));
+        for (label, policy, records, resolved, compatible) in cases {
+            assert_eq!(
+                policy.commitment_resolved(&records),
+                resolved,
+                "{label}"
+            );
+            assert_eq!(
+                policy.commitment_compatible(&records),
+                compatible,
+                "{label}"
+            );
+            assert_eq!(
+                policy.progress_compatible(&records, &contract),
+                !resolved || compatible,
+                "{label}"
+            );
+        }
     }
 }

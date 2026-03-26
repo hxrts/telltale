@@ -9,6 +9,7 @@ use std::sync::Mutex;
 use crate::coroutine::Value;
 use crate::effect::{EffectFailure, EffectHandler, EffectResult};
 use crate::engine::{ObsEvent, ProtocolMachine, ProtocolMachineError, StepResult};
+use crate::semantic_objects::ProtocolMachineSemanticObjects;
 
 struct SiteRunner {
     machine: Mutex<ProtocolMachine>,
@@ -88,6 +89,21 @@ impl NestedProtocolMachineHandler {
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .all_done()
+        })
+    }
+
+    /// Get a copy of the canonical semantic-object bundle for a site.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the site ProtocolMachine mutex is poisoned.
+    #[must_use]
+    pub fn site_semantic_objects(&self, name: &str) -> Option<ProtocolMachineSemanticObjects> {
+        self.sites.get(name).map(|site| {
+            site.machine
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .semantic_objects()
         })
     }
 

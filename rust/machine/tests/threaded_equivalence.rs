@@ -407,6 +407,47 @@ fn test_output_condition_outcomes_match_across_drivers() {
 }
 
 #[test]
+fn test_agreement_semantic_objects_match_across_drivers_for_output_condition_execution() {
+    let image = simple_send_recv_image("A", "B", "msg");
+    let handler = PassthroughHandler;
+
+    let allow_cfg = ProtocolMachineConfig {
+        output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
+            "protocol_machine.observable_output".to_string(),
+        ]),
+        ..ProtocolMachineConfig::default()
+    };
+
+    let mut coop = ProtocolMachine::new(allow_cfg.clone());
+    coop.load_choreography(&image).expect("load image");
+    coop.run(&handler, 50).expect("cooperative run");
+
+    let mut threaded = ThreadedProtocolMachine::with_workers(allow_cfg, 2);
+    threaded.load_choreography(&image).expect("load image");
+    threaded.run(&handler, 50).expect("threaded run");
+
+    let coop_semantics = normalize_semantic_objects(coop.semantic_objects());
+    let threaded_semantics = normalize_semantic_objects(threaded.semantic_objects());
+
+    assert_eq!(
+        coop_semantics.agreement_profiles,
+        threaded_semantics.agreement_profiles
+    );
+    assert_eq!(
+        coop_semantics.agreement_contracts,
+        threaded_semantics.agreement_contracts
+    );
+    assert_eq!(
+        coop_semantics.agreement_evidence,
+        threaded_semantics.agreement_evidence
+    );
+    assert_eq!(
+        coop_semantics.agreement_states,
+        threaded_semantics.agreement_states
+    );
+}
+
+#[test]
 fn test_output_condition_commit_fail_artifacts_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let handler = PassthroughHandler;

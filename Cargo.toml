@@ -78,6 +78,7 @@ criterion = { workspace = true }
 futures = { workspace = true, features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { workspace = true }
+proc-macro2 = { workspace = true }
 tempfile = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "time"] }
 proptest = { workspace = true }
