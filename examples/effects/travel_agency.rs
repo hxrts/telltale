@@ -1,41 +1,38 @@
-//! Two-party travel agency negotiation protocol.
+//! Two-party travel agency negotiation with evidence binding and typed failure.
 //!
-//! This is an effect-boundary example: `tell!` owns the accept/reject branch,
-//! while generated effect traits model customer preferences and agency quoting
-//! and scheduling.
+//! This is an effect-boundary example demonstrating authority constructs that go
+//! beyond session projection: `let`/`check` evidence bindings, `case`/`of`
+//! typed result matching, and `timeout`/`on cancel` failure paths. The protocol
+//! parses and generates proof-backed metadata but is not session-projectable
+//! because it uses authority-level constructs. Rust reads the generated metadata
+//! to inspect the authority surface.
 
-use futures::{executor, try_join};
-use std::error::Error;
-use telltale::{tell, try_session};
+use telltale::tell;
 
 tell! {
-    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    -- // Execution profile for the proof-backed effect boundary.
     profile Replay fairness eventual admissibility replay escalation_window bounded
 
-    -- // Customer-side travel request and budget.
-    type alias TravelRequest =
+    -- // Typed result from the agency quote check.
+    type alias QuoteResult = Result QuoteError QuoteApproval
+
+    -- // Typed approval carries the quoted price and delivery window.
+    type alias QuoteApproval =
     {
-      distance : Int
-      maxBudget : Int
-      address : Int
+      price : Int
+      deliveryDays : Int
     }
 
-    -- // Customer's decision after receiving a quote.
-    type QuoteDecision =
-      | Accept
-      | Reject
+    -- // Typed error carries the rejection reason.
+    type alias QuoteError =
+    {
+      reason : String
+      retryAfter : Int
+    }
 
-    -- // Customer host provides the request and accepts or rejects one quote.
+    -- // Customer host provides the travel request.
     effect CustomerPreferences
-      command request : Session -> TravelRequest
-      {
-        class : best_effort
-        progress : immediate
-        region : session
-        agreement_use : none
-        reentrancy : allow
-      }
-      command decide : Int -> QuoteDecision
+      command request : Session -> Int
       {
         class : best_effort
         progress : immediate
@@ -44,150 +41,75 @@ tell! {
         reentrancy : allow
       }
 
-    -- // Agency host computes a quote and schedules fulfillment.
+    -- // Agency host computes a quote, which may fail.
     effect AgencyRuntime
-      command quote : Int -> Int
+      authoritative quote : Int -> QuoteResult
       {
-        class : best_effort
-        progress : immediate
-        region : session
+        class : authoritative
+        progress : may_block
+        region : fragment
         agreement_use : none
-        reentrancy : allow
-      }
-      command schedule : Int -> Int
-      {
-        class : best_effort
-        progress : immediate
-        region : session
-        agreement_use : none
-        reentrancy : allow
+        reentrancy : reject_same_fragment
       }
 
-    -- // Customer places one order, receives a quote, then accepts or rejects it.
+    -- // Customer places an order. The agency quote is checked as typed evidence.
+    -- // A successful quote flows into the accept branch as a witness value.
+    -- // A failed quote ends with an explicit typed rejection. The timeout
+    -- // branch fires if the agency does not respond within 5 seconds.
     protocol TravelAgency uses CustomerPreferences, AgencyRuntime under Replay =
       roles Customer, Agency
       Customer -> Agency : Order(i32)
-      Agency -> Customer : Quote(i32)
-      choice Customer at
-        -- // Accept sends the address and receives the travel date.
-        | Accept =>
-          Customer -> Agency : Address(i32)
-          Agency -> Customer : Date(i32)
-        -- // Reject ends the negotiation after sending the refusal.
-        | Reject =>
-          Customer -> Agency : Rejection(i32)
+      authoritative let approval = check AgencyRuntime.quote(distance)
+      case approval of
+        | Ok(witness) =>
+            Agency -> Customer : Confirmation(witness)
+        | Err(reason) =>
+            Agency -> Customer : Rejection(reason)
+      timeout 5s Agency at
+        Agency -> Customer : Scheduled
+      on timeout =>
+        Agency -> Customer : TimedOut
+      on cancel =>
+        Agency -> Customer : Cancelled
 }
 
-use TravelAgency::effects;
-use TravelAgency::sessions::*;
-
-struct CustomerHost {
-    request: effects::TravelRequest,
-}
-
-struct AgencyHost;
-
-impl effects::CustomerPreferences for CustomerHost {
-    fn request(&mut self, _input: effects::Session) -> effects::TravelRequest {
-        self.request.clone()
-    }
-
-    fn decide(&mut self, input: i64) -> effects::QuoteDecision {
-        if input < self.request.max_budget {
-            effects::QuoteDecision::Accept
-        } else {
-            effects::QuoteDecision::Reject
-        }
-    }
-}
-
-impl effects::AgencyRuntime for AgencyHost {
-    fn quote(&mut self, input: i64) -> i64 {
-        input * 10
-    }
-
-    fn schedule(&mut self, _input: i64) -> i64 {
-        42
-    }
-}
-
-async fn customer(role: &mut Customer, host: &mut CustomerHost) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: CustomerSession<'_, _>| async {
-        let request = effects::CustomerPreferences::request(host, effects::Session::new("travel"));
-        let distance = i32::try_from(request.distance)?;
-        let address = i32::try_from(request.address)?;
-        let s = s.send(Order(distance)).await?;
-
-        let (Quote(price), s) = s.receive().await?;
-
-        match effects::CustomerPreferences::decide(host, price.into()) {
-            effects::QuoteDecision::Accept => {
-                let s = s.select(Accept).await?;
-                let s = s.send(Address(address)).await?;
-
-                let (Date(date), s) = s.receive().await?;
-                println!(
-                    "Order: distance {distance}, quote {price} — accepted. Delivery date: {date}"
-                );
-                Ok(((), s))
-            }
-            effects::QuoteDecision::Reject => {
-                let s = s.select(Reject).await?;
-                let s = s.send(Rejection(price)).await?;
-                println!("Order: distance {distance}, quote {price} — rejected.");
-                Ok(((), s))
-            }
-        }
-    })
-    .await
-}
-
-async fn agency(role: &mut Agency, host: &mut AgencyHost) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: AgencySession<'_, _>| async {
-        let (Order(distance), s) = s.receive().await?;
-
-        let price = i32::try_from(effects::AgencyRuntime::quote(host, distance.into()))?;
-        let s = s.send(Quote(price)).await?;
-
-        match s.branch().await? {
-            AgencyChoice1::Accept(_accept, s) => {
-                let (Address(_addr), s) = s.receive().await?;
-                let date = i32::try_from(effects::AgencyRuntime::schedule(host, distance.into()))?;
-                let s = s.send(Date(date)).await?;
-                Ok(((), s))
-            }
-            AgencyChoice1::Reject(_reject, s) => {
-                let (Rejection(_price), s) = s.receive().await?;
-                Ok(((), s))
-            }
-        }
-    })
-    .await
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    let Roles(mut c, mut a) = Roles::default();
-    let mut customer_host = CustomerHost {
-        request: effects::TravelRequest {
-            distance: 5,
-            max_budget: 100,
-            address: 123,
-        },
-    };
-    let mut agency_host = AgencyHost;
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
-        "execution profiles = {:?}",
-        TravelAgency::proof_status::EXECUTION_PROFILES
+        "strongest tier = {}",
+        TravelAgency::proof_status::STRONGEST_TIER
     );
     println!(
         "session projectable = {}",
         TravelAgency::proof_status::SESSION_PROJECTABLE
     );
-    executor::block_on(async {
-        try_join!(
-            customer(&mut c, &mut customer_host),
-            agency(&mut a, &mut agency_host)
-        )
-    })?;
+    println!(
+        "protocol machine executable = {}",
+        TravelAgency::proof_status::PROTOCOL_MACHINE_EXECUTABLE
+    );
+    println!(
+        "projection blocker = {:?}",
+        TravelAgency::proof_status::SESSION_PROJECTION_ERROR
+    );
+
+    // The authority module exposes the check bindings and evidence metadata.
+    let reads = TravelAgency::authority::AUTHORITATIVE_READS;
+    println!("authoritative reads = {}", reads.len());
+    for entry in reads {
+        println!(
+            "  {} via {}.{}",
+            entry.binding_name, entry.effect_interface, entry.effect_operation
+        );
+    }
+
+    // Demonstrate creating typed semantic objects from the generated metadata.
+    if let Some(binding) = TravelAgency::authority::authoritative_binding("approval") {
+        let read = binding.authoritative_read("travel-quote#1");
+        println!("authoritative read id = {}", read.read_id);
+        println!("predicate ref = {:?}", read.predicate_ref);
+
+        let observed = binding.observed_read("travel-observed#1", 0, "test-handler");
+        println!("observed read id = {}", observed.read_id);
+    }
+
     Ok(())
 }

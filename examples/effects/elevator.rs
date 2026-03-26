@@ -1,15 +1,16 @@
-//! Elevator controller with three-way coordination.
+//! Elevator controller with authority handoff and publication.
 //!
-//! This is an effect-boundary example: `tell!` owns the relay structure, while
-//! generated effect traits model the user panel input and the physical door
-//! motor operations.
+//! This is an effect-boundary example demonstrating ownership transfer and
+//! publication constructs: `handoff` transfers door control authority from the
+//! user panel to the elevator relay, and `publish` records the door state
+//! transition as a protocol-visible event. The protocol uses authority-level
+//! constructs and is not session-projectable. Rust reads the generated metadata
+//! to inspect the handoff and publication surfaces.
 
-use futures::{executor, try_join};
-use std::error::Error;
-use telltale::{tell, try_session};
+use telltale::tell;
 
 tell! {
-    -- // Execution profile keeps the example on the proof-backed effect boundary.
+    -- // Execution profile for the proof-backed effect boundary.
     profile Replay fairness eventual admissibility replay escalation_window bounded
 
     -- // Host-side door action selected by the user.
@@ -47,173 +48,77 @@ tell! {
         reentrancy : allow
       }
 
-    -- // User chooses one door command and the elevator relays it to the door.
+    -- // User chooses a door command. Authority over the door operation is
+    -- // handed off from the user panel to the elevator relay via an explicit
+    -- // receipt. The relay publishes the state transition as a protocol event.
     protocol Elevator uses UserPanel, DoorMotor under Replay =
       roles U, D, E
       choice U at
-        -- // Open the door, confirm it, then auto-close and confirm closure.
         | OpenDoor =>
           U -> E : OpenDoor
+          handoff door_control to E with control_receipt
           E -> D : OpenDoor
           D -> E : DoorOpened
-          E -> U : DoorOpened
+          publish door_state as DoorStateChanged
           E -> D : CloseDoor
           D -> E : DoorClosed
           E -> U : DoorClosed
-        -- // Close the door directly and confirm the result.
         | CloseDoor =>
           U -> E : CloseDoor
+          handoff door_control to E with control_receipt
           E -> D : CloseDoor
           D -> E : DoorClosed
+          publish door_state as DoorStateChanged
           E -> U : DoorClosed
 }
 
-use Elevator::effects;
-use Elevator::sessions::*;
-
-#[derive(Clone, Debug)]
-struct UserHost {
-    command: effects::DoorAction,
-}
-
-#[derive(Default)]
-struct DoorHost {
-    actions: Vec<&'static str>,
-}
-
-impl effects::UserPanel for UserHost {
-    fn choose(&mut self, _input: effects::Session) -> effects::DoorAction {
-        self.command.clone()
-    }
-}
-
-impl effects::DoorMotor for DoorHost {
-    fn open(&mut self, _input: ()) {
-        self.actions.push("open");
-    }
-
-    fn close(&mut self, _input: ()) {
-        self.actions.push("close");
-    }
-}
-
-fn user_command() -> effects::DoorAction {
-    match std::env::var("ELEVATOR_COMMAND").ok().as_deref() {
-        Some("close") => effects::DoorAction::Close,
-        _ => effects::DoorAction::Open,
-    }
-}
-
-async fn user(role: &mut U, host: &mut UserHost) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: USession<'_, _>| async {
-        match effects::UserPanel::choose(host, effects::Session::new("elevator")) {
-            effects::DoorAction::Open => {
-                println!("U: requesting door open");
-                let s = s.select(OpenDoor).await?;
-                let (DoorOpened, s) = s.receive().await?;
-                println!("U: door is open");
-                let (DoorClosed, end) = s.receive().await?;
-                println!("U: door has closed");
-                Ok(((), end))
-            }
-            effects::DoorAction::Close => {
-                println!("U: requesting door close");
-                let s = s.select(CloseDoor).await?;
-                let (DoorClosed, end) = s.receive().await?;
-                println!("U: door has closed");
-                Ok(((), end))
-            }
-        }
-    })
-    .await
-}
-
-async fn door(role: &mut D, host: &mut DoorHost) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: DSession<'_, _>| async {
-        match s.branch().await? {
-            DChoice1::OpenDoor(OpenDoor, s) => {
-                println!("D: opening door");
-                effects::DoorMotor::open(host, ());
-                let s = s.send(DoorOpened).await?;
-                println!("D: door opened");
-
-                let (CloseDoor, s) = s.receive().await?;
-                println!("D: closing door (auto-close)");
-                effects::DoorMotor::close(host, ());
-                let end = s.send(DoorClosed).await?;
-                println!("D: door closed");
-
-                Ok(((), end))
-            }
-            DChoice1::CloseDoor(CloseDoor, s) => {
-                println!("D: closing door");
-                effects::DoorMotor::close(host, ());
-                let end = s.send(DoorClosed).await?;
-                println!("D: door closed");
-
-                Ok(((), end))
-            }
-        }
-    })
-    .await
-}
-
-async fn elevator(role: &mut E) -> Result<(), Box<dyn Error>> {
-    try_session(role, |s: ESession<'_, _>| async {
-        match s.branch().await? {
-            EChoice1::OpenDoor(OpenDoor, s) => {
-                println!("E: received open request");
-                let s = s.send(OpenDoor).await?;
-
-                let (DoorOpened, s) = s.receive().await?;
-                println!("E: door opened, notifying user");
-                let s = s.send(DoorOpened).await?;
-
-                println!("E: auto-closing door");
-                let s = s.send(CloseDoor).await?;
-
-                let (DoorClosed, s) = s.receive().await?;
-                println!("E: door closed, notifying user");
-                let end = s.send(DoorClosed).await?;
-
-                Ok(((), end))
-            }
-            EChoice1::CloseDoor(CloseDoor, s) => {
-                println!("E: received close request");
-                let s = s.send(CloseDoor).await?;
-
-                let (DoorClosed, s) = s.receive().await?;
-                println!("E: door closed, notifying user");
-                let end = s.send(DoorClosed).await?;
-
-                Ok(((), end))
-            }
-        }
-    })
-    .await
-}
-
-fn main() -> Result<(), Box<dyn Error>> {
-    let Roles(mut u, mut d, mut e) = Roles::default();
-    let mut user_host = UserHost {
-        command: user_command(),
-    };
-    let mut door_host = DoorHost::default();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!(
-        "execution profiles = {:?}",
-        Elevator::proof_status::EXECUTION_PROFILES
+        "strongest tier = {}",
+        Elevator::proof_status::STRONGEST_TIER
     );
     println!(
         "session projectable = {}",
         Elevator::proof_status::SESSION_PROJECTABLE
     );
-    executor::block_on(async {
-        try_join!(
-            user(&mut u, &mut user_host),
-            door(&mut d, &mut door_host),
-            elevator(&mut e)
-        )
-    })?;
-    println!("\nElevator protocol completed successfully");
+    println!(
+        "protocol machine executable = {}",
+        Elevator::proof_status::PROTOCOL_MACHINE_EXECUTABLE
+    );
+    println!(
+        "projection blocker = {:?}",
+        Elevator::proof_status::SESSION_PROJECTION_ERROR
+    );
+
+    // The authority module exposes handoff and publication metadata.
+    let handoffs = Elevator::authority::HANDOFFS;
+    println!("handoffs = {}", handoffs.len());
+    for h in handoffs {
+        println!(
+            "  {} -> {} with receipt {}",
+            h.operation_name, h.target_role, h.receipt_name
+        );
+    }
+
+    let publications = Elevator::authority::PUBLICATIONS;
+    println!("publications = {}", publications.len());
+    for p in publications {
+        println!("  {}", p.publication_name);
+    }
+
+    // Demonstrate creating typed semantic objects from the generated metadata.
+    if let Some(h) = Elevator::authority::handoff("door_control") {
+        let handoff = h.semantic_handoff(1, 0, 0, 2);
+        println!("handoff id = {}", handoff.handoff_id);
+        println!("from coroutine = {}", handoff.from_coro);
+        println!("to coroutine = {}", handoff.to_coro);
+    }
+
+    if let Some(p) = Elevator::authority::publication("DoorStateChanged") {
+        let event = p.publication_event("door-pub#1", "open-door-op#1");
+        println!("publication id = {}", event.publication_id);
+        println!("operation id = {}", event.operation_id);
+    }
+
     Ok(())
 }

@@ -20,20 +20,20 @@ Protocol examples in `examples/protocols/`:
 - `fft.rs`: eight-role FFT butterfly network
 - `ring.rs`: three-node ring topology via `tell!`
 - `ring_choice.rs`: ring with per-hop branching and infinite types
-- `ring_max.rs`: linear ring maximum propagation
+- `ring_max.rs`: ring maximum with broadcast announcement
 - `three_adder.rs`: three-party sum via `tell!`
 
 Effect-boundary examples in `examples/effects/`:
 
 - `client_server_log.rs`: logging decisions at the host boundary
 - `commitment_lifecycle.rs`: commitment, profile-driven progress, and agreement/finality metadata
-- `elevator.rs`: host-driven door/elevator capabilities
+- `elevator.rs`: authority handoff and publication metadata
 - `generated_effect_interfaces.rs`: canonical generated Rust effect traits and semantic metadata
 - `map_reduce.rs`: structured fan-out/fan-in work with host compute boundaries
 - `oauth.rs`: authentication and authorization decisions at the effect boundary
 - `reactive_signal.rs`: reactive signal subscription/current-value/publish interface
 - `three_buyers.rs`: pricing and affordability decisions at the host boundary
-- `travel_agency.rs`: quote/schedule capabilities behind one protocol boundary
+- `travel_agency.rs`: evidence binding, typed failure with case/of, and timeout
 - `wasm/`: browser integration via generated effects
 
 Theory examples in `examples/theory/`:
