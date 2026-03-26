@@ -822,6 +822,8 @@ mod tests {
     #[test]
     fn test_constraint_validation() {
         let topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
             .colocated(
                 RoleName::from_static("Alice"),
                 RoleName::from_static("Unknown"),
