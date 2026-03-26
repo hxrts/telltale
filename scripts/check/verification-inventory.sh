@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify that docs/32_verification_inventory.md metrics match actual values
+# Verify that docs/32_testing_verification_inventory.md metrics match actual values
 # derived from CODE_MAP.md, justfile recipe counts, and macro UI fixture counts.
 set -euo pipefail
 
@@ -15,9 +15,9 @@ errors=()
 metric_value() {
   local name="$1"
   local row
-  row=$(grep -E "^\|[[:space:]]*${name}[[:space:]]*\|" docs/32_verification_inventory.md) || true
+  row=$(grep -E "^\|[[:space:]]*${name}[[:space:]]*\|" docs/32_testing_verification_inventory.md) || true
   if [[ -z "$row" ]]; then
-    echo "missing metric row in docs/32_verification_inventory.md: ${name}" >&2
+    echo "missing metric row in docs/32_testing_verification_inventory.md: ${name}" >&2
     exit 1
   fi
   # Extract the numeric value column (second pipe-delimited field), strip commas
@@ -65,7 +65,7 @@ check_metric() {
   local documented
   documented=$(metric_value "$name")
   if [[ "$documented" -ne "$actual" ]]; then
-    errors+=("docs/32_verification_inventory.md: metric \`${name}\` documents ${documented} but actual is ${actual}")
+    errors+=("docs/32_testing_verification_inventory.md: metric \`${name}\` documents ${documented} but actual is ${actual}")
   fi
 }
 

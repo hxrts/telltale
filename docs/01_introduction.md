@@ -74,7 +74,7 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [WASM Guide](29_wasm_guide.md) | Guide | Informative |
 | [API Reference](30_api_reference.md) | Reference | Informative |
 | [Glossary and Notation Index](31_glossary_notation.md) | Reference | Informative |
-| [Verification Inventory](32_verification_inventory.md) | Reference | Informative |
+| [Verification Inventory](32_testing_verification_inventory.md) | Reference | Informative |
 | [Protocol-Critical Authority Scope](33_protocol_authority_scope.md) | Reference | Normative |
 | [Authority Language Surface](34_authority_language_surface.md) | Reference | Normative |
 | [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) | Reference | Normative |
