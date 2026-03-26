@@ -4,22 +4,19 @@ protocol MealPrep =
   roles Chef, SousChef, Baker
 
   -- Setup phase
-  Chef -> SousChef : IngredientRequest { items : List String }
+  Chef -> SousChef : IngredientRequest(String)
   SousChef -> Chef : DeliveryConfirm
-  Chef -> Baker : OvenStatus { status : String }
+  Chef -> Baker : OvenStatus(String)
 
   -- Cooking phase
-  choice at Chef {
-    | pasta -> {
+  choice Chef at
+    | Pasta =>
       Chef -> SousChef : BoilPasta
       SousChef -> Chef : PastaReady
       Chef -> Baker : PrepareGarlicBread
       Baker -> Chef : BreadReady
-    }
-    | tacos -> {
+    | Tacos =>
       Chef -> SousChef : PrepTortillas
       SousChef -> Chef : TortillasReady
       Chef -> Baker : PrepareGarlicBread
       Baker -> Chef : BreadReady
-    }
-  }
