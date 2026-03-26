@@ -1,105 +1,93 @@
-# WASM Examples
+# WASM Example
 
-A minimal example demonstrating Telltale's `tell!`-based choreographic programming in WebAssembly.
+A minimal `tell!`-based ping-pong protocol compiled to WebAssembly.
 
 ## Overview
 
-This example implements a simple two-party protocol where:
-- Alice sends a "Ping" message to Bob
-- Bob receives the Ping and responds with a "Pong" message
+The example keeps protocol structure in the DSL and host impurity at the generated effect boundary:
 
-The protocol is declared with `tell!` and executed through the generated session types.
+- Alice sends `Ping(String)` to Bob.
+- Bob uses the generated `BrowserRuntime` effect to derive a reply.
+- Bob sends `Pong(String)` back to Alice.
+
+The exported `run_ping_pong()` function executes the generated sessions and returns the observed round trip.
+
+## Prerequisites
+
+- `wasm-pack` 0.14.0
+- `node`
+- `python3`
+
+Install `wasm-pack` if needed:
+
+```bash
+cargo install wasm-pack --version 0.14.0 --locked
+```
 
 ## Quick Start
 
-Build and run the example:
+Build the browser package, run a deterministic smoke check through Node, then serve the demo:
 
 ```bash
 cd examples/wasm
-./build.sh
+./harness.sh run
 ```
 
-This script will:
-1. Check for required tools (`wasm-pack` 0.14.0)
-2. Build the WASM module
-3. Generate an interactive HTML demo
-4. Provide instructions for running
+That command:
 
-## Manual Building
+1. builds `pkg/` with `wasm-pack build --target web --dev`
+2. builds a temporary `nodejs` package and executes `run_ping_pong()` end to end
+3. serves the example at `http://127.0.0.1:8000`
 
-To build for WASM manually:
+## Harness Commands
+
+Build only:
 
 ```bash
-# Install wasm-pack if not already installed
-cargo install wasm-pack --version 0.14.0 --locked
+./harness.sh build
+```
 
-# Build the WASM module
+Run the deterministic smoke check only:
+
+```bash
+./harness.sh smoke
+./harness.sh smoke "Hello from Alice!"
+```
+
+Serve the browser demo on a custom port:
+
+```bash
+./harness.sh serve 4173
+./harness.sh run 4173 "Hello from Alice!"
+```
+
+The smoke check is the most reliable local validation path because it exercises the generated WASM bindings without depending on a browser driver.
+
+## Browser Tests
+
+The crate includes browser-only `wasm-bindgen-test` tests in [src/ping_pong.rs](src/ping_pong.rs). They do not run under the repository's `just wasm-test` Node lane.
+
+Run them with a browser driver when available, for example:
+
+```bash
 cd examples/wasm
-wasm-pack build --target web
+wasm-pack test --headless --chrome
 ```
 
-## Running Tests
+## Repository Commands
 
-Run WASM tests under Node:
+From the repository root:
 
 ```bash
-cd ../..
+just wasm-build
 just wasm-test
 ```
 
-## Running
-
-Create an `index.html` file to test in the browser:
-
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Telltale WASM Ping-Pong</title>
-</head>
-<body>
-    <h1>Telltale WASM Example</h1>
-    <button id="run">Run Ping-Pong Protocol</button>
-    <pre id="output"></pre>
-    
-    <script type="module">
-        import init, { run_ping_pong } from './pkg/wasm_examples.js';
-        
-        async function runProtocol() {
-            await init();
-            
-            const output = document.getElementById('output');
-            output.textContent = 'Running protocol...\n';
-            
-            try {
-                const result = await run_ping_pong("Hello from Alice!");
-                output.textContent += `Alice sent: ${result.sent_ping}\n`;
-                output.textContent += `Bob received: ${result.received_ping}\n`;
-                output.textContent += `Bob sent: ${result.sent_pong}\n`;
-                output.textContent += `Alice received: ${result.received_pong}\n`;
-                
-                output.textContent += '\nProtocol completed successfully!';
-            } catch (e) {
-                output.textContent += `\nError: ${e}`;
-            }
-        }
-        
-        document.getElementById('run').addEventListener('click', runProtocol);
-    </script>
-</body>
-</html>
-```
-
-Then serve the directory with a local HTTP server:
-
-```bash
-python3 -m http.server
-# Open http://localhost:8000 in your browser
-```
+- `just wasm-build` builds the browser package for this example.
+- `just wasm-test` runs the repository-managed Node WASM test lane; for this crate it validates compilation but skips the browser-only tests.
 
 ## Limitations
 
-- This example uses the generated in-memory session wiring from `Roles::default()`
-- For real distributed WASM applications, you'd plug the same protocol into a browser transport
-- WASM is single-threaded, so host execution remains constrained by the browser runtime
+- The demo uses in-memory generated session wiring via `Roles::default()`.
+- Real browser deployments should replace the in-memory path with a transport-backed session integration.
+- WASM remains single-threaded, so concurrency is constrained by the host runtime.

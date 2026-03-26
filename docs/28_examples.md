@@ -249,11 +249,11 @@ cargo run --example adder
 
 This compiles and runs the `adder` example, which demonstrates a simple two-party request response protocol.
 
-The `wasm` example crate uses its own build script. It produces a browser-loadable WASM module.
+The `wasm` example crate uses its own harness. It can build the browser package, run a deterministic Node smoke check, and serve the demo locally.
 
 ```bash
 cd examples/wasm
-./build.sh
+./harness.sh run
 ```
 
 See the comments in each example file for setup requirements. For WASM-specific guidance, see [WASM Guide](29_wasm_guide.md).

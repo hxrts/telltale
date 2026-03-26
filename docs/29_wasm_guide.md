@@ -112,7 +112,9 @@ The canonical WASM example now lives in `examples/wasm/` and uses
 `tell!` plus generated effect traits as the public surface. Browser-facing
 code should keep protocol structure in the DSL and host integration in the
 generated `Protocol::effects` boundary, rather than manually assembling
-low-level effect programs.
+low-level effect programs. Use `./harness.sh build` to emit the browser
+package, `./harness.sh smoke` for a deterministic Node-based end-to-end
+check, and `./harness.sh run` to build, verify, and serve the demo locally.
 
 For multi role tests, share channels by using `InMemoryHandler::with_channels` and a shared channel map. The WASM test suite in `rust/runtime/tests/wasm_integration.rs` shows larger examples. Each handler must reference the same `Arc<Mutex<BTreeMap>>` instances for messages to route correctly. The unit endpoint `()` is sufficient when no external state is needed.
 
