@@ -1765,6 +1765,111 @@ pub fn protocol_machine_semantic_objects(
 mod semantic_object_tests {
     use super::*;
 
+    fn agreement_semantics_fixture() -> ProtocolMachineSemanticObjects {
+        let output_condition = OutputConditionCheck {
+            meta: crate::output_condition::OutputConditionMeta {
+                predicate_ref: "agreement.ready".to_string(),
+                witness_ref: Some("accepted".to_string()),
+                output_digest: "digest:ready".to_string(),
+            },
+            passed: true,
+        };
+        let operations = vec![
+            operation_fixture("cancelled:op", "cancelled", OperationPhase::Cancelled)
+                .with_publication("cancelled"),
+            operation_fixture("timed_out:op", "timed_out", OperationPhase::TimedOut)
+                .with_publication("timed_out")
+                .with_budget(5),
+            operation_fixture("degraded:op", "degraded", OperationPhase::Blocked)
+                .with_publication("degraded")
+                .with_budget(8)
+                .with_dependencies(&["child:1"]),
+        ];
+        let progress_contracts = vec![ProgressContract {
+            operation_id: "degraded:op".to_string(),
+            session: Some(1),
+            state: ProgressState::Degraded,
+            last_ordering_key: Some(8),
+            bounded: true,
+            budget_ticks: Some(8),
+            last_progress_tick: Some(6),
+            escalated_at_tick: Some(8),
+            reason: Some("timeout witness escalated".to_string()),
+        }];
+        let progress_transitions = vec![ProgressTransition {
+            operation_id: "degraded:op".to_string(),
+            session: Some(1),
+            from_state: ProgressState::Blocked,
+            to_state: ProgressState::Degraded,
+            tick: 8,
+            reason: Some("timeout witness escalated".to_string()),
+        }];
+
+        protocol_machine_semantic_objects(
+            &[],
+            &[],
+            &operations,
+            &[],
+            &[output_condition],
+            &progress_contracts,
+            &progress_transitions,
+        )
+    }
+
+    fn operation_fixture(
+        operation_id: &str,
+        kind: &str,
+        phase: OperationPhase,
+    ) -> OperationInstance {
+        OperationInstance {
+            operation_id: operation_id.to_string(),
+            session: Some(1),
+            owner_id: Some("owner/A".to_string()),
+            kind: kind.to_string(),
+            phase,
+            handler_identity: None,
+            effect_ids: Vec::new(),
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: None,
+            budget_ticks: Some(3),
+            requires_proof: false,
+        }
+    }
+
+    trait OperationFixtureExt {
+        fn with_publication(self, publication: &str) -> Self;
+        fn with_budget(self, budget_ticks: u64) -> Self;
+        fn with_dependencies(self, deps: &[&str]) -> Self;
+    }
+
+    impl OperationFixtureExt for OperationInstance {
+        fn with_publication(mut self, publication: &str) -> Self {
+            self.terminal_publication = Some(publication.to_string());
+            self
+        }
+
+        fn with_budget(mut self, budget_ticks: u64) -> Self {
+            self.budget_ticks = Some(budget_ticks);
+            self
+        }
+
+        fn with_dependencies(mut self, deps: &[&str]) -> Self {
+            self.dependent_operation_ids = deps.iter().map(ToString::to_string).collect();
+            self
+        }
+    }
+
+    fn agreement_state<'a>(
+        objects: &'a ProtocolMachineSemanticObjects,
+        operation_id: &str,
+    ) -> &'a AgreementEvidence {
+        objects
+            .agreement_states
+            .iter()
+            .find(|state| state.operation_id == operation_id)
+            .expect("agreement state")
+    }
+
     #[test]
     fn parity_critical_operations_synthesize_progress_contracts() {
         let objects = protocol_machine_semantic_objects(
@@ -1822,85 +1927,7 @@ mod semantic_object_tests {
 
     #[test]
     fn agreement_and_progress_semantics_cover_finalized_timeout_cancelled_and_degraded_paths() {
-        let output_condition = OutputConditionCheck {
-            meta: crate::output_condition::OutputConditionMeta {
-                predicate_ref: "agreement.ready".to_string(),
-                witness_ref: Some("accepted".to_string()),
-                output_digest: "digest:ready".to_string(),
-            },
-            passed: true,
-        };
-
-        let operations = vec![
-            OperationInstance {
-                operation_id: "cancelled:op".to_string(),
-                session: Some(1),
-                owner_id: Some("owner/A".to_string()),
-                kind: "cancelled".to_string(),
-                phase: OperationPhase::Cancelled,
-                handler_identity: None,
-                effect_ids: Vec::new(),
-                dependent_operation_ids: Vec::new(),
-                terminal_publication: Some("cancelled".to_string()),
-                budget_ticks: Some(3),
-                requires_proof: false,
-            },
-            OperationInstance {
-                operation_id: "timed_out:op".to_string(),
-                session: Some(1),
-                owner_id: Some("owner/A".to_string()),
-                kind: "timed_out".to_string(),
-                phase: OperationPhase::TimedOut,
-                handler_identity: None,
-                effect_ids: Vec::new(),
-                dependent_operation_ids: Vec::new(),
-                terminal_publication: Some("timed_out".to_string()),
-                budget_ticks: Some(5),
-                requires_proof: false,
-            },
-            OperationInstance {
-                operation_id: "degraded:op".to_string(),
-                session: Some(1),
-                owner_id: Some("owner/A".to_string()),
-                kind: "degraded".to_string(),
-                phase: OperationPhase::Blocked,
-                handler_identity: None,
-                effect_ids: Vec::new(),
-                dependent_operation_ids: vec!["child:1".to_string()],
-                terminal_publication: Some("degraded".to_string()),
-                budget_ticks: Some(8),
-                requires_proof: false,
-            },
-        ];
-        let progress_contracts = vec![ProgressContract {
-            operation_id: "degraded:op".to_string(),
-            session: Some(1),
-            state: ProgressState::Degraded,
-            last_ordering_key: Some(8),
-            bounded: true,
-            budget_ticks: Some(8),
-            last_progress_tick: Some(6),
-            escalated_at_tick: Some(8),
-            reason: Some("timeout witness escalated".to_string()),
-        }];
-        let progress_transitions = vec![ProgressTransition {
-            operation_id: "degraded:op".to_string(),
-            session: Some(1),
-            from_state: ProgressState::Blocked,
-            to_state: ProgressState::Degraded,
-            tick: 8,
-            reason: Some("timeout witness escalated".to_string()),
-        }];
-
-        let objects = protocol_machine_semantic_objects(
-            &[],
-            &[],
-            &operations,
-            &[],
-            &[output_condition],
-            &progress_contracts,
-            &progress_transitions,
-        );
+        let objects = agreement_semantics_fixture();
 
         let finalized = objects
             .agreement_states
@@ -1910,19 +1937,11 @@ mod semantic_object_tests {
         assert_eq!(finalized.level, AgreementLevel::Finalized);
         assert_eq!(finalized.finalization, Some(FinalizationOutcome::Finalized));
 
-        let cancelled = objects
-            .agreement_states
-            .iter()
-            .find(|state| state.operation_id == "cancelled:op")
-            .expect("cancelled agreement state");
+        let cancelled = agreement_state(&objects, "cancelled:op");
         assert_eq!(cancelled.level, AgreementLevel::Provisional);
         assert_eq!(cancelled.finalization, Some(FinalizationOutcome::Aborted));
 
-        let timed_out = objects
-            .agreement_states
-            .iter()
-            .find(|state| state.operation_id == "timed_out:op")
-            .expect("timed-out agreement state");
+        let timed_out = agreement_state(&objects, "timed_out:op");
         assert_eq!(timed_out.level, AgreementLevel::Provisional);
         assert_eq!(timed_out.finalization, Some(FinalizationOutcome::TimedOut));
 
