@@ -306,7 +306,7 @@ wasm-check:
     set -euo pipefail
     wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-check.XXXXXX")"
     trap 'rm -rf "$wasm_target"' EXIT
-    CARGO_TARGET_DIR="$wasm_target" cargo check --package telltale-choreography --target wasm32-unknown-unknown --features wasm
+    CARGO_TARGET_DIR="$wasm_target" cargo check --package telltale-runtime --target wasm32-unknown-unknown --features wasm
     CARGO_TARGET_DIR="$wasm_target" cargo check --package telltale --target wasm32-unknown-unknown --features wasm
 
 # Check benchmark target compilation without running benchmarks
@@ -396,10 +396,10 @@ wasm-test-all:
 
 # Format choreography DSL files (prints to stdout unless --write is used)
 choreo-fmt *FILES:
-    cargo run -p telltale-choreography --bin choreo-fmt -- {{ FILES }}
+    cargo run -p telltale-runtime --bin choreo-fmt -- {{ FILES }}
 
 choreo-fmt-write *FILES:
-    cargo run -p telltale-choreography --bin choreo-fmt -- --write {{ FILES }}
+    cargo run -p telltale-runtime --bin choreo-fmt -- --write {{ FILES }}
 
 # Install git hooks for pre-commit checks
 install-hooks:
