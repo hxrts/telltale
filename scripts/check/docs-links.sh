@@ -175,10 +175,16 @@ check_target() {
       ;;
   esac
 
-  if [[ ! -e "$rel" ]]; then
-    missing+=("$source:$line_no: missing docs target: $candidate -> $rel")
-    return
-  fi
+  # Skip generated/build-output paths that may not exist at check time.
+  case "$rel" in
+    docs/SUMMARY.md|docs/book|docs/book/*) ;;
+    *)
+      if [[ ! -e "$rel" ]]; then
+        missing+=("$source:$line_no: missing docs target: $candidate -> $rel")
+        return
+      fi
+      ;;
+  esac
 
   checked=$((checked + 1))
 }
