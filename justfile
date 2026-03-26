@@ -300,7 +300,7 @@ artifact-check:
 lean-style-baseline:
     ./scripts/ops/generate-lean-style-baseline.sh
 
-# Check WASM compilation for choreography and core crates
+# Check WASM compilation for runtime and core crates
 wasm-check:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -390,11 +390,11 @@ wasm-test-all:
     );
     EOF
     CARGO_TARGET_DIR="$machine_target" NODE_PATH="$shim_root" wasm-pack test --node rust/machine --features wasm -- --nocapture
-    CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/choreography --features "wasm _wasm_integration_tests" -- --nocapture
+    CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/runtime --features "wasm _wasm_integration_tests" -- --nocapture
     cd examples/wasm
     CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
 
-# Format choreography DSL files (prints to stdout unless --write is used)
+# Format .tell DSL files (prints to stdout unless --write is used)
 choreo-fmt *FILES:
     cargo run -p telltale-runtime --bin choreo-fmt -- {{ FILES }}
 
@@ -516,7 +516,7 @@ lean-init:
     ./scripts/bootstrap/ensure-lean-prebuilt.sh
 
 telltale-lean-check: lean-init
-    # Export rust choreography data, build the Lean runner, and verify three roles with logs
+    # Export choreography data, build the Lean runner, and verify three roles with logs
     mkdir -p lean/artifacts
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
