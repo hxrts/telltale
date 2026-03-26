@@ -194,10 +194,10 @@ fn code_image_from_dsl(input: &str) -> CodeImage {
 }
 
 fn code_image_from_choreography(choreography: &telltale_language::ast::Choreography) -> CodeImage {
-    let global = choreography_to_global(&choreography).expect("convert choreography to global");
+    let global = choreography_to_global(choreography).expect("convert choreography to global");
     let mut locals = BTreeMap::new();
     for role in &choreography.roles {
-        let local = telltale_language::project(&choreography, role).expect("project local type");
+        let local = telltale_language::project(choreography, role).expect("project local type");
         let local_r = local_to_local_r(&local).expect("convert local type");
         locals.insert(role.name().to_string(), local_r);
     }
@@ -319,8 +319,8 @@ fn generated_commitment_metadata_matches_declared_semantic_contracts() {
         MacroCommitLifecycle::proof_status::EXECUTION_PROFILES,
         ["Replay"]
     );
-    assert!(MacroCommitLifecycle::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
-    assert!(!MacroCommitLifecycle::proof_status::SESSION_PROJECTABLE);
+    const _: () = assert!(MacroCommitLifecycle::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+    const _: () = assert!(!MacroCommitLifecycle::proof_status::SESSION_PROJECTABLE);
 }
 
 #[test]
@@ -375,8 +375,8 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     assert_eq!(canonical_handle.proof_ref.as_deref(), Some("proof#1"));
     assert_eq!(handoff.target_role, "Worker");
     assert_eq!(semantic_handoff.activated_owner_id, "Worker");
-    assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
-    assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+    const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
+    const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
 }
 
 #[test]

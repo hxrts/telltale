@@ -148,6 +148,7 @@ fn run_semantic_objects(
     (coop.semantic_objects(), threaded.semantic_objects())
 }
 
+#[allow(clippy::too_many_lines)]
 fn normalize_semantic_objects(
     mut objects: ProtocolMachineSemanticObjects,
 ) -> ProtocolMachineSemanticObjects {

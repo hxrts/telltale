@@ -1388,6 +1388,7 @@ mod runtime_effect_state_tests {
             );
         }
 
+        #[allow(clippy::too_many_lines)]
         fn assert_invariants(&self, scenario: &LifecycleScenario) {
             let semantic_objects = self.machine.semantic_objects();
             let context = self.context(scenario.name);
@@ -1512,6 +1513,7 @@ mod runtime_effect_state_tests {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     fn lifecycle_scenarios() -> Vec<LifecycleScenario> {
         vec![
             LifecycleScenario {
@@ -1655,6 +1657,7 @@ mod runtime_effect_state_tests {
         ]
     }
 
+    #[allow(clippy::too_many_lines)]
     fn adversarial_scenarios() -> Vec<LifecycleScenario> {
         vec![
             LifecycleScenario {
