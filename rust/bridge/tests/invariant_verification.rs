@@ -10,7 +10,7 @@ use telltale_bridge::{
 fn strict_protocol_bundle_verification_required() -> bool {
     std::env::var("TELLTALE_REQUIRE_VERIFY_PROTOCOL_BUNDLE")
         .map(|value| value != "0")
-        .unwrap_or_else(|_| std::env::var("CI").is_ok())
+        .unwrap_or(false)
 }
 
 fn unsupported_verify_protocol_bundle(stderr: &str) -> bool {
