@@ -25,9 +25,9 @@ Lean/Rust mismatches must be documented as justified breaks in `docs/19_rust_lea
 Closure-backed predicates are not serializable and must not be used in artifacts that cross the Lean/Rust bridge.
 For serialized configs and parity artifacts, use `FlowPolicy::PredicateExpr` / `FlowPolicy.predicateExpr`.
 
-## Justfile Commands
+## justfile Commands
 
-The `Justfile` is the primary command interface. Run `just --list` to see all available commands.
+The `justfile` is the primary command interface. Run `just --list` to see all available commands.
 
 ### Quick Reference
 
@@ -49,7 +49,7 @@ cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo fmt --all -- --check
 
 # Single package test
-cargo test --package telltale-choreography test_name
+cargo test --package telltale-runtime test_name
 
 # WASM
 just wasm-check              # Check WASM compilation
@@ -134,8 +134,8 @@ Rust workspace crates are split between the repo root (`telltale`) and the `rust
 | `telltale` | `rust/src/` | Facade crate with session types (`Send`, `Receive`, `Select`, `Branch`, `End`) and async channel abstractions |
 | `telltale-types` | `rust/types/` | Core types (`GlobalType`, `LocalTypeR`, `Label`) matching Lean definitions with content addressing |
 | `telltale-macros` | `rust/macros/` | Procedural macros (`tell!`, `session`, `Role`, `Roles`, `Message`) |
-| `telltale-parser` | `rust/parser/` | DSL parser (Pest grammar, layout preprocessor), AST, projection, codegen |
-| `telltale-choreography` | `rust/choreography/` | Effect handlers, formatter binary, topology, heap, testing infrastructure |
+| `telltale-language` | `rust/language/` | DSL parser (Pest grammar, layout preprocessor), AST, projection, codegen |
+| `telltale-runtime` | `rust/runtime/` | Effect handlers, formatter binary, topology, heap, testing infrastructure |
 | `telltale-theory` | `rust/theory/` | Session type algorithms (projection, merge, duality, sync/async subtyping, bounded recursion) |
 | `telltale-machine` | `rust/machine/` | Protocol machine execution engine (single source of truth for scheduling) |
 | `telltale-simulator` | `rust/simulator/` | Protocol-machine-backed simulation with deterministic middleware (network, faults, properties) |
@@ -198,7 +198,7 @@ Effect handlers: `ChoreoHandler` (async, typed) abstracts choreography-layer tra
 
 Coherence is the per-edge invariant that makes projection well-defined. `EdgeCoherent` checks buffer/type alignment without global re-derivation.
 
-Projection transforms global choreographies to local session types (`rust/parser/src/compiler/projection.rs`, `lean/Choreography/Projection/`).
+Projection transforms global choreographies to local session types (`rust/language/src/compiler/projection.rs`, `lean/Choreography/Projection/`).
 
 Content addressing assigns cryptographic identities to protocol artifacts (`rust/types/src/content_id.rs`).
 

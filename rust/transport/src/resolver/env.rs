@@ -1,7 +1,7 @@
 //! Environment variable based endpoint resolver.
 
 use async_trait::async_trait;
-use telltale_choreography::{RoleName, TopologyEndpoint};
+use telltale_runtime::{RoleName, TopologyEndpoint};
 use thiserror::Error;
 
 use crate::resolver::{EndpointResolver, ResolutionFailureReason, ResolverError};
@@ -36,7 +36,7 @@ pub enum EnvResolverConfigError {
 /// ```rust,no_run
 /// use telltale_transport::EnvResolver;
 /// use telltale_transport::EndpointResolver;
-/// use telltale_choreography::RoleName;
+/// use telltale_runtime::RoleName;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let resolver = EnvResolver::with_default_prefix();

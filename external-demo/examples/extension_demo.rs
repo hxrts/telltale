@@ -43,7 +43,7 @@ pub struct ResultMessage;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CancelMessage;
-use telltale_choreography::{
+use telltale_runtime::{
     ast::{LocalType, Role},
     extensions::{
         discovery::{ExtensionDiscovery, ExtensionMetadata},
@@ -380,21 +380,21 @@ impl ProtocolExtension for DemoProtocolExtension {
     fn validate(
         &self,
         _roles: &[Role],
-    ) -> Result<(), telltale_choreography::extensions::ExtensionValidationError> {
+    ) -> Result<(), telltale_runtime::extensions::ExtensionValidationError> {
         Ok(())
     }
 
     fn project(
         &self,
         _role: &Role,
-        _context: &telltale_choreography::extensions::ProjectionContext,
-    ) -> Result<LocalType, telltale_choreography::compiler::projection::ProjectionError> {
+        _context: &telltale_runtime::extensions::ProjectionContext,
+    ) -> Result<LocalType, telltale_runtime::compiler::projection::ProjectionError> {
         Ok(LocalType::End)
     }
 
     fn generate_code(
         &self,
-        _context: &telltale_choreography::extensions::CodegenContext,
+        _context: &telltale_runtime::extensions::CodegenContext,
     ) -> TokenStream {
         use quote::quote;
         quote! {

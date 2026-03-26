@@ -4,7 +4,7 @@ This guide explains how to build and run the choreography runtime on `wasm32`. I
 
 ## Overview
 
-The `telltale-choreography` crate supports WASM targets. Core effects, handlers, and timeouts compile under `wasm32` using `wasm-bindgen-futures` and `wasm-timer`. The same `Program` and `interpret` API used on native targets works without modification. Platform differences are handled internally by the runtime module.
+The `telltale-runtime` crate supports WASM targets. Core effects, handlers, and timeouts compile under `wasm32` using `wasm-bindgen-futures` and `wasm-timer`. The same `Program` and `interpret` API used on native targets works without modification. Platform differences are handled internally by the runtime module.
 
 ## What Works
 
@@ -27,7 +27,7 @@ Enable the `wasm` feature on the choreography crate.
 
 ```toml
 [dependencies]
-telltale-choreography = { version = "6.0.0", features = ["wasm"] }
+telltale-runtime = { version = "6.0.0", features = ["wasm"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 ```
@@ -58,7 +58,7 @@ The first section defines the `Role` and `Label` enums. `LabelId` requires strin
 
 ```rust
 use serde::{Deserialize, Serialize};
-use telltale_choreography::{interpret, InMemoryHandler, LabelId, Program, RoleId, RoleName};
+use telltale_runtime::{interpret, InMemoryHandler, LabelId, Program, RoleId, RoleName};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum Role {
@@ -114,14 +114,14 @@ code should keep protocol structure in the DSL and host integration in the
 generated `Protocol::effects` boundary, rather than manually assembling
 low-level effect programs.
 
-For multi role tests, share channels by using `InMemoryHandler::with_channels` and a shared channel map. The WASM test suite in `rust/choreography/tests/wasm_integration.rs` shows larger examples. Each handler must reference the same `Arc<Mutex<BTreeMap>>` instances for messages to route correctly. The unit endpoint `()` is sufficient when no external state is needed.
+For multi role tests, share channels by using `InMemoryHandler::with_channels` and a shared channel map. The WASM test suite in `rust/runtime/tests/wasm_integration.rs` shows larger examples. Each handler must reference the same `Arc<Mutex<BTreeMap>>` instances for messages to route correctly. The unit endpoint `()` is sufficient when no external state is needed.
 
 ## TelltaleHandler in WASM
 
 `TelltaleHandler` works in WASM with `TelltaleSession` pairs or custom sessions. This handler manages typed endpoints and routes messages through registered sessions. It is the recommended handler for integration-level WASM tests.
 
 ```rust
-use telltale_choreography::{TelltaleEndpoint, TelltaleHandler, TelltaleSession};
+use telltale_runtime::{TelltaleEndpoint, TelltaleHandler, TelltaleSession};
 
 let (alice_session, bob_session) = TelltaleSession::pair();
 let mut alice_ep = TelltaleEndpoint::new(Role::Client);
@@ -140,7 +140,7 @@ Use your protocol message type for `Message`. The role must implement both `tell
 The runtime provides WASM aware task spawning helpers. These abstractions let the same protocol code run on both native and browser targets without conditional compilation at the call site.
 
 ```rust
-use telltale_choreography::runtime::spawn;
+use telltale_runtime::runtime::spawn;
 
 spawn(async move {
     // task body

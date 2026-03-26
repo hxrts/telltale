@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::time::Duration;
-use telltale_choreography::QueueCapacity;
+use telltale_runtime::QueueCapacity;
 use telltale_types::FixedQ32;
 
 /// Configuration for a TCP transport instance.

@@ -37,6 +37,10 @@ jobs:
         run: just check-verification-inventory
       - name: Check Lean metrics freshness
         run: just check-lean-metrics
+      - name: Run tooling convergence checks
+        run: just check-tooling-convergence
+      - name: Check Lean prebuilt artifacts
+        run: just check-lean-prebuilt
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:
@@ -85,7 +89,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: check
-          args: --package telltale-choreography --target wasm32-unknown-unknown --features wasm
+          args: --package telltale-runtime --target wasm32-unknown-unknown --features wasm
       - name: Check WASM compilation (core)
         uses: actions-rs/cargo@v1
         with:

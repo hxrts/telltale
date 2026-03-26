@@ -7,7 +7,7 @@ The parser translates the layout-sensitive Telltale DSL into the internal AST
 newline separated. Indentation defines blocks. Records keep braces, but
 structural blocks do not.
 
-The parser lives in `rust/parser/src/compiler/parser/`. It uses Pest plus a
+The parser lives in `rust/language/src/compiler/parser/`. It uses Pest plus a
 layout preprocessor. The canonical source-file extension for Telltale source
 files is `.tell`.
 
@@ -664,7 +664,7 @@ The report includes proof-bundle metadata, inferred requirements, lowered protoc
 #### 16) String-based Protocol Definition
 
 ```rust
-use telltale_choreography::compiler::parser::parse_choreography_str;
+use telltale_runtime::compiler::parser::parse_choreography_str;
 
 let protocol = r#"
 protocol PingPong =
@@ -718,7 +718,7 @@ The parser builds the AST for projection, validation, and code generation.
 `parse_choreography_str` parses a DSL string into a `Choreography` AST.
 
 ```rust
-use telltale_choreography::compiler::parser::parse_choreography_str;
+use telltale_runtime::compiler::parser::parse_choreography_str;
 
 let choreo = parse_choreography_str(r#"
 protocol Example =
@@ -734,7 +734,7 @@ It expects the canonical `.tell` source extension.
 
 ```rust
 use std::path::Path;
-use telltale_choreography::compiler::parser::parse_choreography_file;
+use telltale_runtime::compiler::parser::parse_choreography_file;
 
 let choreo = parse_choreography_file(Path::new("protocol.tell"))?;
 ```
@@ -921,7 +921,7 @@ This example uses `par` with leading `|` branches. Each branch defines a paralle
 ### With Projection
 
 ```rust
-use telltale_choreography::compiler::{parser, projection};
+use telltale_runtime::compiler::{parser, projection};
 
 let choreo = parser::parse_choreography_str(input)?;
 
@@ -936,7 +936,7 @@ This projects the global protocol to a local type for each role. The result can 
 ### With Code Generation
 
 ```rust
-use telltale_choreography::compiler::{parser, projection, codegen};
+use telltale_runtime::compiler::{parser, projection, codegen};
 
 let choreo = parser::parse_choreography_str(input)?;
 let mut local_types = Vec::new();
@@ -960,7 +960,7 @@ This generates Rust code for the choreography. The generated code includes sessi
 Run parser tests with:
 
 ```bash
-cargo test --package telltale-choreography parser
+cargo test --package telltale-runtime parser
 ```
 
 This runs the parser test suite for the choreography crate. It exercises grammar and layout handling.

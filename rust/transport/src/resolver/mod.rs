@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use async_trait::async_trait;
-use telltale_choreography::{RoleName, TopologyEndpoint};
+use telltale_runtime::{RoleName, TopologyEndpoint};
 use thiserror::Error;
 
 mod env;

@@ -7,8 +7,8 @@
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use serde::{Deserialize, Serialize};
 use telltale::*;
-use telltale_choreography::compiler::parser::parse_choreography_str_with_extensions;
-use telltale_choreography::extensions::ExtensionRegistry;
+use telltale_runtime::compiler::parser::parse_choreography_str_with_extensions;
+use telltale_runtime::extensions::ExtensionRegistry;
 
 // Type definitions for the generated code
 #[allow(dead_code)]

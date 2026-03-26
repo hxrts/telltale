@@ -1,5 +1,5 @@
-use telltale_parser::compiler::parser::parse_choreography_str;
-use telltale_parser::{generated_effect_families, GeneratedEffectBehavior, GeneratedEffectFamily};
+use telltale_language::compiler::parser::parse_choreography_str;
+use telltale_language::{generated_effect_families, GeneratedEffectBehavior, GeneratedEffectFamily};
 
 #[test]
 fn generated_effect_family_schema_roundtrips_with_simulation_metadata() {

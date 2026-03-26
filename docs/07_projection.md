@@ -329,6 +329,6 @@ authority-level `timeout ... on timeout ... on cancel ...` choreography form.
 
 ### Code Generation
 
-The `generate_type_expr` function in `rust/choreography/src/compiler/codegen/mod.rs` handles all variants. This includes `LocalChoice`, `Loop`, and `Timeout`. Code generation transforms local types into Rust session types. Timeout annotations are currently ignored in the type expression.
+The `generate_type_expr` function in `rust/runtime/src/compiler/codegen/mod.rs` handles all variants. This includes `LocalChoice`, `Loop`, and `Timeout`. Code generation transforms local types into Rust session types. Timeout annotations are currently ignored in the type expression.
 
 Dynamic roles use specialized code generation via `generate_choreography_code_with_dynamic_roles`. This function includes runtime role binding. Validation occurs at choreography initialization. Generated code supports dynamic role counts.

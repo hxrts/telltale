@@ -48,7 +48,7 @@ The default feature set enables Lean runner integration.
 default = ["runner"]
 cli = ["clap"]
 runner = ["telltale-theory"]
-exporter = ["telltale-choreography", "anyhow", "bpaf"]
+exporter = ["telltale-runtime", "anyhow", "bpaf"]
 golden = ["clap", "anyhow", "runner"]
 
 [[bin]]

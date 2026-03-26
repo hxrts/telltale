@@ -13,7 +13,7 @@ RELEASE_PACKAGES=(
   "telltale-types"
   "telltale-theory"
   "telltale"
-  "telltale-choreography"
+  "telltale-runtime"
   "telltale-transport"
   "telltale-machine"
   "telltale-bridge"
@@ -123,7 +123,7 @@ manifest_path() {
     telltale-types) echo "rust/types/Cargo.toml" ;;
     telltale-theory) echo "rust/theory/Cargo.toml" ;;
     telltale) echo "Cargo.toml" ;;
-    telltale-choreography) echo "rust/choreography/Cargo.toml" ;;
+    telltale-runtime) echo "rust/runtime/Cargo.toml" ;;
     telltale-transport) echo "rust/transport/Cargo.toml" ;;
     telltale-machine) echo "rust/machine/Cargo.toml" ;;
     telltale-bridge) echo "rust/bridge/Cargo.toml" ;;

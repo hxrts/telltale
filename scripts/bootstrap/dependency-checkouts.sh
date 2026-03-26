@@ -57,6 +57,30 @@ ensure_mathlib_cache() {
   echo "OK   mathlib4 cache ready at ${marker}"
 }
 
+# ── iris-lean Build Artifacts ─────────────────────────────────────────
+
+ensure_iris_build() {
+  local checkout="$1"
+
+  if find "${checkout}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
+    echo "OK   iris-lean build artifacts present under ${checkout}/.lake/build/lib/lean"
+    return
+  fi
+
+  echo "build iris-lean: compiling pinned dependency with \`lake build Iris\`"
+  if ! (cd "${checkout}" && lake build Iris); then
+    echo "error: failed to build iris-lean at ${checkout}; run \`cd ${checkout} && lake build Iris\` after resolving the local issue" >&2
+    exit 1
+  fi
+
+  if ! find "${checkout}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
+    echo "error: \`lake build Iris\` completed but iris-lean oleans are still missing under ${checkout}/.lake/build/lib/lean" >&2
+    exit 1
+  fi
+
+  echo "OK   iris-lean build artifacts ready under ${checkout}/.lake/build/lib/lean"
+}
+
 # ── Validate Dependencies Array ───────────────────────────────────────
 
 dep_count="$(jq -r '.dependencies | if type == "array" then length else -1 end' "${PINS_FILE}")"
@@ -105,5 +129,7 @@ for i in $(seq 0 $(( dep_count - 1 ))); do
 
   if [[ "${name}" == "mathlib4" ]]; then
     ensure_mathlib_cache "${checkout}"
+  elif [[ "${name}" == "iris-lean" ]]; then
+    ensure_iris_build "${checkout}"
   fi
 done

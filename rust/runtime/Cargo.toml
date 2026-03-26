@@ -1,0 +1,121 @@
+[package]
+name = "telltale-runtime"
+version = "6.0.0"
+authors = ["Sam Hart"]
+edition = "2021"
+autobenches = false
+rust-version = "1.75"
+description = "Choreographic programming for Telltale - effect-based distributed protocols"
+readme = "../../README.md"
+repository = "https://github.com/hxrts/telltale"
+license = "MIT OR Apache-2.0"
+keywords = ["choreography", "session", "types", "effects"]
+categories = ["asynchronous", "concurrency"]
+
+[lib]
+bench = false
+
+[dependencies]
+telltale = { path = "../..", version = "6.0.0" }
+telltale-macros = { path = "../macros", version = "6.0.0" }
+telltale-language = { path = "../language", version = "6.0.0" }
+telltale-types = { path = "../types", version = "6.0.0" }
+telltale-theory = { path = "../theory", version = "6.0.0" }
+futures = { workspace = true }
+async-trait = { workspace = true }
+async-recursion = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+proc-macro2 = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true }
+bincode = { workspace = true }
+time = { workspace = true }
+base64 = { workspace = true }
+hex = { workspace = true }
+uuid = { workspace = true }
+pest = { workspace = true }
+pest_derive = { workspace = true }
+toml = { workspace = true }
+sha2 = { workspace = true }
+parking_lot = { workspace = true }
+cfg-if = { workspace = true }
+
+# Optional dependencies
+rand = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+wasm-timer = { workspace = true }
+getrandom = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+tempfile = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+proptest = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[features]
+default = []
+test-utils = ["rand"]
+wasm = ["getrandom/js"]
+# Internal feature for WASM integration tests (requires wasm-pack)
+_wasm_integration_tests = []
+native-examples = []
+native-cli = []
+
+[[bench]]
+name = "choreography_bench"
+harness = false
+
+[[bench]]
+name = "telltale_handler_bench"
+harness = false
+
+[[bench]]
+name = "hot_paths"
+harness = false
+
+[[bench]]
+name = "enhanced_features"
+harness = false
+
+[[bin]]
+name = "choreo-fmt"
+path = "src/bin/choreo_fmt.rs"
+required-features = ["native-cli"]
+
+[[bin]]
+name = "effect-scaffold"
+path = "src/bin/effect_scaffold.rs"
+required-features = ["native-cli"]
+
+[[example]]
+name = "extension_workflow"
+required-features = ["native-examples"]
+
+[[example]]
+name = "tcp_ping_pong"
+required-features = ["native-examples"]
+
+[[example]]
+name = "telltale_client_server"
+required-features = ["native-examples"]
+
+[[example]]
+name = "three_party_negotiation"
+path = "examples/three_party_negotiation.rs"
+required-features = ["native-examples"]

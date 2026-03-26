@@ -56,6 +56,14 @@ fi
 
 iris_path="$(jq -r '.dependencies[] | select(.name == "iris-lean") | .path' "${PINS_FILE}")"
 if ! find "${iris_path}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
+  echo "sync iris-lean build artifacts: compiling pinned dependency with \`lake build Iris\`"
+  (
+    cd "${iris_path}"
+    lake build Iris
+  )
+fi
+
+if ! find "${iris_path}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
   echo "error: missing prebuilt iris-lean oleans under ${iris_path}/.lake/build/lib/lean" >&2
   echo "hint: build the pinned local iris checkout once, then rerun this command" >&2
   exit 1

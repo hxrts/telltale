@@ -3,7 +3,7 @@
 //! This test focuses solely on whether the parser can handle choice syntax,
 //! not whether the generated code compiles correctly.
 
-use telltale_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
+use telltale_runtime::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
 
 #[test]
 fn test_choice_construct_parsing_only() {

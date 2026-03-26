@@ -4,7 +4,7 @@
 //! the advanced parser capabilities with the proc macro interface.
 
 use proc_macro2::TokenStream;
-use telltale_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
+use telltale_runtime::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
 
 /// Implementation of the full-featured choreography! macro
 pub fn choreography_impl(input: TokenStream) -> Result<TokenStream, syn::Error> {

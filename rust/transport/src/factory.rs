@@ -4,7 +4,7 @@ use crate::config::TcpTransportConfig;
 use crate::resolver::EndpointResolver;
 use crate::TcpTransport;
 use std::sync::Arc;
-use telltale_choreography::{RoleName, Transport, TransportError};
+use telltale_runtime::{RoleName, Transport, TransportError};
 
 /// Factory that creates TCP transports using an endpoint resolver.
 ///
@@ -15,7 +15,7 @@ use telltale_choreography::{RoleName, Transport, TransportError};
 ///
 /// ```rust,no_run
 /// use telltale_transport::{EnvResolver, TcpTransportFactory, TcpTransportConfig};
-/// use telltale_choreography::RoleName;
+/// use telltale_runtime::RoleName;
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create factory with environment-based discovery
@@ -92,7 +92,7 @@ impl<R: EndpointResolver + 'static> TcpTransportFactory<R> {
 mod tests {
     use super::*;
     use crate::resolver::StaticResolver;
-    use telltale_choreography::TopologyEndpoint;
+    use telltale_runtime::TopologyEndpoint;
 
     #[tokio::test]
     async fn test_factory_creates_transport() {

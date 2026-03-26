@@ -91,8 +91,8 @@ fn test_core_requirement_fulfilled() {
     // 2. Get basic features (✓ - basic syntax works above)
     // 3. Use choreography! macro syntax (✓ - direct DSL syntax works)
 
-    use telltale_choreography::compiler::{ExtensionParser, GrammarComposer};
-    use telltale_choreography::extensions::ExtensionRegistry;
+    use telltale_runtime::compiler::{ExtensionParser, GrammarComposer};
+    use telltale_runtime::extensions::ExtensionRegistry;
 
     // Verify extension system integration
     let _registry = ExtensionRegistry::new();

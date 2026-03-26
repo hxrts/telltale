@@ -9,7 +9,7 @@ use proc_macro2::{Delimiter as TokenDelimiter, Group, Ident, Span, TokenStream, 
 use quote::{format_ident, quote, ToTokens};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use syn::{Error, LitStr, Result};
-use telltale_parser::ast::{
+use telltale_language::ast::{
     AgreementProfileDeclaration, AuthorityBindingMode, AuthorityExpr, Branch,
     ChildEffectAggregationPolicy, Choreography, EffectInterfaceDeclaration,
     EffectOperationDeclaration, LocalType, MessageType, OperationDeclaration, Protocol, Role,
@@ -50,7 +50,7 @@ fn parse_macro_choreography(input: MacroTokenStream) -> Result<ParsedMacroChoreo
             )
         })?;
 
-    let choreography = telltale_parser::parse_choreography_str(&source).map_err(|err| {
+    let choreography = telltale_language::parse_choreography_str(&source).map_err(|err| {
         Error::new(
             Span::call_site(),
             format!(
@@ -221,7 +221,7 @@ fn macro_source_text(input: MacroTokenStream) -> Option<String> {
 fn project_local_types(choreography: &Choreography) -> Result<Vec<(Role, LocalType)>> {
     let mut local_types = Vec::new();
     for role in &choreography.roles {
-        let local_type = telltale_parser::project(choreography, role)
+        let local_type = telltale_language::project(choreography, role)
             .map_err(|err| Error::new(Span::call_site(), err.to_string()))?;
         local_types.push((role.clone(), local_type));
     }
@@ -241,12 +241,12 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
     let proof_only = language_tier_status.proof_only;
     let strongest_tier = LitStr::new(
         match language_tier_status.strongest_tier {
-            telltale_parser::ast::LanguageTier::FullSpec => "full_spec",
-            telltale_parser::ast::LanguageTier::SessionProjectable => "session_projectable",
-            telltale_parser::ast::LanguageTier::ProtocolMachineExecutable => {
+            telltale_language::ast::LanguageTier::FullSpec => "full_spec",
+            telltale_language::ast::LanguageTier::SessionProjectable => "session_projectable",
+            telltale_language::ast::LanguageTier::ProtocolMachineExecutable => {
                 "protocol_machine_executable"
             }
-            telltale_parser::ast::LanguageTier::ProofOnly => "proof_only",
+            telltale_language::ast::LanguageTier::ProofOnly => "proof_only",
         },
         Span::call_site(),
     );
@@ -1614,15 +1614,15 @@ fn lower_child_effect_aggregation_policy(
     })
 }
 
-fn lower_effect_authority_class(value: telltale_parser::ast::EffectAuthorityClass) -> TokenStream {
+fn lower_effect_authority_class(value: telltale_language::ast::EffectAuthorityClass) -> TokenStream {
     match value {
-        telltale_parser::ast::EffectAuthorityClass::Authoritative => {
+        telltale_language::ast::EffectAuthorityClass::Authoritative => {
             quote!(EffectAuthorityClass::Authoritative)
         }
-        telltale_parser::ast::EffectAuthorityClass::Command => {
+        telltale_language::ast::EffectAuthorityClass::Command => {
             quote!(EffectAuthorityClass::Command)
         }
-        telltale_parser::ast::EffectAuthorityClass::Observe => {
+        telltale_language::ast::EffectAuthorityClass::Observe => {
             quote!(EffectAuthorityClass::Observe)
         }
     }

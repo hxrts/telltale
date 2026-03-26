@@ -18,7 +18,7 @@
 //!
 //! ```no_run
 //! use telltale_transport::{TcpTransport, TcpTransportConfig, EnvResolver, TcpTransportFactory};
-//! use telltale_choreography::{RoleName, Transport};
+//! use telltale_runtime::{RoleName, Transport};
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -115,5 +115,5 @@ pub use resolver::{
 pub use transport::{TcpTransport, TransportState};
 
 // Re-export core traits and types for convenience
-pub use telltale_choreography::topology::{Transport, TransportError, TransportResult};
-pub use telltale_choreography::RoleName;
+pub use telltale_runtime::topology::{Transport, TransportError, TransportResult};
+pub use telltale_runtime::RoleName;

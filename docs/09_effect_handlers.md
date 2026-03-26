@@ -2,7 +2,7 @@
 
 ## Overview
 
-This page documents the choreography-layer handler surface in `telltale-choreography`.
+This page documents the choreography-layer handler surface in `telltale-runtime`.
 This surface is `ChoreoHandler`.
 For protocol-machine host integration, see [Effect Handlers and Session Types](11_effect_session_bridge.md).
 
@@ -94,12 +94,12 @@ Code written for browsers compiles unchanged for native binaries. Work can move 
 
 ### InMemoryHandler
 
-The InMemoryHandler is located in `rust/choreography/src/effects/handlers/in_memory.rs`. It provides fast local message passing for testing. The implementation uses futures channels internally.
+The InMemoryHandler is located in `rust/runtime/src/effects/handlers/in_memory.rs`. It provides fast local message passing for testing. The implementation uses futures channels internally.
 
 Basic usage creates a handler for a single role.
 
 ```rust
-use telltale_choreography::InMemoryHandler;
+use telltale_runtime::InMemoryHandler;
 
 let mut handler = InMemoryHandler::new(Role::Alice);
 ```
@@ -120,7 +120,7 @@ The shared channels enable communication between handlers in the same process.
 
 ### TelltaleHandler
 
-The TelltaleHandler is located in `rust/choreography/src/effects/handlers/telltale.rs`. It provides production-ready session-typed channels. The implementation uses the core Telltale library for type-safe communication.
+The TelltaleHandler is located in `rust/runtime/src/effects/handlers/telltale.rs`. It provides production-ready session-typed channels. The implementation uses the core Telltale library for type-safe communication.
 
 This handler enforces session types at runtime. It provides strong guarantees about protocol compliance.
 
@@ -128,12 +128,12 @@ See [Using Telltale Handlers](10_telltale_handler.md) for complete documentation
 
 ### RecordingHandler
 
-The RecordingHandler is located in `rust/choreography/src/effects/handlers/recording.rs`. It records all operations for verification and testing. The handler stores a log of send, recv, choose, and offer calls.
+The RecordingHandler is located in `rust/runtime/src/effects/handlers/recording.rs`. It records all operations for verification and testing. The handler stores a log of send, recv, choose, and offer calls.
 
 Basic usage creates a recording handler.
 
 ```rust
-use telltale_choreography::RecordingHandler;
+use telltale_runtime::RecordingHandler;
 
 let mut handler = RecordingHandler::new(Role::Alice);
 // ... execute protocol ...
@@ -145,7 +145,7 @@ The recorded events can be inspected in tests to verify protocol behavior.
 
 ### NoOpHandler
 
-The NoOpHandler is located in `rust/choreography/src/effects/handler.rs`. It implements send and choose as no-ops and returns errors for recv and offer. This is useful for testing protocol structure without actual communication.
+The NoOpHandler is located in `rust/runtime/src/effects/handler.rs`. It implements send and choose as no-ops and returns errors for recv and offer. This is useful for testing protocol structure without actual communication.
 
 ```rust
 let handler = NoOpHandler::<MyRole>::new();
@@ -159,12 +159,12 @@ Middleware wraps handlers to add cross-cutting functionality. Multiple middlewar
 
 ### Trace
 
-The Trace middleware is located in `rust/choreography/src/effects/middleware/trace.rs`. It logs all operations for debugging. The middleware outputs send, recv, choose, and offer calls with role and message details.
+The Trace middleware is located in `rust/runtime/src/effects/middleware/trace.rs`. It logs all operations for debugging. The middleware outputs send, recv, choose, and offer calls with role and message details.
 
 Usage example shows wrapping a handler.
 
 ```rust
-use telltale_choreography::Trace;
+use telltale_runtime::Trace;
 
 let base_handler = InMemoryHandler::new(role);
 let mut handler = Trace::with_prefix(base_handler, "Alice");
@@ -174,12 +174,12 @@ Each operation logs before delegating to the inner handler.
 
 ### Metrics
 
-The Metrics middleware is located in `rust/choreography/src/effects/middleware/metrics.rs`. It counts operations for monitoring. The middleware tracks `send_count`, `recv_count`, and `error_count`.
+The Metrics middleware is located in `rust/runtime/src/effects/middleware/metrics.rs`. It counts operations for monitoring. The middleware tracks `send_count`, `recv_count`, and `error_count`.
 
 Usage example shows metrics collection.
 
 ```rust
-use telltale_choreography::Metrics;
+use telltale_runtime::Metrics;
 
 let base_handler = InMemoryHandler::new(role);
 let mut handler = Metrics::new(base_handler);
@@ -191,12 +191,12 @@ Metrics accumulate over the handler lifetime.
 
 ### Retry
 
-The Retry middleware is located in `rust/choreography/src/effects/middleware/retry.rs`. It retries failed operations with exponential backoff. Only send operations are retried since recv changes protocol state.
+The Retry middleware is located in `rust/runtime/src/effects/middleware/retry.rs`. It retries failed operations with exponential backoff. Only send operations are retried since recv changes protocol state.
 
 Usage example configures retry behavior.
 
 ```rust
-use telltale_choreography::Retry;
+use telltale_runtime::Retry;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
@@ -207,12 +207,12 @@ The handler retries up to 3 times. Delays are 100ms, 200ms, 400ms using exponent
 
 ### FaultInjection
 
-The FaultInjection middleware is located in `rust/choreography/src/effects/middleware/fault_injection.rs`. It requires the `test-utils` feature. The middleware injects random failures and delays for testing fault tolerance.
+The FaultInjection middleware is located in `rust/runtime/src/effects/middleware/fault_injection.rs`. It requires the `test-utils` feature. The middleware injects random failures and delays for testing fault tolerance.
 
 Usage example configures fault injection.
 
 ```rust
-use telltale_choreography::effects::middleware::FaultInjection;
+use telltale_runtime::effects::middleware::FaultInjection;
 use std::time::Duration;
 
 let base_handler = InMemoryHandler::new(role);
@@ -299,7 +299,7 @@ Parameterized roles remain a choreography-level feature of the DSL and AST. Proj
 Topology constraints validate concrete deployments against role family bounds.
 
 ```rust
-use telltale_choreography::topology::{Topology, parse_topology};
+use telltale_runtime::topology::{Topology, parse_topology};
 
 let config = r#"
     topology Prod for Protocol {

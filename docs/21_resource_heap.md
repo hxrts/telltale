@@ -4,7 +4,7 @@ The resource heap provides explicit state tracking for protocol resources. It st
 
 ## Overview
 
-The heap lives in `telltale_choreography::heap`. It is immutable by default, so operations return a new heap value and preserve deterministic behavior.
+The heap lives in `telltale_runtime::heap`. It is immutable by default, so operations return a new heap value and preserve deterministic behavior.
 
 ## Resource Types
 
@@ -45,7 +45,7 @@ pub struct Heap {
 The functional API allocates and consumes resources on the heap.
 
 ```rust
-use telltale_choreography::heap::{Heap, Resource};
+use telltale_runtime::heap::{Heap, Resource};
 
 let heap = Heap::new();
 let msg = Resource::message("Alice", "Bob", "Ping", vec![1, 2, 3], 0);
@@ -62,7 +62,7 @@ Additional heap methods include `size()`, `nullified_count()`, `contains()`, `is
 Merkle trees commit to active resources and nullifiers.
 
 ```rust
-use telltale_choreography::heap::{HeapCommitment, MerkleTree};
+use telltale_runtime::heap::{HeapCommitment, MerkleTree};
 
 let tree = MerkleTree::from_heap(&heap);
 let proof = tree.prove(0);

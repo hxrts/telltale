@@ -9,7 +9,7 @@ use external_demo::choreography;
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use serde::{Deserialize, Serialize};
 use telltale::*;
-use telltale_choreography::{
+use telltale_runtime::{
     compiler::parser::parse_choreography_str_with_extensions, extensions::ExtensionRegistry,
 };
 

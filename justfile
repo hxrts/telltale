@@ -63,6 +63,8 @@ ci-dry-run lane="fast":
     just check-verification-inventory
     just check-lean-metrics-minimal-env
     just check-lean-metrics
+    just check-tooling-convergence
+    just check-lean-prebuilt
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -73,7 +75,6 @@ ci-dry-run lane="fast":
     just check-capability-gates
     just check-release-conformance
     just check-telltale-style
-    just check-tooling-convergence
     just check-semantic-name-parity
     just check-aura-borrowed-lints
     just check-doc-links-ci
@@ -145,7 +146,7 @@ check-tooling-convergence:
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":
-    cargo run -p telltale-choreography --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}
+    cargo run -p telltale-runtime --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}
 
 # Run a simulator harness config and print a JSON report.
 sim-run config:
@@ -165,6 +166,10 @@ check-arch-lean:
 # Validate pinned revisions for local Lean dependency checkouts.
 check-lean-dependency-pins:
     ./scripts/check/lean-dependency-pins.sh
+
+# Ensure pinned Lean dependency checkouts also have the required prebuilt artifacts.
+check-lean-prebuilt:
+    ./scripts/bootstrap/ensure-lean-prebuilt.sh
 
 # Consolidated capability gate checks (byzantine, delegation, envelope, failure, contracts, speculation)
 check-capability-gates:

@@ -78,8 +78,8 @@ Rust and Lean are expected to align on the following surfaces.
 
 | Area | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
-| Projection core relation | `lean/Choreography/Projection/Project.lean` | `rust/choreography/src/compiler/projection.rs` | Aligned on supported subset |
-| Merge semantics | `lean/Choreography/Projection/Erasure/Merge.lean` | `rust/parser/src/compiler/projection/merge.rs` | Aligned |
+| Projection core relation | `lean/Choreography/Projection/Project.lean` | `rust/runtime/src/compiler/projection.rs` | Aligned on supported subset |
+| Merge semantics | `lean/Choreography/Projection/Erasure/Merge.lean` | `rust/language/src/compiler/projection/merge.rs` | Aligned |
 | Projection validation pipeline | `lean/Choreography/Projection/Validator.lean` | `rust/bridge/src/runner_projection_export.rs` | Aligned |
 
 ### Rust-Only Extensions
@@ -88,9 +88,9 @@ The following surfaces are intentionally outside direct Lean parity. They must b
 
 | Surface | Rust Module | Parity Status |
 |---|---|---|
-| `LocalType::LocalChoice` | `rust/parser/src/ast/local_type.rs` | Rust extension |
-| Timeout wrappers in local AST | `rust/parser/src/ast/local_type.rs` | Rust extension |
-| Effect runtime `Parallel` execution contract | `rust/choreography/src/effects/interpreter.rs` | Rust runtime contract |
+| `LocalType::LocalChoice` | `rust/language/src/ast/local_type.rs` | Rust extension |
+| Timeout wrappers in local AST | `rust/language/src/ast/local_type.rs` | Rust extension |
+| Effect runtime `Parallel` execution contract | `rust/runtime/src/effects/interpreter.rs` | Rust runtime contract |
 
 ### Projection Cross-Validation
 

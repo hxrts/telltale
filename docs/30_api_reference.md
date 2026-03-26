@@ -50,7 +50,7 @@ Key exports:
 
 See `rust/theory/src/lib.rs` for the complete feature-gated API.
 
-### `telltale-choreography`
+### `telltale-runtime`
 
 Choreographic DSL, projection, and effect execution.
 
@@ -63,7 +63,7 @@ Key exports:
 - Heap: `Heap`, `Resource`, `MerkleTree`, `HeapCommitment`
 - Extensions: `ExtensionRegistry`, `GrammarExtension`, `ProtocolExtension`
 
-See `rust/choreography/src/lib.rs` for the full export surface.
+See `rust/runtime/src/lib.rs` for the full export surface.
 
 ### `telltale-machine`
 

@@ -366,7 +366,7 @@ GETTING_STARTED="docs/02_getting_started.md"
 if [[ -f "$GETTING_STARTED" ]]; then
     TARGET_CRATES="telltale
 telltale-theory
-telltale-choreography
+telltale-runtime
 telltale-bridge"
 
     # Build actual features per target crate (excluding default, _-prefixed,

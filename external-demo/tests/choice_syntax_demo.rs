@@ -3,7 +3,7 @@
 //! This test shows the working syntax for choice constructs and provides
 //! a corrected version of the user's original request.
 
-use telltale_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
+use telltale_runtime::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
 
 #[test]
 fn demo_correct_choice_syntax() {

@@ -29,7 +29,7 @@ required-features = ["golden"]
 default = ["runner"]
 cli = ["clap"]
 runner = ["telltale-theory"]  # Enable LeanRunner and EquivalenceChecker
-exporter = ["telltale-choreography", "anyhow", "bpaf"]  # Enable choreography exporter
+exporter = ["telltale-runtime", "anyhow", "bpaf"]  # Enable choreography exporter
 golden = ["clap", "anyhow", "runner"]  # Enable golden file management CLI
 
 [dependencies]
@@ -43,14 +43,14 @@ clap = { version = "4.4", features = ["derive"], optional = true }
 bpaf = { version = "0.9", features = ["derive"], optional = true }
 tempfile = { workspace = true }
 anyhow = { workspace = true, optional = true }
-telltale-choreography = { path = "../choreography", version = "6.0.0", optional = true }
+telltale-runtime = { path = "../runtime", version = "6.0.0", optional = true }
 cfg-if = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
 telltale-theory = { path = "../theory", version = "6.0.0" }
-telltale-choreography = { path = "../choreography", version = "6.0.0" }
-telltale-parser = { path = "../parser", version = "6.0.0" }
+telltale-runtime = { path = "../runtime", version = "6.0.0" }
+telltale-language = { path = "../language", version = "6.0.0" }
 telltale-machine = { path = "../machine", version = "6.0.0", features = ["multi-thread"] }
 tempfile = { workspace = true }
 serde_json = { workspace = true }

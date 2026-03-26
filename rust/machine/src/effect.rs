@@ -21,7 +21,7 @@
 //! - any host mutation of session-local runtime state should be routed through
 //!   an explicit ownership capability such as `OwnedSession`.
 //!
-//! This is intentionally **not** the same as `telltale_choreography::ChoreoHandler`:
+//! This is intentionally **not** the same as `telltale_runtime::ChoreoHandler`:
 //! the protocol-machine guest-runtime handler is synchronous, session-local,
 //! and operates on bytecode state, while `ChoreoHandler` is an async, typed
 //! transport abstraction for generated choreography code.

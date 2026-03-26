@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
-use telltale_choreography::{
+use telltale_runtime::{
     MessageLenBytes, QueueCapacity, RoleName, Transport, TransportError, TransportResult,
 };
 use telltale_types::FixedQ32;

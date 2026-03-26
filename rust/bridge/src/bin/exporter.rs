@@ -17,8 +17,8 @@ use bpaf::Bpaf;
 use serde_json::json;
 
 use telltale_bridge::export::{global_to_json, local_to_json};
-use telltale_choreography::ast::convert::choreography_to_global;
-use telltale_choreography::compiler::parse_choreography_file;
+use telltale_runtime::ast::convert::choreography_to_global;
+use telltale_runtime::compiler::parse_choreography_file;
 use telltale_theory::projection::project as theory_project;
 
 #[derive(Debug, Clone, Bpaf)]

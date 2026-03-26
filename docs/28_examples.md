@@ -41,7 +41,7 @@ Theory examples in `examples/theory/`:
 - `async_subtyping.rs`: async-subtyping checks and subtype relation examples
 - `bounded_recursion.rs`: bounded recursion strategies with configurable depth
 
-Generated-interface examples in `rust/choreography/examples/`:
+Generated-interface examples in `rust/runtime/examples/`:
 
 - `authority_surface.rs`:inspect `effect` declarations and proof-backed parser metadata
 - `telltale_client_server.rs` and `three_party_negotiation.rs`:runtime-oriented examples behind `native-examples`
@@ -236,7 +236,7 @@ For canonical tests, exercise the generated `tell!` surface directly:
   behavior
 
 Low-level choreography-interpreter tests still exist inside
-`rust/choreography/tests/` as implementation coverage for that crate, but they
+`rust/runtime/tests/` as implementation coverage for that crate, but they
 are not the public testing model that examples should teach.
 
 ## Running Examples

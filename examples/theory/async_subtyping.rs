@@ -6,7 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use telltale::tell;
-use telltale_parser::{ast::convert::local_to_local_r, parse_choreography_str, project};
+use telltale_language::{ast::convert::local_to_local_r, parse_choreography_str, project};
 use telltale_theory::subtyping::{
     async_subtype, orphan_free, siso_decompose, sync_subtype, InputTree, OutputTree,
 };

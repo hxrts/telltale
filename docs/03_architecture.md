@@ -82,7 +82,7 @@ This diagram summarizes the compile time flow from DSL input to runtime executio
 
 ### AST Module
 
-The AST module is located in `rust/parser/src/ast/`. It represents choreographies as data structures.
+The AST module is located in `rust/language/src/ast/`. It represents choreographies as data structures.
 
 The main type is `Choreography`.
 
@@ -177,7 +177,7 @@ pub enum Protocol {
 
 ### Parser Module
 
-The parser module is located in `rust/parser/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
+The parser module is located in `rust/language/src/compiler/parser/`. It converts DSL text into AST using the Pest parser generator.
 
 The parser validates role declarations and builds the protocol tree from the input text. It runs a layout preprocessor before the grammar parse. This enables layout-sensitive syntax with `->` message arrows, `=>` branch arrows, `choice Role at` branches with leading `|`, and `par` blocks.
 
@@ -193,7 +193,7 @@ entry point expects the canonical `.tell` source extension.
 
 ### Projection Module
 
-The projection module is located in `rust/choreography/src/compiler/projection.rs`. Projection transforms a global protocol into a local view for each role.
+The projection module is located in `rust/runtime/src/compiler/projection.rs`. Projection transforms a global protocol into a local view for each role.
 
 The algorithm determines what each participant should do.
 
@@ -205,7 +205,7 @@ Projection handles merging parallel branches. It also detects conflicts between 
 
 ### Code Generation Module
 
-The codegen module is located in `rust/choreography/src/compiler/codegen/`. It converts local types into Rust session types and effect programs.
+The codegen module is located in `rust/runtime/src/compiler/codegen/`. It converts local types into Rust session types and effect programs.
 
 The generator creates compile-time type-safe protocol implementations.
 
@@ -253,7 +253,7 @@ The generator creates session types and role structs. It supports dynamic roles 
 
 ### Effect System
 
-The effect system is located in `rust/choreography/src/effects/`. It decouples protocol logic from transport.
+The effect system is located in `rust/runtime/src/effects/`. It decouples protocol logic from transport.
 
 Protocols are represented as effect programs. Handlers interpret these programs.
 

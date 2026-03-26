@@ -261,7 +261,7 @@ Theory conversion has the same restriction:
 
 The current lowering split is:
 
-- parser/AST surface in `rust/choreography`
+- parser/AST surface in `rust/language`
 - protocol-machine effect execution boundary in `rust/machine`
 - typed handler boundary centered on protocol-machine `invoke`
 

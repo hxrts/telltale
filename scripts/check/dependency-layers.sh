@@ -27,12 +27,12 @@ declare -A layer_of=(
   ["telltale-types"]=1
   # Core algorithm, parser, and macro layer
   ["telltale-theory"]=2
-  ["telltale-parser"]=2
+  ["telltale-language"]=2
   ["telltale-macros"]=2
   # Runtime/verification
   ["telltale-machine"]=3
   # Session tooling, transport, and facade layer
-  ["telltale-choreography"]=4
+  ["telltale-runtime"]=4
   ["telltale-bridge"]=4
   ["telltale-simulator"]=4
   ["telltale-transport"]=4

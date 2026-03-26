@@ -52,6 +52,16 @@ jobs:
           mkdir -p artifacts
           just check-lean-metrics | tee artifacts/check-lean-metrics.log
 
+      - name: Run tooling convergence checks
+        run: |
+          mkdir -p artifacts
+          just check-tooling-convergence | tee artifacts/check-tooling-convergence.log
+
+      - name: Check Lean prebuilt artifacts
+        run: |
+          mkdir -p artifacts
+          just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
+
       - name: Run Lean architecture/style checks
         run: |
           mkdir -p artifacts
@@ -156,6 +166,16 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-lean-metrics | tee artifacts/check-lean-metrics.log
+
+      - name: Run tooling convergence checks
+        run: |
+          mkdir -p artifacts
+          just check-tooling-convergence | tee artifacts/check-tooling-convergence.log
+
+      - name: Check Lean prebuilt artifacts
+        run: |
+          mkdir -p artifacts
+          just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
 
       - name: Run Lean architecture/style checks
         run: |

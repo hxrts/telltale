@@ -9,7 +9,7 @@ edition = "2021"
 [dependencies]
 # Re-export all telltale functionality
 telltale = { path = ".." }
-telltale-choreography = { path = "../rust/choreography" }
+telltale-runtime = { path = "../rust/runtime" }
 telltale-macros = { path = "../rust/macros" }
 
 # Import our proc macros from the separate crate

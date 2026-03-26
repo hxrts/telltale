@@ -3,7 +3,7 @@
 //! This test checks whether the advanced parser (`parse_and_generate_with_extensions`)
 //! can properly handle choice constructs.
 
-use telltale_choreography::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
+use telltale_runtime::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
 
 // Test the specific syntax requested by the user
 #[test]

@@ -41,7 +41,7 @@ pub mod prelude {
     };
 
     // Choreography types
-    pub use telltale_choreography::{
+    pub use telltale_runtime::{
         ast::{Choreography, LocalType, MessageType, Protocol, Role as ChoreographyRole},
         compiler::{parser::parse_choreography_str_with_extensions, GrammarComposer},
         extensions::{ExtensionRegistry, ProtocolExtension},
@@ -73,7 +73,7 @@ pub mod session {
 
 /// Choreography DSL types and tools
 pub mod choreography_dsl {
-    pub use telltale_choreography::{
+    pub use telltale_runtime::{
         ast, compiler, extensions, runtime, simulation, testing, tracing,
     };
 }
@@ -82,8 +82,8 @@ pub mod choreography_dsl {
 ///
 /// This function configures the extension registry with Aura-specific
 /// grammar extensions and statement parsers.
-pub fn init_aura_extensions() -> telltale_choreography::extensions::ExtensionRegistry {
-    let mut registry = telltale_choreography::extensions::ExtensionRegistry::new();
+pub fn init_aura_extensions() -> telltale_runtime::extensions::ExtensionRegistry {
+    let mut registry = telltale_runtime::extensions::ExtensionRegistry::new();
     aura_extensions::register_aura_extensions(&mut registry);
     registry
 }

@@ -253,7 +253,7 @@ Add the choreography crate and an async runtime.
 
 ```toml
 [dependencies]
-telltale-choreography = "6.0.0"
+telltale-runtime = "6.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -265,7 +265,7 @@ Define roles, labels, and messages for your protocol.
 
 ```rust
 use serde::{Deserialize, Serialize};
-use telltale_choreography::{LabelId, RoleId, RoleName};
+use telltale_runtime::{LabelId, RoleId, RoleName};
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 enum Role { Client, Server }

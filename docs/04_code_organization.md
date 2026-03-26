@@ -38,7 +38,7 @@ graph TB
 
     subgraph Core["Core Algorithm and Parser Layer"]
         theory["telltale-theory<br/>Algorithms: projection, merge, subtyping"]
-        parser["telltale-parser<br/>DSL parser, AST, projection, codegen"]
+        parser["telltale-language<br/>DSL parser, AST, projection, codegen"]
         macros["telltale-macros<br/>Proc macros"]
     end
 
@@ -48,7 +48,7 @@ graph TB
     end
 
     subgraph Application
-        choreo["telltale-choreography<br/>Effect handlers, tooling, testing"]
+        choreo["telltale-runtime<br/>Effect handlers, tooling, testing"]
         lean["telltale-bridge<br/>Lean interop and validation"]
     end
 
@@ -241,9 +241,9 @@ let trace = run(&spec.local_types, &spec.global_type, &spec.initial_states, 100,
 
 The `run` function executes a choreography and returns a trace. The trace contains step records for each role at each step. The simulator crate also ships a CLI entrypoint in `rust/simulator/src/bin/run.rs`.
 
-### telltale-choreography
+### telltale-runtime
 
-This crate is located in `rust/choreography/`. It provides DSL and parsing for choreographic programming. It depends on `telltale`, `telltale-macros`, `telltale-types`, and `telltale-theory`.
+This crate is located in `rust/runtime/`. It provides DSL and parsing for choreographic programming. It depends on `telltale`, `telltale-macros`, `telltale-types`, and `telltale-theory`.
 
 The `ast/` directory contains extended AST types including `Protocol`, `LocalType`, and `Role`. The `compiler/parser` module handles DSL parsing. The `compiler/projection` module handles choreography to `LocalType` projection. The `compiler/codegen` module handles Rust code generation.
 
@@ -269,22 +269,26 @@ This crate is located in `rust/macros/`. It provides procedural macros for deriv
 
 The `tell!` macro parses inline DSL text and generates the protocol module, typed effect interfaces, and session types at compile time. The `Role` and `Roles` derive macros generate `RoleId` trait implementations. The `Message` derive macro generates `Serialize` and `Deserialize` bindings for protocol messages.
 
-### effect-scaffold (binary in telltale-choreography)
+### effect-scaffold (binary in telltale-runtime)
 
-The `effect-scaffold` binary (`rust/choreography/src/bin/effect_scaffold.rs`) is a tooling-only export path that reads Telltale `effect` declarations and writes:
+The `effect-scaffold` binary (`rust/runtime/src/bin/effect_scaffold.rs`) is a tooling-only export path that reads Telltale `effect` declarations and writes:
 
 - canonical Rust request/outcome enums
 - host-runtime handler traits
 - first-class simulator traits and scenario builders
 - an exported effect-family manifest
 
+This path exists for generated surfaces & tooling, not as the primary
+application-facing protocol API. Normal application/library code should rely on
+the typed effect interfaces emitted directly by `tell!`.
+
 Run via `just effect-scaffold path/to/protocol.tell` only when repository workflows need exported files on disk. Normal application/library code should use the typed effect interfaces emitted directly by `tell!`.
 
 ### telltale-transport
 
-This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-choreography` and `telltale-types` and is part of the workspace member list in the root `Cargo.toml`.
+This crate is located in `rust/transport/`. It provides production transport implementations for session types. The crate depends on `telltale-runtime` and `telltale-types` and is part of the workspace member list in the root `Cargo.toml`.
 
-The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-choreography`.
+The crate implements TCP-based transports with async networking via tokio. Future features include TLS support. The transport layer integrates with the effect handler system from `telltale-runtime`.
 
 ### telltale (root crate)
 

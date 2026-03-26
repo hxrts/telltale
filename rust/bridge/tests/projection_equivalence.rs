@@ -28,11 +28,11 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use telltale_choreography::ast::{
+use telltale_runtime::ast::{
     choreography_to_global, local_to_local_r, local_types_equivalent, Choreography, ConversionError,
 };
-use telltale_choreography::compiler::parser::parse_choreography_str;
-use telltale_choreography::compiler::projection::project;
+use telltale_runtime::compiler::parser::parse_choreography_str;
+use telltale_runtime::compiler::projection::project;
 use telltale_theory::projection::project as theory_project;
 
 #[derive(Debug, thiserror::Error)]
@@ -66,7 +66,7 @@ fn parse_choreography(input: &str) -> Choreography {
 fn find_role<'a>(
     choreography: &'a Choreography,
     name: &str,
-) -> Option<&'a telltale_choreography::ast::Role> {
+) -> Option<&'a telltale_runtime::ast::Role> {
     choreography.roles.iter().find(|r| *r.name() == name)
 }
 

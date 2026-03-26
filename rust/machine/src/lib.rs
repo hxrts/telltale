@@ -32,7 +32,7 @@
 //! The protocol machine's [`EffectHandler`] is synchronous, deterministic, and
 //! **session-local**. It must not depend on global time or shared mutable
 //! state across sessions. This is distinct from the async, typed
-//! `telltale_choreography::ChoreoHandler` used by generated choreography code.
+//! `telltale_runtime::ChoreoHandler` used by generated choreography code.
 //!
 //! # Usage
 //!

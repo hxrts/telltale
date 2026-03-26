@@ -11,7 +11,7 @@
 ```rust
 use serde::{Deserialize, Serialize};
 use telltale::{Message, Role};
-use telltale_choreography::{
+use telltale_runtime::{
     ChoreoHandler, LabelId, RoleId, RoleName, TelltaleEndpoint, TelltaleHandler, TelltaleSession,
 };
 
@@ -130,7 +130,7 @@ This check complements endpoint unit tests. It validates protocol-machine behavi
 
 Roles represent participants in the choreography. They must implement:
 - `telltale::Role`
-- `RoleId` (from `telltale_choreography::effects`)
+- `RoleId` (from `telltale_runtime::effects`)
 - `Clone`, `Copy`, `Debug`, `PartialEq`, `Eq`, `Hash`
 
 `RoleId` requires an associated label type that implements `LabelId`. You only need labels if your protocol uses choice.

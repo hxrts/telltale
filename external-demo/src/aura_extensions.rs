@@ -7,7 +7,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-use telltale_choreography::{
+use telltale_runtime::{
     ast::{LocalType, MessageType, Role},
     compiler::projection::ProjectionError,
     extensions::{
@@ -386,15 +386,15 @@ impl ProtocolExtension for AuraAnnotatedSend {
 
 /// Register all Aura extensions with an extension registry
 pub fn register_aura_extensions(
-    registry: &mut telltale_choreography::extensions::ExtensionRegistry,
+    registry: &mut telltale_runtime::extensions::ExtensionRegistry,
 ) {
     let _ = registry.register_grammar(AuraGrammarExtension);
     registry.register_parser(AuraStatementParser, "aura_statement_parser".to_string());
 }
 
 /// Create an extension registry with Aura extensions pre-registered
-pub fn create_aura_extension_registry() -> telltale_choreography::extensions::ExtensionRegistry {
-    let mut registry = telltale_choreography::extensions::ExtensionRegistry::new();
+pub fn create_aura_extension_registry() -> telltale_runtime::extensions::ExtensionRegistry {
+    let mut registry = telltale_runtime::extensions::ExtensionRegistry::new();
     register_aura_extensions(&mut registry);
     registry
 }

@@ -106,7 +106,7 @@ The `role_constraints` block controls acceptable family sizes. The `channel_capa
 You can build topologies programmatically and validate them against choreography roles.
 
 ```rust
-use telltale_choreography::{RoleName, Topology, TopologyEndpoint};
+use telltale_runtime::{RoleName, Topology, TopologyEndpoint};
 
 let topology = Topology::builder()
     .local_role(RoleName::from_static("Coordinator"))
@@ -145,7 +145,7 @@ let topology = parsed.topology;
 `TopologyHandler` wraps transport selection and routing for a role.
 
 ```rust
-use telltale_choreography::{RoleName, TopologyHandler};
+use telltale_runtime::{RoleName, TopologyHandler};
 
 let handler = TopologyHandler::local(RoleName::from_static("Alice"));
 handler.initialize().await?;
@@ -190,7 +190,7 @@ This pattern shows local default setup, named topology setup, and custom topolog
 Transport selection is based on role locations.
 
 ```rust
-use telltale_choreography::topology::{TransportFactory, TransportType};
+use telltale_runtime::topology::{TransportFactory, TransportType};
 
 let transport_type = TransportFactory::transport_for_location(
     &RoleName::from_static("Alice"),

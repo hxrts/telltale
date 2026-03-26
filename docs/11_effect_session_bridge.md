@@ -32,7 +32,7 @@ Rust exposes two handler interfaces.
 
 | Interface | Location | Purpose |
 |---|---|---|
-| `ChoreoHandler` | `rust/choreography/src/effects/handler.rs` | async typed API for generated choreography code |
+| `ChoreoHandler` | `rust/runtime/src/effects/handler.rs` | async typed API for generated choreography code |
 | `EffectHandler` | `rust/machine/src/effect.rs` | sync protocol-machine API over bytecode values |
 
 Third-party runtime integration should use `EffectHandler`.
@@ -247,7 +247,7 @@ just effect-scaffold path/to/protocol.tell
 This command writes files under `artifacts/effect_handler_scaffold` by default. The direct form is:
 
 ```text
-cargo run -p telltale-choreography --bin effect-scaffold -- --out artifacts/effect_handler_scaffold --dsl path/to/protocol.tell
+cargo run -p telltale-runtime --bin effect-scaffold -- --out artifacts/effect_handler_scaffold --dsl path/to/protocol.tell
 ```
 
 Use `--no-simulator` when you want only the Rust effect boundary without simulator artifacts.
@@ -321,7 +321,7 @@ request/outcome model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`.
 
 | Term | Meaning |
 |---|---|
-| `Program` and `Effect` | choreography free algebra in `telltale-choreography` |
+| `Program` and `Effect` | choreography free algebra in `telltale-runtime` |
 | `ChoreoHandler` | async typed handler for generated choreography code |
 | `EffectHandler` | sync protocol-machine host interface for runtime integration |
 | `EffectRuntime` | Lean executable effect action and context transition |

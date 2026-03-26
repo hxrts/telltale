@@ -4,7 +4,7 @@ TCP transport implementations for the Telltale session types runtime.
 
 ## Overview
 
-`telltale-transport` provides a TCP implementation of the `Transport` interface from `telltale-choreography`. It is intended for multi-process and multi-host deployments where roles communicate over network sockets. The crate includes endpoint resolution from environment variables and a factory API for runtime construction.
+`telltale-transport` provides a TCP implementation of the `Transport` interface from `telltale-runtime`. It is intended for multi-process and multi-host deployments where roles communicate over network sockets. The crate includes endpoint resolution from environment variables and a factory API for runtime construction.
 
 ## Features
 
@@ -17,7 +17,7 @@ Add these dependencies to `Cargo.toml`.
 ```toml
 [dependencies]
 telltale-transport = "6.0.0"
-telltale-choreography = "6.0.0"
+telltale-runtime = "6.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -28,7 +28,7 @@ This configuration gives access to the transport types, role identifiers, and To
 ### Direct Configuration
 
 ```rust,no_run
-use telltale_choreography::RoleName;
+use telltale_runtime::RoleName;
 use telltale_transport::{TcpTransport, TcpTransportConfig, Transport};
 
 #[tokio::main]
@@ -66,7 +66,7 @@ export TELLTALE_BOB_ENDPOINT=127.0.0.1:8081
 These variables define role endpoints that the factory can resolve at runtime.
 
 ```rust,no_run
-use telltale_choreography::RoleName;
+use telltale_runtime::RoleName;
 use telltale_transport::{EnvResolver, TcpTransportConfig, TcpTransportFactory};
 
 #[tokio::main]

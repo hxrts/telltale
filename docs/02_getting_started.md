@@ -7,7 +7,7 @@ Add Telltale to your project dependencies.
 ```toml
 [dependencies]
 telltale = "6.0.0"
-telltale-choreography = "6.0.0"
+telltale-runtime = "6.0.0"
 ```
 
 This adds the facade crate and the choreographic programming layer. Pinning versions keeps builds reproducible.
@@ -17,7 +17,7 @@ This adds the facade crate and the choreographic programming layer. Pinning vers
 | If you need | Use |
 |-------------|-----|
 | Core session types plus facade APIs | `telltale` |
-| Choreography DSL, parser, and effect handlers | `telltale-choreography` |
+| Choreography DSL, parser, and effect handlers | `telltale-runtime` |
 | Projection, merge, and subtyping algorithms | `telltale-theory` |
 | Protocol-machine execution with schedulers | `telltale-machine` |
 | Deterministic simulation and scenario middleware | `telltale-simulator` |
@@ -32,11 +32,11 @@ Telltale is organized as a Cargo workspace with several crates. The layout track
 
 The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. Lean includes a `delegate` constructor that is not yet exposed in Rust.
 
-The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks. The `telltale-choreography` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation.
+The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks. The `telltale-runtime` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation.
 
 The `telltale-machine` crate provides the protocol machine and guest-runtime execution surfaces. The `telltale-simulator` crate wraps the protocol machine with deterministic middleware for testing. The `telltale-bridge` crate enables cross-validation with Lean through JSON import and export functions. The `telltale-transport` crate provides production-oriented transport adapters that integrate with choreography handlers.
 
-The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-choreography` for session types and the high-level DSL.
+The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-runtime` for session types and the high-level DSL.
 
 ### Feature Flags
 
@@ -68,7 +68,7 @@ The workspace provides granular feature flags to control dependencies and functi
 | `coherence` | yes | Coherence predicates |
 | `full` | no | Enable all optional features |
 
-#### Choreography Crate (`telltale-choreography`)
+#### Choreography Crate (`telltale-runtime`)
 
 | Feature | Default | Description |
 |---------|---------|-------------|
@@ -107,7 +107,7 @@ This enables all optional features for the facade crate.
 For WASM support, enable the `wasm` feature on the choreography crate.
 
 ```toml
-telltale-choreography = { version = "6.0.0", features = ["wasm"] }
+telltale-runtime = { version = "6.0.0", features = ["wasm"] }
 ```
 
 This enables compilation to WebAssembly targets.
@@ -150,7 +150,7 @@ assert!(PingPong::proof_status::SESSION_PROJECTABLE);
 ```
 
 Start from `tell!` and the generated protocol/effect surfaces. The older
-effect-program builder APIs still exist inside `telltale-choreography`, but
+effect-program builder APIs still exist inside `telltale-runtime`, but
 they are no longer the recommended public entrypoint.
 
 ## Core Concepts
@@ -186,7 +186,7 @@ Both endpoints now communicate through the session pair.
 Alternatively, you can wrap your own sink and stream transports.
 
 ```rust
-use telltale_choreography::effects::TelltaleSession;
+use telltale_runtime::effects::TelltaleSession;
 
 let ws_session = TelltaleSession::from_sink_stream(websocket_writer, websocket_reader);
 client_endpoint.register_session(Role::Server, ws_session);

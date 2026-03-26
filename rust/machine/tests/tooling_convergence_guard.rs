@@ -62,8 +62,8 @@ const TOOLING_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../docs/29_wasm_guide.md"),
     ),
     (
-        "../../choreography/examples/authority_surface.rs",
-        include_str!("../../choreography/examples/authority_surface.rs"),
+        "../../runtime/examples/authority_surface.rs",
+        include_str!("../../runtime/examples/authority_surface.rs"),
     ),
     (
         "../examples/v2_baseline_capture.rs",

@@ -6,7 +6,7 @@
 
 use anyhow::{anyhow, Result};
 use telltale::tell;
-use telltale_parser::{ast::convert::local_to_local_r, parse_choreography_str, project};
+use telltale_language::{ast::convert::local_to_local_r, parse_choreography_str, project};
 use telltale_theory::bounded::{bound_recursion, unfold_bounded, BoundingStrategy};
 use telltale_theory::limits::{FuelSteps, YieldAfterSteps};
 use telltale_types::LocalTypeR;

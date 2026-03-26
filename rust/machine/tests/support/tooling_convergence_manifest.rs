@@ -9,7 +9,7 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
     PatternExpectation {
         path: "../../../justfile",
         pattern:
-            "cargo run -p telltale-choreography --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}",
+            "cargo run -p telltale-runtime --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}",
     },
     PatternExpectation {
         path: "../../../justfile",
@@ -72,7 +72,7 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
         pattern: "Protocol definitions written with `tell!`",
     },
     PatternExpectation {
-        path: "../../choreography/examples/authority_surface.rs",
+        path: "../../runtime/examples/authority_surface.rs",
         pattern: "generated_effect_families(&choreography)",
     },
     PatternExpectation {
