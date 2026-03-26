@@ -12,13 +12,13 @@ Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Art
 
 ### 1. Rust Library
 
-The Rust project implements the operational model from the paper series. It includes the choreography pipeline, VM runtime behavior, admission checks, and simulation tooling.
+The Rust project implements the operational model from the paper series. It includes the choreography pipeline, protocol machine runtime, admission checks, and simulation tooling.
 
 - Choreographic DSL with projection and compiler pipeline
-- Virtual machine for safe execution of asynchronous buffered protocols
+- Protocol machine for safe execution of asynchronous buffered protocols
 - Runtime theorem-pack and capability-guarded admission interfaces
 - Reconfiguration-facing checks for link, delegation, and transition steps
-- Simulation and cross-target conformance tooling for Rust VM and Lean reference traces
+- Simulation and cross-target conformance tooling for Rust protocol machine and Lean reference traces
 
 Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical health check is `cargo test --workspace --all-targets --all-features`.
 
@@ -28,7 +28,7 @@ The Lean project is an active mechanized proof stack. It covers session foundati
 
 ### 3. Papers + Artifact Supplement
 
-The three papers establish a mechanized metatheory for asynchronous buffered multiparty session types. Paper 1 defines an operational coherence invariant enabling compositional preservation proofs. Paper 2 adds quantitative Lyapunov bounds and decidability results. Paper 3 proves a harmony theorem for dynamic reconfiguration. Together they connect choreographic specifications to VM runtime adherence. All results are mechanized in Lean 4.
+The three papers establish a mechanized metatheory for asynchronous buffered multiparty session types. Paper 1 defines an operational coherence invariant enabling compositional preservation proofs. Paper 2 adds quantitative Lyapunov bounds and decidability results. Paper 3 proves a harmony theorem for dynamic reconfiguration. Together they connect choreographic specifications to protocol-machine runtime adherence. All results are mechanized in Lean 4.
 
 The `papers/` directory contains manuscripts and [reproducibility documentation](papers/ARTIFACT.md). PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf), [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf), [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). Citation metadata is in `papers/CITATION.cff`.
 
