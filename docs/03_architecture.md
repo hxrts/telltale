@@ -50,7 +50,7 @@ graph TB
 
     subgraph Layer5["Layer 5: Protocol Machine + Simulation"]
         VMCompiler["Protocol-Machine Compiler<br/>(LocalTypeR → Bytecode)"]
-        protocol machine["Protocol Machine"]
+        PM["Protocol Machine"]
         Scheduler["Scheduler<br/>(Policy-Based)"]
         Sessions["Session Store"]
         Buffers["Bounded Buffers"]
@@ -69,11 +69,11 @@ graph TB
     Handler --> Transport
     Transport --> Exec
     LT --> VMCompiler
-    VMCompiler --> protocol machine
-    protocol machine --> Scheduler
+    VMCompiler --> PM
+    PM --> Scheduler
     Scheduler --> Sessions
     Sessions --> Buffers
-    Middleware --> protocol machine
+    Middleware --> PM
 ```
 
 This diagram summarizes the compile time flow from DSL input to runtime execution. It also highlights the boundary between compilation, the guest runtime, and host-runtime effect handling.

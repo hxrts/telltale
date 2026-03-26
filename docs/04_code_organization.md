@@ -36,22 +36,20 @@ graph TB
         types["telltale-types<br/>Core type definitions"]
     end
 
-    subgraph Theory
+    subgraph Core["Core Algorithm and Parser Layer"]
         theory["telltale-theory<br/>Algorithms: projection, merge, subtyping"]
-    end
-
-    subgraph Verification
-        lean["telltale-bridge<br/>Lean interop & validation"]
+        parser["telltale-parser<br/>DSL parser, AST, projection, codegen"]
+        macros["telltale-macros<br/>Proc macros"]
     end
 
     subgraph Runtime
-        vm["telltale-machine<br/>Protocol machine & guest runtime"]
+        machine["telltale-machine<br/>Protocol machine and guest runtime"]
         simulator["telltale-simulator<br/>Protocol-machine simulation"]
     end
 
     subgraph Application
-        choreo["telltale-choreography<br/>DSL, parsing, generated surfaces & tooling"]
-        macros["telltale-macros<br/>Proc macros"]
+        choreo["telltale-choreography<br/>Effect handlers, tooling, testing"]
+        lean["telltale-bridge<br/>Lean interop and validation"]
     end
 
     subgraph Facade
@@ -63,30 +61,37 @@ graph TB
     end
 
     types --> theory
-    types --> main
+    types --> parser
+    types --> machine
+    types --> simulator
     types --> choreo
     types --> lean
-    types --> protocol-machine
-    types --> simulator
+    types --> main
+    types --> transport
 
-    theory --> main
-    theory --> protocol-machine
+    theory --> machine
     theory --> choreo
     theory --> lean
+    theory --> main
 
-    protocol-machine --> simulator
+    parser --> macros
+    parser --> choreo
+    parser --> main
 
-    macros --> main
+    machine --> simulator
+    machine --> lean
+    machine --> main
+
     macros --> choreo
+    macros --> main
+
     main --> choreo
 
     choreo --> lean
-
-    types --> transport
     choreo --> transport
 ```
 
-This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated. For example, `telltale-theory` and `telltale-choreography` support in `telltale-bridge` requires explicit feature flags.
+This diagram shows direct crate dependencies. Arrows point from dependency to dependent crate. Some edges are feature-gated.
 
 ## Crate Descriptions
 
