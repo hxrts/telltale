@@ -31,7 +31,8 @@ host queries and typed local branching:
 - top-level `type` and `type alias` declarations
 - nominal `effect` interface declarations
 - protocol-level `uses` declarations
-- `let` bindings for `check ...` and `transfer ...`
+- `authoritative let` / `observe let` bindings for effect queries
+- `let` bindings for linear transfer receipts
 - `case ... of` over `Result`/`Maybe`-style constructors
 - `timeout ... on timeout ... on cancel ...`
 - evidence guards of the form `when check Effect.op(...) yields witness`
@@ -143,11 +144,11 @@ The example above desugars to:
 ```tell
 rec RoleDecidesLoop
   choice Client at
-    Request ->
+    | Request =>
       Client -> Server : Request
       Server -> Client : Response
       continue RoleDecidesLoop
-    Done ->
+    | Done =>
       Client -> Server : Done
 ```
 
@@ -280,8 +281,7 @@ Profiles and explicit progress attachment are part of the proof-backed surface.
 use telltale::tell;
 
 tell! {
-  profile Replay
-    fairness strong
+  profile Replay fairness strong
 
   agreement_profile MembershipSoftSafe
     visibility pending
@@ -290,11 +290,8 @@ tell! {
     finalized_at finalized
     evidence commit_fact
 
-  operation MembershipCheck at Coordinator
-    progress MembershipProgress requires Replay within bounded
-    agreement MembershipSoftSafe
-    compose first_success =
-      publish MembershipQueued
+  operation MembershipCheck at Coordinator progress MembershipProgress requires Replay within bounded agreement MembershipSoftSafe compose first_success =
+    publish MembershipQueued
 
   protocol Membership under Replay =
     roles Coordinator, Member
@@ -348,38 +345,25 @@ this form until the authority-sensitive lowering rules are complete.
 
 Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours).
 
-##### Heartbeat Pattern
+##### Liveness Pattern
 
-The heartbeat pattern models connection liveness detection:
+The old `heartbeat` surface is removed from the proof-backed DSL. Model
+connection liveness with explicit protocol-visible timeouts plus ordinary
+messages:
 
 ```tell
 protocol Liveness =
   roles Alice, Bob
-  heartbeat Alice -> Bob every 1s on_missing(3) {
-    Bob -> Alice : Disconnect
-  } body {
-    Alice -> Bob : Ping
+  Alice -> Bob : Ping
+  timeout 1s Bob at
     Bob -> Alice : Pong
-  }
+  on timeout =>
+    Bob -> Alice : Disconnect
 ```
 
-This desugars to a recursive choice:
-
-```tell
-rec HeartbeatLoop
-  Alice -> Bob : Heartbeat
-  choice Bob at
-    Alive ->
-      // body
-      Alice -> Bob : Ping
-      Bob -> Alice : Pong
-      continue HeartbeatLoop
-    Dead ->
-      // on_missing
-      Bob -> Alice : Disconnect
-```
-
-The `on_missing(3)` parameter indicates how many missed heartbeats before declaring the sender dead. The runtime uses this for timeout calculations.
+This keeps liveness handling inside the current verified surface. If you only
+need an operational transport hint rather than a protocol branch, use
+`runtime_timeout` sender metadata instead.
 
 ##### Runtime Timeout Metadata
 
@@ -398,39 +382,38 @@ type. It is a hint to the transport layer and is not verified in Lean. Use it
 for operational timeouts when you do not want the protocol to branch on
 timeout.
 
-#### 11) Proof Bundles and Protocol-Machine-Core Statements
+#### 11) Proof Bundles and Semantic Statements
 
-`proof_bundle` declarations define capability sets. `protocol ... requires ...` selects the bundles required by a protocol.
+`proof_bundle` declarations define capability sets. `protocol ... requires ...`
+selects the bundles required by a protocol.
 
 ```tell
 proof_bundle DelegationBase version "1.0.0" issuer "did:example:issuer" constraint "fresh_nonce" requires [delegation, guard_tokens]
 proof_bundle KnowledgeBase requires [knowledge_flow]
 
-protocol TransferFlow requires DelegationBase, KnowledgeBase = {
-  roles A, B
-  acquire guard as token
-  transfer token to B with bundle DelegationBase
-  tag obligation as obligation_tag
-  check obligation for B into witness
-  A -> B : Commit
-}
+protocol TransferFlow requires DelegationBase, KnowledgeBase =
+  roles Coordinator, Worker
+  let receipt = transfer Session from Coordinator to Worker
+  publish receipt as DelegationRecorded
+  materialize delegationProof from DelegationRecorded
+  handoff acceptInvite to Worker with receipt
+  Coordinator -> Worker : Commit
 ```
 
 The parser stores bundle declarations and required bundle names in typed choreography metadata. Bundle records include optional `version`, `issuer`, and repeated `constraint` fields.
 
-Validation fails on duplicate bundles, missing required bundles, or missing capability coverage for protocol-machine-core statements. If `requires` is omitted and bundle coverage is unambiguous, the parser infers required bundles from protocol-machine-core capability demand.
+Validation fails on duplicate bundles and missing required bundles. If
+`requires` is omitted and bundle coverage is unambiguous, the parser can infer
+required bundles from the semantic statements that remain in the DSL surface.
 
-protocol-machine-core statements lower to `Protocol::Extension` nodes with annotations. The annotation keys are `protocol_machine_core_op`, `required_capability`, and `protocol_machine_core_operands`.
+Legacy protocol-machine-core statements such as `acquire`, `fork`, `join`,
+`delegate`, and `tag` are removed from the proof-backed DSL and are rejected
+fail closed. Keep those instructions in the runtime model rather than in
+choreography source.
 
-```tell
-protocol SpeculativeFlow requires SpecBundle =
-  roles A, B
-  fork ghost0
-  A -> B : Try
-  join
-```
-
-This example shows a protocol-machine-core extension form that still stays inside the typed choreography surface.
+The accepted DSL still includes protocol-visible semantic statements such as
+`publish`, `materialize`, `handoff`, `dependent work`, `begin`, `await`, and
+`resolve`.
 
 #### 12) Authority and Failure Surface
 
@@ -441,15 +424,45 @@ Elm/PureScript-like while making protocol-critical host decisions explicit.
 
 ```tell
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
-  cancel : Session -> Result CancelError CancelReceipt
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
+  observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
+  command cancel : Session -> Result CancelError CancelReceipt
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : required
+    reentrancy : allow
+  }
 
 effect Audit
-  record : AuditEvent -> Unit
+  command record : AuditEvent -> Unit
+  {
+    class : best_effort
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
 
 protocol CommitFlow uses Runtime, Audit =
   roles Coordinator, Worker
-  ...
+  authoritative let readiness = check Runtime.ready(session)
+  Coordinator -> Worker : Commit
 ```
 
 Effects are nominal declarations. `uses` makes protocol dependencies explicit.
@@ -458,13 +471,12 @@ Only declared effects named in `uses` may be referenced by `check`.
 ##### `Result` and `Maybe` with `case/of`
 
 ```tell
-let readiness = check Runtime.ready(session)
-in
-case readiness of
-  | Ok(witness) =>
-      Coordinator -> Worker : Commit(witness)
-  | Err(TimedOut) =>
-      Coordinator -> Worker : Cancel
+authoritative let readiness = check Runtime.ready(session) in
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(TimedOut) =>
+        Coordinator -> Worker : Cancel
 ```
 
 `Result` and `Maybe` are first-class sum-style forms for protocol-visible
@@ -489,12 +501,14 @@ evidence payloads.
 ##### Evidence Binding with `let`
 
 ```tell
+observe let presence = observe Runtime.watchPresence(session)
+authoritative let readiness = check Runtime.ready(session)
 let receipt = transfer Session from Coordinator to Worker
-let readiness = check Runtime.ready(session)
+handoff acceptInvite to Worker with receipt
 ```
 
-Evidence and receipts use ordinary `let` bindings. There is no special
-authority-binding syntax beyond normal expression binding.
+Authority queries use explicit `observe let` or `authoritative let` bindings.
+Linear transfer receipts still use ordinary `let`.
 
 ##### Typed Timeout and Cancellation Blocks
 
@@ -527,36 +541,36 @@ authoritative query succeeds and binds evidence”.
 
 ```tell
 let receipt = transfer Session from Coordinator to Worker
-commit transfer receipt
+handoff acceptInvite to Worker with receipt
 ```
 
 Bindings produced by transfer-like authority operations are linear. The
 compiler rejects duplicate use and implicit discard.
 
-##### Local Helpers with `let ... in`
+##### Scoped Bindings with `let ... in`
 
 ```tell
-let decision =
-  case check Runtime.ready(session) of
-    | Ok(witness) => Commit(witness)
-    | Err(reason) => Abort(reason)
-in
-case decision of
-  | Commit(witness) =>
-      Coordinator -> Worker : Commit(witness)
-  | Abort(reason) =>
-      Coordinator -> Worker : Abort(reason)
+authoritative let readiness = check Runtime.ready(session) in
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(reason) =>
+        Coordinator -> Worker : Abort(reason)
 ```
 
-Local helper expressions keep authority logic readable without pushing that
-logic back into untyped host code.
+`let ... in` introduces an indented statement block. Use it to keep authority
+logic readable without pushing protocol-critical branching back into untyped
+host code.
 
 ##### No Implicit Default Branches
 
 ```tell
-case check Runtime.ready(session) of
-  | Ok(witness) => ...
-  | Err(TimedOut) => ...
+authoritative let readiness = check Runtime.ready(session) in
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(TimedOut) =>
+        Coordinator -> Worker : Cancel
 ```
 
 Protocol-critical authority flows do not allow implicit wildcard/default
@@ -565,12 +579,13 @@ masking for `Result` and `Maybe`. Missing cases are validation errors.
 ##### Typed External Query Surface
 
 ```tell
-let readiness = check Runtime.ready(session)
+authoritative let readiness = check Runtime.ready(session)
 ```
 
 `check Effect.op(...)` is the canonical language-level form for typed host
-queries. It is the user-facing surface that later lowers to the same typed protocol-machine
-`invoke` boundary used by the runtime/effect bridge.
+queries, and it must be bound with `authoritative let`. Observation-only
+queries use `observe let value = observe Effect.op(...)`. These user-facing
+forms lower to the same typed runtime/effect boundary used by the host bridge.
 
 ##### Choosing Between Timeout Metadata and Timeout Branching
 
@@ -595,11 +610,8 @@ agreement_profile PendingPublication
   finalized_at finalized
   evidence publication
 
-operation syncMembership(channel : ChannelId) at Worker
-  progress MembershipProgress requires Replay within bounded
-  agreement PendingPublication prestate ChannelMembership
-  compose threshold_success(2) =
-    publish SyncQueued(channel)
+operation syncMembership(channel : ChannelId) at Worker progress MembershipProgress requires Replay within bounded agreement PendingPublication prestate ChannelMembership compose threshold_success(2) =
+  publish SyncQueued(channel)
 ```
 
 The `compose threshold_success(2)` clause attaches a child-effect rollup policy to the operation without overriding the parent agreement profile.
@@ -618,11 +630,8 @@ agreement_profile ContactCeremonySoftSafe
   finalized_at finalized
   evidence commit_fact
 
-operation addContact(contactId : String) at Coordinator
-  progress ContactProgress requires Replay within bounded
-  agreement ContactCeremonySoftSafe prestate ContactContext
-  compose threshold_success(3) =
-    publish ContactQueued(contactId)
+operation addContact(contactId : String) at Coordinator progress ContactProgress requires Replay within bounded agreement ContactCeremonySoftSafe prestate ContactContext compose threshold_success(3) =
+  publish ContactQueued(contactId)
 ```
 
 This keeps Telltale generic:
@@ -927,7 +936,7 @@ let choreo = parser::parse_choreography_str(input)?;
 
 for role in &choreo.roles {
     let local_type = projection::project(&choreo, role)?;
-    println!("Local type for {}: {:?}", role.name, local_type);
+    println!("Local type for {}: {:?}", role.name(), local_type);
 }
 ```
 

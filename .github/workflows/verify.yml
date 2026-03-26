@@ -47,6 +47,11 @@ jobs:
           mkdir -p artifacts
           just check-verification-inventory | tee artifacts/check-verification-inventory.log
 
+      - name: Validate source doc DSL snippets
+        run: |
+          mkdir -p artifacts
+          just check-source-doc-snippets | tee artifacts/check-source-doc-snippets.log
+
       - name: Check Lean metrics freshness
         run: |
           mkdir -p artifacts
@@ -166,6 +171,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-verification-inventory | tee artifacts/check-verification-inventory.log
+
+      - name: Validate source doc DSL snippets
+        run: |
+          mkdir -p artifacts
+          just check-source-doc-snippets | tee artifacts/check-source-doc-snippets.log
 
       - name: Check Lean metrics freshness
         run: |

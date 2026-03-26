@@ -60,8 +60,8 @@ use telltale::tell;
 tell! {
   protocol RequestResponse =
     roles Client, Server
-    Client -> Server : Request(api.Request)
-    Server -> Client : Response(api.Response)
+    Client -> Server : Request of api.Request
+    Server -> Client : Response of api.Response
 }
 ```
 
@@ -77,10 +77,10 @@ use telltale::tell;
 tell! {
   protocol ChoicePattern =
     roles Client, Server
-    choice at Server
-      | Accept ->
+    choice Server at
+      | Accept =>
           Server -> Client : Confirmation
-      | Reject ->
+      | Reject =>
           Server -> Client : Rejection
 }
 ```
@@ -130,42 +130,43 @@ generated traits.
 use telltale::tell;
 
 tell! {
-    type CommitError =
-      | NotReady
-      | TimedOut
+  type CommitError =
+    | NotReady
+    | TimedOut
 
-    type alias ReadyWitness =
+  type alias ReadyWitness =
+  {
+    epoch : Int
+    issuedBy : Role
+  }
+
+  type alias CommitReceipt =
+  {
+    commitId : String
+    publishedBy : Role
+  }
+
+  effect Runtime
+    authoritative ready : Session -> Result CommitError ReadyWitness
     {
-      epoch : Int
-      issuedBy : Role
+      class : authoritative
+      progress : may_block
+      region : fragment
+      agreement_use : required
+      reentrancy : reject_same_fragment
     }
-    type alias CommitReceipt =
+    command publish : ReadyWitness -> Result CommitError CommitReceipt
     {
-      commitId : String
-      publishedBy : Role
+      class : best_effort
+      progress : immediate
+      region : session
+      agreement_use : required
+      reentrancy : allow
     }
 
-    effect Runtime
-      authoritative ready : Session -> Result CommitError ReadyWitness
-      {
-        class : authoritative
-        progress : may_block
-        region : fragment
-        agreement_use : required
-        reentrancy : reject_same_fragment
-      }
-      command publish : ReadyWitness -> Result CommitError CommitReceipt
-      {
-        class : best_effort
-        progress : immediate
-        region : session
-        agreement_use : required
-        reentrancy : allow
-      }
-
-    protocol CommitFlow uses Runtime =
-      roles Coordinator, Worker
-      Coordinator -> Worker : Commit
+  protocol CommitFlow uses Runtime =
+    roles Coordinator, Worker
+    Coordinator -> Worker : Commit
 }
 
 use CommitFlow::effects;

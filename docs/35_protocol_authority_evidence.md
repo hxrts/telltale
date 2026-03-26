@@ -37,21 +37,30 @@ The current language surface uses a small set of explicit forms:
 
 ```tell
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol CommitFlow uses Runtime =
-  let readiness = check Runtime.ready(session)
-  case readiness of
-    | Ok(witness) =>
-        Coordinator -> Worker : Commit(witness)
-    | Err(TimedOut) =>
-        Coordinator -> Worker : Cancel
+  roles Coordinator, Worker
+  authoritative let readiness = check Runtime.ready(session) in
+    case readiness of
+      | Ok(witness) =>
+          Coordinator -> Worker : Commit(witness)
+      | Err(TimedOut) =>
+          Coordinator -> Worker : Cancel
 ```
 
 Evidence binding uses ordinary `let`:
 
 ```tell
 let receipt = transfer Session from Coordinator to Worker
+handoff acceptInvite to Worker with receipt
 ```
 
 Receipts and transfer-like bindings are linear and must be consumed exactly

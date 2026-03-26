@@ -61,6 +61,7 @@ ci-dry-run lane="fast":
     just check-workflow-actions-regression
     just check-workflow-actions
     just check-verification-inventory
+    just check-source-doc-snippets
     just check-lean-metrics-minimal-env
     just check-lean-metrics
     just check-tooling-convergence
@@ -158,6 +159,10 @@ check-telltale-style:
 # Enforce public tooling/example cutover to generated effect interfaces and owned opens.
 check-tooling-convergence:
     ./scripts/check/tooling-convergence.sh
+
+# Validate source markdown DSL snippets against the real parser.
+check-source-doc-snippets:
+    ./scripts/check/source-doc-snippets.sh
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":

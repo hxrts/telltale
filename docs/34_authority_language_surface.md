@@ -18,12 +18,14 @@ Top-level declarations:
 - `  }`
 - `effect Runtime`
 - `  authoritative ready : Session -> Result CommitError ReadyWitness`
-- `protocol Flow uses Runtime, Audit = ...`
+- `protocol Flow uses Runtime =`
+- `  roles Coordinator, Worker`
+- `  authoritative let witness = check Runtime.ready(session)`
 
 Protocol-local forms:
 
-- `let binding = check Runtime.op(args)`
-- `let binding = observe Effect.op(args)`
+- `authoritative let binding = check Runtime.op(args)`
+- `observe let binding = observe Effect.op(args)`
 - `let receipt = transfer Session from A to B`
 - `let binding = ... in ...`
 - `case expr of | Ok(value) => ... | Err(reason) => ...`
@@ -57,7 +59,9 @@ effect Runtime
   }
 
 protocol Flow uses Runtime =
-  ...
+  roles Coordinator, Worker
+  authoritative let witness = check Runtime.ready(session)
+  Coordinator -> Worker : Commit
 ```
 
 This is the smallest effect declaration plus dependency declaration that the language accepts.
@@ -65,9 +69,12 @@ This is the smallest effect declaration plus dependency declaration that the lan
 ### `Result` with `case/of`
 
 ```tell
-case check Runtime.ready(session) of
-  | Ok(witness) => ...
-  | Err(reason) => ...
+authoritative let readiness = check Runtime.ready(session) in
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(reason) =>
+        Coordinator -> Worker : Cancel(reason)
 ```
 
 This is the canonical typed branching form for authority checks.
@@ -76,8 +83,10 @@ This is the canonical typed branching form for authority checks.
 
 ```tell
 case maybeReceipt of
-  | Just(receipt) => ...
-  | Nothing => ...
+  | Just(receipt) =>
+      Coordinator -> Worker : UseReceipt(receipt)
+  | Nothing =>
+      Coordinator -> Worker : MissingReceipt
 ```
 
 This keeps absence explicit instead of falling back to implicit defaults.
@@ -100,6 +109,7 @@ Custom unions and aliases name failure and evidence values directly in the DSL.
 
 ```tell
 let receipt = transfer Session from Coordinator to Worker
+handoff acceptInvite to Worker with receipt
 ```
 
 Ordinary `let` syntax is the only binding form used for receipts and other authority artifacts.
@@ -121,7 +131,10 @@ Timeout and cancellation are explicit protocol branches, not host-only control f
 
 ```tell
 choice Coordinator at
-  | Commit when check Runtime.ready(session) yields witness => ...
+  | Commit when check Runtime.ready(session) yields witness =>
+      Coordinator -> Worker : Commit(witness)
+  | Abort =>
+      Coordinator -> Worker : Abort
 ```
 
 Evidence guards bind the witness directly at the branch point that authorizes the action.
@@ -130,7 +143,7 @@ Evidence guards bind the witness directly at the branch point that authorizes th
 
 ```tell
 let receipt = transfer Session from Coordinator to Worker
-commit transfer receipt
+handoff acceptInvite to Worker with receipt
 ```
 
 Transfers produce linear values that the compiler requires to be consumed exactly once.
@@ -138,11 +151,12 @@ Transfers produce linear values that the compiler requires to be consumed exactl
 ### Local Helper Expression
 
 ```tell
-let decision = check Runtime.ready(session)
-in
-case decision of
-  | Ok(witness) => ...
-  | Err(reason) => ...
+authoritative let readiness = check Runtime.ready(session) in
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(reason) =>
+        Coordinator -> Worker : Cancel(reason)
 ```
 
 `let ... in ...` keeps small authority decisions local instead of pushing them into host callbacks.
@@ -151,8 +165,10 @@ case decision of
 
 ```tell
 case readiness of
-  | Ok(witness) => ...
-  | Err(reason) => ...
+  | Ok(witness) =>
+      Coordinator -> Worker : Commit(witness)
+  | Err(reason) =>
+      Coordinator -> Worker : Cancel(reason)
 ```
 
 Protocol-critical matches must be exhaustive. Implicit catch-all masking is rejected.
@@ -160,7 +176,7 @@ Protocol-critical matches must be exhaustive. Implicit catch-all masking is reje
 ### Typed External Query
 
 ```tell
-let readiness = check Runtime.ready(session)
+authoritative let readiness = check Runtime.ready(session)
 ```
 
 Typed external queries always enter the protocol through explicit `check` expressions.
@@ -227,10 +243,19 @@ allowed to become proof-bearing success or canonical publication by repair.
 
 ```tell
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol Flow uses Runtime =
-  let readiness = check Runtime.ready(session)
+  roles Coordinator, Worker
+  authoritative let readiness = check Runtime.ready(session)
+  Coordinator -> Worker : Commit
 ```
 
 Current contract:

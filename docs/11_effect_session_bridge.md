@@ -158,11 +158,19 @@ The choreography language now has nominal `effect` declarations, protocol-level 
 
 ```tell
 effect Runtime
-  ready : Session -> Result CommitError ReadyWitness
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
 
 protocol CommitFlow uses Runtime =
-  let readiness = check Runtime.ready(session)
-  ...
+  roles Coordinator, Worker
+  authoritative let readiness = check Runtime.ready(session)
+  Coordinator -> Worker : Commit
 ```
 
 Host-boundary rule:

@@ -303,10 +303,10 @@ This section demonstrates the transformation of a choreography through each laye
 
 Input choreography:
 ```tell
-Alice
-  -> Bob : Request of api.Request
-Bob
-  -> Alice : Response of api.Response
+protocol RequestResponse =
+  roles Alice, Bob
+  Alice -> Bob : Request of api.Request
+  Bob -> Alice : Response of api.Response
 ```
 
 The choreography specifies a request-response pattern.
