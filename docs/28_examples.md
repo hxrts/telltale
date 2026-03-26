@@ -12,34 +12,34 @@ want to inspect session projection and endpoint code. Use the
 generated-interface examples when you want to follow the target architecture:
 protocol-visible orchestration in Telltale, host realization in Rust.
 
-Projection examples in `examples/`:
+Protocol examples in `examples/protocols/`:
 
-- `adder.rs`:recursive two-party adder
-- `alternating_bit.rs`:reliable delivery with ACK branching
-- `double_buffering.rs`:producer-consumer coordination via `tell!`
-- `fft.rs`:eight-role FFT butterfly network
-- `ring.rs`:three-node ring topology via `tell!`
-- `ring_choice.rs`:ring with per-hop branching and infinite types
-- `ring_max.rs`:linear ring maximum propagation
-- `three_adder.rs`:three-party sum via `tell!`
+- `adder.rs`: recursive two-party adder
+- `alternating_bit.rs`: reliable delivery with ACK branching
+- `double_buffering.rs`: producer-consumer coordination via `tell!`
+- `fft.rs`: eight-role FFT butterfly network
+- `ring.rs`: three-node ring topology via `tell!`
+- `ring_choice.rs`: ring with per-hop branching and infinite types
+- `ring_max.rs`: linear ring maximum propagation
+- `three_adder.rs`: three-party sum via `tell!`
 
-Effect-boundary examples in `examples/`:
+Effect-boundary examples in `examples/effects/`:
 
-- `client_server_log.rs`:logging decisions at the host boundary
-- `commitment_lifecycle.rs`:commitment, profile-driven progress, and Aura-shaped agreement/finality metadata
-- `elevator.rs`:host-driven door/elevator capabilities
-- `generated_effect_interfaces.rs`:canonical generated Rust effect traits and semantic metadata
-- `map_reduce.rs`:structured fan-out/fan-in work with host compute boundaries
-- `oauth.rs`:authentication and authorization decisions at the effect boundary
-- `reactive_signal.rs`:reactive signal subscription/current-value/publish interface
-- `three_buyers.rs`:pricing and affordability decisions at the host boundary
-- `travel_agency.rs`:quote/schedule capabilities behind one protocol boundary
-- `wasm-ping-pong/`:browser integration via generated effects
+- `client_server_log.rs`: logging decisions at the host boundary
+- `commitment_lifecycle.rs`: commitment, profile-driven progress, and agreement/finality metadata
+- `elevator.rs`: host-driven door/elevator capabilities
+- `generated_effect_interfaces.rs`: canonical generated Rust effect traits and semantic metadata
+- `map_reduce.rs`: structured fan-out/fan-in work with host compute boundaries
+- `oauth.rs`: authentication and authorization decisions at the effect boundary
+- `reactive_signal.rs`: reactive signal subscription/current-value/publish interface
+- `three_buyers.rs`: pricing and affordability decisions at the host boundary
+- `travel_agency.rs`: quote/schedule capabilities behind one protocol boundary
+- `wasm-ping-pong/`: browser integration via generated effects
 
-Theory examples in `examples/`:
+Theory examples in `examples/theory/`:
 
-- `async_subtyping.rs`:async-subtyping checks and subtype relation examples
-- `bounded_recursion.rs`:bounded recursion strategies with configurable depth
+- `async_subtyping.rs`: async-subtyping checks and subtype relation examples
+- `bounded_recursion.rs`: bounded recursion strategies with configurable depth
 
 Generated-interface examples in `rust/choreography/examples/`:
 
@@ -207,12 +207,12 @@ remains tooling-only and is no longer the primary developer path.
 
 When you want a concrete semantic feature, start here:
 
-- commitment: `examples/commitment_lifecycle.rs`
-- authority, publication, and materialization: `examples/generated_effect_interfaces.rs`
-- structured concurrency: `examples/map_reduce.rs`
-- profile-driven progress: `examples/commitment_lifecycle.rs`
-- reusable domain agreement profiles: `examples/commitment_lifecycle.rs`
-- reactive host boundaries: `examples/reactive_signal.rs`
+- commitment: `examples/effects/commitment_lifecycle.rs`
+- authority, publication, and materialization: `examples/effects/generated_effect_interfaces.rs`
+- structured concurrency: `examples/effects/map_reduce.rs`
+- profile-driven progress: `examples/effects/commitment_lifecycle.rs`
+- reusable domain agreement profiles: `examples/effects/commitment_lifecycle.rs`
+- reactive host boundaries: `examples/effects/reactive_signal.rs`
 
 `commitment_lifecycle.rs` is the repo's explicit example of a domain-defined
 agreement scheme similar in shape to Aura's provisional / soft-safe /

@@ -106,6 +106,71 @@ full = [
     "theory-bounded",
 ]
 
+# Protocol structure examples
+[[example]]
+name = "adder"
+path = "examples/protocols/adder.rs"
+[[example]]
+name = "alternating_bit"
+path = "examples/protocols/alternating_bit.rs"
+[[example]]
+name = "double_buffering"
+path = "examples/protocols/double_buffering.rs"
+[[example]]
+name = "fft"
+path = "examples/protocols/fft.rs"
+[[example]]
+name = "ring"
+path = "examples/protocols/ring.rs"
+[[example]]
+name = "ring_choice"
+path = "examples/protocols/ring_choice.rs"
+[[example]]
+name = "ring_max"
+path = "examples/protocols/ring_max.rs"
+[[example]]
+name = "three_adder"
+path = "examples/protocols/three_adder.rs"
+
+# Effect boundary examples
+[[example]]
+name = "client_server_log"
+path = "examples/effects/client_server_log.rs"
+[[example]]
+name = "commitment_lifecycle"
+path = "examples/effects/commitment_lifecycle.rs"
+[[example]]
+name = "elevator"
+path = "examples/effects/elevator.rs"
+[[example]]
+name = "generated_effect_interfaces"
+path = "examples/effects/generated_effect_interfaces.rs"
+[[example]]
+name = "map_reduce"
+path = "examples/effects/map_reduce.rs"
+[[example]]
+name = "oauth"
+path = "examples/effects/oauth.rs"
+[[example]]
+name = "reactive_signal"
+path = "examples/effects/reactive_signal.rs"
+[[example]]
+name = "three_buyers"
+path = "examples/effects/three_buyers.rs"
+[[example]]
+name = "travel_agency"
+path = "examples/effects/travel_agency.rs"
+
+# Theory algorithm examples
+[[example]]
+name = "async_subtyping"
+path = "examples/theory/async_subtyping.rs"
+required-features = ["theory-async-subtyping"]
+[[example]]
+name = "bounded_recursion"
+path = "examples/theory/bounded_recursion.rs"
+required-features = ["theory-bounded"]
+
 [profile.release]
 debug = true
 
