@@ -288,7 +288,9 @@ fn looks_like_dsl(candidate: &str) -> bool {
     .any(|prefix| trimmed.starts_with(prefix))
 }
 
-fn parse_source_snippet(snippet: &Snippet) -> Result<(), telltale_runtime::compiler::parser::ParseError> {
+fn parse_source_snippet(
+    snippet: &Snippet,
+) -> Result<(), telltale_runtime::compiler::parser::ParseError> {
     match snippet.kind {
         SnippetKind::TellFence => parse_tell_fence(&snippet.content),
         SnippetKind::TellMacro | SnippetKind::ParserString => {
@@ -307,9 +309,8 @@ fn parse_tell_fence(content: &str) -> Result<(), telltale_runtime::compiler::par
         if declares_protocol(content) {
             return original.map(|_| ());
         }
-        let with_dummy_protocol = format!(
-            "{content}\n\nprotocol DocSnippet =\n  roles A, B\n  A -> B : Ping\n"
-        );
+        let with_dummy_protocol =
+            format!("{content}\n\nprotocol DocSnippet =\n  roles A, B\n  A -> B : Ping\n");
         return parse_choreography_str(&with_dummy_protocol).map(|_| ());
     }
 
@@ -415,7 +416,11 @@ fn strip_common_indent(input: &str) -> String {
     let min_indent = lines
         .iter()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| line.chars().take_while(|ch| *ch == ' ' || *ch == '\t').count())
+        .map(|line| {
+            line.chars()
+                .take_while(|ch| *ch == ' ' || *ch == '\t')
+                .count()
+        })
         .min()
         .unwrap_or(0);
 
