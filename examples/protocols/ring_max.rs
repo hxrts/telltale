@@ -105,7 +105,10 @@ fn main() -> Result<()> {
     })?;
 
     println!("Global maximum: {max_a}");
-    println!("All nodes agree: {}", max_a == max_b && max_b == max_c && max_c == max_d && max_d == max_e);
+    println!(
+        "All nodes agree: {}",
+        max_a == max_b && max_b == max_c && max_c == max_d && max_d == max_e
+    );
     assert_eq!(max_a, 15);
     assert!(max_a == max_b && max_b == max_c && max_c == max_d && max_d == max_e);
     Ok(())

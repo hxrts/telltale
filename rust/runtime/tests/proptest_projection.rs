@@ -5,9 +5,7 @@
 use proptest::prelude::*;
 use quote::format_ident;
 use std::collections::HashMap;
-use telltale_runtime::ast::{
-    Annotations, Choreography, LocalType, MessageType, Protocol, Role,
-};
+use telltale_runtime::ast::{Annotations, Choreography, LocalType, MessageType, Protocol, Role};
 use telltale_runtime::compiler::projection::project;
 
 fn role(name: &str) -> Role {

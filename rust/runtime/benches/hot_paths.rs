@@ -168,8 +168,7 @@ fn interpreter_hot_path(c: &mut Criterion) {
                 black_box(
                     count_allocations(|| {
                         rt.block_on(async {
-                            let mut handler =
-                                telltale_runtime::NoOpHandler::<BenchRole>::new();
+                            let mut handler = telltale_runtime::NoOpHandler::<BenchRole>::new();
                             let mut endpoint = ();
                             interpret(&mut handler, &mut endpoint, program).await
                         })

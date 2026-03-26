@@ -4,8 +4,8 @@ use std::env;
 use std::fs;
 use std::path::PathBuf;
 
-use telltale_runtime::compiler::parser::parse_choreography_str;
 use telltale_language::{generate_effect_interface_scaffold, generated_effect_families};
+use telltale_runtime::compiler::parser::parse_choreography_str;
 
 const DEFAULT_OUT_DIR: &str = "target/effect_handler_scaffold";
 const DEFAULT_WITH_SIMULATOR: bool = true;

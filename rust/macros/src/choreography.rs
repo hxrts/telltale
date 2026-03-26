@@ -1614,7 +1614,9 @@ fn lower_child_effect_aggregation_policy(
     })
 }
 
-fn lower_effect_authority_class(value: telltale_language::ast::EffectAuthorityClass) -> TokenStream {
+fn lower_effect_authority_class(
+    value: telltale_language::ast::EffectAuthorityClass,
+) -> TokenStream {
     match value {
         telltale_language::ast::EffectAuthorityClass::Authoritative => {
             quote!(EffectAuthorityClass::Authoritative)

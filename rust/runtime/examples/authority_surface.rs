@@ -1,5 +1,5 @@
-use telltale_runtime::compiler::parser::parse_choreography_str;
 use telltale_language::generated_effect_families;
+use telltale_runtime::compiler::parser::parse_choreography_str;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = r#"
