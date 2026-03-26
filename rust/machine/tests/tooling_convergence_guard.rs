@@ -8,7 +8,7 @@ mod tooling_convergence_manifest;
 use tooling_convergence_manifest::{FORBIDDEN_PATTERNS, REQUIRED_PATTERNS};
 
 const TOOLING_SOURCES: &[(&str, &str)] = &[
-    ("../../../Justfile", include_str!("../../../Justfile")),
+    ("../../../justfile", include_str!("../../../justfile")),
     (
         "../../../docs/02_getting_started.md",
         include_str!("../../../docs/02_getting_started.md"),

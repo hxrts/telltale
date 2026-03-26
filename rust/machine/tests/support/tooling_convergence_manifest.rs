@@ -7,12 +7,12 @@ pub(crate) struct PatternExpectation {
 
 pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
     PatternExpectation {
-        path: "../../../Justfile",
+        path: "../../../justfile",
         pattern:
             "cargo run -p telltale-choreography --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}",
     },
     PatternExpectation {
-        path: "../../../Justfile",
+        path: "../../../justfile",
         pattern: "./scripts/check/tooling-convergence.sh",
     },
     PatternExpectation {
@@ -95,11 +95,11 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
 
 pub(crate) const FORBIDDEN_PATTERNS: &[PatternExpectation] = &[
     PatternExpectation {
-        path: "../../../Justfile",
+        path: "../../../justfile",
         pattern: "effect-scaffold out=",
     },
     PatternExpectation {
-        path: "../../../Justfile",
+        path: "../../../justfile",
         pattern: "-- {{ out }} {{ name }}",
     },
     PatternExpectation {
