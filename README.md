@@ -12,13 +12,13 @@ Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Art
 
 ### 1. Rust Library
 
-The Rust project implements the operational model from the paper series. It includes the choreography pipeline, protocol machine runtime, admission checks, and simulation tooling.
+The Rust project implements the operational model from the paper series. The `tell!` macro is the canonical entry point for protocol specification.
 
-- Choreographic DSL with projection and compiler pipeline
-- Protocol machine for safe execution of asynchronous buffered protocols
-- Runtime theorem-pack and capability-guarded admission interfaces
-- Reconfiguration-facing checks for link, delegation, and transition steps
-- Simulation and cross-target conformance tooling for Rust protocol machine and Lean reference traces
+- `tell!` DSL with projection, compiler pipeline, and typed effect interface generation
+- Protocol machine for deterministic execution of asynchronous buffered protocols
+- Generated effect boundaries with internal and external handler domains
+- Capability-gated admission, semantic object export, and structured audit surfaces
+- Simulation and cross-target conformance tooling against Lean reference traces
 
 Main code is in `rust/`. Workspace configuration is in `Cargo.toml`. A typical health check is `cargo test --workspace --all-targets --all-features`.
 
