@@ -9,15 +9,16 @@ cd "${ROOT_DIR}"
 
 # Crates listed in dependency order (leaves first)
 RELEASE_PACKAGES=(
-  "telltale-macros"
   "telltale-types"
+  "telltale-language"
   "telltale-theory"
+  "telltale-macros"
+  "telltale-machine"
   "telltale"
   "telltale-runtime"
   "telltale-transport"
-  "telltale-machine"
-  "telltale-bridge"
   "telltale-simulator"
+  "telltale-bridge"
 )
 
 # ── Defaults ──────────────────────────────────────────────────────────
@@ -119,15 +120,16 @@ extract_manifest_version() {
 manifest_path() {
   local crate="$1"
   case "${crate}" in
-    telltale-macros) echo "rust/macros/Cargo.toml" ;;
     telltale-types) echo "rust/types/Cargo.toml" ;;
+    telltale-language) echo "rust/language/Cargo.toml" ;;
     telltale-theory) echo "rust/theory/Cargo.toml" ;;
+    telltale-macros) echo "rust/macros/Cargo.toml" ;;
+    telltale-machine) echo "rust/machine/Cargo.toml" ;;
     telltale) echo "Cargo.toml" ;;
     telltale-runtime) echo "rust/runtime/Cargo.toml" ;;
     telltale-transport) echo "rust/transport/Cargo.toml" ;;
-    telltale-machine) echo "rust/machine/Cargo.toml" ;;
-    telltale-bridge) echo "rust/bridge/Cargo.toml" ;;
     telltale-simulator) echo "rust/simulator/Cargo.toml" ;;
+    telltale-bridge) echo "rust/bridge/Cargo.toml" ;;
     *) return 1 ;;
   esac
 }
@@ -185,6 +187,13 @@ run_ci_dry_run() {
 
 publish_package() {
   local package="$1"
+  # Skip if this version is already on crates.io.
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    if cargo search "${package}" --limit 1 2>/dev/null | grep -q "\"${VERSION}\""; then
+      echo "== ${package}@${VERSION} already published, skipping =="
+      return
+    fi
+  fi
   local cmd
   if [[ "${DRY_RUN}" -eq 1 ]]; then
     cmd=(cargo publish -p "${package}" --dry-run --locked)

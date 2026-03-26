@@ -1,6 +1,6 @@
 [package]
 name = "telltale-theory"
-version = "6.0.0"
+version = "7.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
@@ -16,14 +16,14 @@ categories = ["algorithms"]
 bench = false
 
 [dependencies]
-telltale-types = { path = "../types", version = "=6.0.0" }
+telltale-types = { path = "../types", version = "=7.0.0" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
 proptest = { workspace = true }
 assert_matches = { workspace = true }
 criterion = { workspace = true }
-telltale-bridge = { path = "../bridge", version = "=6.0.0" }
+telltale-bridge = { path = "../bridge" }
 
 [features]
 default = ["projection", "duality", "merge", "well-formedness", "bounded", "async-subtyping", "sync-subtyping", "semantics", "coherence"]

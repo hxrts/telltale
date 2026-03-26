@@ -253,7 +253,7 @@ Add the choreography crate and an async runtime.
 
 ```toml
 [dependencies]
-telltale-runtime = "6.0.0"
+telltale-runtime = "7.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
