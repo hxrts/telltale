@@ -8,6 +8,80 @@ cd "$ROOT_DIR"
 
 errors=()
 
+explicit_failure_timeout_events=(
+  TimeoutIssued
+  CancellationRequested
+  Cancelled
+  FailureBranchEntered
+  SessionTerminal
+)
+
+authority_ownership_suites=(
+  rust/machine/tests/ownership_contracts.rs
+  rust/simulator/tests/ownership_faults.rs
+)
+
+identity_replay_suites=(
+  rust/machine/tests/serialization_replay.rs
+  rust/bridge/tests/semantic_object_roundtrip.rs
+  rust/bridge/tests/protocol_machine_cross_target_tests.rs
+)
+
+commitment_progress_suites=(
+  rust/machine/tests/unit/protocol_machine/tests_semantic_state.rs
+  rust/machine/tests/conformance_lean.rs
+  rust/machine/tests/threaded_equivalence.rs
+  rust/machine/src/runtime_contracts.rs
+)
+
+cross_mode_semantic_parity_suites=(
+  rust/machine/tests/threaded_equivalence.rs
+  rust/machine/tests/wasm_trace_equivalence.rs
+  rust/bridge/tests/semantic_object_roundtrip.rs
+  rust/bridge/tests/protocol_machine_cross_target_tests.rs
+)
+
+fail_closed_lowering_admission_suites=(
+  rust/language/src/compiler/parser/mod.rs
+  rust/runtime/tests/authority_compile_fail.rs
+  rust/machine/src/runtime_contracts.rs
+  rust/machine/src/composition.rs
+)
+
+structure_reconfiguration_suites=(
+  rust/machine/src/engine/runtime_exec/semantic_state.rs
+)
+
+semantic_lifecycle_invariant_suites=(
+  rust/machine/src/engine/runtime_exec/semantic_state.rs
+)
+
+adversarial_lifecycle_cases=(
+  stale_late_result_after_handoff
+  owner_crash_before_handoff
+  owner_crash_after_handoff
+  timeout_vs_cancellation_race
+  retry_after_terminalization
+  duplicate_publication_attempt
+  observed_read_use_on_authoritative_path
+  missing_canonical_handle_on_parity_critical_path
+  blocked_progress_escalation
+  immediate_effect_misuse
+)
+
+dsl_runtime_semantics_suites=(
+  rust/tests/dsl_runtime_semantics_tests.rs
+)
+
+simulator_semantic_contract_categories=(
+  parity_progress_contracts
+  exact_once_effect_resolution
+  canonical_publication_uniqueness
+  authoritative_observed_separation
+  progress_escalation_visibility
+  semantic_object_coherence
+)
+
 # ── Helpers ───────────────────────────────────────────────────────────
 
 # Extract the documented value for a named metric from the inventory doc.
@@ -69,6 +143,19 @@ check_metric() {
   fi
 }
 
+count_list() {
+  echo "$#"
+}
+
+bucket_has_coverage() {
+  local count="$1"
+  if [[ "$count" -gt 0 ]]; then
+    echo 1
+  else
+    echo 0
+  fi
+}
+
 # ── Lean CODE_MAP.md Total Metrics ────────────────────────────────────
 
 total_row=$(grep -E '^\|[[:space:]]+\*\*Total\*\*[[:space:]]+\|[[:space:]]+\*\*[0-9,]+\*\*[[:space:]]+\|[[:space:]]+\*\*[0-9,]+\*\*' lean/CODE_MAP.md | head -1) || true
@@ -92,6 +179,11 @@ actual_aura=$(recipe_command_count "check-aura-borrowed-lints")
 check_metric "Ownership contract gate commands" "$actual_ownership"
 check_metric "Aura-derived boundary checks" "$actual_aura"
 
+# ── Explicit Failure/Timeout Event Inventory ─────────────────────────
+
+actual_explicit_failure_timeout_events=$(count_list "${explicit_failure_timeout_events[@]}")
+check_metric "Explicit failure/timeout observable event kinds" "$actual_explicit_failure_timeout_events"
+
 # ── Macro UI Fixture Counts ───────────────────────────────────────────
 
 macro_ui_file="rust/macros/tests/macro_ui.rs"
@@ -101,6 +193,44 @@ actual_fail=$(grep -c '\bt\.compile_fail(' "$macro_ui_file" || echo 0)
 
 check_metric "Macro UI pass fixtures" "$actual_pass"
 check_metric "Macro UI compile-fail fixtures" "$actual_fail"
+
+# ── Property Coverage Baseline ───────────────────────────────────────
+
+actual_authority_ownership=$(count_list "${authority_ownership_suites[@]}")
+actual_identity_replay=$(count_list "${identity_replay_suites[@]}")
+actual_commitment_progress=$(count_list "${commitment_progress_suites[@]}")
+actual_cross_mode_semantic_parity=$(count_list "${cross_mode_semantic_parity_suites[@]}")
+actual_fail_closed_lowering_admission=$(count_list "${fail_closed_lowering_admission_suites[@]}")
+actual_structure_reconfiguration=$(count_list "${structure_reconfiguration_suites[@]}")
+actual_semantic_lifecycle_invariant_suites=$(count_list "${semantic_lifecycle_invariant_suites[@]}")
+actual_adversarial_lifecycle_scenarios=$(count_list "${adversarial_lifecycle_cases[@]}")
+actual_dsl_runtime_semantics_suites=$(count_list "${dsl_runtime_semantics_suites[@]}")
+actual_simulator_semantic_contract_categories=$(count_list "${simulator_semantic_contract_categories[@]}")
+
+actual_executable_property_buckets=$(
+  (
+    bucket_has_coverage 2
+    bucket_has_coverage "$actual_authority_ownership"
+    bucket_has_coverage "$actual_identity_replay"
+    bucket_has_coverage "$actual_commitment_progress"
+    bucket_has_coverage "$actual_structure_reconfiguration"
+    bucket_has_coverage "$actual_fail_closed_lowering_admission"
+  ) | awk '{sum += $1} END {print sum + 0}'
+)
+actual_lacking_property_buckets=$((6 - actual_executable_property_buckets))
+
+check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
+check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
+check_metric "Authority and ownership semantic assurance suites" "$actual_authority_ownership"
+check_metric "Identity and replay semantic assurance suites" "$actual_identity_replay"
+check_metric "Commitment and progress semantic assurance suites" "$actual_commitment_progress"
+check_metric "Cross-mode semantic parity suites" "$actual_cross_mode_semantic_parity"
+check_metric "Fail-closed lowering and admission gate suites" "$actual_fail_closed_lowering_admission"
+check_metric "Structural locality and reconfiguration executable assurance suites" "$actual_structure_reconfiguration"
+check_metric "Semantic lifecycle invariant suites" "$actual_semantic_lifecycle_invariant_suites"
+check_metric "Deterministic adversarial lifecycle scenarios" "$actual_adversarial_lifecycle_scenarios"
+check_metric "End-to-end DSL runtime semantic conformance suites" "$actual_dsl_runtime_semantics_suites"
+check_metric "Simulator semantic contract categories enforced automatically" "$actual_simulator_semantic_contract_categories"
 
 # ── Report ────────────────────────────────────────────────────────────
 

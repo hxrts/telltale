@@ -616,14 +616,51 @@ impl Choreography {
                         validate_expr(expr, effect_ops, used)?;
                         match (mode, expr) {
                             (
+                                super::AuthorityBindingMode::Plain,
+                                super::AuthorityExpr::Check { effect, operation, .. },
+                            ) => {
+                                let op_decl = effect_ops
+                                    .get(effect)
+                                    .and_then(|ops| ops.get(operation))
+                                    .expect("validated effect operation should exist");
+                                if matches!(
+                                    op_decl.authority_class,
+                                    EffectAuthorityClass::Authoritative
+                                ) {
+                                    return Err(ValidationError::ExtensionError(format!(
+                                        "authoritative effect invocation `{effect}.{operation}` must bind through `authoritative let`"
+                                    )));
+                                }
+                            }
+                            (super::AuthorityBindingMode::Plain, super::AuthorityExpr::Observe { .. }) => {
+                                return Err(ValidationError::ExtensionError(
+                                    "`observe` expressions must bind through `observe let`"
+                                        .to_string(),
+                                ));
+                            }
+                            (
                                 super::AuthorityBindingMode::Authoritative,
-                                super::AuthorityExpr::Check { .. },
-                            )
-                            | (
+                                super::AuthorityExpr::Check { effect, operation, .. },
+                            ) => {
+                                let op_decl = effect_ops
+                                    .get(effect)
+                                    .and_then(|ops| ops.get(operation))
+                                    .expect("validated effect operation should exist");
+                                if !matches!(
+                                    op_decl.authority_class,
+                                    EffectAuthorityClass::Authoritative
+                                ) {
+                                    return Err(ValidationError::ExtensionError(format!(
+                                        "`authoritative let` may only bind authoritative effect invocations; `{effect}.{operation}` is {:?}",
+                                        op_decl.authority_class
+                                    )));
+                                }
+                            }
+                            (
                                 super::AuthorityBindingMode::Observe,
                                 super::AuthorityExpr::Observe { .. },
-                            )
-                            | (super::AuthorityBindingMode::Plain, _) => {}
+                            ) => {}
+                            (super::AuthorityBindingMode::Plain, _) => {}
                             (super::AuthorityBindingMode::Authoritative, _) => {
                                 return Err(ValidationError::ExtensionError(
                                     "`authoritative let` must bind a `check` expression"

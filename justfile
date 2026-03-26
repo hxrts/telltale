@@ -65,6 +65,7 @@ ci-dry-run lane="fast":
     just check-lean-metrics
     just check-tooling-convergence
     just check-lean-prebuilt
+    just check-semantic-assurance
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -239,6 +240,15 @@ check-style-boundaries:
 # Keep a small authoritative verification inventory aligned with source-of-truth metrics.
 check-verification-inventory:
     ./scripts/check/verification-inventory.sh
+
+# Run the highest-signal semantic assurance suites directly.
+check-semantic-assurance:
+    cargo test -p telltale-machine runtime_semantic_lifecycle_harness_covers_seeded_state_machine_paths -- --nocapture
+    cargo test -p telltale-machine runtime_semantic_lifecycle_adversarial_corpus_is_deterministic -- --nocapture
+    cargo test -p telltale-machine --features multi-thread --test threaded_equivalence -- --nocapture
+    cargo test -p telltale-simulator --test harness_contracts -- --nocapture
+    cargo test -p telltale-bridge --test protocol_machine_cross_target_tests -- --nocapture
+    cargo test --test dsl_runtime_semantics_tests -- --nocapture
 
 # Keep proc-macro UI boundary contracts under targeted trybuild coverage.
 check-macro-boundaries:

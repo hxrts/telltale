@@ -41,6 +41,8 @@ jobs:
         run: just check-tooling-convergence
       - name: Check Lean prebuilt artifacts
         run: just check-lean-prebuilt
+      - name: Run semantic assurance suites
+        run: just check-semantic-assurance
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:

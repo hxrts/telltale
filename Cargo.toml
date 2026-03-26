@@ -31,6 +31,10 @@ path = "rust/tests/seal_tests.rs"
 name = "session_tests"
 path = "rust/tests/session_tests.rs"
 
+[[test]]
+name = "dsl_runtime_semantics_tests"
+path = "rust/tests/dsl_runtime_semantics_tests.rs"
+
 [lints]
 workspace = true
 

@@ -62,6 +62,11 @@ jobs:
           mkdir -p artifacts
           just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
 
+      - name: Run semantic assurance suites
+        run: |
+          mkdir -p artifacts
+          just check-semantic-assurance | tee artifacts/check-semantic-assurance.log
+
       - name: Run Lean architecture/style checks
         run: |
           mkdir -p artifacts
@@ -176,6 +181,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
+
+      - name: Run semantic assurance suites
+        run: |
+          mkdir -p artifacts
+          just check-semantic-assurance | tee artifacts/check-semantic-assurance.log
 
       - name: Run Lean architecture/style checks
         run: |

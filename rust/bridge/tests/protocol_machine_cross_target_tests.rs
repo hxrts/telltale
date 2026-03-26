@@ -11,6 +11,7 @@ use telltale_machine::model::effects::{
     EffectHandler, EffectResult, RecordingEffectHandler, SendDecision, SendDecisionInput,
 };
 use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::ProtocolMachineSemanticObjects;
 use telltale_machine::ThreadedProtocolMachine;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -218,6 +219,126 @@ where
     panic!("cross-target mismatch:\n{pretty}");
 }
 
+fn normalize_semantic_objects(
+    mut objects: ProtocolMachineSemanticObjects,
+) -> ProtocolMachineSemanticObjects {
+    let normalize_owner_id = |owner_id: &mut Option<String>| {
+        if owner_id.as_deref() == Some("wasm/host") {
+            *owner_id = None;
+        }
+    };
+
+    for operation in &mut objects.operation_instances {
+        if operation.handler_identity.is_some() {
+            operation.handler_identity = Some("<normalized-handler>".to_string());
+        }
+        normalize_owner_id(&mut operation.owner_id);
+    }
+    for effect in &mut objects.outstanding_effects {
+        effect.handler_identity = "<normalized-handler>".to_string();
+        normalize_owner_id(&mut effect.owner_id);
+    }
+    for read in &mut objects.observed_reads {
+        read.handler_identity = "<normalized-handler>".to_string();
+    }
+    for read in &mut objects.authoritative_reads {
+        normalize_owner_id(&mut read.owner_id);
+    }
+    for handle in &mut objects.canonical_handles {
+        normalize_owner_id(&mut handle.owner_id);
+    }
+    for publication in &mut objects.publication_events {
+        normalize_owner_id(&mut publication.owner_id);
+    }
+    for binding in &mut objects.prestate_bindings {
+        normalize_owner_id(&mut binding.participant_digest);
+    }
+    for contract in &mut objects.agreement_contracts {
+        normalize_owner_id(&mut contract.owner_id);
+    }
+    for evidence in &mut objects.agreement_evidence {
+        normalize_owner_id(&mut evidence.owner_id);
+    }
+    for state in &mut objects.agreement_states {
+        normalize_owner_id(&mut state.owner_id);
+    }
+    for region in &mut objects.regions {
+        normalize_owner_id(&mut region.owner_id);
+    }
+
+    objects
+        .operation_instances
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize operation"));
+    objects.operation_instances.dedup();
+
+    objects
+        .outstanding_effects
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize effect"));
+    objects.outstanding_effects.dedup_by(|lhs, rhs| lhs == rhs);
+
+    objects
+        .semantic_handoffs
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize handoff"));
+    objects.semantic_handoffs.dedup();
+    objects
+        .transformation_obligations
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize obligation"));
+    objects.transformation_obligations.dedup();
+    objects
+        .authoritative_reads
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize authoritative read"));
+    objects.authoritative_reads.dedup();
+    objects
+        .observed_reads
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize observed read"));
+    objects.observed_reads.dedup();
+    objects
+        .materialization_proofs
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize proof"));
+    objects.materialization_proofs.dedup();
+    objects
+        .canonical_handles
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize handle"));
+    objects.canonical_handles.dedup();
+    objects
+        .publication_events
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize publication"));
+    objects.publication_events.dedup();
+    objects
+        .prestate_bindings
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize prestate binding"));
+    objects.prestate_bindings.dedup();
+    objects
+        .agreement_profiles
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement profile"));
+    objects.agreement_profiles.dedup();
+    objects
+        .agreement_contracts
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement contract"));
+    objects.agreement_contracts.dedup();
+    objects
+        .agreement_evidence
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement evidence"));
+    objects.agreement_evidence.dedup();
+    objects
+        .agreement_states
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement state"));
+    objects.agreement_states.dedup();
+    objects
+        .regions
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize region"));
+    objects.regions.dedup();
+    objects
+        .progress_contracts
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize progress contract"));
+    objects.progress_contracts.dedup();
+    objects
+        .progress_transitions
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize progress transition"));
+    objects.progress_transitions.dedup();
+    objects
+}
+
 fn classify_mismatch(
     dimension: &str,
     left_effect_signature: &[String],
@@ -330,13 +451,18 @@ fn run_single_thread(
 ) -> (
     Vec<ObsEvent>,
     Vec<telltale_machine::model::effects::EffectTraceEntry>,
+    ProtocolMachineSemanticObjects,
 ) {
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     machine.load_choreography(image).expect("load choreography");
     machine
         .run(&DeterministicHandler, 256)
         .expect("single-thread run");
-    (machine.trace().to_vec(), machine.effect_trace().to_vec())
+    (
+        machine.trace().to_vec(),
+        machine.effect_trace().to_vec(),
+        machine.semantic_objects(),
+    )
 }
 
 fn run_threaded(
@@ -345,6 +471,7 @@ fn run_threaded(
     Vec<ObsEvent>,
     Vec<telltale_machine::model::effects::EffectTraceEntry>,
     Vec<telltale_machine::LaneSelection>,
+    ProtocolMachineSemanticObjects,
 ) {
     run_threaded_with_concurrency(image, 1, 4)
 }
@@ -357,6 +484,7 @@ fn run_threaded_with_concurrency(
     Vec<ObsEvent>,
     Vec<telltale_machine::model::effects::EffectTraceEntry>,
     Vec<telltale_machine::LaneSelection>,
+    ProtocolMachineSemanticObjects,
 ) {
     let mut machine =
         ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), concurrency.max(1));
@@ -370,6 +498,7 @@ fn run_threaded_with_concurrency(
         machine.trace().to_vec(),
         machine.effect_trace().to_vec(),
         machine.lane_trace().to_vec(),
+        machine.semantic_objects(),
     )
 }
 
@@ -377,8 +506,8 @@ fn run_threaded_with_concurrency(
 fn cross_target_matrix_native_single_vs_threaded_traces() {
     let images = [ping_pong_image(), chain_image()];
     for image in images {
-        let (single_trace, single_effects) = run_single_thread(&image);
-        let (threaded_trace, threaded_effects, _) = run_threaded(&image);
+        let (single_trace, single_effects, single_semantic_objects) = run_single_thread(&image);
+        let (threaded_trace, threaded_effects, _, threaded_semantic_objects) = run_threaded(&image);
         let single_effect_sig = effect_signature(&single_effects);
         let threaded_effect_sig = effect_signature(&threaded_effects);
 
@@ -409,6 +538,13 @@ fn cross_target_matrix_native_single_vs_threaded_traces() {
             &single_effect_sig,
             &threaded_effect_sig,
         );
+        assert_eq_structured_attributed(
+            "semantic_objects.bundle",
+            &normalize_semantic_objects(single_semantic_objects),
+            &normalize_semantic_objects(threaded_semantic_objects),
+            &single_effect_sig,
+            &threaded_effect_sig,
+        );
     }
 }
 
@@ -424,6 +560,7 @@ fn cross_target_matrix_replay_effect_trace_comparison() {
 
     let replay_trace = recording.effect_trace();
     let single_trace = single.trace().to_vec();
+    let single_semantic_objects = single.semantic_objects();
 
     let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 4);
     threaded
@@ -457,6 +594,11 @@ fn cross_target_matrix_replay_effect_trace_comparison() {
             || replay_effect_kinds.is_subset(&threaded_effect_kinds),
         "unexpected effect-policy delta across replay targets"
     );
+    assert_eq_structured(
+        "replay.semantic_objects.bundle",
+        &normalize_semantic_objects(single_semantic_objects),
+        &normalize_semantic_objects(threaded.semantic_objects()),
+    );
 }
 
 #[test]
@@ -464,7 +606,7 @@ fn cross_target_matrix_lane_selection_normalization_single_vs_multi_lane() {
     let image = ping_pong_image();
 
     // Single-lane baseline in threaded backend.
-    let (_, _, single_lane_trace) = run_threaded_with_concurrency(&image, 3, 1);
+    let (_, _, single_lane_trace, _) = run_threaded_with_concurrency(&image, 3, 1);
     let single_lane = lane_selection_view(&single_lane_trace);
     assert!(
         single_lane.iter().all(|(_, _, _, lane)| *lane == 0),
@@ -472,7 +614,7 @@ fn cross_target_matrix_lane_selection_normalization_single_vs_multi_lane() {
     );
 
     // Multi-lane run over same workload.
-    let (_, _, multi_lane_trace) = run_threaded_with_concurrency(&image, 3, 4);
+    let (_, _, multi_lane_trace, _) = run_threaded_with_concurrency(&image, 3, 4);
     let multi_lane = lane_selection_view(&multi_lane_trace);
     assert!(
         multi_lane.iter().any(|(_, _, _, lane)| *lane > 0),

@@ -81,7 +81,7 @@ effect Runtime
 
 protocol CommitFlow uses Runtime =
   roles Coordinator, Worker
-  let readiness = check Runtime.ready(session)
+  authoritative let readiness = check Runtime.ready(session)
   case readiness of
     | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)

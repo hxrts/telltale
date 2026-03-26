@@ -20,7 +20,10 @@ use telltale_machine::model::effects::{
 use telltale_machine::OutputConditionPolicy;
 use telltale_machine::ProgressState;
 use telltale_machine::ThreadedProtocolMachine;
-use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
+use telltale_machine::{
+    ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
+    ProtocolMachineSemanticObjects,
+};
 use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
 };
@@ -126,6 +129,143 @@ fn run_progress_states(
     (coop_progress, threaded_progress)
 }
 
+fn run_semantic_objects(
+    image: &telltale_machine::runtime::loader::CodeImage,
+) -> (
+    ProtocolMachineSemanticObjects,
+    ProtocolMachineSemanticObjects,
+) {
+    let handler = PassthroughHandler;
+
+    let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
+    coop.load_choreography(image).expect("load image");
+    coop.run(&handler, 64).expect("cooperative run");
+
+    let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    threaded.load_choreography(image).expect("load image");
+    threaded.run(&handler, 64).expect("threaded run");
+
+    (coop.semantic_objects(), threaded.semantic_objects())
+}
+
+fn normalize_semantic_objects(
+    mut objects: ProtocolMachineSemanticObjects,
+) -> ProtocolMachineSemanticObjects {
+    let normalize_owner_id = |owner_id: &mut Option<String>| {
+        if owner_id.as_deref() == Some("wasm/host") {
+            *owner_id = None;
+        }
+    };
+
+    for operation in &mut objects.operation_instances {
+        if operation.handler_identity.is_some() {
+            operation.handler_identity = Some("<normalized-handler>".to_string());
+        }
+        normalize_owner_id(&mut operation.owner_id);
+    }
+    for effect in &mut objects.outstanding_effects {
+        effect.handler_identity = "<normalized-handler>".to_string();
+        normalize_owner_id(&mut effect.owner_id);
+    }
+    for read in &mut objects.observed_reads {
+        read.handler_identity = "<normalized-handler>".to_string();
+    }
+    for read in &mut objects.authoritative_reads {
+        normalize_owner_id(&mut read.owner_id);
+    }
+    for handle in &mut objects.canonical_handles {
+        normalize_owner_id(&mut handle.owner_id);
+    }
+    for publication in &mut objects.publication_events {
+        normalize_owner_id(&mut publication.owner_id);
+    }
+    for binding in &mut objects.prestate_bindings {
+        normalize_owner_id(&mut binding.participant_digest);
+    }
+    for contract in &mut objects.agreement_contracts {
+        normalize_owner_id(&mut contract.owner_id);
+    }
+    for evidence in &mut objects.agreement_evidence {
+        normalize_owner_id(&mut evidence.owner_id);
+    }
+    for state in &mut objects.agreement_states {
+        normalize_owner_id(&mut state.owner_id);
+    }
+    for region in &mut objects.regions {
+        normalize_owner_id(&mut region.owner_id);
+    }
+
+    objects
+        .operation_instances
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize operation"));
+    objects.operation_instances.dedup();
+    objects
+        .outstanding_effects
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize effect"));
+    objects.outstanding_effects.dedup_by(|lhs, rhs| lhs == rhs);
+    objects
+        .semantic_handoffs
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize handoff"));
+    objects.semantic_handoffs.dedup();
+    objects
+        .transformation_obligations
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize obligation"));
+    objects.transformation_obligations.dedup();
+    objects
+        .authoritative_reads
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize authoritative read"));
+    objects.authoritative_reads.dedup();
+    objects
+        .observed_reads
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize observed read"));
+    objects.observed_reads.dedup();
+    objects
+        .materialization_proofs
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize proof"));
+    objects.materialization_proofs.dedup();
+    objects
+        .canonical_handles
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize handle"));
+    objects.canonical_handles.dedup();
+    objects
+        .publication_events
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize publication"));
+    objects.publication_events.dedup();
+    objects
+        .prestate_bindings
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize prestate binding"));
+    objects.prestate_bindings.dedup();
+    objects
+        .agreement_profiles
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement profile"));
+    objects.agreement_profiles.dedup();
+    objects
+        .agreement_contracts
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement contract"));
+    objects.agreement_contracts.dedup();
+    objects
+        .agreement_evidence
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement evidence"));
+    objects.agreement_evidence.dedup();
+    objects
+        .agreement_states
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement state"));
+    objects.agreement_states.dedup();
+    objects
+        .regions
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize region"));
+    objects.regions.dedup();
+    objects
+        .progress_contracts
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize progress contract"));
+    objects.progress_contracts.dedup();
+    objects
+        .progress_transitions
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize progress transition"));
+    objects.progress_transitions.dedup();
+    objects
+}
+
 #[derive(Debug, Default)]
 struct FlakySendHandler {
     counter: AtomicUsize,
@@ -204,6 +344,13 @@ fn test_progress_contract_exports_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let (coop_progress, threaded_progress) = run_progress_states(&image);
     assert_eq!(coop_progress, threaded_progress);
+}
+
+#[test]
+fn test_semantic_object_exports_match_across_drivers() {
+    let image = simple_send_recv_image("A", "B", "msg");
+    let (coop_semantic_objects, threaded_semantic_objects) = run_semantic_objects(&image);
+    assert_eq!(coop_semantic_objects, threaded_semantic_objects);
 }
 
 #[test]
@@ -455,5 +602,10 @@ fn test_replay_mode_cross_target_differential() {
         per_session(baseline.trace()),
         per_session(replay_threaded.trace()),
         "cross-target replay traces diverged"
+    );
+    assert_eq!(
+        normalize_semantic_objects(baseline.semantic_objects()),
+        normalize_semantic_objects(replay_threaded.semantic_objects()),
+        "cross-target replay semantic objects diverged"
     );
 }

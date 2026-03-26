@@ -2230,7 +2230,7 @@ effect Runtime
 
 protocol ExtensionProjection uses Runtime =
   roles A, B
-  let witness = check Runtime.ready(session)
+  authoritative let witness = check Runtime.ready(session)
   A -> B : Ping
 "#;
 
@@ -2557,7 +2557,7 @@ effect Audit
 
 protocol CommitFlow uses Runtime, Audit =
   roles Coordinator, Worker, Client
-  let readiness = check Runtime.ready(session)
+  authoritative let readiness = check Runtime.ready(session)
   case readiness of
     | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
@@ -2651,7 +2651,7 @@ effect Runtime
 
 protocol CommitFlow uses Runtime =
   roles Coordinator, Worker
-  let readiness = check Runtime.ready(session)
+  authoritative let readiness = check Runtime.ready(session)
   case readiness of
     | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
@@ -2795,6 +2795,58 @@ protocol WatchFlow uses Runtime =
             .validate()
             .expect_err("observational effect use should fail validation");
         assert!(err.to_string().contains("observational"));
+    }
+
+    #[test]
+    fn test_reject_plain_binding_of_authoritative_check() {
+        let input = r#"
+effect Runtime
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
+
+protocol CommitFlow uses Runtime =
+  roles Coordinator, Worker
+  let readiness = check Runtime.ready(session)
+  Coordinator -> Worker : Continue(readiness)
+"#;
+
+        let choreography = parse_choreography_str(input).expect("parse should succeed");
+        let err = choreography
+            .validate()
+            .expect_err("plain authoritative binding must fail validation");
+        assert!(err.to_string().contains("authoritative let"));
+    }
+
+    #[test]
+    fn test_reject_plain_binding_of_observe_expression() {
+        let input = r#"
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
+
+protocol WatchFlow uses Runtime =
+  roles Coordinator, Worker
+  let presence = observe Runtime.watchPresence(session)
+  Coordinator -> Worker : Seen(presence)
+"#;
+
+        let choreography = parse_choreography_str(input).expect("parse should succeed");
+        let err = choreography
+            .validate()
+            .expect_err("plain observe binding must fail validation");
+        assert!(err.to_string().contains("observe let"));
     }
 
     #[test]

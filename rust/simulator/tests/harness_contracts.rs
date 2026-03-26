@@ -6,7 +6,10 @@ use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_simulator::contracts::{evaluate_contracts, ContractCheckConfig};
+use telltale_simulator::contracts::{
+    assert_contracts, evaluate_contracts, ContractCheckConfig, ExpectedProgressState,
+    ExpectedPublication,
+};
 use telltale_simulator::generated::ScenarioEffectResult;
 use telltale_simulator::harness::{DirectAdapter, HarnessConfig, HarnessSpec, SimulationHarness};
 use telltale_simulator::material::{MaterialParams, MeanFieldParams};
@@ -127,11 +130,7 @@ fn harness_run_passes_default_contract_checks() {
         expected_roles: vec!["A".into(), "B".into()],
         ..ContractCheckConfig::default()
     };
-    let report = evaluate_contracts(&result, &config);
-    assert!(
-        report.passed,
-        "expected passing contract report: {report:?}"
-    );
+    assert_contracts(&result, &config).expect("default contracts should pass");
 }
 
 #[test]
@@ -153,6 +152,94 @@ fn harness_contracts_detect_missing_role_samples() {
         .failures
         .iter()
         .any(|msg| msg.contains("missing sampled trace records")));
+}
+
+#[test]
+fn harness_contracts_detect_missing_parity_progress_contracts() {
+    let (global_type, local_types) = simple_protocol();
+    let spec = HarnessSpec::new(local_types, global_type, scenario());
+
+    let adapter = DirectAdapter::new(&PassthroughHandler);
+    let harness = SimulationHarness::new(&adapter);
+    let mut result = harness.run(&spec).expect("harness run");
+    result.replay.semantic_objects.progress_contracts.clear();
+
+    let report = evaluate_contracts(&result, &ContractCheckConfig::default());
+    assert!(!report.passed);
+    assert!(report
+        .failures
+        .iter()
+        .any(|msg| msg.contains("parity-critical semantic operations")));
+}
+
+#[test]
+fn harness_contracts_validate_expected_progress_and_publication_states() {
+    let (global_type, local_types) = simple_protocol();
+    let spec = HarnessSpec::new(local_types, global_type, scenario());
+
+    let adapter = DirectAdapter::new(&PassthroughHandler);
+    let harness = SimulationHarness::new(&adapter);
+    let result = harness.run(&spec).expect("harness run");
+
+    let progress = result
+        .replay
+        .semantic_objects
+        .progress_contracts
+        .first()
+        .expect("at least one progress contract");
+    let publication = result
+        .replay
+        .semantic_objects
+        .publication_events
+        .first()
+        .expect("at least one publication event");
+
+    let config = ContractCheckConfig {
+        expected_progress_states: vec![ExpectedProgressState {
+            operation_id: progress.operation_id.clone(),
+            state: "succeeded".to_string(),
+        }],
+        expected_publications: vec![ExpectedPublication {
+            operation_id: publication.operation_id.clone(),
+            publication: publication.publication.clone(),
+            status: "published".to_string(),
+        }],
+        ..ContractCheckConfig::default()
+    };
+
+    assert_contracts(&result, &config).expect("expected semantic states should match");
+}
+
+#[test]
+fn harness_contracts_report_expected_publication_mismatches() {
+    let (global_type, local_types) = simple_protocol();
+    let spec = HarnessSpec::new(local_types, global_type, scenario());
+
+    let adapter = DirectAdapter::new(&PassthroughHandler);
+    let harness = SimulationHarness::new(&adapter);
+    let result = harness.run(&spec).expect("harness run");
+
+    let publication = result
+        .replay
+        .semantic_objects
+        .publication_events
+        .first()
+        .expect("at least one publication event");
+    let config = ContractCheckConfig {
+        expected_publications: vec![ExpectedPublication {
+            operation_id: publication.operation_id.clone(),
+            publication: publication.publication.clone(),
+            status: "rejected".to_string(),
+        }],
+        ..ContractCheckConfig::default()
+    };
+
+    let report = evaluate_contracts(&result, &config);
+    assert!(!report.passed);
+    assert!(report
+        .failures
+        .iter()
+        .any(|msg| msg.contains("publication status mismatch")));
 }
 
 #[test]

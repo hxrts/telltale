@@ -56,6 +56,121 @@ impl EffectHandler for NoOpHandler {
     }
 }
 
+fn normalize_owner_id(owner_id: &mut Option<String>) {
+    if owner_id.as_deref() == Some("wasm/host") {
+        *owner_id = None;
+    }
+}
+
+fn normalize_semantic_objects(
+    mut objects: ProtocolMachineSemanticObjects,
+) -> ProtocolMachineSemanticObjects {
+    for operation in &mut objects.operation_instances {
+        if operation.handler_identity.is_some() {
+            operation.handler_identity = Some("<normalized-handler>".to_string());
+        }
+        normalize_owner_id(&mut operation.owner_id);
+    }
+    for effect in &mut objects.outstanding_effects {
+        effect.handler_identity = "<normalized-handler>".to_string();
+        normalize_owner_id(&mut effect.owner_id);
+    }
+    for read in &mut objects.authoritative_reads {
+        normalize_owner_id(&mut read.owner_id);
+    }
+    for handle in &mut objects.canonical_handles {
+        normalize_owner_id(&mut handle.owner_id);
+    }
+    for publication in &mut objects.publication_events {
+        normalize_owner_id(&mut publication.owner_id);
+    }
+    for binding in &mut objects.prestate_bindings {
+        normalize_owner_id(&mut binding.participant_digest);
+    }
+    for contract in &mut objects.agreement_contracts {
+        normalize_owner_id(&mut contract.owner_id);
+    }
+    for evidence in &mut objects.agreement_evidence {
+        normalize_owner_id(&mut evidence.owner_id);
+    }
+    for state in &mut objects.agreement_states {
+        normalize_owner_id(&mut state.owner_id);
+    }
+    for region in &mut objects.regions {
+        normalize_owner_id(&mut region.owner_id);
+    }
+
+    objects
+        .operation_instances
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize operation"));
+    objects.operation_instances.dedup();
+    objects
+        .outstanding_effects
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize effect"));
+    objects.outstanding_effects.dedup();
+    objects
+        .semantic_handoffs
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize handoff"));
+    objects.semantic_handoffs.dedup();
+    objects
+        .transformation_obligations
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize obligation"));
+    objects.transformation_obligations.dedup();
+    objects
+        .authoritative_reads
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize authoritative read"));
+    objects.authoritative_reads.dedup();
+    objects
+        .observed_reads
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize observed read"));
+    objects.observed_reads.dedup();
+    objects
+        .materialization_proofs
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize proof"));
+    objects.materialization_proofs.dedup();
+    objects
+        .canonical_handles
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize handle"));
+    objects.canonical_handles.dedup();
+    objects
+        .publication_events
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize publication"));
+    objects.publication_events.dedup();
+    objects
+        .prestate_bindings
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize prestate binding"));
+    objects.prestate_bindings.dedup();
+    objects
+        .agreement_profiles
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement profile"));
+    objects.agreement_profiles.dedup();
+    objects
+        .agreement_contracts
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement contract"));
+    objects.agreement_contracts.dedup();
+    objects
+        .agreement_evidence
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement evidence"));
+    objects.agreement_evidence.dedup();
+    objects
+        .agreement_states
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize agreement state"));
+    objects.agreement_states.dedup();
+    objects
+        .regions
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize region"));
+    objects.regions.dedup();
+    objects
+        .progress_contracts
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize progress contract"));
+    objects.progress_contracts.dedup();
+    objects
+        .progress_transitions
+        .sort_by_key(|value| serde_json::to_string(value).expect("serialize progress transition"));
+    objects.progress_transitions.dedup();
+    objects
+}
+
 fn assert_wasm_trace_matches_vm(
     global: GlobalType,
     locals: BTreeMap<String, LocalTypeR>,
@@ -87,9 +202,93 @@ fn assert_wasm_trace_matches_vm(
     let native_semantic_objects = machine.semantic_objects();
 
     assert_eq!(wasm_trace, native_trace);
+    let wasm_semantic_objects = normalize_semantic_objects(wasm_semantic_objects);
+    let native_semantic_objects = normalize_semantic_objects(native_semantic_objects);
+
+    assert_eq!(
+        wasm_semantic_objects.operation_instances,
+        native_semantic_objects.operation_instances,
+        "operation instance parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.outstanding_effects,
+        native_semantic_objects.outstanding_effects,
+        "outstanding effect parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.semantic_handoffs,
+        native_semantic_objects.semantic_handoffs,
+        "semantic handoff parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.transformation_obligations,
+        native_semantic_objects.transformation_obligations,
+        "transformation obligation parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.authoritative_reads,
+        native_semantic_objects.authoritative_reads,
+        "authoritative read parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.observed_reads,
+        native_semantic_objects.observed_reads,
+        "observed read parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.materialization_proofs,
+        native_semantic_objects.materialization_proofs,
+        "materialization proof parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.canonical_handles,
+        native_semantic_objects.canonical_handles,
+        "canonical handle parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.publication_events,
+        native_semantic_objects.publication_events,
+        "publication parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.prestate_bindings,
+        native_semantic_objects.prestate_bindings,
+        "prestate binding parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.agreement_profiles,
+        native_semantic_objects.agreement_profiles,
+        "agreement profile parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.agreement_contracts,
+        native_semantic_objects.agreement_contracts,
+        "agreement contract parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.agreement_evidence,
+        native_semantic_objects.agreement_evidence,
+        "agreement evidence parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.agreement_states,
+        native_semantic_objects.agreement_states,
+        "agreement state parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.regions,
+        native_semantic_objects.regions,
+        "region parity mismatch",
+    );
     assert_eq!(
         wasm_semantic_objects.progress_contracts,
-        native_semantic_objects.progress_contracts
+        native_semantic_objects.progress_contracts,
+        "progress contract parity mismatch",
+    );
+    assert_eq!(
+        wasm_semantic_objects.progress_transitions,
+        native_semantic_objects.progress_transitions,
+        "progress transition parity mismatch",
     );
 }
 
