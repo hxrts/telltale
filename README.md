@@ -12,9 +12,8 @@ Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Art
 
 ### 1. Rust Library
 
-The Rust project implements the operational model from the paper series. Protocols are written once with the `tell!` macro and projected to local session types and typed effect interfaces for each role.
+The Rust project implements the operational model from the paper series. Protocols are written once with the `tell!` macro and projected to local session types, typed effect interfaces, and authority/evidence constructs for each role.
 
-- `tell!` DSL with projection, typed effect generation, and authority/evidence constructs
 - Protocol machine for deterministic execution with session type enforcement
 - Declared effect boundaries where host logic implements generated Rust traits
 - Native and WASM targets from the same protocol specification
