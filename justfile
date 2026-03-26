@@ -137,6 +137,20 @@ check-arch-rust:
 
 # TellTale syntax/style check suite (dependency layering, docs references, symbols)
 check-telltale-style:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Remove generated docs artifacts so the link checker runs against a clean
+    # tree, matching CI's fresh checkout.  Restore them afterward so local
+    # workflows are unaffected.
+    generated=()
+    for f in docs/SUMMARY.md docs/book; do
+      if [[ -e "$f" ]]; then
+        mv "$f" "$f.__ci_stash__"
+        generated+=("$f")
+      fi
+    done
+    restore() { for f in "${generated[@]}"; do [[ -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; }
+    trap restore EXIT
     ./scripts/check/dependency-layers.sh
     ./scripts/check/docs-links.sh
     ./scripts/check/text-symbols.sh
