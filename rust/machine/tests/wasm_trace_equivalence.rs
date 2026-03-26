@@ -206,18 +206,15 @@ fn assert_wasm_trace_matches_vm(
     let native_semantic_objects = normalize_semantic_objects(native_semantic_objects);
 
     assert_eq!(
-        wasm_semantic_objects.operation_instances,
-        native_semantic_objects.operation_instances,
+        wasm_semantic_objects.operation_instances, native_semantic_objects.operation_instances,
         "operation instance parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.outstanding_effects,
-        native_semantic_objects.outstanding_effects,
+        wasm_semantic_objects.outstanding_effects, native_semantic_objects.outstanding_effects,
         "outstanding effect parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.semantic_handoffs,
-        native_semantic_objects.semantic_handoffs,
+        wasm_semantic_objects.semantic_handoffs, native_semantic_objects.semantic_handoffs,
         "semantic handoff parity mismatch",
     );
     assert_eq!(
@@ -226,13 +223,11 @@ fn assert_wasm_trace_matches_vm(
         "transformation obligation parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.authoritative_reads,
-        native_semantic_objects.authoritative_reads,
+        wasm_semantic_objects.authoritative_reads, native_semantic_objects.authoritative_reads,
         "authoritative read parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.observed_reads,
-        native_semantic_objects.observed_reads,
+        wasm_semantic_objects.observed_reads, native_semantic_objects.observed_reads,
         "observed read parity mismatch",
     );
     assert_eq!(
@@ -241,53 +236,43 @@ fn assert_wasm_trace_matches_vm(
         "materialization proof parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.canonical_handles,
-        native_semantic_objects.canonical_handles,
+        wasm_semantic_objects.canonical_handles, native_semantic_objects.canonical_handles,
         "canonical handle parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.publication_events,
-        native_semantic_objects.publication_events,
+        wasm_semantic_objects.publication_events, native_semantic_objects.publication_events,
         "publication parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.prestate_bindings,
-        native_semantic_objects.prestate_bindings,
+        wasm_semantic_objects.prestate_bindings, native_semantic_objects.prestate_bindings,
         "prestate binding parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.agreement_profiles,
-        native_semantic_objects.agreement_profiles,
+        wasm_semantic_objects.agreement_profiles, native_semantic_objects.agreement_profiles,
         "agreement profile parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.agreement_contracts,
-        native_semantic_objects.agreement_contracts,
+        wasm_semantic_objects.agreement_contracts, native_semantic_objects.agreement_contracts,
         "agreement contract parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.agreement_evidence,
-        native_semantic_objects.agreement_evidence,
+        wasm_semantic_objects.agreement_evidence, native_semantic_objects.agreement_evidence,
         "agreement evidence parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.agreement_states,
-        native_semantic_objects.agreement_states,
+        wasm_semantic_objects.agreement_states, native_semantic_objects.agreement_states,
         "agreement state parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.regions,
-        native_semantic_objects.regions,
+        wasm_semantic_objects.regions, native_semantic_objects.regions,
         "region parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.progress_contracts,
-        native_semantic_objects.progress_contracts,
+        wasm_semantic_objects.progress_contracts, native_semantic_objects.progress_contracts,
         "progress contract parity mismatch",
     );
     assert_eq!(
-        wasm_semantic_objects.progress_transitions,
-        native_semantic_objects.progress_transitions,
+        wasm_semantic_objects.progress_transitions, native_semantic_objects.progress_transitions,
         "progress transition parity mismatch",
     );
 }

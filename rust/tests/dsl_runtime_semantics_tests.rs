@@ -4,7 +4,6 @@
 
 use std::collections::BTreeMap;
 
-use tempfile::NamedTempFile;
 use telltale::tell;
 use telltale_language::ast::convert::{choreography_to_global, local_to_local_r};
 use telltale_language::compiler::parser::parse_choreography_file;
@@ -14,6 +13,7 @@ use telltale_machine::model::effects::{
 };
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ProgressState, ProtocolMachine, ProtocolMachineConfig};
+use tempfile::NamedTempFile;
 
 const SIMPLE_DSL: &str = r#"
     protocol PingPong =
@@ -260,8 +260,11 @@ fn supported_tell_file_surface_lowers_to_runtime_semantic_objects() {
 
 #[test]
 fn generated_commitment_metadata_matches_declared_semantic_contracts() {
-    let choreography = telltale_language::parse_choreography_str(COMMITMENT_DSL).expect("parse DSL");
-    choreography.validate().expect("validate commitment surface");
+    let choreography =
+        telltale_language::parse_choreography_str(COMMITMENT_DSL).expect("parse DSL");
+    choreography
+        .validate()
+        .expect("validate commitment surface");
 
     let operation = &choreography.operation_declarations()[0];
     let progress = operation
@@ -277,8 +280,8 @@ fn generated_commitment_metadata_matches_declared_semantic_contracts() {
         .expect("macro commitment metadata");
     let operation_instance = metadata.operation_instance("syncLedger#1");
     let progress_contract = metadata.progress_contract("syncLedger#1");
-    let agreement_metadata =
-        MacroCommitLifecycle::agreements::operation("syncLedger").expect("macro agreement metadata");
+    let agreement_metadata = MacroCommitLifecycle::agreements::operation("syncLedger")
+        .expect("macro agreement metadata");
     let agreement_contract = agreement_metadata.agreement_contract("syncLedger#1");
     let prestate_binding = agreement_metadata
         .prestate_binding("syncLedger#1", "digest:ledger")
@@ -293,7 +296,10 @@ fn generated_commitment_metadata_matches_declared_semantic_contracts() {
         metadata.progress.requires_profile,
         progress.requires_profile.as_deref()
     );
-    assert_eq!(metadata.progress.within_window, progress.within_window.as_deref());
+    assert_eq!(
+        metadata.progress.within_window,
+        progress.within_window.as_deref()
+    );
     assert_eq!(metadata.progress.on_timeout, progress.on_timeout.as_deref());
     assert_eq!(metadata.progress.on_stall, progress.on_stall.as_deref());
     assert_eq!(operation_instance.kind, operation.name);
@@ -336,29 +342,28 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
 
     let authoritative =
         MacroAuthorityFlow::authority::authoritative_binding("witness").expect("auth binding");
-    let observed = MacroAuthorityFlow::authority::observed_binding("presence")
-        .expect("observed binding");
+    let observed =
+        MacroAuthorityFlow::authority::observed_binding("presence").expect("observed binding");
     let publication =
         MacroAuthorityFlow::authority::publication("AcceptedPublication").expect("publication");
-    let materialization = MacroAuthorityFlow::authority::materialization("acceptedProof")
-        .expect("materialization");
-    let handoff =
-        MacroAuthorityFlow::authority::handoff("acceptInvite").expect("semantic handoff");
+    let materialization =
+        MacroAuthorityFlow::authority::materialization("acceptedProof").expect("materialization");
+    let handoff = MacroAuthorityFlow::authority::handoff("acceptInvite").expect("semantic handoff");
 
     let authoritative_read = authoritative.authoritative_read("read#1");
     let observed_read = observed.observed_read("observe#1", 7, "handler");
     let publication_event = publication.publication_event("publication#1", "acceptInvite");
-    let materialization_proof = materialization.materialization_proof(
-        "proof#1",
-        "Runtime.ready",
-        "digest:ready",
-    );
+    let materialization_proof =
+        materialization.materialization_proof("proof#1", "Runtime.ready", "digest:ready");
     let canonical_handle = materialization.canonical_handle("handle#1", &materialization_proof);
     let semantic_handoff = handoff.semantic_handoff(9, 1, 0, 1);
 
     assert_eq!(authoritative.effect_interface, "Runtime");
     assert_eq!(authoritative.effect_operation, "ready");
-    assert_eq!(authoritative_read.predicate_ref.as_deref(), Some("Runtime.ready"));
+    assert_eq!(
+        authoritative_read.predicate_ref.as_deref(),
+        Some("Runtime.ready")
+    );
     assert_eq!(observed.effect_interface, "Runtime");
     assert_eq!(observed.effect_operation, "watchPresence");
     assert_eq!(observed_read.effect_id, 7);
@@ -387,8 +392,8 @@ fn unsupported_commitment_lifecycle_surface_fails_closed_before_theory_lowering(
     "#;
 
     let choreography = telltale_language::parse_choreography_str(input).expect("parse DSL");
-    let err =
-        choreography_to_global(&choreography).expect_err("unsupported lifecycle lowering must fail");
+    let err = choreography_to_global(&choreography)
+        .expect_err("unsupported lifecycle lowering must fail");
     assert!(
         err.to_string().contains("CommitmentLifecycle"),
         "expected explicit fail-closed lowering error, got {err}"
@@ -460,7 +465,11 @@ protocol CommitLifecycle under Replay =
 #[test]
 fn structure_surface_remains_fail_closed_in_projection() {
     let choreography = telltale_language::parse_choreography_str(AUTHORITY_DSL).expect("parse DSL");
-    assert!(choreography.language_tier_status().protocol_machine_executable);
+    assert!(
+        choreography
+            .language_tier_status()
+            .protocol_machine_executable
+    );
     assert!(!choreography.language_tier_status().session_projectable);
 
     let err = telltale_language::project(&choreography, &choreography.roles[0])

@@ -6,7 +6,9 @@
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
-use telltale_machine::{ObsEvent, ProgressState, ProtocolMachineSemanticObjects, PublicationStatus};
+use telltale_machine::{
+    ObsEvent, ProgressState, ProtocolMachineSemanticObjects, PublicationStatus,
+};
 
 use crate::runner::ScenarioResult;
 
@@ -232,12 +234,20 @@ pub fn evaluate_contracts(
             .collect::<Vec<_>>();
 
         if replay_effect_ids.len()
-            != replay_effect_ids.iter().copied().collect::<BTreeSet<_>>().len()
+            != replay_effect_ids
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len()
         {
             failures.push("effect trace re-used an effect_id".to_string());
         }
         if semantic_effect_ids.len()
-            != semantic_effect_ids.iter().copied().collect::<BTreeSet<_>>().len()
+            != semantic_effect_ids
+                .iter()
+                .copied()
+                .collect::<BTreeSet<_>>()
+                .len()
         {
             failures.push("semantic objects re-used an effect_id".to_string());
         }
@@ -246,9 +256,8 @@ pub fn evaluate_contracts(
     if config.parity_progress_contracts
         && !semantic_objects.parity_critical_operations_have_progress_contracts()
     {
-        failures.push(
-            "parity-critical semantic operations are missing progress contracts".to_string(),
-        );
+        failures
+            .push("parity-critical semantic operations are missing progress contracts".to_string());
     }
 
     if config.canonical_publication_uniqueness {
@@ -298,9 +307,14 @@ pub fn evaluate_contracts(
             ) {
                 continue;
             }
-            if !semantic_objects.progress_transitions.iter().any(|transition| {
-                transition.operation_id == contract.operation_id && transition.to_state == contract.state
-            }) {
+            if !semantic_objects
+                .progress_transitions
+                .iter()
+                .any(|transition| {
+                    transition.operation_id == contract.operation_id
+                        && transition.to_state == contract.state
+                })
+            {
                 failures.push(format!(
                     "progress escalation for operation `{}` in state `{}` was not replay-visible",
                     contract.operation_id,
@@ -336,10 +350,14 @@ pub fn evaluate_contracts(
     }
 
     for expected in &config.expected_publications {
-        let Some(publication) = semantic_objects.publication_events.iter().find(|publication| {
-            publication.operation_id == expected.operation_id
-                && publication.publication == expected.publication
-        }) else {
+        let Some(publication) = semantic_objects
+            .publication_events
+            .iter()
+            .find(|publication| {
+                publication.operation_id == expected.operation_id
+                    && publication.publication == expected.publication
+            })
+        else {
             failures.push(format!(
                 "missing expected publication `{}` for operation `{}`",
                 expected.publication, expected.operation_id
@@ -394,19 +412,25 @@ fn check_semantic_object_coherence(
                 handoff.handoff_id
             ));
         }
-        if !semantic_objects.canonical_handles.iter().any(|handle| {
-            handle.handle_id == format!("handoff:{}", handoff.handoff_id)
-        }) {
+        if !semantic_objects
+            .canonical_handles
+            .iter()
+            .any(|handle| handle.handle_id == format!("handoff:{}", handoff.handoff_id))
+        {
             failures.push(format!(
                 "semantic handoff `{}` is missing a canonical handoff handle",
                 handoff.handoff_id
             ));
         }
-        if !semantic_objects.publication_events.iter().any(|publication| {
-            publication.operation_id == operation_id
-                && publication.publication == "handoff.committed"
-                && publication.status == PublicationStatus::Published
-        }) {
+        if !semantic_objects
+            .publication_events
+            .iter()
+            .any(|publication| {
+                publication.operation_id == operation_id
+                    && publication.publication == "handoff.committed"
+                    && publication.status == PublicationStatus::Published
+            })
+        {
             failures.push(format!(
                 "semantic handoff `{}` is missing a canonical publication",
                 handoff.handoff_id

@@ -617,7 +617,9 @@ impl Choreography {
                         match (mode, expr) {
                             (
                                 super::AuthorityBindingMode::Plain,
-                                super::AuthorityExpr::Check { effect, operation, .. },
+                                super::AuthorityExpr::Check {
+                                    effect, operation, ..
+                                },
                             ) => {
                                 let op_decl = effect_ops
                                     .get(effect)
@@ -632,7 +634,10 @@ impl Choreography {
                                     )));
                                 }
                             }
-                            (super::AuthorityBindingMode::Plain, super::AuthorityExpr::Observe { .. }) => {
+                            (
+                                super::AuthorityBindingMode::Plain,
+                                super::AuthorityExpr::Observe { .. },
+                            ) => {
                                 return Err(ValidationError::ExtensionError(
                                     "`observe` expressions must bind through `observe let`"
                                         .to_string(),
@@ -640,7 +645,9 @@ impl Choreography {
                             }
                             (
                                 super::AuthorityBindingMode::Authoritative,
-                                super::AuthorityExpr::Check { effect, operation, .. },
+                                super::AuthorityExpr::Check {
+                                    effect, operation, ..
+                                },
                             ) => {
                                 let op_decl = effect_ops
                                     .get(effect)
