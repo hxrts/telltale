@@ -7,12 +7,12 @@ use std::path::Path;
 use std::process::Command;
 
 use quote::format_ident;
-use tempfile::tempdir;
 use telltale_runtime::ast::{
     annotation::Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role,
 };
 use telltale_runtime::compiler::codegen::{generate_topology_integration, InlineTopology};
 use telltale_runtime::{RoleName, TopologyBuilder, TopologyEndpoint};
+use tempfile::tempdir;
 
 fn role(name: &str) -> Role {
     Role::new(format_ident!("{name}")).expect("valid role")

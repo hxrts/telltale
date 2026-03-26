@@ -235,13 +235,16 @@ fn assert_site_semantics(objects: &ProtocolMachineSemanticObjects) {
         "site publication identifiers must remain canonical and unique"
     );
     assert!(
-        objects.publication_events.iter().all(|publication| match publication.status {
-            PublicationStatus::Published => publication.reason.is_none(),
-            PublicationStatus::Rejected => publication
-                .reason
-                .as_deref()
-                .is_some_and(|reason| reason.contains("proof-bearing success required")),
-        }),
+        objects
+            .publication_events
+            .iter()
+            .all(|publication| match publication.status {
+                PublicationStatus::Published => publication.reason.is_none(),
+                PublicationStatus::Rejected => publication
+                    .reason
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains("proof-bearing success required")),
+            }),
         "site publication outcomes should retain stable success/rejection diagnostics"
     );
 }

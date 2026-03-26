@@ -1,8 +1,8 @@
 use telltale_bridge::{
     AvailabilityLevel, CAPConfig, DistributedClaims, FLPConfig, InvariantClaims, LivenessConfig,
     PartitionModel, ProtocolEnvelopeBridgeConfig, ProtocolMachineEnvelopeAdherenceConfig,
-    ProtocolMachineEnvelopeAdmissionConfig, QuorumGeometryConfig, QuorumSystemKind,
-    SchedulerKind, TimingModel,
+    ProtocolMachineEnvelopeAdmissionConfig, QuorumGeometryConfig, QuorumSystemKind, SchedulerKind,
+    TimingModel,
 };
 
 use super::{tier1_minimal, ProtocolFixture};

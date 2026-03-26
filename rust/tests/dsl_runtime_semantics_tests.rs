@@ -389,7 +389,11 @@ fn proof_bundle_dsl_surface_resolves_required_bundles_and_lowers() {
     choreography.validate().expect("validate proof-bundle DSL");
 
     let theorem_packs = choreography.theorem_packs();
-    assert_eq!(theorem_packs.len(), 2, "expected both proof bundles to parse");
+    assert_eq!(
+        theorem_packs.len(),
+        2,
+        "expected both proof bundles to parse"
+    );
     assert_eq!(theorem_packs[0].name, "DelegationBase");
     assert_eq!(
         theorem_packs[0].capabilities,
@@ -411,7 +415,9 @@ fn proof_bundle_dsl_surface_resolves_required_bundles_and_lowers() {
 
     let image = code_image_from_choreography(&choreography);
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&image).expect("load bundled image");
+    machine
+        .load_choreography(&image)
+        .expect("load bundled image");
     machine.run(&NoopHandler, 32).expect("run bundled image");
 }
 
@@ -549,11 +555,7 @@ fn declared_agreement_metadata_admits_runtime_semantic_finalization_shapes() {
         finalization: Some(FinalizationOutcome::Finalized),
         ..provisional.clone()
     };
-    assert!(agreement_contract.finalization_admissible(
-        &prestate_binding,
-        &evidence,
-        &finalized
-    ));
+    assert!(agreement_contract.finalization_admissible(&prestate_binding, &evidence, &finalized));
 }
 
 #[test]
@@ -714,8 +716,7 @@ protocol CommitLifecycle =
   Coordinator -> Worker : Prepare
 "#;
 
-    let err =
-        telltale_language::parse_choreography_str(input).expect_err("threshold_success(0)");
+    let err = telltale_language::parse_choreography_str(input).expect_err("threshold_success(0)");
     assert!(err.to_string().contains("positive success count"));
 }
 

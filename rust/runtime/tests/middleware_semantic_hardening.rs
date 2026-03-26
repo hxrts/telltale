@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use telltale_runtime::effects::{interpret, ChoreoHandler, ChoreographyError, LabelId, Program, RoleId};
+use telltale_runtime::effects::{
+    interpret, ChoreoHandler, ChoreographyError, LabelId, Program, RoleId,
+};
 use telltale_runtime::{Metrics, Retry, RoleName, Trace};
 
 #[cfg(feature = "test-utils")]
@@ -88,13 +90,7 @@ impl ChoreoHandler for ScriptedSendHandler {
             attempt_id
         };
 
-        match self
-            .outcomes
-            .lock()
-            .unwrap()
-            .pop_front()
-            .unwrap_or(Ok(()))
-        {
+        match self.outcomes.lock().unwrap().pop_front().unwrap_or(Ok(())) {
             Ok(()) => {
                 self.successes.lock().unwrap().push(attempt_id);
                 Ok(())
@@ -158,7 +154,10 @@ async fn retry_middleware_keeps_retries_visible_without_duplicate_terminal_succe
 
     assert_eq!(probe.attempts().len(), 3);
     assert_eq!(probe.successes().len(), 1);
-    assert_eq!(result.final_state, telltale_runtime::InterpreterState::Completed);
+    assert_eq!(
+        result.final_state,
+        telltale_runtime::InterpreterState::Completed
+    );
 }
 
 #[tokio::test]
@@ -203,8 +202,11 @@ async fn middleware_order_keeps_metrics_semantics_explicit_and_deterministic() {
 #[tokio::test]
 async fn seeded_fault_injection_replays_the_same_failure_schedule() {
     async fn schedule(seed: u64) -> Vec<bool> {
-        let mut handler =
-            FaultInjection::with_seed(ScriptedSendHandler::new(std::iter::repeat(Ok(())).take(8)), 0.5, seed);
+        let mut handler = FaultInjection::with_seed(
+            ScriptedSendHandler::new(std::iter::repeat(Ok(())).take(8)),
+            0.5,
+            seed,
+        );
         let mut outcomes = Vec::new();
         for _ in 0..6 {
             let result = handler
@@ -219,6 +221,12 @@ async fn seeded_fault_injection_replays_the_same_failure_schedule() {
     let second = schedule(42).await;
     let third = schedule(43).await;
 
-    assert_eq!(first, second, "same seed must replay the same injected failures");
-    assert_ne!(first, third, "different seeds should produce a different schedule");
+    assert_eq!(
+        first, second,
+        "same seed must replay the same injected failures"
+    );
+    assert_ne!(
+        first, third,
+        "different seeds should produce a different schedule"
+    );
 }

@@ -8,8 +8,8 @@ use std::any::{Any, TypeId};
 use std::sync::{Arc, Mutex};
 use telltale_language::extensions::timeout::{TimeoutGrammarExtension, TimeoutStatementParser};
 use telltale_runtime::effects::*;
-use telltale_runtime::{parse_and_generate_with_extensions, ExtensionParserBuilder};
 use telltale_runtime::RoleName;
+use telltale_runtime::{parse_and_generate_with_extensions, ExtensionParserBuilder};
 
 // Simple test extension
 #[derive(Clone, Debug)]

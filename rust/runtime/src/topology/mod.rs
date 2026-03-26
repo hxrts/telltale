@@ -242,9 +242,9 @@ impl Topology {
         let resolved = match self.get_location(role) {
             Ok(Location::Colocated(peer)) => self.resolved_location(&peer, visiting),
             Ok(location) => Ok(location),
-            Err(TopologyError::UnknownRole(missing)) => {
-                Err(format!("role {role} refers to unknown colocated peer {missing}"))
-            }
+            Err(TopologyError::UnknownRole(missing)) => Err(format!(
+                "role {role} refers to unknown colocated peer {missing}"
+            )),
         };
 
         visiting.remove(role);
@@ -266,13 +266,14 @@ impl Topology {
                 reason,
             )),
         };
-        let resolve_expected = |location: &Location| match self.resolve_constraint_location(location) {
-            Ok(location) => Ok(location),
-            Err(reason) => Err(TopologyValidation::ConstraintViolation(
-                constraint.clone(),
-                reason,
-            )),
-        };
+        let resolve_expected =
+            |location: &Location| match self.resolve_constraint_location(location) {
+                Ok(location) => Ok(location),
+                Err(reason) => Err(TopologyValidation::ConstraintViolation(
+                    constraint.clone(),
+                    reason,
+                )),
+            };
 
         match constraint {
             TopologyConstraint::Colocated(left, right) => {
@@ -846,7 +847,10 @@ mod tests {
             .separated(RoleName::from_static("Alice"), RoleName::from_static("Bob"))
             .build();
         match separated.validate(&roles) {
-            TopologyValidation::ConstraintViolation(TopologyConstraint::Separated(left, right), _) => {
+            TopologyValidation::ConstraintViolation(
+                TopologyConstraint::Separated(left, right),
+                _,
+            ) => {
                 assert_eq!(left, RoleName::from_static("Alice"));
                 assert_eq!(right, RoleName::from_static("Bob"));
             }
@@ -859,7 +863,10 @@ mod tests {
                 TopologyEndpoint::new("localhost:9000").unwrap(),
             )
             .local_role(RoleName::from_static("Bob"))
-            .pinned(RoleName::from_static("Bob"), Location::Remote(TopologyEndpoint::new("localhost:9001").unwrap()))
+            .pinned(
+                RoleName::from_static("Bob"),
+                Location::Remote(TopologyEndpoint::new("localhost:9001").unwrap()),
+            )
             .build();
         match pinned.validate(&roles) {
             TopologyValidation::ConstraintViolation(TopologyConstraint::Pinned(role, _), _) => {
@@ -872,10 +879,7 @@ mod tests {
     #[test]
     fn test_colocated_roles_require_known_peers() {
         let topology = Topology::builder()
-            .colocated_role(
-                RoleName::from_static("Bob"),
-                RoleName::from_static("Carol"),
-            )
+            .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Carol"))
             .build();
         let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
         match topology.validate(&roles) {

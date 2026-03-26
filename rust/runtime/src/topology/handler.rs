@@ -142,9 +142,7 @@ impl TopologyHandler {
             let mut registry = shared_local_registry()
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner());
-            let entry = registry
-                .entry(self.topology_signature.clone())
-                .or_default();
+            let entry = registry.entry(self.topology_signature.clone()).or_default();
 
             let local = entry
                 .transports

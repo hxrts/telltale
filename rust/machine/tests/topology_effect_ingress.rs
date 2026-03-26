@@ -209,7 +209,9 @@ fn cooperative_vm_canonicalizes_unsorted_topology_events_by_ordering_key() {
     machine
         .load_choreography(&image)
         .expect("load cooperative image");
-    machine.step_round(&handler, 1).expect("cooperative step round");
+    machine
+        .step_round(&handler, 1)
+        .expect("cooperative step round");
 
     let actual: Vec<_> = machine
         .effect_trace()
