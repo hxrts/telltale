@@ -1,67 +1,86 @@
 //! Integration tests for Lean projection export via `telltale_validator`.
 //!
-//! These tests invoke the validator export mode via `LeanRunner::project` and
-//! verify the projected local types match expectations.
+//! These tests exercise the real validator binary rather than only local
+//! projection logic. In strict CI lanes they must fail closed if the validator
+//! is unavailable.
 
+#![allow(clippy::expect_used)]
+
+use serde_json::json;
 use telltale_bridge::export::global_to_json;
 use telltale_bridge::import::json_to_local;
-use telltale_bridge::runner::LeanRunner;
+use telltale_bridge::{LeanRunner, LeanRunnerError};
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
-/// Skip test if the validator binary is not available.
-fn projection_runner_if_available() -> Option<LeanRunner> {
-    if !LeanRunner::is_projection_available() {
-        eprintln!(
-            "SKIP: telltale_validator not found, run `cd lean && lake build telltale_validator`"
-        );
-        return None;
+const STRICT_ENV: &str = "TELLTALE_REQUIRE_LEAN_VALIDATOR";
+
+fn strict_projection_required() -> bool {
+    std::env::var(STRICT_ENV)
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
+fn projection_runner() -> Option<LeanRunner> {
+    match LeanRunner::for_projection() {
+        Ok(runner) => Some(runner),
+        Err(LeanRunnerError::BinaryNotFound(_)) => {
+            assert!(
+                !strict_projection_required(),
+                "strict projection verification is enabled but telltale_validator is unavailable"
+            );
+            eprintln!(
+                "SKIPPED: telltale_validator not found, run `cd lean && lake build telltale_validator`"
+            );
+            None
+        }
+        Err(err) => panic!("failed to initialize Lean projection runner: {err}"),
     }
-    Some(LeanRunner::for_projection().expect("validator should be available"))
+}
+
+fn assert_send_projection(
+    projections: &std::collections::HashMap<String, serde_json::Value>,
+    role: &str,
+    partner: &str,
+) {
+    let local = json_to_local(&projections[role]).expect("parse send projection");
+    assert!(
+        matches!(&local, LocalTypeR::Send { partner: actual, .. } if actual == partner),
+        "{role} should project to Send({partner}), got {local:?}"
+    );
+}
+
+fn assert_recv_projection(
+    projections: &std::collections::HashMap<String, serde_json::Value>,
+    role: &str,
+    partner: &str,
+) {
+    let local = json_to_local(&projections[role]).expect("parse recv projection");
+    assert!(
+        matches!(&local, LocalTypeR::Recv { partner: actual, .. } if actual == partner),
+        "{role} should project to Recv({partner}), got {local:?}"
+    );
 }
 
 #[test]
-fn test_simple_two_role_projection() {
-    let Some(runner) = projection_runner_if_available() else {
+fn test_projection_corpus() {
+    let Some(runner) = projection_runner() else {
         return;
     };
 
-    // A -> B: position(real). end
-    let g = GlobalType::send(
+    let simple = GlobalType::send(
         "A",
         "B",
         Label::with_sort("position", PayloadSort::Real),
         GlobalType::End,
     );
+    let simple_roles = vec!["A".to_string(), "B".to_string()];
+    let simple_projections = runner
+        .project(&global_to_json(&simple), &simple_roles)
+        .expect("simple projection should succeed");
+    assert_send_projection(&simple_projections, "A", "B");
+    assert_recv_projection(&simple_projections, "B", "A");
 
-    let json = global_to_json(&g);
-    let roles = vec!["A".to_string(), "B".to_string()];
-    let projections = runner
-        .project(&json, &roles)
-        .expect("projection should succeed");
-
-    // A should see send
-    let a_local = json_to_local(&projections["A"]).expect("parse A local type");
-    assert!(
-        matches!(&a_local, LocalTypeR::Send { partner, .. } if partner == "B"),
-        "A should send to B"
-    );
-
-    // B should see recv
-    let b_local = json_to_local(&projections["B"]).expect("parse B local type");
-    assert!(
-        matches!(&b_local, LocalTypeR::Recv { partner, .. } if partner == "A"),
-        "B should recv from A"
-    );
-}
-
-#[test]
-fn test_recursive_protocol_projection() {
-    let Some(runner) = projection_runner_if_available() else {
-        return;
-    };
-
-    // mu step. A -> B: position(vector 2). B -> A: force(vector 2). var step
-    let g = GlobalType::mu(
+    let recursive = GlobalType::mu(
         "step",
         GlobalType::send(
             "A",
@@ -75,36 +94,22 @@ fn test_recursive_protocol_projection() {
             ),
         ),
     );
-
-    let json = global_to_json(&g);
-    let roles = vec!["A".to_string(), "B".to_string()];
-    let projections = runner
-        .project(&json, &roles)
-        .expect("projection should succeed");
-
-    // A: mu step. send B position. recv B force. var step
-    let a_local = json_to_local(&projections["A"]).expect("parse A local type");
+    let recursive_roles = vec!["A".to_string(), "B".to_string()];
+    let recursive_projections = runner
+        .project(&global_to_json(&recursive), &recursive_roles)
+        .expect("recursive projection should succeed");
+    let a_local = json_to_local(&recursive_projections["A"]).expect("parse A recursive local type");
+    let b_local = json_to_local(&recursive_projections["B"]).expect("parse B recursive local type");
     assert!(
         matches!(&a_local, LocalTypeR::Mu { var, .. } if var == "step"),
-        "A should have recursive type"
+        "A should project to a recursive local type, got {a_local:?}"
     );
-
-    // B: mu step. recv A position. send A force. var step
-    let b_local = json_to_local(&projections["B"]).expect("parse B local type");
     assert!(
         matches!(&b_local, LocalTypeR::Mu { var, .. } if var == "step"),
-        "B should have recursive type"
+        "B should project to a recursive local type, got {b_local:?}"
     );
-}
 
-#[test]
-fn test_choice_projection_three_roles() {
-    let Some(runner) = projection_runner_if_available() else {
-        return;
-    };
-
-    // A -> B: { yes: B -> C: notify. end, no: B -> C: abort. end }
-    let g = GlobalType::comm(
+    let three_party_choice = GlobalType::comm(
         "A",
         "B",
         vec![
@@ -128,27 +133,59 @@ fn test_choice_projection_three_roles() {
             ),
         ],
     );
+    let three_party_roles = vec!["A".to_string(), "B".to_string(), "C".to_string()];
+    let choice_projections = runner
+        .project(&global_to_json(&three_party_choice), &three_party_roles)
+        .expect("three-party choice projection should succeed");
+    assert_send_projection(&choice_projections, "A", "B");
+    assert_recv_projection(&choice_projections, "B", "A");
+    assert_recv_projection(&choice_projections, "C", "B");
+}
 
-    let json = global_to_json(&g);
-    let roles = vec!["A".to_string(), "B".to_string(), "C".to_string()];
-    let projections = runner
-        .project(&json, &roles)
-        .expect("projection should succeed");
+#[test]
+fn test_projection_reports_missing_requested_role_deterministically() {
+    let Some(runner) = projection_runner() else {
+        return;
+    };
 
-    let a_local = json_to_local(&projections["A"]).expect("parse A local type");
-    let b_local = json_to_local(&projections["B"]).expect("parse B local type");
-    let c_local = json_to_local(&projections["C"]).expect("parse C local type");
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let error = runner
+        .project(&global_to_json(&global), &["Missing".to_string()])
+        .expect_err("requesting a missing role should fail");
 
-    assert!(
-        matches!(&a_local, LocalTypeR::Send { partner, .. } if partner == "B"),
-        "A should send the choice to B"
-    );
-    assert!(
-        matches!(&b_local, LocalTypeR::Recv { partner, .. } if partner == "A"),
-        "B should receive the choice from A"
-    );
-    assert!(
-        matches!(&c_local, LocalTypeR::Recv { partner, .. } if partner == "B"),
-        "C should receive B's follow-up branch message"
-    );
+    match error {
+        LeanRunnerError::ParseError(message) => {
+            assert!(
+                message.contains("missing projection for role Missing"),
+                "expected missing-role diagnostic, got: {message}"
+            );
+        }
+        other => panic!("expected parse error for missing role, got: {other}"),
+    }
+}
+
+#[test]
+fn test_projection_rejects_malformed_payload_with_diagnostic() {
+    let Some(runner) = projection_runner() else {
+        return;
+    };
+
+    let malformed = json!({
+        "kind": "bogus_global_type",
+        "branches": []
+    });
+    let error = runner
+        .project(&malformed, &["A".to_string()])
+        .expect_err("malformed global payload should fail");
+
+    match error {
+        LeanRunnerError::ParseError(message) => {
+            assert!(
+                !message.trim().is_empty(),
+                "expected a non-empty validator diagnostic"
+            );
+        }
+        LeanRunnerError::ProcessFailed { .. } => {}
+        other => panic!("expected diagnostic-bearing projection failure, got: {other}"),
+    }
 }

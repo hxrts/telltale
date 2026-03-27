@@ -44,12 +44,15 @@ cross_mode_semantic_parity_suites=(
 fail_closed_lowering_admission_suites=(
   rust/language/src/compiler/parser/mod.rs
   rust/runtime/tests/authority_compile_fail.rs
+  rust/runtime/tests/authority_control_flow_corpus.rs
   rust/machine/src/runtime_contracts.rs
   rust/machine/src/composition.rs
 )
 
 structure_reconfiguration_suites=(
   rust/machine/src/engine/runtime_exec/semantic_state.rs
+  rust/machine/tests/ownership_contracts.rs
+  rust/runtime/tests/generated_topology_public_path.rs
 )
 
 semantic_lifecycle_invariant_suites=(
@@ -110,9 +113,15 @@ generated_topology_transport_public_path_suites=(
   rust/runtime/tests/generated_topology_public_path.rs
 )
 
+runtime_substrate_boundary_suites=(
+  rust/runtime/tests/runtime_substrate_contracts.rs
+  rust/runtime/tests/wasm_compat.rs
+)
+
 explicit_unsupported_fail_closed_notes=(
   extension_statement_runtime_dispatch
   topology_region_constraint_execution
+  distributed_reconfiguration_schema_only
   remote_transport_realization
 )
 
@@ -245,6 +254,7 @@ actual_distributed_topology_semantic_harness_suites=$(count_list "${distributed_
 actual_agreement_composition_runtime_semantic_suites=$(count_list "${agreement_composition_runtime_semantic_suites[@]}")
 actual_extension_middleware_semantic_hardening_suites=$(count_list "${extension_middleware_semantic_hardening_suites[@]}")
 actual_generated_topology_transport_public_path_suites=$(count_list "${generated_topology_transport_public_path_suites[@]}")
+actual_runtime_substrate_boundary_suites=$(count_list "${runtime_substrate_boundary_suites[@]}")
 actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupported_fail_closed_notes[@]}")
 
 actual_executable_property_buckets=$(
@@ -260,9 +270,10 @@ actual_executable_property_buckets=$(
     bucket_has_coverage "$actual_agreement_composition_runtime_semantic_suites"
     bucket_has_coverage "$actual_extension_middleware_semantic_hardening_suites"
     bucket_has_coverage "$actual_generated_topology_transport_public_path_suites"
+    bucket_has_coverage "$actual_runtime_substrate_boundary_suites"
   ) | awk '{sum += $1} END {print sum + 0}'
 )
-actual_lacking_property_buckets=$((11 - actual_executable_property_buckets))
+actual_lacking_property_buckets=$((12 - actual_executable_property_buckets))
 
 check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
 check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
@@ -281,6 +292,7 @@ check_metric "Distributed and topology semantic harness suites" "$actual_distrib
 check_metric "Agreement and composition runtime semantic suites" "$actual_agreement_composition_runtime_semantic_suites"
 check_metric "Extension and middleware semantic hardening suites" "$actual_extension_middleware_semantic_hardening_suites"
 check_metric "Generated topology and transport public-path suites" "$actual_generated_topology_transport_public_path_suites"
+check_metric "Runtime substrate boundary assurance suites" "$actual_runtime_substrate_boundary_suites"
 check_metric "Explicit unsupported or fail-closed property notes" "$actual_explicit_unsupported_fail_closed_notes"
 
 # ── Report ────────────────────────────────────────────────────────────

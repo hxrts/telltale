@@ -66,7 +66,9 @@ ci-dry-run lane="fast":
     just check-lean-metrics
     just check-tooling-convergence
     just check-lean-prebuilt
+    just check-lean-bridge-strict
     just check-semantic-assurance
+    just check-runtime-boundaries
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -191,6 +193,10 @@ check-lean-dependency-pins:
 check-lean-prebuilt:
     ./scripts/bootstrap/ensure-lean-prebuilt.sh
 
+# Build required Lean bridge binaries and fail closed if strict bridge suites would otherwise skip.
+check-lean-bridge-strict:
+    ./scripts/check/lean-bridge-strict.sh
+
 # Consolidated capability gate checks (byzantine, delegation, envelope, failure, contracts, speculation)
 check-capability-gates:
     ./scripts/check/capability-gates.sh --all
@@ -268,6 +274,13 @@ check-semantic-assurance:
     cargo test -p telltale-simulator --test harness_contracts -- --nocapture
     cargo test -p telltale-bridge --test protocol_machine_cross_target_tests -- --nocapture
     cargo test --test dsl_runtime_semantics_tests -- --nocapture
+
+# Run targeted boundary suites that prove fail-closed language, topology, and runtime substrate behavior.
+check-runtime-boundaries:
+    cargo test -p telltale-runtime --test authority_control_flow_corpus -- --nocapture
+    cargo test -p telltale-bridge --test protocol_bundle_admission_contracts -- --nocapture
+    cargo test -p telltale-runtime --test runtime_substrate_contracts -- --nocapture
+    cargo test -p telltale-runtime --test generated_topology_public_path -- generated_topology_public_path_executes_end_to_end_in_a_temp_crate --exact --nocapture
 
 # Keep proc-macro UI boundary contracts under targeted trybuild coverage.
 check-macro-boundaries:

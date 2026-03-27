@@ -1,0 +1,6 @@
+protocol TransferFlow =
+  roles Coordinator, Worker
+  let receipt = transfer Session from Coordinator to Worker
+  rec Retry
+    handoff acceptInvite to Worker with receipt
+    continue Retry

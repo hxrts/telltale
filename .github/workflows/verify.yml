@@ -67,10 +67,20 @@ jobs:
           mkdir -p artifacts
           just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
 
+      - name: Run strict Lean bridge verification lane
+        run: |
+          mkdir -p artifacts
+          just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
+
       - name: Run semantic assurance suites
         run: |
           mkdir -p artifacts
           just check-semantic-assurance | tee artifacts/check-semantic-assurance.log
+
+      - name: Run runtime boundary suites
+        run: |
+          mkdir -p artifacts
+          just check-runtime-boundaries | tee artifacts/check-runtime-boundaries.log
 
       - name: Run Lean architecture/style checks
         run: |
@@ -192,10 +202,20 @@ jobs:
           mkdir -p artifacts
           just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
 
+      - name: Run strict Lean bridge verification lane
+        run: |
+          mkdir -p artifacts
+          just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
+
       - name: Run semantic assurance suites
         run: |
           mkdir -p artifacts
           just check-semantic-assurance | tee artifacts/check-semantic-assurance.log
+
+      - name: Run runtime boundary suites
+        run: |
+          mkdir -p artifacts
+          just check-runtime-boundaries | tee artifacts/check-runtime-boundaries.log
 
       - name: Run Lean architecture/style checks
         run: |

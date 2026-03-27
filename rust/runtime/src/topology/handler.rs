@@ -327,7 +327,6 @@ impl TopologyHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TopologyBuilder;
 
     #[test]
     fn test_topology_handler_creation() {

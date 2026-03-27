@@ -200,7 +200,10 @@ let transport_type = TransportFactory::transport_for_location(
 assert!(matches!(transport_type, TransportType::Tcp));
 ```
 
-`TransportFactory::create` currently returns an `InMemoryChannelTransport` for all modes. The `TransportType` value signals intent but remote transports are placeholders.
+`TransportFactory::create` now fails closed for remote, per-role, Kubernetes,
+and Consul transport realization until real backends exist. The
+`TransportType` value still signals intent, and `TopologyHandler` remains the
+deterministic local simulation path used in tests and examples.
 
 ## Lean Correspondence
 

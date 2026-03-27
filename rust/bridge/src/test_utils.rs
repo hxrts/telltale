@@ -8,6 +8,9 @@ use crate::runner::LeanRunner;
 /// Path to the Lean validator binary (relative to workspace root).
 pub const LEAN_BINARY_PATH: &str = "lean/.lake/build/bin/telltale_validator";
 
+/// Environment variable enabling strict fail-closed validator requirements.
+pub const STRICT_LEAN_VALIDATOR_ENV: &str = "TELLTALE_REQUIRE_LEAN_VALIDATOR";
+
 /// Skip message displayed when Lean binary is unavailable.
 pub const LEAN_SKIP_MESSAGE: &str =
     "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable.";
@@ -16,6 +19,14 @@ pub const LEAN_SKIP_MESSAGE: &str =
 #[must_use]
 pub fn lean_available() -> bool {
     LeanRunner::is_available()
+}
+
+/// Whether validator-backed tests must fail closed instead of skipping.
+#[must_use]
+pub fn strict_lean_validator_required() -> bool {
+    std::env::var(STRICT_LEAN_VALIDATOR_ENV)
+        .map(|value| value != "0")
+        .unwrap_or(false)
 }
 
 /// Macro for conditionally skipping tests that require the Lean binary.
@@ -36,6 +47,9 @@ pub fn lean_available() -> bool {
 macro_rules! skip_without_lean {
     () => {
         if !$crate::test_utils::lean_available() {
+            if $crate::test_utils::strict_lean_validator_required() {
+                $crate::LeanRunner::require_available();
+            }
             eprintln!("{}", $crate::test_utils::LEAN_SKIP_MESSAGE);
             return;
         }

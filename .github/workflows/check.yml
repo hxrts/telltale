@@ -43,8 +43,12 @@ jobs:
         run: just check-tooling-convergence
       - name: Check Lean prebuilt artifacts
         run: just check-lean-prebuilt
+      - name: Run strict Lean bridge verification lane
+        run: just check-lean-bridge-strict
       - name: Run semantic assurance suites
         run: just check-semantic-assurance
+      - name: Run runtime boundary suites
+        run: just check-runtime-boundaries
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:

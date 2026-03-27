@@ -327,6 +327,39 @@ impl ProtocolMachineRunner {
         Self::new().ok()
     }
 
+    /// Check if the protocol-machine runner binary is available at the default path.
+    #[must_use]
+    pub fn is_available() -> bool {
+        Self::get_binary_path().is_some()
+    }
+
+    /// Require that the protocol-machine runner binary is available.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the binary is not available.
+    pub fn require_available() {
+        if !Self::is_available() {
+            panic!(
+                "\n\
+                ╔══════════════════════════════════════════════════════════════════╗\n\
+                ║  LEAN PROTOCOL-MACHINE RUNNER REQUIRED                          ║\n\
+                ╠══════════════════════════════════════════════════════════════════╣\n\
+                ║  The Lean protocol-machine runner is required but not found.    ║\n\
+                ║                                                                  ║\n\
+                ║  To build Lean runners:                                          ║\n\
+                ║    cd lean && lake build protocol_machine_runner                 ║\n\
+                ║                                                                  ║\n\
+                ║  Or with Nix:                                                    ║\n\
+                ║    nix develop --command bash -c \"cd lean && lake build protocol_machine_runner\" ║\n\
+                ║                                                                  ║\n\
+                ║  Expected path: {path}          \n\
+                ╚══════════════════════════════════════════════════════════════════╝\n",
+                path = Self::DEFAULT_BINARY_PATH
+            );
+        }
+    }
+
     /// Run the protocol-machine runner and return the parsed output.
     ///
     /// # Errors

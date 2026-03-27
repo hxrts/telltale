@@ -1,0 +1,16 @@
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
+
+protocol ParallelObservationalBinding uses Runtime =
+  roles Coordinator, Worker, Auditor
+  observe let presence = observe Runtime.watchPresence(session)
+  par
+    | Coordinator -> Worker : Seen(presence)
+    | Coordinator -> Auditor : Audit(presence)

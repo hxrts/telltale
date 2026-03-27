@@ -1,0 +1,8 @@
+protocol TransferFlow =
+  roles Coordinator, Worker
+  let receipt = transfer Session from Coordinator to Worker
+  call UseReceipt
+  Coordinator -> Worker : Audit
+where
+  protocol UseReceipt =
+    handoff acceptInvite to Worker with receipt

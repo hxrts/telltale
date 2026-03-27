@@ -231,9 +231,17 @@ pub fn parse_choreography_str_with_extensions(
                             }
                         }
 
+                        validate_linear_vm_assets(&body_statements, &layout)?;
+                        validate_authority_surface(&body_statements, &layout)?;
+
+                        let mut local_protocols: Vec<_> = protocol_defs.iter().collect();
+                        local_protocols.sort_by(|(lhs, _), (rhs, _)| lhs.cmp(rhs));
+                        for (_, local_statements) in local_protocols {
+                            validate_linear_vm_assets(local_statements, &layout)?;
+                            validate_authority_surface(local_statements, &layout)?;
+                        }
+
                         statements = inline_calls(&body_statements, &protocol_defs, &layout)?;
-                        validate_linear_vm_assets(&statements, &layout)?;
-                        validate_authority_surface(&statements, &layout)?;
                     }
                     _ => {}
                 }

@@ -1,0 +1,18 @@
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
+
+protocol ChoiceObservationalBinding uses Runtime =
+  roles Coordinator, Worker
+  observe let presence = observe Runtime.watchPresence(session)
+  choice Coordinator at
+    | Continue =>
+        Coordinator -> Worker : Seen(presence)
+    | Retry =>
+        Coordinator -> Worker : Retry(presence)

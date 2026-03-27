@@ -20,6 +20,26 @@ use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, StepResult};
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
+fn protocol_machine_runner() -> Option<ProtocolMachineRunner> {
+    match ProtocolMachineRunner::try_new() {
+        Some(runner) => Some(runner),
+        None => {
+            assert!(
+                !strict_protocol_machine_runner_required(),
+                "strict protocol-machine runner verification is enabled but the Lean runner is unavailable"
+            );
+            eprintln!("SKIPPED: Lean protocol-machine runner not available");
+            None
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
 
@@ -452,8 +472,7 @@ fn assert_step_indexed_equivalence(
 
 #[test]
 fn tier1_step_indexed_correspondence() {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+    let Some(runner) = protocol_machine_runner() else {
         return;
     };
 
@@ -469,8 +488,7 @@ fn tier1_step_indexed_correspondence() {
 
 #[test]
 fn tier2_step_indexed_correspondence() {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+    let Some(runner) = protocol_machine_runner() else {
         return;
     };
 

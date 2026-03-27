@@ -1,0 +1,17 @@
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
+
+protocol ObservationalCallWithCheck uses Runtime =
+  roles Coordinator, Worker
+  call AuthoritativePath
+where
+  protocol AuthoritativePath =
+    authoritative let presence = check Runtime.watchPresence(session)
+    Coordinator -> Worker : Seen(presence)

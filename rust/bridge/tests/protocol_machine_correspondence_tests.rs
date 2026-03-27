@@ -17,6 +17,26 @@ use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
+fn protocol_machine_runner() -> Option<ProtocolMachineRunner> {
+    match ProtocolMachineRunner::try_new() {
+        Some(runner) => Some(runner),
+        None => {
+            assert!(
+                !strict_protocol_machine_runner_required(),
+                "strict protocol-machine runner verification is enabled but the Lean runner is unavailable"
+            );
+            eprintln!("SKIPPED: Lean protocol-machine runner not available");
+            None
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 enum ProtocolMachineCorrespondenceError {
     #[error("machine load failed: {0}")]
@@ -289,8 +309,7 @@ fn test_protocol_machine_semantic_audit_correspondence_ping_pong() {
     let fixture = test_choreographies::ping_pong();
     let rust_output = run_rust_vm(&fixture, 200).expect("run rust ProtocolMachine");
 
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+    let Some(runner) = protocol_machine_runner() else {
         return;
     };
     let choreography = fixture_to_choreography_json(&fixture);
@@ -316,8 +335,7 @@ fn test_protocol_machine_semantic_audit_correspondence_all_tier1() {
         test_choreographies::chain(),
     ];
 
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+    let Some(runner) = protocol_machine_runner() else {
         return;
     };
 
@@ -351,8 +369,7 @@ fn test_protocol_machine_semantic_audit_correspondence_tier2_to_tier4() {
         test_choreographies::tier4_classical::queue_observer(),
     ];
 
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+    let Some(runner) = protocol_machine_runner() else {
         return;
     };
 

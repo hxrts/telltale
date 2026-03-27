@@ -30,10 +30,15 @@ fn validate_linear_choice_branches(
         let out = validate_linear_block(&branch.statements, live_assets, input)?;
         if let Some(prev) = &merged {
             if prev != &out {
-                return Err(linear_usage_error(
-                    input,
-                    "linear assets diverge across choice branches",
-                ));
+                let mut differing_assets: Vec<_> =
+                    prev.symmetric_difference(&out).cloned().collect();
+                differing_assets.sort();
+                let message = if let [asset] = differing_assets.as_slice() {
+                    format!("linear binding '{asset}' diverges across choice branches")
+                } else {
+                    "linear assets diverge across choice branches".to_string()
+                };
+                return Err(linear_usage_error(input, message));
             }
         } else {
             merged = Some(out);
@@ -58,6 +63,7 @@ fn validate_linear_block(
             Statement::Let {
                 name, expr, body, ..
             } => {
+                consume_live_assets_in_expr(expr, &mut live_assets);
                 if matches!(expr, super::types::AuthorityExprSpec::Transfer { .. })
                     && !live_assets.insert(name.clone())
                 {
@@ -157,7 +163,7 @@ fn validate_linear_block(
             | Statement::Handoff { .. }
             | Statement::DependentWork { .. }
             | Statement::Continue { .. }
-            | Statement::Call { .. } => {}
+            | Statement::Call { .. } => consume_live_assets(statement, &mut live_assets),
         }
     }
 
@@ -387,9 +393,17 @@ fn statement_binding_usage_diverges(statement: &Statement, name: &str) -> bool {
                     binding_usage_diverges_across_choice_branches(branch, name)
                 })
         }
-        Statement::Case { branches, .. } => branches
-            .iter()
-            .any(|branch| binding_usage_diverges_across_choice_branches(&branch.statements, name)),
+        Statement::Case { branches, .. } => {
+            branches
+                .iter()
+                .map(|branch| count_binding_uses(&branch.statements, name))
+                .collect::<Vec<_>>()
+                .windows(2)
+                .any(|window| window[0] != window[1])
+                || branches.iter().any(|branch| {
+                    binding_usage_diverges_across_choice_branches(&branch.statements, name)
+                })
+        }
         Statement::Let { body, .. } => body
             .as_deref()
             .is_some_and(|body| binding_usage_diverges_across_choice_branches(body, name)),
@@ -504,6 +518,31 @@ fn count_expr_uses(expr: &super::types::AuthorityExprSpec, name: &str) -> usize 
         super::types::AuthorityExprSpec::Constructor { arg, .. } => arg
             .as_ref()
             .map_or(0, |value| value.split(name).count().saturating_sub(1)),
+    }
+}
+
+fn consume_live_assets(statement: &Statement, live_assets: &mut HashSet<String>) {
+    let consumed: Vec<String> = live_assets
+        .iter()
+        .filter(|name| count_statement_uses(statement, name) > 0)
+        .cloned()
+        .collect();
+    for asset in consumed {
+        live_assets.remove(&asset);
+    }
+}
+
+fn consume_live_assets_in_expr(
+    expr: &super::types::AuthorityExprSpec,
+    live_assets: &mut HashSet<String>,
+) {
+    let consumed: Vec<String> = live_assets
+        .iter()
+        .filter(|name| count_expr_uses(expr, name) > 0)
+        .cloned()
+        .collect();
+    for asset in consumed {
+        live_assets.remove(&asset);
     }
 }
 

@@ -336,7 +336,12 @@ impl Topology {
                     ))
                 }
             }
-            TopologyConstraint::Region(_, _) => None,
+            TopologyConstraint::Region(role, region) => {
+                Some(TopologyValidation::ConstraintViolation(
+                    constraint.clone(),
+                    format!("region constraint for role {role} in {region} is not yet executable"),
+                ))
+            }
         }
     }
 
@@ -875,6 +880,26 @@ mod tests {
                 assert_eq!(role, RoleName::from_static("Bob"));
             }
             other => panic!("Expected pinned placement violation, got {other:?}"),
+        }
+
+        let region = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .region(
+                RoleName::from_static("Alice"),
+                Region::new("membership").expect("region"),
+            )
+            .build();
+        match region.validate(&roles) {
+            TopologyValidation::ConstraintViolation(
+                TopologyConstraint::Region(role, region),
+                msg,
+            ) => {
+                assert_eq!(role, RoleName::from_static("Alice"));
+                assert_eq!(region, Region::new("membership").unwrap());
+                assert!(msg.contains("not yet executable"));
+            }
+            other => panic!("Expected region constraint fail-closed violation, got {other:?}"),
         }
     }
 

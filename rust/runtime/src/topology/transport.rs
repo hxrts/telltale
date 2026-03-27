@@ -212,22 +212,21 @@ pub struct TransportFactory;
 
 impl TransportFactory {
     /// Create a transport for a role based on the topology.
-    pub fn create(topology: &Topology, role: &RoleName) -> Box<dyn Transport> {
+    pub fn create(topology: &Topology, role: &RoleName) -> TransportResult<Box<dyn Transport>> {
         match &topology.mode {
+            Some(TopologyMode::PerRole) => Err(TransportError::NotReady),
+            Some(TopologyMode::Kubernetes(_namespace)) => Err(TransportError::NotReady),
+            Some(TopologyMode::Consul(_datacenter)) => Err(TransportError::NotReady),
             Some(TopologyMode::Local) | None => {
-                Box::new(InMemoryChannelTransport::new(role.clone()))
-            }
-            Some(TopologyMode::PerRole) => {
-                // PerRole mode falls back to in-memory (TCP transport unsupported)
-                Box::new(InMemoryChannelTransport::new(role.clone()))
-            }
-            Some(TopologyMode::Kubernetes(_namespace)) => {
-                // Kubernetes mode falls back to in-memory (K8s discovery unsupported)
-                Box::new(InMemoryChannelTransport::new(role.clone()))
-            }
-            Some(TopologyMode::Consul(_datacenter)) => {
-                // Consul mode falls back to in-memory (Consul discovery unsupported)
-                Box::new(InMemoryChannelTransport::new(role.clone()))
+                let has_remote_participants = topology
+                    .locations
+                    .values()
+                    .any(|location| matches!(location, Location::Remote(_)));
+                if has_remote_participants {
+                    Err(TransportError::NotReady)
+                } else {
+                    Ok(Box::new(InMemoryChannelTransport::new(role.clone())))
+                }
             }
         }
     }
@@ -346,5 +345,36 @@ mod tests {
         assert!(TransportType::SharedMemory.is_local());
         assert!(!TransportType::Tcp.is_local());
         assert!(!TransportType::WebSocket.is_local());
+    }
+
+    #[test]
+    fn test_transport_factory_create_fails_closed_for_remote_or_managed_topologies() {
+        let local_topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .build();
+        assert!(TransportFactory::create(&local_topology, &RoleName::from_static("Alice")).is_ok());
+
+        let remote_topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .remote_role(
+                RoleName::from_static("Bob"),
+                crate::identifiers::Endpoint::new("localhost:8080").unwrap(),
+            )
+            .build();
+        assert!(matches!(
+            TransportFactory::create(&remote_topology, &RoleName::from_static("Alice")),
+            Err(TransportError::NotReady)
+        ));
+
+        let per_role_topology = Topology::builder()
+            .mode(TopologyMode::PerRole)
+            .local_role(RoleName::from_static("Alice"))
+            .local_role(RoleName::from_static("Bob"))
+            .build();
+        assert!(matches!(
+            TransportFactory::create(&per_role_topology, &RoleName::from_static("Alice")),
+            Err(TransportError::NotReady)
+        ));
     }
 }
