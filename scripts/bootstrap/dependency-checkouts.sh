@@ -78,8 +78,9 @@ ensure_iris_build() {
       break
     fi
     if [[ "${attempts}" -lt "${max_attempts}" ]]; then
-      echo "warning: iris-lean build attempt ${attempts}/${max_attempts} failed; retrying in 5s"
-      sleep 5
+      echo "warning: iris-lean build attempt ${attempts}/${max_attempts} failed; cleaning packages and retrying in 10s"
+      rm -rf "${checkout}/.lake/packages"
+      sleep 10
     fi
   done
   if [[ "${ok}" -ne 1 ]]; then
@@ -125,14 +126,20 @@ for i in $(seq 0 $(( dep_count - 1 ))); do
   mkdir -p "$(dirname "${checkout}")"
 
   if [[ -d "${checkout}/.git" ]]; then
-    echo "sync ${name}: fetching pinned revision ${revision}"
+    actual="$(git -C "${checkout}" rev-parse HEAD 2>/dev/null || true)"
+    if [[ "${actual}" == "${revision}" ]]; then
+      echo "OK   ${name} already at pinned revision ${revision}"
+    else
+      echo "sync ${name}: fetching pinned revision ${revision}"
+      git -C "${checkout}" fetch --depth=1 origin "${revision}"
+      git -C "${checkout}" checkout --detach "${revision}"
+    fi
   else
     echo "clone ${name}: ${repo} -> ${checkout}"
     git clone --filter=blob:none "${repo}" "${checkout}"
+    git -C "${checkout}" fetch --depth=1 origin "${revision}"
+    git -C "${checkout}" checkout --detach "${revision}"
   fi
-
-  git -C "${checkout}" fetch --depth=1 origin "${revision}"
-  git -C "${checkout}" checkout --detach "${revision}"
 
   actual="$(git -C "${checkout}" rev-parse HEAD)"
   if [[ "${actual}" != "${revision}" ]]; then
