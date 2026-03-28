@@ -78,8 +78,7 @@ ensure_iris_build() {
       break
     fi
     if [[ "${attempts}" -lt "${max_attempts}" ]]; then
-      echo "warning: iris-lean build attempt ${attempts}/${max_attempts} failed; cleaning packages and retrying in 10s"
-      rm -rf "${checkout}/.lake/packages"
+      echo "warning: iris-lean build attempt ${attempts}/${max_attempts} failed; retrying in 10s"
       sleep 10
     fi
   done
