@@ -19,7 +19,7 @@ use crate::semantic_objects::{ProtocolMachineSemanticObjects, TickedObsEvent};
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
-use telltale_machine::EffectExchangeRecord;
+use telltale_machine::{EffectExchangeRecord, ReconfigurationEvent, ReconfigurationPolicy};
 
 #[path = "protocol_machine_runner_json_parsing.rs"]
 mod parsing;
@@ -216,6 +216,15 @@ pub struct InvariantVerificationResult {
     pub errors: Vec<LeanStructuredError>,
     #[serde(default)]
     pub artifacts: Value,
+}
+
+/// Result from Lean reconfiguration-transition validation entrypoint.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReconfigurationValidationResult {
+    pub valid: bool,
+    #[serde(default)]
+    pub errors: Vec<LeanStructuredError>,
+    pub event: Option<ReconfigurationEvent>,
 }
 
 /// Runner for invoking the Lean protocol-machine runner binary.
@@ -609,6 +618,41 @@ impl ProtocolMachineRunner {
             valid: parse_required_valid(&response, "verifyProtocolBundle")?,
             errors: parse_structured_errors(&response),
             artifacts: response.get("artifacts").cloned().unwrap_or(Value::Null),
+        })
+    }
+
+    /// Validate one deterministic reconfiguration transition against the Lean reference hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lean invocation fails or the returned event cannot be decoded.
+    pub fn validate_reconfiguration_transition(
+        &self,
+        artifact_id: &str,
+        policy: &ReconfigurationPolicy,
+        previous_members: &[String],
+        next_members: &[String],
+    ) -> Result<ReconfigurationValidationResult, ProtocolMachineRunnerError> {
+        let payload = serde_json::json!({
+            "artifact_id": artifact_id,
+            "policy": policy,
+            "previous_members": previous_members,
+            "next_members": next_members,
+        });
+        let response =
+            self.run_validation_operation("validateReconfigurationTransition", &payload)?;
+        let event = response
+            .get("artifacts")
+            .and_then(|artifacts| artifacts.get("event"))
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|err| ProtocolMachineRunnerError::ParseError(err.to_string()))?;
+
+        Ok(ReconfigurationValidationResult {
+            valid: parse_required_valid(&response, "validateReconfigurationTransition")?,
+            errors: parse_structured_errors(&response),
+            event,
         })
     }
 }

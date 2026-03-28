@@ -11,7 +11,6 @@ use telltale_bridge::{
 enum BundleVerificationOutcome {
     Verified(InvariantVerificationResult),
     MissingRunner,
-    UnsupportedOperation(String),
 }
 
 fn strict_protocol_bundle_verification_required() -> bool {
@@ -26,13 +25,6 @@ fn strict_protocol_machine_runner_required() -> bool {
         .unwrap_or(false)
 }
 
-fn unsupported_verify_protocol_bundle(stderr: &str) -> bool {
-    stderr.contains("verifyProtocolBundle")
-        || stderr.contains("unknown operation")
-        || stderr.contains("unsupported operation")
-        || stderr.contains("missing choreographies")
-}
-
 fn verify_bundle(
     bundle: &telltale_bridge::ProtocolBundle,
 ) -> Result<BundleVerificationOutcome, ProtocolMachineRunnerError> {
@@ -45,19 +37,9 @@ fn verify_bundle(
         return Ok(BundleVerificationOutcome::MissingRunner);
     };
 
-    match runner.verify_invariants(bundle) {
-        Ok(result) => Ok(BundleVerificationOutcome::Verified(result)),
-        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_verify_protocol_bundle(&stderr) =>
-        {
-            assert!(
-                !strict_protocol_bundle_verification_required(),
-                "strict protocol-bundle verification is enabled but verifyProtocolBundle is unsupported: {stderr}"
-            );
-            Ok(BundleVerificationOutcome::UnsupportedOperation(stderr))
-        }
-        Err(err) => Err(err),
-    }
+    runner
+        .verify_invariants(bundle)
+        .map(BundleVerificationOutcome::Verified)
 }
 
 fn verified_result_or_skip(
@@ -69,26 +51,24 @@ fn verified_result_or_skip(
             eprintln!("SKIPPED: Lean protocol-machine runner not available");
             None
         }
-        Ok(BundleVerificationOutcome::UnsupportedOperation(stderr)) => {
-            eprintln!(
-                "SKIPPED: Lean protocol-machine runner does not support verifyProtocolBundle yet: {stderr}"
-            );
-            None
-        }
         Err(err) => panic!("verify_invariants failed unexpectedly: {err}"),
     }
 }
 
 #[test]
 fn test_verify_protocol_bundle_classifies_expected_stderr_patterns() {
-    assert!(unsupported_verify_protocol_bundle(
-        "unsupported operation: verifyProtocolBundle"
-    ));
-    assert!(unsupported_verify_protocol_bundle(
-        "unknown operation verifyProtocolBundle"
-    ));
-    assert!(unsupported_verify_protocol_bundle("missing choreographies"));
-    assert!(!unsupported_verify_protocol_bundle("schema decode failed"));
+    let fixture = test_choreographies::tier3_distributed::simple_majority();
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+        return;
+    };
+    let result = runner
+        .verify_invariants(&fixture.to_bundle())
+        .expect("verifyProtocolBundle should execute");
+    assert!(
+        result.valid,
+        "supported verifyProtocolBundle path should accept the valid quorum fixture"
+    );
 }
 
 #[test]
@@ -108,12 +88,6 @@ fn test_verify_protocol_bundle_support_matrix_is_explicit() {
                 "strict protocol-machine runner verification is enabled but the runner is unavailable"
             );
             eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        }
-        BundleVerificationOutcome::UnsupportedOperation(stderr) => {
-            assert!(
-                unsupported_verify_protocol_bundle(&stderr),
-                "unsupported operation path should preserve the classifier diagnostic"
-            );
         }
     }
 }

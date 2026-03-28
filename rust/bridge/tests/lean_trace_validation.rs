@@ -3,10 +3,15 @@
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;
 
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+
 use telltale_bridge::{
     canonical_schema_version, global_to_json, ChoreographyJson, ProtocolMachineRunner,
     ProtocolMachineRunnerError, ProtocolMachineTraceEvent,
 };
+use telltale_language::ast::convert::{choreography_to_global, local_to_local_r};
+use telltale_language::compiler::parser::parse_choreography_file;
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectHandler, EffectResult, SendDecision, SendDecisionInput,
@@ -204,6 +209,45 @@ fn run_rust_semantic_audit(
         .collect()
 }
 
+fn authority_pass_fixture(name: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../runtime/tests/ui/authority_pass")
+        .join(format!("{name}.tell"))
+}
+
+fn code_image_from_choreography(choreography: &telltale_language::ast::Choreography) -> CodeImage {
+    let global = choreography_to_global(choreography).expect("convert choreography to global");
+    let mut locals = BTreeMap::new();
+    for role in &choreography.roles {
+        let local = telltale_language::project(choreography, role).expect("project local type");
+        let local_r = local_to_local_r(&local).expect("convert local type");
+        locals.insert(role.name().to_string(), local_r);
+    }
+    CodeImage::from_local_types(&locals, &global)
+}
+
+fn run_rust_semantic_audit_for_choreography(
+    choreography: &telltale_language::ast::Choreography,
+    max_steps: usize,
+) -> Vec<ProtocolMachineTraceEvent> {
+    let image = code_image_from_choreography(choreography);
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
+        output_condition_policy: OutputConditionPolicy::AllowAll,
+        ..ProtocolMachineConfig::default()
+    });
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    machine
+        .run(&PassthroughHandler, max_steps)
+        .expect("run choreography");
+    machine
+        .trace()
+        .iter()
+        .filter_map(obs_to_semantic_audit_event)
+        .collect()
+}
+
 fn validate_trace(
     fixture: &test_choreographies::ProtocolFixture,
     trace: &[ProtocolMachineTraceEvent],
@@ -334,5 +378,57 @@ fn lean_rejects_tampered_protocol_machine_trace_with_structured_errors() {
         TraceValidationOutcome::Valid => {
             panic!("tampered protocol-machine trace unexpectedly validated");
         }
+    }
+}
+
+#[test]
+fn lean_accepts_projectable_authority_control_flow_trace_corpus() {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        if strict_protocol_machine_runner_required() {
+            ProtocolMachineRunner::require_available();
+        }
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+        return;
+    };
+
+    for fixture in [
+        "call_plain_communication",
+        "choice_observational_binding",
+        "loop_authoritative_binding",
+        "recursion_authoritative_binding",
+    ] {
+        let choreography = parse_choreography_file(&authority_pass_fixture(fixture))
+            .unwrap_or_else(|err| panic!("parse {fixture}: {err}"));
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        assert!(
+            choreography.language_tier_status().session_projectable,
+            "{fixture} should remain session-projectable"
+        );
+
+        let trace = run_rust_semantic_audit_for_choreography(&choreography, 128);
+        let validation = runner
+            .validate_trace(
+                &[ChoreographyJson {
+                    schema_version: canonical_schema_version(),
+                    global_type: global_to_json(
+                        &choreography_to_global(&choreography)
+                            .expect("convert authority control-flow choreography to global"),
+                    ),
+                    roles: choreography
+                        .roles
+                        .iter()
+                        .map(|role| role.name().to_string())
+                        .collect(),
+                }],
+                &trace,
+            )
+            .unwrap_or_else(|err| panic!("validate_trace {fixture}: {err}"));
+        assert!(
+            validation.valid,
+            "Lean validateTrace rejected accepted authority control-flow trace for {fixture}: {:?}",
+            validation.errors
+        );
     }
 }

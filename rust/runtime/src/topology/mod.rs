@@ -230,6 +230,25 @@ pub struct Topology {
 }
 
 impl Topology {
+    fn explicit_region(&self, role: &RoleName) -> Result<Option<Region>, String> {
+        let mut regions = self
+            .constraints
+            .iter()
+            .filter_map(|constraint| match constraint {
+                TopologyConstraint::Region(candidate, region) if candidate == role => Some(region),
+                _ => None,
+            });
+        let Some(first) = regions.next() else {
+            return Ok(None);
+        };
+        if let Some(conflict) = regions.find(|region| *region != first) {
+            return Err(format!(
+                "role {role} has conflicting region constraints ({first} vs {conflict})"
+            ));
+        }
+        Ok(Some(first.clone()))
+    }
+
     fn resolved_location(
         &self,
         role: &RoleName,
@@ -249,6 +268,46 @@ impl Topology {
 
         visiting.remove(role);
         resolved
+    }
+
+    fn resolved_region(
+        &self,
+        role: &RoleName,
+        visiting: &mut BTreeSet<RoleName>,
+    ) -> Result<Option<Region>, String> {
+        if !visiting.insert(role.clone()) {
+            return Err(format!("cyclic colocated placement involving role {role}"));
+        }
+
+        let explicit = self.explicit_region(role)?;
+        let inherited = match self.get_location(role) {
+            Ok(Location::Colocated(peer)) => self.resolved_region(&peer, visiting)?,
+            Ok(Location::Local | Location::Remote(_)) => None,
+            Err(TopologyError::UnknownRole(missing)) => {
+                visiting.remove(role);
+                return Err(format!(
+                    "role {role} refers to unknown colocated peer {missing}"
+                ));
+            }
+        };
+        visiting.remove(role);
+
+        match (explicit, inherited) {
+            (Some(explicit), Some(inherited)) if explicit != inherited => Err(format!(
+                "role {role} declares region {explicit} but colocated peer resolves to {inherited}"
+            )),
+            (Some(explicit), _) => Ok(Some(explicit)),
+            (None, inherited) => Ok(inherited),
+        }
+    }
+
+    /// Resolve the effective region for one role after colocated inheritance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive string when the role is unknown or region constraints conflict.
+    pub fn region_for_role(&self, role: &RoleName) -> Result<Option<Region>, String> {
+        self.resolved_region(role, &mut BTreeSet::new())
     }
 
     fn resolve_constraint_location(&self, location: &Location) -> Result<Location, String> {
@@ -337,10 +396,21 @@ impl Topology {
                 }
             }
             TopologyConstraint::Region(role, region) => {
-                Some(TopologyValidation::ConstraintViolation(
-                    constraint.clone(),
-                    format!("region constraint for role {role} in {region} is not yet executable"),
-                ))
+                match self.resolved_region(role, &mut BTreeSet::new()) {
+                    Ok(Some(actual)) if &actual == region => None,
+                    Ok(Some(actual)) => Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!("role {role} resolved to region {actual}, expected {region}"),
+                    )),
+                    Ok(None) => Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!("role {role} has no resolved region, expected {region}"),
+                    )),
+                    Err(reason) => Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        reason,
+                    )),
+                }
             }
         }
     }
@@ -896,23 +966,25 @@ mod tests {
 
         let region = Topology::builder()
             .local_role(RoleName::from_static("Alice"))
-            .local_role(RoleName::from_static("Bob"))
+            .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
             .region(
                 RoleName::from_static("Alice"),
                 Region::new("membership").expect("region"),
             )
             .build();
-        match region.validate(&roles) {
-            TopologyValidation::ConstraintViolation(
-                TopologyConstraint::Region(role, region),
-                msg,
-            ) => {
-                assert_eq!(role, RoleName::from_static("Alice"));
-                assert_eq!(region, Region::new("membership").unwrap());
-                assert!(msg.contains("not yet executable"));
-            }
-            other => panic!("Expected region constraint fail-closed violation, got {other:?}"),
-        }
+        assert!(region.validate(&roles).is_valid());
+        assert_eq!(
+            region
+                .region_for_role(&RoleName::from_static("Alice"))
+                .expect("region for Alice"),
+            Some(Region::new("membership").unwrap())
+        );
+        assert_eq!(
+            region
+                .region_for_role(&RoleName::from_static("Bob"))
+                .expect("region inherited by colocated Bob"),
+            Some(Region::new("membership").unwrap())
+        );
     }
 
     #[test]
@@ -926,6 +998,34 @@ mod tests {
                 assert_eq!(role, RoleName::from_static("Carol"));
             }
             other => panic!("Expected missing colocated peer role, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_conflicting_region_constraints_reject_validation() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
+            .region(
+                RoleName::from_static("Alice"),
+                Region::new("membership").expect("region"),
+            )
+            .region(
+                RoleName::from_static("Bob"),
+                Region::new("archive").expect("region"),
+            )
+            .build();
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
+        match topology.validate(&roles) {
+            TopologyValidation::ConstraintViolation(
+                TopologyConstraint::Region(role, region),
+                msg,
+            ) => {
+                assert_eq!(role, RoleName::from_static("Bob"));
+                assert_eq!(region, Region::new("archive").unwrap());
+                assert!(msg.contains("colocated peer resolves"));
+            }
+            other => panic!("Expected conflicting region violation, got {other:?}"),
         }
     }
 

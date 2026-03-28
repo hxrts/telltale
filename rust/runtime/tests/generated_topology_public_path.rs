@@ -302,10 +302,10 @@ async fn generated_helpers_execute_local_and_custom_topologies_end_to_end() {
         .expect("transport intent"),
         TransportType::Tcp
     );
-    assert!(
-        TransportFactory::create(&custom_topology, &RoleName::from_static("Alice")).is_err(),
-        "placeholder remote transport creation must fail closed"
-    );
+    let direct_transport =
+        TransportFactory::create(&custom_topology, &RoleName::from_static("Alice"))
+            .expect("direct remote-capable transport");
+    assert!(direct_transport.is_connected(&RoleName::from_static("Bob")));
 }
 
 #[test]
@@ -378,24 +378,41 @@ fn generated_helpers_reject_invalid_topology_combinations_before_execution() {
         "unexpected error: {invalid_pin_error}"
     );
 
-    let unsupported_region = TopologyBuilder::new()
+    let supported_region = TopologyBuilder::new()
         .local_role(RoleName::from_static("Alice"))
-        .local_role(RoleName::from_static("Bob"))
+        .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
         .region(
             RoleName::from_static("Alice"),
             telltale_runtime::Region::new("membership").expect("region"),
         )
         .build();
-    let unsupported_region_error = match TopologyRoundTrip::topology::with_topology(
-        unsupported_region,
+    let region_handler = TopologyRoundTrip::topology::with_topology(
+        supported_region.clone(),
+        TopologyRoundTrip::Role::Alice,
+    )
+    .expect("region-respecting topology should validate");
+    assert_eq!(
+        region_handler
+            .topology()
+            .region_for_role(&RoleName::from_static("Bob"))
+            .expect("inherited region"),
+        Some(telltale_runtime::Region::new("membership").unwrap())
+    );
+
+    let conflicting_region = supported_region.with_constraint(telltale_runtime::TopologyConstraint::Region(
+        RoleName::from_static("Bob"),
+        telltale_runtime::Region::new("archive").unwrap(),
+    ));
+    let conflicting_region_error = match TopologyRoundTrip::topology::with_topology(
+        conflicting_region,
         TopologyRoundTrip::Role::Alice,
     ) {
-        Ok(_) => panic!("region constraints should fail closed until executable"),
+        Ok(_) => panic!("conflicting region constraints should fail validation"),
         Err(err) => err,
     };
     assert!(
-        unsupported_region_error.contains("not yet executable"),
-        "unexpected error: {unsupported_region_error}"
+        conflicting_region_error.contains("colocated peer resolves"),
+        "unexpected error: {conflicting_region_error}"
     );
 }
 

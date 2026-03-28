@@ -24,6 +24,7 @@ authority_ownership_suites=(
 lean_correspondence_strict_suites=(
   rust/bridge/tests/lean_trace_validation.rs
   rust/bridge/tests/property_tests.rs
+  rust/bridge/tests/protocol_bundle_admission_contracts.rs
   rust/simulator/tests/lean_reference_parity.rs
 )
 
@@ -59,6 +60,8 @@ fail_closed_lowering_admission_suites=(
 structure_reconfiguration_suites=(
   rust/machine/src/engine/runtime_exec/semantic_state.rs
   rust/machine/tests/ownership_contracts.rs
+  rust/machine/src/composition.rs
+  rust/bridge/tests/protocol_bundle_admission_contracts.rs
   rust/runtime/tests/generated_topology_public_path.rs
 )
 
@@ -128,9 +131,7 @@ runtime_substrate_boundary_suites=(
 explicit_unsupported_fail_closed_notes=(
   extension_statement_runtime_dispatch
   lean_full_run_reference_execution
-  topology_region_constraint_execution
-  distributed_reconfiguration_schema_only
-  remote_transport_realization
+  managed_discovery_transport_realization
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────

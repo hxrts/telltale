@@ -9,7 +9,7 @@ use std::sync::Arc;
 use telltale_bridge::{
     export_protocol_bundle, DistributedClaims, InvariantClaims, ProtocolEnvelopeBridgeConfig,
     ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
-    QuorumSystemKind, ReconfigurationConfig,
+    ProtocolMachineRunner, QuorumSystemKind, ReconfigurationConfig,
 };
 use telltale_machine::determinism::DeterminismMode;
 use telltale_machine::output_condition::OutputConditionPolicy;
@@ -120,6 +120,18 @@ fn local_claim_consistency(claims: &InvariantClaims) -> Result<(), &'static str>
     }
 
     Ok(())
+}
+
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
+fn unsupported_reconfiguration_validation(stderr: &str) -> bool {
+    stderr.contains("validateReconfigurationTransition")
+        || stderr.contains("unknown operation")
+        || stderr.contains("unsupported operation")
 }
 
 #[test]
@@ -499,5 +511,248 @@ fn distributed_reconfiguration_claims_remain_schema_visible_but_do_not_bypass_ru
         ),
         RuntimeGateResult::Admitted,
         "reconfiguration schema metadata is descriptive today and must not mutate default runtime admission",
+    );
+}
+
+#[test]
+fn exported_reconfiguration_claims_flow_into_machine_runtime_admission() {
+    let exported = exported_bundle(InvariantClaims {
+        distributed: DistributedClaims {
+            reconfiguration: Some(ReconfigurationConfig {
+                dynamic_membership: true,
+                overlap_required: true,
+            }),
+            ..DistributedClaims::default()
+        },
+        ..InvariantClaims::default()
+    });
+
+    let machine_bundle = exported
+        .to_machine_bundle(CompositionCertificate {
+            artifact_id: "cert/bridge-reconfig".to_string(),
+            link_ok_full: true,
+            theorem_pack: TheoremPackCapabilities::full(),
+            runtime_contracts: Some(RuntimeContracts::full()),
+        })
+        .expect("bridge bundle should convert into machine bundle");
+    assert_eq!(
+        machine_bundle.reconfiguration_policy(),
+        Some(&telltale_machine::ReconfigurationPolicy {
+            dynamic_membership: true,
+            overlap_required: true,
+        })
+    );
+
+    let mut runtime =
+        ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+    runtime
+        .admit_bundle(machine_bundle)
+        .expect("reconfiguration-enabled bridge bundle should admit with matching contracts");
+    runtime
+        .seed_bundle_membership(0, ["Alice", "Bob"])
+        .expect("seed membership");
+    let event = runtime
+        .reconfigure_bundle(0, ["Bob", "Carol"])
+        .expect("apply reconfiguration");
+    assert_eq!(event.previous_members, vec!["Alice", "Bob"]);
+    assert_eq!(event.next_members, vec!["Bob", "Carol"]);
+    assert!(event.overlap_preserved);
+}
+
+#[test]
+fn exported_reconfiguration_claims_reject_runtime_without_matching_capabilities() {
+    let exported = exported_bundle(InvariantClaims {
+        distributed: DistributedClaims {
+            reconfiguration: Some(ReconfigurationConfig {
+                dynamic_membership: true,
+                overlap_required: true,
+            }),
+            ..DistributedClaims::default()
+        },
+        ..InvariantClaims::default()
+    });
+
+    let mut contracts = RuntimeContracts::full();
+    contracts
+        .capabilities
+        .remove(&RuntimeCapability::LiveMigration);
+    let machine_bundle = exported
+        .to_machine_bundle(CompositionCertificate {
+            artifact_id: "cert/bridge-reconfig-missing".to_string(),
+            link_ok_full: true,
+            theorem_pack: TheoremPackCapabilities::full(),
+            runtime_contracts: Some(contracts),
+        })
+        .expect("bridge bundle should convert into machine bundle");
+
+    let mut runtime =
+        ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+    let err = runtime
+        .admit_bundle(machine_bundle)
+        .expect_err("overlap-required reconfiguration should require live migration capability");
+    assert!(matches!(
+        err,
+        CompositionError::MissingReconfigurationCapability { ref capability, .. }
+        if capability == "reconfiguration::overlap_required"
+    ));
+}
+
+#[test]
+fn exported_reconfiguration_transition_matches_lean_reference_event() {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        if strict_protocol_machine_runner_required() {
+            ProtocolMachineRunner::require_available();
+        }
+        return;
+    };
+
+    let exported = exported_bundle(InvariantClaims {
+        distributed: DistributedClaims {
+            reconfiguration: Some(ReconfigurationConfig {
+                dynamic_membership: true,
+                overlap_required: true,
+            }),
+            ..DistributedClaims::default()
+        },
+        ..InvariantClaims::default()
+    });
+
+    let machine_bundle = exported
+        .to_machine_bundle(CompositionCertificate {
+            artifact_id: "cert/bridge-reconfig-lean".to_string(),
+            link_ok_full: true,
+            theorem_pack: TheoremPackCapabilities::full(),
+            runtime_contracts: Some(RuntimeContracts::full()),
+        })
+        .expect("bridge bundle should convert into machine bundle");
+    let policy = machine_bundle
+        .reconfiguration_policy()
+        .cloned()
+        .expect("bridge bundle should carry reconfiguration policy");
+
+    let mut runtime =
+        ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+    runtime
+        .admit_bundle(machine_bundle)
+        .expect("aligned bridge/runtime bundle should admit");
+    runtime
+        .seed_bundle_membership(0, ["Carol", "Alice", "Bob"])
+        .expect("seed membership");
+    let rust_event = runtime
+        .reconfigure_bundle(0, ["Bob", "Dora", "Carol"])
+        .expect("apply accepted reconfiguration");
+
+    let validation = match runner.validate_reconfiguration_transition(
+        &rust_event.artifact_id,
+        &policy,
+        &rust_event.previous_members,
+        &rust_event.next_members,
+    ) {
+        Ok(validation) => validation,
+        Err(telltale_bridge::ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+            if unsupported_reconfiguration_validation(&stderr) =>
+        {
+            assert!(
+                !strict_protocol_machine_runner_required(),
+                "strict protocol-machine runner verification is enabled but validateReconfigurationTransition is unsupported: {stderr}"
+            );
+            eprintln!("SKIPPED: validateReconfigurationTransition unsupported: {stderr}");
+            return;
+        }
+        Err(err) => panic!("lean reconfiguration validation should execute: {err}"),
+    };
+
+    assert!(
+        validation.valid,
+        "accepted reconfiguration should validate in Lean: {:?}",
+        validation.errors
+    );
+    assert_eq!(validation.event.as_ref(), Some(&rust_event));
+}
+
+#[test]
+fn invalid_reconfiguration_transition_matches_lean_rejection() {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        if strict_protocol_machine_runner_required() {
+            ProtocolMachineRunner::require_available();
+        }
+        return;
+    };
+
+    let exported = exported_bundle(InvariantClaims {
+        distributed: DistributedClaims {
+            reconfiguration: Some(ReconfigurationConfig {
+                dynamic_membership: true,
+                overlap_required: true,
+            }),
+            ..DistributedClaims::default()
+        },
+        ..InvariantClaims::default()
+    });
+
+    let machine_bundle = exported
+        .to_machine_bundle(CompositionCertificate {
+            artifact_id: "cert/bridge-reconfig-invalid".to_string(),
+            link_ok_full: true,
+            theorem_pack: TheoremPackCapabilities::full(),
+            runtime_contracts: Some(RuntimeContracts::full()),
+        })
+        .expect("bridge bundle should convert into machine bundle");
+    let policy = machine_bundle
+        .reconfiguration_policy()
+        .cloned()
+        .expect("bridge bundle should carry reconfiguration policy");
+
+    let mut runtime =
+        ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+    runtime
+        .admit_bundle(machine_bundle)
+        .expect("aligned bridge/runtime bundle should admit");
+    runtime
+        .seed_bundle_membership(0, ["Alice", "Bob"])
+        .expect("seed membership");
+    let rust_err = runtime
+        .reconfigure_bundle(0, ["Carol", "Dora"])
+        .expect_err("disjoint overlap-required transition must reject");
+    assert!(matches!(
+        rust_err,
+        CompositionError::OverlapRequiredViolation { .. }
+    ));
+
+    let validation = match runner.validate_reconfiguration_transition(
+        "cert/bridge-reconfig-invalid",
+        &policy,
+        &["Alice".to_string(), "Bob".to_string()],
+        &["Carol".to_string(), "Dora".to_string()],
+    ) {
+        Ok(validation) => validation,
+        Err(telltale_bridge::ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+            if unsupported_reconfiguration_validation(&stderr) =>
+        {
+            assert!(
+                !strict_protocol_machine_runner_required(),
+                "strict protocol-machine runner verification is enabled but validateReconfigurationTransition is unsupported: {stderr}"
+            );
+            eprintln!("SKIPPED: validateReconfigurationTransition unsupported: {stderr}");
+            return;
+        }
+        Err(err) => panic!("lean reconfiguration validation should execute: {err}"),
+    };
+
+    assert!(!validation.valid, "invalid transition must reject in Lean");
+    assert!(
+        validation
+            .errors
+            .iter()
+            .any(|error| error.code == "reconfiguration.overlap_required"),
+        "expected explicit overlap-required error, got {:?}",
+        validation.errors
+    );
+    assert_eq!(
+        validation
+            .event
+            .as_ref()
+            .map(|event| event.overlap_preserved),
+        Some(false)
     );
 }

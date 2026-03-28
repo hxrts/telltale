@@ -25,6 +25,10 @@ echo "run strict protocol-bundle verification corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
   cargo test -p telltale-bridge --test invariant_verification -- --nocapture
 
+echo "run strict reconfiguration correspondence corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+  cargo test -p telltale-bridge --test protocol_bundle_admission_contracts -- --nocapture
+
 echo "run strict protocol-machine trace validation corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_TRACE_VALIDATION=1 \

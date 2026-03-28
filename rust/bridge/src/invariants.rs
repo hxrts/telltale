@@ -1,12 +1,17 @@
 //! Typed invariant-claims schema for proof-oriented protocol bundles.
 
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use telltale_machine::composition::{CompositionCertificate, ReconfigurationPolicy};
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::ProtocolBundle as MachineProtocolBundle;
 use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 
 use crate::export::{global_to_json, local_to_json};
+use crate::import::{json_to_global, json_to_local};
 
 /// Schema version for protocol-bundle payloads.
 pub const PROTOCOL_BUNDLE_SCHEMA_VERSION: &str = "protocol_bundle.v1";
@@ -321,6 +326,66 @@ pub struct ProtocolBundle {
     pub global_type: Value,
     pub local_types: BTreeMap<String, Value>,
     pub claims: InvariantClaims,
+}
+
+/// Errors that can occur while converting an exported bridge bundle into a machine bundle.
+#[derive(Debug, thiserror::Error)]
+pub enum MachineBundleConversionError {
+    /// Global type JSON could not be parsed back into a Rust type.
+    #[error("failed to import global type from bridge bundle: {0}")]
+    GlobalImport(#[from] crate::ImportError),
+    /// One of the local type JSON payloads could not be parsed.
+    #[error("failed to import local type for role `{role}` from bridge bundle: {source}")]
+    LocalImport {
+        /// Role whose local type failed to import.
+        role: String,
+        /// Underlying import error.
+        source: crate::ImportError,
+    },
+}
+
+impl ProtocolBundle {
+    /// Reconfiguration claim carried by the bridge bundle, if any.
+    #[must_use]
+    pub fn reconfiguration_policy(&self) -> Option<ReconfigurationPolicy> {
+        self.claims
+            .distributed
+            .reconfiguration
+            .as_ref()
+            .map(|reconfiguration| ReconfigurationPolicy {
+                dynamic_membership: reconfiguration.dynamic_membership,
+                overlap_required: reconfiguration.overlap_required,
+            })
+    }
+
+    /// Convert this exported bundle into a machine bundle with the provided admission certificate.
+    ///
+    /// # Errors
+    ///
+    /// Returns `MachineBundleConversionError` when the exported global/local types cannot be
+    /// imported back into Rust machine artifacts.
+    pub fn to_machine_bundle(
+        &self,
+        certificate: CompositionCertificate,
+    ) -> Result<MachineProtocolBundle, MachineBundleConversionError> {
+        let global = json_to_global(&self.global_type)?;
+        let mut local_types = BTreeMap::new();
+        for (role, local) in &self.local_types {
+            let local_type = json_to_local(local).map_err(|source| {
+                MachineBundleConversionError::LocalImport {
+                    role: role.clone(),
+                    source,
+                }
+            })?;
+            local_types.insert(role.clone(), local_type);
+        }
+        let code = Arc::new(CodeImage::from_local_types(&local_types, &global));
+        let bundle = MachineProtocolBundle::new(code, certificate);
+        Ok(match self.reconfiguration_policy() {
+            Some(policy) => bundle.with_reconfiguration_policy(policy),
+            None => bundle,
+        })
+    }
 }
 
 /// Export a typed protocol bundle for Lean-side verification entrypoints.

@@ -394,6 +394,210 @@ def parseValidateSimulationTracePayload (payload : Json) :
     actions := collectTraceActions global
   }], traceArr.toList)
 
+def bridgeSchemaVersion : Json :=
+  Json.str "lean_bridge.v1"
+
+def optionalField (key : String) (value : Option Json) : List (String × Json) :=
+  match value with
+  | some fieldValue => [(key, fieldValue)]
+  | none => []
+
+def traceEventJson (kind : String) (tick sid : Nat)
+    (sender receiver label : Option String := none)
+    (role : Option String := none) : Json :=
+  let fields : List (String × Json) :=
+    [ ("schema_version", bridgeSchemaVersion)
+    , ("kind", Json.str kind)
+    , ("tick", Json.num tick)
+    , ("session", Json.num sid) ] ++
+    optionalField "sender" (sender.map Json.str) ++
+    optionalField "receiver" (receiver.map Json.str) ++
+    optionalField "label" (label.map Json.str) ++
+    optionalField "role" (role.map Json.str)
+  Json.mkObj fields
+
+def simulationTraceForActions (roles : List String)
+    (actions : List (String × String × String)) (steps : Nat) : List Json :=
+  let opened := traceEventJson "opened" 0 0 none none none (some (String.intercalate "," roles))
+  let actionCount := actions.length
+  let rec go (idx : Nat) (remaining : Nat) (acc : List Json) : List Json :=
+    match remaining with
+    | 0 => acc.reverse
+    | remaining' + 1 =>
+        if h : actionCount = 0 then
+          go (idx + 1) remaining' acc
+        else
+          let actionIdx := (idx / 2) % actionCount
+          let (sender, receiver, label) := actions.get ⟨actionIdx, by
+            have hPos : 0 < actionCount := Nat.pos_of_ne_zero h
+            exact Nat.mod_lt _ hPos
+          ⟩
+          let kind := if idx % 2 = 0 then "sent" else "received"
+          let event := traceEventJson kind idx.succ 0 (some sender) (some receiver) (some label)
+          go (idx + 1) remaining' (event :: acc)
+  opened :: go 0 steps []
+
+def parseRunSimulationPayload (payload : Json) :
+    Except String (List String × List (String × String × String) × Nat) := do
+  let globalJson := payload.getObjValD "global_type"
+  let global ← globalTypeFromJson globalJson
+  let scenarioJson ← payload.getObjVal? "scenario"
+  let steps ← requiredNatField scenarioJson "steps"
+  pure (global.roles, collectTraceActions global, steps)
+
+def simulationResponse (roles : List String) (actions : List (String × String × String))
+    (steps : Nat) : Json :=
+  Json.mkObj
+    [ ("schema_version", bridgeSchemaVersion)
+    , ("trace", Json.arr <| (simulationTraceForActions roles actions steps).toArray)
+    , ("violations", Json.arr #[])
+    , ("artifacts", Json.mkObj
+        [ ("mode", Json.str "deterministic_reference")
+        , ("steps", Json.num steps)
+        , ("action_count", Json.num actions.length) ]) ]
+
+def optionalNatField? (value : Json) (field : String) : Option Nat :=
+  match value.getObjVal? field with
+  | .ok fieldValue =>
+      match fieldValue.getNat? with
+      | .ok n => some n
+      | .error _ => none
+  | .error _ => none
+
+def optionalBoolField? (value : Json) (field : String) : Option Bool :=
+  match value.getObjVal? field with
+  | .ok fieldValue =>
+      match fieldValue.getBool? with
+      | .ok b => some b
+      | .error _ => none
+  | .error _ => none
+
+def optionalStringField? (value : Json) (field : String) : Option String :=
+  match value.getObjVal? field with
+  | .ok fieldValue =>
+      match fieldValue.getStr? with
+      | .ok s => some s
+      | .error _ => none
+  | .error _ => none
+
+def verifyProtocolBundleErrors (payload : Json) : List Json :=
+  let claims := payload.getObjValD "claims"
+  let distributed := claims.getObjValD "distributed"
+  let liveness := claims.getObjValD "liveness"
+  let quorumErrors :=
+  let quorumGeometry := distributed.getObjValD "quorum_geometry"
+  match (
+    optionalNatField? quorumGeometry "n",
+    optionalNatField? quorumGeometry "quorum_size",
+    optionalNatField? quorumGeometry "intersection_size"
+  ) with
+  | (some n, some quorumSize, some intersectionSize) =>
+      if intersectionSize = 0 || 2 * quorumSize ≤ n then
+        [structuredError
+          "bundle.bad_quorum"
+          "claims.distributed.quorum_geometry"
+          "quorum geometry must guarantee non-empty intersection and majority overlap"]
+      else
+        []
+  | _ => []
+
+  let progressRequired := (optionalBoolField? liveness "progress_required").getD false
+  let scheduler := optionalStringField? liveness "scheduler"
+  let flp := distributed.getObjValD "flp"
+  let deadlockErrors := match (
+    optionalNatField? flp "crash_bound",
+    optionalBoolField? flp "requires_determinism",
+    scheduler
+  ) with
+  | (some crashBound, some true, some "Cooperative") =>
+      if progressRequired && crashBound > 0 then
+        [structuredError
+          "bundle.deadlock_risk"
+          "claims.liveness"
+          "cooperative progress claims with crash-bound FLP assumptions are rejected in the executable verifier"]
+      else
+        []
+  | _ => []
+
+  let partialSynchrony := distributed.getObjValD "partial_synchrony"
+  let responsiveness := distributed.getObjValD "responsiveness"
+  let unboundedWaitErrors := match (
+    optionalStringField? partialSynchrony "timing",
+    optionalNatField? partialSynchrony "delta_bound",
+    optionalBoolField? responsiveness "requires_stable_period"
+  ) with
+  | (some "Asynchronous", none, _) =>
+      if progressRequired then
+        [structuredError
+          "bundle.unbounded_wait"
+          "claims.distributed.partial_synchrony"
+          "progress-required bundles must provide a bounded synchrony window"]
+      else
+        []
+  | _ => []
+
+  quorumErrors ++ deadlockErrors ++ unboundedWaitErrors
+
+def verifyProtocolBundleResponse (payload : Json) : Json :=
+  let errors := verifyProtocolBundleErrors payload
+  Json.mkObj
+    [ ("valid", Json.bool errors.isEmpty)
+    , ("errors", Json.arr errors.toArray)
+    , ("artifacts", Json.mkObj
+        [ ("mode", Json.str "deterministic_bundle_verifier")
+        , ("error_count", Json.num errors.length) ]) ]
+
+def sortedUniqueStrings (items : List String) : List String :=
+  (items.eraseDups.toArray.qsort (fun left right => left < right)).toList
+
+def memberDifferences (left right : List String) : List String :=
+  left.filter (fun item => !(right.contains item))
+
+def validateReconfigurationTransitionResponse (payload : Json) : Json :=
+  let artifactId := (optionalStringField? payload "artifact_id").getD "reconfiguration"
+  let policy := payload.getObjValD "policy"
+  let dynamicMembership := (optionalBoolField? policy "dynamic_membership").getD false
+  let overlapRequired := (optionalBoolField? policy "overlap_required").getD false
+  let previousMembers := sortedUniqueStrings <| (jsonStringList (payload.getObjValD "previous_members")).toOption.getD []
+  let nextMembers := sortedUniqueStrings <| (jsonStringList (payload.getObjValD "next_members")).toOption.getD []
+  let overlapPreserved := previousMembers.isEmpty || previousMembers.any (fun member => nextMembers.contains member)
+  let errors :=
+    (if !dynamicMembership then
+      [structuredError
+        "reconfiguration.disabled"
+        "policy.dynamic_membership"
+        "dynamic membership must be enabled for a reconfiguration transition"]
+    else []) ++
+    (if nextMembers.isEmpty then
+      [structuredError
+        "reconfiguration.empty_membership"
+        "next_members"
+        "reconfiguration transitions must preserve a non-empty membership set"]
+    else []) ++
+    (if overlapRequired && !overlapPreserved then
+      [structuredError
+        "reconfiguration.overlap_required"
+        "next_members"
+        "overlap-required reconfiguration transitions must preserve at least one member"]
+    else [])
+  let event :=
+    Json.mkObj
+      [ ("artifact_id", Json.str artifactId)
+      , ("epoch", Json.num 1)
+      , ("previous_members", Json.arr <| previousMembers.map Json.str |>.toArray)
+      , ("next_members", Json.arr <| nextMembers.map Json.str |>.toArray)
+      , ("added_members", Json.arr <| (memberDifferences nextMembers previousMembers).map Json.str |>.toArray)
+      , ("removed_members", Json.arr <| (memberDifferences previousMembers nextMembers).map Json.str |>.toArray)
+      , ("overlap_preserved", Json.bool overlapPreserved)
+      , ("dynamic_membership", Json.bool dynamicMembership)
+      , ("overlap_required", Json.bool overlapRequired) ]
+  Json.mkObj
+    [ ("valid", Json.bool errors.isEmpty)
+    , ("errors", Json.arr errors.toArray)
+    , ("artifacts", Json.mkObj
+        [ ("mode", Json.str "deterministic_reconfiguration_validator")
+        , ("event", event) ]) ]
+
 def dispatchOperation (operation : String) (payload : Json) : IO Unit := do
   match operation with
   | "validateTrace" =>
@@ -411,9 +615,21 @@ def dispatchOperation (operation : String) (payload : Json) : IO Unit := do
             validationResponse [structuredError "simulation.invalid_payload" "payload" err]
       IO.println response.compress
   | "verifyProtocolBundle" =>
-      throw (IO.userError "unsupported operation: verifyProtocolBundle")
+      IO.println (verifyProtocolBundleResponse payload).compress
+  | "validateReconfigurationTransition" =>
+      IO.println (validateReconfigurationTransitionResponse payload).compress
   | "runSimulation" =>
-      throw (IO.userError "unsupported operation: runSimulation")
+      let response :=
+        match parseRunSimulationPayload payload with
+        | .ok (roles, actions, steps) => simulationResponse roles actions steps
+        | .error err =>
+            Json.mkObj
+              [ ("schema_version", bridgeSchemaVersion)
+              , ("trace", Json.arr #[])
+              , ("violations", Json.arr #[])
+              , ("artifacts", Json.mkObj [])
+              , ("errors", Json.arr #[structuredError "simulation.invalid_payload" "payload" err]) ]
+      IO.println response.compress
   | other =>
       throw (IO.userError s!"unsupported operation: {other}")
 

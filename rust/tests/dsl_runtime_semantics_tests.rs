@@ -3,6 +3,7 @@
 //! End-to-end DSL-to-runtime semantic conformance tests.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use proc_macro2::{Ident, Span};
 use telltale::tell;
@@ -231,6 +232,16 @@ fn code_image_from_choreography(choreography: &telltale_language::ast::Choreogra
         locals.insert(role.name().to_string(), local_r);
     }
     CodeImage::from_local_types(&locals, &global)
+}
+
+fn authority_pass_fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("rust")
+        .join("runtime")
+        .join("tests")
+        .join("ui")
+        .join("authority_pass")
+        .join(format!("{name}.tell"))
 }
 
 #[derive(Debug)]
@@ -612,6 +623,69 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     assert_eq!(semantic_handoff.activated_owner_id, "Worker");
     const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
     const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+}
+
+#[test]
+fn projectable_authority_control_flow_surfaces_lower_to_runtime_semantic_objects() {
+    for fixture in [
+        "call_plain_communication",
+        "choice_observational_binding",
+        "loop_authoritative_binding",
+        "recursion_authoritative_binding",
+    ] {
+        let choreography =
+            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        assert!(
+            choreography.language_tier_status().session_projectable,
+            "{fixture} should remain session-projectable"
+        );
+
+        let image = code_image_from_choreography(&choreography);
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine
+            .load_choreography(&image)
+            .unwrap_or_else(|err| panic!("load {fixture}: {err}"));
+        machine
+            .run(&NoopHandler, 128)
+            .unwrap_or_else(|err| panic!("run {fixture}: {err}"));
+
+        let semantic_objects = machine.semantic_objects();
+        assert!(
+            semantic_objects.parity_critical_operations_have_progress_contracts(),
+            "{fixture} should preserve parity-critical progress contracts after lowering"
+        );
+        assert!(
+            semantic_objects
+                .publication_events
+                .iter()
+                .any(|publication| publication.publication == "effect.succeeded"),
+            "{fixture} should emit canonical effect publications after lowering"
+        );
+    }
+}
+
+#[test]
+fn parallel_authority_control_flow_surface_projects_and_converts_locals() {
+    let choreography =
+        parse_choreography_file(&authority_pass_fixture("parallel_observational_binding"))
+            .expect("parse parallel authority fixture");
+    choreography
+        .validate()
+        .expect("validate parallel authority fixture");
+    assert!(
+        choreography.language_tier_status().session_projectable,
+        "parallel observational authority fixture should remain session-projectable"
+    );
+
+    for role in &choreography.roles {
+        let local = telltale_language::project(&choreography, role)
+            .unwrap_or_else(|err| panic!("project {}: {err}", role.name()));
+        local_to_local_r(&local)
+            .unwrap_or_else(|err| panic!("convert {} local type: {err}", role.name()));
+    }
 }
 
 #[test]

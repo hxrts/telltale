@@ -104,7 +104,7 @@ topology TwoPhaseCommit_Prod for TwoPhaseCommit {
 }
 ```
 
-The `role_constraints` block controls acceptable family sizes. The `channel_capacities` block sets per-edge capacity in bits (used for branching feasibility checks). The `constraints` block encodes separation, pinning, and region requirements.
+The `role_constraints` block controls acceptable family sizes. The `channel_capacities` block sets per-edge capacity in bits (used for branching feasibility checks). The `constraints` block encodes separation, pinning, and region requirements. `region: Role -> region_name` is now executable topology data: validated roles resolve a concrete region, colocated roles inherit the peer region unless they declare the same region explicitly, and conflicting colocated region declarations reject deterministically.
 
 ## Rust API
 
@@ -136,6 +136,7 @@ assert!(validation.is_valid());
 ```
 
 `Topology::builder` produces a `TopologyBuilder` with fluent helpers. `Topology::validate` checks that all roles referenced in the topology and constraints exist in the choreography.
+`Topology::region_for_role(&role)` resolves the effective region after colocated inheritance and reports conflicting region declarations as validation errors.
 
 Explicit family-cardinality checks use the same topology object:
 
@@ -217,10 +218,7 @@ let transport_type = TransportFactory::transport_for_location(
 assert!(matches!(transport_type, TransportType::Tcp));
 ```
 
-`TransportFactory::create` now fails closed for remote, per-role, Kubernetes,
-and Consul transport realization until real backends exist. The
-`TransportType` value still signals intent, and `TopologyHandler` remains the
-deterministic local simulation path used in tests and examples.
+`TransportFactory::create` now realizes loopback `Location::Remote` endpoints through a deterministic TCP transport on native targets. `TopologyHandler` uses the same remote slice for `with_topology(...)` helpers, so generated topology public-path tests now exercise real loopback message delivery instead of an intent-only placeholder. `TopologyMode::PerRole`, `TopologyMode::Kubernetes`, and `TopologyMode::Consul` still fail closed with `TransportError::NotReady` until discovery-backed runtime backends exist.
 
 ## Lean Correspondence
 

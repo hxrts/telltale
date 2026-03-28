@@ -88,11 +88,12 @@ pub use invariants::{
     ConsistencyLevel, CoordinationConfig, DataAvailabilityConfig, DistributedClaims, FLPConfig,
     FailureDetectorsConfig, FailureEnvelopeConfig, FaultModel, FluidConfig, FosterConfig,
     FunctionalCLTConfig, HeavyTrafficConfig, InvariantClaims, LDPConfig, LittlesLawConfig,
-    LivenessConfig, MaxWeightConfig, MeanFieldConfig, MixingConfig, NakamotoConfig,
-    PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
-    ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
-    QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
-    SchedulerKind, TimingModel, PROTOCOL_BUNDLE_SCHEMA_VERSION,
+    LivenessConfig, MachineBundleConversionError, MaxWeightConfig, MeanFieldConfig, MixingConfig,
+    NakamotoConfig, PartialSynchronyConfig, PartitionModel, ProtocolBundle,
+    ProtocolEnvelopeBridgeConfig, ProtocolMachineEnvelopeAdherenceConfig,
+    ProtocolMachineEnvelopeAdmissionConfig, QuorumGeometryConfig, QuorumSystemKind,
+    ReconfigurationConfig, ResponsivenessConfig, SchedulerKind, TimingModel,
+    PROTOCOL_BUNDLE_SCHEMA_VERSION,
 };
 pub use protocol_machine_trace::{
     event_session, normalize_semantic_audit, observationally_equivalent, partition_by_session,
@@ -128,6 +129,7 @@ cfg_if! {
             ProtocolMachineRunInput, ProtocolMachineRunOutput, ProtocolMachineRunner,
             ProtocolMachineRunnerError, ProtocolMachineSessionStatus,
             ProtocolMachineStepState, ProtocolMachineTraceEvent, TraceValidation,
+            ReconfigurationValidationResult,
         };
         pub use validate::{ValidationResult, Validator};
     }

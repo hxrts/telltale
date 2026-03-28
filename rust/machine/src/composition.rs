@@ -5,6 +5,7 @@
 //! - shared immutable protocol artifacts (`Arc<CodeImage>`),
 //! - memory-budget accounting for composed workloads.
 
+use std::collections::BTreeSet;
 use std::mem::size_of;
 use std::sync::Arc;
 
@@ -167,6 +168,45 @@ pub struct CompositionCertificate {
     pub runtime_contracts: Option<RuntimeContracts>,
 }
 
+/// Reconfiguration policy admitted for one protocol bundle.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ReconfigurationPolicy {
+    /// Whether the runtime may change the active member set over time.
+    pub dynamic_membership: bool,
+    /// Whether consecutive member sets must overlap.
+    pub overlap_required: bool,
+}
+
+/// Deterministic audit artifact emitted for one accepted reconfiguration.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ReconfigurationEvent {
+    /// Stable bundle/certificate identifier.
+    pub artifact_id: String,
+    /// Monotonic epoch after the transition.
+    pub epoch: u64,
+    /// Canonical sorted member set before the transition.
+    pub previous_members: Vec<String>,
+    /// Canonical sorted member set after the transition.
+    pub next_members: Vec<String>,
+    /// Canonical sorted members added by the transition.
+    pub added_members: Vec<String>,
+    /// Canonical sorted members removed by the transition.
+    pub removed_members: Vec<String>,
+    /// Whether overlap was preserved on this transition.
+    pub overlap_preserved: bool,
+    /// Policy flag carried by the admitted bundle.
+    pub dynamic_membership: bool,
+    /// Policy flag carried by the admitted bundle.
+    pub overlap_required: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct ReconfigurationRuntimeState {
+    epoch: u64,
+    active_members: BTreeSet<String>,
+    history: Vec<ReconfigurationEvent>,
+}
+
 /// Immutable protocol bundle loaded by the composition API.
 #[derive(Debug, Clone)]
 pub struct ProtocolBundle {
@@ -174,13 +214,32 @@ pub struct ProtocolBundle {
     pub code: Arc<CodeImage>,
     /// Certificate checked at admission time.
     pub certificate: CompositionCertificate,
+    /// Optional runtime reconfiguration policy admitted for this bundle.
+    pub reconfiguration_policy: Option<ReconfigurationPolicy>,
 }
 
 impl ProtocolBundle {
     /// Construct a bundle from a code image and certificate.
     #[must_use]
     pub fn new(code: Arc<CodeImage>, certificate: CompositionCertificate) -> Self {
-        Self { code, certificate }
+        Self {
+            code,
+            certificate,
+            reconfiguration_policy: None,
+        }
+    }
+
+    /// Attach a deterministic reconfiguration policy to the bundle.
+    #[must_use]
+    pub fn with_reconfiguration_policy(mut self, policy: ReconfigurationPolicy) -> Self {
+        self.reconfiguration_policy = Some(policy);
+        self
+    }
+
+    /// The admitted reconfiguration policy for this bundle, if any.
+    #[must_use]
+    pub fn reconfiguration_policy(&self) -> Option<&ReconfigurationPolicy> {
+        self.reconfiguration_policy.as_ref()
     }
 }
 
@@ -245,6 +304,40 @@ pub enum CompositionError {
         /// Certificate artifact id that failed admission.
         artifact_id: String,
     },
+    /// Bundle index does not exist.
+    #[error("bundle index {bundle_idx} is out of range")]
+    InvalidBundleIndex {
+        /// The bundle index that was requested.
+        bundle_idx: usize,
+    },
+    /// Reconfiguration was requested for a bundle that did not admit it.
+    #[error("bundle `{artifact_id}` rejected reconfiguration request: bundle is not reconfiguration-enabled")]
+    ReconfigurationDisabled {
+        /// Certificate artifact id associated with the rejected bundle.
+        artifact_id: String,
+    },
+    /// Reconfiguration requires a runtime capability that was not supplied.
+    #[error("bundle `{artifact_id}` rejected reconfiguration request: missing required capability `{capability}`")]
+    MissingReconfigurationCapability {
+        /// Certificate artifact id associated with the rejected bundle.
+        artifact_id: String,
+        /// Human-readable capability key.
+        capability: String,
+    },
+    /// Reconfiguration attempted to produce an empty membership set.
+    #[error(
+        "bundle `{artifact_id}` rejected reconfiguration request: membership set may not be empty"
+    )]
+    EmptyMembership {
+        /// Certificate artifact id associated with the rejected bundle.
+        artifact_id: String,
+    },
+    /// Reconfiguration violated the admitted overlap policy.
+    #[error("bundle `{artifact_id}` rejected reconfiguration request: overlap_required but member sets are disjoint")]
+    OverlapRequiredViolation {
+        /// Certificate artifact id associated with the rejected bundle.
+        artifact_id: String,
+    },
     /// Admission would violate memory budget.
     #[error("bundle `{artifact_id}` rejected: memory budget exceeded ({reason})")]
     BudgetExceeded {
@@ -263,6 +356,7 @@ pub enum CompositionError {
 pub struct ComposedRuntime {
     machine: ProtocolMachine,
     bundles: Vec<ProtocolBundle>,
+    reconfiguration_states: Vec<Option<ReconfigurationRuntimeState>>,
     budget: MemoryBudget,
     usage: MemoryUsage,
 }
@@ -275,6 +369,7 @@ impl ComposedRuntime {
         Self {
             machine,
             bundles: Vec::new(),
+            reconfiguration_states: Vec::new(),
             budget,
             usage: MemoryUsage {
                 bytes_per_coroutine: size_of::<crate::coroutine::Coroutine>(),
@@ -308,6 +403,8 @@ impl ComposedRuntime {
         }
 
         self.bundles.push(bundle);
+        self.reconfiguration_states
+            .push(Some(ReconfigurationRuntimeState::default()));
         self.usage.protocol_count = self.bundles.len();
         Ok(())
     }
@@ -318,13 +415,10 @@ impl ComposedRuntime {
     ///
     /// Returns a `CompositionError` when index is invalid or ProtocolMachine loading fails.
     pub fn load_bundle_session(&mut self, bundle_idx: usize) -> Result<usize, CompositionError> {
-        let bundle =
-            self.bundles
-                .get(bundle_idx)
-                .ok_or_else(|| CompositionError::BudgetExceeded {
-                    artifact_id: format!("bundle/{bundle_idx}"),
-                    reason: "bundle index out of range".to_string(),
-                })?;
+        let bundle = self
+            .bundles
+            .get(bundle_idx)
+            .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?;
 
         let sid = self.machine.load_choreography(&bundle.code)?;
         self.refresh_usage();
@@ -374,6 +468,154 @@ impl ComposedRuntime {
     #[must_use]
     pub fn bundles(&self) -> &[ProtocolBundle] {
         &self.bundles
+    }
+
+    /// Seed the active membership set for one admitted reconfiguration-enabled bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `CompositionError` when the bundle index is invalid, reconfiguration is disabled,
+    /// or the membership set is empty.
+    pub fn seed_bundle_membership<I, S>(
+        &mut self,
+        bundle_idx: usize,
+        members: I,
+    ) -> Result<(), CompositionError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let bundle = self
+            .bundles
+            .get(bundle_idx)
+            .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?;
+        let state = self
+            .reconfiguration_states
+            .get_mut(bundle_idx)
+            .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?
+            .as_mut()
+            .ok_or_else(|| CompositionError::ReconfigurationDisabled {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            })?;
+        if bundle.reconfiguration_policy.is_none() {
+            return Err(CompositionError::ReconfigurationDisabled {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            });
+        }
+        let members: BTreeSet<String> = members.into_iter().map(Into::into).collect();
+        if members.is_empty() {
+            return Err(CompositionError::EmptyMembership {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            });
+        }
+        state.active_members = members;
+        state.epoch = 0;
+        state.history.clear();
+        Ok(())
+    }
+
+    /// Apply one deterministic reconfiguration transition to an admitted bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `CompositionError` when the bundle index is invalid, the bundle does not admit
+    /// reconfiguration, the transition violates required overlap, or the new membership set is
+    /// empty.
+    pub fn reconfigure_bundle<I, S>(
+        &mut self,
+        bundle_idx: usize,
+        next_members: I,
+    ) -> Result<ReconfigurationEvent, CompositionError>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let bundle = self
+            .bundles
+            .get(bundle_idx)
+            .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?;
+        let Some(policy) = bundle.reconfiguration_policy.as_ref() else {
+            return Err(CompositionError::ReconfigurationDisabled {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            });
+        };
+        if !policy.dynamic_membership {
+            return Err(CompositionError::ReconfigurationDisabled {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            });
+        }
+
+        let state = self
+            .reconfiguration_states
+            .get_mut(bundle_idx)
+            .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?
+            .as_mut()
+            .ok_or_else(|| CompositionError::ReconfigurationDisabled {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            })?;
+        let next_members: BTreeSet<String> = next_members.into_iter().map(Into::into).collect();
+        if next_members.is_empty() {
+            return Err(CompositionError::EmptyMembership {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            });
+        }
+
+        let overlap_preserved =
+            state.active_members.is_empty() || !state.active_members.is_disjoint(&next_members);
+        if policy.overlap_required && !overlap_preserved {
+            return Err(CompositionError::OverlapRequiredViolation {
+                artifact_id: bundle.certificate.artifact_id.clone(),
+            });
+        }
+
+        let previous_members: Vec<String> = state.active_members.iter().cloned().collect();
+        let next_members_vec: Vec<String> = next_members.iter().cloned().collect();
+        let added_members: Vec<String> = next_members
+            .difference(&state.active_members)
+            .cloned()
+            .collect();
+        let removed_members: Vec<String> = state
+            .active_members
+            .difference(&next_members)
+            .cloned()
+            .collect();
+
+        state.epoch = state.epoch.saturating_add(1);
+        state.active_members = next_members;
+        let event = ReconfigurationEvent {
+            artifact_id: bundle.certificate.artifact_id.clone(),
+            epoch: state.epoch,
+            previous_members,
+            next_members: next_members_vec,
+            added_members,
+            removed_members,
+            overlap_preserved,
+            dynamic_membership: policy.dynamic_membership,
+            overlap_required: policy.overlap_required,
+        };
+        state.history.push(event.clone());
+        Ok(event)
+    }
+
+    /// The canonical sorted active member set for one bundle, if configured.
+    #[must_use]
+    pub fn bundle_members(&self, bundle_idx: usize) -> Option<&BTreeSet<String>> {
+        self.reconfiguration_states
+            .get(bundle_idx)
+            .and_then(Option::as_ref)
+            .map(|state| &state.active_members)
+    }
+
+    /// The deterministic reconfiguration history for one bundle, if configured.
+    #[must_use]
+    pub fn bundle_reconfiguration_history(
+        &self,
+        bundle_idx: usize,
+    ) -> Option<&[ReconfigurationEvent]> {
+        self.reconfiguration_states
+            .get(bundle_idx)
+            .and_then(Option::as_ref)
+            .map(|state| state.history.as_slice())
     }
 
     /// Access underlying ProtocolMachine.
@@ -478,6 +720,42 @@ impl ComposedRuntime {
                 artifact_id: cert.artifact_id.clone(),
                 capability: "output_condition_gating".to_string(),
             });
+        }
+        if let Some(policy) = &bundle.reconfiguration_policy {
+            let Some(contracts) = runtime_contracts else {
+                return Err(CompositionError::MissingRuntimeContracts {
+                    artifact_id: cert.artifact_id.clone(),
+                });
+            };
+            if !contracts
+                .capabilities
+                .contains(&crate::runtime_contracts::RuntimeCapability::PlacementRefinement)
+            {
+                return Err(CompositionError::MissingReconfigurationCapability {
+                    artifact_id: cert.artifact_id.clone(),
+                    capability: "reconfiguration::placement_refinement".to_string(),
+                });
+            }
+            if policy.dynamic_membership
+                && !contracts
+                    .capabilities
+                    .contains(&crate::runtime_contracts::RuntimeCapability::AutoscaleRepartition)
+            {
+                return Err(CompositionError::MissingReconfigurationCapability {
+                    artifact_id: cert.artifact_id.clone(),
+                    capability: "reconfiguration::dynamic_membership".to_string(),
+                });
+            }
+            if policy.overlap_required
+                && !contracts
+                    .capabilities
+                    .contains(&crate::runtime_contracts::RuntimeCapability::LiveMigration)
+            {
+                return Err(CompositionError::MissingReconfigurationCapability {
+                    artifact_id: cert.artifact_id.clone(),
+                    capability: "reconfiguration::overlap_required".to_string(),
+                });
+            }
         }
         Ok(())
     }
@@ -841,5 +1119,150 @@ mod tests {
         runtime
             .admit_bundle(bundle)
             .expect("replay profile should admit with matching contracts");
+    }
+
+    #[test]
+    fn reconfiguration_requires_runtime_capabilities_at_admission() {
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let mut contracts = RuntimeContracts::full();
+        contracts
+            .capabilities
+            .remove(&crate::runtime_contracts::RuntimeCapability::AutoscaleRepartition);
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/reconfig-missing-cap".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(contracts),
+            },
+        )
+        .with_reconfiguration_policy(ReconfigurationPolicy {
+            dynamic_membership: true,
+            overlap_required: true,
+        });
+        let err = runtime
+            .admit_bundle(bundle)
+            .expect_err("dynamic membership should require explicit runtime capability");
+        assert!(matches!(
+            err,
+            CompositionError::MissingReconfigurationCapability { capability, .. }
+            if capability == "reconfiguration::dynamic_membership"
+        ));
+    }
+
+    #[test]
+    fn reconfiguration_emits_deterministic_membership_events() {
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/reconfig-ok".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(RuntimeContracts::full()),
+            },
+        )
+        .with_reconfiguration_policy(ReconfigurationPolicy {
+            dynamic_membership: true,
+            overlap_required: true,
+        });
+        runtime.admit_bundle(bundle).expect("admit bundle");
+        runtime
+            .seed_bundle_membership(0, ["Alice", "Bob"])
+            .expect("seed members");
+
+        let event = runtime
+            .reconfigure_bundle(0, ["Bob", "Carol"])
+            .expect("reconfigure");
+        assert_eq!(event.epoch, 1);
+        assert_eq!(event.previous_members, vec!["Alice", "Bob"]);
+        assert_eq!(event.next_members, vec!["Bob", "Carol"]);
+        assert_eq!(event.added_members, vec!["Carol"]);
+        assert_eq!(event.removed_members, vec!["Alice"]);
+        assert!(event.overlap_preserved);
+        assert_eq!(
+            runtime
+                .bundle_members(0)
+                .expect("members after reconfiguration"),
+            &BTreeSet::from(["Bob".to_string(), "Carol".to_string()])
+        );
+        assert_eq!(
+            runtime
+                .bundle_reconfiguration_history(0)
+                .expect("history")
+                .last()
+                .expect("event in history"),
+            &event
+        );
+    }
+
+    #[test]
+    fn reconfiguration_rejects_disjoint_membership_when_overlap_is_required() {
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/reconfig-overlap".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(RuntimeContracts::full()),
+            },
+        )
+        .with_reconfiguration_policy(ReconfigurationPolicy {
+            dynamic_membership: true,
+            overlap_required: true,
+        });
+        runtime.admit_bundle(bundle).expect("admit bundle");
+        runtime
+            .seed_bundle_membership(0, ["Alice", "Bob"])
+            .expect("seed members");
+        let err = runtime
+            .reconfigure_bundle(0, ["Carol", "Dave"])
+            .expect_err("overlap-required policy should reject disjoint membership");
+        assert!(matches!(
+            err,
+            CompositionError::OverlapRequiredViolation { .. }
+        ));
+    }
+
+    #[test]
+    fn reconfiguration_history_is_stable_across_recreated_runtimes() {
+        fn drive_history() -> Vec<ReconfigurationEvent> {
+            let mut runtime =
+                ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+            let bundle = ProtocolBundle::new(
+                image("m"),
+                CompositionCertificate {
+                    artifact_id: "cert/reconfig-history".to_string(),
+                    link_ok_full: true,
+                    theorem_pack: TheoremPackCapabilities::full(),
+                    runtime_contracts: Some(RuntimeContracts::full()),
+                },
+            )
+            .with_reconfiguration_policy(ReconfigurationPolicy {
+                dynamic_membership: true,
+                overlap_required: true,
+            });
+            runtime.admit_bundle(bundle).expect("admit bundle");
+            runtime
+                .seed_bundle_membership(0, ["Alice", "Bob"])
+                .expect("seed members");
+            runtime
+                .reconfigure_bundle(0, ["Bob", "Carol"])
+                .expect("first reconfiguration");
+            runtime
+                .reconfigure_bundle(0, ["Carol", "Dave"])
+                .expect("second reconfiguration");
+            runtime
+                .bundle_reconfiguration_history(0)
+                .expect("reconfiguration history")
+                .to_vec()
+        }
+
+        assert_eq!(drive_history(), drive_history());
     }
 }
