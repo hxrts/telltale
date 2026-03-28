@@ -100,8 +100,12 @@ pub(super) fn parse_sim_trace_validation(
     })
 }
 
-pub(super) fn simulation_trace_payload(trace: &[ProtocolMachineTraceEvent]) -> Value {
+pub(super) fn simulation_trace_payload(
+    input: &SimRunInput,
+    trace: &[ProtocolMachineTraceEvent],
+) -> Value {
     serde_json::json!({
+        "input": input,
         "trace": trace,
     })
 }

@@ -29,7 +29,7 @@ pub mod tracing;
 pub use runtime::{SystemClock, SystemRng};
 
 // Re-export typed identifiers
-pub use identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
+pub use identifiers::{Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
 
 // Re-export main APIs
 pub use ast::{Choreography, MessageType, Protocol, Role};
@@ -54,10 +54,11 @@ pub use extensions::{
 };
 pub use runtime::{spawn, spawn_local};
 pub use topology::{
-    parse_topology, ByteMessage, InMemoryChannelTransport, Location, ParsedTopology, Topology,
-    TopologyBuilder, TopologyConstraint, TopologyError, TopologyHandler, TopologyHandlerBuilder,
-    TopologyLoadError, TopologyMode, TopologyParseError, TopologyValidation, Transport,
-    TransportError, TransportFactory, TransportMessage, TransportResult, TransportType,
+    parse_topology, ByteMessage, InMemoryChannelTransport, Location, ParsedTopology,
+    RoleFamilyConstraint, RoleFamilyConstraintError, Topology, TopologyBuilder, TopologyConstraint,
+    TopologyError, TopologyHandler, TopologyHandlerBuilder, TopologyLoadError, TopologyMode,
+    TopologyParseError, TopologyValidation, Transport, TransportError, TransportFactory,
+    TransportMessage, TransportResult, TransportType,
 };
 
 // Re-export heap types for resource management

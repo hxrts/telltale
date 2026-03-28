@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
+use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
 /// Metrics collection middleware
@@ -106,5 +107,14 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Metrics<H> {
         F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         self.inner.with_timeout(ep, at, dur, body).await
+    }
+}
+
+impl<H> ExtensibleHandler for Metrics<H>
+where
+    H: ExtensibleHandler + Send,
+{
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role> {
+        self.inner.extension_registry()
     }
 }

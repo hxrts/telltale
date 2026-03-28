@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::thread;
@@ -19,7 +19,7 @@ use crate::semantic_objects::{ProtocolMachineSemanticObjects, TickedObsEvent};
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
-use telltale_machine::EffectExchangeRecord;
+use telltale_machine::{EffectExchangeRecord, ReconfigurationEvent, ReconfigurationPolicy};
 
 #[path = "protocol_machine_runner_json_parsing.rs"]
 mod parsing;
@@ -73,7 +73,7 @@ pub struct ProtocolMachineRunInput {
 }
 
 /// One session status entry from the protocol-machine runner.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProtocolMachineSessionStatus {
     /// Schema version for this payload.
     #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
@@ -122,6 +122,8 @@ pub struct ProtocolMachineTraceEvent {
     pub output_digest: Option<String>,
     #[serde(default)]
     pub passed: Option<bool>,
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 /// One scheduler-step state entry from the protocol-machine runner.
@@ -133,6 +135,12 @@ pub struct ProtocolMachineStepState {
     /// Coroutine selected for this step, when available.
     #[serde(default)]
     pub selected_coro: Option<u64>,
+    /// Program counter selected for this step, when available.
+    #[serde(default)]
+    pub selected_pc: Option<u64>,
+    /// Lean-side selected endpoint local type snapshot for this step.
+    #[serde(default)]
+    pub selected_type: Option<Value>,
     /// Execution status tag for the selected step.
     #[serde(default)]
     pub exec_status: Option<String>,
@@ -199,6 +207,7 @@ pub struct TraceValidation {
 pub struct ComparisonResult {
     pub equivalent: bool,
     pub semantic_audit_equivalent: bool,
+    pub session_statuses_equivalent: bool,
     pub semantic_handoffs_equivalent: bool,
     pub invalidation_artifacts_equivalent: bool,
     pub rust_semantic_audit: Vec<TickedObsEvent<ProtocolMachineTraceEvent>>,
@@ -216,6 +225,15 @@ pub struct InvariantVerificationResult {
     pub errors: Vec<LeanStructuredError>,
     #[serde(default)]
     pub artifacts: Value,
+}
+
+/// Result from Lean reconfiguration-transition validation entrypoint.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReconfigurationValidationResult {
+    pub valid: bool,
+    #[serde(default)]
+    pub errors: Vec<LeanStructuredError>,
+    pub event: Option<ReconfigurationEvent>,
 }
 
 /// Runner for invoking the Lean protocol-machine runner binary.
@@ -242,14 +260,36 @@ impl ProtocolMachineRunner {
         timeout: Duration,
         operation: &str,
     ) -> Result<Output, ProtocolMachineRunnerError> {
+        let stdout_handle = child.stdout.take().map(|mut stdout| {
+            thread::spawn(move || {
+                let mut buf = Vec::new();
+                let _ = stdout.read_to_end(&mut buf);
+                buf
+            })
+        });
+        let stderr_handle = child.stderr.take().map(|mut stderr| {
+            thread::spawn(move || {
+                let mut buf = Vec::new();
+                let _ = stderr.read_to_end(&mut buf);
+                buf
+            })
+        });
         let start = Instant::now();
         loop {
             // bounded: exits on child completion or timeout
             match child.try_wait()? {
-                Some(_) => {
-                    return child
-                        .wait_with_output()
-                        .map_err(ProtocolMachineRunnerError::from)
+                Some(status) => {
+                    let stdout = stdout_handle
+                        .map(|handle| handle.join().unwrap_or_default())
+                        .unwrap_or_default();
+                    let stderr = stderr_handle
+                        .map(|handle| handle.join().unwrap_or_default())
+                        .unwrap_or_default();
+                    return Ok(Output {
+                        status,
+                        stdout,
+                        stderr,
+                    });
                 }
                 None => {
                     if start.elapsed() >= timeout {
@@ -262,6 +302,12 @@ impl ProtocolMachineRunner {
                             eprintln!(
                                 "best-effort child.wait failed during timeout handling: {err}"
                             );
+                        }
+                        if let Some(handle) = stdout_handle {
+                            let _ = handle.join();
+                        }
+                        if let Some(handle) = stderr_handle {
+                            let _ = handle.join();
                         }
                         return Err(ProtocolMachineRunnerError::TimedOut {
                             operation: operation.to_string(),
@@ -325,6 +371,39 @@ impl ProtocolMachineRunner {
     #[must_use]
     pub fn try_new() -> Option<Self> {
         Self::new().ok()
+    }
+
+    /// Check if the protocol-machine runner binary is available at the default path.
+    #[must_use]
+    pub fn is_available() -> bool {
+        Self::get_binary_path().is_some()
+    }
+
+    /// Require that the protocol-machine runner binary is available.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the binary is not available.
+    pub fn require_available() {
+        if !Self::is_available() {
+            panic!(
+                "\n\
+                ╔══════════════════════════════════════════════════════════════════╗\n\
+                ║  LEAN PROTOCOL-MACHINE RUNNER REQUIRED                          ║\n\
+                ╠══════════════════════════════════════════════════════════════════╣\n\
+                ║  The Lean protocol-machine runner is required but not found.    ║\n\
+                ║                                                                  ║\n\
+                ║  To build Lean runners:                                          ║\n\
+                ║    cd lean && lake build protocol_machine_runner                 ║\n\
+                ║                                                                  ║\n\
+                ║  Or with Nix:                                                    ║\n\
+                ║    nix develop --command bash -c \"cd lean && lake build protocol_machine_runner\" ║\n\
+                ║                                                                  ║\n\
+                ║  Expected path: {path}          \n\
+                ╚══════════════════════════════════════════════════════════════════╝\n",
+                path = Self::DEFAULT_BINARY_PATH
+            );
+        }
     }
 
     /// Run the protocol-machine runner and return the parsed output.
@@ -429,9 +508,11 @@ impl ProtocolMachineRunner {
     /// Returns an error if Lean invocation fails.
     pub fn validate_trace(
         &self,
+        choreographies: &[ChoreographyJson],
         rust_trace: &[ProtocolMachineTraceEvent],
     ) -> Result<TraceValidation, ProtocolMachineRunnerError> {
         let payload = serde_json::json!({
+            "choreographies": choreographies,
             "trace": rust_trace,
         });
         let response = self.run_validation_operation("validateTrace", &payload)?;
@@ -465,9 +546,10 @@ impl ProtocolMachineRunner {
     /// Returns an error if Lean invocation fails.
     pub fn validate_simulation_trace(
         &self,
+        input: &SimRunInput,
         trace: &[ProtocolMachineTraceEvent],
     ) -> Result<SimTraceValidation, ProtocolMachineRunnerError> {
-        let payload = simulation_trace_payload(trace);
+        let payload = simulation_trace_payload(input, trace);
         let response = self.run_validation_operation("validateSimulationTrace", &payload)?;
         parse_sim_trace_validation(&response)
     }
@@ -512,7 +594,14 @@ impl ProtocolMachineRunner {
         let rust_normalized = normalize_semantic_audit(&rust_ticked);
         let lean_normalized = normalize_semantic_audit(&lean_ticked);
         let semantic_audit_equivalent = semantic_audits_equivalent(&rust_ticked, &lean_ticked);
-        let diff = compute_trace_diff(&rust_normalized, &lean_normalized);
+        let session_statuses_equivalent = normalized_session_statuses(&rust_output.sessions)
+            == normalized_session_statuses(&lean_output.sessions);
+        let diff = compute_execution_diff(
+            &rust_normalized,
+            &lean_normalized,
+            &rust_output.sessions,
+            &lean_output.sessions,
+        );
         let semantic_handoffs_equivalent = rust_output.semantic_objects.semantic_handoffs
             == lean_output.semantic_objects.semantic_handoffs;
         let rust_invalidated_effects: Vec<_> = rust_output
@@ -545,8 +634,9 @@ impl ProtocolMachineRunner {
                 == lean_output.semantic_objects.transformation_obligations;
 
         Ok(ComparisonResult {
-            equivalent: semantic_audit_equivalent,
+            equivalent: semantic_audit_equivalent && session_statuses_equivalent,
             semantic_audit_equivalent,
+            session_statuses_equivalent,
             semantic_handoffs_equivalent,
             invalidation_artifacts_equivalent,
             rust_semantic_audit: rust_normalized,
@@ -573,6 +663,43 @@ impl ProtocolMachineRunner {
             valid: parse_required_valid(&response, "verifyProtocolBundle")?,
             errors: parse_structured_errors(&response),
             artifacts: response.get("artifacts").cloned().unwrap_or(Value::Null),
+        })
+    }
+
+    /// Validate one deterministic reconfiguration transition against the Lean reference hook.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lean invocation fails or the returned event cannot be decoded.
+    pub fn validate_reconfiguration_transition(
+        &self,
+        artifact_id: &str,
+        policy: &ReconfigurationPolicy,
+        starting_epoch: u64,
+        previous_members: &[String],
+        next_members: &[String],
+    ) -> Result<ReconfigurationValidationResult, ProtocolMachineRunnerError> {
+        let payload = serde_json::json!({
+            "artifact_id": artifact_id,
+            "policy": policy,
+            "starting_epoch": starting_epoch,
+            "previous_members": previous_members,
+            "next_members": next_members,
+        });
+        let response =
+            self.run_validation_operation("validateReconfigurationTransition", &payload)?;
+        let event = response
+            .get("artifacts")
+            .and_then(|artifacts| artifacts.get("event"))
+            .cloned()
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|err| ProtocolMachineRunnerError::ParseError(err.to_string()))?;
+
+        Ok(ReconfigurationValidationResult {
+            valid: parse_required_valid(&response, "validateReconfigurationTransition")?,
+            errors: parse_structured_errors(&response),
+            event,
         })
     }
 }
@@ -606,6 +733,37 @@ pub fn compute_trace_diff(
         "rust_len": rust_trace.len(),
         "lean_len": lean_trace.len(),
     }))
+}
+
+fn normalized_session_statuses(
+    sessions: &[ProtocolMachineSessionStatus],
+) -> Vec<ProtocolMachineSessionStatus> {
+    let mut normalized = sessions.to_vec();
+    normalized.sort_by_key(|session| session.sid);
+    normalized
+}
+
+fn compute_execution_diff(
+    rust_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
+    lean_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
+    rust_sessions: &[ProtocolMachineSessionStatus],
+    lean_sessions: &[ProtocolMachineSessionStatus],
+) -> Option<Value> {
+    if let Some(diff) = compute_trace_diff(rust_trace, lean_trace) {
+        return Some(diff);
+    }
+
+    let rust_sessions = normalized_session_statuses(rust_sessions);
+    let lean_sessions = normalized_session_statuses(lean_sessions);
+    if rust_sessions != lean_sessions {
+        return Some(serde_json::json!({
+            "kind": "session_status_mismatch",
+            "rust": rust_sessions,
+            "lean": lean_sessions,
+        }));
+    }
+
+    None
 }
 
 /// Helper to build a protocol-machine runner input from JSON values.
@@ -665,6 +823,7 @@ mod tests {
             witness_ref: None,
             output_digest: None,
             passed: None,
+            reason: None,
         }
     }
 
@@ -762,8 +921,16 @@ mod tests {
 
     #[test]
     fn simulation_trace_payload_has_expected_shape() {
+        let input = SimRunInput {
+            schema_version: crate::schema::canonical_schema_version(),
+            scenario: serde_json::json!({ "kind": "unit-test" }),
+            global_type: serde_json::json!({ "tag": "end" }),
+            local_types: std::collections::BTreeMap::new(),
+            initial_states: std::collections::BTreeMap::new(),
+        };
         let trace = vec![trace_event("sent", 1, Some(0))];
-        let payload = simulation_trace_payload(&trace);
+        let payload = simulation_trace_payload(&input, &trace);
+        assert_eq!(payload["input"]["schema_version"], input.schema_version);
         assert!(payload["trace"].is_array());
         assert_eq!(payload["trace"][0]["kind"], "sent");
     }

@@ -7,44 +7,48 @@ use telltale_bridge::{
     InvariantVerificationResult, ProtocolMachineRunner, ProtocolMachineRunnerError,
 };
 
+#[derive(Debug)]
+enum BundleVerificationOutcome {
+    Verified(InvariantVerificationResult),
+    MissingRunner,
+}
+
 fn strict_protocol_bundle_verification_required() -> bool {
     std::env::var("TELLTALE_REQUIRE_VERIFY_PROTOCOL_BUNDLE")
         .map(|value| value != "0")
         .unwrap_or(false)
 }
 
-fn unsupported_verify_protocol_bundle(stderr: &str) -> bool {
-    stderr.contains("verifyProtocolBundle")
-        || stderr.contains("unknown operation")
-        || stderr.contains("unsupported operation")
-        || stderr.contains("missing choreographies")
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
 }
 
-fn verify_bundle_or_skip(
+fn verify_bundle(
     bundle: &telltale_bridge::ProtocolBundle,
-) -> Option<InvariantVerificationResult> {
-    let strict = strict_protocol_bundle_verification_required();
+) -> Result<BundleVerificationOutcome, ProtocolMachineRunnerError> {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
-        assert!(
-            !strict,
-            "protocol-machine runner binary is required when strict protocol-bundle verification is enabled"
-        );
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        return None;
+        if strict_protocol_bundle_verification_required()
+            || strict_protocol_machine_runner_required()
+        {
+            ProtocolMachineRunner::require_available();
+        }
+        return Ok(BundleVerificationOutcome::MissingRunner);
     };
 
-    match runner.verify_invariants(bundle) {
-        Ok(result) => Some(result),
-        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_verify_protocol_bundle(&stderr) =>
-        {
-            assert!(
-                !strict,
-                "strict protocol-bundle verification is enabled but verifyProtocolBundle is unsupported: {stderr}"
-            );
-            eprintln!(
-                "SKIPPED: Lean protocol-machine runner does not support verifyProtocolBundle yet"
-            );
+    runner
+        .verify_invariants(bundle)
+        .map(BundleVerificationOutcome::Verified)
+}
+
+fn verified_result_or_skip(
+    outcome: Result<BundleVerificationOutcome, ProtocolMachineRunnerError>,
+) -> Option<InvariantVerificationResult> {
+    match outcome {
+        Ok(BundleVerificationOutcome::Verified(result)) => Some(result),
+        Ok(BundleVerificationOutcome::MissingRunner) => {
+            eprintln!("SKIPPED: Lean protocol-machine runner not available");
             None
         }
         Err(err) => panic!("verify_invariants failed unexpectedly: {err}"),
@@ -52,9 +56,46 @@ fn verify_bundle_or_skip(
 }
 
 #[test]
+fn test_verify_protocol_bundle_classifies_expected_stderr_patterns() {
+    let fixture = test_choreographies::tier3_distributed::simple_majority();
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+        return;
+    };
+    let result = runner
+        .verify_invariants(&fixture.to_bundle())
+        .expect("verifyProtocolBundle should execute");
+    assert!(
+        result.valid,
+        "supported verifyProtocolBundle path should accept the valid quorum fixture"
+    );
+}
+
+#[test]
+fn test_verify_protocol_bundle_support_matrix_is_explicit() {
+    let fixture = test_choreographies::tier3_distributed::simple_majority();
+
+    match verify_bundle(&fixture.to_bundle()).expect("support probe should not hard-fail") {
+        BundleVerificationOutcome::Verified(result) => {
+            assert!(
+                result.valid,
+                "supported verifyProtocolBundle path should accept the valid quorum fixture"
+            );
+        }
+        BundleVerificationOutcome::MissingRunner => {
+            assert!(
+                !strict_protocol_machine_runner_required(),
+                "strict protocol-machine runner verification is enabled but the runner is unavailable"
+            );
+            eprintln!("SKIPPED: Lean protocol-machine runner not available");
+        }
+    }
+}
+
+#[test]
 fn test_lean_verifies_valid_quorum_protocol() {
     let fixture = test_choreographies::tier3_distributed::simple_majority();
-    let Some(result) = verify_bundle_or_skip(&fixture.to_bundle()) else {
+    let Some(result) = verified_result_or_skip(verify_bundle(&fixture.to_bundle())) else {
         return;
     };
 
@@ -68,7 +109,7 @@ fn test_lean_verifies_valid_quorum_protocol() {
 #[test]
 fn test_lean_rejects_bad_quorum() {
     let fixture = test_choreographies::bad_quorum();
-    let Some(result) = verify_bundle_or_skip(&fixture.to_bundle()) else {
+    let Some(result) = verified_result_or_skip(verify_bundle(&fixture.to_bundle())) else {
         return;
     };
 
@@ -93,7 +134,7 @@ fn test_lean_rejects_bad_quorum() {
 #[test]
 fn test_lean_rejects_deadlock() {
     let fixture = test_choreographies::deadlock();
-    let Some(result) = verify_bundle_or_skip(&fixture.to_bundle()) else {
+    let Some(result) = verified_result_or_skip(verify_bundle(&fixture.to_bundle())) else {
         return;
     };
 
@@ -114,7 +155,7 @@ fn test_lean_rejects_deadlock() {
 #[test]
 fn test_lean_rejects_unbounded_wait() {
     let fixture = test_choreographies::unbounded_wait();
-    let Some(result) = verify_bundle_or_skip(&fixture.to_bundle()) else {
+    let Some(result) = verified_result_or_skip(verify_bundle(&fixture.to_bundle())) else {
         return;
     };
 

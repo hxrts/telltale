@@ -108,6 +108,22 @@ def muDepth : LocalType → Nat
   | .mu L => 1 + muDepth L
   | _ => 0
 
+private theorem substBranches_eq_nil_iff (n : Nat) (replacement : LocalType)
+    (bs : List (Label × LocalType)) :
+    LocalType.substBranches n replacement bs = [] ↔ bs = [] := by
+  induction bs with
+  | nil =>
+      simp [LocalType.substBranches]
+  | cons head tail =>
+      cases head
+      simp [LocalType.substBranches]
+
+private theorem substBranches_ne_nil (n : Nat) (replacement : LocalType)
+    {bs : List (Label × LocalType)} (h : bs ≠ []) :
+    LocalType.substBranches n replacement bs ≠ [] := by
+  intro hSubst
+  exact h ((substBranches_eq_nil_iff n replacement bs).mp hSubst)
+
 /-! ## Substitution Decision Preservation -/
 
 /-- Substitution preserves reachesCommDecide.
@@ -125,21 +141,25 @@ theorem subst_preserves_reaches_comm_decide (n : Nat) (replacement : LocalType) 
     reachesCommDecide (LocalType.subst n replacement L) = true := by
   cases L with
   | send r T L' =>
-    -- subst n replacement (.send r T L') = .send r T (subst n replacement L')
-    -- reachesCommDecide .send = true
-    rfl
+    simp [LocalType.subst, reachesCommDecide]
   | recv r T L' =>
-    -- subst n replacement (.recv r T L') = .recv r T (subst n replacement L')
-    -- reachesCommDecide .recv = true
-    rfl
+    simp [LocalType.subst, reachesCommDecide]
   | select r bs =>
-    -- subst n replacement (.select r bs) = .select r bs (no recursion in branches)
-    unfold LocalType.subst
-    exact hL
+    cases bs with
+    | nil =>
+        simp [reachesCommDecide] at hL
+    | cons head tail =>
+        simpa [LocalType.subst, reachesCommDecide] using
+          (show LocalType.substBranches n replacement (head :: tail) ≠ [] from
+            substBranches_ne_nil n replacement (by simp))
   | branch r bs =>
-    -- subst n replacement (.branch r bs) = .branch r bs (no recursion in branches)
-    unfold LocalType.subst
-    exact hL
+    cases bs with
+    | nil =>
+        simp [reachesCommDecide] at hL
+    | cons head tail =>
+        simpa [LocalType.subst, reachesCommDecide] using
+          (show LocalType.substBranches n replacement (head :: tail) ≠ [] from
+            substBranches_ne_nil n replacement (by simp))
   | end_ =>
     -- reachesCommDecide .end_ = false, contradicts hL
     exact Bool.noConfusion hL
@@ -175,18 +195,28 @@ private theorem reaches_comm_of_comm (L : LocalType) (h : reachesCommDecide L = 
 
 /-- Key insight: subst preserves the top-level constructor for non-var types.
     For comm types (send/recv/select/branch), this lets us build ReachesComm. -/
-private theorem reaches_comm_subst_comm (L : LocalType) (n : Nat) (r : LocalType)
+private theorem reaches_comm_subst_comm (L : LocalType) (n : Nat) (replacement : LocalType)
     (h : reachesCommDecide L = true) (hNotMu : ∀ L', L ≠ .mu L') (hNotVar : ∀ m, L ≠ .var m) :
-    ReachesComm (LocalType.subst n r L) := by
+    ReachesComm (LocalType.subst n replacement L) := by
   cases L with
   | send => simp only [LocalType.subst]; exact ReachesComm.send
   | recv => simp only [LocalType.subst]; exact ReachesComm.recv
   | select r bs =>
-    simp only [LocalType.subst, reachesCommDecide, Bool.not_eq_true'] at *
-    exact ReachesComm.select (fun hemp => by simp [hemp] at h)
+    have hNonEmpty : bs ≠ [] := by
+      by_cases hEmpty : bs = []
+      · simp [reachesCommDecide, hEmpty] at h
+      · exact hEmpty
+    simpa [LocalType.subst] using
+      (ReachesComm.select (r := r) (bs := LocalType.substBranches n replacement bs)
+        (substBranches_ne_nil n replacement hNonEmpty))
   | branch r bs =>
-    simp only [LocalType.subst, reachesCommDecide, Bool.not_eq_true'] at *
-    exact ReachesComm.branch (fun hemp => by simp [hemp] at h)
+    have hNonEmpty : bs ≠ [] := by
+      by_cases hEmpty : bs = []
+      · simp [reachesCommDecide, hEmpty] at h
+      · exact hEmpty
+    simpa [LocalType.subst] using
+      (ReachesComm.branch (r := r) (bs := LocalType.substBranches n replacement bs)
+        (substBranches_ne_nil n replacement hNonEmpty))
   | end_ => exact Bool.noConfusion h
   | var m => exact absurd rfl (hNotVar m)
   | mu L' => exact absurd rfl (hNotMu L')
@@ -265,14 +295,14 @@ private theorem reaches_comm_unfold_mu (fuel : Nat) (L : LocalType)
         · simp [reachesCommDecide, hEmpty] at hBody
         · exact hEmpty
       simp [LocalType.unfold, LocalType.subst]
-      exact ReachesComm.select hNonEmpty
+      exact ReachesComm.select (substBranches_ne_nil 0 (.mu (.select r bs)) hNonEmpty)
   | branch r bs =>
       have hNonEmpty : bs ≠ [] := by
         by_cases hEmpty : bs = []
         · simp [reachesCommDecide, hEmpty] at hBody
         · exact hEmpty
       simp [LocalType.unfold, LocalType.subst]
-      exact ReachesComm.branch hNonEmpty
+      exact ReachesComm.branch (substBranches_ne_nil 0 (.mu (.branch r bs)) hNonEmpty)
   | end_ =>
       exact Bool.noConfusion hBody
   | var m =>

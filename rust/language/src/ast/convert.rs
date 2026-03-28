@@ -19,6 +19,7 @@
 //! - `LocalChoice`: DSL-only feature for local decisions
 
 use super::{Branch, Choreography, LocalType, MessageType, NonEmptyVec, Protocol};
+use crate::ast::Condition;
 use telltale_types::{GlobalType as GlobalTypeCore, Label, LocalTypeR, PayloadSort};
 use thiserror::Error;
 
@@ -109,10 +110,7 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
             hint: "Desugar to nested Sends using desugar_broadcast() first".to_string(),
         }),
 
-        Protocol::Loop { .. } => Err(ConversionError::UnsupportedFeature {
-            feature: "Loop".to_string(),
-            hint: "Convert to Rec/Var using desugar_loop() first".to_string(),
-        }),
+        Protocol::Loop { condition, body } => convert_protocol_loop(condition.as_ref(), body),
 
         Protocol::Parallel { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Parallel".to_string(),
@@ -129,11 +127,7 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
                     .to_string(),
         }),
 
-        Protocol::Let { .. } => Err(ConversionError::UnsupportedFeature {
-            feature: "Let".to_string(),
-            hint: "Authority-local let bindings must be erased or lowered before theory conversion"
-                .to_string(),
-        }),
+        Protocol::Let { continuation, .. } => protocol_to_global(continuation),
 
         Protocol::Case { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Case".to_string(),
@@ -261,13 +255,84 @@ fn convert_choice_branch(
                 });
             }
 
-            let cont_global = protocol_to_global(continuation)?;
-            let label = message_to_label(message);
+            let label = Label::new(branch.label.to_string());
+            let cont_global = if branch.label == message.name {
+                protocol_to_global(continuation)?
+            } else {
+                protocol_to_global(&branch.protocol)?
+            };
             Ok((label, cont_global))
         }
         _ => Err(ConversionError::InvalidChoice {
             label: branch.label.to_string(),
         }),
+    }
+}
+
+fn append_global_continuation(
+    global: GlobalTypeCore,
+    continuation: GlobalTypeCore,
+) -> GlobalTypeCore {
+    match global {
+        GlobalTypeCore::End => continuation,
+        GlobalTypeCore::Comm {
+            sender,
+            receiver,
+            branches,
+        } => GlobalTypeCore::Comm {
+            sender,
+            receiver,
+            branches: branches
+                .into_iter()
+                .map(|(label, branch)| {
+                    (
+                        label,
+                        append_global_continuation(branch, continuation.clone()),
+                    )
+                })
+                .collect(),
+        },
+        GlobalTypeCore::Mu { var, body } => GlobalTypeCore::Mu {
+            var,
+            body: Box::new(append_global_continuation(*body, continuation)),
+        },
+        GlobalTypeCore::Var(var) => GlobalTypeCore::Var(var),
+    }
+}
+
+fn repeat_global(body: &Protocol, iterations: usize) -> ConversionResult<GlobalTypeCore> {
+    if iterations == 0 {
+        return Ok(GlobalTypeCore::End);
+    }
+
+    let body_global = protocol_to_global(body)?;
+    let mut repeated = GlobalTypeCore::End;
+    for _ in 0..iterations {
+        repeated = append_global_continuation(body_global.clone(), repeated);
+    }
+    Ok(repeated)
+}
+
+fn convert_protocol_loop(
+    condition: Option<&Condition>,
+    body: &Protocol,
+) -> ConversionResult<GlobalTypeCore> {
+    match condition {
+        Some(Condition::Count(iterations))
+        | Some(Condition::Fuel(iterations))
+        | Some(Condition::YieldAfter(iterations)) => repeat_global(body, *iterations),
+        Some(Condition::RoleDecides(_)) => Err(ConversionError::UnsupportedFeature {
+            feature: "Loop".to_string(),
+            hint: "Role-decides loops should be desugared to choice+recursion before theory conversion"
+                .to_string(),
+        }),
+        Some(Condition::Custom(_)) | Some(Condition::YieldWhen(_)) | None => {
+            Err(ConversionError::UnsupportedFeature {
+                feature: "Loop".to_string(),
+                hint: "Only finite counted loops currently lower to GlobalType; use recursion for open-ended loops"
+                    .to_string(),
+            })
+        }
     }
 }
 
@@ -333,10 +398,7 @@ pub fn local_to_local_r(local: &LocalType) -> ConversionResult<LocalTypeR> {
                 .to_string(),
         }),
 
-        LocalType::Loop { .. } => Err(ConversionError::UnsupportedFeature {
-            feature: "Loop".to_string(),
-            hint: "Loop should be converted to Rec/Var before conversion".to_string(),
-        }),
+        LocalType::Loop { condition, body } => convert_local_loop(condition.as_ref(), body),
 
         LocalType::Timeout { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Timeout".to_string(),
@@ -417,6 +479,79 @@ fn convert_local_branch(
         partner: from.name().to_string(),
         branches: r_branches,
     })
+}
+
+fn append_local_r_continuation(local: LocalTypeR, continuation: LocalTypeR) -> LocalTypeR {
+    match local {
+        LocalTypeR::End => continuation,
+        LocalTypeR::Send { partner, branches } => LocalTypeR::Send {
+            partner,
+            branches: branches
+                .into_iter()
+                .map(|(label, payload, branch)| {
+                    (
+                        label,
+                        payload,
+                        append_local_r_continuation(branch, continuation.clone()),
+                    )
+                })
+                .collect(),
+        },
+        LocalTypeR::Recv { partner, branches } => LocalTypeR::Recv {
+            partner,
+            branches: branches
+                .into_iter()
+                .map(|(label, payload, branch)| {
+                    (
+                        label,
+                        payload,
+                        append_local_r_continuation(branch, continuation.clone()),
+                    )
+                })
+                .collect(),
+        },
+        LocalTypeR::Mu { var, body } => LocalTypeR::Mu {
+            var,
+            body: Box::new(append_local_r_continuation(*body, continuation)),
+        },
+        LocalTypeR::Var(var) => LocalTypeR::Var(var),
+    }
+}
+
+fn repeat_local_r(body: &LocalType, iterations: usize) -> ConversionResult<LocalTypeR> {
+    if iterations == 0 {
+        return Ok(LocalTypeR::End);
+    }
+
+    let body_r = local_to_local_r(body)?;
+    let mut repeated = LocalTypeR::End;
+    for _ in 0..iterations {
+        repeated = append_local_r_continuation(body_r.clone(), repeated);
+    }
+    Ok(repeated)
+}
+
+fn convert_local_loop(
+    condition: Option<&Condition>,
+    body: &LocalType,
+) -> ConversionResult<LocalTypeR> {
+    match condition {
+        Some(Condition::Count(iterations))
+        | Some(Condition::Fuel(iterations))
+        | Some(Condition::YieldAfter(iterations)) => repeat_local_r(body, *iterations),
+        Some(Condition::RoleDecides(_)) => Err(ConversionError::UnsupportedFeature {
+            feature: "Loop".to_string(),
+            hint: "Role-decides loops should be desugared to choice+recursion before theory conversion"
+                .to_string(),
+        }),
+        Some(Condition::Custom(_)) | Some(Condition::YieldWhen(_)) | None => {
+            Err(ConversionError::UnsupportedFeature {
+                feature: "Loop".to_string(),
+                hint: "Only finite counted loops currently lower to LocalTypeR; use recursion for open-ended loops"
+                    .to_string(),
+            })
+        }
+    }
 }
 
 // ============================================================================

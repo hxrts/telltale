@@ -1,0 +1,26 @@
+effect Runtime
+  authoritative ready : Session -> Result ReadyErr ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
+
+type ReadyErr =
+  | NotReady
+
+type alias ReadyWitness =
+{
+  epoch : Int
+}
+
+protocol CaseAuthoritativeBinding uses Runtime =
+  roles Coordinator, Worker
+  authoritative let readiness = check Runtime.ready(session)
+  case readiness of
+    | Ok(witness) =>
+        Coordinator -> Worker : Commit(witness)
+    | Err(reason) =>
+        Coordinator -> Worker : Abort(reason)

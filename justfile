@@ -66,7 +66,10 @@ ci-dry-run lane="fast":
     just check-lean-metrics
     just check-tooling-convergence
     just check-lean-prebuilt
+    just check-lean-bridge-strict
+    just check-extension-dispatch
     just check-semantic-assurance
+    just check-runtime-boundaries
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -164,6 +167,11 @@ check-tooling-convergence:
 check-source-doc-snippets:
     ./scripts/check/source-doc-snippets.sh
 
+# Run the deterministic extension statement parsing/dispatch regression suites.
+check-extension-dispatch:
+    cargo test -p telltale-runtime --test extension_integration -- --nocapture
+    cargo test -p telltale-runtime --features test-utils --test middleware_semantic_hardening -- --nocapture
+
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":
     cargo run -p telltale-runtime --bin effect-scaffold -- --out {{ out }} --dsl {{ dsl }}
@@ -190,6 +198,10 @@ check-lean-dependency-pins:
 # Ensure pinned Lean dependency checkouts also have the required prebuilt artifacts.
 check-lean-prebuilt:
     ./scripts/bootstrap/ensure-lean-prebuilt.sh
+
+# Build required Lean bridge binaries and fail closed if strict bridge suites would otherwise skip.
+check-lean-bridge-strict:
+    ./scripts/check/lean-bridge-strict.sh
 
 # Consolidated capability gate checks (byzantine, delegation, envelope, failure, contracts, speculation)
 check-capability-gates:
@@ -264,10 +276,22 @@ check-verification-inventory:
 check-semantic-assurance:
     cargo test -p telltale-machine runtime_semantic_lifecycle_harness_covers_seeded_state_machine_paths -- --nocapture
     cargo test -p telltale-machine runtime_semantic_lifecycle_adversarial_corpus_is_deterministic -- --nocapture
+    cargo test -p telltale-machine --test replay_persistence_identity -- --nocapture
+    cargo test -p telltale-machine reconfiguration_snapshot_restore_preserves_plan_execution_history -- --nocapture
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence -- --nocapture
     cargo test -p telltale-simulator --test harness_contracts -- --nocapture
+    cargo test -p telltale-bridge --test reconfiguration_recovery_harness -- --nocapture
+    cargo test -p telltale-bridge --test protocol_bundle_admission_contracts reconfiguration_plan_with_runtime_topology_artifacts_matches_lean_step_validation -- --exact --nocapture
     cargo test -p telltale-bridge --test protocol_machine_cross_target_tests -- --nocapture
     cargo test --test dsl_runtime_semantics_tests -- --nocapture
+
+# Run targeted boundary suites that prove fail-closed language, topology, and runtime substrate behavior.
+check-runtime-boundaries:
+    cargo test -p telltale-runtime --test authority_control_flow_corpus -- --nocapture
+    cargo test -p telltale-bridge --test protocol_bundle_admission_contracts -- --nocapture
+    cargo test -p telltale-runtime topology_exports_canonical_reconfiguration_placement_artifacts -- --nocapture
+    cargo test -p telltale-runtime --test runtime_substrate_contracts -- --nocapture
+    cargo test -p telltale-runtime --test generated_topology_public_path -- generated_topology_public_path_executes_end_to_end_in_a_temp_crate --exact --nocapture
 
 # Keep proc-macro UI boundary contracts under targeted trybuild coverage.
 check-macro-boundaries:

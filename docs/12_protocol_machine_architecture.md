@@ -192,6 +192,20 @@ Runtime delegation uses one sanctioned manager-style path rather than scattered 
 
 This path is the runtime realization of delegation/reconfiguration. It should not be read as the theorem statement itself. The theorem-level side remains `DelegationWF` and related harmony results.
 
+Reconfiguration is no longer only a single-step membership swap. The runtime now
+supports deterministic multi-step reconfiguration plans with:
+
+- canonical per-phase `ReconfigurationEvent` artifacts
+- placement observations and derived transport-boundary summaries per phase
+- atomic plan execution, so invalid later steps do not partially commit earlier
+  transitions
+- serializable reconfiguration snapshots that preserve membership history and
+  executed plan artifacts across recovery
+
+These artifacts stay transport agnostic. They record resolved placement facts
+and boundary classes (`in_process`, `shared_memory`, `network`) rather than any
+deployment-product-specific backend details.
+
 ## Capability Gate Architecture
 
 | Capability Gate | Lean Surface | Rust Surface |

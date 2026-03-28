@@ -3,6 +3,7 @@
 //! End-to-end DSL-to-runtime semantic conformance tests.
 
 use std::collections::BTreeMap;
+use std::path::PathBuf;
 
 use proc_macro2::{Ident, Span};
 use telltale::tell;
@@ -233,7 +234,17 @@ fn code_image_from_choreography(choreography: &telltale_language::ast::Choreogra
     CodeImage::from_local_types(&locals, &global)
 }
 
-#[derive(Debug)]
+fn authority_pass_fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("rust")
+        .join("runtime")
+        .join("tests")
+        .join("ui")
+        .join("authority_pass")
+        .join(format!("{name}.tell"))
+}
+
+#[derive(Debug, Clone)]
 struct DummyCapabilityExtension;
 
 impl ProtocolExtension for DummyCapabilityExtension {
@@ -271,6 +282,10 @@ impl ProtocolExtension for DummyCapabilityExtension {
 
     fn type_id(&self) -> std::any::TypeId {
         std::any::TypeId::of::<Self>()
+    }
+
+    fn clone_box(&self) -> Box<dyn ProtocolExtension> {
+        Box::new(self.clone())
     }
 }
 
@@ -612,6 +627,153 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     assert_eq!(semantic_handoff.activated_owner_id, "Worker");
     const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
     const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+}
+
+#[test]
+fn projectable_authority_control_flow_surfaces_lower_to_runtime_semantic_objects() {
+    for fixture in [
+        "call_plain_communication",
+        "choice_observational_binding",
+        "loop_authoritative_binding",
+        "recursion_authoritative_binding",
+    ] {
+        let choreography =
+            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        assert!(
+            choreography.language_tier_status().session_projectable,
+            "{fixture} should remain session-projectable"
+        );
+
+        let image = code_image_from_choreography(&choreography);
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine
+            .load_choreography(&image)
+            .unwrap_or_else(|err| panic!("load {fixture}: {err}"));
+        machine
+            .run(&NoopHandler, 128)
+            .unwrap_or_else(|err| panic!("run {fixture}: {err}"));
+
+        let semantic_objects = machine.semantic_objects();
+        assert!(
+            semantic_objects.parity_critical_operations_have_progress_contracts(),
+            "{fixture} should preserve parity-critical progress contracts after lowering"
+        );
+        assert!(
+            semantic_objects
+                .publication_events
+                .iter()
+                .any(|publication| publication.publication == "effect.succeeded"),
+            "{fixture} should emit canonical effect publications after lowering"
+        );
+    }
+}
+
+#[test]
+fn parallel_authority_control_flow_surface_projects_and_converts_locals() {
+    let choreography =
+        parse_choreography_file(&authority_pass_fixture("parallel_observational_binding"))
+            .expect("parse parallel authority fixture");
+    choreography
+        .validate()
+        .expect("validate parallel authority fixture");
+    assert!(
+        choreography.language_tier_status().session_projectable,
+        "parallel observational authority fixture should remain session-projectable"
+    );
+
+    for role in &choreography.roles {
+        let local = telltale_language::project(&choreography, role)
+            .unwrap_or_else(|err| panic!("project {}: {err}", role.name()));
+        local_to_local_r(&local)
+            .unwrap_or_else(|err| panic!("convert {} local type: {err}", role.name()));
+    }
+}
+
+#[test]
+fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theory_conversion() {
+    for (fixture, expected_feature) in [
+        ("case_authoritative_binding", "Case"),
+        ("timeout_observational_binding", "Timeout"),
+    ] {
+        let choreography =
+            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        let status = choreography.language_tier_status();
+        assert!(
+            status.protocol_machine_executable,
+            "{fixture} should remain protocol-machine executable"
+        );
+        assert!(
+            !status.session_projectable,
+            "{fixture} should remain non-projectable until explicit lowering exists"
+        );
+        assert!(
+            !status.theory_convertible,
+            "{fixture} should remain outside the theory-convertible subset"
+        );
+        let err = choreography_to_global(&choreography)
+            .expect_err("non-projectable fixture must fail theory conversion");
+        assert!(
+            err.to_string().contains(expected_feature),
+            "{fixture} should fail theory conversion with an explicit {expected_feature} blocker, got {err}"
+        );
+    }
+
+    for fixture in [
+        "call_plain_communication",
+        "choice_observational_binding",
+        "loop_authoritative_binding",
+        "recursion_authoritative_binding",
+    ] {
+        let choreography =
+            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        assert!(
+            choreography.language_tier_status().session_projectable,
+            "{fixture} should remain session-projectable"
+        );
+        assert!(
+            choreography.language_tier_status().theory_convertible,
+            "{fixture} should remain theory-convertible"
+        );
+        choreography_to_global(&choreography)
+            .unwrap_or_else(|err| panic!("convert {fixture} to GlobalType: {err}"));
+    }
+
+    let choreography =
+        parse_choreography_file(&authority_pass_fixture("parallel_observational_binding"))
+            .expect("parse parallel fixture");
+    choreography
+        .validate()
+        .expect("validate parallel authority fixture");
+    let status = choreography.language_tier_status();
+    assert!(
+        status.session_projectable,
+        "parallel observational fixture should remain session-projectable"
+    );
+    assert!(
+        !status.theory_convertible,
+        "parallel observational fixture must stay outside the theory-convertible subset"
+    );
+    for role in &choreography.roles {
+        let local = telltale_language::project(&choreography, role)
+            .unwrap_or_else(|err| panic!("project {}: {err}", role.name()));
+        local_to_local_r(&local)
+            .unwrap_or_else(|err| panic!("convert {} local type: {err}", role.name()));
+    }
+    let err = choreography_to_global(&choreography)
+        .expect_err("parallel fixture should remain outside theory conversion");
+    assert!(
+        err.to_string().contains("Parallel"),
+        "parallel theory-conversion blocker should remain explicit, got {err}"
+    );
 }
 
 #[test]

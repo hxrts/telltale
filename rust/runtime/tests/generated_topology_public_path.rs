@@ -11,7 +11,7 @@ use telltale_runtime::ast::{
     annotation::Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role,
 };
 use telltale_runtime::compiler::codegen::{generate_topology_integration, InlineTopology};
-use telltale_runtime::{RoleName, TopologyBuilder, TopologyEndpoint};
+use telltale_runtime::{RoleFamilyConstraint, RoleName, TopologyBuilder, TopologyEndpoint};
 use tempfile::tempdir;
 
 fn role(name: &str) -> Role {
@@ -132,6 +132,7 @@ fn named_topology_module() -> String {
                 RoleName::from_static("Bob"),
                 TopologyEndpoint::new("127.0.0.1:19901").expect("valid endpoint"),
             )
+            .role_family_constraint("Replica", RoleFamilyConstraint::bounded(2, 4))
             .build(),
     };
     generate_topology_integration(&choreography, &[edge]).to_string()
@@ -241,8 +242,8 @@ pub mod TopologyNamed {{
         r#"
 use generated_topology_public_path_smoke::{TopologyCapacity, TopologyNamed, TopologyRoundTrip};
 use telltale_runtime::{
-    ChannelCapacity, Location, RoleName, TopologyBuilder, TopologyEndpoint,
-    TransportFactory, TransportType,
+    ChannelCapacity, Location, RoleFamilyConstraint, RoleName, TopologyBuilder,
+    TopologyEndpoint, TransportFactory, TransportType,
 };
 
 #[tokio::test]
@@ -301,6 +302,10 @@ async fn generated_helpers_execute_local_and_custom_topologies_end_to_end() {
         .expect("transport intent"),
         TransportType::Tcp
     );
+    let direct_transport =
+        TransportFactory::create(&custom_topology, &RoleName::from_static("Alice"))
+            .expect("direct remote-capable transport");
+    assert!(direct_transport.is_connected(&RoleName::from_static("Bob")));
 }
 
 #[test]
@@ -372,6 +377,43 @@ fn generated_helpers_reject_invalid_topology_combinations_before_execution() {
         invalid_pin_error.contains("ConstraintViolation"),
         "unexpected error: {invalid_pin_error}"
     );
+
+    let supported_region = TopologyBuilder::new()
+        .local_role(RoleName::from_static("Alice"))
+        .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
+        .region(
+            RoleName::from_static("Alice"),
+            telltale_runtime::Region::new("membership").expect("region"),
+        )
+        .build();
+    let region_handler = TopologyRoundTrip::topology::with_topology(
+        supported_region.clone(),
+        TopologyRoundTrip::Role::Alice,
+    )
+    .expect("region-respecting topology should validate");
+    assert_eq!(
+        region_handler
+            .topology()
+            .region_for_role(&RoleName::from_static("Bob"))
+            .expect("inherited region"),
+        Some(telltale_runtime::Region::new("membership").unwrap())
+    );
+
+    let conflicting_region = supported_region.with_constraint(telltale_runtime::TopologyConstraint::Region(
+        RoleName::from_static("Bob"),
+        telltale_runtime::Region::new("archive").unwrap(),
+    ));
+    let conflicting_region_error = match TopologyRoundTrip::topology::with_topology(
+        conflicting_region,
+        TopologyRoundTrip::Role::Alice,
+    ) {
+        Ok(_) => panic!("conflicting region constraints should fail validation"),
+        Err(err) => err,
+    };
+    assert!(
+        conflicting_region_error.contains("colocated peer resolves"),
+        "unexpected error: {conflicting_region_error}"
+    );
 }
 
 #[tokio::test]
@@ -437,6 +479,23 @@ async fn generated_named_topology_helpers_execute_without_external_network() {
         )
         .expect("named transport intent"),
         TransportType::Tcp
+    );
+    assert_eq!(
+        TopologyNamed::topology::topologies::edge().get_family_constraint("Replica"),
+        Some(&RoleFamilyConstraint::bounded(2, 4))
+    );
+    assert!(
+        TopologyNamed::topology::topologies::edge()
+            .validate_family("Replica", 2)
+            .is_ok(),
+        "generated named topology should preserve inline role-family constraints"
+    );
+    assert_eq!(
+        TopologyNamed::topology::topologies::edge()
+            .validate_family("Replica", 5)
+            .expect_err("generated named topology should fail explicit family validation")
+            .to_string(),
+        "role family has 5 instances, maximum allowed is 4"
     );
 
     edge_alice

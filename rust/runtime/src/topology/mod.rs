@@ -33,8 +33,11 @@ use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::fmt;
 
-use crate::identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
+use crate::identifiers::{Endpoint as TopologyEndpoint, Region, RoleName};
 use crate::ChannelCapacity;
+use telltale_types::{
+    canonical_transport_boundaries, PlacementObservation, TransportBoundaryObservation,
+};
 
 /// Location specifies where a role is deployed.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
@@ -119,18 +122,12 @@ impl fmt::Display for TopologyConstraint {
     }
 }
 
-/// Common deployment modes for quick configuration
+/// Common topology presets for quick configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TopologyMode {
     /// All roles in-process (testing)
     #[default]
     Local,
-    /// Each role in separate process
-    PerRole,
-    /// Discover via Kubernetes services
-    Kubernetes(Namespace), // namespace
-    /// Discover via Consul
-    Consul(Datacenter), // datacenter
 }
 
 /// Constraints on the number of instances for a role family.
@@ -217,7 +214,7 @@ impl std::error::Error for RoleFamilyConstraintError {}
 /// Uses BTreeMap for deterministic iteration order.
 #[derive(Debug, Clone, Default)]
 pub struct Topology {
-    /// Optional mode for shorthand configuration
+    /// Optional preset for shorthand configuration
     pub mode: Option<TopologyMode>,
     /// Role → Location mapping
     pub locations: BTreeMap<RoleName, Location>,
@@ -230,6 +227,25 @@ pub struct Topology {
 }
 
 impl Topology {
+    fn explicit_region(&self, role: &RoleName) -> Result<Option<Region>, String> {
+        let mut regions = self
+            .constraints
+            .iter()
+            .filter_map(|constraint| match constraint {
+                TopologyConstraint::Region(candidate, region) if candidate == role => Some(region),
+                _ => None,
+            });
+        let Some(first) = regions.next() else {
+            return Ok(None);
+        };
+        if let Some(conflict) = regions.find(|region| *region != first) {
+            return Err(format!(
+                "role {role} has conflicting region constraints ({first} vs {conflict})"
+            ));
+        }
+        Ok(Some(first.clone()))
+    }
+
     fn resolved_location(
         &self,
         role: &RoleName,
@@ -249,6 +265,105 @@ impl Topology {
 
         visiting.remove(role);
         resolved
+    }
+
+    fn resolved_region(
+        &self,
+        role: &RoleName,
+        visiting: &mut BTreeSet<RoleName>,
+    ) -> Result<Option<Region>, String> {
+        if !visiting.insert(role.clone()) {
+            return Err(format!("cyclic colocated placement involving role {role}"));
+        }
+
+        let explicit = self.explicit_region(role)?;
+        let inherited = match self.get_location(role) {
+            Ok(Location::Colocated(peer)) => self.resolved_region(&peer, visiting)?,
+            Ok(Location::Local | Location::Remote(_)) => None,
+            Err(TopologyError::UnknownRole(missing)) => {
+                visiting.remove(role);
+                return Err(format!(
+                    "role {role} refers to unknown colocated peer {missing}"
+                ));
+            }
+        };
+        visiting.remove(role);
+
+        match (explicit, inherited) {
+            (Some(explicit), Some(inherited)) if explicit != inherited => Err(format!(
+                "role {role} declares region {explicit} but colocated peer resolves to {inherited}"
+            )),
+            (Some(explicit), _) => Ok(Some(explicit)),
+            (None, inherited) => Ok(inherited),
+        }
+    }
+
+    /// Resolve the effective region for one role after colocated inheritance.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive string when the role is unknown or region constraints conflict.
+    pub fn region_for_role(&self, role: &RoleName) -> Result<Option<Region>, String> {
+        self.resolved_region(role, &mut BTreeSet::new())
+    }
+
+    /// Export canonical placement observations for a selected active-member set.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive string when any role is unknown or region constraints conflict.
+    pub fn placement_observations_for_roles<I, R>(
+        &self,
+        roles: I,
+    ) -> Result<Vec<PlacementObservation>, String>
+    where
+        I: IntoIterator<Item = R>,
+        R: AsRef<str>,
+    {
+        let mut observations = Vec::new();
+        for role in roles {
+            let role_name =
+                RoleName::new(role.as_ref().to_string()).map_err(|err| err.to_string())?;
+            let region = self
+                .region_for_role(&role_name)?
+                .map(|region| region.to_string());
+            let observation = match self.get_location(&role_name) {
+                Ok(Location::Local) => PlacementObservation::local(role_name.to_string()),
+                Ok(Location::Remote(endpoint)) => {
+                    PlacementObservation::remote(role_name.to_string(), endpoint.to_string())
+                }
+                Ok(Location::Colocated(peer)) => {
+                    PlacementObservation::colocated(role_name.to_string(), peer.to_string())
+                }
+                Err(TopologyError::UnknownRole(_)) => {
+                    return Err(format!(
+                        "placement observation requested unknown role {role_name}"
+                    ));
+                }
+            };
+            observations.push(match region {
+                Some(region) => observation.with_region(region),
+                None => observation,
+            });
+        }
+        telltale_types::canonicalize_placement_observations(&observations)
+    }
+
+    /// Export canonical transport-observable boundaries for a selected member set.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive string when any role is unknown or placement observations conflict.
+    pub fn transport_boundaries_for_roles<I, R>(
+        &self,
+        roles: I,
+    ) -> Result<Vec<TransportBoundaryObservation>, String>
+    where
+        I: IntoIterator<Item = R>,
+        R: AsRef<str>,
+    {
+        let observations = self.placement_observations_for_roles(roles)?;
+        canonical_transport_boundaries(&observations)
     }
 
     fn resolve_constraint_location(&self, location: &Location) -> Result<Location, String> {
@@ -336,7 +451,23 @@ impl Topology {
                     ))
                 }
             }
-            TopologyConstraint::Region(_, _) => None,
+            TopologyConstraint::Region(role, region) => {
+                match self.resolved_region(role, &mut BTreeSet::new()) {
+                    Ok(Some(actual)) if &actual == region => None,
+                    Ok(Some(actual)) => Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!("role {role} resolved to region {actual}, expected {region}"),
+                    )),
+                    Ok(None) => Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        format!("role {role} has no resolved region, expected {region}"),
+                    )),
+                    Err(reason) => Some(TopologyValidation::ConstraintViolation(
+                        constraint.clone(),
+                        reason,
+                    )),
+                }
+            }
         }
     }
 
@@ -677,6 +808,18 @@ impl TopologyBuilder {
         self
     }
 
+    /// Add a role-family cardinality constraint.
+    pub fn role_family_constraint(
+        mut self,
+        family: impl Into<String>,
+        constraint: RoleFamilyConstraint,
+    ) -> Self {
+        self.topology
+            .role_constraints
+            .insert(family.into(), constraint);
+        self
+    }
+
     /// Build the topology
     pub fn build(self) -> Topology {
         self.topology
@@ -876,6 +1019,28 @@ mod tests {
             }
             other => panic!("Expected pinned placement violation, got {other:?}"),
         }
+
+        let region = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
+            .region(
+                RoleName::from_static("Alice"),
+                Region::new("membership").expect("region"),
+            )
+            .build();
+        assert!(region.validate(&roles).is_valid());
+        assert_eq!(
+            region
+                .region_for_role(&RoleName::from_static("Alice"))
+                .expect("region for Alice"),
+            Some(Region::new("membership").unwrap())
+        );
+        assert_eq!(
+            region
+                .region_for_role(&RoleName::from_static("Bob"))
+                .expect("region inherited by colocated Bob"),
+            Some(Region::new("membership").unwrap())
+        );
     }
 
     #[test]
@@ -890,6 +1055,86 @@ mod tests {
             }
             other => panic!("Expected missing colocated peer role, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn test_conflicting_region_constraints_reject_validation() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
+            .region(
+                RoleName::from_static("Alice"),
+                Region::new("membership").expect("region"),
+            )
+            .region(
+                RoleName::from_static("Bob"),
+                Region::new("archive").expect("region"),
+            )
+            .build();
+        let roles = vec![RoleName::from_static("Alice"), RoleName::from_static("Bob")];
+        match topology.validate(&roles) {
+            TopologyValidation::ConstraintViolation(
+                TopologyConstraint::Region(role, region),
+                msg,
+            ) => {
+                assert_eq!(role, RoleName::from_static("Bob"));
+                assert_eq!(region, Region::new("archive").unwrap());
+                assert!(msg.contains("colocated peer resolves"));
+            }
+            other => panic!("Expected conflicting region violation, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_topology_exports_canonical_reconfiguration_placement_artifacts() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Alice"))
+            .colocated_role(RoleName::from_static("Bob"), RoleName::from_static("Alice"))
+            .remote_role(
+                RoleName::from_static("Carol"),
+                TopologyEndpoint::new("127.0.0.1:19841").unwrap(),
+            )
+            .region(
+                RoleName::from_static("Alice"),
+                Region::new("eu_central_1").expect("region"),
+            )
+            .region(
+                RoleName::from_static("Carol"),
+                Region::new("us_east_1").expect("region"),
+            )
+            .build();
+
+        let placements = topology
+            .placement_observations_for_roles(["Alice", "Bob", "Carol"])
+            .expect("placement observations");
+        assert_eq!(
+            placements,
+            vec![
+                telltale_types::PlacementObservation::local("Alice").with_region("eu_central_1"),
+                telltale_types::PlacementObservation::colocated("Bob", "Alice")
+                    .with_region("eu_central_1"),
+                telltale_types::PlacementObservation::remote("Carol", "127.0.0.1:19841")
+                    .with_region("us_east_1"),
+            ]
+        );
+
+        let boundaries = topology
+            .transport_boundaries_for_roles(["Alice", "Bob", "Carol"])
+            .expect("transport boundaries");
+        assert!(
+            boundaries.iter().any(|boundary| matches!(
+                boundary.boundary,
+                telltale_types::TransportBoundaryKind::SharedMemory
+            )),
+            "topology should expose colocated shared-memory boundaries"
+        );
+        assert!(
+            boundaries.iter().any(|boundary| matches!(
+                boundary.boundary,
+                telltale_types::TransportBoundaryKind::Network
+            ) && boundary.cross_region),
+            "topology should expose cross-region network boundaries"
+        );
     }
 
     #[test]
@@ -1017,5 +1262,20 @@ mod tests {
 
         let unknown = topology.get_family_constraint("Unknown");
         assert!(unknown.is_none());
+    }
+
+    #[test]
+    fn test_topology_builder_preserves_role_family_constraints() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Coordinator"))
+            .role_family_constraint("Witness", RoleFamilyConstraint::bounded(2, 5))
+            .build();
+
+        assert_eq!(
+            topology.get_family_constraint("Witness"),
+            Some(&RoleFamilyConstraint::bounded(2, 5))
+        );
+        assert!(topology.validate_family("Witness", 2).is_ok());
+        assert!(topology.validate_family("Witness", 6).is_err());
     }
 }

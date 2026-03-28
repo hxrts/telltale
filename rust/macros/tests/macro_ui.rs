@@ -5,6 +5,7 @@ fn choreography_macro_ui() {
     t.pass("tests/ui/pass/choice_protocol.rs");
     t.pass("tests/ui/pass/broadcast_protocol.rs");
     t.pass("tests/ui/pass/authority_surface.rs");
+    t.pass("tests/ui/pass/authority_control_flow.rs");
     t.pass("tests/ui/pass/commitment_surface.rs");
     t.pass("tests/ui/pass/namespaced_protocol.rs");
     t.pass("tests/ui/pass/profiled_protocol.rs");
@@ -15,6 +16,8 @@ fn choreography_macro_ui() {
     t.compile_fail("tests/ui/fail/undefined_role.rs");
     t.compile_fail("tests/ui/fail/conflicting_msg_payload.rs");
     t.compile_fail("tests/ui/fail/ambiguous_message_derive.rs");
+    t.compile_fail("tests/ui/fail/authority_linear_choice_divergence.rs");
+    t.compile_fail("tests/ui/fail/authority_observational_choice_with_check.rs");
     t.compile_fail("tests/ui/fail/missing_message_attr.rs");
     t.compile_fail("tests/ui/fail/missing_route_attr.rs");
 }

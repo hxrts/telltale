@@ -57,6 +57,11 @@ private def payloadSizeViolation? {ι γ π ε ν : Type u} [IdentityModel ι] [
       some s!"{context} payload exceeds max_payload_bytes={st.config.maxPayloadBytes} (actual={bytes})"
 private def recvIdentityLabel (T : ValType) : Label :=
   s!"recv:{reprStr T}"
+
+private def payloadLabelOrFallback (fallback : Label) (payload : Value) : Label :=
+  match payload with
+  | .string lbl => lbl
+  | _ => fallback
 private def strictSchemaAnnotationMessage (role context label : String) : String :=
   s!"{role}: {context} payload '{label}' requires explicit ValType annotation in strict_schema mode"
 private def strictSchemaMissingAnnotationSend?
@@ -167,7 +172,7 @@ private def sendWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (v : Value) : StepPack ι γ π ε ν :=
   if owns coro ep then
-    match SessionStore.lookupType st.sessions ep with
+    match (SessionStore.lookupType st.sessions ep).map LocalType.unfold with
     | some (.send r T L') => sendWithType st coro ep r T L' v
     | some (.select _ choices) =>
         match strictSchemaMissingAnnotationSend? st ep.role choices with
@@ -235,7 +240,7 @@ private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
             sender := edge.sender
             receiver := edge.receiver
             stepKind := .receive
-            label := recvIdentityLabel T
+            label := payloadLabelOrFallback (recvIdentityLabel T) sv.payload
             payloadDigest := communicationIdentityPayloadDigest sv.payload
             seqNo := sv.seqNo
           }
@@ -276,10 +281,7 @@ private def recvOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
   else
     match SessionStore.lookupHandler st.sessions edge with
     | none => faultPack st coro (.specFault "no handler bound") "no handler bound"
-    | some h =>
-        match consumeProgressToken coro.progressTokens token with
-        | none => faultPack st coro (.noProgressToken edge) "missing progress token"
-        | some tokens' => recvWithHandler st coro ep edge T L' dst h tokens'
+    | some h => recvWithHandler st coro ep edge T L' dst h coro.progressTokens
 private def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
@@ -287,7 +289,7 @@ private def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
     (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (dst : Reg) : StepPack ι γ π ε ν :=
   if owns coro ep then
-    match SessionStore.lookupType st.sessions ep with
+    match (SessionStore.lookupType st.sessions ep).map LocalType.unfold with
     | some (.recv r T L') =>
         let edge := edgeFrom r ep
         let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }
@@ -378,7 +380,7 @@ private def offerWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Guar
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) (ep : Endpoint) (lbl : Label) : StepPack ι γ π ε ν :=
   if owns coro ep then
-    match SessionStore.lookupType st.sessions ep with
+    match (SessionStore.lookupType st.sessions ep).map LocalType.unfold with
     | some (.select r choices) =>
         match choices.find? (fun p => p.fst == lbl) with
         | none => faultPack st coro (.unknownLabel lbl) "unknown label"
@@ -468,7 +470,7 @@ private def chooseWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [Gua
     (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
     (ep : Endpoint) (table : List (Label × PC)) : StepPack ι γ π ε ν :=
   if owns coro ep then
-    match SessionStore.lookupType st.sessions ep with
+    match (SessionStore.lookupType st.sessions ep).map LocalType.unfold with
     | some (.branch r choices) =>
         let edge := edgeFrom r ep
         let token := { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } }

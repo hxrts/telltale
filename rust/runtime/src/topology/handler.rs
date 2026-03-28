@@ -170,9 +170,35 @@ impl TopologyHandler {
         local
     }
 
-    async fn ensure_transport(&self, role: &RoleName) -> Box<dyn Transport> {
+    async fn ensure_transport(&self, role: &RoleName) -> TransportResult<Box<dyn Transport>> {
+        let self_location = self
+            .topology
+            .get_location(&self.role)
+            .map_err(|_| TransportError::UnknownRole(self.role.clone()))?;
+        let peer_location = self
+            .topology
+            .get_location(role)
+            .map_err(|_| TransportError::UnknownRole(role.clone()))?;
+        if matches!(self_location, Location::Remote(_))
+            || matches!(peer_location, Location::Remote(_))
+        {
+            #[cfg(target_arch = "wasm32")]
+            {
+                return Err(TransportError::NotReady);
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                return super::transport::create_peer_transport(
+                    &self.topology,
+                    &self.topology_signature,
+                    &self.role,
+                    role,
+                )
+                .await;
+            }
+        }
         let shared = self.ensure_connected_transport(role).await;
-        Box::new(SharedInMemoryTransport::new(shared))
+        Ok(Box::new(SharedInMemoryTransport::new(shared)))
     }
 
     /// Initialize transports for all roles.
@@ -187,7 +213,7 @@ impl TopologyHandler {
         // Create transports for each role in the topology
         for role in self.topology.locations.keys() {
             if role != &self.role {
-                let transport = self.ensure_transport(role).await;
+                let transport = self.ensure_transport(role).await?;
                 transports.insert(role.clone(), transport);
             }
         }
@@ -208,7 +234,7 @@ impl TopologyHandler {
 
             // Create transport on-demand
             let mut transports = write_lock!(self.transports);
-            let transport = self.ensure_transport(to_role).await;
+            let transport = self.ensure_transport(to_role).await?;
             transports.insert(to_role.clone(), transport);
 
             transports
@@ -229,7 +255,7 @@ impl TopologyHandler {
             drop(transports);
 
             let mut transports = write_lock!(self.transports);
-            let transport = self.ensure_transport(from_role).await;
+            let transport = self.ensure_transport(from_role).await?;
             transports.insert(from_role.clone(), transport);
 
             transports
@@ -327,7 +353,6 @@ impl TopologyHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::TopologyBuilder;
 
     #[test]
     fn test_topology_handler_creation() {
@@ -395,7 +420,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn local_handlers_share_deterministic_message_routing() {
-        let topology = TopologyBuilder::new()
+        let topology = Topology::builder()
             .local_role(RoleName::from_static("Alice"))
             .local_role(RoleName::from_static("Bob"))
             .build();

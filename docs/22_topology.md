@@ -16,7 +16,7 @@ pub enum Location {
 
 The `Local` variant means in-process execution. The `Remote` variant stores a network endpoint. The `Colocated` variant ties a role to another role location.
 
-Topology state holds role mappings, constraints, and optional mode shortcuts.
+Topology state holds role mappings, constraints, and an optional local-only shorthand.
 
 ```rust
 pub struct Topology {
@@ -28,14 +28,11 @@ pub struct Topology {
 }
 ```
 
-`TopologyMode` provides common presets. `TopologyConstraint` and `RoleFamilyConstraint` add placement and role family rules.
+`TopologyMode` is intentionally narrow. The runtime only exposes a local shorthand. Deployment-specific discovery or orchestration belongs in transport or integration crates, not in `telltale-runtime`. `TopologyConstraint` and `RoleFamilyConstraint` add placement and role family rules.
 
 ```rust
 pub enum TopologyMode {
     Local,
-    PerRole,
-    Kubernetes(Namespace),
-    Consul(Datacenter),
 }
 
 pub enum TopologyConstraint {
@@ -51,11 +48,13 @@ pub struct RoleFamilyConstraint {
 }
 ```
 
-`TopologyMode` is parsed from DSL values like `local` and `kubernetes(ns)`. Role family constraints are used to validate wildcard and range roles.
+`TopologyMode` is parsed from the DSL value `local`. Older deployment-specific `mode:` values like `per_role`, `kubernetes(...)`, or `consul(...)` now reject explicitly because runtime topology is transport agnostic. Role family constraints are used to validate wildcard and range roles.
 
 `RoleFamilyConstraint` provides helper constructors and a validation method:
 
 ```rust
+use telltale_runtime::RoleFamilyConstraint;
+
 // Minimum-only constraint (unbounded max)
 let unbounded = RoleFamilyConstraint::min_only(3);
 
@@ -68,7 +67,10 @@ bounded.validate(1)?;  // Err(BelowMinimum)
 bounded.validate(6)?;  // Err(AboveMaximum)
 ```
 
-These helpers let generated runners fail fast on invalid family cardinalities before any transport wiring or handler startup occurs.
+Role-family constraints are explicit validation data. Parsed topologies and
+builder-created topologies preserve them, and generated inline topology
+helpers retain them, but the caller still supplies the resolved family count
+at runtime via `validate_family`.
 
 ## DSL Syntax
 
@@ -76,8 +78,6 @@ Topologies are defined in `.topology` files or parsed from strings.
 
 ```text
 topology TwoPhaseCommit_Prod for TwoPhaseCommit {
-    mode: per_role
-
     Coordinator: coordinator.prod.internal:9000
     ParticipantA: participant-a.prod.internal:9000
     ParticipantB: participant-b.prod.internal:9000
@@ -99,14 +99,14 @@ topology TwoPhaseCommit_Prod for TwoPhaseCommit {
 }
 ```
 
-The `role_constraints` block controls acceptable family sizes. The `channel_capacities` block sets per-edge capacity in bits (used for branching feasibility checks). The `constraints` block encodes separation, pinning, and region requirements.
+The `role_constraints` block controls acceptable family sizes. The `channel_capacities` block sets per-edge capacity in bits (used for branching feasibility checks). The `constraints` block encodes separation, pinning, and region requirements. `region: Role -> region_name` is now executable topology data: validated roles resolve a concrete region, colocated roles inherit the peer region unless they declare the same region explicitly, and conflicting colocated region declarations reject deterministically.
 
 ## Rust API
 
 You can build topologies programmatically and validate them against choreography roles.
 
 ```rust
-use telltale_runtime::{RoleName, Topology, TopologyEndpoint};
+use telltale_runtime::{RoleFamilyConstraint, RoleName, Topology, TopologyEndpoint};
 
 let topology = Topology::builder()
     .local_role(RoleName::from_static("Coordinator"))
@@ -118,6 +118,7 @@ let topology = Topology::builder()
         RoleName::from_static("ParticipantB"),
         TopologyEndpoint::new("localhost:9002").unwrap(),
     )
+    .role_family_constraint("Participant", RoleFamilyConstraint::bounded(2, 5))
     .build();
 
 let roles = [
@@ -130,6 +131,29 @@ assert!(validation.is_valid());
 ```
 
 `Topology::builder` produces a `TopologyBuilder` with fluent helpers. `Topology::validate` checks that all roles referenced in the topology and constraints exist in the choreography.
+`Topology::region_for_role(&role)` resolves the effective region after colocated inheritance and reports conflicting region declarations as validation errors.
+
+For reconfiguration and recovery flows, the same topology can export canonical
+placement and transport-boundary artifacts for an active member set:
+
+```rust
+let placements = topology.placement_observations_for_roles(["Coordinator", "ParticipantA"])?;
+let boundaries = topology.transport_boundaries_for_roles(["Coordinator", "ParticipantA"])?;
+```
+
+`placement_observations_for_roles(...)` returns transport-agnostic facts per
+member: local/remote/colocated kind, optional endpoint, and resolved region.
+`transport_boundaries_for_roles(...)` derives canonical in-process,
+shared-memory, and network boundaries plus cross-region markers. These are the
+runtime-facing inputs used by deterministic multi-step reconfiguration plans and
+their recovery artifacts.
+
+Explicit family-cardinality checks use the same topology object:
+
+```rust
+topology.validate_family("Participant", 3)?;
+assert!(topology.validate_family("Participant", 1).is_err());
+```
 
 Topologies can also be loaded from DSL files.
 
@@ -151,7 +175,7 @@ let handler = TopologyHandler::local(RoleName::from_static("Alice"));
 handler.initialize().await?;
 ```
 
-The local constructor sets `TopologyMode::Local` and creates in-process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`.
+The local constructor sets `TopologyMode::Local` and creates in-process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`. If you need Kubernetes, Consul, or another discovery system, implement that in a transport or integration crate and feed the runtime explicit `Location::Remote` endpoints or another transport-facing adapter boundary.
 
 Generated protocols include helpers under `Protocol::topology`, including `Protocol::topology::handler(role)` and `Protocol::topology::with_topology(topology, role)`. These return a `TopologyHandler` for the selected role.
 
@@ -173,7 +197,11 @@ pub mod topology {
 }
 ```
 
-`handler(role)` builds a local topology handler. `with_topology(topology, role)` validates role coverage and returns a role-bound handler. The `topologies` submodule is emitted when inline topology definitions are present in the DSL.
+`handler(role)` builds a local topology handler. `with_topology(topology, role)`
+validates role coverage, placement constraints, and branch-capacity constraints
+and returns a role-bound handler. Inline named topologies preserve declared
+role-family constraints as topology data, but callers still invoke
+`validate_family(...)` explicitly because family counts are runtime inputs.
 
 Usage pattern:
 
@@ -200,7 +228,12 @@ let transport_type = TransportFactory::transport_for_location(
 assert!(matches!(transport_type, TransportType::Tcp));
 ```
 
-`TransportFactory::create` currently returns an `InMemoryChannelTransport` for all modes. The `TransportType` value signals intent but remote transports are placeholders.
+`TransportFactory::create` realizes loopback `Location::Remote` endpoints through a deterministic TCP transport on native targets. `TopologyHandler` uses the same remote slice for `with_topology(...)` helpers, so generated topology public-path tests exercise real loopback message delivery instead of an intent-only placeholder. The runtime does not encode discovery products or managed deployment backends directly. Those belong outside the runtime API.
+
+Those transport decisions are also visible through
+`transport_boundaries_for_roles(...)`, which means topology-aware
+reconfiguration tests compare the same canonical boundary summary across direct
+execution, snapshot/restore, and bridge-mediated recovery runs.
 
 ## Lean Correspondence
 

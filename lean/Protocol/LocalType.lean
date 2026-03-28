@@ -103,15 +103,41 @@ def targetRole? : LocalType → Option Role
   | _ => none
 
 /-! ## LocalType Substitution and Unfolding -/
-/-- Substitute a type for variable n (structural recursion on continuation). -/
-def subst (n : Nat) (replacement : LocalType) : LocalType → LocalType
-  | .send r T L => .send r T (subst n replacement L)
-  | .recv r T L => .recv r T (subst n replacement L)
-  | .select r bs => .select r bs  -- simplified: doesn't descend into branches
-  | .branch r bs => .branch r bs  -- simplified: doesn't descend into branches
-  | .end_ => .end_
-  | .var m => if m = n then replacement else .var m
-  | .mu L => .mu (subst (n + 1) replacement L)
+private theorem size_of_lt_branch (lbl : Label) (cont : LocalType)
+    (rest : List (Label × LocalType)) :
+    sizeOf cont < sizeOf ((lbl, cont) :: rest) ∧
+      sizeOf rest < sizeOf ((lbl, cont) :: rest) := by
+  simp only [List.cons.sizeOf_spec, Prod.mk.sizeOf_spec]
+  constructor <;> omega
+
+mutual
+  /-- Substitute a type for variable n (structural recursion on continuation). -/
+  def subst (n : Nat) (replacement : LocalType) : LocalType → LocalType
+    | .send r T L => .send r T (subst n replacement L)
+    | .recv r T L => .recv r T (subst n replacement L)
+    | .select r bs => .select r (substBranches n replacement bs)
+    | .branch r bs => .branch r (substBranches n replacement bs)
+    | .end_ => .end_
+    | .var m => if m = n then replacement else .var m
+    | .mu L => .mu (subst (n + 1) replacement L)
+  termination_by
+    lt => sizeOf lt
+  decreasing_by
+    all_goals simp_wf
+
+  def substBranches (n : Nat) (replacement : LocalType) : List (Label × LocalType) →
+      List (Label × LocalType)
+    | [] => []
+    | (lbl, cont) :: rest =>
+        (lbl, subst n replacement cont) :: substBranches n replacement rest
+  termination_by
+    bs => sizeOf bs
+  decreasing_by
+    all_goals
+      first
+        | exact (size_of_lt_branch _ _ _).1
+        | exact (size_of_lt_branch _ _ _).2
+end
 
 /-- Unfold a recursive type one level.
     For μ X. L, unfold gives L[μ X. L / X], i.e., substitute var 0 with the whole μ-type.

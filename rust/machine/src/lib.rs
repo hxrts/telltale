@@ -265,7 +265,9 @@ pub use communication_replay::{
 };
 pub use composition::{
     ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
-    MemoryUsage, ProtocolBundle, SchedulerCapability, TheoremPackCapabilities,
+    MemoryUsage, ProtocolBundle, ReconfigurationEvent, ReconfigurationPlan,
+    ReconfigurationPlanExecution, ReconfigurationPlanStep, ReconfigurationPolicy,
+    ReconfigurationRuntimeSnapshot, SchedulerCapability, TheoremPackCapabilities,
 };
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};

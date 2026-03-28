@@ -7,6 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::{Duration, Instant};
 use tracing::{debug, trace, warn};
 
+use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
 /// Tracing middleware that logs all choreographic operations
@@ -107,5 +108,14 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Trace<H> {
             Err(e) => warn!(prefix = %self.prefix, ?at, ?elapsed, error = %e, "timeout: failed"),
         }
         result
+    }
+}
+
+impl<H> ExtensibleHandler for Trace<H>
+where
+    H: ExtensibleHandler + Send,
+{
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role> {
+        self.inner.extension_registry()
     }
 }

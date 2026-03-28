@@ -277,6 +277,52 @@ fn ownership_semantic_objects_expose_authoritative_reads() {
 }
 
 #[test]
+fn ownership_handoff_invalidates_pretransfer_readiness_witnesses() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = machine
+        .load_choreography_owned(&image, "runtime/owner")
+        .expect("owned open should succeed");
+
+    let witness = owned
+        .issue_readiness_witness(&mut machine, "session.ready")
+        .expect("issue readiness witness");
+    let receipt = owned
+        .begin_transfer(&mut machine, "runtime/next-owner", OwnershipScope::Session)
+        .expect("begin transfer");
+    let transferred = owned
+        .commit_transfer(&mut machine, &receipt)
+        .expect("commit transfer");
+
+    let stale_err = owned
+        .consume_readiness_witness(&mut machine, &witness)
+        .expect_err("pre-transfer witness must be stale under revoked ownership");
+    assert!(matches!(
+        stale_err,
+        OwnershipError::StaleCapability {
+            session_id,
+            ref owner_id,
+            expected_generation,
+            actual_generation,
+        } if session_id == transferred.session_id()
+            && owner_id == "runtime/owner"
+            && expected_generation == 0
+            && actual_generation == 1
+    ));
+
+    let new_owner_err = transferred
+        .consume_readiness_witness(&mut machine, &witness)
+        .expect_err("pre-transfer witness must not validate under the activated owner");
+    assert!(matches!(
+        new_owner_err,
+        OwnershipError::InvalidWitness {
+            reason,
+            ..
+        } if reason.contains("live ownership no longer matches witness")
+    ));
+}
+
+#[test]
 fn ownership_observed_reads_are_rejected_on_semantic_paths() {
     let image = simple_send_recv_image("A", "B", "m");
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());

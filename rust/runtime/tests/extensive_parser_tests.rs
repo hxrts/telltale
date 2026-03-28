@@ -130,6 +130,10 @@ impl ProtocolExtension for TestProtocolExtension {
     fn type_id(&self) -> std::any::TypeId {
         std::any::TypeId::of::<Self>()
     }
+
+    fn clone_box(&self) -> Box<dyn ProtocolExtension> {
+        Box::new(self.clone())
+    }
 }
 
 // ============================================================================

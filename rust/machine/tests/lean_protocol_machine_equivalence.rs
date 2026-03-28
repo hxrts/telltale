@@ -17,9 +17,19 @@ use telltale_types::{GlobalType, Label};
 
 use test_support::PassthroughHandler;
 
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
 #[test]
 fn test_lean_semantic_audit_matches_rust() {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
+        assert!(
+            !strict_protocol_machine_runner_required(),
+            "strict protocol-machine runner verification is enabled but the Lean runner is unavailable"
+        );
         eprintln!(
             "Lean protocol-machine runner not available. Build with: cd lean && lake build protocol_machine_runner"
         );

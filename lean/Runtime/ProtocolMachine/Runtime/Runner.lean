@@ -21,17 +21,25 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : ProtocolMachineState ι γ π ε ν) : ProtocolMachineState ι γ π ε ν :=
-  let step := fun (sched : SchedState γ) (p : CoroutineId × BlockReason γ) =>
+  let wakeCoroutine := fun (stAcc : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) =>
+    match stAcc.coroutines[cid]? with
+    | none => stAcc
+    | some coro =>
+        let coro' := { coro with status := .ready }
+        updateCoro stAcc cid coro'
+  let step := fun (stAcc : ProtocolMachineState ι γ π ε ν) (p : CoroutineId × BlockReason γ) =>
     let (cid, reason) := p
     match reason with
     | .recvWait edge _ =>
-        if (signedBufferLookup st.buffers edge).isEmpty then
-          sched
+        if (signedBufferLookup stAcc.buffers edge).isEmpty then
+          stAcc
         else
-          unblockCoroutine sched cid
-    | _ => sched
-  let sched' := st.sched.blockedSet.toList.foldl step (syncLaneViews st.sched)
-  { st with sched := sched' }
+          let sched' := unblockCoroutine stAcc.sched cid
+          let st' := { stAcc with sched := sched' }
+          wakeCoroutine st' cid
+    | _ => stAcc
+  let st' := st.sched.blockedSet.toList.foldl step { st with sched := syncLaneViews st.sched }
+  st'
 
 /-! ## Round Execution -/
 
@@ -85,14 +93,12 @@ def sessionTerminal {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Bool :=
-  st.coroutines.all (fun c =>
-    if c.ownedEndpoints.any (fun ep => decide (ep.sid = sid)) then
-      match c.status with
-      | .done => true
-      | .faulted _ => true
-      | _ => false
-    else
-      true)
+  match st.sessions.find? (fun p => decide (p.fst = sid)) with
+  | some (_, session) =>
+      match session.phase with
+      | .active => false
+      | _ => true
+  | none => true
 
 /-! ## Fuel-Bounded Scheduled Runner -/
 

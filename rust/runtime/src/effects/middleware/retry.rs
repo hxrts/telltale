@@ -8,6 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 use tracing::debug;
 
+use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
 /// Retry middleware with exponential backoff
@@ -107,5 +108,14 @@ impl<H: ChoreoHandler + Send> ChoreoHandler for Retry<H> {
         F: std::future::Future<Output = ChoreoResult<T>> + Send,
     {
         self.inner.with_timeout(ep, at, dur, body).await
+    }
+}
+
+impl<H> ExtensibleHandler for Retry<H>
+where
+    H: ExtensibleHandler + Send,
+{
+    fn extension_registry(&self) -> &ExtensionRegistry<Self::Endpoint, Self::Role> {
+        self.inner.extension_registry()
     }
 }

@@ -12,8 +12,8 @@ use std::collections::BTreeMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use telltale_runtime::{
-    interpret, Effect, InMemoryHandler, InterpreterState, LabelId, MessageTag, Program, RoleId,
-    RoleName,
+    interpret, spawn, spawn_local, Effect, InMemoryHandler, InterpreterState, LabelId, MessageTag,
+    Program, RoleId, RoleName,
 };
 use wasm_bindgen_test::*;
 
@@ -311,4 +311,19 @@ async fn test_futures_channel_compatibility() {
     // Test receive
     let value = rx.next().await;
     assert_eq!(value, Some(42));
+}
+
+#[wasm_bindgen_test]
+async fn test_runtime_spawn_wrappers_schedule_tasks() {
+    let (tx, rx) = futures::channel::oneshot::channel();
+    spawn(async move {
+        tx.send("spawn").expect("send spawn result");
+    });
+    assert_eq!(rx.await.expect("receive spawn result"), "spawn");
+
+    let (tx, rx) = futures::channel::oneshot::channel();
+    spawn_local(async move {
+        tx.send("spawn_local").expect("send local spawn result");
+    });
+    assert_eq!(rx.await.expect("receive local spawn result"), "spawn_local");
 }

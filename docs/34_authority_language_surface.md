@@ -213,7 +213,9 @@ Current linear rules:
 Current cross-construct rule:
 
 - the implementation counts use across subsequent statements and across explicit branch bodies
-- this is intentionally fail-closed for `choice`, `case`, `timeout`, `loop`, `par`, `call`, and recursion until a richer flow-sensitive linear analysis is added
+- the parser and protocol-machine surface support `choice`, `case`, `timeout`, `loop`, `par`, `call`, and recursion with explicit linear preservation checks
+- rejected programs fail closed when linear assets diverge across branches, timeout/cancel paths, loop iterations, recursive unfoldings, or parallel arms
+- observational bindings remain separated from authoritative evidence under these control-flow forms
 
 ## Effect Declarations and Uses
 
@@ -275,12 +277,21 @@ Current projection behavior is intentionally explicit:
 - `let` is treated as local-only and projects through to its continuation
 - `case/of` is currently rejected by projection
 - `timeout ... on timeout ... on cancel ...` is currently rejected by projection
+- accepted authority-aware `choice`, `call`, `loop`, `par`, and recursion forms remain protocol-machine executable, and the subset without other blockers remains session-projectable
 
 This preserves MPST clarity while the explicit projection rules are still being designed.
 
-Theory conversion has the same restriction:
+Theory conversion is narrower than projection today:
 
 - `let`, `case/of`, and `timeout` must be lowered further before conversion to theory-facing global types
+- `choice`, `call`, counted loops, and recursion convert today when the surrounding protocol stays in the common subset
+- `par` is session-projectable and protocol-machine executable, but it still has no theory-facing global-type conversion and fails closed with an explicit `Parallel` blocker
+
+Current reviewed matrix:
+
+- `choice`, `call`, counted `loop`, and recursion: session-projectable, protocol-machine executable, and theory-convertible
+- `par`: session-projectable and protocol-machine executable, but intentionally outside the theory-convertible supported subset
+- `case/of` and `timeout`: protocol-machine executable only. They are neither session-projectable nor theory-convertible
 
 ## Lowering Boundary
 

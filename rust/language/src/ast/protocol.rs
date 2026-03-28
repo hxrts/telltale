@@ -193,7 +193,7 @@ pub enum Protocol {
 }
 
 /// A branch in a choice
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Branch {
     pub label: Ident,
     pub guard: Option<ChoiceGuard>,
@@ -201,7 +201,7 @@ pub struct Branch {
 }
 
 /// Match branch in a `case/of` expression.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CaseBranch {
     pub pattern: CasePattern,
     pub protocol: Protocol,
@@ -220,6 +220,189 @@ pub enum AuthorityBindingMode {
     Plain,
     Authoritative,
     Observe,
+}
+
+impl Clone for Protocol {
+    fn clone(&self) -> Self {
+        match self {
+            Protocol::Begin {
+                operation,
+                args,
+                progress,
+                continuation,
+            } => Protocol::Begin {
+                operation: operation.clone(),
+                args: args.clone(),
+                progress: progress.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Await {
+                operation,
+                continuation,
+            } => Protocol::Await {
+                operation: operation.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Resolve {
+                operation,
+                outcome,
+                continuation,
+            } => Protocol::Resolve {
+                operation: operation.clone(),
+                outcome: outcome.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Invalidate {
+                operation,
+                continuation,
+            } => Protocol::Invalidate {
+                operation: operation.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Send {
+                from,
+                to,
+                message,
+                continuation,
+                annotations,
+                from_annotations,
+                to_annotations,
+            } => Protocol::Send {
+                from: from.clone(),
+                to: to.clone(),
+                message: message.clone(),
+                continuation: continuation.clone(),
+                annotations: annotations.clone(),
+                from_annotations: from_annotations.clone(),
+                to_annotations: to_annotations.clone(),
+            },
+            Protocol::Broadcast {
+                from,
+                to_all,
+                message,
+                continuation,
+                annotations,
+                from_annotations,
+            } => Protocol::Broadcast {
+                from: from.clone(),
+                to_all: to_all.clone(),
+                message: message.clone(),
+                continuation: continuation.clone(),
+                annotations: annotations.clone(),
+                from_annotations: from_annotations.clone(),
+            },
+            Protocol::Choice {
+                role,
+                branches,
+                annotations,
+            } => Protocol::Choice {
+                role: role.clone(),
+                branches: branches.clone(),
+                annotations: annotations.clone(),
+            },
+            Protocol::Let {
+                name,
+                mode,
+                expr,
+                linear,
+                continuation,
+            } => Protocol::Let {
+                name: name.clone(),
+                mode: *mode,
+                expr: expr.clone(),
+                linear: *linear,
+                continuation: continuation.clone(),
+            },
+            Protocol::Case { expr, branches } => Protocol::Case {
+                expr: expr.clone(),
+                branches: branches.clone(),
+            },
+            Protocol::Timeout {
+                role,
+                duration_ms,
+                body,
+                on_timeout,
+                on_cancel,
+            } => Protocol::Timeout {
+                role: role.clone(),
+                duration_ms: *duration_ms,
+                body: body.clone(),
+                on_timeout: on_timeout.clone(),
+                on_cancel: on_cancel.clone(),
+            },
+            Protocol::Loop { condition, body } => Protocol::Loop {
+                condition: condition.clone(),
+                body: body.clone(),
+            },
+            Protocol::Parallel { protocols } => Protocol::Parallel {
+                protocols: protocols.clone(),
+            },
+            Protocol::Rec { label, body } => Protocol::Rec {
+                label: label.clone(),
+                body: body.clone(),
+            },
+            Protocol::Var(label) => Protocol::Var(label.clone()),
+            Protocol::Publish {
+                event,
+                arg,
+                continuation,
+            } => Protocol::Publish {
+                event: event.clone(),
+                arg: arg.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::PublishAuthority {
+                witness,
+                publication_name,
+                continuation,
+            } => Protocol::PublishAuthority {
+                witness: witness.clone(),
+                publication_name: publication_name.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Materialize {
+                proof,
+                publication,
+                continuation,
+            } => Protocol::Materialize {
+                proof: proof.clone(),
+                publication: publication.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Handoff {
+                operation,
+                target,
+                receipt,
+                continuation,
+            } => Protocol::Handoff {
+                operation: operation.clone(),
+                target: target.clone(),
+                receipt: receipt.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::DependentWork {
+                name,
+                arg,
+                required_for,
+                continuation,
+            } => Protocol::DependentWork {
+                name: name.clone(),
+                arg: arg.clone(),
+                required_for: required_for.clone(),
+                continuation: continuation.clone(),
+            },
+            Protocol::Extension {
+                extension,
+                continuation,
+                annotations,
+            } => Protocol::Extension {
+                extension: extension.clone(),
+                continuation: continuation.clone(),
+                annotations: annotations.clone(),
+            },
+            Protocol::End => Protocol::End,
+        }
+    }
 }
 
 /// Authority- or evidence-oriented expression surface syntax.

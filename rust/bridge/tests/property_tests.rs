@@ -136,23 +136,8 @@ fn arb_invariant_claims() -> impl Strategy<Value = InvariantClaims> {
         )
 }
 
-fn has_communication(global: &GlobalType) -> bool {
-    match global {
-        GlobalType::End => false,
-        GlobalType::Comm { branches, .. } => {
-            branches.iter().any(|(_, cont)| has_communication(cont)) || !branches.is_empty()
-        }
-        GlobalType::Mu { body, .. } => has_communication(body),
-        GlobalType::Var(_) => false,
-    }
-}
-
 fn runtime_check_invariant(protocol: &GeneratedProtocol, claims: &InvariantClaims) -> bool {
-    if let Some(liveness) = &claims.liveness {
-        if liveness.progress_required && !has_communication(&protocol.global) {
-            return false;
-        }
-    }
+    let _ = protocol;
 
     if let Some(quorum) = &claims.distributed.quorum_geometry {
         if quorum.quorum_size == 0
@@ -253,6 +238,7 @@ fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceE
         witness_ref: None,
         output_digest: None,
         passed: None,
+        reason: None,
     };
 
     match event {
@@ -310,6 +296,16 @@ fn run_rust_semantic_audit(
         .collect())
 }
 
+fn protocol_to_choreography_json(
+    protocol: &GeneratedProtocol,
+) -> telltale_bridge::ChoreographyJson {
+    telltale_bridge::ChoreographyJson {
+        schema_version: telltale_bridge::canonical_schema_version(),
+        global_type: telltale_bridge::global_to_json(&protocol.global),
+        roles: protocol.local_types.keys().cloned().collect(),
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(8))]
 
@@ -322,7 +318,8 @@ proptest! {
             return Ok(());
         };
 
-        match runner.validate_trace(&trace) {
+        let choreography = protocol_to_choreography_json(&protocol);
+        match runner.validate_trace(&[choreography], &trace) {
             Ok(validation) => {
                 prop_assert!(
                     validation.valid || !validation.errors.is_empty(),

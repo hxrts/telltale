@@ -1,0 +1,17 @@
+effect Runtime
+  observe watchPresence : Session -> PresenceView
+  {
+    class : observational
+    progress : immediate
+    region : session
+    agreement_use : forbidden
+    reentrancy : allow
+  }
+
+protocol TimeoutObservationalBinding uses Runtime =
+  roles Coordinator, Worker
+  observe let presence = observe Runtime.watchPresence(session)
+  timeout 5s Coordinator at
+    Coordinator -> Worker : Continue(presence)
+  on timeout =>
+    Coordinator -> Worker : Retry(presence)

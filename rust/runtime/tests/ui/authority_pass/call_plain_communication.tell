@@ -1,0 +1,9 @@
+protocol CallPlainCommunication =
+  roles Coordinator, Worker
+  call Handshake
+  call Confirm
+where
+  protocol Handshake =
+    Coordinator -> Worker : Ping
+  protocol Confirm =
+    Worker -> Coordinator : Pong

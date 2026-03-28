@@ -169,6 +169,18 @@ private def roleProgramMap {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (fun acc entry => acc.insert entry.1 (compileLocalTypeR (γ := γ) (ε := ε) entry.2).toArray)
     {}
 
+private def relocateInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (offset : PC) : Instr γ ε → Instr γ ε
+  | .choose chan table =>
+      .choose chan (table.map (fun (lbl, pc) => (lbl, offset + pc)))
+  | .jump target => .jump (offset + target)
+  | .spawn target args => .spawn (offset + target) args
+  | instr => instr
+
+private def relocateCode {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (offset : PC) (code : List (Instr γ ε)) : List (Instr γ ε) :=
+  code.map (relocateInstr (γ := γ) (ε := ε) offset)
+
 /-! ### Image Constructors -/
 
 /-- Build a CodeImage by compiling LocalTypeR per role and concatenating the bytecode. -/
@@ -183,7 +195,8 @@ def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     let (code, entryPoints) := acc
     let (role, lt) := entry
     let startPc := code.length
-    let code' := code ++ compileLocalTypeR (γ:=γ) (ε:=ε) lt
+    let roleCode := compileLocalTypeR (γ:=γ) (ε:=ε) lt
+    let code' := code ++ relocateCode (γ := γ) (ε := ε) startPc roleCode
     (code', entryPoints ++ [(role, startPc)])
   let (code, entryPoints) := ordered.foldl step ([], [])
   let localTypes' := ordered.map (fun (r, lt) => (r, localTypeRToLocalType lt))

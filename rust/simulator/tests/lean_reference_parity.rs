@@ -3,10 +3,11 @@
 
 use std::collections::BTreeMap;
 
+use serde_json::json;
 use telltale_bridge::{
-    canonical_schema_version, compute_trace_diff, global_to_json, local_to_json,
-    normalize_semantic_audit, ProtocolMachineRunner, ProtocolMachineRunnerError,
-    ProtocolMachineTraceEvent, SimRunInput, SimRunOutput, SimTraceValidation, TickedObsEvent,
+    canonical_schema_version, global_to_json, local_to_json, normalize_semantic_audit,
+    ProtocolMachineRunner, ProtocolMachineTraceEvent, SimRunInput, SimRunOutput,
+    SimTraceValidation, TickedObsEvent,
 };
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
@@ -202,49 +203,36 @@ fn three_role_ring_fixture() -> SimFixture {
     }
 }
 
-fn unsupported_operation(stderr: &str) -> bool {
-    stderr.contains("unknown operation")
-        || stderr.contains("unsupported operation")
-        || stderr.contains("runSimulation")
-        || stderr.contains("validateSimulationTrace")
-        || stderr.contains("missing choreographies")
+fn strict_simulation_trace_validation_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_SIMULATION_TRACE_VALIDATION")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
 }
 
 fn run_reference_or_skip(
     runner: &ProtocolMachineRunner,
     input: &SimRunInput,
-    fixture_name: &str,
 ) -> Option<SimRunOutput> {
     match runner.run_reference_simulation(input) {
         Ok(out) => Some(out),
-        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_operation(&stderr) =>
-        {
-            eprintln!(
-                "SKIPPED: Lean protocol-machine runner does not support runSimulation yet ({fixture_name})"
-            );
-            None
-        }
-        Err(err) => panic!("run_reference_simulation failed for {fixture_name}: {err}"),
+        Err(err) => panic!("run_reference_simulation failed: {err}"),
     }
 }
 
 fn validate_sim_trace_or_skip(
     runner: &ProtocolMachineRunner,
+    input: &SimRunInput,
     trace: &[ProtocolMachineTraceEvent],
-    fixture_name: &str,
 ) -> Option<SimTraceValidation> {
-    match runner.validate_simulation_trace(trace) {
+    match runner.validate_simulation_trace(input, trace) {
         Ok(out) => Some(out),
-        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_operation(&stderr) =>
-        {
-            eprintln!(
-                "SKIPPED: Lean protocol-machine runner does not support validateSimulationTrace yet ({fixture_name})"
-            );
-            None
-        }
-        Err(err) => panic!("validate_simulation_trace failed for {fixture_name}: {err}"),
+        Err(err) => panic!("validate_simulation_trace failed: {err}"),
     }
 }
 
@@ -269,6 +257,7 @@ fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceE
         witness_ref: None,
         output_digest: None,
         passed: None,
+        reason: None,
     };
 
     match event {
@@ -356,17 +345,165 @@ fn parity_signal_kind(kind: &str) -> bool {
     matches!(kind, "opened" | "sent" | "received" | "closed")
 }
 
-fn to_ticked(
-    trace: &[ProtocolMachineTraceEvent],
+fn collect_actions(global: &GlobalType) -> Vec<(String, String, String)> {
+    match global {
+        GlobalType::End | GlobalType::Var(_) => Vec::new(),
+        GlobalType::Mu { body, .. } => collect_actions(body),
+        GlobalType::Comm {
+            sender,
+            receiver,
+            branches,
+        } => {
+            let mut out = Vec::new();
+            for (label, cont) in branches {
+                out.push((sender.clone(), receiver.clone(), label.name.clone()));
+                out.extend(collect_actions(cont));
+            }
+            out
+        }
+    }
+}
+
+type ExpectedPrefixShape = (
+    String,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+);
+
+fn expected_prefix_shapes(fixture: &SimFixture) -> Vec<ExpectedPrefixShape> {
+    let mut expected = vec![(
+        "opened".to_string(),
+        None,
+        None,
+        None,
+        Some(fixture.global.roles().join(",")),
+    )];
+    for (sender, receiver, label) in collect_actions(&fixture.global) {
+        expected.push((
+            "sent".to_string(),
+            Some(sender.clone()),
+            Some(receiver.clone()),
+            Some(label.clone()),
+            None,
+        ));
+        expected.push((
+            "received".to_string(),
+            Some(sender),
+            Some(receiver),
+            Some(label),
+            None,
+        ));
+    }
+    expected
+}
+
+fn active_per_role(local: &LocalTypeR) -> usize {
+    match local {
+        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+            1 + branches
+                .iter()
+                .map(|(_, _, cont)| active_per_role(cont))
+                .max()
+                .unwrap_or(0)
+        }
+        LocalTypeR::Mu { body, .. } => active_per_role(body),
+        LocalTypeR::Var(_) | LocalTypeR::End => 0,
+    }
+}
+
+fn active_steps_per_round(fixture: &SimFixture) -> usize {
+    fixture
+        .local_types
+        .values()
+        .map(active_per_role)
+        .max()
+        .unwrap_or(0)
+}
+
+fn expected_observable_count(fixture: &SimFixture) -> u64 {
+    let steps = usize::try_from(fixture.scenario.steps).expect("scenario steps fit in usize");
+    let num_roles = fixture.local_types.len();
+    let active_per_round = active_steps_per_round(fixture);
+    if steps == 0 || num_roles == 0 {
+        return 0;
+    }
+
+    let mut invoke_count = 0usize;
+    let mut active_count = 0usize;
+    let mut step_idx = 1usize;
+    let mut emitted = 0usize;
+    let max_budget = steps.saturating_mul(num_roles.max(1)).saturating_mul(10);
+
+    for _ in 0..max_budget {
+        if step_idx >= steps {
+            break;
+        }
+        emitted += 1;
+        invoke_count += 1;
+        if invoke_count >= num_roles {
+            invoke_count -= num_roles;
+            active_count += 1;
+            step_idx += 1;
+            if active_per_round > 0 && active_count >= active_per_round && step_idx < steps {
+                active_count = 0;
+                step_idx += 1;
+            }
+        }
+    }
+
+    u64::try_from(emitted).expect("emitted observable count fits in u64")
+}
+
+fn canonical_reference_event(
+    event: &TickedObsEvent<ProtocolMachineTraceEvent>,
+) -> serde_json::Value {
+    json!({
+        "kind": event.event.kind,
+        "tick": event.tick,
+        "session": event.event.session,
+        "sender": event.event.sender,
+        "receiver": event.event.receiver,
+        "label": event.event.label,
+        "role": event.event.role,
+    })
+}
+
+fn normalized_reference_trace(
+    events: &[ProtocolMachineTraceEvent],
 ) -> Vec<TickedObsEvent<ProtocolMachineTraceEvent>> {
-    trace
+    let ticked: Vec<_> = events
         .iter()
         .cloned()
         .map(|event| TickedObsEvent {
             tick: event.tick,
             event,
         })
-        .collect()
+        .collect();
+    normalize_semantic_audit(&ticked)
+}
+
+fn expected_simulation_artifacts(fixture: &SimFixture) -> serde_json::Value {
+    let observable_count = expected_observable_count(fixture);
+    json!({
+        "mode": "deterministic_reference",
+        "steps": fixture.scenario.steps,
+        "action_count": collect_actions(&fixture.global).len(),
+        "trace_length": observable_count + 1,
+        "observable_count": observable_count,
+        "num_roles": fixture.local_types.len(),
+        "active_steps_per_round": active_steps_per_round(fixture),
+        "roles": fixture.global.roles(),
+        "actions": collect_actions(&fixture.global)
+            .into_iter()
+            .map(|(sender, receiver, label)| json!({
+                "sender": sender,
+                "receiver": receiver,
+                "label": label,
+            }))
+            .collect::<Vec<_>>(),
+    })
 }
 
 fn run_rust_scenario(fixture: &SimFixture) -> ScenarioResult {
@@ -397,7 +534,7 @@ fn to_sim_run_input(fixture: &SimFixture) -> SimRunInput {
 }
 
 #[allow(clippy::needless_pass_by_value)]
-fn assert_reference_parity(fixture: SimFixture) {
+fn assert_reference_execution(fixture: SimFixture) {
     let rust_result = run_rust_scenario(&fixture);
 
     let Some(runner) = ProtocolMachineRunner::try_new() else {
@@ -406,7 +543,7 @@ fn assert_reference_parity(fixture: SimFixture) {
     };
 
     let input = to_sim_run_input(&fixture);
-    let Some(lean_out) = run_reference_or_skip(&runner, &input, fixture.name) else {
+    let Some(lean_out) = run_reference_or_skip(&runner, &input) else {
         return;
     };
 
@@ -417,6 +554,7 @@ fn assert_reference_parity(fixture: SimFixture) {
         .filter_map(obs_to_semantic_audit_event)
         .filter(|event| parity_signal_kind(&event.kind))
         .collect();
+
     let lean_events: Vec<ProtocolMachineTraceEvent> = lean_out
         .trace
         .iter()
@@ -424,17 +562,9 @@ fn assert_reference_parity(fixture: SimFixture) {
         .cloned()
         .collect();
 
-    if !lean_events.is_empty() && lean_events.iter().all(|event| event.kind == "opened") {
-        eprintln!(
-            "SKIPPED: Lean runSimulation returned load-only trace for {}",
-            fixture.name
-        );
-        return;
-    }
-
     assert!(
         !rust_events.is_empty(),
-        "Rust simulator produced no parity-signal events for {}",
+        "Rust simulator produced no observable trace for {}",
         fixture.name
     );
     assert!(
@@ -443,16 +573,51 @@ fn assert_reference_parity(fixture: SimFixture) {
         fixture.name
     );
 
-    let rust_ticked = to_ticked(&rust_events);
-    let lean_ticked = to_ticked(&lean_events);
-    let rust_norm = normalize_semantic_audit(&rust_ticked);
-    let lean_norm = normalize_semantic_audit(&lean_ticked);
-
-    let diff = compute_trace_diff(&rust_norm, &lean_norm);
+    let expected_prefix = expected_prefix_shapes(&fixture);
+    let observed_prefix: Vec<_> = lean_events
+        .iter()
+        .take(expected_prefix.len())
+        .map(|event| {
+            (
+                event.kind.clone(),
+                event.sender.clone(),
+                event.receiver.clone(),
+                event.label.clone(),
+                event.role.clone(),
+            )
+        })
+        .collect();
     assert_eq!(
-        rust_norm, lean_norm,
-        "reference parity mismatch for {}: {:?}",
-        fixture.name, diff
+        observed_prefix, expected_prefix,
+        "reference simulation emitted an unexpected action prefix for {}",
+        fixture.name
+    );
+    assert_eq!(
+        normalized_reference_trace(&rust_events)
+            .iter()
+            .map(canonical_reference_event)
+            .collect::<Vec<_>>(),
+        normalized_reference_trace(&lean_events)
+            .iter()
+            .map(canonical_reference_event)
+            .collect::<Vec<_>>(),
+        "reference simulation trace diverged from Rust simulator for {}",
+        fixture.name
+    );
+    assert_eq!(
+        lean_out.artifacts,
+        expected_simulation_artifacts(&fixture),
+        "reference simulation artifacts changed unexpectedly for {}",
+        fixture.name
+    );
+
+    let validation = runner
+        .validate_simulation_trace(&input, &lean_events)
+        .expect("lean reference trace should validate under Lean rules");
+    assert!(
+        validation.valid,
+        "Lean reference trace failed self-validation for {}: {:?}",
+        fixture.name, validation.errors
     );
 
     assert!(
@@ -469,32 +634,36 @@ fn assert_reference_parity(fixture: SimFixture) {
 
 #[test]
 fn test_reference_simulator_parity_ping_pong_loop() {
-    assert_reference_parity(ping_pong_loop_fixture());
+    assert_reference_execution(ping_pong_loop_fixture());
 }
 
 #[test]
 fn test_reference_simulator_parity_three_role_ring_loop() {
-    assert_reference_parity(three_role_ring_fixture());
+    assert_reference_execution(three_role_ring_fixture());
 }
 
 #[test]
 fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
     let fixtures = [ping_pong_loop_fixture(), three_role_ring_fixture()];
     let Some(runner) = ProtocolMachineRunner::try_new() else {
+        assert!(
+            !strict_simulation_trace_validation_required() && !strict_protocol_machine_runner_required(),
+            "strict simulation trace validation is enabled but the protocol-machine runner is unavailable"
+        );
         eprintln!("SKIPPED: Lean protocol-machine runner not available");
         return;
     };
 
     for fixture in fixtures {
         let rust_result = run_rust_scenario(&fixture);
+        let input = to_sim_run_input(&fixture);
         let rust_events: Vec<ProtocolMachineTraceEvent> = rust_result
             .replay
             .obs_trace
             .iter()
             .filter_map(obs_to_semantic_audit_event)
             .collect();
-        let Some(validation) = validate_sim_trace_or_skip(&runner, &rust_events, fixture.name)
-        else {
+        let Some(validation) = validate_sim_trace_or_skip(&runner, &input, &rust_events) else {
             return;
         };
 
@@ -504,4 +673,53 @@ fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
             fixture.name, validation.errors
         );
     }
+}
+
+#[test]
+fn test_lean_reference_validation_rejects_tampered_simulator_trace() {
+    let fixture = ping_pong_loop_fixture();
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        assert!(
+            !strict_simulation_trace_validation_required() && !strict_protocol_machine_runner_required(),
+            "strict simulation trace validation is enabled but the protocol-machine runner is unavailable"
+        );
+        eprintln!("SKIPPED: Lean protocol-machine runner not available");
+        return;
+    };
+
+    let rust_result = run_rust_scenario(&fixture);
+    let input = to_sim_run_input(&fixture);
+    let mut rust_events: Vec<ProtocolMachineTraceEvent> = rust_result
+        .replay
+        .obs_trace
+        .iter()
+        .filter_map(obs_to_semantic_audit_event)
+        .collect();
+
+    let first_message = rust_events
+        .iter_mut()
+        .find(|event| event.label.is_some())
+        .expect("simulator trace must contain a message event");
+    first_message.label = Some("tampered_sim_label".to_string());
+
+    let Some(validation) = validate_sim_trace_or_skip(&runner, &input, &rust_events) else {
+        return;
+    };
+
+    assert!(
+        !validation.valid,
+        "tampered simulator trace should fail Lean reference validation"
+    );
+    assert!(
+        !validation.errors.is_empty(),
+        "tampered simulator trace should produce structured errors"
+    );
+    assert!(
+        validation
+            .errors
+            .iter()
+            .all(|error| !error.code.trim().is_empty() && !error.message.trim().is_empty()),
+        "structured errors should include stable code/message fields: {:?}",
+        validation.errors
+    );
 }
