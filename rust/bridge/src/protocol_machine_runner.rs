@@ -798,8 +798,16 @@ mod tests {
 
     #[test]
     fn simulation_trace_payload_has_expected_shape() {
+        let input = SimRunInput {
+            schema_version: crate::schema::canonical_schema_version(),
+            scenario: serde_json::json!({ "kind": "unit-test" }),
+            global_type: serde_json::json!({ "tag": "end" }),
+            local_types: std::collections::BTreeMap::new(),
+            initial_states: std::collections::BTreeMap::new(),
+        };
         let trace = vec![trace_event("sent", 1, Some(0))];
-        let payload = simulation_trace_payload(&trace);
+        let payload = simulation_trace_payload(&input, &trace);
+        assert_eq!(payload["input"]["schema_version"], input.schema_version);
         assert!(payload["trace"].is_array());
         assert_eq!(payload["trace"][0]["kind"], "sent");
     }
