@@ -68,8 +68,22 @@ ensure_iris_build() {
   fi
 
   echo "build iris-lean: compiling pinned dependency with \`lake build Iris\`"
-  if ! (cd "${checkout}" && lake build Iris); then
-    echo "error: failed to build iris-lean at ${checkout}; run \`cd ${checkout} && lake build Iris\` after resolving the local issue" >&2
+  local attempts=0
+  local max_attempts=3
+  local ok=0
+  while [[ "${attempts}" -lt "${max_attempts}" ]]; do
+    attempts=$((attempts + 1))
+    if (cd "${checkout}" && lake build Iris); then
+      ok=1
+      break
+    fi
+    if [[ "${attempts}" -lt "${max_attempts}" ]]; then
+      echo "warning: iris-lean build attempt ${attempts}/${max_attempts} failed; retrying in 5s"
+      sleep 5
+    fi
+  done
+  if [[ "${ok}" -ne 1 ]]; then
+    echo "error: failed to build iris-lean at ${checkout} after ${max_attempts} attempts; run \`cd ${checkout} && lake build Iris\` after resolving the local issue" >&2
     exit 1
   fi
 
