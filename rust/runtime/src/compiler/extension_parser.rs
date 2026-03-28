@@ -88,7 +88,7 @@ impl Default for ExtensionParser {
 fn compose_grammar_from_registry(
     registry: &ExtensionRegistry,
 ) -> Result<String, GrammarCompositionError> {
-    let base_grammar = include_str!("../../../language/src/compiler/choreography.pest");
+    let base_grammar = include_str!("choreography.pest");
     let extension_rules = registry.compose_grammar("");
     if extension_rules.trim().is_empty() {
         return Ok(base_grammar.to_string());
