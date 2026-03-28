@@ -73,7 +73,7 @@ pub struct ProtocolMachineRunInput {
 }
 
 /// One session status entry from the protocol-machine runner.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ProtocolMachineSessionStatus {
     /// Schema version for this payload.
     #[serde(deserialize_with = "crate::schema::deserialize_schema_version")]
@@ -199,6 +199,7 @@ pub struct TraceValidation {
 pub struct ComparisonResult {
     pub equivalent: bool,
     pub semantic_audit_equivalent: bool,
+    pub session_statuses_equivalent: bool,
     pub semantic_handoffs_equivalent: bool,
     pub invalidation_artifacts_equivalent: bool,
     pub rust_semantic_audit: Vec<TickedObsEvent<ProtocolMachineTraceEvent>>,
@@ -557,7 +558,14 @@ impl ProtocolMachineRunner {
         let rust_normalized = normalize_semantic_audit(&rust_ticked);
         let lean_normalized = normalize_semantic_audit(&lean_ticked);
         let semantic_audit_equivalent = semantic_audits_equivalent(&rust_ticked, &lean_ticked);
-        let diff = compute_trace_diff(&rust_normalized, &lean_normalized);
+        let session_statuses_equivalent = normalized_session_statuses(&rust_output.sessions)
+            == normalized_session_statuses(&lean_output.sessions);
+        let diff = compute_execution_diff(
+            &rust_normalized,
+            &lean_normalized,
+            &rust_output.sessions,
+            &lean_output.sessions,
+        );
         let semantic_handoffs_equivalent = rust_output.semantic_objects.semantic_handoffs
             == lean_output.semantic_objects.semantic_handoffs;
         let rust_invalidated_effects: Vec<_> = rust_output
@@ -590,8 +598,9 @@ impl ProtocolMachineRunner {
                 == lean_output.semantic_objects.transformation_obligations;
 
         Ok(ComparisonResult {
-            equivalent: semantic_audit_equivalent,
+            equivalent: semantic_audit_equivalent && session_statuses_equivalent,
             semantic_audit_equivalent,
+            session_statuses_equivalent,
             semantic_handoffs_equivalent,
             invalidation_artifacts_equivalent,
             rust_semantic_audit: rust_normalized,
@@ -630,12 +639,14 @@ impl ProtocolMachineRunner {
         &self,
         artifact_id: &str,
         policy: &ReconfigurationPolicy,
+        starting_epoch: u64,
         previous_members: &[String],
         next_members: &[String],
     ) -> Result<ReconfigurationValidationResult, ProtocolMachineRunnerError> {
         let payload = serde_json::json!({
             "artifact_id": artifact_id,
             "policy": policy,
+            "starting_epoch": starting_epoch,
             "previous_members": previous_members,
             "next_members": next_members,
         });
@@ -686,6 +697,37 @@ pub fn compute_trace_diff(
         "rust_len": rust_trace.len(),
         "lean_len": lean_trace.len(),
     }))
+}
+
+fn normalized_session_statuses(
+    sessions: &[ProtocolMachineSessionStatus],
+) -> Vec<ProtocolMachineSessionStatus> {
+    let mut normalized = sessions.to_vec();
+    normalized.sort_by_key(|session| session.sid);
+    normalized
+}
+
+fn compute_execution_diff(
+    rust_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
+    lean_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
+    rust_sessions: &[ProtocolMachineSessionStatus],
+    lean_sessions: &[ProtocolMachineSessionStatus],
+) -> Option<Value> {
+    if let Some(diff) = compute_trace_diff(rust_trace, lean_trace) {
+        return Some(diff);
+    }
+
+    let rust_sessions = normalized_session_statuses(rust_sessions);
+    let lean_sessions = normalized_session_statuses(lean_sessions);
+    if rust_sessions != lean_sessions {
+        return Some(serde_json::json!({
+            "kind": "session_status_mismatch",
+            "rust": rust_sessions,
+            "lean": lean_sessions,
+        }));
+    }
+
+    None
 }
 
 /// Helper to build a protocol-machine runner input from JSON values.

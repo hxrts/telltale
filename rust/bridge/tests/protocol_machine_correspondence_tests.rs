@@ -325,6 +325,11 @@ fn test_protocol_machine_semantic_audit_correspondence_ping_pong() {
         "trace mismatch for ping_pong: {:?}",
         result.diff
     );
+    assert!(
+        result.session_statuses_equivalent,
+        "session status mismatch for ping_pong"
+    );
+    assert_eq!(result.rust_semantic_audit, result.lean_semantic_audit);
 }
 
 #[test]
@@ -356,6 +361,12 @@ fn test_protocol_machine_semantic_audit_correspondence_all_tier1() {
             "trace mismatch for {}: {:?}",
             fixture.name, result.diff
         );
+        assert!(
+            result.session_statuses_equivalent,
+            "session status mismatch for {}",
+            fixture.name
+        );
+        assert_eq!(result.rust_semantic_audit, result.lean_semantic_audit);
 
         assert_stepwise_prefix_equivalent(fixture.name, &result);
     }
@@ -390,6 +401,12 @@ fn test_protocol_machine_semantic_audit_correspondence_tier2_to_tier4() {
             "trace mismatch for {}: {:?}",
             fixture.name, result.diff
         );
+        assert!(
+            result.session_statuses_equivalent,
+            "session status mismatch for {}",
+            fixture.name
+        );
+        assert_eq!(result.rust_semantic_audit, result.lean_semantic_audit);
         if fixture.name == "binary_choice" {
             assert_stepwise_prefix_equivalent(fixture.name, &result);
         }

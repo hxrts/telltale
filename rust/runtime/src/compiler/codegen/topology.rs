@@ -64,8 +64,7 @@ pub fn generate_topology_integration(
                 TopologyMode,
             };
             use ::telltale_runtime::{
-                ChannelCapacity, Datacenter, Namespace, Region, RoleFamilyConstraint, RoleName,
-                TopologyEndpoint,
+                ChannelCapacity, Region, RoleFamilyConstraint, RoleName, TopologyEndpoint,
             };
 
             #handler_method
@@ -353,15 +352,6 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
 fn generate_mode_builder_call(mode: &TopologyMode) -> TokenStream {
     match mode {
         TopologyMode::Local => quote! { .mode(TopologyMode::Local) },
-        TopologyMode::PerRole => quote! { .mode(TopologyMode::PerRole) },
-        TopologyMode::Kubernetes(ns) => {
-            let ns_literal = ns.as_str();
-            quote! { .mode(TopologyMode::Kubernetes(Namespace::new(#ns_literal).unwrap())) }
-        }
-        TopologyMode::Consul(dc) => {
-            let dc_literal = dc.as_str();
-            quote! { .mode(TopologyMode::Consul(Datacenter::new(#dc_literal).unwrap())) }
-        }
     }
 }
 
@@ -611,6 +601,17 @@ mod tests {
         let code = tokens.to_string();
 
         assert!(code.contains("TopologyMode :: Local"));
+    }
+
+    #[test]
+    fn test_generated_topology_helpers_do_not_import_deployment_backends() {
+        let choreography = create_test_choreography();
+        let tokens = generate_topology_integration(&choreography, &[]);
+        let code = tokens.to_string();
+
+        assert!(!code.contains("Datacenter"));
+        assert!(!code.contains("Kubernetes"));
+        assert!(!code.contains("Consul"));
     }
 
     #[test]

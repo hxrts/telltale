@@ -3,9 +3,8 @@
 //! This module provides abstractions for different transport mechanisms:
 //! - `InMemoryTransport`: In-process communication using channels
 //! - `TcpTransport`: Network communication over TCP
-//! - Discovery-based transports (Kubernetes, Consul)
 
-use super::{Location, Topology, TopologyMode};
+use super::{Location, Topology};
 use crate::identifiers::RoleName;
 use crate::mutex_lock;
 #[cfg(not(target_arch = "wasm32"))]
@@ -524,55 +523,48 @@ pub struct TransportFactory;
 impl TransportFactory {
     /// Create a transport for a role based on the topology.
     pub fn create(topology: &Topology, role: &RoleName) -> TransportResult<Box<dyn Transport>> {
-        match &topology.mode {
-            Some(TopologyMode::PerRole) => Err(TransportError::NotReady),
-            Some(TopologyMode::Kubernetes(_namespace)) => Err(TransportError::NotReady),
-            Some(TopologyMode::Consul(_datacenter)) => Err(TransportError::NotReady),
-            Some(TopologyMode::Local) | None => {
-                let has_remote_participants = topology
-                    .locations
-                    .values()
-                    .any(|location| matches!(location, Location::Remote(_)));
-                if has_remote_participants {
-                    #[cfg(target_arch = "wasm32")]
-                    {
-                        let _ = role;
-                        Err(TransportError::NotReady)
-                    }
-                    #[cfg(not(target_arch = "wasm32"))]
-                    {
-                        topology
-                            .region_for_role(role)
-                            .map_err(TransportError::ConnectionFailed)?;
-                        let state = shared_tcp_role_state(topology, "transport_factory", role)?;
-                        let warm_state = Arc::clone(&state);
-                        spawn(async move {
-                            let _ = warm_state.ensure_started().await;
-                        });
-                        let peer_endpoints = topology
-                            .locations
-                            .iter()
-                            .filter(|(peer, _)| *peer != role)
-                            .map(|(peer, location)| {
-                                let _ = topology
-                                    .region_for_role(peer)
-                                    .map_err(TransportError::ConnectionFailed)?;
-                                let endpoint = match location {
-                                    Location::Remote(endpoint) => Some(endpoint.clone()),
-                                    Location::Local | Location::Colocated(_) => None,
-                                };
-                                Ok((peer.clone(), endpoint))
-                            })
-                            .collect::<TransportResult<BTreeMap<_, _>>>()?;
-                        Ok(Box::new(TcpRoleTransport {
-                            state,
-                            peer_endpoints,
-                        }))
-                    }
-                } else {
-                    Ok(Box::new(InMemoryChannelTransport::new(role.clone())))
-                }
+        let has_remote_participants = topology
+            .locations
+            .values()
+            .any(|location| matches!(location, Location::Remote(_)));
+        if has_remote_participants {
+            #[cfg(target_arch = "wasm32")]
+            {
+                let _ = role;
+                Err(TransportError::NotReady)
             }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                topology
+                    .region_for_role(role)
+                    .map_err(TransportError::ConnectionFailed)?;
+                let state = shared_tcp_role_state(topology, "transport_factory", role)?;
+                let warm_state = Arc::clone(&state);
+                spawn(async move {
+                    let _ = warm_state.ensure_started().await;
+                });
+                let peer_endpoints = topology
+                    .locations
+                    .iter()
+                    .filter(|(peer, _)| *peer != role)
+                    .map(|(peer, location)| {
+                        let _ = topology
+                            .region_for_role(peer)
+                            .map_err(TransportError::ConnectionFailed)?;
+                        let endpoint = match location {
+                            Location::Remote(endpoint) => Some(endpoint.clone()),
+                            Location::Local | Location::Colocated(_) => None,
+                        };
+                        Ok((peer.clone(), endpoint))
+                    })
+                    .collect::<TransportResult<BTreeMap<_, _>>>()?;
+                Ok(Box::new(TcpRoleTransport {
+                    state,
+                    peer_endpoints,
+                }))
+            }
+        } else {
+            Ok(Box::new(InMemoryChannelTransport::new(role.clone())))
         }
     }
 
@@ -724,39 +716,5 @@ mod tests {
                 .expect("remote recv"),
             b"hello remote".to_vec()
         );
-
-        let per_role_topology = Topology::builder()
-            .mode(TopologyMode::PerRole)
-            .local_role(RoleName::from_static("Alice"))
-            .local_role(RoleName::from_static("Bob"))
-            .build();
-        assert!(matches!(
-            TransportFactory::create(&per_role_topology, &RoleName::from_static("Alice")),
-            Err(TransportError::NotReady)
-        ));
-
-        let kubernetes_topology = Topology::builder()
-            .mode(TopologyMode::Kubernetes(
-                crate::identifiers::Namespace::new("prod").unwrap(),
-            ))
-            .local_role(RoleName::from_static("Alice"))
-            .local_role(RoleName::from_static("Bob"))
-            .build();
-        assert!(matches!(
-            TransportFactory::create(&kubernetes_topology, &RoleName::from_static("Alice")),
-            Err(TransportError::NotReady)
-        ));
-
-        let consul_topology = Topology::builder()
-            .mode(TopologyMode::Consul(
-                crate::identifiers::Datacenter::new("eucentral").unwrap(),
-            ))
-            .local_role(RoleName::from_static("Alice"))
-            .local_role(RoleName::from_static("Bob"))
-            .build();
-        assert!(matches!(
-            TransportFactory::create(&consul_topology, &RoleName::from_static("Alice")),
-            Err(TransportError::NotReady)
-        ));
     }
 }

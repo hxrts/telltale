@@ -437,24 +437,84 @@ def simulationTraceForActions (roles : List String)
           go (idx + 1) remaining' (event :: acc)
   opened :: go 0 steps []
 
+def maxNatList : List Nat → Nat
+  | [] => 0
+  | head :: tail => tail.foldl Nat.max head
+
+mutual
+  def activePerRole : SessionTypes.LocalTypeR.LocalTypeR → Nat
+    | .send _ branches | .recv _ branches => 1 + activePerBranches branches
+    | .mu _ body => activePerRole body
+    | .var _ | .end => 0
+
+  def activePerBranches :
+      List (SessionTypes.GlobalType.Label × Option SessionTypes.ValType ×
+        SessionTypes.LocalTypeR.LocalTypeR) → Nat
+    | [] => 0
+    | (_, _, cont) :: rest => Nat.max (activePerRole cont) (activePerBranches rest)
+end
+
+def activeStepsPerSession (global : GlobalType) : Nat :=
+  let locals := global.roles.map (fun role => Choreography.Projection.Project.trans global role)
+  maxNatList (locals.map activePerRole)
+
+def simulationObservableCount (steps : Nat) (numRoles : Nat) (activePerRound : Nat) : Nat :=
+  if steps = 0 || numRoles = 0 then
+    0
+  else
+    let rec go (remainingBudget invokeCount activeCount stepIdx emitted : Nat) : Nat :=
+      match remainingBudget with
+      | 0 => emitted
+      | remainingBudget' + 1 =>
+          if stepIdx >= steps then
+            emitted
+          else
+            let invokeCount := invokeCount + 1
+            let (invokeCount', activeCount', stepIdx') :=
+              if invokeCount >= numRoles then
+                let invokeCount' := invokeCount - numRoles
+                let activeCount' := activeCount + 1
+                let stepIdx' := stepIdx + 1
+                if activePerRound > 0 && activeCount' >= activePerRound && stepIdx' < steps then
+                  (invokeCount', 0, stepIdx' + 1)
+                else
+                  (invokeCount', activeCount', stepIdx')
+              else
+                (invokeCount, activeCount, stepIdx)
+            go remainingBudget' invokeCount' activeCount' stepIdx' (emitted + 1)
+    go (steps * (Nat.max numRoles 1) * 10) 0 0 1 0
+
 def parseRunSimulationPayload (payload : Json) :
-    Except String (List String × List (String × String × String) × Nat) := do
+    Except String (List String × List (String × String × String) × Nat × Nat × Nat) := do
   let globalJson := payload.getObjValD "global_type"
   let global ← globalTypeFromJson globalJson
   let scenarioJson ← payload.getObjVal? "scenario"
   let steps ← requiredNatField scenarioJson "steps"
-  pure (global.roles, collectTraceActions global, steps)
+  pure (global.roles, collectTraceActions global, steps, global.roles.length, activeStepsPerSession global)
 
 def simulationResponse (roles : List String) (actions : List (String × String × String))
-    (steps : Nat) : Json :=
+    (steps numRoles activePerRound : Nat) : Json :=
+  let observableCount := simulationObservableCount steps numRoles activePerRound
+  let actionsJson :=
+    actions.map (fun (sender, receiver, label) =>
+      Json.mkObj
+        [ ("sender", Json.str sender)
+        , ("receiver", Json.str receiver)
+        , ("label", Json.str label) ])
   Json.mkObj
     [ ("schema_version", bridgeSchemaVersion)
-    , ("trace", Json.arr <| (simulationTraceForActions roles actions steps).toArray)
+    , ("trace", Json.arr <| (simulationTraceForActions roles actions observableCount).toArray)
     , ("violations", Json.arr #[])
     , ("artifacts", Json.mkObj
         [ ("mode", Json.str "deterministic_reference")
         , ("steps", Json.num steps)
-        , ("action_count", Json.num actions.length) ]) ]
+        , ("action_count", Json.num actions.length)
+        , ("trace_length", Json.num (Nat.succ observableCount))
+        , ("observable_count", Json.num observableCount)
+        , ("num_roles", Json.num numRoles)
+        , ("active_steps_per_round", Json.num activePerRound)
+        , ("roles", Json.arr <| roles.map Json.str |>.toArray)
+        , ("actions", Json.arr <| actionsJson.toArray) ]) ]
 
 def optionalNatField? (value : Json) (field : String) : Option Nat :=
   match value.getObjVal? field with
@@ -556,6 +616,7 @@ def memberDifferences (left right : List String) : List String :=
 def validateReconfigurationTransitionResponse (payload : Json) : Json :=
   let artifactId := (optionalStringField? payload "artifact_id").getD "reconfiguration"
   let policy := payload.getObjValD "policy"
+  let startingEpoch := (optionalNatField? payload "starting_epoch").getD 0
   let dynamicMembership := (optionalBoolField? policy "dynamic_membership").getD false
   let overlapRequired := (optionalBoolField? policy "overlap_required").getD false
   let previousMembers := sortedUniqueStrings <| (jsonStringList (payload.getObjValD "previous_members")).toOption.getD []
@@ -583,7 +644,7 @@ def validateReconfigurationTransitionResponse (payload : Json) : Json :=
   let event :=
     Json.mkObj
       [ ("artifact_id", Json.str artifactId)
-      , ("epoch", Json.num 1)
+      , ("epoch", Json.num (Nat.succ startingEpoch))
       , ("previous_members", Json.arr <| previousMembers.map Json.str |>.toArray)
       , ("next_members", Json.arr <| nextMembers.map Json.str |>.toArray)
       , ("added_members", Json.arr <| (memberDifferences nextMembers previousMembers).map Json.str |>.toArray)
@@ -621,7 +682,8 @@ def dispatchOperation (operation : String) (payload : Json) : IO Unit := do
   | "runSimulation" =>
       let response :=
         match parseRunSimulationPayload payload with
-        | .ok (roles, actions, steps) => simulationResponse roles actions steps
+        | .ok (roles, actions, steps, numRoles, activePerRound) =>
+            simulationResponse roles actions steps numRoles activePerRound
         | .error err =>
             Json.mkObj
               [ ("schema_version", bridgeSchemaVersion)

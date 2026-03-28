@@ -3,9 +3,7 @@
 //! Parses topology definitions from DSL source code.
 
 use super::{Location, RoleFamilyConstraint, Topology, TopologyConstraint, TopologyMode};
-use crate::identifiers::{
-    Datacenter, Endpoint as TopologyEndpoint, IdentifierError, Namespace, Region, RoleName,
-};
+use crate::identifiers::{Endpoint as TopologyEndpoint, IdentifierError, Region, RoleName};
 use crate::ChannelCapacity;
 use pest::Parser;
 use pest_derive::Parser;
@@ -153,35 +151,29 @@ fn parse_topology_mode(
 }
 
 fn parse_mode_value(pair: pest::iterators::Pair<Rule>) -> Result<TopologyMode, TopologyParseError> {
-    let inner = pair.into_inner().next();
-    match inner {
-        Some(p) => match p.as_rule() {
-            Rule::kubernetes_mode => {
-                let namespace = p.into_inner().next().map(|i| i.as_str()).ok_or_else(|| {
-                    TopologyParseError::InvalidConstraint(
-                        "kubernetes mode requires a namespace".to_string(),
-                    )
-                })?;
-                Ok(TopologyMode::Kubernetes(Namespace::new(namespace)?))
-            }
-            Rule::consul_mode => {
-                let datacenter = p.into_inner().next().map(|i| i.as_str()).ok_or_else(|| {
-                    TopologyParseError::InvalidConstraint(
-                        "consul mode requires a datacenter".to_string(),
-                    )
-                })?;
-                Ok(TopologyMode::Consul(Datacenter::new(datacenter)?))
-            }
-            _ => {
-                let s = p.as_str();
-                match s {
-                    "local" => Ok(TopologyMode::Local),
-                    "per_role" => Ok(TopologyMode::PerRole),
-                    _ => Err(TopologyParseError::UnknownMode(s.to_string())),
-                }
-            }
-        },
-        None => Ok(TopologyMode::Local),
+    let mut inner = pair.into_inner();
+    let mode_name = inner
+        .next()
+        .map(|p| p.as_str().to_string())
+        .ok_or_else(|| TopologyParseError::UnknownMode("empty mode".to_string()))?;
+    let mode_arg = inner.next().map(|p| p.as_str().to_string());
+    match (mode_name.as_str(), mode_arg.as_deref()) {
+        ("local", None) => Ok(TopologyMode::Local),
+        ("local", Some(arg)) => Err(TopologyParseError::UnknownMode(format!("local({arg})"))),
+        ("per_role", arg) => Err(TopologyParseError::UnknownMode(match arg {
+            Some(arg) => format!("per_role({arg})"),
+            None => "per_role".to_string(),
+        })),
+        ("kubernetes", arg) => Err(TopologyParseError::UnknownMode(match arg {
+            Some(arg) => format!("kubernetes({arg})"),
+            None => "kubernetes".to_string(),
+        })),
+        ("consul", arg) => Err(TopologyParseError::UnknownMode(match arg {
+            Some(arg) => format!("consul({arg})"),
+            None => "consul".to_string(),
+        })),
+        (other, Some(arg)) => Err(TopologyParseError::UnknownMode(format!("{other}({arg})"))),
+        (other, None) => Err(TopologyParseError::UnknownMode(other.to_string())),
     }
 }
 
@@ -501,17 +493,40 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_kubernetes_mode() {
+    fn test_parse_removed_deployment_modes_fail_closed() {
+        for input in [
+            r#"
+                topology PerRole for MyProtocol {
+                    mode: per_role
+                }
+            "#,
+            r#"
+                topology K8s for MyProtocol {
+                    mode: kubernetes(myapp)
+                }
+            "#,
+            r#"
+                topology Consul for MyProtocol {
+                    mode: consul(eucentral)
+                }
+            "#,
+        ] {
+            let err = parse_topology(input).expect_err("removed mode must reject");
+            assert!(matches!(err, TopologyParseError::UnknownMode(_)));
+        }
+    }
+
+    #[test]
+    fn test_parse_unknown_mode() {
         let input = r#"
-            topology K8s for MyProtocol {
-                mode: kubernetes(myapp)
+            topology Unknown for MyProtocol {
+                mode: edge_router(prod)
             }
         "#;
 
-        let result = parse_topology(input).unwrap();
-        assert_eq!(
-            result.topology.mode,
-            Some(TopologyMode::Kubernetes(Namespace::new("myapp").unwrap()))
+        let err = parse_topology(input).expect_err("unknown mode must reject");
+        assert!(
+            matches!(err, TopologyParseError::UnknownMode(mode) if mode == "edge_router(prod)")
         );
     }
 

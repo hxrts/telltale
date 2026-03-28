@@ -29,7 +29,7 @@ pub mod tracing;
 pub use runtime::{SystemClock, SystemRng};
 
 // Re-export typed identifiers
-pub use identifiers::{Datacenter, Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
+pub use identifiers::{Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
 
 // Re-export main APIs
 pub use ast::{Choreography, MessageType, Protocol, Role};

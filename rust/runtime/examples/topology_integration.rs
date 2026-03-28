@@ -2,9 +2,9 @@
 //!
 //! This example demonstrates the topology integration for choreographic protocols,
 //! showing how to:
-//! - Create handlers with local-mode topology (for testing)
-//! - Create handlers with custom topology (for distributed deployment)
-//! - Use pre-configured topology constants
+//! - Create handlers with local shorthand topology (for testing)
+//! - Create handlers with explicit placement topology (for distributed deployment)
+//! - Use pre-configured topology values without binding the runtime to a deployment product
 //!
 //! Run with:
 //! ```bash
@@ -14,16 +14,16 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use telltale_runtime::topology::{TopologyBuilder, TopologyHandler, TopologyMode};
-use telltale_runtime::{Namespace, RoleName, TopologyEndpoint};
+use telltale_runtime::topology::{TopologyBuilder, TopologyHandler};
+use telltale_runtime::{RoleName, Topology, TopologyEndpoint};
 
 fn main() {
     println!("╔════════════════════════════════════════════════════════════╗");
     println!("║       Topology Integration for Choreographic Protocols     ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    // Example 1: Local mode for testing
-    println!("=== 1. Local Mode Handler ===");
+    // Example 1: Local shorthand for testing
+    println!("=== 1. Local Topology Handler ===");
     demonstrate_local_handler();
 
     // Example 2: Custom topology for distributed deployment
@@ -43,7 +43,7 @@ fn main() {
     println!("╚════════════════════════════════════════════════════════════╝");
 }
 
-/// Demonstrate creating a local-mode handler for testing
+/// Demonstrate creating a local-topology handler for testing
 fn demonstrate_local_handler() {
     // In a generated protocol, this would be:
     // let handler = MyProtocol::topology::handler(Role::Alice);
@@ -52,7 +52,7 @@ fn demonstrate_local_handler() {
     let handler = TopologyHandler::local(RoleName::from_static("Alice"));
 
     println!("  Created handler for role: {}", handler.role());
-    println!("  Topology mode: Local (all in-process)");
+    println!("  Topology preset: local (all in-process)");
     println!(
         "  Handler location for 'Alice': {:?}",
         handler
@@ -63,7 +63,7 @@ fn demonstrate_local_handler() {
 
 /// Demonstrate creating handlers with custom topology
 fn demonstrate_custom_topology() {
-    // Build a production topology
+    // Build an explicit placement topology
     let topology = TopologyBuilder::new()
         .local_role(RoleName::from_static("Alice"))
         .remote_role(
@@ -113,16 +113,15 @@ fn demonstrate_custom_topology() {
 
 /// Demonstrate pre-configured topologies
 fn demonstrate_preconfigured_topologies() {
-    // Development topology - all local
-    let dev_topology = TopologyBuilder::new().mode(TopologyMode::Local).build();
+    // Development topology - all local via shorthand
+    let dev_topology = Topology::local_mode();
 
     println!("  Development topology:");
-    println!("    Mode: {:?}", dev_topology.mode);
+    println!("    Preset: {:?}", dev_topology.mode);
     println!("    All roles run in-process");
 
-    // Production topology with specific deployments
+    // Production topology with explicit endpoints
     let prod_topology = TopologyBuilder::new()
-        .mode(TopologyMode::PerRole)
         .remote_role(
             RoleName::from_static("Alice"),
             TopologyEndpoint::new("alice.prod.internal:8080").unwrap(),
@@ -138,21 +137,10 @@ fn demonstrate_preconfigured_topologies() {
         .build();
 
     println!("\n  Production topology:");
-    println!("    Mode: {:?}", prod_topology.mode);
+    println!("    Preset: {:?}", prod_topology.mode);
     for (role, location) in &prod_topology.locations {
         println!("    {}: {:?}", role, location);
     }
-
-    // Kubernetes topology
-    let k8s_topology = TopologyBuilder::new()
-        .mode(TopologyMode::Kubernetes(
-            Namespace::new("my_namespace").unwrap(),
-        ))
-        .build();
-
-    println!("\n  Kubernetes topology:");
-    println!("    Mode: {:?}", k8s_topology.mode);
-    println!("    Role discovery via Kubernetes services");
 }
 
 /// Demonstrate role validation

@@ -281,9 +281,17 @@ Current projection behavior is intentionally explicit:
 
 This preserves MPST clarity while the explicit projection rules are still being designed.
 
-Theory conversion has the same restriction:
+Theory conversion is narrower than projection today:
 
 - `let`, `case/of`, and `timeout` must be lowered further before conversion to theory-facing global types
+- `choice`, `call`, counted loops, and recursion convert today when the surrounding protocol stays in the common subset
+- `par` is session-projectable and protocol-machine executable, but it still has no theory-facing global-type conversion and fails closed with an explicit `Parallel` blocker
+
+Current reviewed matrix:
+
+- `choice`, `call`, counted `loop`, and recursion: session-projectable, protocol-machine executable, theory-convertible
+- `par`: session-projectable, protocol-machine executable, not theory-convertible
+- `case/of` and `timeout`: protocol-machine executable, not session-projectable, not theory-convertible
 
 ## Lowering Boundary
 

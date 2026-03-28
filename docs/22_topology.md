@@ -16,7 +16,7 @@ pub enum Location {
 
 The `Local` variant means in-process execution. The `Remote` variant stores a network endpoint. The `Colocated` variant ties a role to another role location.
 
-Topology state holds role mappings, constraints, and optional mode shortcuts.
+Topology state holds role mappings, constraints, and an optional local-only shorthand.
 
 ```rust
 pub struct Topology {
@@ -28,14 +28,11 @@ pub struct Topology {
 }
 ```
 
-`TopologyMode` provides common presets. `TopologyConstraint` and `RoleFamilyConstraint` add placement and role family rules.
+`TopologyMode` is intentionally narrow. The runtime only exposes a local shorthand; deployment-specific discovery or orchestration belongs in transport or integration crates, not in `telltale-runtime`. `TopologyConstraint` and `RoleFamilyConstraint` add placement and role family rules.
 
 ```rust
 pub enum TopologyMode {
     Local,
-    PerRole,
-    Kubernetes(Namespace),
-    Consul(Datacenter),
 }
 
 pub enum TopologyConstraint {
@@ -51,7 +48,7 @@ pub struct RoleFamilyConstraint {
 }
 ```
 
-`TopologyMode` is parsed from DSL values like `local` and `kubernetes(ns)`. Role family constraints are used to validate wildcard and range roles.
+`TopologyMode` is parsed from the DSL value `local`. Older deployment-specific `mode:` values like `per_role`, `kubernetes(...)`, or `consul(...)` now reject explicitly because runtime topology is transport agnostic. Role family constraints are used to validate wildcard and range roles.
 
 `RoleFamilyConstraint` provides helper constructors and a validation method:
 
@@ -81,8 +78,6 @@ Topologies are defined in `.topology` files or parsed from strings.
 
 ```text
 topology TwoPhaseCommit_Prod for TwoPhaseCommit {
-    mode: per_role
-
     Coordinator: coordinator.prod.internal:9000
     ParticipantA: participant-a.prod.internal:9000
     ParticipantB: participant-b.prod.internal:9000
@@ -138,6 +133,21 @@ assert!(validation.is_valid());
 `Topology::builder` produces a `TopologyBuilder` with fluent helpers. `Topology::validate` checks that all roles referenced in the topology and constraints exist in the choreography.
 `Topology::region_for_role(&role)` resolves the effective region after colocated inheritance and reports conflicting region declarations as validation errors.
 
+For reconfiguration and recovery flows, the same topology can export canonical
+placement and transport-boundary artifacts for an active member set:
+
+```rust
+let placements = topology.placement_observations_for_roles(["Coordinator", "ParticipantA"])?;
+let boundaries = topology.transport_boundaries_for_roles(["Coordinator", "ParticipantA"])?;
+```
+
+`placement_observations_for_roles(...)` returns transport-agnostic facts per
+member: local/remote/colocated kind, optional endpoint, and resolved region.
+`transport_boundaries_for_roles(...)` derives canonical in-process,
+shared-memory, and network boundaries plus cross-region markers. These are the
+runtime-facing inputs used by deterministic multi-step reconfiguration plans and
+their recovery artifacts.
+
 Explicit family-cardinality checks use the same topology object:
 
 ```rust
@@ -165,7 +175,7 @@ let handler = TopologyHandler::local(RoleName::from_static("Alice"));
 handler.initialize().await?;
 ```
 
-The local constructor sets `TopologyMode::Local` and creates in-process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`.
+The local constructor sets `TopologyMode::Local` and creates in-process transports. For custom layouts, use `TopologyHandler::new` or the builder with a `Topology`. If you need Kubernetes, Consul, or another discovery system, implement that in a transport or integration crate and feed the runtime explicit `Location::Remote` endpoints or another transport-facing adapter boundary.
 
 Generated protocols include helpers under `Protocol::topology`, including `Protocol::topology::handler(role)` and `Protocol::topology::with_topology(topology, role)`. These return a `TopologyHandler` for the selected role.
 
@@ -218,7 +228,12 @@ let transport_type = TransportFactory::transport_for_location(
 assert!(matches!(transport_type, TransportType::Tcp));
 ```
 
-`TransportFactory::create` now realizes loopback `Location::Remote` endpoints through a deterministic TCP transport on native targets. `TopologyHandler` uses the same remote slice for `with_topology(...)` helpers, so generated topology public-path tests now exercise real loopback message delivery instead of an intent-only placeholder. `TopologyMode::PerRole`, `TopologyMode::Kubernetes`, and `TopologyMode::Consul` still fail closed with `TransportError::NotReady` until discovery-backed runtime backends exist.
+`TransportFactory::create` realizes loopback `Location::Remote` endpoints through a deterministic TCP transport on native targets. `TopologyHandler` uses the same remote slice for `with_topology(...)` helpers, so generated topology public-path tests exercise real loopback message delivery instead of an intent-only placeholder. The runtime does not encode discovery products or managed deployment backends directly; those belong outside the runtime API.
+
+Those transport decisions are also visible through
+`transport_boundaries_for_roles(...)`, which means topology-aware
+reconfiguration tests compare the same canonical boundary summary across direct
+execution, snapshot/restore, and bridge-mediated recovery runs.
 
 ## Lean Correspondence
 

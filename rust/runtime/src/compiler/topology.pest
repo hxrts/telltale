@@ -14,15 +14,7 @@ topology_body = {
 
 // Topology mode declaration
 topology_mode = { "mode" ~ ":" ~ topology_mode_value ~ ";"? }
-topology_mode_value = {
-    "local"
-    | "per_role"
-    | kubernetes_mode
-    | consul_mode
-}
-
-kubernetes_mode = { "kubernetes" ~ "(" ~ ident ~ ")" }
-consul_mode = { "consul" ~ "(" ~ ident ~ ")" }
+topology_mode_value = { ident ~ ("(" ~ ident ~ ")")? }
 
 // Role to location mappings
 topology_mappings = { topology_mapping* }

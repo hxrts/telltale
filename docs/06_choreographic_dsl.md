@@ -324,7 +324,7 @@ This example shows bounded ranges for role indices. It models partial broadcasts
 
 #### 10) Timing Patterns
 
-Timing patterns provide constructs for building time-aware protocols. All patterns desugar to standard MPST constructs (choice, recursion) and remain verifiable in Lean.
+Timing patterns provide constructs for building time-aware protocols. They are part of the protocol-machine surface today, but they are not all session-projectable yet.
 
 ##### Timed Choice
 
@@ -340,8 +340,10 @@ protocol TimedRequest =
 ```
 
 Use `timeout duration Role at` when deadline expiry is a protocol-visible
-outcome. The runtime enforces the deadline. Projection currently rejects
-this form until the authority-sensitive lowering rules are complete.
+outcome. The runtime enforces the deadline. Projection and theory conversion
+currently reject this form until the authority-sensitive lowering rules are
+complete, so it is protocol-machine executable but not part of the MPST/common
+theory subset yet.
 
 Durations support: `ms` (milliseconds), `s` (seconds), `m` (minutes), `h` (hours).
 

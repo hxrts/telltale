@@ -19,9 +19,10 @@ use telltale_machine::{
     ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
     ProtocolBundle as MachineProtocolBundle, ProtocolMachineAdmissibilityClass,
     ProtocolMachineConfig, ProtocolMachineEscalationWindowClass, ProtocolMachineFairnessAssumption,
-    RuntimeCapability, RuntimeContracts, RuntimeGateResult, SchedPolicy, SchedulerCapability,
-    TheoremPackCapabilities,
+    ReconfigurationPlan, ReconfigurationPlanStep, RuntimeCapability, RuntimeContracts,
+    RuntimeGateResult, SchedPolicy, SchedulerCapability, TheoremPackCapabilities,
 };
+use telltale_runtime::{Region, RoleName, Topology, TopologyEndpoint};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 fn simple_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
@@ -645,6 +646,7 @@ fn exported_reconfiguration_transition_matches_lean_reference_event() {
     let validation = match runner.validate_reconfiguration_transition(
         &rust_event.artifact_id,
         &policy,
+        0,
         &rust_event.previous_members,
         &rust_event.next_members,
     ) {
@@ -722,6 +724,7 @@ fn invalid_reconfiguration_transition_matches_lean_rejection() {
     let validation = match runner.validate_reconfiguration_transition(
         "cert/bridge-reconfig-invalid",
         &policy,
+        0,
         &["Alice".to_string(), "Bob".to_string()],
         &["Carol".to_string(), "Dora".to_string()],
     ) {
@@ -755,4 +758,159 @@ fn invalid_reconfiguration_transition_matches_lean_rejection() {
             .map(|event| event.overlap_preserved),
         Some(false)
     );
+}
+
+#[test]
+fn reconfiguration_plan_with_runtime_topology_artifacts_matches_lean_step_validation() {
+    let Some(runner) = ProtocolMachineRunner::try_new() else {
+        if strict_protocol_machine_runner_required() {
+            ProtocolMachineRunner::require_available();
+        }
+        return;
+    };
+
+    let exported = exported_bundle(InvariantClaims {
+        distributed: DistributedClaims {
+            reconfiguration: Some(ReconfigurationConfig {
+                dynamic_membership: true,
+                overlap_required: true,
+            }),
+            ..DistributedClaims::default()
+        },
+        ..InvariantClaims::default()
+    });
+
+    let machine_bundle = exported
+        .to_machine_bundle(CompositionCertificate {
+            artifact_id: "cert/bridge-reconfig-plan".to_string(),
+            link_ok_full: true,
+            theorem_pack: TheoremPackCapabilities::full(),
+            runtime_contracts: Some(RuntimeContracts::full()),
+        })
+        .expect("bridge bundle should convert into machine bundle");
+    let policy = machine_bundle
+        .reconfiguration_policy()
+        .cloned()
+        .expect("bridge bundle should carry reconfiguration policy");
+
+    let mut runtime =
+        ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+    runtime
+        .admit_bundle(machine_bundle)
+        .expect("aligned bridge/runtime bundle should admit");
+    runtime
+        .seed_bundle_membership(0, ["Alice", "Bob"])
+        .expect("seed membership");
+
+    let prepare_topology = Topology::builder()
+        .local_role(RoleName::from_static("Bob"))
+        .colocated_role(RoleName::from_static("Carol"), RoleName::from_static("Bob"))
+        .remote_role(
+            RoleName::from_static("Dora"),
+            TopologyEndpoint::new("127.0.0.1:19851").expect("endpoint"),
+        )
+        .region(
+            RoleName::from_static("Bob"),
+            Region::new("eu_central_1").expect("region"),
+        )
+        .region(
+            RoleName::from_static("Dora"),
+            Region::new("us_east_1").expect("region"),
+        )
+        .build();
+    let cutover_topology = Topology::builder()
+        .remote_role(
+            RoleName::from_static("Carol"),
+            TopologyEndpoint::new("127.0.0.1:19852").expect("endpoint"),
+        )
+        .colocated_role(
+            RoleName::from_static("Dora"),
+            RoleName::from_static("Carol"),
+        )
+        .remote_role(
+            RoleName::from_static("Eve"),
+            TopologyEndpoint::new("127.0.0.1:19853").expect("endpoint"),
+        )
+        .region(
+            RoleName::from_static("Carol"),
+            Region::new("us_east_1").expect("region"),
+        )
+        .region(
+            RoleName::from_static("Eve"),
+            Region::new("us_west_2").expect("region"),
+        )
+        .build();
+    let plan = ReconfigurationPlan {
+        plan_id: "plan/bridge-blue-green".to_string(),
+        steps: vec![
+            ReconfigurationPlanStep {
+                step_id: "prepare".to_string(),
+                next_members: vec!["Bob".to_string(), "Carol".to_string(), "Dora".to_string()],
+                placements: prepare_topology
+                    .placement_observations_for_roles(["Bob", "Carol", "Dora"])
+                    .expect("prepare placement observations"),
+            },
+            ReconfigurationPlanStep {
+                step_id: "cutover".to_string(),
+                next_members: vec!["Carol".to_string(), "Dora".to_string(), "Eve".to_string()],
+                placements: cutover_topology
+                    .placement_observations_for_roles(["Carol", "Dora", "Eve"])
+                    .expect("cutover placement observations"),
+            },
+        ],
+    };
+
+    let execution = runtime
+        .execute_reconfiguration_plan(0, &plan)
+        .expect("execute plan");
+    assert_eq!(execution.phases.len(), 2);
+    assert!(
+        execution.phases[0]
+            .transport_boundaries
+            .iter()
+            .any(|boundary| matches!(
+                boundary.boundary,
+                telltale_types::TransportBoundaryKind::SharedMemory
+            )),
+        "prepare phase should expose a colocated shared-memory boundary"
+    );
+    assert!(
+        execution.phases[1]
+            .transport_boundaries
+            .iter()
+            .any(|boundary| matches!(
+                boundary.boundary,
+                telltale_types::TransportBoundaryKind::Network
+            ) && boundary.cross_region),
+        "cutover phase should expose a cross-region network boundary"
+    );
+
+    for phase in &execution.phases {
+        let validation = match runner.validate_reconfiguration_transition(
+            &phase.event.artifact_id,
+            &policy,
+            phase.event.epoch.saturating_sub(1),
+            &phase.event.previous_members,
+            &phase.event.next_members,
+        ) {
+            Ok(validation) => validation,
+            Err(telltale_bridge::ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
+                if unsupported_reconfiguration_validation(&stderr) =>
+            {
+                assert!(
+                    !strict_protocol_machine_runner_required(),
+                    "strict protocol-machine runner verification is enabled but validateReconfigurationTransition is unsupported: {stderr}"
+                );
+                eprintln!("SKIPPED: validateReconfigurationTransition unsupported: {stderr}");
+                return;
+            }
+            Err(err) => panic!("lean reconfiguration validation should execute: {err}"),
+        };
+        assert!(
+            validation.valid,
+            "accepted reconfiguration plan phase should validate in Lean: {:?}",
+            validation.errors
+        );
+        assert_eq!(validation.event.as_ref(), Some(&phase.event));
+    }
 }
