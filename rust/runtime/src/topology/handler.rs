@@ -394,7 +394,7 @@ mod tests {
     #[cfg(not(target_arch = "wasm32"))]
     #[tokio::test]
     async fn local_handlers_share_deterministic_message_routing() {
-        let topology = TopologyBuilder::new()
+        let topology = Topology::builder()
             .local_role(RoleName::from_static("Alice"))
             .local_role(RoleName::from_static("Bob"))
             .build();

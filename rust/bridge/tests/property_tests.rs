@@ -310,6 +310,16 @@ fn run_rust_semantic_audit(
         .collect())
 }
 
+fn protocol_to_choreography_json(
+    protocol: &GeneratedProtocol,
+) -> telltale_bridge::ChoreographyJson {
+    telltale_bridge::ChoreographyJson {
+        schema_version: telltale_bridge::canonical_schema_version(),
+        global_type: telltale_bridge::global_to_json(&protocol.global),
+        roles: protocol.local_types.keys().cloned().collect(),
+    }
+}
+
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(8))]
 
@@ -322,7 +332,8 @@ proptest! {
             return Ok(());
         };
 
-        match runner.validate_trace(&trace) {
+        let choreography = protocol_to_choreography_json(&protocol);
+        match runner.validate_trace(&[choreography], &trace) {
             Ok(validation) => {
                 prop_assert!(
                     validation.valid || !validation.errors.is_empty(),

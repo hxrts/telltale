@@ -270,6 +270,7 @@ check-verification-inventory:
 check-semantic-assurance:
     cargo test -p telltale-machine runtime_semantic_lifecycle_harness_covers_seeded_state_machine_paths -- --nocapture
     cargo test -p telltale-machine runtime_semantic_lifecycle_adversarial_corpus_is_deterministic -- --nocapture
+    cargo test -p telltale-machine --test replay_persistence_identity -- --nocapture
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence -- --nocapture
     cargo test -p telltale-simulator --test harness_contracts -- --nocapture
     cargo test -p telltale-bridge --test protocol_machine_cross_target_tests -- --nocapture

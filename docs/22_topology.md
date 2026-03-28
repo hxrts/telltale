@@ -56,6 +56,8 @@ pub struct RoleFamilyConstraint {
 `RoleFamilyConstraint` provides helper constructors and a validation method:
 
 ```rust
+use telltale_runtime::RoleFamilyConstraint;
+
 // Minimum-only constraint (unbounded max)
 let unbounded = RoleFamilyConstraint::min_only(3);
 
@@ -68,7 +70,10 @@ bounded.validate(1)?;  // Err(BelowMinimum)
 bounded.validate(6)?;  // Err(AboveMaximum)
 ```
 
-These helpers let generated runners fail fast on invalid family cardinalities before any transport wiring or handler startup occurs.
+Role-family constraints are explicit validation data. Parsed topologies and
+builder-created topologies preserve them, and generated inline topology
+helpers retain them, but the caller still supplies the resolved family count
+at runtime via `validate_family`.
 
 ## DSL Syntax
 
@@ -106,7 +111,7 @@ The `role_constraints` block controls acceptable family sizes. The `channel_capa
 You can build topologies programmatically and validate them against choreography roles.
 
 ```rust
-use telltale_runtime::{RoleName, Topology, TopologyEndpoint};
+use telltale_runtime::{RoleFamilyConstraint, RoleName, Topology, TopologyEndpoint};
 
 let topology = Topology::builder()
     .local_role(RoleName::from_static("Coordinator"))
@@ -118,6 +123,7 @@ let topology = Topology::builder()
         RoleName::from_static("ParticipantB"),
         TopologyEndpoint::new("localhost:9002").unwrap(),
     )
+    .role_family_constraint("Participant", RoleFamilyConstraint::bounded(2, 5))
     .build();
 
 let roles = [
@@ -130,6 +136,13 @@ assert!(validation.is_valid());
 ```
 
 `Topology::builder` produces a `TopologyBuilder` with fluent helpers. `Topology::validate` checks that all roles referenced in the topology and constraints exist in the choreography.
+
+Explicit family-cardinality checks use the same topology object:
+
+```rust
+topology.validate_family("Participant", 3)?;
+assert!(topology.validate_family("Participant", 1).is_err());
+```
 
 Topologies can also be loaded from DSL files.
 
@@ -173,7 +186,11 @@ pub mod topology {
 }
 ```
 
-`handler(role)` builds a local topology handler. `with_topology(topology, role)` validates role coverage and returns a role-bound handler. The `topologies` submodule is emitted when inline topology definitions are present in the DSL.
+`handler(role)` builds a local topology handler. `with_topology(topology, role)`
+validates role coverage, placement constraints, and branch-capacity constraints
+and returns a role-bound handler. Inline named topologies preserve declared
+role-family constraints as topology data, but callers still invoke
+`validate_family(...)` explicitly because family counts are runtime inputs.
 
 Usage pattern:
 

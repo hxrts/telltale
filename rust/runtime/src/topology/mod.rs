@@ -682,6 +682,18 @@ impl TopologyBuilder {
         self
     }
 
+    /// Add a role-family cardinality constraint.
+    pub fn role_family_constraint(
+        mut self,
+        family: impl Into<String>,
+        constraint: RoleFamilyConstraint,
+    ) -> Self {
+        self.topology
+            .role_constraints
+            .insert(family.into(), constraint);
+        self
+    }
+
     /// Build the topology
     pub fn build(self) -> Topology {
         self.topology
@@ -1042,5 +1054,20 @@ mod tests {
 
         let unknown = topology.get_family_constraint("Unknown");
         assert!(unknown.is_none());
+    }
+
+    #[test]
+    fn test_topology_builder_preserves_role_family_constraints() {
+        let topology = Topology::builder()
+            .local_role(RoleName::from_static("Coordinator"))
+            .role_family_constraint("Witness", RoleFamilyConstraint::bounded(2, 5))
+            .build();
+
+        assert_eq!(
+            topology.get_family_constraint("Witness"),
+            Some(&RoleFamilyConstraint::bounded(2, 5))
+        );
+        assert!(topology.validate_family("Witness", 2).is_ok());
+        assert!(topology.validate_family("Witness", 6).is_err());
     }
 }

@@ -11,7 +11,7 @@ use telltale_runtime::ast::{
     annotation::Annotations, Branch, Choreography, MessageType, NonEmptyVec, Protocol, Role,
 };
 use telltale_runtime::compiler::codegen::{generate_topology_integration, InlineTopology};
-use telltale_runtime::{RoleName, TopologyBuilder, TopologyEndpoint};
+use telltale_runtime::{RoleFamilyConstraint, RoleName, TopologyBuilder, TopologyEndpoint};
 use tempfile::tempdir;
 
 fn role(name: &str) -> Role {
@@ -132,6 +132,7 @@ fn named_topology_module() -> String {
                 RoleName::from_static("Bob"),
                 TopologyEndpoint::new("127.0.0.1:19901").expect("valid endpoint"),
             )
+            .role_family_constraint("Replica", RoleFamilyConstraint::bounded(2, 4))
             .build(),
     };
     generate_topology_integration(&choreography, &[edge]).to_string()
@@ -241,8 +242,8 @@ pub mod TopologyNamed {{
         r#"
 use generated_topology_public_path_smoke::{TopologyCapacity, TopologyNamed, TopologyRoundTrip};
 use telltale_runtime::{
-    ChannelCapacity, Location, RoleName, TopologyBuilder, TopologyEndpoint,
-    TransportFactory, TransportType,
+    ChannelCapacity, Location, RoleFamilyConstraint, RoleName, TopologyBuilder,
+    TopologyEndpoint, TransportFactory, TransportType,
 };
 
 #[tokio::test]
@@ -461,6 +462,23 @@ async fn generated_named_topology_helpers_execute_without_external_network() {
         )
         .expect("named transport intent"),
         TransportType::Tcp
+    );
+    assert_eq!(
+        TopologyNamed::topology::topologies::edge().get_family_constraint("Replica"),
+        Some(&RoleFamilyConstraint::bounded(2, 4))
+    );
+    assert!(
+        TopologyNamed::topology::topologies::edge()
+            .validate_family("Replica", 2)
+            .is_ok(),
+        "generated named topology should preserve inline role-family constraints"
+    );
+    assert_eq!(
+        TopologyNamed::topology::topologies::edge()
+            .validate_family("Replica", 5)
+            .expect_err("generated named topology should fail explicit family validation")
+            .to_string(),
+        "role family has 5 instances, maximum allowed is 4"
     );
 
     edge_alice

@@ -21,8 +21,15 @@ authority_ownership_suites=(
   rust/simulator/tests/ownership_faults.rs
 )
 
+lean_correspondence_strict_suites=(
+  rust/bridge/tests/lean_trace_validation.rs
+  rust/bridge/tests/property_tests.rs
+  rust/simulator/tests/lean_reference_parity.rs
+)
+
 identity_replay_suites=(
   rust/machine/tests/serialization_replay.rs
+  rust/machine/tests/replay_persistence_identity.rs
   rust/bridge/tests/semantic_object_roundtrip.rs
   rust/bridge/tests/protocol_machine_cross_target_tests.rs
 )
@@ -120,6 +127,7 @@ runtime_substrate_boundary_suites=(
 
 explicit_unsupported_fail_closed_notes=(
   extension_statement_runtime_dispatch
+  lean_full_run_reference_execution
   topology_region_constraint_execution
   distributed_reconfiguration_schema_only
   remote_transport_realization
@@ -239,6 +247,7 @@ check_metric "Macro UI compile-fail fixtures" "$actual_fail"
 
 # ── Property Coverage Baseline ───────────────────────────────────────
 
+actual_lean_correspondence_strict=$(count_list "${lean_correspondence_strict_suites[@]}")
 actual_authority_ownership=$(count_list "${authority_ownership_suites[@]}")
 actual_identity_replay=$(count_list "${identity_replay_suites[@]}")
 actual_commitment_progress=$(count_list "${commitment_progress_suites[@]}")
@@ -260,6 +269,7 @@ actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupport
 actual_executable_property_buckets=$(
   (
     bucket_has_coverage "$actual_authority_ownership"
+    bucket_has_coverage "$actual_lean_correspondence_strict"
     bucket_has_coverage "$actual_identity_replay"
     bucket_has_coverage "$actual_commitment_progress"
     bucket_has_coverage "$actual_cross_mode_semantic_parity"
@@ -273,11 +283,12 @@ actual_executable_property_buckets=$(
     bucket_has_coverage "$actual_runtime_substrate_boundary_suites"
   ) | awk '{sum += $1} END {print sum + 0}'
 )
-actual_lacking_property_buckets=$((12 - actual_executable_property_buckets))
+actual_lacking_property_buckets=$((13 - actual_executable_property_buckets))
 
 check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
 check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
 check_metric "Authority and ownership semantic assurance suites" "$actual_authority_ownership"
+check_metric "Lean-backed correspondence strict suites" "$actual_lean_correspondence_strict"
 check_metric "Identity and replay semantic assurance suites" "$actual_identity_replay"
 check_metric "Commitment and progress semantic assurance suites" "$actual_commitment_progress"
 check_metric "Cross-mode semantic parity suites" "$actual_cross_mode_semantic_parity"

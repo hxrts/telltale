@@ -462,9 +462,11 @@ impl ProtocolMachineRunner {
     /// Returns an error if Lean invocation fails.
     pub fn validate_trace(
         &self,
+        choreographies: &[ChoreographyJson],
         rust_trace: &[ProtocolMachineTraceEvent],
     ) -> Result<TraceValidation, ProtocolMachineRunnerError> {
         let payload = serde_json::json!({
+            "choreographies": choreographies,
             "trace": rust_trace,
         });
         let response = self.run_validation_operation("validateTrace", &payload)?;
@@ -498,9 +500,10 @@ impl ProtocolMachineRunner {
     /// Returns an error if Lean invocation fails.
     pub fn validate_simulation_trace(
         &self,
+        input: &SimRunInput,
         trace: &[ProtocolMachineTraceEvent],
     ) -> Result<SimTraceValidation, ProtocolMachineRunnerError> {
-        let payload = simulation_trace_payload(trace);
+        let payload = simulation_trace_payload(input, trace);
         let response = self.run_validation_operation("validateSimulationTrace", &payload)?;
         parse_sim_trace_validation(&response)
     }

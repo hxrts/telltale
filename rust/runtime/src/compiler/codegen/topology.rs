@@ -64,7 +64,8 @@ pub fn generate_topology_integration(
                 TopologyMode,
             };
             use ::telltale_runtime::{
-                ChannelCapacity, Datacenter, Namespace, Region, RoleName, TopologyEndpoint,
+                ChannelCapacity, Datacenter, Namespace, Region, RoleFamilyConstraint, RoleName,
+                TopologyEndpoint,
             };
 
             #handler_method
@@ -329,6 +330,13 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
         ));
     }
 
+    // Add role-family constraints
+    for (family, constraint) in &topology.role_constraints {
+        builder_calls.push(generate_role_family_constraint_builder_call(
+            family, constraint,
+        ));
+    }
+
     if builder_calls.is_empty() {
         quote! {
             TopologyBuilder::new().build()
@@ -454,6 +462,21 @@ fn generate_channel_capacity_builder_call(
             ChannelCapacity::try_new(#capacity_value)
                 .expect("generated channel capacity must be within declared bounds")
         )
+    }
+}
+
+fn generate_role_family_constraint_builder_call(
+    family: &str,
+    constraint: &crate::topology::RoleFamilyConstraint,
+) -> TokenStream {
+    let min = constraint.min;
+    match constraint.max {
+        Some(max) => quote! {
+            .role_family_constraint(#family, RoleFamilyConstraint::bounded(#min, #max))
+        },
+        None => quote! {
+            .role_family_constraint(#family, RoleFamilyConstraint::min_only(#min))
+        },
     }
 }
 
@@ -619,6 +642,10 @@ mod tests {
                 RoleName::from_static("Alice"),
                 RoleName::from_static("Carol"),
             )
+            .role_family_constraint(
+                "Witness",
+                crate::topology::RoleFamilyConstraint::bounded(2, 5),
+            )
             .build();
 
         let tokens = generate_topology_builder(
@@ -629,6 +656,8 @@ mod tests {
 
         assert!(code.contains("colocated"));
         assert!(code.contains("separated"));
+        assert!(code.contains("role_family_constraint"));
+        assert!(code.contains("RoleFamilyConstraint :: bounded"));
     }
 
     #[test]

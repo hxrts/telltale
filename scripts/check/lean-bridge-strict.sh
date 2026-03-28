@@ -25,4 +25,14 @@ echo "run strict protocol-bundle verification corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
   cargo test -p telltale-bridge --test invariant_verification -- --nocapture
 
+echo "run strict protocol-machine trace validation corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_TRACE_VALIDATION=1 \
+  cargo test -p telltale-bridge --test lean_trace_validation -- --nocapture
+
+echo "run strict simulator trace validation corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+TELLTALE_REQUIRE_SIMULATION_TRACE_VALIDATION=1 \
+  cargo test -p telltale-simulator --test lean_reference_parity -- --nocapture
+
 echo "lean-bridge-strict: ok"
