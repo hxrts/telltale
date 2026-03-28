@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
 use std::thread;
@@ -122,6 +122,8 @@ pub struct ProtocolMachineTraceEvent {
     pub output_digest: Option<String>,
     #[serde(default)]
     pub passed: Option<bool>,
+    #[serde(default)]
+    pub reason: Option<String>,
 }
 
 /// One scheduler-step state entry from the protocol-machine runner.
@@ -133,6 +135,12 @@ pub struct ProtocolMachineStepState {
     /// Coroutine selected for this step, when available.
     #[serde(default)]
     pub selected_coro: Option<u64>,
+    /// Program counter selected for this step, when available.
+    #[serde(default)]
+    pub selected_pc: Option<u64>,
+    /// Lean-side selected endpoint local type snapshot for this step.
+    #[serde(default)]
+    pub selected_type: Option<Value>,
     /// Execution status tag for the selected step.
     #[serde(default)]
     pub exec_status: Option<String>,
@@ -252,14 +260,36 @@ impl ProtocolMachineRunner {
         timeout: Duration,
         operation: &str,
     ) -> Result<Output, ProtocolMachineRunnerError> {
+        let stdout_handle = child.stdout.take().map(|mut stdout| {
+            thread::spawn(move || {
+                let mut buf = Vec::new();
+                let _ = stdout.read_to_end(&mut buf);
+                buf
+            })
+        });
+        let stderr_handle = child.stderr.take().map(|mut stderr| {
+            thread::spawn(move || {
+                let mut buf = Vec::new();
+                let _ = stderr.read_to_end(&mut buf);
+                buf
+            })
+        });
         let start = Instant::now();
         loop {
             // bounded: exits on child completion or timeout
             match child.try_wait()? {
-                Some(_) => {
-                    return child
-                        .wait_with_output()
-                        .map_err(ProtocolMachineRunnerError::from)
+                Some(status) => {
+                    let stdout = stdout_handle
+                        .map(|handle| handle.join().unwrap_or_default())
+                        .unwrap_or_default();
+                    let stderr = stderr_handle
+                        .map(|handle| handle.join().unwrap_or_default())
+                        .unwrap_or_default();
+                    return Ok(Output {
+                        status,
+                        stdout,
+                        stderr,
+                    });
                 }
                 None => {
                     if start.elapsed() >= timeout {
@@ -272,6 +302,12 @@ impl ProtocolMachineRunner {
                             eprintln!(
                                 "best-effort child.wait failed during timeout handling: {err}"
                             );
+                        }
+                        if let Some(handle) = stdout_handle {
+                            let _ = handle.join();
+                        }
+                        if let Some(handle) = stderr_handle {
+                            let _ = handle.join();
                         }
                         return Err(ProtocolMachineRunnerError::TimedOut {
                             operation: operation.to_string(),
@@ -787,6 +823,7 @@ mod tests {
             witness_ref: None,
             output_digest: None,
             passed: None,
+            reason: None,
         }
     }
 

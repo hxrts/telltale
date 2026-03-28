@@ -28,12 +28,13 @@ pub use lints::{
 };
 
 use crate::ast::{
-    AgreementProfileDeclaration, Choreography, EffectInterfaceDeclaration,
-    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration, RegionDeclaration,
-    RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration, TypeDeclaration,
+    AgreementProfileDeclaration, Annotations, Choreography, EffectInterfaceDeclaration,
+    ExecutionProfileDeclaration, GuestRuntimeDeclaration, OperationDeclaration, Protocol,
+    RegionDeclaration, Role, RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
+    TypeDeclaration,
 };
 use crate::compiler::layout::preprocess_layout;
-use crate::extensions::{ExtensionRegistry, ProtocolExtension};
+use crate::extensions::{ExtensionRegistry, ParseContext, ProtocolExtension, StatementParser};
 use pest::Parser;
 use pest_derive::Parser;
 use proc_macro2::{Span, TokenStream};
@@ -53,6 +54,8 @@ use role::parse_roles_from_pair;
 use statement::{parse_local_protocol_decl, parse_protocol_body};
 use types::Statement;
 
+type ParsedExtensions = (Choreography, Vec<Box<dyn ProtocolExtension>>);
+
 #[derive(Parser)]
 #[grammar = "compiler/choreography.pest"]
 struct ChoreographyParser;
@@ -67,16 +70,27 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
 }
 
 /// Parse a choreographic protocol from a string with extension support
-#[allow(clippy::too_many_lines)]
 pub fn parse_choreography_str_with_extensions(
     input: &str,
-    _registry: &ExtensionRegistry,
-) -> std::result::Result<(Choreography, Vec<Box<dyn ProtocolExtension>>), ParseError> {
+    registry: &ExtensionRegistry,
+) -> std::result::Result<ParsedExtensions, ParseError> {
     let dedented = strip_common_indent(input);
-    reject_legacy_structural_braces(&dedented)?;
-    reject_removed_legacy_surfaces(&dedented)?;
-    let layout = preprocess_layout(&dedented).map_err(|e| ParseError::Layout {
-        span: ErrorSpan::from_line_col(e.line, e.column, &dedented),
+    if registry.has_extensions() {
+        if let Some(parsed) = try_parse_with_extension_dispatch(&dedented, registry)? {
+            return Ok(parsed);
+        }
+    }
+    parse_choreography_str_core(&dedented)
+}
+
+#[allow(clippy::too_many_lines)]
+fn parse_choreography_str_core(
+    dedented: &str,
+) -> std::result::Result<ParsedExtensions, ParseError> {
+    reject_legacy_structural_braces(dedented)?;
+    reject_removed_legacy_surfaces(dedented)?;
+    let layout = preprocess_layout(dedented).map_err(|e| ParseError::Layout {
+        span: ErrorSpan::from_line_col(e.line, e.column, dedented),
         message: e.message,
     })?;
     let pairs = ChoreographyParser::parse(Rule::choreography, &layout).map_err(Box::new)?;
@@ -357,6 +371,493 @@ pub fn parse_choreography_str_with_extensions(
         })?;
 
     Ok((choreography, Vec::new()))
+}
+
+struct ExtensionBinding<'a> {
+    rule_name: String,
+    parser: &'a dyn StatementParser,
+    prefix: String,
+}
+
+struct StatementChunk {
+    text: String,
+    extension_binding: Option<usize>,
+}
+
+struct ProtocolBodySplit {
+    stripped_input: String,
+    chunks: Vec<StatementChunk>,
+}
+
+fn try_parse_with_extension_dispatch(
+    input: &str,
+    registry: &ExtensionRegistry,
+) -> std::result::Result<Option<ParsedExtensions>, ParseError> {
+    let bindings = collect_extension_bindings(registry);
+    if bindings.is_empty() || !input_contains_extension_candidates(input, &bindings) {
+        return Ok(None);
+    }
+
+    let split = match split_protocol_body_chunks(input, &bindings) {
+        Some(split) => split,
+        None => return Ok(None),
+    };
+    if !split
+        .chunks
+        .iter()
+        .any(|chunk| chunk.extension_binding.is_some())
+    {
+        return Ok(None);
+    }
+
+    let (mut choreography, _) = parse_choreography_str_core(&split.stripped_input)?;
+    let mut extensions = Vec::new();
+    let mut rebuilt = Protocol::End;
+
+    for chunk in &split.chunks {
+        let (chunk_protocol, mut chunk_extensions) =
+            parse_chunk_protocol(chunk, &choreography.roles, registry, input, &bindings)?;
+        rebuilt = append_protocol(rebuilt, chunk_protocol);
+        extensions.append(&mut chunk_extensions);
+    }
+
+    choreography.protocol = rebuilt;
+    choreography
+        .validate()
+        .map_err(|message| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, input),
+            message: message.to_string(),
+        })?;
+
+    Ok(Some((choreography, extensions)))
+}
+
+fn parse_chunk_protocol(
+    chunk: &StatementChunk,
+    roles: &[Role],
+    registry: &ExtensionRegistry,
+    original_input: &str,
+    bindings: &[ExtensionBinding<'_>],
+) -> std::result::Result<(Protocol, Vec<Box<dyn ProtocolExtension>>), ParseError> {
+    if let Some(binding_idx) = chunk.extension_binding {
+        let binding = &bindings[binding_idx];
+        let ext = binding
+            .parser
+            .parse_statement(
+                &binding.rule_name,
+                chunk.text.trim(),
+                &ParseContext {
+                    declared_roles: roles,
+                    input: original_input,
+                },
+            )
+            .map_err(|err| ParseError::Syntax {
+                span: ErrorSpan::from_line_col(1, 1, original_input),
+                message: err.to_string(),
+            })?;
+        ext.validate(roles).map_err(|err| ParseError::Syntax {
+            span: ErrorSpan::from_line_col(1, 1, original_input),
+            message: err.to_string(),
+        })?;
+        return Ok((
+            Protocol::Extension {
+                extension: ext.clone(),
+                continuation: Box::new(Protocol::End),
+                annotations: Annotations::default(),
+            },
+            vec![ext],
+        ));
+    }
+
+    let chunk_source = build_chunk_protocol_source(roles, &chunk.text);
+    let (choreography, extensions) =
+        parse_choreography_str_with_extensions(&chunk_source, registry)?;
+    Ok((choreography.protocol, extensions))
+}
+
+fn append_protocol(left: Protocol, right: Protocol) -> Protocol {
+    match left {
+        Protocol::End => right,
+        Protocol::Begin {
+            operation,
+            args,
+            progress,
+            continuation,
+        } => Protocol::Begin {
+            operation,
+            args,
+            progress,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Await {
+            operation,
+            continuation,
+        } => Protocol::Await {
+            operation,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Resolve {
+            operation,
+            outcome,
+            continuation,
+        } => Protocol::Resolve {
+            operation,
+            outcome,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Invalidate {
+            operation,
+            continuation,
+        } => Protocol::Invalidate {
+            operation,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Send {
+            from,
+            to,
+            message,
+            continuation,
+            annotations,
+            from_annotations,
+            to_annotations,
+        } => Protocol::Send {
+            from,
+            to,
+            message,
+            continuation: Box::new(append_protocol(*continuation, right)),
+            annotations,
+            from_annotations,
+            to_annotations,
+        },
+        Protocol::Broadcast {
+            from,
+            to_all,
+            message,
+            continuation,
+            annotations,
+            from_annotations,
+        } => Protocol::Broadcast {
+            from,
+            to_all,
+            message,
+            continuation: Box::new(append_protocol(*continuation, right)),
+            annotations,
+            from_annotations,
+        },
+        Protocol::Let {
+            name,
+            mode,
+            expr,
+            linear,
+            continuation,
+        } => Protocol::Let {
+            name,
+            mode,
+            expr,
+            linear,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Publish {
+            event,
+            arg,
+            continuation,
+        } => Protocol::Publish {
+            event,
+            arg,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::PublishAuthority {
+            witness,
+            publication_name,
+            continuation,
+        } => Protocol::PublishAuthority {
+            witness,
+            publication_name,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Materialize {
+            proof,
+            publication,
+            continuation,
+        } => Protocol::Materialize {
+            proof,
+            publication,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Handoff {
+            operation,
+            target,
+            receipt,
+            continuation,
+        } => Protocol::Handoff {
+            operation,
+            target,
+            receipt,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::DependentWork {
+            name,
+            arg,
+            required_for,
+            continuation,
+        } => Protocol::DependentWork {
+            name,
+            arg,
+            required_for,
+            continuation: Box::new(append_protocol(*continuation, right)),
+        },
+        Protocol::Extension {
+            extension,
+            continuation,
+            annotations,
+        } => Protocol::Extension {
+            extension,
+            continuation: Box::new(append_protocol(*continuation, right)),
+            annotations,
+        },
+        Protocol::Choice {
+            role,
+            branches,
+            annotations,
+        } => Protocol::Choice {
+            role,
+            branches: {
+                let mut iter = branches.into_vec().into_iter().map(|mut branch| {
+                    branch.protocol = append_protocol(branch.protocol, right.clone());
+                    branch
+                });
+                let first = iter.next().expect("choice branches are non-empty");
+                crate::ast::NonEmptyVec::from_head_tail(first, iter.collect())
+            },
+            annotations,
+        },
+        Protocol::Case { expr, branches } => Protocol::Case {
+            expr,
+            branches: {
+                let mut iter = branches.into_vec().into_iter().map(|mut branch| {
+                    branch.protocol = append_protocol(branch.protocol, right.clone());
+                    branch
+                });
+                let first = iter.next().expect("case branches are non-empty");
+                crate::ast::NonEmptyVec::from_head_tail(first, iter.collect())
+            },
+        },
+        Protocol::Timeout {
+            role,
+            duration_ms,
+            body,
+            on_timeout,
+            on_cancel,
+        } => Protocol::Timeout {
+            role,
+            duration_ms,
+            body: Box::new(append_protocol(*body, right.clone())),
+            on_timeout: Box::new(append_protocol(*on_timeout, right.clone())),
+            on_cancel: on_cancel.map(|branch| Box::new(append_protocol(*branch, right.clone()))),
+        },
+        Protocol::Loop { condition, body } => Protocol::Loop {
+            condition,
+            body: Box::new(append_protocol(*body, right)),
+        },
+        Protocol::Parallel { protocols } => Protocol::Parallel {
+            protocols: {
+                let mut iter = protocols
+                    .into_vec()
+                    .into_iter()
+                    .map(|protocol| append_protocol(protocol, right.clone()));
+                let first = iter.next().expect("parallel branches are non-empty");
+                crate::ast::NonEmptyVec::from_head_tail(first, iter.collect())
+            },
+        },
+        Protocol::Rec { label, body } => Protocol::Rec {
+            label,
+            body: Box::new(append_protocol(*body, right)),
+        },
+        Protocol::Var(label) => Protocol::Var(label),
+    }
+}
+
+fn build_chunk_protocol_source(roles: &[Role], chunk: &str) -> String {
+    let role_list = roles
+        .iter()
+        .map(|role| role.name().to_string())
+        .collect::<Vec<_>>()
+        .join(", ");
+    let normalized = strip_common_indent(chunk);
+    let body = normalized
+        .lines()
+        .map(|line| {
+            if line.is_empty() {
+                String::new()
+            } else {
+                format!("    {line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!("protocol __ExtensionChunk =\n    roles {role_list}\n{body}\n")
+}
+
+fn split_protocol_body_chunks(
+    input: &str,
+    bindings: &[ExtensionBinding<'_>],
+) -> Option<ProtocolBodySplit> {
+    let lines: Vec<&str> = input.lines().collect();
+    let protocol_idx = lines
+        .iter()
+        .position(|line| line.trim_start().starts_with("protocol "))?;
+
+    let mut cursor = protocol_idx + 1;
+    while cursor < lines.len() && is_blank_or_comment(lines[cursor]) {
+        cursor += 1;
+    }
+    if cursor < lines.len() && lines[cursor].trim_start().starts_with("roles ") {
+        cursor += 1;
+    }
+    while cursor < lines.len() && is_blank_or_comment(lines[cursor]) {
+        cursor += 1;
+    }
+    if cursor >= lines.len() {
+        return Some(ProtocolBodySplit {
+            stripped_input: input.to_string(),
+            chunks: Vec::new(),
+        });
+    }
+
+    let body_indent = indentation_width(lines[cursor]);
+    let mut working_lines = lines
+        .iter()
+        .map(|line| (*line).to_string())
+        .collect::<Vec<_>>();
+    let mut chunks = Vec::new();
+    let mut idx = cursor;
+
+    while idx < lines.len() {
+        let trimmed = lines[idx].trim_start();
+        if trimmed.is_empty() || trimmed.starts_with("--") {
+            idx += 1;
+            continue;
+        }
+        let indent = indentation_width(lines[idx]);
+        if indent < body_indent || (indent == body_indent && trimmed.starts_with("where")) {
+            break;
+        }
+        if indent > body_indent {
+            idx += 1;
+            continue;
+        }
+
+        let start = idx;
+        idx += 1;
+        while idx < lines.len() {
+            let trimmed = lines[idx].trim_start();
+            if trimmed.is_empty() || trimmed.starts_with("--") {
+                idx += 1;
+                continue;
+            }
+            let indent = indentation_width(lines[idx]);
+            if indent < body_indent || (indent == body_indent && trimmed.starts_with("where")) {
+                break;
+            }
+            if indent == body_indent {
+                break;
+            }
+            idx += 1;
+        }
+
+        let chunk_text = lines[start..idx].join("\n");
+        let extension_binding = detect_extension_binding(lines[start], bindings);
+        if extension_binding.is_some() {
+            for line in &mut working_lines[start..idx] {
+                line.clear();
+            }
+        }
+        chunks.push(StatementChunk {
+            text: chunk_text,
+            extension_binding,
+        });
+    }
+
+    let mut stripped_input = working_lines.join("\n");
+    if input.ends_with('\n') {
+        stripped_input.push('\n');
+    }
+    Some(ProtocolBodySplit {
+        stripped_input,
+        chunks,
+    })
+}
+
+fn detect_extension_binding(line: &str, bindings: &[ExtensionBinding<'_>]) -> Option<usize> {
+    let trimmed = line.trim_start();
+    bindings
+        .iter()
+        .position(|binding| starts_with_statement_prefix(trimmed, &binding.prefix))
+}
+
+fn input_contains_extension_candidates(input: &str, bindings: &[ExtensionBinding<'_>]) -> bool {
+    input
+        .lines()
+        .any(|line| detect_extension_binding(line, bindings).is_some())
+}
+
+fn collect_extension_bindings<'a>(registry: &'a ExtensionRegistry) -> Vec<ExtensionBinding<'a>> {
+    let mut bindings = Vec::new();
+    for rule_name in registry.statement_rules() {
+        let Some(prefix) = extension_rule_prefix(registry, rule_name) else {
+            continue;
+        };
+        let Some(parser_id) = registry.get_parser_for_rule(rule_name) else {
+            continue;
+        };
+        let Some(parser) = registry.get_statement_parser(parser_id) else {
+            continue;
+        };
+        bindings.push(ExtensionBinding {
+            rule_name: rule_name.to_string(),
+            parser,
+            prefix,
+        });
+    }
+    bindings.sort_by(|left, right| right.prefix.len().cmp(&left.prefix.len()));
+    bindings
+}
+
+fn extension_rule_prefix(registry: &ExtensionRegistry, rule_name: &str) -> Option<String> {
+    registry.grammar_extensions().find_map(|extension| {
+        if !extension.statement_rules().contains(&rule_name) {
+            return None;
+        }
+        extract_rule_prefix(extension.grammar_rules(), rule_name)
+    })
+}
+
+fn extract_rule_prefix(grammar_rules: &str, rule_name: &str) -> Option<String> {
+    let pattern = format!(r#"{rule_name}\s*=\s*\{{\s*"([^"]+)""#);
+    let regex = Regex::new(&pattern).ok()?;
+    regex
+        .captures(grammar_rules)
+        .and_then(|captures| captures.get(1).map(|matched| matched.as_str().to_string()))
+}
+
+fn starts_with_statement_prefix(line: &str, prefix: &str) -> bool {
+    let Some(rest) = line.strip_prefix(prefix) else {
+        return false;
+    };
+    rest.is_empty()
+        || rest
+            .chars()
+            .next()
+            .is_some_and(|ch| ch.is_whitespace() || matches!(ch, '(' | '{' | '"' | '\''))
+}
+
+fn indentation_width(line: &str) -> usize {
+    line.len() - line.trim_start_matches([' ', '\t']).len()
+}
+
+fn is_blank_or_comment(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    trimmed.is_empty() || trimmed.starts_with("--")
 }
 
 fn reject_legacy_structural_braces(input: &str) -> std::result::Result<(), ParseError> {

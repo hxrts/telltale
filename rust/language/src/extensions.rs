@@ -126,6 +126,13 @@ pub trait ProtocolExtension: Send + Sync + Debug {
     fn as_any(&self) -> &dyn Any;
     fn as_any_mut(&mut self) -> &mut dyn Any;
     fn type_id(&self) -> TypeId;
+    fn clone_box(&self) -> Box<dyn ProtocolExtension>;
+}
+
+impl Clone for Box<dyn ProtocolExtension> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 /// Registry for managing DSL extensions with conflict resolution
@@ -262,6 +269,18 @@ impl ExtensionRegistry {
     /// Get statement parser by ID
     pub fn get_statement_parser(&self, parser_id: &str) -> Option<&dyn StatementParser> {
         self.statement_parsers.get(parser_id).map(|p| p.as_ref())
+    }
+
+    /// Get the number of registered statement parsers.
+    pub fn statement_parser_count(&self) -> usize {
+        self.statement_parsers.len()
+    }
+
+    /// Get the registered extension statement rules in stable order.
+    pub fn statement_rules(&self) -> Vec<&str> {
+        let mut rules: Vec<_> = self.rule_to_parser.keys().map(String::as_str).collect();
+        rules.sort_unstable();
+        rules
     }
 
     /// Add dependency between extensions

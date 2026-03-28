@@ -8,6 +8,7 @@ struct PassCase {
     name: &'static str,
     session_projectable: bool,
     protocol_machine_executable: bool,
+    theory_convertible: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -24,6 +25,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "call_plain_communication",
             session_projectable: true,
             protocol_machine_executable: true,
+            theory_convertible: true,
         },
         fail_fixture: "linear_call_fail_closed",
     },
@@ -33,6 +35,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "case_authoritative_binding",
             session_projectable: false,
             protocol_machine_executable: true,
+            theory_convertible: false,
         },
         fail_fixture: "linear_case_divergence",
     },
@@ -42,6 +45,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "choice_observational_binding",
             session_projectable: true,
             protocol_machine_executable: true,
+            theory_convertible: true,
         },
         fail_fixture: "linear_choice_divergence",
     },
@@ -51,6 +55,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "loop_authoritative_binding",
             session_projectable: true,
             protocol_machine_executable: true,
+            theory_convertible: true,
         },
         fail_fixture: "linear_loop_preservation",
     },
@@ -60,6 +65,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "parallel_observational_binding",
             session_projectable: true,
             protocol_machine_executable: true,
+            theory_convertible: false,
         },
         fail_fixture: "linear_parallel_preservation",
     },
@@ -69,6 +75,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "recursion_authoritative_binding",
             session_projectable: true,
             protocol_machine_executable: true,
+            theory_convertible: true,
         },
         fail_fixture: "linear_recursion_preservation",
     },
@@ -78,6 +85,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
             name: "timeout_observational_binding",
             session_projectable: false,
             protocol_machine_executable: true,
+            theory_convertible: false,
         },
         fail_fixture: "linear_timeout_divergence",
     },
@@ -130,6 +138,11 @@ fn authority_control_flow_pairs_spell_out_supported_and_rejected_surfaces() {
         assert_eq!(
             status.protocol_machine_executable, pair.pass.protocol_machine_executable,
             "unexpected protocol_machine_executable status for {} ({})",
+            pair.pass.name, pair.construct
+        );
+        assert_eq!(
+            status.theory_convertible, pair.pass.theory_convertible,
+            "unexpected theory_convertible status for {} ({})",
             pair.pass.name, pair.construct
         );
 

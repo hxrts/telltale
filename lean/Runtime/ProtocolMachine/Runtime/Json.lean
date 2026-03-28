@@ -81,26 +81,34 @@ private def ownershipTerminalReasonToJson (reason : OwnershipTerminalReason) : J
 def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   match ev.event with
   | .sent edge val seqNo =>
-      Json.mkObj
+      let labelField :=
+        match val with
+        | .string s => [("label", Json.str s)]
+        | _ => []
+      Json.mkObj <|
         [ ("kind", Json.str "sent")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
         , ("sequence", Json.num seqNo)
-        , ("value", valueToJson val) ]
+        , ("value", valueToJson val) ] ++ labelField
   | .received edge val seqNo =>
-      Json.mkObj
+      let labelField :=
+        match val with
+        | .string s => [("label", Json.str s)]
+        | _ => []
+      Json.mkObj <|
         [ ("kind", Json.str "received")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
         , ("receiver", Json.str edge.receiver)
         , ("sequence", Json.num seqNo)
-        , ("value", valueToJson val) ]
+        , ("value", valueToJson val) ] ++ labelField
   | .offered edge lbl =>
       Json.mkObj
-        [ ("kind", Json.str "offered")
+        [ ("kind", Json.str "sent")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
@@ -108,7 +116,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("label", Json.str lbl) ]
   | .chose edge lbl =>
       Json.mkObj
-        [ ("kind", Json.str "chose")
+        [ ("kind", Json.str "received")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
         , ("sender", Json.str edge.sender)
@@ -124,6 +132,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         [ ("kind", Json.str "opened")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
+        , ("role", Json.str (String.intercalate "," roles))
         , ("roles", Json.arr (roles.map Json.str).toArray) ]
   | .closed sid =>
       Json.mkObj

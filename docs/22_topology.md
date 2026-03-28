@@ -28,7 +28,7 @@ pub struct Topology {
 }
 ```
 
-`TopologyMode` is intentionally narrow. The runtime only exposes a local shorthand; deployment-specific discovery or orchestration belongs in transport or integration crates, not in `telltale-runtime`. `TopologyConstraint` and `RoleFamilyConstraint` add placement and role family rules.
+`TopologyMode` is intentionally narrow. The runtime only exposes a local shorthand. Deployment-specific discovery or orchestration belongs in transport or integration crates, not in `telltale-runtime`. `TopologyConstraint` and `RoleFamilyConstraint` add placement and role family rules.
 
 ```rust
 pub enum TopologyMode {
@@ -228,7 +228,7 @@ let transport_type = TransportFactory::transport_for_location(
 assert!(matches!(transport_type, TransportType::Tcp));
 ```
 
-`TransportFactory::create` realizes loopback `Location::Remote` endpoints through a deterministic TCP transport on native targets. `TopologyHandler` uses the same remote slice for `with_topology(...)` helpers, so generated topology public-path tests exercise real loopback message delivery instead of an intent-only placeholder. The runtime does not encode discovery products or managed deployment backends directly; those belong outside the runtime API.
+`TransportFactory::create` realizes loopback `Location::Remote` endpoints through a deterministic TCP transport on native targets. `TopologyHandler` uses the same remote slice for `with_topology(...)` helpers, so generated topology public-path tests exercise real loopback message delivery instead of an intent-only placeholder. The runtime does not encode discovery products or managed deployment backends directly. Those belong outside the runtime API.
 
 Those transport decisions are also visible through
 `transport_boundaries_for_roles(...)`, which means topology-aware

@@ -926,6 +926,8 @@ protocol ParallelDemo =
 ```
 
 This example uses `par` with leading `|` branches. Each branch defines a parallel sub protocol.
+`par` remains protocol-machine executable and session-projectable, but it is not
+part of the theory-convertible subset tracked by `language_tier_status()`.
 
 ## Integration
 

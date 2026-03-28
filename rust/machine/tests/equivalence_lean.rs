@@ -14,8 +14,11 @@ use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
 
 use telltale_bridge::export::global_to_json;
-use telltale_bridge::runner::{ChoreographyJson, LeanRunner, LeanRunnerError};
-use telltale_bridge::{canonical_schema_version, partition_by_session, NormalizedEvent};
+use telltale_bridge::{
+    canonical_schema_version, partition_by_session, ChoreographyJson, NormalizedEvent,
+    ProtocolMachineRunInput, ProtocolMachineRunOutput, ProtocolMachineRunner,
+    ProtocolMachineRunnerError,
+};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 use test_support::{
@@ -72,15 +75,12 @@ fn normalize_rust_trace(trace: &[ObsEvent], session_ids: &[usize]) -> Vec<Normal
         .collect()
 }
 
-fn normalize_lean_trace(output: &serde_json::Value) -> Vec<NormalizedEvent> {
-    let mut session_ids: Vec<usize> = output["sessions"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|s| s["sid"].as_u64().map(|v| v as usize))
-                .collect()
-        })
-        .unwrap_or_default();
+fn normalize_lean_trace(output: &ProtocolMachineRunOutput) -> Vec<NormalizedEvent> {
+    let mut session_ids: Vec<usize> = output
+        .sessions
+        .iter()
+        .filter_map(|session| usize::try_from(session.sid).ok())
+        .collect();
     session_ids.sort_unstable();
 
     let mut sid_map: HashMap<usize, usize> = HashMap::new();
@@ -88,30 +88,26 @@ fn normalize_lean_trace(output: &serde_json::Value) -> Vec<NormalizedEvent> {
         sid_map.insert(*sid, idx);
     }
 
-    output["trace"]
-        .as_array()
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|ev| {
-                    let kind = ev["kind"].as_str()?;
-                    if kind != "sent" && kind != "received" {
-                        return None;
-                    }
-                    let session = ev["session"].as_u64()? as usize;
-                    let sender = ev["sender"].as_str()?.to_string();
-                    let receiver = ev["receiver"].as_str()?.to_string();
-                    let session_index = *sid_map.get(&session)?;
-                    Some(NormalizedEvent {
-                        kind: kind.to_string(),
-                        session_index,
-                        sender,
-                        receiver,
-                        label: None,
-                    })
-                })
-                .collect()
+    output
+        .trace
+        .iter()
+        .filter_map(|ev| {
+            if ev.kind != "sent" && ev.kind != "received" {
+                return None;
+            }
+            let session = usize::try_from(ev.session?).ok()?;
+            let sender = ev.sender.clone()?;
+            let receiver = ev.receiver.clone()?;
+            let session_index = *sid_map.get(&session)?;
+            Some(NormalizedEvent {
+                kind: ev.kind.clone(),
+                session_index,
+                sender,
+                receiver,
+                label: None,
+            })
         })
-        .unwrap_or_default()
+        .collect()
 }
 
 fn run_rust(
@@ -134,14 +130,25 @@ fn run_lean(
     choreos: &[ChoreographyJson],
     concurrency: usize,
     max_rounds: usize,
-) -> Result<Vec<NormalizedEvent>, LeanRunnerError> {
+) -> Result<Vec<NormalizedEvent>, ProtocolMachineRunnerError> {
     let runner_path = protocol_machine_runner_path().ok_or_else(|| {
-        LeanRunnerError::BinaryNotFound(PathBuf::from(
+        ProtocolMachineRunnerError::BinaryNotFound(PathBuf::from(
             "lean/.lake/build/bin/protocol_machine_runner",
         ))
     })?;
-    let runner = LeanRunner::with_binary_path(runner_path)?;
-    let output = runner.run_protocol_machine(choreos, concurrency, max_rounds)?;
+    let runner = ProtocolMachineRunner::with_binary_path(runner_path)?;
+    let input = ProtocolMachineRunInput {
+        schema_version: canonical_schema_version(),
+        choreographies: choreos.to_vec(),
+        concurrency: concurrency as u64,
+        max_steps: max_rounds as u64,
+    };
+    let output = runner.run_protocol_machine(&input)?;
+    if std::env::var("TELLTALE_DEBUG_EQUIV").ok().as_deref() == Some("1") {
+        eprintln!("lean sessions: {:?}", output.sessions);
+        eprintln!("lean trace: {:?}", output.trace);
+        eprintln!("lean step states: {:?}", output.step_states);
+    }
     Ok(normalize_lean_trace(&output))
 }
 
@@ -220,7 +227,7 @@ fn equivalence_lean_basic() {
     // Cross-language equivalence (skip if Lean runner unavailable).
     let lean_trace = match run_lean(&choreos, concurrencies[0], 200) {
         Ok(t) => t,
-        Err(LeanRunnerError::BinaryNotFound(_)) => return,
+        Err(ProtocolMachineRunnerError::BinaryNotFound(_)) => return,
         Err(e) => panic!("Lean runner failed: {e}"),
     };
     if lean_trace.is_empty() {
@@ -238,7 +245,7 @@ fn equivalence_lean_basic() {
     for &n in &concurrencies[1..] {
         let lean_trace_n = match run_lean(&choreos, n, 200) {
             Ok(t) => t,
-            Err(LeanRunnerError::BinaryNotFound(_)) => return,
+            Err(ProtocolMachineRunnerError::BinaryNotFound(_)) => return,
             Err(e) => panic!("Lean runner failed: {e}"),
         };
         if lean_trace_n.is_empty() {

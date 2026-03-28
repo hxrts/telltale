@@ -174,6 +174,7 @@ fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEven
         witness_ref: None,
         output_digest: None,
         passed: None,
+        reason: None,
     };
 
     match ev {
@@ -272,10 +273,9 @@ fn run_rust_step_states(
         }
         .to_string();
 
-        let event = machine
-            .trace()
-            .get(old_len)
-            .and_then(obs_to_semantic_audit_event)
+        let event = machine.trace()[old_len..]
+            .iter()
+            .find_map(obs_to_semantic_audit_event)
             .map(|event| TickedObsEvent {
                 tick: event.tick,
                 event,

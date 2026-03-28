@@ -349,6 +349,7 @@ pub struct LanguageTierStatus {
     pub strongest_tier: LanguageTier,
     pub session_projectable: bool,
     pub protocol_machine_executable: bool,
+    pub theory_convertible: bool,
     pub proof_only: bool,
     pub diagnostic: String,
 }
@@ -814,6 +815,7 @@ impl Choreography {
 
     #[must_use]
     pub fn language_tier_status(&self) -> LanguageTierStatus {
+        let theory_convertible = super::convert::protocol_to_global(&self.protocol).is_ok();
         let session_blocker = find_session_projection_blocker(&self.protocol);
         let missing_progress = self
             .operation_declarations()
@@ -847,14 +849,17 @@ impl Choreography {
             format!(
                 "full spec is valid for proof analysis only; protocol-machine execution is blocked: {missing_progress}"
             )
+        } else if !theory_convertible {
+            "full spec is valid, protocol-machine execution is available, and the protocol is session-projectable, but theory conversion remains explicitly unavailable for this surface".to_string()
         } else {
-            "full spec is valid, protocol-machine execution is available, and the protocol is session-projectable".to_string()
+            "full spec is valid, protocol-machine execution is available, the protocol is session-projectable, and theory conversion is available".to_string()
         };
 
         LanguageTierStatus {
             strongest_tier,
             session_projectable,
             protocol_machine_executable,
+            theory_convertible,
             proof_only: matches!(strongest_tier, LanguageTier::ProofOnly),
             diagnostic,
         }

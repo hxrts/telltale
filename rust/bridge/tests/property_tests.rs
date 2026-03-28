@@ -136,23 +136,8 @@ fn arb_invariant_claims() -> impl Strategy<Value = InvariantClaims> {
         )
 }
 
-fn has_communication(global: &GlobalType) -> bool {
-    match global {
-        GlobalType::End => false,
-        GlobalType::Comm { branches, .. } => {
-            branches.iter().any(|(_, cont)| has_communication(cont)) || !branches.is_empty()
-        }
-        GlobalType::Mu { body, .. } => has_communication(body),
-        GlobalType::Var(_) => false,
-    }
-}
-
 fn runtime_check_invariant(protocol: &GeneratedProtocol, claims: &InvariantClaims) -> bool {
-    if let Some(liveness) = &claims.liveness {
-        if liveness.progress_required && !has_communication(&protocol.global) {
-            return false;
-        }
-    }
+    let _ = protocol;
 
     if let Some(quorum) = &claims.distributed.quorum_geometry {
         if quorum.quorum_size == 0
@@ -253,6 +238,7 @@ fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceE
         witness_ref: None,
         output_digest: None,
         passed: None,
+        reason: None,
     };
 
     match event {

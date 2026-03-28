@@ -393,9 +393,16 @@ def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) : StepPack ι γ π ε ν :=
-  -- Mark the coroutine as done.
+  -- Mark the coroutine as done and remove its active endpoint type, matching Rust halt semantics.
+  let st' :=
+    match readReg coro.regs 0 with
+    | some (.chan ep) => { st with sessions := SessionStore.removeType st.sessions ep }
+    | _ =>
+        match coro.ownedEndpoints with
+        | ep :: _ => { st with sessions := SessionStore.removeType st.sessions ep }
+        | [] => st
   let coro' := advancePc { coro with status := .done }
-  pack coro' st (mkRes .halted none)
+  pack coro' st' (mkRes .halted none)
 
 /-! ## Result helpers: cost accounting -/
 

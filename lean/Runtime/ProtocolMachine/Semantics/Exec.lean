@@ -119,7 +119,7 @@ private def monitorSessionShapeError? {ι γ π ε ν : Type u} [IdentityModel �
       match endpointAtChanReg? coro chan with
       | none => some "[monitor] missing channel endpoint"
       | some ep =>
-          match SessionStore.lookupType st.sessions ep with
+          match (SessionStore.lookupType st.sessions ep).map LocalType.unfold with
           | some (.send _ _ _) => none
           | some (.select _ _) => none
           | some _ => some "[monitor] expected Send state"
@@ -128,7 +128,7 @@ private def monitorSessionShapeError? {ι γ π ε ν : Type u} [IdentityModel �
       match endpointAtChanReg? coro chan with
       | none => some "[monitor] missing channel endpoint"
       | some ep =>
-          match SessionStore.lookupType st.sessions ep with
+          match (SessionStore.lookupType st.sessions ep).map LocalType.unfold with
           | some (.recv _ _ _) => none
           | some (.branch _ _) => none
           | some _ => some "[monitor] expected Recv state"
@@ -206,7 +206,7 @@ def execWithInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
       match monitorPrecheckError? st coro instr with
       | some msg =>
           let st' := { st with monitor := SessionMonitor.reject st.monitor msg }
-          let pack' := faultPack st' coro (.typeViolation .unit .unit) msg
+          let pack' := faultPack st' coro (.specFault msg) msg
           commitPack st' coroId pack'
       | none =>
           let st' := recordMonitorJudgment st coro instr

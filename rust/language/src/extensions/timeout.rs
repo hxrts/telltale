@@ -208,6 +208,10 @@ impl ProtocolExtension for TimeoutProtocol {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
+
+    fn clone_box(&self) -> Box<dyn ProtocolExtension> {
+        Box::new(self.clone())
+    }
 }
 
 /// Convenience function to register the timeout extension.

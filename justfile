@@ -67,6 +67,7 @@ ci-dry-run lane="fast":
     just check-tooling-convergence
     just check-lean-prebuilt
     just check-lean-bridge-strict
+    just check-extension-dispatch
     just check-semantic-assurance
     just check-runtime-boundaries
     cargo build --workspace --all-targets --all-features
@@ -165,6 +166,11 @@ check-tooling-convergence:
 # Validate source markdown DSL snippets against the real parser.
 check-source-doc-snippets:
     ./scripts/check/source-doc-snippets.sh
+
+# Run the deterministic extension statement parsing/dispatch regression suites.
+check-extension-dispatch:
+    cargo test -p telltale-runtime --test extension_integration -- --nocapture
+    cargo test -p telltale-runtime --features test-utils --test middleware_semantic_hardening -- --nocapture
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":

@@ -289,9 +289,9 @@ Theory conversion is narrower than projection today:
 
 Current reviewed matrix:
 
-- `choice`, `call`, counted `loop`, and recursion: session-projectable, protocol-machine executable, theory-convertible
-- `par`: session-projectable, protocol-machine executable, not theory-convertible
-- `case/of` and `timeout`: protocol-machine executable, not session-projectable, not theory-convertible
+- `choice`, `call`, counted `loop`, and recursion: session-projectable, protocol-machine executable, and theory-convertible
+- `par`: session-projectable and protocol-machine executable, but intentionally outside the theory-convertible supported subset
+- `case/of` and `timeout`: protocol-machine executable only. They are neither session-projectable nor theory-convertible
 
 ## Lowering Boundary
 

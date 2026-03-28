@@ -114,6 +114,7 @@ fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEven
         witness_ref: None,
         output_digest: None,
         passed: None,
+        reason: None,
     };
 
     match ev {

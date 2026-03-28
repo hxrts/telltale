@@ -135,9 +135,13 @@ long_horizon_recovery_harness_suites=(
   rust/bridge/tests/reconfiguration_recovery_harness.rs
 )
 
-explicit_unsupported_fail_closed_notes=(
-  extension_statement_runtime_dispatch
-  lean_full_run_reference_execution
+explicit_unsupported_fail_closed_notes=()
+
+forbidden_inventory_gap_phrases=(
+  "not yet as a full semantic lifecycle harness"
+  "still incomplete"
+  "load-only Lean output"
+  "fail-closed placeholder"
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────
@@ -315,6 +319,12 @@ check_metric "Generated topology and transport public-path suites" "$actual_gene
 check_metric "Runtime substrate boundary assurance suites" "$actual_runtime_substrate_boundary_suites"
 check_metric "Long-horizon recovery differential harness suites" "$actual_long_horizon_recovery_harness_suites"
 check_metric "Explicit unsupported or fail-closed property notes" "$actual_explicit_unsupported_fail_closed_notes"
+
+for phrase in "${forbidden_inventory_gap_phrases[@]}"; do
+  if rg -Fq "$phrase" docs/32_testing_verification_inventory.md; then
+    errors+=("docs/32_testing_verification_inventory.md: stale gap phrase remains in inventory: ${phrase}")
+  fi
+done
 
 # ── Report ────────────────────────────────────────────────────────────
 

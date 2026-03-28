@@ -26,6 +26,12 @@ use telltale_types::{
     TransportBoundaryObservation,
 };
 
+type ValidatedPlanStepArtifacts = (
+    BTreeSet<String>,
+    Vec<PlacementObservation>,
+    Vec<TransportBoundaryObservation>,
+);
+
 /// Determinism capability required to admit a protocol bundle.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DeterminismCapability {
@@ -596,14 +602,7 @@ impl ComposedRuntime {
     fn validate_plan_step(
         artifact_id: &str,
         step: &ReconfigurationPlanStep,
-    ) -> Result<
-        (
-            BTreeSet<String>,
-            Vec<PlacementObservation>,
-            Vec<TransportBoundaryObservation>,
-        ),
-        CompositionError,
-    > {
+    ) -> Result<ValidatedPlanStepArtifacts, CompositionError> {
         let next_members = step.next_members.iter().cloned().collect::<BTreeSet<_>>();
         if next_members.is_empty() {
             return Err(CompositionError::InvalidReconfigurationPlan {
@@ -1003,104 +1002,158 @@ impl ComposedRuntime {
         let caps = &cert.theorem_pack;
         let runtime_contracts = cert.runtime_contracts.as_ref();
 
+        self.require_runtime_contracts(cert, runtime_contracts)?;
+        self.require_scheduler_capability(cert, caps)?;
+        self.require_determinism_capability(cert, caps)?;
+        self.require_execution_profile(cert, caps, runtime_contracts)?;
+        self.require_output_condition_gating(cert, caps)?;
+        self.require_reconfiguration_capabilities(bundle, runtime_contracts)?;
+        Ok(())
+    }
+
+    fn require_runtime_contracts(
+        &self,
+        cert: &CompositionCertificate,
+        runtime_contracts: Option<&RuntimeContracts>,
+    ) -> Result<(), CompositionError> {
         match enforce_protocol_machine_runtime_gates(self.machine.config(), runtime_contracts) {
-            RuntimeGateResult::Admitted => {}
+            RuntimeGateResult::Admitted => Ok(()),
             RuntimeGateResult::RejectedMissingContracts => {
-                return Err(CompositionError::MissingRuntimeContracts {
+                Err(CompositionError::MissingRuntimeContracts {
                     artifact_id: cert.artifact_id.clone(),
-                });
+                })
             }
             RuntimeGateResult::RejectedUnsupportedDeterminismProfile => {
-                return Err(CompositionError::MissingCapability {
+                Err(CompositionError::MissingCapability {
                     artifact_id: cert.artifact_id.clone(),
                     capability: format!(
                         "determinism_profile::{:?}",
                         self.machine.config().determinism_mode
                     ),
-                });
+                })
             }
         }
+    }
 
+    fn require_scheduler_capability(
+        &self,
+        cert: &CompositionCertificate,
+        caps: &TheoremPackCapabilities,
+    ) -> Result<(), CompositionError> {
         let required_sched = match self.machine.config().sched_policy {
             SchedPolicy::Cooperative => SchedulerCapability::Cooperative,
             SchedPolicy::RoundRobin => SchedulerCapability::RoundRobin,
             SchedPolicy::Priority(_) => SchedulerCapability::Priority,
             SchedPolicy::ProgressAware => SchedulerCapability::ProgressAware,
         };
-        if !caps.schedulers.contains(&required_sched) {
-            return Err(CompositionError::MissingCapability {
+        if caps.schedulers.contains(&required_sched) {
+            Ok(())
+        } else {
+            Err(CompositionError::MissingCapability {
                 artifact_id: cert.artifact_id.clone(),
                 capability: format!("scheduler::{required_sched:?}"),
-            });
+            })
         }
+    }
 
+    fn require_determinism_capability(
+        &self,
+        cert: &CompositionCertificate,
+        caps: &TheoremPackCapabilities,
+    ) -> Result<(), CompositionError> {
         let required_det = match self.machine.config().determinism_mode {
             DeterminismMode::Full => DeterminismCapability::Full,
             DeterminismMode::ModuloEffects => DeterminismCapability::ModuloEffects,
             DeterminismMode::ModuloCommutativity => DeterminismCapability::ModuloCommutativity,
             DeterminismMode::Replay => DeterminismCapability::Replay,
         };
-        if !caps.determinism.contains(&required_det) {
-            return Err(CompositionError::MissingCapability {
+        if caps.determinism.contains(&required_det) {
+            Ok(())
+        } else {
+            Err(CompositionError::MissingCapability {
                 artifact_id: cert.artifact_id.clone(),
                 capability: format!("determinism::{required_det:?}"),
-            });
+            })
         }
-        if !execution_profile_supported(
+    }
+
+    fn require_execution_profile(
+        &self,
+        cert: &CompositionCertificate,
+        caps: &TheoremPackCapabilities,
+        runtime_contracts: Option<&RuntimeContracts>,
+    ) -> Result<(), CompositionError> {
+        if execution_profile_supported(
             &caps.execution_profile(),
             self.machine.config(),
             runtime_contracts,
         ) {
-            return Err(CompositionError::MissingCapability {
+            Ok(())
+        } else {
+            Err(CompositionError::MissingCapability {
                 artifact_id: cert.artifact_id.clone(),
                 capability: "execution_profile".to_string(),
-            });
+            })
         }
-        if !matches!(
+    }
+
+    fn require_output_condition_gating(
+        &self,
+        cert: &CompositionCertificate,
+        caps: &TheoremPackCapabilities,
+    ) -> Result<(), CompositionError> {
+        let output_conditions_disabled = matches!(
             self.machine.config().output_condition_policy,
             OutputConditionPolicy::Disabled
-        ) && !caps.output_condition_gating
-        {
-            return Err(CompositionError::MissingCapability {
+        );
+        if output_conditions_disabled || caps.output_condition_gating {
+            Ok(())
+        } else {
+            Err(CompositionError::MissingCapability {
                 artifact_id: cert.artifact_id.clone(),
                 capability: "output_condition_gating".to_string(),
+            })
+        }
+    }
+
+    fn require_reconfiguration_capabilities(
+        &self,
+        bundle: &ProtocolBundle,
+        runtime_contracts: Option<&RuntimeContracts>,
+    ) -> Result<(), CompositionError> {
+        let Some(policy) = &bundle.reconfiguration_policy else {
+            return Ok(());
+        };
+        let cert = &bundle.certificate;
+        let Some(contracts) = runtime_contracts else {
+            return Err(CompositionError::MissingRuntimeContracts {
+                artifact_id: cert.artifact_id.clone(),
+            });
+        };
+        let capabilities = &contracts.capabilities;
+        if !capabilities.contains(&crate::runtime_contracts::RuntimeCapability::PlacementRefinement)
+        {
+            return Err(CompositionError::MissingReconfigurationCapability {
+                artifact_id: cert.artifact_id.clone(),
+                capability: "reconfiguration::placement_refinement".to_string(),
             });
         }
-        if let Some(policy) = &bundle.reconfiguration_policy {
-            let Some(contracts) = runtime_contracts else {
-                return Err(CompositionError::MissingRuntimeContracts {
-                    artifact_id: cert.artifact_id.clone(),
-                });
-            };
-            if !contracts
-                .capabilities
-                .contains(&crate::runtime_contracts::RuntimeCapability::PlacementRefinement)
-            {
-                return Err(CompositionError::MissingReconfigurationCapability {
-                    artifact_id: cert.artifact_id.clone(),
-                    capability: "reconfiguration::placement_refinement".to_string(),
-                });
-            }
-            if policy.dynamic_membership
-                && !contracts
-                    .capabilities
-                    .contains(&crate::runtime_contracts::RuntimeCapability::AutoscaleRepartition)
-            {
-                return Err(CompositionError::MissingReconfigurationCapability {
-                    artifact_id: cert.artifact_id.clone(),
-                    capability: "reconfiguration::dynamic_membership".to_string(),
-                });
-            }
-            if policy.overlap_required
-                && !contracts
-                    .capabilities
-                    .contains(&crate::runtime_contracts::RuntimeCapability::LiveMigration)
-            {
-                return Err(CompositionError::MissingReconfigurationCapability {
-                    artifact_id: cert.artifact_id.clone(),
-                    capability: "reconfiguration::overlap_required".to_string(),
-                });
-            }
+        if policy.dynamic_membership
+            && !capabilities
+                .contains(&crate::runtime_contracts::RuntimeCapability::AutoscaleRepartition)
+        {
+            return Err(CompositionError::MissingReconfigurationCapability {
+                artifact_id: cert.artifact_id.clone(),
+                capability: "reconfiguration::dynamic_membership".to_string(),
+            });
+        }
+        if policy.overlap_required
+            && !capabilities.contains(&crate::runtime_contracts::RuntimeCapability::LiveMigration)
+        {
+            return Err(CompositionError::MissingReconfigurationCapability {
+                artifact_id: cert.artifact_id.clone(),
+                capability: "reconfiguration::overlap_required".to_string(),
+            });
         }
         Ok(())
     }

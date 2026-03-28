@@ -72,6 +72,11 @@ jobs:
           mkdir -p artifacts
           just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
 
+      - name: Run extension dispatch suites
+        run: |
+          mkdir -p artifacts
+          just check-extension-dispatch | tee artifacts/check-extension-dispatch.log
+
       - name: Run semantic assurance suites
         run: |
           mkdir -p artifacts
@@ -206,6 +211,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
+
+      - name: Run extension dispatch suites
+        run: |
+          mkdir -p artifacts
+          just check-extension-dispatch | tee artifacts/check-extension-dispatch.log
 
       - name: Run semantic assurance suites
         run: |

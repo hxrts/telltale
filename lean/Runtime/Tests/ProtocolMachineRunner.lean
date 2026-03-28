@@ -113,10 +113,131 @@ def sessionTypeCountsJson (sessions : SessionStore UnitVerify) : Json :=
   Json.mkObj <| (sessionTypeCounts sessions).map (fun p =>
     (toString p.fst, Json.num p.snd))
 
-def stepEventToJson (tick : Nat) (ev : Option (StepEvent UnitEffect)) : Json :=
+def selectedEndpointTypeJson (st : RunnerState) (cid : CoroutineId) : Json :=
+  match st.coroutines[cid]? with
+  | none => Json.null
+  | some coro =>
+      match coro.regs[0]? with
+      | some (Value.chan ep) =>
+          match SessionStore.lookupType st.sessions ep with
+          | some ty => Json.str (reprStr ty)
+          | none => Json.null
+      | _ => Json.null
+
+def faultTag : Fault UnitGuard → String
+  | .typeViolation expected actual =>
+      s!"type_violation:{reprStr expected}->{reprStr actual}"
+  | .unknownLabel lbl => s!"unknown_label:{lbl}"
+  | .channelClosed ep => s!"channel_closed:{ep.role}"
+  | .invalidSignature edge => s!"invalid_signature:{edge.sender}->{edge.receiver}"
+  | .acquireFault _ msg => s!"acquire_fault:{msg}"
+  | .invokeFault msg => s!"invoke_fault:{msg}"
+  | .transferFault msg => s!"transfer_fault:{msg}"
+  | .closeFault msg => s!"close_fault:{msg}"
+  | .specFault msg => s!"spec_fault:{msg}"
+  | .flowViolation msg => s!"flow_violation:{msg}"
+  | .noProgressToken edge => s!"no_progress_token:{edge.sender}->{edge.receiver}"
+  | .outOfCredits => "out_of_credits"
+  | .outOfRegisters => "out_of_registers"
+
+def stepBridgeEventsForObs (ev : TickedObsEvent UnitEffect) : List Json :=
+  match ev.event with
+  | .sent edge val _seqNo =>
+      let label :=
+        match val with
+        | .string s => some s
+        | _ => none
+      let fields :=
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("kind", Json.str "sent")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num edge.sid)
+        , ("sender", Json.str edge.sender)
+        , ("receiver", Json.str edge.receiver) ] ++
+        match label with
+        | some lbl => [("label", Json.str lbl)]
+        | none => []
+      [Json.mkObj fields]
+  | .received edge val _seqNo =>
+      let label :=
+        match val with
+        | .string s => some s
+        | _ => none
+      let fields :=
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("kind", Json.str "received")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num edge.sid)
+        , ("sender", Json.str edge.sender)
+        , ("receiver", Json.str edge.receiver) ] ++
+        match label with
+        | some lbl => [("label", Json.str lbl)]
+        | none => []
+      [Json.mkObj fields]
+  | .offered edge lbl =>
+      [Json.mkObj
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("kind", Json.str "sent")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num edge.sid)
+        , ("sender", Json.str edge.sender)
+        , ("receiver", Json.str edge.receiver)
+        , ("label", Json.str lbl) ]]
+  | .chose edge lbl =>
+      [Json.mkObj
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("kind", Json.str "received")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num edge.sid)
+        , ("sender", Json.str edge.sender)
+        , ("receiver", Json.str edge.receiver)
+        , ("label", Json.str lbl) ]]
+  | .opened sid roles =>
+      [Json.mkObj
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("kind", Json.str "opened")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num sid)
+        , ("role", Json.str (String.intercalate "," roles)) ]]
+  | .closed sid =>
+      [Json.mkObj
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("kind", Json.str "closed")
+        , ("tick", Json.num ev.tick)
+        , ("session", Json.num sid) ]]
+  | .invoked _ _ => []
+  | _ => [obsEventToJson ev]
+
+def stepEventToJson (tick cid : Nat) (status : ExecStatus UnitGuard)
+    (ev : Option (StepEvent UnitEffect)) : Json :=
   match ev with
-  | some (.obs obs) => obsEventToJson { tick := tick, event := obs }
-  | _ => Json.null
+  | some (.obs obs) => (stepBridgeEventsForObs { tick := tick, event := obs }).headD Json.null
+  | _ =>
+      match status with
+      | .halted =>
+          Json.mkObj
+            [ ("kind", Json.str "halted")
+            , ("tick", Json.num tick)
+            , ("target", Json.str (toString cid)) ]
+      | .faulted err =>
+          Json.mkObj
+            [ ("kind", Json.str "faulted")
+            , ("tick", Json.num tick)
+            , ("target", Json.str (toString cid))
+            , ("reason", Json.str (faultTag err)) ]
+      | _ => Json.null
+
+def syntheticLifecycleEvents (stepStates : List Json) : List Json :=
+  stepStates.foldl
+    (fun acc stepJson =>
+      match stepJson.getObjVal? "event" with
+      | .ok eventJson =>
+          match eventJson.getObjValAs? String "kind" with
+          | .ok "halted" => acc ++ [eventJson]
+          | .ok "faulted" => acc ++ [eventJson]
+          | _ => acc
+      | .error _ => acc)
+    []
 
 def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
     (stepIndex : Nat) (acc : List Json) : RunnerState × List Json :=
@@ -135,9 +256,11 @@ def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
             Json.mkObj
               [ ("step_index", Json.num stepIndex)
               , ("selected_coro", Json.num cid)
+              , ("selected_pc", Json.num (match stNext.coroutines[cid]? with | some coro => coro.pc | none => 0))
+              , ("selected_type", selectedEndpointTypeJson stNext cid)
               , ("exec_status", Json.str (execStatusTag res.status))
               , ("session_type_counts", sessionTypeCountsJson stNext.sessions)
-              , ("event", stepEventToJson stNext.clock res.event) ]
+              , ("event", stepEventToJson stNext.clock cid res.status res.event) ]
           let acc' := stepJson :: acc
           if allTerminal stNext then
             (stNext, acc'.reverse)
@@ -415,6 +538,85 @@ def traceEventJson (kind : String) (tick sid : Nat)
     optionalField "label" (label.map Json.str) ++
     optionalField "role" (role.map Json.str)
   Json.mkObj fields
+
+def bridgeEventsForObs (ev : TickedObsEvent UnitEffect) : List Json :=
+  match ev.event with
+  | .sent edge val _seqNo =>
+      let label :=
+        match val with
+        | .string s => some s
+        | _ => none
+      [traceEventJson "sent" ev.tick edge.sid (some edge.sender) (some edge.receiver) label]
+  | .received edge val _seqNo =>
+      let label :=
+        match val with
+        | .string s => some s
+        | _ => none
+      [traceEventJson "received" ev.tick edge.sid (some edge.sender) (some edge.receiver) label]
+  | .offered edge lbl =>
+      [traceEventJson "sent" ev.tick edge.sid (some edge.sender) (some edge.receiver) (some lbl)]
+  | .chose edge lbl =>
+      [traceEventJson "received" ev.tick edge.sid (some edge.sender) (some edge.receiver) (some lbl)]
+  | .opened sid roles =>
+      [traceEventJson "opened" ev.tick sid none none none (some (String.intercalate "," roles))]
+  | .closed sid =>
+      [traceEventJson "closed" ev.tick sid]
+  | .invoked _ _ => []
+  | _ => [obsEventToJson ev]
+
+def jsonSessionField? (event : Json) : Option Nat :=
+  match event.getObjValAs? Nat "session" with
+  | .ok sid => some sid
+  | .error _ => none
+
+def jsonTickField? (event : Json) : Option Nat :=
+  match event.getObjValAs? Nat "tick" with
+  | .ok tick => some tick
+  | .error _ => none
+
+def jsonSetTick (event : Json) (tick : Nat) : Json :=
+  match event with
+  | Json.obj fields =>
+      Json.mkObj <| ("tick", Json.num tick) :: fields.toList.filter (fun p => p.1 != "tick")
+  | other => other
+
+def normalizeBridgeTraceEvents (events : List Json) : List Json :=
+  let rec getTick (sid : Nat) : List (Nat × Nat) → Nat
+    | [] => 0
+    | (sid', tick) :: rest => if sid' = sid then tick else getTick sid rest
+  let rec setTick (sid tick : Nat) : List (Nat × Nat) → List (Nat × Nat)
+    | [] => [(sid, tick)]
+    | (sid', tick') :: rest =>
+        if sid' = sid then
+          (sid, tick) :: rest
+        else
+          (sid', tick') :: setTick sid tick rest
+  let rec go (ticks : List (Nat × Nat)) (rest : List Json) (acc : List Json) : List Json :=
+    match rest with
+    | [] => acc.reverse
+    | event :: tail =>
+        match jsonSessionField? event with
+        | some sid =>
+            let tick := getTick sid ticks
+            let ticks' := setTick sid (tick + 1) ticks
+            go ticks' tail (jsonSetTick event tick :: acc)
+        | none =>
+            go ticks tail (event :: acc)
+  go [] events []
+
+def mergeBridgeTraceEvents (left right : List Json) : List Json :=
+  let rec go (left right : List Json) : List Json :=
+    match left, right with
+    | [], _ => right
+    | _, [] => left
+    | l :: ls, r :: rs =>
+        let ltick := jsonTickField? l |>.getD 0
+        let rtick := jsonTickField? r |>.getD 0
+        if ltick ≤ rtick then
+          l :: go ls (r :: rs)
+        else
+          r :: go (l :: ls) rs
+  go left right
 
 def simulationTraceForActions (roles : List String)
     (actions : List (String × String × String)) (steps : Nat) : List Json :=
@@ -732,14 +934,22 @@ def main : IO Unit := do
       | .ok res => pure res
       | .error e => throw (IO.userError s!"bad choreography: {e}")
     let image := buildImage g roles
-    let (st', _) := loadChoreography st image
-    st := st'
+    match loadChoreographyResult st image with
+    | .ok st' _ => st := st'
+    | .validationFailed reason =>
+        throw (IO.userError s!"bad choreography image: {reason}")
+    | .tooManySessions max =>
+        throw (IO.userError s!"too many sessions while loading choreographies: {max}")
+    | .tooManyCoroutines max =>
+        throw (IO.userError s!"too many coroutines while loading choreographies: {max}")
 
   -- Run the protocol machine while collecting per-step scheduler state.
   let (st', stepStates) := runWithStepStates maxSteps concurrency st
 
   -- Build output JSON.
-  let traceJson := traceToJson st'.obsTrace
+  let traceBase :=
+    st'.obsTrace.foldr (fun ev acc => bridgeEventsForObs ev ++ acc) []
+  let traceJson := Json.arr ((mergeBridgeTraceEvents traceBase (syntheticLifecycleEvents stepStates)).toArray)
   let sessionsJson := Json.arr (st'.sessions.map (fun p =>
     let sid : SessionId := p.fst
     Json.mkObj

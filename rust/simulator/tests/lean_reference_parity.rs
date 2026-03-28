@@ -257,6 +257,7 @@ fn obs_to_semantic_audit_event(event: &ObsEvent) -> Option<ProtocolMachineTraceE
         witness_ref: None,
         output_digest: None,
         passed: None,
+        reason: None,
     };
 
     match event {
@@ -363,15 +364,15 @@ fn collect_actions(global: &GlobalType) -> Vec<(String, String, String)> {
     }
 }
 
-fn expected_prefix_shapes(
-    fixture: &SimFixture,
-) -> Vec<(
+type ExpectedPrefixShape = (
     String,
     Option<String>,
     Option<String>,
     Option<String>,
     Option<String>,
-)> {
+);
+
+fn expected_prefix_shapes(fixture: &SimFixture) -> Vec<ExpectedPrefixShape> {
     let mut expected = vec![(
         "opened".to_string(),
         None,
@@ -452,7 +453,7 @@ fn expected_observable_count(fixture: &SimFixture) -> u64 {
         }
     }
 
-    emitted as u64
+    u64::try_from(emitted).expect("emitted observable count fits in u64")
 }
 
 fn canonical_reference_event(

@@ -1,37 +1,30 @@
 //! Extension-aware parser that integrates with the existing parser
 //!
 //! This module provides a parser that can handle both standard choreographic
-//! constructs and extension-defined syntax by leveraging the grammar composition system.
+//! constructs and extension-defined syntax by leveraging the shared extension
+//! registry and parser dispatch path.
 
-use crate::ast::{Protocol, Role};
-use crate::compiler::grammar::{GrammarComposer, GrammarCompositionError};
-use crate::compiler::parser::{parse_choreography_str, ParseError};
-use crate::extensions::StatementParser;
+use crate::compiler::grammar::GrammarCompositionError;
+use crate::compiler::parser::{parse_choreography_str_with_extensions, ParseError};
+use crate::extensions::{ExtensionRegistry, GrammarExtension, StatementParser};
 
 /// Extension-aware parser that can handle both core and extension syntax
 pub struct ExtensionParser {
-    grammar_composer: GrammarComposer,
+    extension_registry: ExtensionRegistry,
     /// Pre-allocated buffer for parsing operations to reduce allocations
     parse_buffer: String,
-    /// Pre-allocated HashMap for annotations to reduce allocations
-    annotation_cache: std::collections::HashMap<String, String>,
 }
 
 impl ExtensionParser {
     /// Create a new extension parser
     pub fn new() -> Self {
         Self {
-            grammar_composer: GrammarComposer::new(),
+            extension_registry: ExtensionRegistry::new(),
             parse_buffer: String::with_capacity(1024), // Pre-allocate for common case
-            annotation_cache: std::collections::HashMap::with_capacity(16), // Pre-allocate for annotations
         }
     }
 
-    /// Register an extension with both grammar and parsing support
-    ///
-    /// Note: Grammar extensions are fully supported and registered with the grammar composer.
-    /// Statement parsers are accepted but not currently stored. Extension parsing passes
-    /// through the standard parser - full extension statement dispatch is a planned feature.
+    /// Register an extension with both grammar and parsing support.
     ///
     /// # Errors
     ///
@@ -39,18 +32,16 @@ impl ExtensionParser {
     pub fn register_extension<G, P>(
         &mut self,
         grammar_ext: G,
-        _statement_parser: P,
+        statement_parser: P,
     ) -> Result<(), crate::extensions::ParseError>
     where
-        G: crate::extensions::GrammarExtension + 'static,
+        G: GrammarExtension + 'static,
         P: StatementParser + 'static,
     {
-        // Register grammar extension (this also registers the grammar rules for rule mapping)
-        self.grammar_composer.register_extension(grammar_ext)?;
-
-        // Statement parser registration is accepted but not stored.
-        // Full extension statement dispatch will require extending GrammarComposer
-        // to track parsers alongside grammar rules.
+        let parser_id = grammar_ext.extension_id().to_string();
+        self.extension_registry.register_grammar(grammar_ext)?;
+        self.extension_registry
+            .register_parser(statement_parser, parser_id);
         Ok(())
     }
 
@@ -61,54 +52,29 @@ impl ExtensionParser {
     ) -> Result<crate::ast::Choreography, ExtensionParseError> {
         // Clear and reuse buffers to reduce allocations
         self.parse_buffer.clear();
-        self.annotation_cache.clear();
 
         // Reserve capacity based on input size for efficient parsing
         self.parse_buffer.reserve(input.len());
-
-        // Hybrid approach: parse with standard parser, then post-process
-        // to handle any extension statements
-
-        let mut choreography =
-            parse_choreography_str(input).map_err(ExtensionParseError::StandardParseError)?;
-
-        // Post-process to identify and parse extension statements (optimized)
-        choreography.protocol =
-            self.process_extensions_optimized(choreography.protocol, input, &choreography.roles)?;
-
-        Ok(choreography)
-    }
-
-    /// Process a protocol tree to identify and dispatch extension statements.
-    ///
-    /// Returns the protocol unchanged. Extension statement dispatch is a reserved
-    /// extension point: the grammar composer identifies extension statements,
-    /// but this method does not yet transform them.
-    fn process_extensions_optimized(
-        &mut self,
-        protocol: Protocol,
-        _input: &str,
-        _roles: &[Role],
-    ) -> Result<Protocol, ExtensionParseError> {
-        Ok(protocol)
+        parse_choreography_str_with_extensions(input, &self.extension_registry)
+            .map(|(choreography, _)| choreography)
+            .map_err(ExtensionParseError::StandardParseError)
     }
 
     /// Check if an extension can handle a given statement
     pub fn can_handle_statement(&self, statement_type: &str) -> bool {
-        self.grammar_composer.has_extension_rule(statement_type)
+        self.extension_registry.can_handle(statement_type)
     }
 
     /// Get the composed grammar for debugging
-    pub fn get_composed_grammar(&mut self) -> Result<String, GrammarCompositionError> {
-        self.grammar_composer.compose()
+    pub fn get_composed_grammar(&self) -> Result<String, GrammarCompositionError> {
+        compose_grammar_from_registry(&self.extension_registry)
     }
 
     /// Get statistics about registered extensions
     pub fn extension_stats(&self) -> ExtensionStats {
         ExtensionStats {
-            grammar_extensions: self.grammar_composer.extension_count(),
-            // Statement parsers are not stored separately (see register_extension doc)
-            statement_parsers: 0,
+            grammar_extensions: self.extension_registry.grammar_extensions().count(),
+            statement_parsers: self.extension_registry.statement_parser_count(),
         }
     }
 }
@@ -117,6 +83,64 @@ impl Default for ExtensionParser {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn compose_grammar_from_registry(
+    registry: &ExtensionRegistry,
+) -> Result<String, GrammarCompositionError> {
+    let base_grammar = include_str!("../../../language/src/compiler/choreography.pest");
+    let extension_rules = registry.compose_grammar("");
+    if extension_rules.trim().is_empty() {
+        return Ok(base_grammar.to_string());
+    }
+
+    let statement_rules: Vec<_> = registry.statement_rules();
+    let mut lines: Vec<String> = base_grammar.lines().map(ToOwned::to_owned).collect();
+    let (stmt_start, stmt_end) = find_statement_rule_bounds(&lines)?;
+    let indent = find_statement_indent(&lines, stmt_start, stmt_end);
+    let insert_lines: Vec<String> = statement_rules
+        .iter()
+        .map(|rule| format!("{indent}| {rule}"))
+        .collect();
+    lines.splice(stmt_end..stmt_end, insert_lines);
+
+    let mut composed = lines.join("\n");
+    composed.push('\n');
+    composed.push_str("// Extension Rules\n");
+    composed.push_str(&extension_rules);
+    Ok(composed)
+}
+
+fn find_statement_rule_bounds(lines: &[String]) -> Result<(usize, usize), GrammarCompositionError> {
+    let start = lines
+        .iter()
+        .position(|line| line.trim_start().starts_with("statement = _{"))
+        .ok_or_else(|| {
+            GrammarCompositionError::InvalidBaseGrammar(
+                "Could not find statement rule in base grammar".to_string(),
+            )
+        })?;
+
+    for (idx, line) in lines.iter().enumerate().skip(start + 1) {
+        if line.trim_start().starts_with('}') {
+            return Ok((start, idx));
+        }
+    }
+
+    Err(GrammarCompositionError::InvalidBaseGrammar(
+        "Could not find end of statement rule in base grammar".to_string(),
+    ))
+}
+
+fn find_statement_indent(lines: &[String], start: usize, end: usize) -> String {
+    for line in lines.iter().take(end).skip(start + 1) {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with('|') {
+            let indent_len = line.len().saturating_sub(trimmed.len());
+            return line[..indent_len].to_string();
+        }
+    }
+    "    ".to_string()
 }
 
 /// Statistics about registered extensions

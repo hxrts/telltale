@@ -62,7 +62,7 @@ fn demo_annotation_extension() -> Result<(), Box<dyn std::error::Error>> {
         }
     "#;
 
-    // Demonstrate extension registration (full dispatch is a reserved extension point)
+    // Demonstrate extension registration and parser dispatch availability.
     println!("Priority extension registered");
     println!(
         "Can handle 'priority_stmt': {}",
@@ -76,7 +76,7 @@ fn demo_extension_composition() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nDemo 3: Extension Composition");
 
     // Create a parser with multiple extensions
-    let mut parser = ExtensionParserBuilder::new()
+    let parser = ExtensionParserBuilder::new()
         .with_extension(PriorityGrammarExtension, PriorityStatementParser)
         .expect("priority extension should register")
         .with_extension(LoggingGrammarExtension, LoggingStatementParser)
@@ -241,6 +241,10 @@ impl ProtocolExtension for PriorityProtocol {
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
     }
+
+    fn clone_box(&self) -> Box<dyn ProtocolExtension> {
+        Box::new(self.clone())
+    }
 }
 
 // === Logging Extension ===
@@ -333,6 +337,10 @@ impl ProtocolExtension for LoggingProtocol {
 
     fn type_id(&self) -> TypeId {
         TypeId::of::<Self>()
+    }
+
+    fn clone_box(&self) -> Box<dyn ProtocolExtension> {
+        Box::new(self.clone())
     }
 }
 

@@ -130,6 +130,11 @@ def SessionState.updateType {ν : Type u} [VerificationModel ν]
   -- Update the local type map for an endpoint.
   { st with localTypes := updateG st.localTypes e L }
 
+def SessionState.removeType {ν : Type u} [VerificationModel ν]
+    (st : SessionState ν) (e : Endpoint) : SessionState ν :=
+  -- Remove the local type entry for an endpoint.
+  { st with localTypes := st.localTypes.filter (fun p => !(p.fst = e)) }
+
 def SessionState.updateTrace {ν : Type u} [VerificationModel ν]
     (st : SessionState ν) (edge : Edge) (ts : List ValType) : SessionState ν :=
   -- Update the type trace for an edge.
@@ -223,6 +228,17 @@ def SessionStore.updateType {ν : Type u} [VerificationModel ν]
         (sid, st.updateType e L) :: rest
       else
         (sid, st) :: SessionStore.updateType rest e L
+
+def SessionStore.removeType {ν : Type u} [VerificationModel ν]
+    (store : SessionStore ν) (e : Endpoint) : SessionStore ν :=
+  -- Remove the local type for the endpoint from its session.
+  match store with
+  | [] => []
+  | (sid, st) :: rest =>
+      if sid = e.sid then
+        (sid, st.removeType e) :: rest
+      else
+        (sid, st) :: SessionStore.removeType rest e
 
 def SessionStore.updateTrace {ν : Type u} [VerificationModel ν]
     (store : SessionStore ν) (edge : Edge) (ts : List ValType) : SessionStore ν :=

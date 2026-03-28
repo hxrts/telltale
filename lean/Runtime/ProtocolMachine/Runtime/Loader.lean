@@ -97,13 +97,32 @@ inductive ChoreographyLoadResult (ι γ π ε ν : Type u) [IdentityModel ι] [G
   | tooManySessions (max : Nat)
   | tooManyCoroutines (max : Nat)
 
+mutual
+  private def localTypeREq : SessionTypes.LocalTypeR.LocalTypeR → SessionTypes.LocalTypeR.LocalTypeR → Bool
+    | .end, .end => true
+    | .var v1, .var v2 => v1 == v2
+    | .mu v1 b1, .mu v2 b2 => (v1 == v2) && localTypeREq b1 b2
+    | .send p1 bs1, .send p2 bs2 => (p1 == p2) && branchesEq bs1 bs2
+    | .recv p1 bs1, .recv p2 bs2 => (p1 == p2) && branchesEq bs1 bs2
+    | _, _ => false
+
+  private def branchesEq : List SessionTypes.LocalTypeR.BranchR → List SessionTypes.LocalTypeR.BranchR → Bool
+    | [], [] => true
+    | b1 :: bs1, b2 :: bs2 => branchEq b1 b2 && branchesEq bs1 bs2
+    | _, _ => false
+
+  private def branchEq : SessionTypes.LocalTypeR.BranchR → SessionTypes.LocalTypeR.BranchR → Bool
+    | (l1, v1, t1), (l2, v2, t2) =>
+        decide (l1 = l2) && decide (v1 = v2) && localTypeREq t1 t2
+end
+
 private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (image : CodeImage γ ε) : Option String :=
   let lookupLocalType :=
-    fun (roles : List (Role × LocalType)) (role : Role) =>
+    fun (roles : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) (role : Role) =>
       (roles.find? (fun p => p.1 = role)).map Prod.snd
   let entryRoles := image.program.entryPoints.map Prod.fst
-  let localRoles := image.program.localTypes.map Prod.fst
+  let localRoles := image.program.localTypesR.map Prod.fst
   if entryRoles.length ≠ localRoles.length then
     some "entry/local role arity mismatch"
   else if entryRoles.eraseDups.length ≠ entryRoles.length then
@@ -114,7 +133,7 @@ private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     some "entry/local role mismatch"
   else
     match entryRoles.find? (fun role =>
-      match lookupLocalType image.program.localTypes role with
+      match lookupLocalType image.program.localTypesR role with
       | none => true
       | some claimed =>
           let projected? := Choreography.Projection.Project.projectR? image.globalType role
@@ -122,7 +141,7 @@ private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
           | none => true
           | some projected =>
 /- ## Structured Block 3 -/
-              reprStr (localTypeRToLocalType projected.1) != reprStr claimed) with
+              !localTypeREq projected.1 claimed) with
     | some role => some s!"projection mismatch for role {role}"
     | none => none
 
@@ -165,13 +184,14 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
       (entry : Role × PC) =>
     let (coros, ready, nextId) := acc
     let coro : CoroutineState γ ε :=
+      let endpoint : Endpoint := { sid := sid, role := entry.1 }
       { id := nextId
       , programId := programId
       , pc := entry.2
-      , regs := Array.replicate 8 .unit
+      , regs := (Array.replicate 8 .unit).set! 0 (.chan endpoint)
       , status := .ready
       , effectCtx := default
-      , ownedEndpoints := [{ sid := sid, role := entry.1 }]
+      , ownedEndpoints := [endpoint]
       , progressTokens := []
       , knowledgeSet := []
       , costBudget := st.config.costModel.defaultBudget

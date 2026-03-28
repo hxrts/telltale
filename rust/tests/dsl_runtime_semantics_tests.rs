@@ -244,7 +244,7 @@ fn authority_pass_fixture(name: &str) -> PathBuf {
         .join(format!("{name}.tell"))
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct DummyCapabilityExtension;
 
 impl ProtocolExtension for DummyCapabilityExtension {
@@ -282,6 +282,10 @@ impl ProtocolExtension for DummyCapabilityExtension {
 
     fn type_id(&self) -> std::any::TypeId {
         std::any::TypeId::of::<Self>()
+    }
+
+    fn clone_box(&self) -> Box<dyn ProtocolExtension> {
+        Box::new(self.clone())
     }
 }
 
@@ -708,6 +712,10 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
             !status.session_projectable,
             "{fixture} should remain non-projectable until explicit lowering exists"
         );
+        assert!(
+            !status.theory_convertible,
+            "{fixture} should remain outside the theory-convertible subset"
+        );
         let err = choreography_to_global(&choreography)
             .expect_err("non-projectable fixture must fail theory conversion");
         assert!(
@@ -731,6 +739,10 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
             choreography.language_tier_status().session_projectable,
             "{fixture} should remain session-projectable"
         );
+        assert!(
+            choreography.language_tier_status().theory_convertible,
+            "{fixture} should remain theory-convertible"
+        );
         choreography_to_global(&choreography)
             .unwrap_or_else(|err| panic!("convert {fixture} to GlobalType: {err}"));
     }
@@ -745,6 +757,10 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
     assert!(
         status.session_projectable,
         "parallel observational fixture should remain session-projectable"
+    );
+    assert!(
+        !status.theory_convertible,
+        "parallel observational fixture must stay outside the theory-convertible subset"
     );
     for role in &choreography.roles {
         let local = telltale_language::project(&choreography, role)
