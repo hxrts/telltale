@@ -32,11 +32,19 @@ VERSION=""
 TAG_PREFIX="v"
 TAG_NAME=""
 TRANSIENT_RELEASE_PATHS=(
-  "examples/wasm/Cargo.lock"
   "lean/CODE_MAP.md"
 )
 RESTORE_ON_EXIT=()
 RESTORE_TMP_DIR=""
+WASM_EXAMPLE_LOCK_PATH="examples/wasm/Cargo.lock"
+WASM_EXAMPLE_LOCK_PACKAGES=(
+  "telltale"
+  "telltale-language"
+  "telltale-machine"
+  "telltale-macros"
+  "telltale-theory"
+  "telltale-types"
+)
 
 # ── Helpers ───────────────────────────────────────────────────────────
 usage() {
@@ -116,6 +124,31 @@ extract_manifest_version() {
   ' "${manifest_path}"
 }
 
+extract_lockfile_version() {
+  local lockfile_path="$1"
+  local package="$2"
+  awk -v package="${package}" '
+    /^\[\[package\]\]$/ {
+      in_target = 0
+      next
+    }
+    /^name = "/ {
+      current = $0
+      sub(/^name = "/, "", current)
+      sub(/"$/, "", current)
+      in_target = (current == package)
+      next
+    }
+    in_target && /^version = "/ {
+      version = $0
+      sub(/^version = "/, "", version)
+      sub(/"$/, "", version)
+      print version
+      exit
+    }
+  ' "${lockfile_path}"
+}
+
 # Map crate name to Cargo.toml path
 manifest_path() {
   local crate="$1"
@@ -176,6 +209,23 @@ assert_versions_match() {
   if [[ "${package_version}" != "${VERSION}" ]]; then
     die "version mismatch for ${package}: ${package_version} != ${VERSION}"
   fi
+}
+
+assert_wasm_example_lock_matches_versions() {
+  local package
+  local lock_version
+
+  [[ -f "${WASM_EXAMPLE_LOCK_PATH}" ]] || die "missing ${WASM_EXAMPLE_LOCK_PATH}"
+
+  for package in "${WASM_EXAMPLE_LOCK_PACKAGES[@]}"; do
+    lock_version="$(extract_lockfile_version "${WASM_EXAMPLE_LOCK_PATH}" "${package}")"
+    if [[ -z "${lock_version}" ]]; then
+      die "missing ${package} entry in ${WASM_EXAMPLE_LOCK_PATH}"
+    fi
+    if [[ "${lock_version}" != "${VERSION}" ]]; then
+      die "${WASM_EXAMPLE_LOCK_PATH} is stale for ${package}: ${lock_version} != ${VERSION}. Run: cargo generate-lockfile --manifest-path examples/wasm/Cargo.toml"
+    fi
+  done
 }
 
 # ── Publish Pipeline ───────────────────────────────────────────────────
@@ -308,6 +358,8 @@ main() {
     echo "== validating version for ${package} =="
     assert_versions_match "${package}"
   done
+  echo "== validating versions for wasm example lockfile =="
+  assert_wasm_example_lock_matches_versions
 
   if [[ "${DRY_RUN}" -eq 0 && "${CARGO_REGISTRY_TOKEN:-}" == "" ]]; then
     die "CARGO_REGISTRY_TOKEN is not set; publishing will fail"
