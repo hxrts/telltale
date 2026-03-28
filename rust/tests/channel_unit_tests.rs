@@ -59,8 +59,8 @@ fn test_unbounded_pair_creates_connected_channels() {
 
     // Should be able to send and receive
     tx.unbounded_send(42).unwrap();
-    let received = rx.try_next().unwrap();
-    assert_eq!(received, Some(42));
+    let received = rx.try_recv().unwrap();
+    assert_eq!(received, 42);
 }
 
 #[test]
@@ -70,8 +70,8 @@ fn test_unbounded_pair_reverse_order() {
 
     tx.unbounded_send(123).unwrap();
     let mut rx = rx;
-    let received = rx.try_next().unwrap();
-    assert_eq!(received, Some(123));
+    let received = rx.try_recv().unwrap();
+    assert_eq!(received, 123);
 }
 
 #[test]
