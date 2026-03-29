@@ -228,246 +228,112 @@ impl ProtocolMachineExecutionProfile {
 /// Canonical transported-theorem boundary ledger for admission and guarantee surfaces.
 #[must_use]
 pub fn transported_theorem_boundary() -> Vec<TransportedTheoremBoundaryEntry> {
-    use TransportedTheoremUsageClass::{
-        BlackBoxPremiseOnly, DocumentationBackgroundOnly, RuntimeCriticalInstantiatedPremise,
-    };
+    let mut boundary = black_box_transported_theorem_entries();
+    boundary.extend(runtime_critical_transported_theorem_entries());
+    boundary.extend(documentation_background_transported_theorem_entries());
+    boundary
+}
+
+fn boundary_entry(
+    key: &str,
+    usage_class: TransportedTheoremUsageClass,
+    consumed_by_rust_runtime_admission: bool,
+    consumed_by_lean_runtime_gate: bool,
+    assumption_boundary: Option<&str>,
+) -> TransportedTheoremBoundaryEntry {
+    TransportedTheoremBoundaryEntry {
+        key: key.to_string(),
+        usage_class,
+        consumed_by_rust_runtime_admission,
+        consumed_by_lean_runtime_gate,
+        assumption_boundary: assumption_boundary.map(str::to_string),
+    }
+}
+
+fn black_box_transported_theorem_entries() -> Vec<TransportedTheoremBoundaryEntry> {
+    use TransportedTheoremUsageClass::BlackBoxPremiseOnly;
+
+    [
+        "termination",
+        "output_condition_soundness",
+        "flp_lower_bound",
+        "flp_impossibility",
+        "cap_impossibility",
+        "quorum_geometry_safety",
+        "partial_synchrony_liveness",
+        "responsiveness",
+        "nakamoto_security",
+        "reconfiguration_safety",
+        "atomic_broadcast_ordering",
+        "accountable_safety",
+        "failure_detector_boundaries",
+        "data_availability_retrievability",
+        "coordination_characterization",
+        "crdt_envelope_and_equivalence",
+        "consensus_envelope",
+        "failure_envelope",
+        "effect_interface_bridge",
+    ]
+    .into_iter()
+    .map(|key| boundary_entry(key, BlackBoxPremiseOnly, false, false, None))
+    .collect()
+}
+
+fn runtime_critical_transported_theorem_entries() -> Vec<TransportedTheoremBoundaryEntry> {
+    use TransportedTheoremUsageClass::RuntimeCriticalInstantiatedPremise;
 
     vec![
-        TransportedTheoremBoundaryEntry {
-            key: "termination".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "output_condition_soundness".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "flp_lower_bound".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "flp_impossibility".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "cap_impossibility".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "quorum_geometry_safety".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "partial_synchrony_liveness".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "responsiveness".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "nakamoto_security".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "reconfiguration_safety".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "atomic_broadcast_ordering".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "accountable_safety".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "failure_detector_boundaries".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "data_availability_retrievability".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "coordination_characterization".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "crdt_envelope_and_equivalence".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "byzantine_safety_characterization".to_string(),
-            usage_class: RuntimeCriticalInstantiatedPremise,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: true,
-            assumption_boundary: Some(
-                "Lean theorem-pack gate only; Rust runtime admission does not currently consume this key."
-                    .to_string(),
+        boundary_entry(
+            "byzantine_safety_characterization",
+            RuntimeCriticalInstantiatedPremise,
+            false,
+            true,
+            Some(
+                "Lean theorem-pack gate only; Rust runtime admission does not currently consume this key.",
             ),
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "consensus_envelope".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "failure_envelope".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "protocol_machine_envelope_adherence".to_string(),
-            usage_class: RuntimeCriticalInstantiatedPremise,
-            consumed_by_rust_runtime_admission: true,
-            consumed_by_lean_runtime_gate: true,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "protocol_machine_envelope_admission".to_string(),
-            usage_class: RuntimeCriticalInstantiatedPremise,
-            consumed_by_rust_runtime_admission: true,
-            consumed_by_lean_runtime_gate: true,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "protocol_envelope_bridge".to_string(),
-            usage_class: RuntimeCriticalInstantiatedPremise,
-            consumed_by_rust_runtime_admission: true,
-            consumed_by_lean_runtime_gate: true,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "effect_interface_bridge".to_string(),
-            usage_class: BlackBoxPremiseOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_foster".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_maxweight".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_ldp".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_mean_field".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_heavy_traffic".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_mixing".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_fluid".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_concentration".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_littles_law".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
-        TransportedTheoremBoundaryEntry {
-            key: "classical_functional_clt".to_string(),
-            usage_class: DocumentationBackgroundOnly,
-            consumed_by_rust_runtime_admission: false,
-            consumed_by_lean_runtime_gate: false,
-            assumption_boundary: None,
-        },
+        ),
+        boundary_entry(
+            "protocol_machine_envelope_adherence",
+            RuntimeCriticalInstantiatedPremise,
+            true,
+            true,
+            None,
+        ),
+        boundary_entry(
+            "protocol_machine_envelope_admission",
+            RuntimeCriticalInstantiatedPremise,
+            true,
+            true,
+            None,
+        ),
+        boundary_entry(
+            "protocol_envelope_bridge",
+            RuntimeCriticalInstantiatedPremise,
+            true,
+            true,
+            None,
+        ),
     ]
+}
+
+fn documentation_background_transported_theorem_entries() -> Vec<TransportedTheoremBoundaryEntry> {
+    use TransportedTheoremUsageClass::DocumentationBackgroundOnly;
+
+    [
+        "classical_foster",
+        "classical_maxweight",
+        "classical_ldp",
+        "classical_mean_field",
+        "classical_heavy_traffic",
+        "classical_mixing",
+        "classical_fluid",
+        "classical_concentration",
+        "classical_littles_law",
+        "classical_functional_clt",
+    ]
+    .into_iter()
+    .map(|key| boundary_entry(key, DocumentationBackgroundOnly, false, false, None))
+    .collect()
 }
 
 /// Runtime-critical transported theorem families.
@@ -496,6 +362,12 @@ pub fn rust_runtime_critical_transport_theorem_keys() -> Vec<String> {
 
 /// Validate that the canonical transported-theorem ledger and shipped runtime
 /// execution-profile keys stay in exact correspondence.
+///
+/// # Errors
+///
+/// Returns an error when the transported-theorem ledger and runtime profile
+/// disagree about which theorem-pack keys are runtime-critical, enabled, or
+/// guarded by an explicit assumption boundary.
 pub fn validate_transported_theorem_boundary_consistency(
     boundary: &[TransportedTheoremBoundaryEntry],
     profile: &ProtocolMachineExecutionProfile,

@@ -45,8 +45,7 @@ fn canonicalize_state_for_cross_target(
     canonical
 }
 
-#[test]
-fn test_lean_semantic_audit_matches_rust() {
+fn strict_protocol_machine_runner() -> Option<ProtocolMachineRunner> {
     let Some(runner) = ProtocolMachineRunner::try_new() else {
         assert!(
             !strict_protocol_machine_runner_required(),
@@ -55,27 +54,35 @@ fn test_lean_semantic_audit_matches_rust() {
         eprintln!(
             "Lean protocol-machine runner not available. Build with: cd lean && lake build protocol_machine_runner"
         );
-        return;
+        return None;
     };
+    Some(runner)
+}
 
-    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
-    let roles = vec!["A".to_string(), "B".to_string()];
+fn sample_global_and_roles() -> (GlobalType, Vec<String>) {
+    (
+        GlobalType::send("A", "B", Label::new("msg"), GlobalType::End),
+        vec!["A".to_string(), "B".to_string()],
+    )
+}
 
-    let input = ProtocolMachineRunInput {
+fn sample_run_input(global: &GlobalType, roles: Vec<String>) -> ProtocolMachineRunInput {
+    ProtocolMachineRunInput {
         schema_version: canonical_schema_version(),
         choreographies: vec![ChoreographyJson {
             schema_version: canonical_schema_version(),
-            global_type: global_to_json(&global),
-            roles: roles.clone(),
+            global_type: global_to_json(global),
+            roles,
         }],
         concurrency: 1,
         max_steps: 50,
-    };
+    }
+}
 
-    let lean_out = runner
-        .run(&input)
-        .expect("run Lean protocol-machine runner");
-    let lean_trace: Vec<(u64, String, String, String, String)> = lean_out
+fn lean_comm_trace(
+    lean_out: &telltale_bridge::ProtocolMachineRunOutput,
+) -> Vec<(u64, String, String, String, String)> {
+    lean_out
         .trace
         .iter()
         .filter_map(|ev| match ev.kind.as_str() {
@@ -95,20 +102,11 @@ fn test_lean_semantic_audit_matches_rust() {
             )),
             _ => None,
         })
-        .collect();
-    if lean_trace.is_empty() {
-        eprintln!("SKIPPED: Lean protocol-machine runner emitted no communication trace");
-        return;
-    }
+        .collect()
+}
 
-    let image = test_support::code_image_from_global(&global)
-        .expect("projected code image should exist for the test global");
-    let handler = PassthroughHandler;
-    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine.load_choreography(&image).expect("load image");
-    machine.run(&handler, 50).expect("run machine");
-
-    let rust_trace: Vec<(u64, String, String, String, String)> = normalize_trace(machine.trace())
+fn rust_comm_trace(machine: &ProtocolMachine) -> Vec<(u64, String, String, String, String)> {
+    normalize_trace(machine.trace())
         .iter()
         .filter_map(|ev| match ev {
             ObsEvent::Sent {
@@ -139,10 +137,23 @@ fn test_lean_semantic_audit_matches_rust() {
             )),
             _ => None,
         })
-        .collect();
+        .collect()
+}
 
-    assert_eq!(lean_trace, rust_trace, "Lean and Rust traces diverged");
+fn run_sample_machine(global: &GlobalType) -> ProtocolMachine {
+    let image = test_support::code_image_from_global(global)
+        .expect("projected code image should exist for the test global");
+    let handler = PassthroughHandler;
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load image");
+    machine.run(&handler, 50).expect("run machine");
+    machine
+}
 
+fn assert_last_step_matches_rust(
+    machine: &ProtocolMachine,
+    lean_out: &telltale_bridge::ProtocolMachineRunOutput,
+) {
     let rust_pre_dispatch = machine
         .last_pre_dispatch_refinement_slice()
         .expect("export pre-dispatch refinement slice");
@@ -185,6 +196,31 @@ fn test_lean_semantic_audit_matches_rust() {
     );
     assert_eq!(lean_last_step.ready_queue, rust_slice.scheduler.ready_queue);
     assert_eq!(lean_last_step.blocked, rust_slice.scheduler.blocked);
+}
+
+#[test]
+fn test_lean_semantic_audit_matches_rust() {
+    let Some(runner) = strict_protocol_machine_runner() else {
+        return;
+    };
+
+    let (global, roles) = sample_global_and_roles();
+    let input = sample_run_input(&global, roles);
+
+    let lean_out = runner
+        .run(&input)
+        .expect("run Lean protocol-machine runner");
+    let lean_trace = lean_comm_trace(&lean_out);
+    if lean_trace.is_empty() {
+        eprintln!("SKIPPED: Lean protocol-machine runner emitted no communication trace");
+        return;
+    }
+
+    let machine = run_sample_machine(&global);
+    let rust_trace = rust_comm_trace(&machine);
+
+    assert_eq!(lean_trace, rust_trace, "Lean and Rust traces diverged");
+    assert_last_step_matches_rust(&machine, &lean_out);
 }
 
 #[test]

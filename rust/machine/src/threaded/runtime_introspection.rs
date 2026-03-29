@@ -11,8 +11,20 @@ impl ThreadedProtocolMachine {
     pub fn refinement_slice(
         &self,
     ) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
-        let coroutines = self
-            .coroutines
+        let coroutines = self.refinement_coroutines()?;
+        let sessions = self.refinement_sessions()?;
+        let scheduler = self.refinement_scheduler()?;
+        Ok(ProtocolMachineRefinementSlice {
+            coroutines,
+            sessions,
+            scheduler,
+        })
+    }
+
+    fn refinement_coroutines(
+        &self,
+    ) -> Result<Vec<crate::refinement::CoroutineRefinementSlice>, RefinementSliceError> {
+        self.coroutines
             .iter()
             .map(|coro| {
                 let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
@@ -48,10 +60,11 @@ impl ThreadedProtocolMachine {
                     })?,
                 })
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect()
+    }
 
-        let sessions = self
-            .sessions
+    fn refinement_sessions(&self) -> Result<Vec<SessionRefinementSlice>, RefinementSliceError> {
+        self.sessions
             .sessions
             .read()
             .expect("threaded ProtocolMachine lock poisoned")
@@ -102,8 +115,10 @@ impl ThreadedProtocolMachine {
                     })?,
                 })
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect()
+    }
 
+    fn refinement_scheduler(&self) -> Result<SchedulerRefinementSlice, RefinementSliceError> {
         let ready_queue = self
             .scheduler
             .ready_snapshot()
@@ -129,20 +144,16 @@ impl ThreadedProtocolMachine {
                 ))
             })
             .collect::<Result<std::collections::BTreeMap<_, _>, _>>()?;
-        let scheduler = SchedulerRefinementSlice {
+        let step_count = self.scheduler.step_count();
+        Ok(SchedulerRefinementSlice {
             ready_queue,
             blocked,
-            step_count: u64::try_from(self.scheduler.step_count()).map_err(|_| {
+            step_count: u64::try_from(step_count).map_err(|_| {
                 RefinementSliceError::CountOverflow {
                     field: "scheduler.step_count",
-                    value: self.scheduler.step_count(),
+                    value: step_count,
                 }
             })?,
-        };
-        Ok(ProtocolMachineRefinementSlice {
-            coroutines,
-            sessions,
-            scheduler,
         })
     }
 

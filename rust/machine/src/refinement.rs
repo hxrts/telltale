@@ -198,7 +198,7 @@ impl TransitionRefinementSummary {
             selected_pc: selected_pc(coroutines, last_sched_step)?,
             selected_type: selected_type_json(coroutines, sessions, last_sched_step)?,
             exec_status: last_sched_step
-                .map(|step| sched_exec_status_tag(&step.exec_status).to_string()),
+                .map(|step| sched_exec_status_tag(step.exec_status).to_string()),
             session_type_counts,
             buffered_message_counts,
             ready_queue: scheduler_slice.ready_queue,
@@ -417,7 +417,7 @@ pub(crate) fn session_status_tag(status: &SessionStatus) -> &'static str {
     }
 }
 
-pub(crate) fn sched_exec_status_tag(status: &crate::SchedExecStatus) -> &'static str {
+pub(crate) fn sched_exec_status_tag(status: crate::SchedExecStatus) -> &'static str {
     match status {
         crate::SchedExecStatus::Continue => "continue",
         crate::SchedExecStatus::Yielded => "yielded",

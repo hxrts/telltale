@@ -82,9 +82,7 @@ fn test_verify_protocol_bundle_support_matrix_is_explicit() {
 fn test_verify_protocol_bundle_emits_transported_theorem_boundary_inventory() {
     let fixture = test_choreographies::tier3_distributed::simple_majority();
     let result = verify_bundle(&fixture.to_bundle()).expect("support probe should not hard-fail");
-    let result = match result {
-        BundleVerificationOutcome::Verified(result) => result,
-    };
+    let BundleVerificationOutcome::Verified(result) = result;
 
     let boundary = result
         .artifacts
