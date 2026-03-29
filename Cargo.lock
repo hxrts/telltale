@@ -1578,6 +1578,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn",
+ "telltale-bridge",
  "telltale-language",
  "telltale-machine",
  "telltale-macros",

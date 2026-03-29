@@ -106,6 +106,7 @@ The Lean bridge still contains a small amount of trusted normalization logic.
 That logic is intentionally narrow and is audited explicitly in CI by
 `just check-bridge-normalization`.
 The rows in this table are source-derived and checked by
+`telltale_bridge::bridge_normalization_ledger()` via
 `scripts/check/bridge-normalization-ledger.sh`.
 
 | Surface | Normalization rule | Classification | Why permitted | Enforcing artifacts |

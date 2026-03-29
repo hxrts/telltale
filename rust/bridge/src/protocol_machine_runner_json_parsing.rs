@@ -1,21 +1,5 @@
 use super::*;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SchemaVersionBackfillPath {
-    Root,
-    TraceEvent,
-    SessionStatus,
-    StepEvent,
-    SemanticObjects,
-}
-
-const SCHEMA_VERSION_BACKFILL_PATHS: &[SchemaVersionBackfillPath] = &[
-    SchemaVersionBackfillPath::Root,
-    SchemaVersionBackfillPath::TraceEvent,
-    SchemaVersionBackfillPath::SessionStatus,
-    SchemaVersionBackfillPath::StepEvent,
-    SchemaVersionBackfillPath::SemanticObjects,
-];
+use crate::bridge_normalization::{SchemaVersionBackfillPath, SCHEMA_VERSION_BACKFILL_PATHS};
 
 fn inject_field_if_missing(object: &mut serde_json::Map<String, Value>, key: &str, value: Value) {
     object.entry(key.to_string()).or_insert(value);

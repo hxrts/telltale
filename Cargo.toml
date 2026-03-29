@@ -90,6 +90,7 @@ anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
 # For examples
 telltale-theory = { path = "rust/theory", version = "8.0.0" }
+telltale-bridge = { path = "rust/bridge", version = "8.0.0" }
 serde_json = { workspace = true }
 
 [features]

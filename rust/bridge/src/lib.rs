@@ -68,6 +68,7 @@ pub mod semantic_objects;
 
 cfg_if! {
     if #[cfg(feature = "runner")] {
+        pub mod bridge_normalization;
         pub(crate) mod projection_payload;
         pub mod equivalence;
         pub mod protocol_machine_runner;
@@ -133,6 +134,11 @@ cfg_if! {
             ProtocolMachineRunnerError, ProtocolMachineSessionStatus,
             ProtocolMachineStepState, ProtocolMachineTraceEvent, TraceValidation,
             ReconfigurationValidationResult,
+        };
+        pub use bridge_normalization::{
+            bridge_normalization_ledger, BridgeNormalizationClassification,
+            BridgeNormalizationEntry, SchemaVersionBackfillPath,
+            SCHEMA_VERSION_BACKFILL_PATHS,
         };
         pub use validate::{ValidationResult, Validator};
     }

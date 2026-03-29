@@ -3,6 +3,7 @@
 use std::fs;
 use std::path::PathBuf;
 
+use telltale_bridge::bridge_normalization_ledger;
 use telltale_language::ast::{choreography_to_global, AuthorityMetatheoryTier};
 use telltale_language::parse_choreography_file;
 use telltale_machine::{transported_theorem_boundary, TransportedTheoremUsageClass};
@@ -181,13 +182,25 @@ fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
         "`scripts/check/verification-inventory.sh`",
         "The rows in this table are source-derived and checked by",
         "`scripts/check/bridge-normalization-ledger.sh`",
-        "| semantic-audit tick normalization |",
-        "| runner JSON schema backfill |",
         "| Public docs as contract |",
     ] {
         assert!(
             doc.contains(needle),
             "verification inventory should advertise docs-as-contract boundary for {needle}"
+        );
+    }
+
+    for entry in bridge_normalization_ledger() {
+        let row = format!(
+            "| {} | {} | {} | {} |",
+            entry.surface,
+            entry.rule,
+            entry.classification.doc_label(),
+            entry.rationale
+        );
+        assert!(
+            doc.contains(&row),
+            "verification inventory should contain bridge normalization ledger row: {row}"
         );
     }
 
