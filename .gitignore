@@ -1,6 +1,8 @@
+# Build artifacts
 target/
+.tmp/
 
-# Nix build artifacts
+# Nix artifacts
 result
 result-*
 .direnv/
@@ -67,8 +69,3 @@ subject_reduction/
 # Mutation testing artifacts
 mutants.out/
 mutants.out.old/
-
-# QPF experiments
-QpfTypes/
-qpf4-example/
-subject_reduction/
