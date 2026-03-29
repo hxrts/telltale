@@ -26,9 +26,61 @@ set_option autoImplicit false
 
 universe u
 
-private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
-  roles.foldl
-    (fun acc r1 => acc ++ roles.map (fun r2 => { sid := sid, sender := r1, receiver := r2 }))
+private def insertEdgeIfNew (edge : Edge) (edges : List Edge) : List Edge :=
+  if edges.any (fun existing => decide (existing = edge)) then
+    edges
+  else
+    edges ++ [edge]
+
+mutual
+  private partial def collectProtocolEdges
+      (sid : SessionId) (owner : Role) (lt : LocalType) (acc : List Edge) : List Edge :=
+    match lt with
+    | .send partner _ cont =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := owner, receiver := partner } acc
+        collectProtocolEdges sid owner cont acc'
+    | .recv partner _ cont =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := partner, receiver := owner } acc
+        collectProtocolEdges sid owner cont acc'
+    | .select partner branches =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := owner, receiver := partner } acc
+        collectProtocolBranchEdges sid owner branches acc'
+    | .branch partner branches =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := partner, receiver := owner } acc
+        collectProtocolBranchEdges sid owner branches acc'
+    | .mu body => collectProtocolEdges sid owner body acc
+    | .var _ | .end_ => acc
+
+  private partial def collectProtocolBranchEdges
+      (sid : SessionId) (owner : Role) (branches : List (Label × LocalType))
+      (acc : List Edge) : List Edge :=
+    match branches with
+    | [] => acc
+    | (_, cont) :: rest =>
+        let acc' := collectProtocolEdges sid owner cont acc
+        collectProtocolBranchEdges sid owner rest acc'
+end
+
+private def protocolEdges
+    (sid : SessionId) (localTypes : List (Role × LocalType)) : List Edge :=
+  localTypes.foldl
+    (fun acc entry => collectProtocolEdges sid entry.1 entry.2 acc)
     []
 
 -- Session disjointness (executable checks)
@@ -161,7 +213,7 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
   let programs' := st.programs.push image.program
   let roles := image.program.entryPoints.map (fun p => p.fst)
   let endpoints := roles.map (fun r => { sid := sid, role := r })
-  let edges := allEdges sid roles
+  let edges := protocolEdges sid image.program.localTypes
   let buffers := signedBuffersEnsure st.buffers edges
   let localTypes := image.program.localTypes.map (fun p => ({ sid := sid, role := p.1 }, p.2))
   let handlers := edges.map (fun e => (e, 0))

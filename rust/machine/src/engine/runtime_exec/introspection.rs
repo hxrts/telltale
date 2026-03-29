@@ -10,6 +10,59 @@ impl ProtocolMachine {
         cooperative_refinement_slice(&self.coroutines, &self.sessions, &self.sched)
     }
 
+    /// Export the most recent normalized pre-dispatch refinement slice.
+    ///
+    /// This snapshot is captured after ingress, timeout pruning, receiver
+    /// unblocking, and ready-eligibility normalization, but before runnable
+    /// coroutine selection.
+    #[must_use]
+    pub fn last_pre_dispatch_refinement_slice(&self) -> Option<ProtocolMachineRefinementSlice> {
+        self.last_pre_dispatch_state.clone()
+    }
+
+    /// Export the most recent scheduler-transition summary used for exact
+    /// Rust↔Lean step-state checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when exported counts do not fit the bridge-safe `u64` schema.
+    pub fn transition_refinement_summary(
+        &self,
+    ) -> Result<crate::refinement::TransitionRefinementSummary, RefinementSliceError> {
+        crate::refinement::TransitionRefinementSummary::from_runtime_state(
+            &self.coroutines,
+            &self.sessions,
+            &self.sched,
+            self.last_sched_step.as_ref(),
+        )
+    }
+
+    /// Export the full currently claimed runtime refinement bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when exported counts do not fit the bridge-safe `u64` schema.
+    pub fn claimed_runtime_refinement_bundle(
+        &self,
+    ) -> Result<crate::refinement::ClaimedRuntimeRefinementBundle, RefinementSliceError> {
+        let authority_audit_log = self.combined_authority_audit_log();
+        crate::refinement::ClaimedRuntimeRefinementBundle::from_runtime_state(
+            &self.coroutines,
+            &self.sessions,
+            &self.sched,
+            self.last_sched_step.as_ref(),
+            authority_audit_log.as_slice(),
+            self.delegation_audit_log.as_slice(),
+            self.operation_instances.as_slice(),
+            self.obs_trace.as_slice(),
+            self.outstanding_effects.as_slice(),
+            self.output_condition_checks.as_slice(),
+            self.progress_contracts.as_slice(),
+            self.progress_transitions.as_slice(),
+            self.effect_exchanges.as_slice(),
+        )
+    }
+
     fn combined_authority_audit_log(&self) -> Vec<AuthorityAuditRecord> {
         let mut out = self.authority_audit_log.as_slice().to_vec();
         for sid in self.sessions.session_ids() {

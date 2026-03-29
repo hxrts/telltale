@@ -18,7 +18,8 @@ use telltale_machine::model::output_condition::OutputConditionPolicy;
 use telltale_machine::model::state::SessionStatus;
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, StepResult};
-use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRefinementSlice};
+use telltale_theory::projection::project_all;
 
 fn strict_protocol_machine_runner_required() -> bool {
     std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
@@ -87,7 +88,11 @@ impl EffectHandler for PassthroughHandler {
 struct RustStepState {
     step_index: u64,
     status: String,
+    pre_state: ProtocolMachineRefinementSlice,
+    post_state: ProtocolMachineRefinementSlice,
     selected_coro: Option<u64>,
+    selected_pc: Option<u64>,
+    selected_type: Option<serde_json::Value>,
     exec_status: Option<String>,
     event: Option<TickedObsEvent<ProtocolMachineTraceEvent>>,
     pre_session_type_counts: BTreeMap<u64, u64>,
@@ -96,6 +101,28 @@ struct RustStepState {
     ready_queue: Vec<u64>,
     blocked: BTreeMap<u64, String>,
     session_type_deltas: BTreeMap<u64, i64>,
+}
+
+fn canonicalize_state_for_cross_target(
+    slice: &ProtocolMachineRefinementSlice,
+) -> ProtocolMachineRefinementSlice {
+    let mut canonical = slice.clone();
+    let ready: std::collections::BTreeSet<u64> =
+        canonical.scheduler.ready_queue.iter().copied().collect();
+    for coroutine in &mut canonical.coroutines {
+        coroutine.pc = 0;
+        match coroutine.status.as_str() {
+            "done" | "faulted" | "speculating" => {}
+            _ if canonical.scheduler.blocked.contains_key(&coroutine.coro_id) => {
+                coroutine.status = "blocked".to_string();
+            }
+            _ if ready.contains(&coroutine.coro_id) => {
+                coroutine.status = "ready".to_string();
+            }
+            _ => {}
+        }
+    }
+    canonical
 }
 
 fn session_type_counts(machine: &ProtocolMachine) -> BTreeMap<u64, u64> {
@@ -243,7 +270,16 @@ fn run_rust_step_states(
     fixture: &test_choreographies::ProtocolFixture,
     max_steps: usize,
 ) -> Result<Vec<RustStepState>, String> {
-    let image = CodeImage::from_local_types(&fixture.local_types, &fixture.global);
+    let projected: BTreeMap<String, _> = project_all(&fixture.global)
+        .map_err(|e| format!("project fixture global for {}: {e}", fixture.name))?
+        .into_iter()
+        .collect();
+    let local_types = if projected.is_empty() {
+        &fixture.local_types
+    } else {
+        &projected
+    };
+    let image = CodeImage::from_local_types(local_types, &fixture.global);
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
         output_condition_policy: OutputConditionPolicy::AllowAll,
         ..ProtocolMachineConfig::default()
@@ -259,6 +295,11 @@ fn run_rust_step_states(
         let status = machine
             .step(&PassthroughHandler)
             .map_err(|e| e.to_string())?;
+        let pre_state = machine
+            .last_pre_dispatch_refinement_slice()
+            .ok_or_else(|| {
+                "export pre-dispatch refinement slice: missing step snapshot".to_string()
+            })?;
         let status = match status {
             StepResult::Continue => "continue",
             StepResult::Stuck => "stuck",
@@ -276,36 +317,28 @@ fn run_rust_step_states(
 
         let after_counts = session_type_counts(&machine);
         let deltas = session_type_deltas(&before_counts, &after_counts);
-        let step_meta = machine.last_sched_step().cloned();
-        let refinement = machine
+        let post_state = machine
             .refinement_slice()
-            .map_err(|e| format!("export refinement slice: {e}"))?;
-        let buffered_message_counts = refinement
-            .sessions
-            .iter()
-            .map(|session| (session.sid, session.buffered_messages))
-            .collect();
+            .map_err(|e| format!("export post-step refinement slice: {e}"))?;
+        let transition = machine
+            .transition_refinement_summary()
+            .map_err(|e| format!("export transition refinement summary: {e}"))?;
 
         out.push(RustStepState {
             step_index: step_index as u64,
             status,
-            selected_coro: step_meta.as_ref().map(|m| m.selected_coro as u64),
-            exec_status: step_meta.as_ref().map(|m| {
-                match m.exec_status {
-                    telltale_machine::SchedExecStatus::Continue => "continue",
-                    telltale_machine::SchedExecStatus::Yielded => "yielded",
-                    telltale_machine::SchedExecStatus::Blocked => "blocked",
-                    telltale_machine::SchedExecStatus::Halted => "halted",
-                    telltale_machine::SchedExecStatus::Faulted => "faulted",
-                }
-                .to_string()
-            }),
+            pre_state,
+            post_state,
+            selected_coro: transition.selected_coro,
+            selected_pc: transition.selected_pc,
+            selected_type: transition.selected_type,
+            exec_status: transition.exec_status,
             event,
             pre_session_type_counts: before_counts,
             session_type_counts: after_counts,
-            buffered_message_counts,
-            ready_queue: refinement.scheduler.ready_queue,
-            blocked: refinement.scheduler.blocked,
+            buffered_message_counts: transition.buffered_message_counts,
+            ready_queue: transition.ready_queue,
+            blocked: transition.blocked,
             session_type_deltas: deltas,
         });
 
@@ -429,7 +462,18 @@ fn assert_step_indexed_equivalence(
             };
             let lean_deltas =
                 session_type_deltas(&lean_prev_counts, &lean_step.session_type_counts);
-            if rust_step.selected_coro != lean_step.selected_coro
+            if lean_step
+                .pre_state
+                .as_ref()
+                .map(canonicalize_state_for_cross_target)
+                != Some(canonicalize_state_for_cross_target(&rust_step.pre_state))
+                || lean_step
+                    .post_state
+                    .as_ref()
+                    .map(canonicalize_state_for_cross_target)
+                    != Some(canonicalize_state_for_cross_target(&rust_step.post_state))
+                || rust_step.selected_coro != lean_step.selected_coro
+                || rust_step.selected_type != lean_step.selected_type
                 || rust_step.exec_status != lean_step.exec_status
                 || rust_step.session_type_counts != lean_step.session_type_counts
                 || rust_step.buffered_message_counts != lean_step.buffered_message_counts
@@ -447,7 +491,13 @@ fn assert_step_indexed_equivalence(
                         "kind": "step_state_mismatch",
                         "step_index": idx,
                         "rust": {
+                            "pre_state": canonicalize_state_for_cross_target(&rust_step.pre_state),
+                            "post_state": canonicalize_state_for_cross_target(&rust_step.post_state),
+                            "pre_state_raw": rust_step.pre_state,
+                            "post_state_raw": rust_step.post_state,
                             "selected_coro": rust_step.selected_coro,
+                            "selected_pc": rust_step.selected_pc,
+                            "selected_type": rust_step.selected_type,
                             "exec_status": rust_step.exec_status,
                             "session_type_counts": rust_step.session_type_counts,
                             "buffered_message_counts": rust_step.buffered_message_counts,
@@ -457,7 +507,13 @@ fn assert_step_indexed_equivalence(
                             "event": rust_step.event.as_ref().map(|e| canonical_event(&e.event)),
                         },
                         "lean": {
+                            "pre_state": lean_step.pre_state.as_ref().map(canonicalize_state_for_cross_target),
+                            "post_state": lean_step.post_state.as_ref().map(canonicalize_state_for_cross_target),
+                            "pre_state_raw": lean_step.pre_state,
+                            "post_state_raw": lean_step.post_state,
                             "selected_coro": lean_step.selected_coro,
+                            "selected_pc": lean_step.selected_pc,
+                            "selected_type": lean_step.selected_type,
                             "exec_status": lean_step.exec_status,
                             "session_type_counts": lean_step.session_type_counts,
                             "buffered_message_counts": lean_step.buffered_message_counts,

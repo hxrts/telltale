@@ -16,8 +16,10 @@ impl ProtocolMachine {
             return Err(ProtocolMachineError::InvalidConcurrency { n });
         }
         self.last_sched_step = None;
+        self.last_pre_dispatch_state = None;
         self.clock.advance();
         if self.all_done() {
+            self.last_pre_dispatch_state = self.refinement_slice().ok();
             return Ok(StepResult::AllDone);
         }
 
@@ -28,6 +30,7 @@ impl ProtocolMachine {
         self.try_unblock_receivers();
         self.evaluate_progress_contracts()?;
         self.ensure_ready_eligibility();
+        self.last_pre_dispatch_state = self.refinement_slice().ok();
         #[cfg(debug_assertions)]
         self.debug_assert_ready_eligibility_consistent();
         if !self.sched.has_eligible_ready() {

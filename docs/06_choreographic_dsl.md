@@ -67,6 +67,10 @@ tell! {
 legacy brace-based structural syntax are rejected. The canonical surface is
 token-form, indentation-based, and proof-directed.
 
+`tell!` is outside the current formal-verification claim. The formal claim
+currently covers the Lean models/theorems plus strict correspondence and
+operational compiler gates, not Rust macro expansion itself.
+
 When a protocol projects cleanly to sessions, the generated module exposes
 `Protocol::sessions`. Every generated protocol also exposes
 `Protocol::proof_status`, which reports the strongest supported tier and any

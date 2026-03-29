@@ -19,7 +19,10 @@ use crate::semantic_objects::{ProtocolMachineSemanticObjects, TickedObsEvent};
 use crate::sim_reference::{
     SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
 };
-use telltale_machine::{EffectExchangeRecord, ReconfigurationEvent, ReconfigurationPolicy};
+use telltale_machine::{
+    EffectExchangeRecord, ProtocolMachineRefinementSlice, ReconfigurationEvent,
+    ReconfigurationPolicy,
+};
 
 #[path = "protocol_machine_runner_json_parsing.rs"]
 mod parsing;
@@ -132,6 +135,12 @@ pub struct ProtocolMachineStepState {
     /// Step index in execution order.
     #[serde(default)]
     pub step_index: u64,
+    /// Concrete pre-step runtime state slice exported by the theorem-side runner.
+    #[serde(default)]
+    pub pre_state: Option<ProtocolMachineRefinementSlice>,
+    /// Concrete post-step runtime state slice exported by the theorem-side runner.
+    #[serde(default)]
+    pub post_state: Option<ProtocolMachineRefinementSlice>,
     /// Coroutine selected for this step, when available.
     #[serde(default)]
     pub selected_coro: Option<u64>,

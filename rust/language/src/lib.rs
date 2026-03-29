@@ -4,6 +4,14 @@
     clippy::must_use_candidate
 )]
 
+//! Public language and compiler-facing APIs.
+//!
+//! These parser, lowering, projection, and code-generation entry points are
+//! supported and covered by strict operational verification gates, but they are
+//! intentionally outside the current formal-verification claim. The current
+//! claim is scoped to the Lean models/theorems plus the theorem-defined Rust↔Lean
+//! runtime correspondence surface, not to Rust compiler-pipeline correctness.
+
 pub mod ast;
 pub mod compiler;
 pub mod effect_spec;

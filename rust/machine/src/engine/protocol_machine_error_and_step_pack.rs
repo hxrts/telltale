@@ -292,6 +292,8 @@ where
     corrupted_edges: BTreeMap<(SiteId, SiteId), CorruptionType>,
     timed_out_sites: BTreeMap<SiteId, u64>,
     last_sched_step: Option<SchedStepDebug>,
+    #[serde(skip, default)]
+    last_pre_dispatch_state: Option<crate::refinement::ProtocolMachineRefinementSlice>,
     handler_identity_anchor: Option<String>,
 }
 
@@ -376,6 +378,7 @@ where
             corrupted_edges: BTreeMap::new(),
             timed_out_sites: BTreeMap::new(),
             last_sched_step: None,
+            last_pre_dispatch_state: None,
             handler_identity_anchor: None,
         }
     }

@@ -2,6 +2,12 @@
 //!
 //! This module contains the compilation pipeline that transforms choreographic
 //! specifications into executable code.
+//!
+//! The exported parser, lowering, projection, and code-generation helpers are
+//! public supported surfaces, but they are intentionally outside the current
+//! formal-verification claim. They remain covered by strict compiler-pipeline,
+//! docs-contract, and Lean-backed operational gates until a mechanized
+//! compiler-correctness proof closes that gap.
 
 pub mod analysis;
 pub mod choice_analysis;

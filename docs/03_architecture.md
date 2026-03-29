@@ -12,6 +12,12 @@ The architecture has three compile-time stages and two runtime paths:
 4. Effect handler execution (async interpreter with pluggable transports)
 5. Protocol-machine execution and simulation (protocol machine with scheduler and deterministic middleware)
 
+The current formal-verification claim is narrower than this full architecture
+diagram. The Rust parser, lowering, projection, code generation, and macro
+entry paths are operationally checked and Lean-cross-validated, but they remain
+outside the current formal claim until a mechanized compiler-correctness proof
+exists for the claimed DSL subset.
+
 ### Runtime Layering
 
 The execution architecture separates three concerns. The protocol machine is a deterministic small-step reducer that is the sole authority over semantic progression. The guest runtime wraps the protocol machine with typed effect interfaces and concrete handlers. The host runtime is the surrounding system that provides time, storage, network, and process lifecycle.

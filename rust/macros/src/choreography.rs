@@ -22,6 +22,11 @@ struct ParsedMacroChoreography {
 }
 
 /// Main entry point for the tell! macro.
+///
+/// This macro is intentionally outside the current formal-verification claim.
+/// It is treated as a public frontend convenience surface whose generated
+/// output is checked by compiler-pipeline, Lean-correspondence, and macro-UI
+/// gates rather than by a mechanized macro-expansion proof.
 pub fn tell(input: MacroTokenStream) -> Result<TokenStream> {
     let parsed = parse_macro_choreography(input)?;
     parsed

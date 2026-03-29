@@ -6,6 +6,7 @@ import Runtime.ProtocolMachine.Runtime.Loader
 import Runtime.ProtocolMachine.Runtime.Runner
 import Runtime.ProtocolMachine.Runtime.Scheduler
 import Runtime.ProtocolMachine.Runtime.Monitor
+import Runtime.Proofs.ProtocolMachine.ConcreteRefinement
 import Runtime.Proofs.ProtocolMachine.Monitor
 import Runtime.Proofs.TheoremPack.API
 import Runtime.ProtocolMachine.Semantics.Exec
@@ -107,22 +108,8 @@ def execStatusTag : ExecStatus UnitGuard → String
   | .joined => "joined"
   | .aborted => "aborted"
 
-def sessionTypeCounts (sessions : SessionStore UnitVerify) : List (SessionId × Nat) :=
-  sessions.map (fun p => (p.fst, p.snd.localTypes.length))
-
-def sessionTypeCountsJson (sessions : SessionStore UnitVerify) : Json :=
-  Json.mkObj <| (sessionTypeCounts sessions).map (fun p =>
-    (toString p.fst, Json.num p.snd))
-
-def bufferedMessageCounts (sessions : SessionStore UnitVerify) : List (SessionId × Nat) :=
-  sessions.map (fun p =>
-    let sid := p.fst
-    let count := p.snd.buffers.foldl (fun acc entry => acc + entry.snd.length) 0
-    (sid, count))
-
-def bufferedMessageCountsJson (sessions : SessionStore UnitVerify) : Json :=
-  Json.mkObj <| (bufferedMessageCounts sessions).map (fun p =>
-    (toString p.fst, Json.num p.snd))
+def natAssocJson (entries : List (Nat × Nat)) : Json :=
+  Json.mkObj <| entries.map (fun p => (toString p.fst, Json.num p.snd))
 
 def sortedSessionStatusesJson (st : RunnerState) : Array Json :=
   ((st.sessions.map (fun p =>
@@ -149,119 +136,74 @@ def blockedStateJson (sched : SchedState UnitGuard) : Json :=
 def readyQueueJson (sched : SchedState UnitGuard) : Json :=
   Json.arr <| sched.readyQueue.map Json.num |>.toArray
 
-def selectedEndpointTypeJson (st : RunnerState) (cid : CoroutineId) : Json :=
-  match st.coroutines[cid]? with
+def selectedEndpointTypeJson (selectedType : Option LocalType) : Json :=
+  match selectedType with
+  | some ty => Json.str (reprStr ty)
   | none => Json.null
-  | some coro =>
-      match coro.regs[0]? with
-      | some (Value.chan ep) =>
-          match SessionStore.lookupType st.sessions ep with
-          | some ty => Json.str (reprStr ty)
-          | none => Json.null
-      | _ => Json.null
 
-def faultTag : Fault UnitGuard → String
-  | .typeViolation expected actual =>
-      s!"type_violation:{reprStr expected}->{reprStr actual}"
-  | .unknownLabel lbl => s!"unknown_label:{lbl}"
-  | .channelClosed ep => s!"channel_closed:{ep.role}"
-  | .invalidSignature edge => s!"invalid_signature:{edge.sender}->{edge.receiver}"
-  | .acquireFault _ msg => s!"acquire_fault:{msg}"
-  | .invokeFault msg => s!"invoke_fault:{msg}"
-  | .transferFault msg => s!"transfer_fault:{msg}"
-  | .closeFault msg => s!"close_fault:{msg}"
-  | .specFault msg => s!"spec_fault:{msg}"
-  | .flowViolation msg => s!"flow_violation:{msg}"
-  | .noProgressToken edge => s!"no_progress_token:{edge.sender}->{edge.receiver}"
-  | .outOfCredits => "out_of_credits"
-  | .outOfRegisters => "out_of_registers"
+def concreteCoroutineSliceJson
+    (coro : Runtime.Proofs.ConcreteCoroutineSlice) : Json :=
+  Json.mkObj
+    [ ("coro_id", Json.num coro.coroId)
+    , ("session_id", Json.num coro.sessionId)
+    , ("pc", Json.num coro.pc)
+    , ("status", Json.str coro.statusTag)
+    , ("owned_endpoints", Json.num coro.ownedEndpointCount)
+    , ("progress_tokens", Json.num coro.progressTokenCount) ]
 
-def stepBridgeEventsForObs (ev : TickedObsEvent UnitEffect) : List Json :=
-  match ev.event with
-  | .sent edge val _seqNo =>
-      let label :=
-        match val with
-        | .string s => some s
-        | _ => none
-      let fields :=
-        [ ("schema_version", Json.str "lean_bridge.v1")
-        , ("kind", Json.str "sent")
-        , ("tick", Json.num ev.tick)
-        , ("session", Json.num edge.sid)
-        , ("sender", Json.str edge.sender)
-        , ("receiver", Json.str edge.receiver) ] ++
-        match label with
-        | some lbl => [("label", Json.str lbl)]
-        | none => []
-      [Json.mkObj fields]
-  | .received edge val _seqNo =>
-      let label :=
-        match val with
-        | .string s => some s
-        | _ => none
-      let fields :=
-        [ ("schema_version", Json.str "lean_bridge.v1")
-        , ("kind", Json.str "received")
-        , ("tick", Json.num ev.tick)
-        , ("session", Json.num edge.sid)
-        , ("sender", Json.str edge.sender)
-        , ("receiver", Json.str edge.receiver) ] ++
-        match label with
-        | some lbl => [("label", Json.str lbl)]
-        | none => []
-      [Json.mkObj fields]
-  | .offered edge lbl =>
-      [Json.mkObj
-        [ ("schema_version", Json.str "lean_bridge.v1")
-        , ("kind", Json.str "sent")
-        , ("tick", Json.num ev.tick)
-        , ("session", Json.num edge.sid)
-        , ("sender", Json.str edge.sender)
-        , ("receiver", Json.str edge.receiver)
-        , ("label", Json.str lbl) ]]
-  | .chose edge lbl =>
-      [Json.mkObj
-        [ ("schema_version", Json.str "lean_bridge.v1")
-        , ("kind", Json.str "received")
-        , ("tick", Json.num ev.tick)
-        , ("session", Json.num edge.sid)
-        , ("sender", Json.str edge.sender)
-        , ("receiver", Json.str edge.receiver)
-        , ("label", Json.str lbl) ]]
-  | .opened sid roles =>
-      [Json.mkObj
-        [ ("schema_version", Json.str "lean_bridge.v1")
-        , ("kind", Json.str "opened")
-        , ("tick", Json.num ev.tick)
-        , ("session", Json.num sid)
-        , ("role", Json.str (String.intercalate "," roles)) ]]
-  | .closed sid =>
-      [Json.mkObj
-        [ ("schema_version", Json.str "lean_bridge.v1")
-        , ("kind", Json.str "closed")
-        , ("tick", Json.num ev.tick)
-        , ("session", Json.num sid) ]]
-  | .invoked _ _ => []
-  | _ => [obsEventToJson ev]
+def concreteSessionSliceJson
+    (sess : Runtime.Proofs.ConcreteSessionSlice) : Json :=
+  Json.mkObj
+    [ ("sid", Json.num sess.sid)
+    , ("role_count", Json.num sess.roleCount)
+    , ("local_type_entries", Json.num sess.localTypeCount)
+    , ("buffer_edges", Json.num sess.bufferEdgeCount)
+    , ("buffered_messages", Json.num sess.bufferedMessageCount)
+    , ("status", Json.str sess.statusTag)
+    , ("epoch", Json.num sess.epoch) ]
 
-def stepEventToJson (tick cid : Nat) (status : ExecStatus UnitGuard)
-    (ev : Option (StepEvent UnitEffect)) : Json :=
-  match ev with
-  | some (.obs obs) => (stepBridgeEventsForObs { tick := tick, event := obs }).headD Json.null
-  | _ =>
-      match status with
-      | .halted =>
-          Json.mkObj
-            [ ("kind", Json.str "halted")
-            , ("tick", Json.num tick)
-            , ("target", Json.str (toString cid)) ]
-      | .faulted err =>
-          Json.mkObj
-            [ ("kind", Json.str "faulted")
-            , ("tick", Json.num tick)
-            , ("target", Json.str (toString cid))
-            , ("reason", Json.str (faultTag err)) ]
-      | _ => Json.null
+def concreteSchedulerSliceJson
+    (sched : Runtime.Proofs.ConcreteSchedulerSlice) : Json :=
+  Json.mkObj
+    [ ("ready_queue", Json.arr <| sched.readyQueue.map Json.num |>.toArray)
+    , ("blocked", Json.mkObj <| sched.blocked.map (fun p => (toString p.1, Json.str p.2)))
+    , ("step_count", Json.num sched.stepCount) ]
+
+def concreteProtocolMachineSliceJson
+    (slice : Runtime.Proofs.ConcreteProtocolMachineSlice) : Json :=
+  Json.mkObj
+    [ ("coroutines", Json.arr <| slice.coroutines.map concreteCoroutineSliceJson |>.toArray)
+    , ("sessions", Json.arr <| slice.sessions.map concreteSessionSliceJson |>.toArray)
+    , ("scheduler", concreteSchedulerSliceJson slice.scheduler) ]
+
+def concreteTraceEventJson
+    (ev : Runtime.Proofs.ConcreteTraceEvent) : Json :=
+  let fields :=
+    [ ("schema_version", Json.str "lean_bridge.v1")
+    , ("kind", Json.str ev.kind)
+    , ("tick", Json.num ev.tick) ] ++
+    (match ev.session with
+    | some sid => [("session", Json.num sid)]
+    | none => []) ++
+    (match ev.sender with
+    | some sender => [("sender", Json.str sender)]
+    | none => []) ++
+    (match ev.receiver with
+    | some receiver => [("receiver", Json.str receiver)]
+    | none => []) ++
+    (match ev.label with
+    | some label => [("label", Json.str label)]
+    | none => []) ++
+    (match ev.role with
+    | some role => [("role", Json.str role)]
+    | none => []) ++
+    (match ev.target with
+    | some target => [("target", Json.str target)]
+    | none => []) ++
+    (match ev.reason with
+    | some reason => [("reason", Json.str reason)]
+    | none => [])
+  Json.mkObj fields
 
 def syntheticLifecycleEvents (stepStates : List Json) : List Json :=
   stepStates.foldl
@@ -288,18 +230,27 @@ def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
           let (stExec, res) := execInstr stSched cid
           let sched' := updateAfterStep stExec.sched cid res.status
           let stNext : RunnerState := { stExec with sched := sched' }
+          let projectedStep :=
+            match Runtime.Proofs.projectConcreteScheduledStep? st'' with
+            | some step => step
+            | none =>
+                Runtime.Proofs.mkConcreteScheduledStep
+                  stNext.clock st'' stNext cid res.status res.event
+          let transition := projectedStep.transition
           let stepJson :=
             Json.mkObj
               [ ("step_index", Json.num stepIndex)
-              , ("selected_coro", Json.num cid)
-              , ("selected_pc", Json.num (match stNext.coroutines[cid]? with | some coro => coro.pc | none => 0))
-              , ("selected_type", selectedEndpointTypeJson stNext cid)
-              , ("exec_status", Json.str (execStatusTag res.status))
-              , ("session_type_counts", sessionTypeCountsJson stNext.sessions)
-              , ("buffered_message_counts", bufferedMessageCountsJson stNext.sessions)
-              , ("ready_queue", readyQueueJson stNext.sched)
-              , ("blocked", blockedStateJson stNext.sched)
-              , ("event", stepEventToJson stNext.clock cid res.status res.event) ]
+              , ("pre_state", concreteProtocolMachineSliceJson projectedStep.preState)
+              , ("post_state", concreteProtocolMachineSliceJson projectedStep.postState)
+              , ("selected_coro", Json.num transition.selectedCoro)
+              , ("selected_pc", Json.num transition.selectedPc)
+              , ("selected_type", selectedEndpointTypeJson transition.selectedType)
+              , ("exec_status", Json.str transition.execStatusTag)
+              , ("session_type_counts", natAssocJson transition.sessionTypeCounts)
+              , ("buffered_message_counts", natAssocJson transition.bufferedMessageCounts)
+              , ("ready_queue", Json.arr <| transition.readyQueue.map Json.num |>.toArray)
+              , ("blocked", Json.mkObj <| transition.blocked.map (fun p => (toString p.1, Json.str p.2)))
+              , ("event", projectedStep.event.map concreteTraceEventJson |>.getD Json.null) ]
           let acc' := stepJson :: acc
           if allTerminal stNext then
             (stNext, acc'.reverse)

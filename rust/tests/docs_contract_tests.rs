@@ -183,6 +183,9 @@ fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
         "The rows in this table are source-derived and checked by",
         "`scripts/check/bridge-normalization-ledger.sh`",
         "| Public docs as contract |",
+        "## Compiler and Macro Claim Boundary",
+        "the current public formal-verification claim does not include any Rust parser,",
+        "`tell!` macro expansion are outside the formal claim",
     ] {
         assert!(
             doc.contains(needle),
@@ -207,5 +210,44 @@ fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
     assert!(
         !doc.contains("session-status ordering |"),
         "removed bridge normalization rows must stay out of the inventory"
+    );
+}
+
+#[test]
+fn choreographic_dsl_doc_and_macro_docs_exclude_tell_from_formal_claim() {
+    let dsl_doc = read_doc("docs/06_choreographic_dsl.md");
+    assert!(
+        dsl_doc.contains("`tell!` is outside the current formal-verification claim."),
+        "DSL doc must explicitly exclude tell! from the current formal claim"
+    );
+
+    let macro_lib = read_doc("rust/macros/src/lib.rs");
+    assert!(
+        macro_lib.contains("not part of the current\n//! formal-verification claim"),
+        "macro crate docs must explicitly exclude macros from the current formal claim"
+    );
+
+    let macro_choreography = read_doc("rust/macros/src/choreography.rs");
+    assert!(
+        macro_choreography.contains("This macro is intentionally outside the current formal-verification claim."),
+        "tell! macro implementation docs must explicitly exclude tell! from the current formal claim"
+    );
+
+    let language_lib = read_doc("rust/language/src/lib.rs");
+    assert!(
+        language_lib.contains("intentionally outside the current formal-verification claim"),
+        "language crate docs must explicitly exclude Rust compiler-pipeline APIs from the current formal claim"
+    );
+
+    let runtime_compiler = read_doc("rust/runtime/src/compiler/mod.rs");
+    assert!(
+        runtime_compiler.contains("intentionally outside the current\n//! formal-verification claim"),
+        "runtime compiler module docs must explicitly exclude compiler helpers from the current formal claim"
+    );
+
+    let architecture_doc = read_doc("docs/03_architecture.md");
+    assert!(
+        architecture_doc.contains("The current formal-verification claim is narrower than this full architecture"),
+        "architecture doc must explicitly scope the formal claim below the full Rust compiler/runtime architecture"
     );
 }

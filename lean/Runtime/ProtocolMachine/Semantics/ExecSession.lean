@@ -72,16 +72,67 @@ private def handlersCoverRoles (sid : SessionId) (roles : List Role)
   -- Ensure every role's self-edge is bound to some handler.
   roles.all (fun r => handlerBound handlers { sid := sid, sender := r, receiver := r })
 
-private def allEdges (sid : SessionId) (roles : List Role) : List Edge :=
-  -- Enumerate all directed edges between roles for a session.
-  roles.foldl
-    (fun acc r1 => acc ++ roles.map (fun r2 => { sid := sid, sender := r1, receiver := r2 }))
+private def insertEdgeIfNew (edge : Edge) (edges : List Edge) : List Edge :=
+  if edges.any (fun existing => decide (existing = edge)) then
+    edges
+  else
+    edges ++ [edge]
+
+mutual
+  private partial def collectProtocolEdges
+      (sid : SessionId) (owner : Role) (lt : LocalType) (acc : List Edge) : List Edge :=
+    match lt with
+    | .send partner _ cont =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := owner, receiver := partner } acc
+        collectProtocolEdges sid owner cont acc'
+    | .recv partner _ cont =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := partner, receiver := owner } acc
+        collectProtocolEdges sid owner cont acc'
+    | .select partner branches =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := owner, receiver := partner } acc
+        collectProtocolBranchEdges sid owner branches acc'
+    | .branch partner branches =>
+        let acc' :=
+          if owner = partner then
+            acc
+          else
+            insertEdgeIfNew { sid := sid, sender := partner, receiver := owner } acc
+        collectProtocolBranchEdges sid owner branches acc'
+    | .mu body => collectProtocolEdges sid owner body acc
+    | .var _ | .end_ => acc
+
+  private partial def collectProtocolBranchEdges
+      (sid : SessionId) (owner : Role) (branches : List (Label × LocalType))
+      (acc : List Edge) : List Edge :=
+    match branches with
+    | [] => acc
+    | (_, cont) :: rest =>
+        let acc' := collectProtocolEdges sid owner cont acc
+        collectProtocolBranchEdges sid owner rest acc'
+end
+
+private def protocolEdges
+    (sid : SessionId) (localTypes : List (Role × LocalType)) : List Edge :=
+  localTypes.foldl
+    (fun acc entry => collectProtocolEdges sid entry.1 entry.2 acc)
     []
 
-private def handlersCoverEdges (sid : SessionId) (roles : List Role)
+private def handlersCoverEdges (sid : SessionId) (localTypes : List (Role × LocalType))
     (handlers : List (Edge × HandlerId)) : Bool :=
   -- Ensure every session edge is bound to some handler.
-  (allEdges sid roles).all (fun e => handlerBound handlers e)
+  (protocolEdges sid localTypes).all (fun e => handlerBound handlers e)
 
 /-! ### Open Context and Resource Constructors -/
 
@@ -102,7 +153,7 @@ private def mkOpenContext {ν : Type u} [VerificationModel ν]
   let payload := Value.prod (.nat sid) (.string (String.intercalate "," roles))
   let endpoints := roles.map (fun r => { sid := sid, role := r })
   let localTypes := triples.map (fun p => ({ sid := sid, role := p.1 }, p.2.1))
-  let edges := allEdges sid roles
+  let edges := protocolEdges sid (triples.map (fun p => (p.1, p.2.1)))
   let buffers := signedBuffersEnsure bufs edges
   { scope := scope, payload := payload, endpoints := endpoints
   , localTypes := localTypes, edges := edges, buffers := buffers }
@@ -193,9 +244,10 @@ private def openWithTriples {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
   let roles := triples.map (fun p => p.1)
   let dstRegs := triples.map (fun p => p.2.2)
   let pairs := List.zip roles dstRegs
+  let roleTypes := triples.map (fun p => (p.1, p.2.1))
   if st.config.spatialOk roles = false then
     faultPack st coro (.specFault "spatial requirements failed") "spatial requirements failed"
-  else if !handlersCoverEdges sid roles handlers then
+  else if !handlersCoverEdges sid roleTypes handlers then
     faultPack st coro (.specFault "handler bindings missing") "handler bindings missing"
   else
     match writeEndpoints coro.regs sid pairs with

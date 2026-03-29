@@ -275,6 +275,34 @@ mod tests {
             .as_object_mut()
             .expect("semantic objects object")
             .remove("schema_version");
+        let refinement_slice = json!({
+            "coroutines": [
+                {
+                    "coro_id": 0,
+                    "session_id": 0,
+                    "pc": 0,
+                    "status": "ready",
+                    "owned_endpoints": 1,
+                    "progress_tokens": 0
+                }
+            ],
+            "sessions": [
+                {
+                    "sid": 0,
+                    "role_count": 2,
+                    "local_type_entries": 1,
+                    "buffer_edges": 0,
+                    "buffered_messages": 0,
+                    "status": "active",
+                    "epoch": 0
+                }
+            ],
+            "scheduler": {
+                "ready_queue": [0],
+                "blocked": {},
+                "step_count": 1
+            }
+        });
 
         json!({
             "trace": [
@@ -297,6 +325,8 @@ mod tests {
             "step_states": [
                 {
                     "step_index": 0,
+                    "pre_state": refinement_slice.clone(),
+                    "post_state": refinement_slice,
                     "selected_coro": 0,
                     "selected_pc": 0,
                     "exec_status": "continue",
@@ -364,6 +394,8 @@ mod tests {
         assert_eq!(parsed.trace.len(), 1);
         assert_eq!(parsed.sessions.len(), 1);
         assert_eq!(parsed.step_states.len(), 1);
+        assert!(parsed.step_states[0].pre_state.is_some());
+        assert!(parsed.step_states[0].post_state.is_some());
         assert_eq!(
             parsed.semantic_objects.schema_version,
             crate::semantic_objects::canonical_semantic_objects_schema_version()

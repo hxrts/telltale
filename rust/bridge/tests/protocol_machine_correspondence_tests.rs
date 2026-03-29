@@ -235,10 +235,13 @@ fn run_rust_vm(
             topology: None,
         })
         .collect();
-    let effect_exchanges = machine.effect_exchanges().to_vec();
+    let refinement_bundle = machine
+        .claimed_runtime_refinement_bundle()
+        .expect("export claimed runtime refinement bundle");
+    let effect_exchanges = refinement_bundle.effect_exchanges.clone();
 
-    let output_condition_trace = machine
-        .output_condition_checks()
+    let output_condition_trace = refinement_bundle
+        .output_condition_checks
         .iter()
         .map(|c| OutputConditionTraceEvent {
             predicate_ref: c.meta.predicate_ref.clone(),
@@ -249,7 +252,7 @@ fn run_rust_vm(
         .collect();
 
     let semantic_objects = semantic_objects_from_json(
-        serde_json::to_value(machine.semantic_objects()).expect("encode semantic objects"),
+        serde_json::to_value(refinement_bundle.semantic_objects).expect("encode semantic objects"),
     )
     .expect("decode semantic objects into bridge schema");
 

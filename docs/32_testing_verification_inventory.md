@@ -77,17 +77,39 @@ The current proved or proof-backed claimed surface is:
 
 - the Lean `SessionTypes`, `SessionCoTypes`, `Choreography`, `Protocol`, and
   `Runtime` models and theorem libraries
-- the supported DSL subset explicitly described in the property coverage table
-  for parser -> projection -> theory-conversion -> protocol-machine lowering
 - the strict Rust↔Lean correspondence corpora and comparison contracts tracked
   in the Lean correspondence rows below
 - the packaged first-party crates and binaries only at the level of
   operationally checked artifact/release assurance, not full mechanized proof
 
+## Compiler and Macro Claim Boundary
+
+The current public formal-verification claim does not include any Rust parser, lowering, projection, import/export, or macro-expansion entry path.
+More concretely: the current public formal-verification claim does not include any Rust parser, lowering, projection, import/export, or macro-expansion entry path.
+
+For the current claim:
+
+- `parse_choreography_str`, `parse_choreography_file`, `choreography_to_global`,
+  `local_to_local_r`, Rust-side projection/codegen/import-export helpers, and
+  `tell!` macro expansion are outside the formal claim
+- because those entry paths are outside the current formal claim, no
+  compiler-facing theorem-object JSON/import-export path remains on the
+  current claim-critical path
+- those Rust compiler and macro paths are still covered by strict operational
+  gates, especially the compiler-pipeline, projection-equivalence, exact-shape
+  JSON, Lean-validator, and macro-UI suites
+- the exact DSL fragment that would need mechanized compiler proof before the
+  public claim can broaden is the theory-convertible subset already tracked in
+  the property table below: straight-line send/recv, communicated `choice`,
+  `call`, counted `loop`, and guarded recursion
+- `par`, `case/of`, `timeout`, and any other fail-closed or runtime-only forms
+  are outside both the current formal claim and that future proof-target subset
+
 ## Out of Scope / Assumption Boundaries
 
 The current public claim does not include:
 
+- Rust parser/lowering/projection/import-export and `tell!` macro expansion
 - user-supplied handlers, transports, plugins, or deployment adapters
 - third-party infrastructure or deployment environments
 - Cargo, crates.io, git hosting, OS, compiler, and toolchain correctness beyond
@@ -121,11 +143,11 @@ Rust↔Lean refinement slice.
 | Runtime state component | Rust surface | Lean surface | Current refinement status | Note |
 |---|---|---|---|---|
 | Coroutine identity, program counter, status, owned-endpoint count, progress-token count | `rust/machine/src/refinement.rs` (`CoroutineRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteCoroutineSlice`) | exact slice | Compared exactly across cooperative, Lean, and threaded executions today |
-| Session id, role count, local-type entry count, buffered-message count, epoch | `rust/machine/src/refinement.rs` (`SessionRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteSessionSlice`) | exact slice | This is the current session-level refinement surface |
+| Session id, role count, local-type entry count, buffer-edge count, buffered-message count, status tag, epoch | `rust/machine/src/refinement.rs` (`SessionRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteSessionSlice`) | exact slice | The theorem-side session slice now carries the same session-status and buffer-edge surface used by the Rust runtime slice |
 | Scheduler ready queue, blocked-set tags, step count | `rust/machine/src/refinement.rs` (`SchedulerRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteSchedulerSlice`) | exact slice | The canonical scheduler slice is compared exactly today |
-| Per-step event stream, `session_type_counts`, `ready_queue`, and `blocked` snapshots | `rust/bridge/src/protocol_machine_runner.rs` (`ProtocolMachineStepState`) | `lean/Runtime/Tests/ProtocolMachineRunner.lean` step-state JSON export | strict correspondence, not yet part of the proved refinement slice | Deterministic parity exists, but this surface is still compared through the bridge runner rather than covered by the current Lean refinement theorem |
-| Effect exchanges and output-condition trace | `rust/bridge/src/protocol_machine_runner.rs` (`effect_exchanges`, `output_condition_trace`) | Lean runner JSON export and strict bridge suites | strict correspondence, not yet part of the proved refinement slice | Compared in strict lanes, not yet in the concrete refinement theorem |
-| Semantic-object families (handoffs, progress contracts, publications, agreement state, transformation obligations) | `rust/machine/src/engine/runtime_exec/introspection.rs`, `rust/machine/src/threaded/runtime_introspection.rs` | `lean/Runtime/Proofs/ProtocolMachine/SemanticObjects/*` | theorem-backed separately, not yet folded into one full refinement slice | Conservation theorems and strict comparison exist, but Phase 20 is the work to unify them into a single end-to-end runtime refinement claim |
+| Per-step event stream, theorem-defined `pre_state`/`post_state`, selected coroutine/type state, `session_type_counts`, `ready_queue`, and `blocked` snapshots | `rust/bridge/src/protocol_machine_runner.rs` (`ProtocolMachineStepState`), `rust/machine/src/refinement.rs` (`TransitionRefinementSummary`, `ClaimedRuntimeRefinementBundle`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean`, `lean/Runtime/Tests/ProtocolMachineRunner.lean` step-state JSON export | theorem-defined claimed transition surface with exact strict correspondence to Rust | The claim-critical transition object is now defined on the Lean side as a scheduled-step projection carrying pre/post slices, transition summary, and step event projection; Rust is compared against that exact surface, while compiler-layout-specific program counters remain exported for audit/debugging rather than as a separate semantic claim |
+| Effect exchanges and output-condition trace | `rust/bridge/src/protocol_machine_runner.rs` (`effect_exchanges`, `output_condition_trace`) | Lean runner JSON export and strict bridge suites | outside the current claim-critical refinement core | Compared in strict lanes, but the current mechanized runtime-refinement claim is intentionally scoped to the theorem-defined protocol-machine state/transition/event surface above |
+| Semantic-object families (handoffs, progress contracts, publications, agreement state, transformation obligations) | `rust/machine/src/engine/runtime_exec/introspection.rs`, `rust/machine/src/threaded/runtime_introspection.rs` | `lean/Runtime/Proofs/ProtocolMachine/SemanticObjects/*` | theorem-backed separately, outside the current claim-critical refinement core | Conservation theorems and strict comparison exist, but they are tracked as separate theorem families rather than folded into the concrete protocol-machine refinement core |
 
 ## Gate Ownership
 
@@ -170,7 +192,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Artifact / release | Packaged-crate and resume verification | `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | Every publishable crate now goes through the `cargo publish --dry-run --locked --no-verify` packaging path, package-manifest resource paths are checked before packaging, the full packaged crate set is compiled from extracted tarballs, external consumer canaries for `telltale`, `telltale-runtime`, and `telltale-bridge` run outside the workspace layout with exact last-line stdout assertions, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
 | Mutation pressure | Direct fail-closed perturbation suites | `rust/machine/src/runtime_contracts.rs`, `scripts/check/fail-closed-mutations.sh` | Representative bridge payload, theorem-boundary, source-derived docs-row, package-registry, package-manifest, package-resource, and inventory mutations are injected directly against the narrow owning gates so drift is rejected before broader integration lanes run |
 | Concrete refinement | Exact cooperative/Lean/threaded state-slice parity plus Lean proof-connected slice | `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/machine/tests/lean_protocol_machine_equivalence.rs`, `rust/machine/tests/threaded_equivalence.rs` | The first concrete protocol-machine refinement slice now compares coroutine/session/scheduler state exactly across Rust, Lean, and canonical threaded execution, exports bounded `u64` bridge fields fail-closed, and is connected to dedicated Lean refinement theorems over the same slice |
-| Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | The supported DSL subset now runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes; bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |
+| Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | This pipeline is operationally checked, not part of the current formal claim: the supported DSL subset runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes, and bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |
 | Deadlock automation | Lean-sound regular-fragment checker mirrored into Rust diagnostics | `rust/types/src/local.rs`, `rust/bridge/tests/regular_practical_fragment_checks.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | The automatic deadlock-discharge fragment is now mechanically characterized as closed + contractive projected locals whose full unfold exposes send/recv, checked first in Lean on `SessionTypes.LocalTypeR`, mirrored in Rust only for macro/proof-status diagnostics, and exercised end to end through bridge parity and generated `proof_status` surfaces |
 | Public docs as contract | Source-derived capability/admission, authority-support, and trust-surface tables | `rust/tests/docs_contract_tests.rs`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh` | The highest-value public verification/capability docs now separate source-derived tables from explanatory prose, and those rows are checked mechanically against runtime-contract, DSL-tier, and bridge-ledger facts |
 | Deterministic scale budgets | Larger supported corpora with structural size envelopes | `rust/bridge/tests/scale_budget_contracts.rs` | Larger lowering/projection corpora, longer record/replay histories, larger reconfiguration snapshots, and larger Lean bridge payloads now run as deterministic structural-budget gates with exact replay/snapshot equality and explicit serialized-size envelopes rather than ambient wall-clock benchmarks |

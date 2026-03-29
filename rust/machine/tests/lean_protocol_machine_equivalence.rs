@@ -12,7 +12,7 @@ use telltale_bridge::{
 };
 use telltale_machine::trace::normalize_trace;
 use telltale_machine::ObsEvent;
-use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineRefinementSlice};
 use telltale_types::{GlobalType, Label};
 
 use test_support::PassthroughHandler;
@@ -21,6 +21,28 @@ fn strict_protocol_machine_runner_required() -> bool {
     std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
         .map(|value| value != "0")
         .unwrap_or(false)
+}
+
+fn canonicalize_state_for_cross_target(
+    slice: &ProtocolMachineRefinementSlice,
+) -> ProtocolMachineRefinementSlice {
+    let mut canonical = slice.clone();
+    let ready: std::collections::BTreeSet<u64> =
+        canonical.scheduler.ready_queue.iter().copied().collect();
+    for coroutine in &mut canonical.coroutines {
+        coroutine.pc = 0;
+        match coroutine.status.as_str() {
+            "done" | "faulted" | "speculating" => {}
+            _ if canonical.scheduler.blocked.contains_key(&coroutine.coro_id) => {
+                coroutine.status = "blocked".to_string();
+            }
+            _ if ready.contains(&coroutine.coro_id) => {
+                coroutine.status = "ready".to_string();
+            }
+            _ => {}
+        }
+    }
+    canonical
 }
 
 #[test]
@@ -79,7 +101,8 @@ fn test_lean_semantic_audit_matches_rust() {
         return;
     }
 
-    let image = test_support::simple_send_recv_image("A", "B", "msg");
+    let image = test_support::code_image_from_global(&global)
+        .expect("projected code image should exist for the test global");
     let handler = PassthroughHandler;
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     machine.load_choreography(&image).expect("load image");
@@ -121,25 +144,66 @@ fn test_lean_semantic_audit_matches_rust() {
     assert_eq!(lean_trace, rust_trace, "Lean and Rust traces diverged");
 
     let rust_slice = machine.refinement_slice().expect("export refinement slice");
-    let rust_session_type_counts = rust_slice
-        .sessions
-        .iter()
-        .map(|session| (session.sid, session.local_type_entries))
-        .collect::<std::collections::BTreeMap<_, _>>();
-    let rust_buffered_message_counts = rust_slice
-        .sessions
-        .iter()
-        .map(|session| (session.sid, session.buffered_messages))
-        .collect::<std::collections::BTreeMap<_, _>>();
+    let rust_transition = machine
+        .transition_refinement_summary()
+        .expect("export transition refinement summary");
     let lean_last_step = lean_out
         .step_states
         .last()
         .expect("lean run should export final step state");
-    assert_eq!(lean_last_step.session_type_counts, rust_session_type_counts);
+    assert_eq!(lean_last_step.selected_coro, rust_transition.selected_coro);
+    assert_eq!(lean_last_step.exec_status, rust_transition.exec_status);
+    assert_eq!(
+        lean_last_step.session_type_counts,
+        rust_transition.session_type_counts
+    );
     assert_eq!(
         lean_last_step.buffered_message_counts,
-        rust_buffered_message_counts
+        rust_transition.buffered_message_counts
+    );
+    assert_eq!(lean_last_step.ready_queue, rust_transition.ready_queue);
+    assert_eq!(lean_last_step.blocked, rust_transition.blocked);
+    assert_eq!(
+        lean_last_step
+            .post_state
+            .as_ref()
+            .map(canonicalize_state_for_cross_target),
+        Some(canonicalize_state_for_cross_target(&rust_slice)),
+        "Lean post-step refinement slice diverged from Rust runtime slice"
     );
     assert_eq!(lean_last_step.ready_queue, rust_slice.scheduler.ready_queue);
     assert_eq!(lean_last_step.blocked, rust_slice.scheduler.blocked);
+}
+
+#[test]
+fn claimed_runtime_refinement_bundle_matches_component_exports() {
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let image = test_support::code_image_from_global(&global)
+        .expect("projected code image should exist for the test global");
+    let handler = PassthroughHandler;
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load image");
+    machine.run(&handler, 50).expect("run machine");
+
+    let bundle = machine
+        .claimed_runtime_refinement_bundle()
+        .expect("export claimed runtime refinement bundle");
+
+    assert_eq!(
+        bundle.state,
+        machine.refinement_slice().expect("export refinement slice")
+    );
+    assert_eq!(
+        bundle.transition,
+        machine
+            .transition_refinement_summary()
+            .expect("export transition summary")
+    );
+    assert_eq!(bundle.effect_exchanges, machine.effect_exchanges().to_vec());
+    assert_eq!(
+        bundle.output_condition_checks,
+        machine.output_condition_checks().to_vec()
+    );
+    assert_eq!(bundle.semantic_objects, machine.semantic_objects());
+    assert_eq!(bundle.semantic_audit, machine.semantic_audit_log());
 }

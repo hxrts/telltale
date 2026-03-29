@@ -1,4 +1,6 @@
 import Runtime.ProtocolMachine.Semantics.ExecHelpers
+import Runtime.ProtocolMachine.Runtime.SchedulerStep
+import Runtime.ProtocolMachine.Runtime.Runner
 import Runtime.Proofs.ProtocolMachine.InstrSpec.ConfigEquivSendRecv
 import Runtime.Proofs.ProtocolMachine.Scheduler
 import Runtime.Proofs.SchedulerApi
@@ -48,7 +50,9 @@ structure ConcreteSessionSlice where
   sid : SessionId
   roleCount : Nat
   localTypeCount : Nat
+  bufferEdgeCount : Nat
   bufferedMessageCount : Nat
+  statusTag : String
   epoch : Nat
   deriving Repr, DecidableEq
 
@@ -63,6 +67,36 @@ structure ConcreteProtocolMachineSlice where
   sessions : List ConcreteSessionSlice
   scheduler : ConcreteSchedulerSlice
   deriving Repr, DecidableEq
+
+structure ConcreteTransitionSlice where
+  selectedCoro : CoroutineId
+  selectedPc : Nat
+  selectedType : Option LocalType
+  execStatusTag : String
+  sessionTypeCounts : List (SessionId × Nat)
+  bufferedMessageCounts : List (SessionId × Nat)
+  readyQueue : List CoroutineId
+  blocked : List (CoroutineId × String)
+  deriving Repr
+
+structure ConcreteTraceEvent where
+  kind : String
+  tick : Nat
+  session : Option SessionId := none
+  sender : Option String := none
+  receiver : Option String := none
+  label : Option String := none
+  role : Option String := none
+  target : Option String := none
+  reason : Option String := none
+  deriving Repr, DecidableEq
+
+structure ConcreteScheduledStep where
+  preState : ConcreteProtocolMachineSlice
+  postState : ConcreteProtocolMachineSlice
+  transition : ConcreteTransitionSlice
+  event : Option ConcreteTraceEvent
+  deriving Repr
 
 def concreteCoroStatusTag : CoroStatus γ → String
   | .ready => "ready"
@@ -95,7 +129,13 @@ def projectConcreteSessionSlice (entry : SessionId × SessionState ν) : Concret
   { sid := entry.1
   , roleCount := entry.2.roles.length
   , localTypeCount := entry.2.localTypes.length
+  , bufferEdgeCount := entry.2.buffers.length
   , bufferedMessageCount := entry.2.buffers.foldl (fun acc p => acc + p.2.length) 0
+  , statusTag := match entry.2.phase with
+      | .opening => "draining"
+      | .active => "active"
+      | .closing => "draining"
+      | .closed => "closed"
   , epoch := entry.2.epoch
   }
 
@@ -105,6 +145,169 @@ def projectConcreteSchedulerSlice (sched : SchedState γ) : ConcreteSchedulerSli
   , stepCount := sched.stepCount
   }
 
+def concreteExecStatusTag : ExecStatus γ → String
+  | .continue => "continue"
+  | .yielded => "yielded"
+  | .blocked _ => "blocked"
+  | .halted => "halted"
+  | .faulted _ => "faulted"
+  | .spawned _ => "spawned"
+  | .transferred _ _ => "transferred"
+  | .closed _ => "closed"
+  | .forked _ => "forked"
+  | .joined => "joined"
+  | .aborted => "aborted"
+
+def concreteFaultTag : Fault γ → String
+  | .typeViolation expected actual =>
+      s!"type_violation:{reprStr expected}->{reprStr actual}"
+  | .unknownLabel lbl => s!"unknown_label:{lbl}"
+  | .channelClosed ep => s!"channel_closed:{ep.role}"
+  | .invalidSignature edge => s!"invalid_signature:{edge.sender}->{edge.receiver}"
+  | .acquireFault _ msg => s!"acquire_fault:{msg}"
+  | .invokeFault msg => s!"invoke_fault:{msg}"
+  | .transferFault msg => s!"transfer_fault:{msg}"
+  | .closeFault msg => s!"close_fault:{msg}"
+  | .specFault msg => s!"spec_fault:{msg}"
+  | .flowViolation msg => s!"flow_violation:{msg}"
+  | .noProgressToken edge => s!"no_progress_token:{edge.sender}->{edge.receiver}"
+  | .outOfCredits => "out_of_credits"
+  | .outOfRegisters => "out_of_registers"
+
+def projectConcreteObsEvent?
+    (tick : Nat)
+    (ev : ObsEvent ε) : Option ConcreteTraceEvent :=
+  match ev with
+  | .sent edge val _seqNo =>
+      let label :=
+        match val with
+        | .string s => some s
+        | _ => none
+      some
+        { kind := "sent"
+        , tick := tick
+        , session := some edge.sid
+        , sender := some edge.sender
+        , receiver := some edge.receiver
+        , label := label }
+  | .received edge val _seqNo =>
+      let label :=
+        match val with
+        | .string s => some s
+        | _ => none
+      some
+        { kind := "received"
+        , tick := tick
+        , session := some edge.sid
+        , sender := some edge.sender
+        , receiver := some edge.receiver
+        , label := label }
+  | .offered edge lbl =>
+      some
+        { kind := "sent"
+        , tick := tick
+        , session := some edge.sid
+        , sender := some edge.sender
+        , receiver := some edge.receiver
+        , label := some lbl }
+  | .chose edge lbl =>
+      some
+        { kind := "received"
+        , tick := tick
+        , session := some edge.sid
+        , sender := some edge.sender
+        , receiver := some edge.receiver
+        , label := some lbl }
+  | .opened sid roles =>
+      some
+        { kind := "opened"
+        , tick := tick
+        , session := some sid
+        , role := some (String.intercalate "," roles) }
+  | .closed sid =>
+      some
+        { kind := "closed"
+        , tick := tick
+        , session := some sid }
+  | _ => none
+
+def projectConcreteTraceEvent?
+    (tick cid : Nat)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε)) : Option ConcreteTraceEvent :=
+  match ev with
+  | some (.obs obs) => projectConcreteObsEvent? tick obs
+  | _ =>
+      match status with
+      | .halted =>
+          some
+            { kind := "halted"
+            , tick := tick
+            , target := some (toString cid) }
+      | .faulted err =>
+          some
+            { kind := "faulted"
+            , tick := tick
+            , target := some (toString cid)
+            , reason := some (concreteFaultTag err) }
+      | _ => none
+
+theorem project_concrete_trace_event_obs
+    (tick cid : Nat)
+    (status : ExecStatus γ)
+    (obs : ObsEvent ε) :
+    projectConcreteTraceEvent? tick cid status (some (StepEvent.obs obs)) =
+      projectConcreteObsEvent? tick obs := by
+  simp [projectConcreteTraceEvent?]
+
+theorem append_event_obs_trace_shape
+    (st : ProtocolMachineState ι γ π ε ν)
+    (obs : ObsEvent ε) :
+    (appendEvent st (some (StepEvent.obs obs))).obsTrace =
+      st.obsTrace ++ [{ tick := st.clock, event := obs }] := by
+  simp [appendEvent]
+
+theorem project_concrete_trace_event_obs_matches_appended_trace
+    (st : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (obs : ObsEvent ε) :
+    projectConcreteTraceEvent? st.clock cid status (some (StepEvent.obs obs)) =
+      ((appendEvent st (some (StepEvent.obs obs))).obsTrace.reverse.head?.map
+        (fun ev => projectConcreteObsEvent? ev.tick ev.event)).join := by
+  rw [append_event_obs_trace_shape]
+  simp [project_concrete_trace_event_obs]
+
+def projectSessionTypeCounts (sessions : SessionStore ν) : List (SessionId × Nat) :=
+  sessions.map (fun entry => (entry.1, entry.2.localTypes.length))
+
+def projectBufferedMessageCounts (sessions : SessionStore ν) : List (SessionId × Nat) :=
+  sessions.map (fun entry =>
+    (entry.1, entry.2.buffers.foldl (fun acc p => acc + p.2.length) 0))
+
+def projectSelectedEndpointType?
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) : Option LocalType :=
+  match st.coroutines[cid]? with
+  | none => none
+  | some coro =>
+      match coro.regs[0]? with
+      | some (Value.chan ep) => SessionStore.lookupType st.sessions ep
+      | _ => none
+
+def projectConcreteTransitionSlice
+    (st : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ) : ConcreteTransitionSlice :=
+  { selectedCoro := cid
+  , selectedPc := match st.coroutines[cid]? with | some coro => coro.pc | none => 0
+  , selectedType := projectSelectedEndpointType? st cid
+  , execStatusTag := concreteExecStatusTag status
+  , sessionTypeCounts := projectSessionTypeCounts st.sessions
+  , bufferedMessageCounts := projectBufferedMessageCounts st.sessions
+  , readyQueue := st.sched.readyQueue
+  , blocked := st.sched.blockedSet.toList.map (fun p => (p.1, concreteBlockReasonTag p.2))
+  }
+
 def projectConcreteProtocolMachineSlice
     (st : ProtocolMachineState ι γ π ε ν) : ConcreteProtocolMachineSlice :=
   { coroutines := st.coroutines.toList.map projectConcreteCoroutineSlice
@@ -112,11 +315,173 @@ def projectConcreteProtocolMachineSlice
   , scheduler := projectConcreteSchedulerSlice st.sched
   }
 
+def mkConcreteScheduledStep
+    (tick : Nat)
+    (pre post : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε)) : ConcreteScheduledStep :=
+  { preState := projectConcreteProtocolMachineSlice pre
+  , postState := projectConcreteProtocolMachineSlice post
+  , transition := projectConcreteTransitionSlice post cid status
+  , event := projectConcreteTraceEvent? tick cid status ev
+  }
+
+def projectConcreteScheduledStep?
+    (st : ProtocolMachineState ι γ π ε ν) : Option ConcreteScheduledStep :=
+  match schedule st with
+  | none => none
+  | some (cid, stSched) =>
+      let (stExec, res) := execInstr stSched cid
+      let sched' := updateAfterStep stExec.sched cid res.status
+      let stNext : ProtocolMachineState ι γ π ε ν := { stExec with sched := sched' }
+      some (mkConcreteScheduledStep st.clock st stNext cid res.status res.event)
+
+theorem project_concrete_scheduled_step_none_iff
+    (st : ProtocolMachineState ι γ π ε ν) :
+    projectConcreteScheduledStep? st = none ↔ schedule st = none := by
+  cases hSched : schedule st with
+  | none =>
+      simp [projectConcreteScheduledStep?, hSched]
+  | some pair =>
+      simp [projectConcreteScheduledStep?, hSched]
+
+theorem project_concrete_scheduled_step_some
+    (st stSched stExec stNext : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε))
+    (hSchedule : schedule st = some (cid, stSched))
+    (hExec : execInstr stSched cid = (stExec, { status := status, event := ev }))
+    (hNext : stNext = { stExec with sched := updateAfterStep stExec.sched cid status }) :
+    projectConcreteScheduledStep? st =
+      some (mkConcreteScheduledStep st.clock st stNext cid status ev) := by
+  subst hNext
+  unfold projectConcreteScheduledStep?
+  simp [hSchedule, hExec]
+
+theorem project_concrete_scheduled_step_post_state_eq_sched_step
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map ConcreteScheduledStep.postState (projectConcreteScheduledStep? st) =
+      Option.map projectConcreteProtocolMachineSlice (schedStep st) := by
+  unfold projectConcreteScheduledStep? schedStep
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep]
+
+theorem project_concrete_scheduled_step_pre_state_eq_schedule_source
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map ConcreteScheduledStep.preState (projectConcreteScheduledStep? st) =
+      (match schedule st with
+      | none => none
+      | some _ => some (projectConcreteProtocolMachineSlice st)) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+    | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep]
+
+def concreteSessionTypeCountsOfStateSlice
+    (slice : ConcreteProtocolMachineSlice) : List (SessionId × Nat) :=
+  slice.sessions.map (fun sess => (sess.sid, sess.localTypeCount))
+
+def concreteBufferedMessageCountsOfStateSlice
+    (slice : ConcreteProtocolMachineSlice) : List (SessionId × Nat) :=
+  slice.sessions.map (fun sess => (sess.sid, sess.bufferedMessageCount))
+
 theorem project_concrete_scheduler_slice_syncLaneViews
     (sched : SchedState γ) :
     projectConcreteSchedulerSlice (syncLaneViews sched) =
       projectConcreteSchedulerSlice sched := by
   simp [projectConcreteSchedulerSlice, syncLaneViews]
+
+theorem project_transition_ready_queue_eq_state_slice
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (status : ExecStatus γ) :
+    (projectConcreteTransitionSlice st cid status).readyQueue =
+      (projectConcreteProtocolMachineSlice st).scheduler.readyQueue := by
+  rfl
+
+theorem project_transition_selected_pc_eq_state
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (status : ExecStatus γ) :
+    (projectConcreteTransitionSlice st cid status).selectedPc =
+      match st.coroutines[cid]? with
+      | some coro => coro.pc
+      | none => 0 := by
+  rfl
+
+theorem project_transition_selected_type_eq_lookup
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (status : ExecStatus γ) :
+    (projectConcreteTransitionSlice st cid status).selectedType =
+      projectSelectedEndpointType? st cid := by
+  rfl
+
+theorem project_transition_blocked_eq_state_slice
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (status : ExecStatus γ) :
+    (projectConcreteTransitionSlice st cid status).blocked =
+      (projectConcreteProtocolMachineSlice st).scheduler.blocked := by
+  rfl
+
+theorem project_transition_session_type_counts_eq_state_slice
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (status : ExecStatus γ) :
+    (projectConcreteTransitionSlice st cid status).sessionTypeCounts =
+      concreteSessionTypeCountsOfStateSlice (projectConcreteProtocolMachineSlice st) := by
+  simp [projectConcreteTransitionSlice, projectConcreteProtocolMachineSlice,
+    concreteSessionTypeCountsOfStateSlice, projectSessionTypeCounts, projectConcreteSessionSlice]
+
+theorem project_transition_buffered_message_counts_eq_state_slice
+    (st : ProtocolMachineState ι γ π ε ν) (cid : CoroutineId) (status : ExecStatus γ) :
+    (projectConcreteTransitionSlice st cid status).bufferedMessageCounts =
+      concreteBufferedMessageCountsOfStateSlice (projectConcreteProtocolMachineSlice st) := by
+  simp [projectConcreteTransitionSlice, projectConcreteProtocolMachineSlice,
+    concreteBufferedMessageCountsOfStateSlice, projectBufferedMessageCounts,
+    projectConcreteSessionSlice]
+
+theorem mk_concrete_scheduled_step_pre_state
+    (tick : Nat)
+    (pre post : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε)) :
+    (mkConcreteScheduledStep tick pre post cid status ev).preState =
+      projectConcreteProtocolMachineSlice pre := by
+  rfl
+
+theorem mk_concrete_scheduled_step_post_state
+    (tick : Nat)
+    (pre post : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε)) :
+    (mkConcreteScheduledStep tick pre post cid status ev).postState =
+      projectConcreteProtocolMachineSlice post := by
+  rfl
+
+theorem mk_concrete_scheduled_step_transition
+    (tick : Nat)
+    (pre post : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε)) :
+    (mkConcreteScheduledStep tick pre post cid status ev).transition =
+      projectConcreteTransitionSlice post cid status := by
+  rfl
+
+theorem mk_concrete_scheduled_step_event
+    (tick : Nat)
+    (pre post : ProtocolMachineState ι γ π ε ν)
+    (cid : CoroutineId)
+    (status : ExecStatus γ)
+    (ev : Option (StepEvent ε)) :
+    (mkConcreteScheduledStep tick pre post cid status ev).event =
+      projectConcreteTraceEvent? tick cid status ev := by
+  rfl
 
 theorem concrete_send_slice_preserves_coherent
     {G G' : GEnv} {D D' : DEnv}
@@ -144,13 +509,6 @@ theorem concrete_scheduler_slice_cooperative_refines_concurrent
     (st : ProtocolMachineState ι γ π ε ν) :
     cooperative_refines_concurrent st :=
   cooperative_refines_concurrent_holds st
-
-theorem concrete_slice_scheduler_iris_invariant_from_bundle [Telltale.TelltaleIris]
-    {st₀ : ProtocolMachineState ι γ π ε ν}
-    (bundle : Runtime.Proofs.ProtocolMachineSchedulerBundle st₀) :
-    Runtime.Proofs.SchedulerIrisInvariant
-      (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀ :=
-  Runtime.Proofs.scheduler_iris_invariant_from_bundle bundle
 
 theorem concrete_slice_threaded_one_refines_canonical
     (fuel : Nat) (st : ProtocolMachineState ι γ π ε ν) :

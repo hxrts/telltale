@@ -3,6 +3,10 @@
 //! This crate provides derive macros and attribute macros for defining
 //! session-typed protocols in Telltale. It includes:
 //!
+//! These macros are public convenience surfaces, not part of the current
+//! formal-verification claim. They are covered by strict operational and UI
+//! regression gates rather than a mechanized macro-correctness proof today.
+//!
 //! - `#[derive(Message)]` - Derive message trait implementations
 //! - `#[derive(Role)]` - Derive role trait implementations with routing
 //! - `#[derive(Roles)]` - Derive roles container with automatic channel setup
