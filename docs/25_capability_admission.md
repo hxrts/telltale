@@ -86,10 +86,33 @@ The theorem-pack inventory publishes machine-readable capability keys.
 | protocol safety and liveness | `termination`, `output_condition_soundness` |
 | distributed impossibility and safety | `flp_impossibility`, `cap_impossibility`, `quorum_geometry_safety` |
 | distributed deployment families | `partial_synchrony_liveness`, `reconfiguration_safety`, `atomic_broadcast_ordering` |
-| advanced envelope families | `consensus_envelope`, `failure_envelope`, `vm_envelope_adherence`, `vm_envelope_admission`, `protocol_envelope_bridge` |
+| advanced envelope families | `consensus_envelope`, `failure_envelope`, `protocol_machine_envelope_adherence`, `protocol_machine_envelope_admission`, `protocol_envelope_bridge` |
 | classical transport families | `classical_foster`, `classical_maxweight`, `classical_ldp`, `classical_functional_clt` |
 
 Rust capability snapshots should align with this inventory for release and admission claims.
+
+## Transported Theorem Boundary
+
+Not every transported theorem family influences shipped runtime admission.
+Telltale now tracks that boundary explicitly in Lean and Rust.
+
+| Usage class | Meaning | Current examples |
+|---|---|---|
+| `runtime_critical_instantiated_premise` | materially influences a shipped runtime gate/guarantee surface | `protocol_machine_envelope_adherence`, `protocol_machine_envelope_admission`, `protocol_envelope_bridge` |
+| `black_box_premise_only` | used by verifier/reporting surfaces, but not consumed directly by shipped Rust runtime admission | `flp_impossibility`, `quorum_geometry_safety`, `failure_envelope` |
+| `documentation_background_only` | carried for theorem-program inventory/docs only | `classical_foster`, `classical_functional_clt` |
+
+The canonical ledger lives in:
+
+- `lean/Runtime/Proofs/TheoremPack/AdmissionBoundary.lean`
+- `rust/machine/src/runtime_contracts.rs`
+
+One runtime-critical theorem family is intentionally marked as a boundary rather
+than a shipped Rust admission dependency today:
+
+- `byzantine_safety_characterization` is consumed by a Lean theorem-pack gate
+  alias, but Rust runtime admission does not currently use it. That gap is now
+  explicit rather than implicit.
 
 ## Composition Admission
 

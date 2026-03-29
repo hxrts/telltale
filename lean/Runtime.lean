@@ -33,6 +33,7 @@ import Runtime.Proofs.ProtocolMachine.Speculation
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Classical
+import Runtime.Proofs.TheoremPack.AdmissionBoundary
 import Runtime.Proofs.TheoremPack.API
 import Runtime.Proofs.SchedulerTheoremPack
 import IrisExtractionInstance

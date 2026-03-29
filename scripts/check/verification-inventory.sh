@@ -101,6 +101,7 @@ simulator_semantic_contract_categories=(
 theorem_pack_admission_suites=(
   rust/bridge/tests/protocol_bundle_admission_contracts.rs
   rust/bridge/tests/invariant_verification.rs
+  rust/machine/src/runtime_contracts.rs
   rust/tests/dsl_runtime_semantics_tests.rs
 )
 

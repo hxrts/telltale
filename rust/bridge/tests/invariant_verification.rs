@@ -79,6 +79,88 @@ fn test_verify_protocol_bundle_support_matrix_is_explicit() {
 }
 
 #[test]
+fn test_verify_protocol_bundle_emits_transported_theorem_boundary_inventory() {
+    let fixture = test_choreographies::tier3_distributed::simple_majority();
+    let result = verify_bundle(&fixture.to_bundle()).expect("support probe should not hard-fail");
+    let result = match result {
+        BundleVerificationOutcome::Verified(result) => result,
+    };
+
+    let boundary = result
+        .artifacts
+        .get("transported_theorem_boundary")
+        .and_then(serde_json::Value::as_array)
+        .expect("verifyProtocolBundle should emit transported theorem boundary artifacts");
+    assert!(
+        !boundary.is_empty(),
+        "transported theorem boundary ledger must not be empty"
+    );
+
+    let rust_runtime_keys = result
+        .artifacts
+        .get("rust_runtime_critical_transport_theorem_keys")
+        .and_then(serde_json::Value::as_array)
+        .expect("verifyProtocolBundle should emit Rust runtime theorem keys");
+    let rust_runtime_keys: Vec<_> = rust_runtime_keys
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .expect("runtime theorem key entries must be strings")
+        })
+        .collect();
+    assert_eq!(
+        rust_runtime_keys,
+        vec![
+            "protocol_machine_envelope_adherence",
+            "protocol_machine_envelope_admission",
+            "protocol_envelope_bridge",
+        ]
+    );
+    assert_eq!(
+        result
+            .artifacts
+            .get("runtime_critical_transport_theorems_explicit")
+            .and_then(serde_json::Value::as_bool),
+        Some(true),
+        "runtime-critical theorem boundary must fail closed when assumption markers disappear",
+    );
+
+    let byzantine = boundary
+        .iter()
+        .find(|entry| {
+            entry.get("key").and_then(serde_json::Value::as_str)
+                == Some("byzantine_safety_characterization")
+        })
+        .expect("transported theorem boundary should classify byzantine safety");
+    assert_eq!(
+        byzantine
+            .get("usage_class")
+            .and_then(serde_json::Value::as_str),
+        Some("runtime_critical_instantiated_premise")
+    );
+    assert_eq!(
+        byzantine
+            .get("consumed_by_rust_runtime_admission")
+            .and_then(serde_json::Value::as_bool),
+        Some(false)
+    );
+    assert_eq!(
+        byzantine
+            .get("consumed_by_lean_runtime_gate")
+            .and_then(serde_json::Value::as_bool),
+        Some(true)
+    );
+    assert!(
+        byzantine
+            .get("assumption_boundary")
+            .and_then(serde_json::Value::as_str)
+            .is_some(),
+        "Lean-only runtime-critical theorem gates must carry explicit assumption markers",
+    );
+}
+
+#[test]
 fn test_lean_verifies_valid_quorum_protocol() {
     let fixture = test_choreographies::tier3_distributed::simple_majority();
     let Some(result) = verified_result_or_skip(verify_bundle(&fixture.to_bundle())) else {

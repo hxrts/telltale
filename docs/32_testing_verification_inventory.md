@@ -14,8 +14,8 @@ When one of these values changes legitimately:
 
 | Metric | Value | Source |
 |---|---:|---|
-| Lean core-library files | 650 | `lean/CODE_MAP.md` total row |
-| Lean core-library lines | 132,260 | `lean/CODE_MAP.md` total row |
+| Lean core-library files | 651 | `lean/CODE_MAP.md` total row |
+| Lean core-library lines | 132,553 | `lean/CODE_MAP.md` total row |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 6 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
@@ -34,7 +34,7 @@ When one of these values changes legitimately:
 | Deterministic adversarial lifecycle scenarios | 10 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | End-to-end DSL runtime semantic conformance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Simulator semantic contract categories enforced automatically | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Theorem-pack and admission executable assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Theorem-pack and admission executable assurance suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Distributed and topology semantic harness suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Agreement and composition runtime semantic suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Extension and middleware semantic hardening suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -66,7 +66,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Structure | Deterministic runtime structure suite | `rust/machine/src/engine/runtime_exec/semantic_state.rs`, `rust/machine/tests/ownership_contracts.rs`, `rust/machine/src/composition.rs`, `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/runtime/tests/generated_topology_public_path.rs` | Structural handoff locality, transformation obligations, pre-transfer witness invalidation, generated topology validation, executable region inheritance/conflict checks, bridge-to-runtime reconfiguration admission, atomic multi-step plan execution, canonical placement/transport-boundary phase artifacts, deterministic reconfiguration history, snapshot/restore state, and Lean-validated transition artifacts are now exercised on executable runtime paths |
 | Premise | Fail-closed + admission checks | `rust/machine/src/runtime_contracts.rs`, `rust/machine/src/composition.rs`, `rust/language/src/compiler/parser/mod.rs`, `rust/runtime/tests/authority_compile_fail.rs`, `rust/runtime/tests/authority_control_flow_corpus.rs` | Assumption-heavy paths are rejected or gated, and the authority/control-flow boundary is now exercised with deterministic accepted/rejected `.tell` and `tell!` fixtures |
 | Premise | End-to-end supported/fail-closed lowering | `rust/tests/dsl_runtime_semantics_tests.rs` | The theory-backed supported subset is explicit and executable: `choice`, `call`, counted `loop`, and recursion remain parser -> projection -> theory-conversion -> protocol-machine clean. `par`, `case/of`, and `timeout` stay outside that theory-convertible subset and are covered through the executable/runtime and boundary suites above |
-| Admission | Theorem-pack and bundle assurance | `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/bridge/tests/invariant_verification.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Proof-bundle declarations, capability drops, and admission-gated runtime requests are now exercised end to end with stable diagnostics |
+| Admission | Theorem-pack and bundle assurance | `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/bridge/tests/invariant_verification.rs`, `rust/machine/src/runtime_contracts.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Proof-bundle declarations, capability drops, admission-gated runtime requests, and the explicit transported-theorem boundary ledger are now exercised end to end with stable diagnostics; runtime-critical instantiated premises are separated from Lean-only assumption boundaries and black-box/background theorem inventory |
 | Distributed topology | Deterministic harness | `rust/simulator/tests/distributed.rs`, `rust/machine/tests/topology_effect_ingress.rs`, `rust/runtime/tests/generated_topology_public_path.rs` | Distributed replay, ordered topology ingress, generated helpers, and invalid placement rejection now run through executable runtime paths without ambient network dependency |
 | Agreement | Runtime commitment semantics | `rust/machine/src/effect/core_types.rs`, `rust/machine/src/semantic_objects.rs`, `rust/machine/tests/threaded_equivalence.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Agreement profiles and child-effect rollups are checked as runtime semantics across scenario tables, lowering, and cross-driver parity |
 | Extension boundary | Deterministic parse-to-runtime dispatch + middleware stacks | `rust/runtime/tests/extension_integration.rs`, `rust/runtime/tests/middleware_semantic_hardening.rs` | Registered statement rules now parse into `Protocol::Extension`, lower into runtime extension effects, execute through deterministic extensible handlers, fail with stable diagnostics when handlers are missing or payloads are malformed, and remain middleware-safe under retry, metrics, trace, and seeded fault injection |

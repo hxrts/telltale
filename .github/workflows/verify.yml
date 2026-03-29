@@ -102,6 +102,11 @@ jobs:
           mkdir -p artifacts
           just check-concrete-refinement | tee artifacts/check-concrete-refinement.log
 
+      - name: Run transported theorem boundary suites
+        run: |
+          mkdir -p artifacts
+          just check-transported-theorem-boundary | tee artifacts/check-transported-theorem-boundary.log
+
       - name: Run handler contract suites
         run: |
           mkdir -p artifacts
@@ -251,6 +256,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-authority-metatheory | tee artifacts/check-authority-metatheory.log
+
+      - name: Run transported theorem boundary suites
+        run: |
+          mkdir -p artifacts
+          just check-transported-theorem-boundary | tee artifacts/check-transported-theorem-boundary.log
 
       - name: Run handler contract suites
         run: |

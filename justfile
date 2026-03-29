@@ -73,6 +73,7 @@ ci-dry-run lane="fast":
     just check-deadlock-automation
     just check-authority-metatheory
     just check-concrete-refinement
+    just check-transported-theorem-boundary
     just check-handler-contracts
     just check-extension-dispatch
     just check-semantic-assurance
@@ -314,6 +315,13 @@ check-concrete-refinement:
     cargo test -p telltale-machine --test lean_protocol_machine_equivalence -- --nocapture
     cargo test -p telltale-machine test_reschedule_moves_selected_coro_to_back_of_ready_queue -- --nocapture
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence test_refinement_slices_match_across_drivers_at_canonical_concurrency -- --exact --nocapture
+
+# Keep the transported-theorem admission boundary explicit across Lean, Rust, and bridge artifacts.
+check-transported-theorem-boundary:
+    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build Runtime.Proofs.TheoremPack.AdmissionBoundary
+    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build protocol_machine_runner
+    cargo test -p telltale-machine transported_theorem_boundary_ -- --nocapture
+    cargo test -p telltale-bridge --test invariant_verification test_verify_protocol_bundle_emits_transported_theorem_boundary_inventory -- --exact --nocapture
 
 # Run the DSL -> lowering -> export/import -> Lean projection compiler pipeline suites.
 check-compiler-pipeline:

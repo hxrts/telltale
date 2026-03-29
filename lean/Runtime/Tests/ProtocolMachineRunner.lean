@@ -7,6 +7,7 @@ import Runtime.ProtocolMachine.Runtime.Runner
 import Runtime.ProtocolMachine.Runtime.Scheduler
 import Runtime.ProtocolMachine.Runtime.Monitor
 import Runtime.Proofs.ProtocolMachine.Monitor
+import Runtime.Proofs.TheoremPack.API
 import Runtime.ProtocolMachine.Semantics.Exec
 import Choreography.Projection.Json
 import Choreography.Projection.Project.Primitive
@@ -772,6 +773,35 @@ def optionalStringField? (value : Json) (field : String) : Option String :=
       | .error _ => none
   | .error _ => none
 
+def transportedTheoremUsageClassJson
+    (usage : Runtime.Proofs.TheoremPackAPI.TransportedTheoremUsageClass) : Json :=
+  Json.str <|
+    match usage with
+    | .blackBoxPremiseOnly => "black_box_premise_only"
+    | .runtimeCriticalInstantiatedPremise => "runtime_critical_instantiated_premise"
+    | .documentationBackgroundOnly => "documentation_background_only"
+
+def transportedTheoremBoundaryJson : Json :=
+  Json.arr <|
+    (Runtime.Proofs.TheoremPackAPI.transportedTheoremBoundaryInventory.map
+      (fun (entry : Runtime.Proofs.TheoremPackAPI.TransportedTheoremBoundaryEntry) =>
+        Json.mkObj <|
+          [ ("key", Json.str entry.key)
+          , ("usage_class", transportedTheoremUsageClassJson entry.usageClass)
+          , ("consumed_by_rust_runtime_admission",
+              Json.bool entry.consumedByRustRuntimeAdmission)
+          , ("consumed_by_lean_runtime_gate",
+              Json.bool entry.consumedByLeanRuntimeGate)
+          ] ++
+          match entry.assumptionBoundary? with
+          | some assumption => [("assumption_boundary", Json.str assumption)]
+          | none => [] )).toArray
+
+def runtimeCriticalTransportedTheoremKeysJson : Json :=
+  Json.arr <|
+    Runtime.Proofs.TheoremPackAPI.rustRuntimeCriticalTransportedTheoremKeys.map Json.str
+      |>.toArray
+
 def verifyProtocolBundleErrors (payload : Json) : List Json :=
   let claims := payload.getObjValD "claims"
   let distributed := claims.getObjValD "distributed"
@@ -837,7 +867,13 @@ def verifyProtocolBundleResponse (payload : Json) : Json :=
     , ("errors", Json.arr errors.toArray)
     , ("artifacts", Json.mkObj
         [ ("mode", Json.str "deterministic_bundle_verifier")
-        , ("error_count", Json.num errors.length) ]) ]
+        , ("error_count", Json.num errors.length)
+        , ("transported_theorem_boundary", transportedTheoremBoundaryJson)
+        , ("rust_runtime_critical_transport_theorem_keys",
+            runtimeCriticalTransportedTheoremKeysJson)
+        , ("runtime_critical_transport_theorems_explicit",
+            Json.bool Runtime.Proofs.TheoremPackAPI.runtimeCriticalTransportedTheoremsExplicit)
+        ]) ]
 
 def sortedUniqueStrings (items : List String) : List String :=
   (items.eraseDups.toArray.qsort (fun left right => left < right)).toList

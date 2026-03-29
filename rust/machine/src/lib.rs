@@ -211,10 +211,13 @@ pub mod runtime {
             admit_protocol_machine_runtime, determinism_profile_supported,
             enforce_protocol_machine_runtime_gates, execution_profile_supported,
             request_determinism_profile, requires_protocol_machine_runtime_contracts,
-            runtime_capability_snapshot, runtime_execution_profile, DeterminismArtifacts,
-            ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
-            ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption,
-            RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts, RuntimeGateResult,
+            runtime_capability_snapshot, runtime_execution_profile,
+            rust_runtime_critical_transport_theorem_keys, transported_theorem_boundary,
+            DeterminismArtifacts, ProtocolMachineAdmissibilityClass,
+            ProtocolMachineEscalationWindowClass, ProtocolMachineExecutionProfile,
+            ProtocolMachineFairnessAssumption, RuntimeAdmissionResult, RuntimeCapability,
+            RuntimeContracts, RuntimeGateResult, TransportedTheoremBoundaryEntry,
+            TransportedTheoremUsageClass,
         };
     }
 
@@ -323,10 +326,12 @@ pub use runtime_contracts::{
     admit_protocol_machine_runtime, determinism_profile_supported,
     enforce_protocol_machine_runtime_gates, execution_profile_supported,
     request_determinism_profile, requires_protocol_machine_runtime_contracts,
-    runtime_capability_snapshot, runtime_execution_profile, DeterminismArtifacts,
-    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+    runtime_capability_snapshot, runtime_execution_profile,
+    rust_runtime_critical_transport_theorem_keys, transported_theorem_boundary,
+    DeterminismArtifacts, ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
     ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeAdmissionResult,
-    RuntimeCapability, RuntimeContracts, RuntimeGateResult,
+    RuntimeCapability, RuntimeContracts, RuntimeGateResult, TransportedTheoremBoundaryEntry,
+    TransportedTheoremUsageClass,
 };
 pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,

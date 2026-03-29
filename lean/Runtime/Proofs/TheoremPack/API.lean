@@ -1,3 +1,4 @@
+import Runtime.Proofs.TheoremPack.AdmissionBoundary
 import Runtime.Proofs.TheoremPack.Inventory
 import Runtime.Proofs.TheoremPack.ReleaseConformance
 import Runtime.Proofs.ProtocolMachine.Speculation
@@ -81,6 +82,39 @@ abbrev proofCarryingMetadataInventory
     (pack : ProtocolMachineTheoremPack (space := space)) :
     List (String × Bool) :=
   Runtime.Proofs.proofCarryingMetadataInventory (pack := pack)
+
+/-- API alias for transported-theorem usage classes. -/
+abbrev TransportedTheoremUsageClass :=
+  Runtime.Proofs.TransportedTheoremUsageClass
+
+/-- API alias for one transported-theorem boundary ledger row. -/
+abbrev TransportedTheoremBoundaryEntry :=
+  Runtime.Proofs.TransportedTheoremBoundaryEntry
+
+/-- API alias: canonical transported-theorem boundary ledger. -/
+abbrev transportedTheoremBoundaryInventory :=
+  Runtime.Proofs.transportedTheoremBoundaryInventory
+
+/-- API alias: runtime-critical transported-theorem subset. -/
+abbrev runtimeCriticalTransportedTheoremBoundaryInventory :=
+  Runtime.Proofs.runtimeCriticalTransportedTheoremBoundaryInventory
+
+/-- API alias: transported-theorem keys consumed by shipped Rust runtime admission. -/
+abbrev rustRuntimeCriticalTransportedTheoremKeys :=
+  Runtime.Proofs.rustRuntimeCriticalTransportedTheoremKeys
+
+/-- API alias: transported-theorem keys consumed by Lean theorem-pack gates. -/
+abbrev leanRuntimeCriticalTransportedTheoremKeys :=
+  Runtime.Proofs.leanRuntimeCriticalTransportedTheoremKeys
+
+/-- API alias: theorem-boundary snapshot paired with one pack's enablement inventory. -/
+abbrev transportedTheoremBoundarySnapshot :=
+  @Runtime.Proofs.transportedTheoremBoundarySnapshot
+
+/-- API alias: all runtime-critical transported theorems are either instantiated
+in Rust admission or explicitly marked as assumption boundaries. -/
+abbrev runtimeCriticalTransportedTheoremsExplicit :=
+  Runtime.Proofs.runtimeCriticalTransportedTheoremsExplicit
 
 /-- Compact list of enabled semantic-object theorem attachment points. -/
 def semanticObjectCapabilities
