@@ -115,7 +115,8 @@ def sortedSessionStatusesJson (st : RunnerState) : Array Json :=
   ((st.sessions.map (fun p =>
       let sid : SessionId := p.fst
       (sid, Json.mkObj
-        [ ("sid", Json.num sid)
+        [ ("schema_version", Json.str "lean_bridge.v1")
+        , ("sid", Json.num sid)
         , ("terminal", Json.bool (sessionTerminal st sid)) ]))).toArray.qsort
         (fun left right => left.1 < right.1)).map Prod.snd
 
@@ -205,6 +206,24 @@ def concreteTraceEventJson
     | none => [])
   Json.mkObj fields
 
+def concreteScheduledStepJson
+    (stepIndex : Nat)
+    (step : Runtime.Proofs.ConcreteScheduledStep) : Json :=
+  let transition := step.transition
+  Json.mkObj
+    [ ("step_index", Json.num stepIndex)
+    , ("pre_state", concreteProtocolMachineSliceJson step.preState)
+    , ("post_state", concreteProtocolMachineSliceJson step.postState)
+    , ("selected_coro", Json.num transition.selectedCoro)
+    , ("selected_pc", Json.num transition.selectedPc)
+    , ("selected_type", selectedEndpointTypeJson transition.selectedType)
+    , ("exec_status", Json.str transition.execStatusTag)
+    , ("session_type_counts", natAssocJson transition.sessionTypeCounts)
+    , ("buffered_message_counts", natAssocJson transition.bufferedMessageCounts)
+    , ("ready_queue", Json.arr <| transition.readyQueue.map Json.num |>.toArray)
+    , ("blocked", Json.mkObj <| transition.blocked.map (fun p => (toString p.1, Json.str p.2)))
+    , ("event", step.event.map concreteTraceEventJson |>.getD Json.null) ]
+
 def syntheticLifecycleEvents (stepStates : List Json) : List Json :=
   stepStates.foldl
     (fun acc stepJson =>
@@ -224,33 +243,22 @@ def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
   | fuel' + 1 =>
       let st' := { st with clock := st.clock + 1 }
       let st'' := tryUnblockReceivers st'
-      match schedule st'' with
+      match hSched : schedule st'' with
       | none => (st'', acc.reverse)
       | some (cid, stSched) =>
           let (stExec, res) := execInstr stSched cid
           let sched' := updateAfterStep stExec.sched cid res.status
           let stNext : RunnerState := { stExec with sched := sched' }
           let projectedStep :=
-            match Runtime.Proofs.projectConcreteScheduledStep? st'' with
+            match hProjected : Runtime.Proofs.projectConcreteScheduledStep? st'' with
             | some step => step
             | none =>
-                Runtime.Proofs.mkConcreteScheduledStep
-                  stNext.clock st'' stNext cid res.status res.event
-          let transition := projectedStep.transition
-          let stepJson :=
-            Json.mkObj
-              [ ("step_index", Json.num stepIndex)
-              , ("pre_state", concreteProtocolMachineSliceJson projectedStep.preState)
-              , ("post_state", concreteProtocolMachineSliceJson projectedStep.postState)
-              , ("selected_coro", Json.num transition.selectedCoro)
-              , ("selected_pc", Json.num transition.selectedPc)
-              , ("selected_type", selectedEndpointTypeJson transition.selectedType)
-              , ("exec_status", Json.str transition.execStatusTag)
-              , ("session_type_counts", natAssocJson transition.sessionTypeCounts)
-              , ("buffered_message_counts", natAssocJson transition.bufferedMessageCounts)
-              , ("ready_queue", Json.arr <| transition.readyQueue.map Json.num |>.toArray)
-              , ("blocked", Json.mkObj <| transition.blocked.map (fun p => (toString p.1, Json.str p.2)))
-              , ("event", projectedStep.event.map concreteTraceEventJson |>.getD Json.null) ]
+                False.elim <| by
+                  have hNoSchedule :=
+                    (Runtime.Proofs.project_concrete_scheduled_step_none_iff (st := st'')).mp
+                      hProjected
+                  simp [hSched] at hNoSchedule
+          let stepJson := concreteScheduledStepJson stepIndex projectedStep
           let acc' := stepJson :: acc
           if allTerminal stNext then
             (stNext, acc'.reverse)
@@ -978,7 +986,8 @@ def main : IO Unit := do
   let sessionsJson := Json.arr (sortedSessionStatusesJson st')
   let status := if allTerminal st' then "completed" else "stuck"
   let out := Json.mkObj
-    [ ("trace", traceJson)
+    [ ("schema_version", bridgeSchemaVersion)
+    , ("trace", traceJson)
     , ("step_states", Json.arr stepStates.toArray)
     , ("sessions", sessionsJson)
     , ("steps_executed", Json.num st'.sched.stepCount)

@@ -4,6 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+STRICT_TMPDIR="${ROOT_DIR}/.tmp/bridge-normalization"
+mkdir -p "${STRICT_TMPDIR}"
+
+if [[ -n "${TMPDIR:-}" && ! -d "${TMPDIR}" ]]; then
+  export TMPDIR="${STRICT_TMPDIR}"
+else
+  export TMPDIR="${TMPDIR:-${STRICT_TMPDIR}}"
+fi
+
 errors=()
 
 cargo test -p telltale-bridge --lib bridge_normalization_contract_ -- --nocapture >/dev/null
@@ -18,6 +27,33 @@ if [[ "${#injected_keys[@]}" -ne 1 || "${injected_keys[0]}" != "schema_version" 
   )
 fi
 
+if ! rg -q '#\[cfg\(test\)\]\s*fn inject_field_if_missing' -U \
+  rust/bridge/src/protocol_machine_runner_json_parsing.rs; then
+  errors+=(
+    "rust/bridge/src/protocol_machine_runner_json_parsing.rs: schema backfill helper must be test-only"
+  )
+fi
+
+if ! rg -q '#\[cfg\(test\)\]\s*fn backfill_protocol_machine_run_output_schema_versions' -U \
+  rust/bridge/src/protocol_machine_runner_json_parsing.rs; then
+  errors+=(
+    "rust/bridge/src/protocol_machine_runner_json_parsing.rs: schema-version backfill must be test-only"
+  )
+fi
+
+if ! rg -q '#\[cfg\(test\)\]\s*pub\(super\) fn parse_protocol_machine_run_output_with_schema_backfill' -U \
+  rust/bridge/src/protocol_machine_runner_json_parsing.rs; then
+  errors+=(
+    "rust/bridge/src/protocol_machine_runner_json_parsing.rs: compatibility parser must be test-only"
+  )
+fi
+
+if ! rg -q "parse_protocol_machine_run_output_strict" rust/bridge/src/protocol_machine_runner.rs; then
+  errors+=(
+    "rust/bridge/src/protocol_machine_runner.rs: strict runner path must use parse_protocol_machine_run_output_strict"
+  )
+fi
+
 if ! rg -q "## Bridge Normalization Trust Surface" docs/32_testing_verification_inventory.md; then
   errors+=(
     "docs/32_testing_verification_inventory.md: missing 'Bridge Normalization Trust Surface' section"
@@ -25,8 +61,7 @@ if ! rg -q "## Bridge Normalization Trust Surface" docs/32_testing_verification_
 fi
 
 for needle in \
-  "semantic-audit tick normalization" \
-  "runner JSON schema backfill"
+  "semantic-audit tick normalization"
 do
   if ! rg -q "${needle}" docs/32_testing_verification_inventory.md; then
     errors+=(
@@ -36,8 +71,7 @@ do
 done
 
 for needle in \
-  "irreducible trusted comparison logic" \
-  "compatibility-only, removable by schema tightening"
+  "irreducible trusted comparison logic"
 do
   if ! rg -q "${needle}" docs/32_testing_verification_inventory.md; then
     errors+=(
@@ -45,6 +79,12 @@ do
     )
   fi
 done
+
+if rg -q '^\| runner JSON schema backfill \|' docs/32_testing_verification_inventory.md; then
+  errors+=(
+    "docs/32_testing_verification_inventory.md: compatibility-only schema backfill must stay outside the trusted bridge ledger"
+  )
+fi
 
 if rg -q "session-status ordering" docs/32_testing_verification_inventory.md; then
   errors+=(

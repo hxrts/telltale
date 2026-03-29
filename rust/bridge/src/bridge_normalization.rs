@@ -3,6 +3,9 @@
 //! This module exists to keep the remaining trusted bridge behavior small,
 //! explicit, and source-derived. Documentation and shell gates should point at
 //! this ledger instead of maintaining parallel hand-written classifications.
+//!
+//! Compatibility helpers that are outside the strict claim-critical path should
+//! not appear here.
 
 /// Classification for one bridge trust-surface entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -10,9 +13,6 @@ pub enum BridgeNormalizationClassification {
     /// Irreducible comparison logic that preserves protocol semantics while
     /// abstracting away non-semantic scheduling details.
     IrreducibleTrustedComparisonLogic,
-    /// Compatibility-only schema backfill that must not synthesize semantic
-    /// content.
-    CompatibilityOnlySchemaBackfill,
 }
 
 impl BridgeNormalizationClassification {
@@ -21,9 +21,6 @@ impl BridgeNormalizationClassification {
     pub const fn doc_label(self) -> &'static str {
         match self {
             Self::IrreducibleTrustedComparisonLogic => "irreducible trusted comparison logic",
-            Self::CompatibilityOnlySchemaBackfill => {
-                "compatibility-only, removable by schema tightening"
-            }
         }
     }
 }
@@ -74,29 +71,17 @@ pub struct BridgeNormalizationEntry {
 /// Canonical bridge normalization ledger.
 #[must_use]
 pub fn bridge_normalization_ledger() -> Vec<BridgeNormalizationEntry> {
-    vec![
-        BridgeNormalizationEntry {
-            surface: "semantic-audit tick normalization",
-            rule: "Normalize only `tick`, and only per extracted session id",
-            classification: BridgeNormalizationClassification::IrreducibleTrustedComparisonLogic,
-            rationale: "Absolute cross-session scheduling order is not semantic protocol truth; per-session observable order is",
-            artifacts: &[
-                "rust/bridge/src/protocol_machine_trace.rs",
-                "rust/bridge/tests/protocol_machine_correspondence_tests.rs",
-                "rust/bridge/tests/protocol_machine_differential_steps.rs",
-            ],
-        },
-        BridgeNormalizationEntry {
-            surface: "runner JSON schema backfill",
-            rule: "Inject missing `schema_version` fields only at the root, nested trace/session/step-event nodes, and semantic-object export",
-            classification: BridgeNormalizationClassification::CompatibilityOnlySchemaBackfill,
-            rationale: "Older runner payloads may omit nested schema tags; the bridge must not synthesize semantic fields",
-            artifacts: &[
-                "rust/bridge/src/protocol_machine_runner_json_parsing.rs",
-                "scripts/check/bridge-normalization-ledger.sh",
-            ],
-        },
-    ]
+    vec![BridgeNormalizationEntry {
+        surface: "semantic-audit tick normalization",
+        rule: "Normalize only `tick`, and only per extracted session id",
+        classification: BridgeNormalizationClassification::IrreducibleTrustedComparisonLogic,
+        rationale: "Absolute cross-session scheduling order is not semantic protocol truth; per-session observable order is",
+        artifacts: &[
+            "rust/bridge/src/protocol_machine_trace.rs",
+            "rust/bridge/tests/protocol_machine_correspondence_tests.rs",
+            "rust/bridge/tests/protocol_machine_differential_steps.rs",
+        ],
+    }]
 }
 
 #[cfg(test)]
@@ -106,7 +91,7 @@ mod tests {
     #[test]
     fn bridge_normalization_contract_ledger_is_minimal_and_explicit() {
         let ledger = bridge_normalization_ledger();
-        assert_eq!(ledger.len(), 2);
+        assert_eq!(ledger.len(), 1);
 
         let tick = &ledger[0];
         assert_eq!(tick.surface, "semantic-audit tick normalization");
@@ -117,17 +102,6 @@ mod tests {
         assert_eq!(
             tick.classification,
             BridgeNormalizationClassification::IrreducibleTrustedComparisonLogic
-        );
-
-        let schema = &ledger[1];
-        assert_eq!(schema.surface, "runner JSON schema backfill");
-        assert_eq!(
-            schema.classification,
-            BridgeNormalizationClassification::CompatibilityOnlySchemaBackfill
-        );
-        assert!(
-            schema.rule.contains("`schema_version`"),
-            "compatibility shim must stay schema-only"
         );
     }
 

@@ -260,6 +260,54 @@ theorem project_concrete_trace_event_obs
       projectConcreteObsEvent? tick obs := by
   simp [projectConcreteTraceEvent?]
 
+theorem project_concrete_trace_event_none
+    (tick cid : Nat)
+    (status : ExecStatus γ) :
+    projectConcreteTraceEvent? tick cid status (none : Option (StepEvent ε)) =
+      match status with
+      | .halted =>
+          some
+            { kind := "halted"
+            , tick := tick
+            , target := some (toString cid) }
+      | .faulted err =>
+          some
+            { kind := "faulted"
+            , tick := tick
+            , target := some (toString cid)
+            , reason := some (concreteFaultTag err) }
+      | _ => none := by
+  cases status <;> simp [projectConcreteTraceEvent?, concreteFaultTag]
+
+theorem project_concrete_trace_event_internal
+    (tick cid : Nat)
+    (status : ExecStatus γ) :
+    projectConcreteTraceEvent? tick cid status (some (StepEvent.internal : StepEvent ε)) =
+      match status with
+      | .halted =>
+          some
+            { kind := "halted"
+            , tick := tick
+            , target := some (toString cid) }
+      | .faulted err =>
+          some
+            { kind := "faulted"
+            , tick := tick
+            , target := some (toString cid)
+            , reason := some (concreteFaultTag err) }
+      | _ => none := by
+  cases status <;> simp [projectConcreteTraceEvent?, concreteFaultTag]
+
+theorem append_event_none_trace_shape
+    (st : ProtocolMachineState ι γ π ε ν) :
+    (appendEvent st none).obsTrace = st.obsTrace := by
+  simp [appendEvent]
+
+theorem append_event_internal_trace_shape
+    (st : ProtocolMachineState ι γ π ε ν) :
+    (appendEvent st (some StepEvent.internal)).obsTrace = st.obsTrace := by
+  simp [appendEvent]
+
 theorem append_event_obs_trace_shape
     (st : ProtocolMachineState ι γ π ε ν)
     (obs : ObsEvent ε) :
@@ -371,7 +419,9 @@ theorem project_concrete_scheduled_step_post_state_eq_sched_step
   | some pair =>
       cases pair with
       | mk cid stSched =>
-          simp [mkConcreteScheduledStep]
+          cases hExec : execInstr stSched cid with
+          | mk stExec res =>
+              rfl
 
 theorem project_concrete_scheduled_step_pre_state_eq_schedule_source
     (st : ProtocolMachineState ι γ π ε ν) :
@@ -387,6 +437,63 @@ theorem project_concrete_scheduled_step_pre_state_eq_schedule_source
       cases pair with
       | mk cid stSched =>
           simp [mkConcreteScheduledStep]
+
+theorem project_concrete_scheduled_step_transition_eq_sched_step
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map ConcreteScheduledStep.transition (projectConcreteScheduledStep? st) =
+      (match schedule st with
+      | none => none
+      | some (cid, stSched) =>
+          let (stExec, res) := execInstr stSched cid
+          let sched' := updateAfterStep stExec.sched cid res.status
+          let stNext : ProtocolMachineState ι γ π ε ν := { stExec with sched := sched' }
+          some (projectConcreteTransitionSlice stNext cid res.status)) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          cases hExec : execInstr stSched cid with
+          | mk stExec res =>
+              rfl
+
+theorem project_concrete_scheduled_step_event_eq_sched_step
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map ConcreteScheduledStep.event (projectConcreteScheduledStep? st) =
+      (match schedule st with
+      | none => none
+      | some (cid, stSched) =>
+          let (_stExec, res) := execInstr stSched cid
+          some (projectConcreteTraceEvent? st.clock cid res.status res.event)) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, projectConcreteTransitionSlice]
+
+theorem project_concrete_scheduled_step_eq_schedule_exec
+    (st : ProtocolMachineState ι γ π ε ν) :
+    projectConcreteScheduledStep? st =
+      (match schedule st with
+      | none => none
+      | some (cid, stSched) =>
+          let (stExec, res) := execInstr stSched cid
+          let sched' := updateAfterStep stExec.sched cid res.status
+          let stNext : ProtocolMachineState ι γ π ε ν := { stExec with sched := sched' }
+          some (mkConcreteScheduledStep st.clock st stNext cid res.status res.event)) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, projectConcreteTransitionSlice]
 
 def concreteSessionTypeCountsOfStateSlice
     (slice : ConcreteProtocolMachineSlice) : List (SessionId × Nat) :=
@@ -442,6 +549,76 @@ theorem project_transition_buffered_message_counts_eq_state_slice
   simp [projectConcreteTransitionSlice, projectConcreteProtocolMachineSlice,
     concreteBufferedMessageCountsOfStateSlice, projectBufferedMessageCounts,
     projectConcreteSessionSlice]
+
+theorem project_concrete_scheduled_step_ready_queue_matches_post_state
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map (fun step => step.transition.readyQueue) (projectConcreteScheduledStep? st) =
+      Option.map (fun step => step.postState.scheduler.readyQueue) (projectConcreteScheduledStep? st) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, project_transition_ready_queue_eq_state_slice]
+
+theorem project_concrete_scheduled_step_blocked_matches_post_state
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map (fun step => step.transition.blocked) (projectConcreteScheduledStep? st) =
+      Option.map (fun step => step.postState.scheduler.blocked) (projectConcreteScheduledStep? st) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, project_transition_blocked_eq_state_slice]
+
+theorem project_concrete_scheduled_step_session_type_counts_match_post_state
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map (fun step => step.transition.sessionTypeCounts) (projectConcreteScheduledStep? st) =
+      Option.map (fun step => concreteSessionTypeCountsOfStateSlice step.postState) (projectConcreteScheduledStep? st) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, project_transition_session_type_counts_eq_state_slice]
+
+theorem project_concrete_scheduled_step_buffered_message_counts_match_post_state
+    (st : ProtocolMachineState ι γ π ε ν) :
+    Option.map (fun step => step.transition.bufferedMessageCounts) (projectConcreteScheduledStep? st) =
+      Option.map (fun step => concreteBufferedMessageCountsOfStateSlice step.postState) (projectConcreteScheduledStep? st) := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, project_transition_buffered_message_counts_eq_state_slice]
+
+theorem project_concrete_scheduled_step_matches_schedule_exec
+    (st : ProtocolMachineState ι γ π ε ν) :
+    match projectConcreteScheduledStep? st, schedule st with
+    | none, none => True
+    | some step, some (cid, stSched) =>
+        let (_stExec, res) := execInstr stSched cid
+        step.transition.selectedCoro = cid ∧
+        step.transition.execStatusTag = concreteExecStatusTag res.status
+    | _, _ => False := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, projectConcreteTransitionSlice]
 
 theorem mk_concrete_scheduled_step_pre_state
     (tick : Nat)

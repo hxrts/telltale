@@ -143,6 +143,9 @@ fn test_lean_semantic_audit_matches_rust() {
 
     assert_eq!(lean_trace, rust_trace, "Lean and Rust traces diverged");
 
+    let rust_pre_dispatch = machine
+        .last_pre_dispatch_refinement_slice()
+        .expect("export pre-dispatch refinement slice");
     let rust_slice = machine.refinement_slice().expect("export refinement slice");
     let rust_transition = machine
         .transition_refinement_summary()
@@ -151,7 +154,16 @@ fn test_lean_semantic_audit_matches_rust() {
         .step_states
         .last()
         .expect("lean run should export final step state");
+    assert_eq!(
+        lean_last_step
+            .pre_state
+            .as_ref()
+            .map(canonicalize_state_for_cross_target),
+        Some(canonicalize_state_for_cross_target(&rust_pre_dispatch)),
+        "Lean pre-step refinement slice diverged from Rust pre-dispatch slice"
+    );
     assert_eq!(lean_last_step.selected_coro, rust_transition.selected_coro);
+    assert_eq!(lean_last_step.selected_type, rust_transition.selected_type);
     assert_eq!(lean_last_step.exec_status, rust_transition.exec_status);
     assert_eq!(
         lean_last_step.session_type_counts,

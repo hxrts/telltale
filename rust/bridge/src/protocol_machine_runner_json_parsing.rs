@@ -1,4 +1,5 @@
 use super::*;
+#[cfg(test)]
 use crate::bridge_normalization::{SchemaVersionBackfillPath, SCHEMA_VERSION_BACKFILL_PATHS};
 use std::collections::BTreeSet;
 
@@ -16,6 +17,7 @@ const RUN_OUTPUT_ALLOWED_KEYS: &[&str] = &[
     "semantic_objects",
 ];
 
+#[cfg(test)]
 fn inject_field_if_missing(object: &mut serde_json::Map<String, Value>, key: &str, value: Value) {
     object.entry(key.to_string()).or_insert(value);
 }
@@ -26,6 +28,7 @@ fn inject_field_if_missing(object: &mut serde_json::Map<String, Value>, key: &st
 /// Lean runner payloads that omitted nested `schema_version` fields can still be
 /// deserialized into the current bridge types. No non-schema fields are
 /// synthesized here.
+#[cfg(test)]
 fn backfill_protocol_machine_run_output_schema_versions(mut value: Value) -> Value {
     let bridge_schema = Value::String(crate::schema::canonical_schema_version());
     let semantic_objects_schema =
@@ -92,7 +95,22 @@ fn backfill_protocol_machine_run_output_schema_versions(mut value: Value) -> Val
     value
 }
 
-pub(super) fn parse_protocol_machine_run_output(
+pub(super) fn parse_protocol_machine_run_output_strict(
+    value: Value,
+) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
+    reject_unknown_protocol_machine_run_output_fields(&value)?;
+    let output: ProtocolMachineRunOutput = serde_json::from_value(value)
+        .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+    crate::schema::ensure_supported_schema_version(
+        &output.schema_version,
+        "ProtocolMachineRunOutput",
+    )
+    .map_err(ProtocolMachineRunnerError::ParseError)?;
+    Ok(output)
+}
+
+#[cfg(test)]
+pub(super) fn parse_protocol_machine_run_output_with_schema_backfill(
     value: Value,
 ) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
     reject_unknown_protocol_machine_run_output_fields(&value)?;
@@ -389,8 +407,9 @@ mod tests {
 
     #[test]
     fn parse_protocol_machine_run_output_accepts_schema_backfilled_payloads() {
-        let parsed = parse_protocol_machine_run_output(minimal_run_output_json())
-            .expect("schema backfill should make legacy payload parseable");
+        let parsed =
+            parse_protocol_machine_run_output_with_schema_backfill(minimal_run_output_json())
+                .expect("schema backfill should make legacy payload parseable");
         assert_eq!(parsed.trace.len(), 1);
         assert_eq!(parsed.sessions.len(), 1);
         assert_eq!(parsed.step_states.len(), 1);
@@ -410,8 +429,8 @@ mod tests {
             .expect("root object")
             .remove("trace");
 
-        let err =
-            parse_protocol_machine_run_output(payload).expect_err("missing trace must not parse");
+        let err = parse_protocol_machine_run_output_strict(payload)
+            .expect_err("missing trace must not parse");
         assert!(matches!(err, ProtocolMachineRunnerError::ParseError(_)));
     }
 
@@ -420,7 +439,7 @@ mod tests {
         let mut payload = minimal_run_output_json();
         payload["schema_version"] = Value::String("0.0.0".to_string());
 
-        let err = parse_protocol_machine_run_output(payload)
+        let err = parse_protocol_machine_run_output_strict(payload)
             .expect_err("unsupported schema version must fail closed");
         assert!(matches!(err, ProtocolMachineRunnerError::ParseError(_)));
     }
@@ -433,11 +452,21 @@ mod tests {
             .expect("root object")
             .insert("phase16_mutation".to_string(), json!(true));
 
-        let err = parse_protocol_machine_run_output(payload)
+        let err = parse_protocol_machine_run_output_strict(payload)
             .expect_err("unknown top-level fields must fail closed");
         assert!(
             err.to_string()
                 .contains("unknown field `phase16_mutation` in ProtocolMachineRunOutput"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn parse_protocol_machine_run_output_strict_rejects_missing_nested_schema_versions() {
+        let err = parse_protocol_machine_run_output_strict(minimal_run_output_json())
+            .expect_err("strict runner parsing must reject legacy payloads");
+        assert!(
+            err.to_string().contains("schema_version"),
             "unexpected error: {err}"
         );
     }

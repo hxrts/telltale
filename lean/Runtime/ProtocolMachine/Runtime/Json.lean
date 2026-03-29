@@ -79,13 +79,15 @@ private def ownershipTerminalReasonToJson (reason : OwnershipTerminalReason) : J
 
 /-- Serialize a ticked observable event to JSON (UnitEffect only). -/
 def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
+  let withSchema (fields : List (String × Json)) : Json :=
+    Json.mkObj <| ("schema_version", Json.str "lean_bridge.v1") :: fields
   match ev.event with
   | .sent edge val seqNo =>
       let labelField :=
         match val with
         | .string s => [("label", Json.str s)]
         | _ => []
-      Json.mkObj <|
+      withSchema <|
         [ ("kind", Json.str "sent")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
@@ -98,7 +100,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         match val with
         | .string s => [("label", Json.str s)]
         | _ => []
-      Json.mkObj <|
+      withSchema <|
         [ ("kind", Json.str "received")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
@@ -107,7 +109,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("sequence", Json.num seqNo)
         , ("value", valueToJson val) ] ++ labelField
   | .offered edge lbl =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "sent")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
@@ -115,7 +117,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("receiver", Json.str edge.receiver)
         , ("label", Json.str lbl) ]
   | .chose edge lbl =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "received")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num edge.sid)
@@ -128,19 +130,19 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   -- Session lifecycle events
 
   | .opened sid roles =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "opened")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("role", Json.str (String.intercalate "," roles))
         , ("roles", Json.arr (roles.map Json.str).toArray) ]
   | .closed sid =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "closed")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
   | .epochAdvanced sid epoch =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "epoch_advanced")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
@@ -150,7 +152,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   -- Runtime ownership/coroutine events
 
   | .transferred ep fromCoro toCoro =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "transferred")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
@@ -158,23 +160,23 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("from", Json.num fromCoro)
         , ("to", Json.num toCoro) ]
   | .forked sid gsid =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "forked")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("ghost", Json.num gsid) ]
   | .joined sid =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "joined")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
   | .aborted sid =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "aborted")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid) ]
   | .sessionTerminal sid reason =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "session_terminal")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
@@ -184,49 +186,49 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   -- Guard/effect and monitoring events
 
   | .acquired layer ep =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "acquired")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role)
         , ("layer", Json.str layer) ]
   | .released layer ep =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "released")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role)
         , ("layer", Json.str layer) ]
   | .invoked ep _ =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "invoked")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num ep.sid)
         , ("role", Json.str ep.role) ]
   | .tagged _ =>
-      Json.mkObj [("kind", Json.str "tagged"), ("tick", Json.num ev.tick)]
+      withSchema [("kind", Json.str "tagged"), ("tick", Json.num ev.tick)]
   | .checked _ permitted =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "checked")
 /- ## Structured Block 2 -/
         , ("tick", Json.num ev.tick)
         , ("permitted", Json.bool permitted) ]
   | .failureBranchEntered sid coroId faultClass =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "failure_branch_entered")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
         , ("coro_id", Json.num coroId)
         , ("fault", Json.str faultClass) ]
   | .timeoutIssued site untilTick witnessId =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "timeout_issued")
         , ("tick", Json.num ev.tick)
         , ("site", Json.str site)
         , ("until_tick", Json.num untilTick)
         , ("witness_id", Json.num witnessId) ]
   | .cancellationRequested sid witnessId ownerId reason =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "cancellation_requested")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)
@@ -234,7 +236,7 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("owner_id", Json.str ownerId)
         , ("reason", ownershipTerminalReasonToJson reason) ]
   | .cancelled sid witnessId reason =>
-      Json.mkObj
+      withSchema
         [ ("kind", Json.str "cancelled")
         , ("tick", Json.num ev.tick)
         , ("session", Json.num sid)

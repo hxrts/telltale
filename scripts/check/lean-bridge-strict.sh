@@ -4,8 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
 LEAN_THREADS="${LEAN_NUM_THREADS:-3}"
+STRICT_TMPDIR="${ROOT_DIR}/.tmp/lean-bridge-strict"
 
 cd "${ROOT_DIR}"
+
+mkdir -p "${STRICT_TMPDIR}"
+
+if [[ -n "${TMPDIR:-}" && ! -d "${TMPDIR}" ]]; then
+  export TMPDIR="${STRICT_TMPDIR}"
+else
+  export TMPDIR="${TMPDIR:-${STRICT_TMPDIR}}"
+fi
 
 ./scripts/bootstrap/ensure-lean-prebuilt.sh
 
