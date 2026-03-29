@@ -37,16 +37,32 @@ impl ProtocolMachine {
         )
     }
 
-    /// Export the full currently claimed runtime refinement bundle.
+    /// Export the current claim-critical runtime refinement core bundle.
     ///
     /// # Errors
     ///
     /// Returns an error when exported counts do not fit the bridge-safe `u64` schema.
-    pub fn claimed_runtime_refinement_bundle(
+    pub fn claimed_runtime_core_bundle(
         &self,
-    ) -> Result<crate::refinement::ClaimedRuntimeRefinementBundle, RefinementSliceError> {
+    ) -> Result<crate::refinement::ClaimedRuntimeCoreBundle, RefinementSliceError> {
+        crate::refinement::ClaimedRuntimeCoreBundle::from_runtime_state(
+            &self.coroutines,
+            &self.sessions,
+            &self.sched,
+            self.last_sched_step.as_ref(),
+        )
+    }
+
+    /// Export the broader runtime observation bundle used by operational suites.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when exported counts do not fit the bridge-safe `u64` schema.
+    pub fn runtime_observation_bundle(
+        &self,
+    ) -> Result<crate::refinement::RuntimeObservationBundle, RefinementSliceError> {
         let authority_audit_log = self.combined_authority_audit_log();
-        crate::refinement::ClaimedRuntimeRefinementBundle::from_runtime_state(
+        crate::refinement::RuntimeObservationBundle::from_runtime_state(
             &self.coroutines,
             &self.sessions,
             &self.sched,

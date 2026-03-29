@@ -188,7 +188,7 @@ fn test_lean_semantic_audit_matches_rust() {
 }
 
 #[test]
-fn claimed_runtime_refinement_bundle_matches_component_exports() {
+fn claimed_runtime_core_bundle_matches_component_exports() {
     let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
     let image = test_support::code_image_from_global(&global)
         .expect("projected code image should exist for the test global");
@@ -198,8 +198,8 @@ fn claimed_runtime_refinement_bundle_matches_component_exports() {
     machine.run(&handler, 50).expect("run machine");
 
     let bundle = machine
-        .claimed_runtime_refinement_bundle()
-        .expect("export claimed runtime refinement bundle");
+        .claimed_runtime_core_bundle()
+        .expect("export claimed runtime core bundle");
 
     assert_eq!(
         bundle.state,
@@ -211,6 +211,22 @@ fn claimed_runtime_refinement_bundle_matches_component_exports() {
             .transition_refinement_summary()
             .expect("export transition summary")
     );
+}
+
+#[test]
+fn runtime_observation_bundle_matches_component_exports() {
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+    let image = test_support::code_image_from_global(&global)
+        .expect("projected code image should exist for the test global");
+    let handler = PassthroughHandler;
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine.load_choreography(&image).expect("load image");
+    machine.run(&handler, 50).expect("run machine");
+
+    let bundle = machine
+        .runtime_observation_bundle()
+        .expect("export runtime observation bundle");
+
     assert_eq!(bundle.effect_exchanges, machine.effect_exchanges().to_vec());
     assert_eq!(
         bundle.output_condition_checks,

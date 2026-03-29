@@ -207,10 +207,41 @@ impl TransitionRefinementSummary {
     }
 }
 
-/// Canonical machine-side bundle for the currently claimed runtime refinement surface.
+/// Canonical machine-side bundle for the currently claimed runtime refinement core.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ClaimedRuntimeRefinementBundle {
+pub struct ClaimedRuntimeCoreBundle {
     /// Concrete coroutine/session/scheduler slice.
+    pub state: ProtocolMachineRefinementSlice,
+    /// Most recent scheduler-transition summary.
+    pub transition: TransitionRefinementSummary,
+}
+
+impl ClaimedRuntimeCoreBundle {
+    pub(crate) fn from_runtime_state(
+        coroutines: &[Coroutine],
+        sessions: &SessionStore,
+        scheduler: &Scheduler,
+        last_sched_step: Option<&crate::SchedStepDebug>,
+    ) -> Result<Self, RefinementSliceError> {
+        let state = cooperative_refinement_slice(coroutines, sessions, scheduler)?;
+        let transition = TransitionRefinementSummary::from_runtime_state(
+            coroutines,
+            sessions,
+            scheduler,
+            last_sched_step,
+        )?;
+        Ok(Self { state, transition })
+    }
+}
+
+/// Broader machine-side observation bundle used by operational assurance suites.
+///
+/// This bundle is intentionally larger than the current claim-critical concrete
+/// refinement core. It includes semantic-audit and semantic-object surfaces that
+/// are tracked by separate theorem and runtime-assurance families.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RuntimeObservationBundle {
+    /// Concrete coroutine/session/scheduler slice for the current machine state.
     pub state: ProtocolMachineRefinementSlice,
     /// Most recent scheduler-transition summary.
     pub transition: TransitionRefinementSummary,
@@ -224,7 +255,7 @@ pub struct ClaimedRuntimeRefinementBundle {
     pub semantic_objects: ProtocolMachineSemanticObjects,
 }
 
-impl ClaimedRuntimeRefinementBundle {
+impl RuntimeObservationBundle {
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn from_runtime_state(
         coroutines: &[Coroutine],
@@ -241,8 +272,7 @@ impl ClaimedRuntimeRefinementBundle {
         progress_transitions: &[ProgressTransition],
         effect_exchanges: &[EffectExchangeRecord],
     ) -> Result<Self, RefinementSliceError> {
-        let state = cooperative_refinement_slice(coroutines, sessions, scheduler)?;
-        let transition = TransitionRefinementSummary::from_runtime_state(
+        let core = ClaimedRuntimeCoreBundle::from_runtime_state(
             coroutines,
             sessions,
             scheduler,
@@ -267,8 +297,8 @@ impl ClaimedRuntimeRefinementBundle {
             progress_transitions,
         );
         Ok(Self {
-            state,
-            transition,
+            state: core.state,
+            transition: core.transition,
             semantic_audit,
             effect_exchanges: effect_exchanges.to_vec(),
             output_condition_checks: output_condition_checks.to_vec(),

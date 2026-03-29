@@ -620,6 +620,28 @@ theorem project_concrete_scheduled_step_matches_schedule_exec
       | mk cid stSched =>
           simp [mkConcreteScheduledStep, projectConcreteTransitionSlice]
 
+theorem project_concrete_scheduled_step_claimed_surface_spec
+    (st : ProtocolMachineState ι γ π ε ν) :
+    match projectConcreteScheduledStep? st, schedule st with
+    | none, none => True
+    | some step, some (cid, stSched) =>
+        let (stExec, res) := execInstr stSched cid
+        let sched' := updateAfterStep stExec.sched cid res.status
+        let stNext : ProtocolMachineState ι γ π ε ν := { stExec with sched := sched' }
+        step.preState = projectConcreteProtocolMachineSlice st ∧
+          step.postState = projectConcreteProtocolMachineSlice stNext ∧
+          step.transition = projectConcreteTransitionSlice stNext cid res.status ∧
+          step.event = projectConcreteTraceEvent? st.clock cid res.status res.event
+    | _, _ => False := by
+  unfold projectConcreteScheduledStep?
+  cases hSched : schedule st with
+  | none =>
+      simp
+  | some pair =>
+      cases pair with
+      | mk cid stSched =>
+          simp [mkConcreteScheduledStep, projectConcreteTransitionSlice]
+
 theorem mk_concrete_scheduled_step_pre_state
     (tick : Nat)
     (pre post : ProtocolMachineState ι γ π ε ν)

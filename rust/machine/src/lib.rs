@@ -319,9 +319,9 @@ pub use output_condition::{
 pub use owned::OwnedSession;
 pub use persistence::{NoopPersistence, PersistenceModel};
 pub use refinement::{
-    ClaimedRuntimeRefinementBundle, CoroutineRefinementSlice, ProtocolMachineRefinementSlice,
-    RefinementSliceError, SchedulerRefinementSlice, SessionRefinementSlice,
-    TransitionRefinementSummary,
+    ClaimedRuntimeCoreBundle, CoroutineRefinementSlice, ProtocolMachineRefinementSlice,
+    RefinementSliceError, RuntimeObservationBundle, SchedulerRefinementSlice,
+    SessionRefinementSlice, TransitionRefinementSummary,
 };
 pub use runtime_contracts::{
     admit_protocol_machine_runtime, determinism_profile_supported,
