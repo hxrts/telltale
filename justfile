@@ -253,9 +253,12 @@ check-extension-dispatch:
     cargo test -p telltale-runtime --test extension_integration -- --nocapture
     cargo test -p telltale-runtime --features test-utils --test middleware_semantic_hardening -- --nocapture
 
-# Run the machine-checkable handler contract boundary suites.
+# Run the machine-checkable first-party handler/transport contract boundary suites.
 check-handler-contracts:
-    cargo test -p telltale-runtime --test handler_contracts -- --nocapture
+    mkdir -p .tmp
+    TMPDIR=$PWD/.tmp cargo test -p telltale-runtime --test handler_contracts -- --nocapture
+    TMPDIR=$PWD/.tmp cargo test -p telltale-runtime --test transport_contracts -- --nocapture
+    TMPDIR=$PWD/.tmp cargo test -p telltale-transport --test transport_contract_profiles -- --nocapture
 
 # Run the Lean-backed regular-fragment deadlock automation suites.
 check-deadlock-automation:

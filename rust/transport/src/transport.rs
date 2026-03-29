@@ -11,7 +11,9 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
 use telltale_runtime::{
-    MessageLenBytes, QueueCapacity, RoleName, Transport, TransportError, TransportResult,
+    DocumentedTransportContract, MessageLenBytes, QueueCapacity, RoleName, Transport,
+    TransportContractProfile, TransportContractTier, TransportError, TransportOperationalContract,
+    TransportResult, TransportSemanticContract, TransportStartupMode,
 };
 use telltale_types::FixedQ32;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -284,6 +286,32 @@ impl TcpTransport {
             self.connect_to(peer).await?;
         }
         Ok(())
+    }
+}
+
+impl DocumentedTransportContract for TcpTransport {
+    fn contract_profile() -> TransportContractProfile {
+        TransportContractProfile {
+            transport_name: "TcpTransport",
+            tier: TransportContractTier::FirstPartyRuntime,
+            semantics: TransportSemanticContract {
+                role_addressed_routing: true,
+                per_peer_fifo_delivery: true,
+                fail_closed_unknown_role: true,
+                no_message_synthesis: true,
+                explicit_readiness_errors: true,
+                deterministic_for_regression: false,
+            },
+            operational: TransportOperationalContract {
+                transport_type: telltale_runtime::TransportType::Tcp,
+                startup_mode: TransportStartupMode::ExplicitStart,
+                environment_resolved: false,
+            },
+            notes: vec![
+                "First-party TCP transport in the separate telltale-transport crate.",
+                "Requires explicit start before first use.",
+            ],
+        }
     }
 }
 

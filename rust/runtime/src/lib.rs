@@ -7,6 +7,12 @@
 //! global viewpoint, with automatic generation of local session types for each
 //! participant. This includes an effect handler system that decouples protocol
 //! logic from transport implementation.
+//!
+//! For the current formal-verification claim, only the shipped first-party
+//! handler/transport implementations with documented contract profiles are
+//! inside the first-party runtime boundary. User-supplied third-party handlers
+//! and transports remain outside that claim unless they separately satisfy the
+//! same contract.
 
 #![allow(
     clippy::missing_errors_doc,
@@ -57,11 +63,14 @@ pub use extensions::{
 };
 pub use runtime::{spawn, spawn_local};
 pub use topology::{
-    parse_topology, ByteMessage, InMemoryChannelTransport, Location, ParsedTopology,
+    parse_topology, validate_transport_contract_profile, validated_transport_contract_profile,
+    ByteMessage, DocumentedTransportContract, InMemoryChannelTransport, Location, ParsedTopology,
     RoleFamilyConstraint, RoleFamilyConstraintError, Topology, TopologyBuilder, TopologyConstraint,
     TopologyError, TopologyHandler, TopologyHandlerBuilder, TopologyLoadError, TopologyMode,
-    TopologyParseError, TopologyValidation, Transport, TransportError, TransportFactory,
-    TransportMessage, TransportResult, TransportType,
+    TopologyParseError, TopologyValidation, Transport, TransportContractProfile,
+    TransportContractTier, TransportContractViolation, TransportError, TransportFactory,
+    TransportMessage, TransportOperationalContract, TransportResult, TransportSemanticContract,
+    TransportStartupMode, TransportType,
 };
 
 // Re-export heap types for resource management

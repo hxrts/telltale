@@ -16,11 +16,18 @@
 //! Topology types are currently Rust-only. Future Lean formalization may
 //! include deployment constraints in `lean/Protocol/Deployment/`.
 
+mod contract;
 mod handler;
 mod parser;
 mod transport;
 mod validation_types;
 
+pub use contract::{
+    validate_transport_contract_profile, validated_transport_contract_profile,
+    DocumentedTransportContract, TransportContractProfile, TransportContractTier,
+    TransportContractViolation, TransportOperationalContract, TransportSemanticContract,
+    TransportStartupMode,
+};
 pub use handler::{TopologyHandler, TopologyHandlerBuilder};
 pub use parser::{parse_topology, ParsedTopology, TopologyParseError};
 pub use transport::{

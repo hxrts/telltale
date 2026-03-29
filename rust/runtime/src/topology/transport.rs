@@ -4,7 +4,11 @@
 //! - `InMemoryTransport`: In-process communication using channels
 //! - `TcpTransport`: Network communication over TCP
 
-use super::{Location, Topology};
+use super::{
+    validate_transport_contract_profile, DocumentedTransportContract, Location, Topology,
+    TransportContractProfile, TransportContractTier, TransportOperationalContract,
+    TransportSemanticContract, TransportStartupMode,
+};
 use crate::identifiers::RoleName;
 use crate::mutex_lock;
 #[cfg(not(target_arch = "wasm32"))]
@@ -139,6 +143,32 @@ impl InMemoryChannelTransport {
     /// Get the role name.
     pub fn role(&self) -> &RoleName {
         &self.role
+    }
+}
+
+impl DocumentedTransportContract for InMemoryChannelTransport {
+    fn contract_profile() -> TransportContractProfile {
+        TransportContractProfile {
+            transport_name: "InMemoryChannelTransport",
+            tier: TransportContractTier::FirstPartyRuntime,
+            semantics: TransportSemanticContract {
+                role_addressed_routing: true,
+                per_peer_fifo_delivery: true,
+                fail_closed_unknown_role: true,
+                no_message_synthesis: true,
+                explicit_readiness_errors: false,
+                deterministic_for_regression: true,
+            },
+            operational: TransportOperationalContract {
+                transport_type: TransportType::InMemory,
+                startup_mode: TransportStartupMode::ReadyOnCreate,
+                environment_resolved: false,
+            },
+            notes: vec![
+                "In-process channel transport for first-party local execution.",
+                "Deterministic enough for strict regression suites.",
+            ],
+        }
     }
 }
 
@@ -406,6 +436,32 @@ struct TcpPeerTransport {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+impl DocumentedTransportContract for TcpPeerTransport {
+    fn contract_profile() -> TransportContractProfile {
+        TransportContractProfile {
+            transport_name: "TcpPeerTransport",
+            tier: TransportContractTier::FirstPartyRuntime,
+            semantics: TransportSemanticContract {
+                role_addressed_routing: true,
+                per_peer_fifo_delivery: true,
+                fail_closed_unknown_role: true,
+                no_message_synthesis: true,
+                explicit_readiness_errors: true,
+                deterministic_for_regression: false,
+            },
+            operational: TransportOperationalContract {
+                transport_type: TransportType::Tcp,
+                startup_mode: TransportStartupMode::BackgroundWarmup,
+                environment_resolved: false,
+            },
+            notes: vec![
+                "Single-peer runtime TCP transport used for loopback remote topology execution.",
+            ],
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[async_trait]
 impl Transport for TcpPeerTransport {
     async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
@@ -448,6 +504,32 @@ impl Transport for TcpPeerTransport {
 struct TcpRoleTransport {
     state: Arc<TcpRoleState>,
     peer_endpoints: BTreeMap<RoleName, Option<crate::identifiers::Endpoint>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl DocumentedTransportContract for TcpRoleTransport {
+    fn contract_profile() -> TransportContractProfile {
+        TransportContractProfile {
+            transport_name: "TcpRoleTransport",
+            tier: TransportContractTier::FirstPartyRuntime,
+            semantics: TransportSemanticContract {
+                role_addressed_routing: true,
+                per_peer_fifo_delivery: true,
+                fail_closed_unknown_role: true,
+                no_message_synthesis: true,
+                explicit_readiness_errors: true,
+                deterministic_for_regression: false,
+            },
+            operational: TransportOperationalContract {
+                transport_type: TransportType::Tcp,
+                startup_mode: TransportStartupMode::BackgroundWarmup,
+                environment_resolved: false,
+            },
+            notes: vec![
+                "Role-addressed runtime TCP transport used by the first-party topology helper.",
+            ],
+        }
+    }
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -521,8 +603,44 @@ pub(crate) async fn create_peer_transport(
 pub struct TransportFactory;
 
 impl TransportFactory {
+    fn validated_first_party_profile(
+        profile: TransportContractProfile,
+    ) -> TransportResult<TransportContractProfile> {
+        validate_transport_contract_profile(&profile)
+            .map_err(|err| TransportError::ConnectionFailed(err.to_string()))?;
+        Ok(profile)
+    }
+
+    /// Return the documented first-party transport contract selected for a role/topology pair.
+    pub fn contract_profile_for_topology(
+        topology: &Topology,
+        role: &RoleName,
+    ) -> TransportResult<TransportContractProfile> {
+        let has_remote_participants = topology
+            .locations
+            .values()
+            .any(|location| matches!(location, Location::Remote(_)));
+        if has_remote_participants {
+            #[cfg(target_arch = "wasm32")]
+            {
+                let _ = (topology, role);
+                Err(TransportError::NotReady)
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                topology
+                    .region_for_role(role)
+                    .map_err(TransportError::ConnectionFailed)?;
+                Self::validated_first_party_profile(TcpRoleTransport::contract_profile())
+            }
+        } else {
+            Self::validated_first_party_profile(InMemoryChannelTransport::contract_profile())
+        }
+    }
+
     /// Create a transport for a role based on the topology.
     pub fn create(topology: &Topology, role: &RoleName) -> TransportResult<Box<dyn Transport>> {
+        let _profile = Self::contract_profile_for_topology(topology, role)?;
         let has_remote_participants = topology
             .locations
             .values()

@@ -134,6 +134,7 @@ runtime_substrate_boundary_suites=(
 
 handler_contract_boundary_suites=(
   rust/runtime/tests/handler_contracts.rs
+  rust/runtime/tests/transport_contracts.rs
 )
 
 long_horizon_recovery_harness_suites=(

@@ -3,6 +3,12 @@
 //! This crate provides production-ready transport implementations for
 //! the Telltale session types library.
 //!
+//! `telltale-transport` ships first-party transport implementations. Those
+//! implementations participate in the current first-party runtime contract
+//! boundary through documented transport-contract profiles. Third-party
+//! transports remain outside the formal-verification claim unless they
+//! separately satisfy the same contract.
+//!
 //! ## Features
 //!
 //! - TCP transport with length-prefixed message framing
