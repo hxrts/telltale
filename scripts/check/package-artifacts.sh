@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+tmp_root="${TMPDIR:-/tmp}"
+if [[ ! -d "${tmp_root}" ]]; then
+  export TMPDIR="/tmp"
+fi
+
 source "${ROOT_DIR}/scripts/lib/release-packages.sh"
 
 require_command() {
@@ -213,16 +218,16 @@ if errors:
     sys.exit(1)
 PY
 
-echo "== cargo publish --dry-run --locked for every release crate =="
+echo "== cargo publish --dry-run --locked --no-verify for every release crate =="
 rm -rf "${package_target_dir}" "${saved_tarball_dir}"
 mkdir -p "${package_target_dir}" "${saved_tarball_dir}"
 for package in "${RELEASE_PACKAGES[@]}"; do
   package_target_dir_run="${package_target_dir}/${package}"
   rm -rf "${package_target_dir_run}"
   mkdir -p "${package_target_dir_run}"
-  echo "-- cargo publish -p ${package} --dry-run --locked --allow-dirty"
+  echo "-- cargo publish -p ${package} --dry-run --locked --allow-dirty --no-verify"
   CARGO_TARGET_DIR="${package_target_dir_run}" \
-    cargo publish -p "${package}" --dry-run --locked --allow-dirty
+    cargo publish -p "${package}" --dry-run --locked --allow-dirty --no-verify
 
   tarball="${package_target_dir_run}/package/${package}-${workspace_version}.crate"
   [[ -f "${tarball}" ]] || {
@@ -230,11 +235,7 @@ for package in "${RELEASE_PACKAGES[@]}"; do
     exit 1
   }
 
-  case "${package}" in
-    telltale|telltale-runtime|telltale-bridge)
-      cp "${tarball}" "${saved_tarball_dir}/"
-      ;;
-  esac
+  cp "${tarball}" "${saved_tarball_dir}/"
 
   rm -rf "${package_target_dir_run}"
 done
@@ -247,13 +248,14 @@ tarball_path() {
 assert_tarball_contains() {
   local package="$1"
   local needle="$2"
-  local tarball
+  local tarball listing
   tarball="$(tarball_path "${package}")"
   [[ -f "${tarball}" ]] || {
     echo "error: missing tarball ${tarball}" >&2
     exit 1
   }
-  tar -tf "${tarball}" | grep -Fq "/${needle}" || {
+  listing="$(tar -tf "${tarball}")"
+  grep -Fq "/${needle}" <<<"${listing}" || {
     echo "error: ${package} tarball missing ${needle}" >&2
     exit 1
   }
@@ -262,16 +264,87 @@ assert_tarball_contains() {
 smoke_packaged_crate() {
   local package="$1"
   shift
-  local tarball tmpdir crate_root
+  local tarball tmpdir crate_root status
   tarball="$(tarball_path "${package}")"
   tmpdir="$(mktemp -d)"
   tar -xf "${tarball}" -C "${tmpdir}"
   crate_root="${tmpdir}/${package}-${workspace_version}"
+  set +e
   (
     cd "${crate_root}"
     CARGO_TARGET_DIR="${tmpdir}/target" "$@"
   )
+  status=$?
+  set -e
   rm -rf "${tmpdir}"
+  return "${status}"
+}
+
+prepare_packaged_registry() {
+  local dest_dir="$1"
+  mkdir -p "${dest_dir}"
+  for package in "${RELEASE_PACKAGES[@]}"; do
+    tar -xf "$(tarball_path "${package}")" -C "${dest_dir}"
+  done
+}
+
+write_patch_section() {
+  local dest_file="$1"
+  local packaged_dir="$2"
+  {
+    echo "[patch.crates-io]"
+    for package in "${RELEASE_PACKAGES[@]}"; do
+      echo "${package} = { path = \"${packaged_dir}/${package}-${workspace_version}\" }"
+    done
+  } >> "${dest_file}"
+}
+
+create_consumer_canary() {
+  local canary_dir="$1"
+  local packaged_dir="$2"
+  local dependency_block="$3"
+  local main_body="$4"
+
+  mkdir -p "${canary_dir}/src"
+  cat > "${canary_dir}/Cargo.toml" <<EOF
+[package]
+name = "$(basename "${canary_dir}")"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+${dependency_block}
+EOF
+  write_patch_section "${canary_dir}/Cargo.toml" "${packaged_dir}"
+  cat > "${canary_dir}/src/main.rs" <<EOF
+${main_body}
+EOF
+}
+
+run_consumer_canary() {
+  local name="$1"
+  local dependency_block="$2"
+  local main_body="$3"
+  shift 3
+  local tmpdir packaged_dir canary_dir status
+  tmpdir="$(mktemp -d)"
+  packaged_dir="${tmpdir}/packaged"
+  canary_dir="${tmpdir}/${name}"
+  prepare_packaged_registry "${packaged_dir}"
+  create_consumer_canary "${canary_dir}" "${packaged_dir}" "${dependency_block}" "${main_body}"
+  set +e
+  (
+    cd "${canary_dir}"
+    CARGO_TARGET_DIR="${tmpdir}/target" \
+      CARGO_INCREMENTAL=0 \
+      CARGO_PROFILE_DEV_DEBUG=0 \
+      "$@"
+  )
+  status=$?
+  set -e
+  rm -rf "${tmpdir}"
+  return "${status}"
 }
 
 echo "== verify packaged resource presence =="
@@ -297,5 +370,64 @@ smoke_packaged_crate telltale-runtime cargo check --lib --all-features
 
 echo "== smoke check packaged telltale-bridge crate =="
 smoke_packaged_crate telltale-bridge cargo check --lib --all-features
+
+echo "== run external consumer canary: telltale =="
+run_consumer_canary \
+  telltale-package-canary \
+  "telltale = { version = \"=${workspace_version}\" }" \
+  'use telltale::tell;
+
+tell! {
+    protocol ExternalCanary =
+      roles A, B
+      A -> B : Ping
+}
+
+fn main() {
+    assert!(ExternalCanary::proof_status::SESSION_PROJECTABLE);
+    assert!(ExternalCanary::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+    println!("root canary ok: {}", ExternalCanary::proof_status::DEADLOCK_AUTOMATION_ELIGIBLE);
+}' \
+  cargo run --quiet
+
+echo "== run external consumer canary: telltale-runtime =="
+run_consumer_canary \
+  telltale-runtime-package-canary \
+  "$(printf 'telltale = { version = \"=%s\" }\ntelltale-runtime = { version = \"=%s\" }' "${workspace_version}" "${workspace_version}")" \
+  'use telltale_runtime::{compile_choreography_with_extensions, tell};
+
+tell! {
+    protocol RuntimeCanary =
+      roles A, B
+      A -> B : Ping
+}
+
+fn main() {
+    let tokens = compile_choreography_with_extensions(
+        "protocol Generated =\n  roles A, B\n  A -> B : Ping\n",
+    )
+    .expect("packaged runtime parser/codegen should succeed");
+    assert!(RuntimeCanary::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+    let rendered = tokens.to_string();
+    assert!(rendered.contains("Generated"));
+    println!("runtime canary ok: {}", rendered.len());
+}' \
+  cargo run --quiet
+
+echo "== run external consumer canary: telltale-bridge =="
+run_consumer_canary \
+  telltale-bridge-package-canary \
+  "$(printf 'serde_json = \"1\"\ntelltale-bridge = { version = \"=%s\" }\ntelltale-types = { version = \"=%s\" }' "${workspace_version}" "${workspace_version}")" \
+  'use telltale_bridge::{global_to_json, json_to_global};
+use telltale_types::{GlobalType, Label};
+
+fn main() {
+    let global = GlobalType::comm("Client", "Server", vec![(Label::new("ping"), GlobalType::End)]);
+    let json = global_to_json(&global);
+    let reparsed = json_to_global(&json).expect("bridge import/export roundtrip should succeed");
+    assert_eq!(reparsed, global);
+    println!("bridge canary ok: {}", serde_json::to_string(&json).unwrap());
+}' \
+  cargo run --quiet
 
 echo "package-artifacts: ok"

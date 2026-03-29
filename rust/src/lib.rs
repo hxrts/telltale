@@ -36,6 +36,7 @@
 pub mod channel;
 
 // Re-export core types (always available)
+pub use futures;
 pub use serde;
 pub use telltale_types as types;
 pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};

@@ -4,6 +4,11 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
+tmp_root="${TMPDIR:-/tmp}"
+if [[ ! -d "${tmp_root}" ]]; then
+  export TMPDIR="/tmp"
+fi
+
 source "${ROOT_DIR}/scripts/lib/release-packages.sh"
 
 workspace_version="$(awk '

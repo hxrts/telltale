@@ -2143,8 +2143,8 @@ fn generate_role_structs(roles: &[Role]) -> TokenStream {
 
     quote! {
         type Channel = ::telltale::channel::Bidirectional<
-            ::futures::channel::mpsc::UnboundedSender<Label>,
-            ::futures::channel::mpsc::UnboundedReceiver<Label>,
+            ::telltale::futures::channel::mpsc::UnboundedSender<Label>,
+            ::telltale::futures::channel::mpsc::UnboundedReceiver<Label>,
         >;
 
         #(#role_structs)*
