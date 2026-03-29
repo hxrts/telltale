@@ -356,11 +356,13 @@ run_consumer_canary() {
   local name="$1"
   local dependency_block="$2"
   local main_body="$3"
-  shift 3
-  local tmpdir packaged_dir canary_dir status
+  local expected_last_line="$4"
+  shift 4
+  local tmpdir packaged_dir canary_dir output status actual_last_line
   tmpdir="$(mktemp -d)"
   packaged_dir="${tmpdir}/packaged"
   canary_dir="${tmpdir}/${name}"
+  output="${tmpdir}/${name}.log"
   prepare_packaged_registry "${packaged_dir}"
   create_consumer_canary "${canary_dir}" "${packaged_dir}" "${dependency_block}" "${main_body}"
   set +e
@@ -370,11 +372,23 @@ run_consumer_canary() {
       CARGO_INCREMENTAL=0 \
       CARGO_PROFILE_DEV_DEBUG=0 \
       "$@"
-  )
+  ) >"${output}" 2>&1
   status=$?
   set -e
+  if [[ "${status}" -ne 0 ]]; then
+    cat "${output}" >&2
+    rm -rf "${tmpdir}"
+    return "${status}"
+  fi
+  actual_last_line="$(awk 'NF { line = $0 } END { print line }' "${output}")"
+  if [[ "${actual_last_line}" != "${expected_last_line}" ]]; then
+    echo "error: ${name} expected last line '${expected_last_line}' but saw '${actual_last_line}'" >&2
+    cat "${output}" >&2
+    rm -rf "${tmpdir}"
+    return 1
+  fi
   rm -rf "${tmpdir}"
-  return "${status}"
+  return 0
 }
 
 echo "== verify packaged resource presence =="
@@ -418,6 +432,7 @@ fn main() {
     assert!(ExternalCanary::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
     println!("root canary ok: {}", ExternalCanary::proof_status::DEADLOCK_AUTOMATION_ELIGIBLE);
 }' \
+  "root canary ok: true" \
   cargo run --quiet
 
 echo "== run external consumer canary: telltale-runtime =="
@@ -442,6 +457,7 @@ fn main() {
     assert!(rendered.contains("Generated"));
     println!("runtime canary ok: {}", rendered.len());
 }' \
+  "runtime canary ok: 304" \
   cargo run --quiet
 
 echo "== run external consumer canary: telltale-bridge =="
@@ -458,6 +474,7 @@ fn main() {
     assert_eq!(reparsed, global);
     println!("bridge canary ok: {}", serde_json::to_string(&json).unwrap());
 }' \
+  'bridge canary ok: {"branches":[{"continuation":{"kind":"end"},"label":{"name":"ping","sort":"unit"}}],"kind":"comm","receiver":"Server","sender":"Client"}' \
   cargo run --quiet
 
 echo "package-artifacts: ok"
