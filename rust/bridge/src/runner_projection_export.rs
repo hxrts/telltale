@@ -207,6 +207,84 @@ impl LeanRunner {
         Ok(result)
     }
 
+    /// Check whether a local type is in the regular practical fragment for automatic
+    /// deadlock-freedom obligations.
+    pub fn check_regular_practical_fragment(
+        &self,
+        local_json: &Value,
+    ) -> Result<RegularPracticalFragmentCheckResult, LeanRunnerError> {
+        let local_file = NamedTempFile::new()?;
+        let output_file = NamedTempFile::new()?;
+
+        std::fs::write(
+            local_file.path(),
+            serde_json::to_string_pretty(local_json)
+                .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
+        )?;
+
+        let mut command = Command::new(&self.binary_path);
+        command
+            .arg("--check-regular-practical-fragment")
+            .arg(local_file.path())
+            .arg("--output")
+            .arg(output_file.path());
+        let output = self.run_command_with_timeout(command, "check_regular_practical_fragment")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+            return Err(LeanRunnerError::ProcessFailed {
+                code: output.status.code().unwrap_or(-1),
+                stderr,
+            });
+        }
+
+        let output_content = std::fs::read_to_string(output_file.path())?;
+        let payload: Value = serde_json::from_str(&output_content)
+            .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
+
+        let success = payload
+            .get("success")
+            .and_then(|v| v.as_bool())
+            .ok_or_else(|| LeanRunnerError::ParseError("missing success field".to_string()))?;
+        if !success {
+            let err = payload
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Lean regular-practical-fragment check failed");
+            return Err(LeanRunnerError::ParseError(err.to_string()));
+        }
+
+        Ok(RegularPracticalFragmentCheckResult {
+            result: payload
+                .get("result")
+                .and_then(|v| v.as_bool())
+                .ok_or_else(|| LeanRunnerError::ParseError("missing result field".to_string()))?,
+            reaches_communication: payload
+                .get("reaches_communication")
+                .and_then(|v| v.as_bool())
+                .ok_or_else(|| {
+                    LeanRunnerError::ParseError("missing reaches_communication field".to_string())
+                })?,
+            well_formed: payload
+                .get("well_formed")
+                .and_then(|v| v.as_bool())
+                .ok_or_else(|| {
+                    LeanRunnerError::ParseError("missing well_formed field".to_string())
+                })?,
+            full_unfold_head: payload
+                .get("full_unfold_head")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    LeanRunnerError::ParseError("missing full_unfold_head field".to_string())
+                })?
+                .to_string(),
+            reason: payload
+                .get("reason")
+                .and_then(|v| v.as_str())
+                .map(str::to_string),
+        })
+    }
+
     /// Run one or more choreographies on the Lean ProtocolMachine at a given concurrency level.
     ///
     /// # Errors

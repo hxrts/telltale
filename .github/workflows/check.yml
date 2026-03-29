@@ -51,6 +51,8 @@ jobs:
         run: just check-lean-bridge-strict
       - name: Run compiler pipeline suites
         run: just check-compiler-pipeline
+      - name: Run deadlock automation suites
+        run: just check-deadlock-automation
       - name: Run concrete refinement suites
         run: just check-concrete-refinement
       - name: Run extension dispatch suites

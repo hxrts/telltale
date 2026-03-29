@@ -281,6 +281,30 @@ impl LocalTypeR {
         }
     }
 
+    /// Count nested recursion binders at the current head position.
+    ///
+    /// Corresponds to Lean's `LocalTypeR.muHeight`.
+    #[must_use]
+    pub fn mu_height(&self) -> usize {
+        match self {
+            LocalTypeR::Mu { body, .. } => 1 + body.mu_height(),
+            _ => 0,
+        }
+    }
+
+    /// Fully unfold leading recursion until a non-`Mu` head is exposed.
+    ///
+    /// Corresponds to Lean's `LocalTypeR.fullUnfold`.
+    #[must_use]
+    pub fn full_unfold(&self) -> LocalTypeR {
+        let mut current = self.clone();
+        let fuel = self.mu_height();
+        for _ in 0..fuel {
+            current = current.unfold();
+        }
+        current
+    }
+
     /// Compute the dual of a local type (swap send/recv).
     ///
     /// The dual of role A's view is role B's view when A and B are the only participants.
@@ -387,6 +411,27 @@ impl LocalTypeR {
             && self.all_choices_non_empty()
             && self.unique_branch_labels()
             && self.is_guarded()
+    }
+
+    /// Check whether full unfolding exposes a communication head.
+    ///
+    /// Corresponds to Lean's `LocalTypeR.reachesCommunication`.
+    #[must_use]
+    pub fn reaches_communication(&self) -> bool {
+        match self.full_unfold() {
+            LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+                !branches.is_empty()
+            }
+            LocalTypeR::End | LocalTypeR::Var(_) | LocalTypeR::Mu { .. } => false,
+        }
+    }
+
+    /// Mechanically characterized practical fragment that needs no manual `ReachesComm`.
+    ///
+    /// Corresponds to Lean's `LocalTypeR.regularPracticalFragment`.
+    #[must_use]
+    pub fn regular_practical_fragment(&self) -> bool {
+        self.well_formed() && self.reaches_communication()
     }
 
     /// Count the depth of a local type (for termination proofs).
@@ -654,6 +699,43 @@ mod tests {
         );
         assert!(guarded.is_guarded());
         assert!(guarded.well_formed()); // Guarded recursion should pass well_formed()
+    }
+
+    #[test]
+    fn test_mu_height_and_full_unfold() {
+        let lt = LocalTypeR::mu(
+            "outer",
+            LocalTypeR::mu(
+                "inner",
+                LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("inner")),
+            ),
+        );
+        assert_eq!(lt.mu_height(), 2);
+        assert_matches!(lt.full_unfold(), LocalTypeR::Send { partner, branches } => {
+            assert_eq!(partner, "B");
+            assert_eq!(branches.len(), 1);
+        });
+    }
+
+    #[test]
+    fn test_reaches_communication_matches_practical_fragment_intent() {
+        assert!(!LocalTypeR::End.reaches_communication());
+        assert!(!LocalTypeR::End.regular_practical_fragment());
+
+        let send = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::End);
+        assert!(send.reaches_communication());
+        assert!(send.regular_practical_fragment());
+
+        let guarded = LocalTypeR::mu(
+            "t",
+            LocalTypeR::recv("B", Label::new("msg"), LocalTypeR::var("t")),
+        );
+        assert!(guarded.reaches_communication());
+        assert!(guarded.regular_practical_fragment());
+
+        let unguarded = LocalTypeR::mu("t", LocalTypeR::var("t"));
+        assert!(!unguarded.reaches_communication());
+        assert!(!unguarded.regular_practical_fragment());
     }
 
     #[test]

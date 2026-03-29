@@ -89,6 +89,21 @@ pub struct LeanValidationResult {
     pub raw_output: String,
 }
 
+/// Result of Lean regular-practical-fragment checking for a projected local type.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RegularPracticalFragmentCheckResult {
+    /// Whether the local type is in the mechanically characterized fragment.
+    pub result: bool,
+    /// Whether full unfolding exposes a communication head.
+    pub reaches_communication: bool,
+    /// Whether the local type is well formed on the Lean side.
+    pub well_formed: bool,
+    /// Head constructor seen after full unfolding.
+    pub full_unfold_head: String,
+    /// Stable diagnostic reason when the type is outside the fragment.
+    pub reason: Option<String>,
+}
+
 /// Runner for invoking the Lean verification binary.
 ///
 /// The runner manages invocation of the `telltale_validator` Lean executable,

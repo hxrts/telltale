@@ -120,7 +120,10 @@ cfg_if! {
             CoherenceBundle, EquivalenceChecker, EquivalenceConfig, EquivalenceError,
             EquivalenceResult, GoldenBundle,
         };
-        pub use runner::{ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult};
+        pub use runner::{
+            ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,
+            RegularPracticalFragmentCheckResult,
+        };
         pub use sim_reference::{
             SimRunInput, SimRunOutput, SimTraceValidation, SimulationStructuredError,
         };

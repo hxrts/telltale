@@ -70,6 +70,7 @@ ci-dry-run lane="fast":
     just check-lean-prebuilt
     just check-lean-bridge-strict
     just check-compiler-pipeline
+    just check-deadlock-automation
     just check-concrete-refinement
     just check-extension-dispatch
     just check-semantic-assurance
@@ -175,6 +176,13 @@ check-source-doc-snippets:
 check-extension-dispatch:
     cargo test -p telltale-runtime --test extension_integration -- --nocapture
     cargo test -p telltale-runtime --features test-utils --test middleware_semantic_hardening -- --nocapture
+
+# Run the Lean-backed regular-fragment deadlock automation suites.
+check-deadlock-automation:
+    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build telltale_validator
+    cargo test -p telltale-types test_reaches_communication_matches_practical_fragment_intent -- --nocapture
+    TELLTALE_REQUIRE_LEAN_PROJECTION_RUNNER=1 cargo test -p telltale-bridge --test regular_practical_fragment_checks -- --nocapture
+    cargo test --test dsl_runtime_semantics_tests generated_proof_status_exposes_ -- --nocapture
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":

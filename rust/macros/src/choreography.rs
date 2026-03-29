@@ -288,15 +288,70 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
     let authority_module = generate_authority_module(choreography)?;
     let commitments_module = generate_commitments_module(choreography)?;
     let agreements_module = generate_agreements_module(choreography)?;
-    let (projectable, projection_error, sessions_module) = match project_local_types(choreography) {
-        Ok(local_types) => (
-            quote!(true),
-            quote!(None),
-            Some(generate_sessions_module(choreography, &local_types)?),
-        ),
+    let deadlock_fragment = LitStr::new(
+        "closed + contractive projected local types whose full unfold exposes send/recv",
+        Span::call_site(),
+    );
+    let (
+        projectable,
+        projection_error,
+        sessions_module,
+        deadlock_automation_eligible,
+        deadlock_automation_roles,
+        deadlock_automation_diagnostic,
+    ) = match project_local_types(choreography) {
+        Ok(local_types) => {
+            let mut eligible_roles = Vec::new();
+            let mut ineligible_roles = Vec::new();
+            for (role, local_type) in &local_types {
+                match telltale_language::ast::convert::local_to_local_r(local_type) {
+                    Ok(local_r) => {
+                        if local_r.regular_practical_fragment() {
+                            eligible_roles
+                                .push(LitStr::new(&role.name().to_string(), Span::call_site()));
+                        } else {
+                            ineligible_roles.push(role.name().to_string());
+                        }
+                    }
+                    Err(err) => {
+                        ineligible_roles
+                            .push(format!("{} (conversion failed: {err})", role.name()));
+                    }
+                }
+            }
+            let automation_eligible = ineligible_roles.is_empty();
+            let automation_eligible = quote!(#automation_eligible);
+            let automation_diagnostic = if ineligible_roles.is_empty() {
+                quote!(None)
+            } else {
+                let reason = LitStr::new(
+                    &format!(
+                        "automatic deadlock-fragment discharge unavailable for roles: {}",
+                        ineligible_roles.join(", ")
+                    ),
+                    Span::call_site(),
+                );
+                quote!(Some(#reason))
+            };
+            (
+                quote!(true),
+                quote!(None),
+                Some(generate_sessions_module(choreography, &local_types)?),
+                automation_eligible,
+                eligible_roles,
+                automation_diagnostic,
+            )
+        }
         Err(err) => {
             let message = syn::LitStr::new(&err.to_string(), Span::call_site());
-            (quote!(false), quote!(Some(#message)), None)
+            (
+                quote!(false),
+                quote!(Some(#message)),
+                None,
+                quote!(false),
+                Vec::new(),
+                quote!(Some("automatic deadlock-fragment discharge unavailable because session projection failed")),
+            )
         }
     };
 
@@ -329,6 +384,19 @@ fn generate_protocol_module(choreography: &Choreography, source: &str) -> Result
 
             #[allow(dead_code)]
             pub const SESSION_PROJECTION_ERROR: Option<&str> = #projection_error;
+
+            #[allow(dead_code)]
+            pub const DEADLOCK_AUTOMATION_FRAGMENT: &str = #deadlock_fragment;
+
+            #[allow(dead_code)]
+            pub const DEADLOCK_AUTOMATION_ELIGIBLE: bool = #deadlock_automation_eligible;
+
+            #[allow(dead_code)]
+            pub const DEADLOCK_AUTOMATION_ROLES: &[&str] = &[#(#deadlock_automation_roles),*];
+
+            #[allow(dead_code)]
+            pub const DEADLOCK_AUTOMATION_DIAGNOSTIC: Option<&str> =
+                #deadlock_automation_diagnostic;
 
             #[allow(dead_code)]
             pub const REQUIRED_THEOREM_PACKS: &[&str] = &[#(#theorem_packs),*];

@@ -444,6 +444,33 @@ fn generated_proof_status_exposes_required_theorem_packs() {
     );
     const _: () = assert!(MacroBundledFlow::proof_status::SESSION_PROJECTABLE);
     const _: () = assert!(MacroBundledFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+    const _: () = assert!(MacroBundledFlow::proof_status::DEADLOCK_AUTOMATION_ELIGIBLE);
+    assert_eq!(
+        MacroBundledFlow::proof_status::DEADLOCK_AUTOMATION_ROLES,
+        ["A", "B"]
+    );
+    assert!(
+        MacroBundledFlow::proof_status::DEADLOCK_AUTOMATION_DIAGNOSTIC.is_none(),
+        "fully projectable ping/pong-style protocols should stay in the automatic fragment"
+    );
+}
+
+#[test]
+fn generated_proof_status_exposes_deadlock_automation_diagnostics() {
+    const _: () = assert!(!MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_ELIGIBLE);
+    assert!(
+        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_ROLES.is_empty(),
+        "non-projectable protocols should not advertise automatic deadlock discharge roles"
+    );
+    assert_eq!(
+        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_FRAGMENT,
+        "closed + contractive projected local types whose full unfold exposes send/recv"
+    );
+    assert!(
+        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_DIAGNOSTIC
+            .expect("non-projectable protocol should explain why automatic deadlock discharge is unavailable")
+            .contains("session projection failed")
+    );
 }
 
 #[test]

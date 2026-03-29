@@ -253,6 +253,56 @@ def runCheckOrphanFree (localPath : System.FilePath)
   IO.FS.writeFile outputPath (payload.pretty ++ "\n")
   pure exitCode
 
+/-! ## Deadlock-Automation Fragment Check Runner -/
+
+/-- Classify the fully-unfolded head shape of a local type. -/
+def fullUnfoldHeadKind (localType : LocalTypeR) : String :=
+  match localType.fullUnfold with
+  | .end => "end"
+  | .var _ => "var"
+  | .mu _ _ => "mu"
+  | .send _ _ => "send"
+  | .recv _ _ => "recv"
+
+/-- Explain why a local type is outside the automatic deadlock fragment. -/
+def regularFragmentReason (localType : LocalTypeR) : Option String :=
+  if localType.isClosed != true then
+    some "local type has free recursion variables"
+  else if localType.isContractive != true then
+    some "local type is not contractive/guarded"
+  else if reachesCommunication localType != true then
+    some s!"full unfolding does not expose a communication head (got {fullUnfoldHeadKind localType})"
+  else
+    none
+
+/-- Export regular-practical-fragment check result to a JSON file. -/
+def runCheckRegularPracticalFragment (localPath : System.FilePath)
+    (outputPath : System.FilePath) : IO UInt32 := do
+  let localResult ← readLocalTypeFile localPath
+  let (payload, exitCode) :=
+    match localResult with
+    | .ok localType =>
+        let result := regularPracticalFragment localType
+        let fields :=
+          [ ("success", Json.bool true)
+          , ("result", Json.bool result)
+          , ("reaches_communication", Json.bool (reachesCommunication localType))
+          , ("well_formed", Json.bool (localType.isClosed && localType.isContractive))
+          , ("full_unfold_head", Json.str (fullUnfoldHeadKind localType))
+          ]
+        let fields :=
+          match regularFragmentReason localType with
+          | some reason => fields.concat ("reason", Json.str reason)
+          | none => fields
+        (Json.mkObj fields, (0 : UInt32))
+    | .error err =>
+        (Json.mkObj
+          [ ("success", Json.bool false)
+          , ("error", Json.str s!"failed to decode local type: {err}")
+          ], (1 : UInt32))
+  IO.FS.writeFile outputPath (payload.pretty ++ "\n")
+  pure exitCode
+
 /-! ## CLI Entry -/
 
 /-- Usage message. -/
@@ -261,7 +311,8 @@ def usage : String :=
   "       telltale_validator --export-projection <path> --role <role> --output <path>\n" ++
   "       telltale_validator --export-all-projections <path> --output <path>\n" ++
   "       telltale_validator --check-async-subtype <subtype-path> <supertype-path> --output <path>\n" ++
-  "       telltale_validator --check-orphan-free <local-type-path> --output <path>"
+  "       telltale_validator --check-orphan-free <local-type-path> --output <path>\n" ++
+  "       telltale_validator --check-regular-practical-fragment <local-type-path> --output <path>"
 
 /-- CLI entry point. -/
 def validatorMain (args : List String) : IO UInt32 :=
@@ -284,6 +335,8 @@ def validatorMain (args : List String) : IO UInt32 :=
       runCheckAsyncSubtype ⟨subPath⟩ ⟨supPath⟩ ⟨outputPath⟩
   | ["--check-orphan-free", localPath, "--output", outputPath] =>
       runCheckOrphanFree ⟨localPath⟩ ⟨outputPath⟩
+  | ["--check-regular-practical-fragment", localPath, "--output", outputPath] =>
+      runCheckRegularPracticalFragment ⟨localPath⟩ ⟨outputPath⟩
   | _ =>
       IO.println usage *> pure (1 : UInt32)
 

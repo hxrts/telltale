@@ -87,6 +87,11 @@ jobs:
           mkdir -p artifacts
           just check-compiler-pipeline | tee artifacts/check-compiler-pipeline.log
 
+      - name: Run deadlock automation suites
+        run: |
+          mkdir -p artifacts
+          just check-deadlock-automation | tee artifacts/check-deadlock-automation.log
+
       - name: Run concrete refinement suites
         run: |
           mkdir -p artifacts
