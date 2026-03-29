@@ -21,7 +21,7 @@ When one of these values changes legitimately:
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 9 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 10 | `rust/macros/tests/macro_ui.rs` |
-| Property buckets with executable assurance suites | 14 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Property buckets with executable assurance suites | 15 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Lean-backed correspondence strict suites | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -41,6 +41,7 @@ When one of these values changes legitimately:
 | Generated topology and transport public-path suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Runtime substrate boundary assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Long-horizon recovery differential harness suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Artifact and release assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
 ## Property Coverage Baseline
@@ -68,6 +69,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Generated deployment path | Public helper end-to-end execution | `rust/runtime/tests/generated_topology_public_path.rs` | `handler(...)`, `with_topology(...)`, and named inline topology helpers are exercised as public surfaces with real loopback remote transport, negative validation coverage, executable region semantics, preservation of inline role-family constraints, and a transport-agnostic runtime topology API |
 | Runtime substrate | Target-aware wrapper contracts | `rust/runtime/tests/runtime_substrate_contracts.rs`, `rust/runtime/tests/wasm_compat.rs` | Native and WASM wrapper seams now have direct regression coverage for `spawn`, `spawn_local`, and deterministic clock/RNG discipline, and deterministic assurance suites are guarded against accidental `SystemClock` / `SystemRng` drift |
 | Recovery | Long-horizon differential harness | `rust/bridge/tests/reconfiguration_recovery_harness.rs` | Ownership-transfer replay artifacts, bridge export/import, topology-derived placement artifacts, atomic multi-step reconfiguration plans, snapshot/restore recovery, and deterministic suffix replay now execute as one end-to-end recovery family with explicit divergence detection |
+| Artifact / release | Packaged-crate and resume verification | `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | Every publishable crate now goes through `cargo publish --dry-run --locked`, packaged tarballs for `telltale`, `telltale-runtime`, and `telltale-bridge` are smoke-checked from extraction roots, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
 
 ## Bridge Normalization Trust Surface
 

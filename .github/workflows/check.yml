@@ -37,6 +37,8 @@ jobs:
         run: just check-verification-inventory
       - name: Audit bridge normalization ledger
         run: just check-bridge-normalization
+      - name: Check packaged crate artifacts
+        run: just check-package-artifacts
       - name: Validate source doc DSL snippets
         run: just check-source-doc-snippets
       - name: Check Lean metrics freshness

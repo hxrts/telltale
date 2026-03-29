@@ -62,6 +62,7 @@ ci-dry-run lane="fast":
     just check-workflow-actions
     just check-verification-inventory
     just check-bridge-normalization
+    just check-package-artifacts
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
     just check-lean-metrics
@@ -272,6 +273,13 @@ check-style-boundaries:
 # Keep a small authoritative verification inventory aligned with source-of-truth metrics.
 check-verification-inventory:
     ./scripts/check/verification-inventory.sh
+
+# Validate publishable crate artifacts from their packaged form, plus package-root
+# resource boundaries and release-script resume behavior.
+check-package-artifacts:
+    ./scripts/check/package-artifacts.sh
+    ./scripts/check/package-resource-audit.sh
+    ./scripts/check/release-recovery.sh
 
 # Audit the trusted bridge normalization surface so new compared fields or
 # schema backfills cannot appear silently.

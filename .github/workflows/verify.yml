@@ -72,6 +72,11 @@ jobs:
           mkdir -p artifacts
           just check-bridge-normalization | tee artifacts/check-bridge-normalization.log
 
+      - name: Check packaged crate artifacts
+        run: |
+          mkdir -p artifacts
+          just check-package-artifacts | tee artifacts/check-package-artifacts.log
+
       - name: Run strict Lean bridge verification lane
         run: |
           mkdir -p artifacts
