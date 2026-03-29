@@ -1,0 +1,198 @@
+#![allow(missing_docs)]
+
+use std::fs;
+use std::path::PathBuf;
+
+use telltale_language::ast::{choreography_to_global, AuthorityMetatheoryTier};
+use telltale_language::parse_choreography_file;
+use telltale_machine::{transported_theorem_boundary, TransportedTheoremUsageClass};
+
+fn repo_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+}
+
+fn read_doc(path: &str) -> String {
+    fs::read_to_string(repo_root().join(path)).unwrap_or_else(|err| panic!("read {path}: {err}"))
+}
+
+fn authority_fixture_path(name: &str) -> PathBuf {
+    repo_root()
+        .join("rust/runtime/tests/ui/authority_pass")
+        .join(format!("{name}.tell"))
+}
+
+fn assert_contains_row(doc: &str, row: &str) {
+    assert!(
+        doc.contains(row),
+        "missing expected docs row:\n{row}\n\ndocument excerpt:\n{}",
+        &doc[..doc.len().min(4000)]
+    );
+}
+
+fn yes_no(value: bool) -> &'static str {
+    if value {
+        "yes"
+    } else {
+        "no"
+    }
+}
+
+fn authority_tier_name(tier: AuthorityMetatheoryTier) -> &'static str {
+    match tier {
+        AuthorityMetatheoryTier::SessionTypedCoordination => "`session_typed_coordination`",
+        AuthorityMetatheoryTier::EvidencePublicationSemanticObjects => {
+            "`evidence_publication_semantic_objects`"
+        }
+        AuthorityMetatheoryTier::RuntimeSemanticOnly => "`runtime_semantic_only`",
+    }
+}
+
+#[test]
+fn capability_admission_source_derived_boundary_rows_match_runtime_contracts() {
+    let doc = read_doc("docs/25_capability_admission.md");
+    assert!(
+        doc.contains("Source-Derived Rows"),
+        "capability admission doc should explicitly mark source-derived rows"
+    );
+
+    for key in [
+        "byzantine_safety_characterization",
+        "protocol_machine_envelope_adherence",
+        "protocol_machine_envelope_admission",
+        "protocol_envelope_bridge",
+    ] {
+        let entry = transported_theorem_boundary()
+            .into_iter()
+            .find(|entry| entry.key == key)
+            .unwrap_or_else(|| panic!("missing transported-theorem boundary entry for {key}"));
+        let usage_class = match entry.usage_class {
+            TransportedTheoremUsageClass::RuntimeCriticalInstantiatedPremise => {
+                "`runtime_critical_instantiated_premise`"
+            }
+            TransportedTheoremUsageClass::BlackBoxPremiseOnly => "`black_box_premise_only`",
+            TransportedTheoremUsageClass::DocumentationBackgroundOnly => {
+                "`documentation_background_only`"
+            }
+        };
+        let assumption_boundary = entry
+            .assumption_boundary
+            .unwrap_or_else(|| "`none`".to_string());
+        let row = format!(
+            "| `{}` | {} | {} | {} | {} |",
+            entry.key,
+            usage_class,
+            yes_no(entry.consumed_by_rust_runtime_admission),
+            yes_no(entry.consumed_by_lean_runtime_gate),
+            assumption_boundary
+        );
+        assert_contains_row(&doc, &row);
+    }
+}
+
+#[test]
+fn authority_language_source_derived_support_matrix_matches_fixture_statuses() {
+    let doc = read_doc("docs/34_authority_language_surface.md");
+    assert!(
+        doc.contains("Source-Derived Support Matrix"),
+        "authority language doc should explicitly mark source-derived support matrices"
+    );
+
+    for (fixture, label, expected_blocker) in [
+        (
+            "call_plain_communication",
+            "`call` with plain communication",
+            None,
+        ),
+        (
+            "choice_observational_binding",
+            "`choice` with observational binding",
+            None,
+        ),
+        (
+            "loop_authoritative_binding",
+            "counted `loop` with authoritative binding",
+            None,
+        ),
+        (
+            "recursion_authoritative_binding",
+            "recursion with authoritative binding",
+            None,
+        ),
+        (
+            "parallel_observational_binding",
+            "`par` with observational binding",
+            Some("Parallel"),
+        ),
+        (
+            "case_authoritative_binding",
+            "`case/of` with authoritative binding",
+            Some("Case"),
+        ),
+        (
+            "timeout_observational_binding",
+            "`timeout` with observational binding",
+            Some("Timeout"),
+        ),
+    ] {
+        let path = authority_fixture_path(fixture);
+        let choreography =
+            parse_choreography_file(&path).unwrap_or_else(|err| panic!("parse {fixture}: {err}"));
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        let language_status = choreography.language_tier_status();
+        let authority_status = choreography.authority_metatheory_status();
+        let blocker = match expected_blocker {
+            Some(expected_blocker) => {
+                let err = choreography_to_global(&choreography)
+                    .expect_err("non-theory-convertible fixture must fail conversion");
+                assert!(
+                    err.to_string().contains(expected_blocker),
+                    "{fixture} should report an explicit {expected_blocker} blocker, got {err}"
+                );
+                format!("`{expected_blocker}`")
+            }
+            None => {
+                choreography_to_global(&choreography)
+                    .unwrap_or_else(|err| panic!("convert {fixture} to GlobalType: {err}"));
+                "`none`".to_string()
+            }
+        };
+
+        let row = format!(
+            "| {} | {} | {} | {} | {} | {} |",
+            label,
+            yes_no(language_status.protocol_machine_executable),
+            yes_no(language_status.session_projectable),
+            yes_no(language_status.theory_convertible),
+            authority_tier_name(authority_status.strongest_tier),
+            blocker
+        );
+        assert_contains_row(&doc, &row);
+    }
+}
+
+#[test]
+fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
+    let doc = read_doc("docs/32_testing_verification_inventory.md");
+
+    for needle in [
+        "The numeric rows in this section are source-derived and checked by",
+        "`scripts/check/verification-inventory.sh`",
+        "The rows in this table are source-derived and checked by",
+        "`scripts/check/bridge-normalization-ledger.sh`",
+        "| semantic-audit tick normalization |",
+        "| runner JSON schema backfill |",
+        "| Public docs as contract |",
+    ] {
+        assert!(
+            doc.contains(needle),
+            "verification inventory should advertise docs-as-contract boundary for {needle}"
+        );
+    }
+
+    assert!(
+        !doc.contains("session-status ordering |"),
+        "removed bridge normalization rows must stay out of the inventory"
+    );
+}

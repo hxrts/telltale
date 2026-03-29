@@ -114,6 +114,19 @@ than a shipped Rust admission dependency today:
   alias, but Rust runtime admission does not currently use it. That gap is now
   explicit rather than implicit.
 
+### Source-Derived Rows
+
+The following rows are source-derived and checked against
+`telltale_machine::transported_theorem_boundary()` by
+`rust/tests/docs_contract_tests.rs`.
+
+| Key | Usage class | Rust runtime admission | Lean runtime gate | Assumption boundary |
+|---|---|---|---|---|
+| `byzantine_safety_characterization` | `runtime_critical_instantiated_premise` | no | yes | Lean theorem-pack gate only; Rust runtime admission does not currently consume this key. |
+| `protocol_machine_envelope_adherence` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
+| `protocol_machine_envelope_admission` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
+| `protocol_envelope_bridge` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
+
 ## Composition Admission
 
 Composed runtime admission in `rust/machine/src/composition.rs` enforces both proof artifacts and runtime gates.

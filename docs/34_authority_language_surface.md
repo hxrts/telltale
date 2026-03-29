@@ -317,11 +317,23 @@ Theory conversion is narrower than projection today:
 - `choice`, `call`, counted loops, and recursion convert today when the surrounding protocol stays in the common subset
 - `par` is session-projectable and protocol-machine executable, but it still has no theory-facing global-type conversion and fails closed with an explicit `Parallel` blocker
 
-Current reviewed matrix:
+### Source-Derived Support Matrix
 
-- `choice`, `call`, counted `loop`, and recursion: session-projectable, protocol-machine executable, and theory-convertible
-- `par`: session-projectable and protocol-machine executable, but intentionally outside the theory-convertible supported subset
-- `case/of` and `timeout`: protocol-machine executable only. They are neither session-projectable nor theory-convertible
+The following rows are source-derived from the checked authority fixture corpus
+and validated by `rust/tests/docs_contract_tests.rs`.
+
+| Fixture surface | Protocol-machine executable | Session-projectable | Theory-convertible | Authority theorem tier | Explicit blocker |
+|---|---|---|---|---|---|
+| `call` with plain communication | yes | yes | yes | `session_typed_coordination` | `none` |
+| `choice` with observational binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
+| counted `loop` with authoritative binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
+| recursion with authoritative binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
+| `par` with observational binding | yes | yes | no | `runtime_semantic_only` | `Parallel` |
+| `case/of` with authoritative binding | yes | no | no | `runtime_semantic_only` | `Case` |
+| `timeout` with observational binding | yes | no | no | `runtime_semantic_only` | `Timeout` |
+
+Explanatory prose below remains hand-written. The table above is the checked
+contract surface for the reviewed authority/control-flow subset.
 
 ## Lowering Boundary
 

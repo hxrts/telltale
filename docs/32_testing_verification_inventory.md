@@ -12,6 +12,9 @@ When one of these values changes legitimately:
 2. refresh this page,
 3. rerun `just check-verification-inventory`.
 
+The numeric rows in this section are source-derived and checked by
+`scripts/check/verification-inventory.sh`.
+
 | Metric | Value | Source |
 |---|---:|---|
 | Lean core-library files | 651 | `lean/CODE_MAP.md` total row |
@@ -21,7 +24,7 @@ When one of these values changes legitimately:
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 9 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 10 | `rust/macros/tests/macro_ui.rs` |
-| Property buckets with executable assurance suites | 20 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Property buckets with executable assurance suites | 21 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Lean-backed correspondence strict suites | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -47,6 +50,7 @@ When one of these values changes legitimately:
 | Concrete protocol-machine refinement suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Compiler and serialization pipeline suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Deadlock automation fragment assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Docs-as-contract assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
 ## Gate Ownership
@@ -92,12 +96,15 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Concrete refinement | Exact cooperative/Lean/threaded state-slice parity plus Lean proof-connected slice | `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/machine/tests/lean_protocol_machine_equivalence.rs`, `rust/machine/tests/threaded_equivalence.rs` | The first concrete protocol-machine refinement slice now compares coroutine/session/scheduler state exactly across Rust, Lean, and canonical threaded execution, exports bounded `u64` bridge fields fail-closed, and is connected to dedicated Lean refinement theorems over the same slice |
 | Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | The supported DSL subset now runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes; bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |
 | Deadlock automation | Lean-sound regular-fragment checker mirrored into Rust diagnostics | `rust/types/src/local.rs`, `rust/bridge/tests/regular_practical_fragment_checks.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | The automatic deadlock-discharge fragment is now mechanically characterized as closed + contractive projected locals whose full unfold exposes send/recv, checked first in Lean on `SessionTypes.LocalTypeR`, mirrored in Rust only for macro/proof-status diagnostics, and exercised end to end through bridge parity and generated `proof_status` surfaces |
+| Public docs as contract | Source-derived capability/admission, authority-support, and trust-surface tables | `rust/tests/docs_contract_tests.rs`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh` | The highest-value public verification/capability docs now separate source-derived tables from explanatory prose, and those rows are checked mechanically against runtime-contract, DSL-tier, and bridge-ledger facts |
 
 ## Bridge Normalization Trust Surface
 
 The Lean bridge still contains a small amount of trusted normalization logic.
 That logic is intentionally narrow and is audited explicitly in CI by
 `just check-bridge-normalization`.
+The rows in this table are source-derived and checked by
+`scripts/check/bridge-normalization-ledger.sh`.
 
 | Surface | Normalization rule | Classification | Why permitted | Enforcing artifacts |
 |---|---|---|---|---|

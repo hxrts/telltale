@@ -119,6 +119,7 @@ check-fast-structure:
     just check-verification-inventory
     just check-bridge-normalization
     just check-fail-closed-mutations
+    just check-docs-as-contract
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
     just check-lean-metrics
@@ -197,6 +198,11 @@ check-tooling-convergence:
 # Validate source markdown DSL snippets against the real parser.
 check-source-doc-snippets:
     ./scripts/check/source-doc-snippets.sh
+
+# Check that key public verification/capability docs stay aligned with
+# source-derived rows and trusted ledgers.
+check-docs-as-contract:
+    ./scripts/check/docs-as-contract.sh
 
 # Deliberately perturb narrow verification boundaries and prove each gate fails closed.
 check-fail-closed-mutations:

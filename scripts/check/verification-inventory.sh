@@ -171,6 +171,12 @@ deadlock_automation_fragment_suites=(
   rust/tests/dsl_runtime_semantics_tests.rs
 )
 
+docs_as_contract_assurance_suites=(
+  rust/tests/docs_contract_tests.rs
+  scripts/check/verification-inventory.sh
+  scripts/check/bridge-normalization-ledger.sh
+)
+
 explicit_unsupported_fail_closed_notes=()
 
 forbidden_inventory_gap_phrases=(
@@ -324,6 +330,7 @@ actual_mutation_fail_closed_assurance_suites=$(count_list "${mutation_fail_close
 actual_concrete_protocol_machine_refinement_suites=$(count_list "${concrete_protocol_machine_refinement_suites[@]}")
 actual_compiler_serialization_pipeline_suites=$(count_list "${compiler_serialization_pipeline_suites[@]}")
 actual_deadlock_automation_fragment_suites=$(count_list "${deadlock_automation_fragment_suites[@]}")
+actual_docs_as_contract_assurance_suites=$(count_list "${docs_as_contract_assurance_suites[@]}")
 actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupported_fail_closed_notes[@]}")
 
 actual_executable_property_buckets=$(
@@ -348,9 +355,10 @@ actual_executable_property_buckets=$(
     bucket_has_coverage "$actual_concrete_protocol_machine_refinement_suites"
     bucket_has_coverage "$actual_compiler_serialization_pipeline_suites"
     bucket_has_coverage "$actual_deadlock_automation_fragment_suites"
+    bucket_has_coverage "$actual_docs_as_contract_assurance_suites"
   ) | awk '{sum += $1} END {print sum + 0}'
 )
-actual_lacking_property_buckets=$((20 - actual_executable_property_buckets))
+actual_lacking_property_buckets=$((21 - actual_executable_property_buckets))
 
 check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
 check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
@@ -378,6 +386,7 @@ check_metric "Mutation fail-closed assurance suites" "$actual_mutation_fail_clos
 check_metric "Concrete protocol-machine refinement suites" "$actual_concrete_protocol_machine_refinement_suites"
 check_metric "Compiler and serialization pipeline suites" "$actual_compiler_serialization_pipeline_suites"
 check_metric "Deadlock automation fragment assurance suites" "$actual_deadlock_automation_fragment_suites"
+check_metric "Docs-as-contract assurance suites" "$actual_docs_as_contract_assurance_suites"
 check_metric "Explicit unsupported or fail-closed property notes" "$actual_explicit_unsupported_fail_closed_notes"
 
 for phrase in "${forbidden_inventory_gap_phrases[@]}"; do
