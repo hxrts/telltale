@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
+mkdir -p "${ROOT_DIR}/.tmp"
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -14,7 +15,7 @@ require_command() {
 require_command python3
 require_command rg
 
-tmpdir="$(mktemp -d)"
+tmpdir="$(mktemp -d "${ROOT_DIR}/.tmp/fail-closed-mutations.XXXXXX")"
 restore_entries=()
 
 cleanup() {
@@ -124,11 +125,11 @@ restore_now docs/34_authority_language_surface.md "${authority_doc_backup}"
 
 replace_once \
   docs/32_testing_verification_inventory.md \
-  "| Handler contract boundary assurance suites | 1 |" \
+  "| Handler contract boundary assurance suites | 2 |" \
   "| Handler contract boundary assurance suites | 999 |"
 assert_gate_fails \
   "verification inventory metric mutation" \
-  'metric `Handler contract boundary assurance suites` documents 999 but actual is 1' \
+  'metric `Handler contract boundary assurance suites` documents 999 but actual is 2' \
   ./scripts/check/verification-inventory.sh
 restore_now docs/32_testing_verification_inventory.md "${doc_backup}"
 

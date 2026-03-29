@@ -152,6 +152,8 @@ name = "generated-topology-public-path-smoke"
 version = "0.1.0"
 edition = "2021"
 
+[workspace]
+
 [dependencies]
 telltale-runtime = {{ path = "{}" }}
 tokio = {{ version = "1.35", features = ["macros", "rt-multi-thread"] }}

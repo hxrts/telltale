@@ -35,6 +35,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
       - name: Run PR-critical assurance lane
         run: just check-pr-critical
+      - name: Run cross-runtime parity gate
+        run: ./scripts/check/cross-runtime-parity.sh --all
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:

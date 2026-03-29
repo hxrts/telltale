@@ -345,6 +345,7 @@ smoke_packaged_crate() {
   crate_root="${tmpdir}/${package}-${workspace_version}"
   packaged_dir="${tmpdir}/packaged"
   prepare_packaged_registry "${packaged_dir}"
+  ensure_standalone_workspace_manifest "${crate_root}/Cargo.toml"
   write_patch_section "${crate_root}/Cargo.toml" "${packaged_dir}"
   set +e
   (
@@ -376,6 +377,13 @@ write_patch_section() {
   } >> "${dest_file}"
 }
 
+ensure_standalone_workspace_manifest() {
+  local manifest_path="$1"
+  if ! rg -q '^\[workspace\]$' "${manifest_path}"; then
+    printf '\n[workspace]\n' >> "${manifest_path}"
+  fi
+}
+
 create_consumer_canary() {
   local canary_dir="$1"
   local packaged_dir="$2"
@@ -393,6 +401,7 @@ publish = false
 [dependencies]
 ${dependency_block}
 EOF
+  ensure_standalone_workspace_manifest "${canary_dir}/Cargo.toml"
   write_patch_section "${canary_dir}/Cargo.toml" "${packaged_dir}"
   cat > "${canary_dir}/src/main.rs" <<EOF
 ${main_body}
