@@ -194,6 +194,8 @@ gate_ownership_recipes=(
   check-fast-structure
   check-focused-assurance
   check-package-artifacts
+  check-pr-critical
+  check-deep-assurance
 )
 
 # ── Helpers ───────────────────────────────────────────────────────────

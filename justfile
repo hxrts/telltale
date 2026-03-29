@@ -57,29 +57,17 @@ ci-dry-run lane="fast":
       export TMPDIR="/tmp"
     fi
     cargo fmt --all -- --check
-    # Fail fast on structural/docs/schema drift before the heavier assurance lanes.
-    just check-fast-structure
-    just check-focused-assurance
-    just check-package-artifacts
+    # Fail fast on the canonical PR-critical verification surface before the broader build/test lanes.
+    just check-pr-critical
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
     just check-arch
-    just check-arch-lean
-    just check-capability-gates
-    just check-release-conformance
     just check-telltale-style
     just check-semantic-name-parity
-    just check-aura-borrowed-lints
-    just check-doc-links-ci
     just check-doc-quality
     just perf-baseline check
-    just check-protocol-machine-placeholders
-    just check-parity
-    just verify-lean-protocol-machine-targets
-    just verify-protocols
-    just verify-track-a
     just perf-baseline sla
     # Benchmark target compilation checks
     just bench-check
@@ -93,13 +81,47 @@ ci-dry-run lane="fast":
     just telltale-lean-check-extended
     just telltale-lean-check-failing
     if [[ "{{lane}}" == "full" ]]; then
-      just verify-lean-full || true
-      just verify-cross-target-matrix
-      just verify-track-b
-      just verify-properties
-      just verify-composition-stress
-      just perf-baseline run
+      just check-deep-assurance
     fi
+
+# Canonical PR-critical verification lane used by fast CI and local dry runs.
+check-pr-critical:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    just check-fast-structure
+    just check-focused-assurance
+    just check-package-artifacts
+    just check-arch-lean
+    just check-protocol-machine-placeholders
+    just check-parity
+    just check-ownership-contracts
+    just check-aura-borrowed-lints
+    just check-doc-links-ci
+    just check-capability-gates
+    just check-release-conformance
+    just verify-lean-protocol-machine-targets
+    just verify-protocols
+    just verify-track-a
+
+# Canonical scheduled deep-assurance lane for larger corpora and redundant heavy checks.
+check-deep-assurance:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    just check-scale-budgets
+    just verify-lean-full || true
+    just verify-cross-target-matrix
+    just verify-track-b
+    just verify-properties
+    just verify-composition-stress
+    just perf-baseline run
 
 # Mirror the markdown link-check action used in GitHub check.yml docs lane
 check-doc-links-ci:
@@ -114,6 +136,7 @@ check-fast-structure:
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
     fi
+    just check-ci-assurance-lanes
     just check-workflow-actions-regression
     just check-workflow-actions
     just check-verification-inventory
@@ -128,7 +151,7 @@ check-fast-structure:
     just check-lean-dependency-pins
 
 # Canonical focused assurance lane: strict Lean-backed correspondence and the
-# highest-signal semantic/property suites that should fail before broad workspace tests.
+# highest-signal PR-critical semantic/property suites that should fail before broad workspace tests.
 check-focused-assurance:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -142,11 +165,14 @@ check-focused-assurance:
     just check-authority-metatheory
     just check-concrete-refinement
     just check-transported-theorem-boundary
-    just check-scale-budgets
     just check-handler-contracts
     just check-extension-dispatch
     just check-semantic-assurance
     just check-runtime-boundaries
+
+# Verify that CI/workflow ownership flows through the canonical PR/deep lane recipes.
+check-ci-assurance-lanes:
+    ./scripts/check/ci-assurance-lanes.sh
 
 # Rust style guide lint check (comprehensive)
 lint:

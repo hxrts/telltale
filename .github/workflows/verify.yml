@@ -37,73 +37,10 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
-      - name: Run fast structural verification lane
+      - name: Run PR-critical assurance lane
         run: |
           mkdir -p artifacts
-          just check-fast-structure | tee artifacts/check-fast-structure.log
-
-      - name: Run focused assurance lane
-        run: |
-          mkdir -p artifacts
-          just check-focused-assurance | tee artifacts/check-focused-assurance.log
-
-      - name: Run packaged artifact assurance lane
-        run: |
-          mkdir -p artifacts
-          just check-package-artifacts | tee artifacts/check-package-artifacts.log
-
-      - name: Run Lean architecture/style checks
-        run: |
-          mkdir -p artifacts
-          just check-arch-lean | tee artifacts/check-arch-lean.log
-
-      - name: Run executable protocol machine placeholder baseline checks
-        run: |
-          mkdir -p artifacts
-          just check-protocol-machine-placeholders | tee artifacts/check-protocol-machine-placeholders.log
-
-      - name: Run parity checks
-        run: |
-          mkdir -p artifacts
-          just check-parity | tee artifacts/check-parity.log
-
-      - name: Run ownership contract checks
-        run: |
-          mkdir -p artifacts
-          just check-ownership-contracts | tee artifacts/check-ownership-contracts.log
-
-      - name: Run Aura-derived boundary checks
-        run: |
-          mkdir -p artifacts
-          just check-aura-borrowed-lints | tee artifacts/check-aura-borrowed-lints.log
-
-      - name: Run docs link checks
-        run: |
-          mkdir -p artifacts
-          ./scripts/check/docs-links.sh | tee artifacts/check-docs-links.log
-
-      - name: Run capability gate checks
-        run: |
-          mkdir -p artifacts
-          just check-capability-gates | tee artifacts/check-capability-gates.log
-
-      - name: Run release conformance checks
-        run: |
-          mkdir -p artifacts
-          just check-release-conformance | tee artifacts/check-release-conformance.log
-
-      - name: Build targeted Lean protocol machine modules
-        run: just verify-lean-protocol-machine-targets
-
-      - name: Run protocol verification lane
-        run: |
-          mkdir -p artifacts
-          just verify-protocols | tee artifacts/verify-protocols.log
-
-      - name: Run Track A gate
-        run: |
-          mkdir -p artifacts
-          just verify-track-a | tee artifacts/verify-track-a.log
+          just check-pr-critical | tee artifacts/check-pr-critical.log
 
       - name: Upload fast-lane artifacts
         uses: actions/upload-artifact@v4
@@ -142,92 +79,15 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
-      - name: Run fast structural verification lane
+      - name: Run PR-critical assurance lane
         run: |
           mkdir -p artifacts
-          just check-fast-structure | tee artifacts/check-fast-structure.log
+          just check-pr-critical | tee artifacts/check-pr-critical.log
 
-      - name: Run focused assurance lane
+      - name: Run scheduled deep-assurance lane
         run: |
           mkdir -p artifacts
-          just check-focused-assurance | tee artifacts/check-focused-assurance.log
-
-      - name: Run packaged artifact assurance lane
-        run: |
-          mkdir -p artifacts
-          just check-package-artifacts | tee artifacts/check-package-artifacts.log
-
-      - name: Run Lean architecture/style checks
-        run: |
-          mkdir -p artifacts
-          just check-arch-lean | tee artifacts/check-arch-lean.log
-
-      - name: Run executable protocol machine placeholder baseline checks
-        run: |
-          mkdir -p artifacts
-          just check-protocol-machine-placeholders | tee artifacts/check-protocol-machine-placeholders.log
-
-      - name: Run parity checks
-        run: |
-          mkdir -p artifacts
-          just check-parity | tee artifacts/check-parity.log
-
-      - name: Run ownership contract checks
-        run: |
-          mkdir -p artifacts
-          just check-ownership-contracts | tee artifacts/check-ownership-contracts.log
-
-      - name: Run Aura-derived boundary checks
-        run: |
-          mkdir -p artifacts
-          just check-aura-borrowed-lints | tee artifacts/check-aura-borrowed-lints.log
-
-      - name: Run docs link checks
-        run: |
-          mkdir -p artifacts
-          ./scripts/check/docs-links.sh | tee artifacts/check-docs-links.log
-
-      - name: Run capability gate checks
-        run: |
-          mkdir -p artifacts
-          just check-capability-gates | tee artifacts/check-capability-gates.log
-
-      - name: Run release conformance checks
-        run: |
-          mkdir -p artifacts
-          just check-release-conformance | tee artifacts/check-release-conformance.log
-
-      - name: Run full Lean build
-        continue-on-error: true
-        run: |
-          mkdir -p artifacts
-          cd lean
-          lake build | tee ../artifacts/lean-full-build.log
-
-      - name: Run cross-target matrix lane
-        run: |
-          mkdir -p artifacts
-          just verify-cross-target-matrix | tee artifacts/verify-cross-target-matrix.log
-
-      - name: Run Track B gate
-        run: |
-          mkdir -p artifacts
-          just verify-track-b | tee artifacts/verify-track-b.log
-
-      - name: Run property-based lane
-        run: |
-          mkdir -p artifacts
-          just verify-properties | tee artifacts/verify-properties.log
-
-      - name: Run composition stress lane
-        run: |
-          mkdir -p artifacts
-          just verify-composition-stress | tee artifacts/verify-composition-stress.log
-
-      - name: Run V2 benchmark matrix
-        run: |
-          mkdir -p artifacts
-          just perf-baseline run | tee artifacts/perf-baseline-run.log
+          just check-deep-assurance | tee artifacts/check-deep-assurance.log
 
       - name: Upload heavy-lane artifacts
         uses: actions/upload-artifact@v4

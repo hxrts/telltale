@@ -62,9 +62,11 @@ than duplicating their inner gate lists by hand.
 
 | Gate | Canonical entry point | Primary owning files | Local run surface | GitHub run surface |
 |---|---|---|---|---|
-| Fast structural verification | `just check-fast-structure` | `justfile`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `scripts/check/source-doc-snippets.sh`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
-| Focused assurance | `just check-focused-assurance` | `justfile`, strict Lean bridge suites, compiler pipeline suites, metatheory/refinement/runtime boundary suites | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
-| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Fast structural verification | `just check-fast-structure` | `justfile`, `scripts/check/ci-assurance-lanes.sh`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `scripts/check/source-doc-snippets.sh`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Focused assurance | `just check-focused-assurance` | `justfile`, strict Lean bridge suites, compiler pipeline suites, metatheory/refinement/runtime boundary suites | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| PR-critical assurance | `just check-pr-critical` | `justfile`, `.github/workflows/check.yml`, `.github/workflows/verify.yml` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Scheduled deep assurance | `just check-deep-assurance` | `justfile`, `.github/workflows/verify.yml`, scale-budget and larger-corpus verification lanes | `just ci-dry-run full`, direct local recipe use | `verify.yml` |
 
 ## Property Coverage Baseline
 

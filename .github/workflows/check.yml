@@ -31,29 +31,15 @@ jobs:
           args: --all -- --check
       - name: Install just
         run: cargo install just --locked
-      - name: Run fast structural verification lane
-        run: just check-fast-structure
-      - name: Run focused assurance lane
-        run: just check-focused-assurance
-      - name: Check packaged crate artifacts
-        run: just check-package-artifacts
+      - name: Install native tooling
+        run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
+      - name: Run PR-critical assurance lane
+        run: just check-pr-critical
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:
           command: build
           args: --workspace --all-targets --all-features
-      - name: Install native tooling
-        run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
-      - name: Run executable protocol machine placeholder baseline checks
-        run: ./scripts/check/protocol-machine-placeholders.sh
-      - name: Run parity checks
-        run: ./scripts/check/cross-runtime-parity.sh --all
-      - name: Run ownership contract checks
-        run: just check-ownership-contracts
-      - name: Run Aura-derived boundary checks
-        run: just check-aura-borrowed-lints
-      - name: Check docs links
-        run: ./scripts/check/docs-links.sh
       - name: Run linter
         uses: actions-rs/cargo@v1
         with:
