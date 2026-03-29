@@ -735,6 +735,10 @@ pub fn compute_trace_diff(
     }))
 }
 
+/// Canonicalize session-status output for comparison.
+///
+/// Only output ordering is normalized here. `sid` and `terminal` remain exact
+/// comparison fields once the list has been sorted.
 fn normalized_session_statuses(
     sessions: &[ProtocolMachineSessionStatus],
 ) -> Vec<ProtocolMachineSessionStatus> {
@@ -933,6 +937,28 @@ mod tests {
         assert_eq!(payload["input"]["schema_version"], input.schema_version);
         assert!(payload["trace"].is_array());
         assert_eq!(payload["trace"][0]["kind"], "sent");
+    }
+
+    #[test]
+    fn normalized_session_statuses_sorts_without_changing_terminality() {
+        let statuses = vec![
+            ProtocolMachineSessionStatus {
+                schema_version: crate::schema::canonical_schema_version(),
+                sid: 3,
+                terminal: true,
+            },
+            ProtocolMachineSessionStatus {
+                schema_version: crate::schema::canonical_schema_version(),
+                sid: 1,
+                terminal: false,
+            },
+        ];
+
+        let normalized = normalized_session_statuses(&statuses);
+        assert_eq!(normalized[0].sid, 1);
+        assert!(!normalized[0].terminal);
+        assert_eq!(normalized[1].sid, 3);
+        assert!(normalized[1].terminal);
     }
 
     #[test]

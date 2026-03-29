@@ -215,23 +215,28 @@ fn strict_protocol_machine_runner_required() -> bool {
         .unwrap_or(false)
 }
 
-fn run_reference_or_skip(
-    runner: &ProtocolMachineRunner,
-    input: &SimRunInput,
-) -> Option<SimRunOutput> {
+fn protocol_machine_runner() -> ProtocolMachineRunner {
+    if strict_protocol_machine_runner_required() || strict_simulation_trace_validation_required() {
+        ProtocolMachineRunner::require_available();
+    }
+    ProtocolMachineRunner::try_new()
+        .expect("Lean protocol-machine runner must be available for simulator parity tests")
+}
+
+fn run_reference(runner: &ProtocolMachineRunner, input: &SimRunInput) -> SimRunOutput {
     match runner.run_reference_simulation(input) {
-        Ok(out) => Some(out),
+        Ok(out) => out,
         Err(err) => panic!("run_reference_simulation failed: {err}"),
     }
 }
 
-fn validate_sim_trace_or_skip(
+fn validate_sim_trace(
     runner: &ProtocolMachineRunner,
     input: &SimRunInput,
     trace: &[ProtocolMachineTraceEvent],
-) -> Option<SimTraceValidation> {
+) -> SimTraceValidation {
     match runner.validate_simulation_trace(input, trace) {
-        Ok(out) => Some(out),
+        Ok(out) => out,
         Err(err) => panic!("validate_simulation_trace failed: {err}"),
     }
 }
@@ -536,16 +541,10 @@ fn to_sim_run_input(fixture: &SimFixture) -> SimRunInput {
 #[allow(clippy::needless_pass_by_value)]
 fn assert_reference_execution(fixture: SimFixture) {
     let rust_result = run_rust_scenario(&fixture);
-
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let input = to_sim_run_input(&fixture);
-    let Some(lean_out) = run_reference_or_skip(&runner, &input) else {
-        return;
-    };
+    let lean_out = run_reference(&runner, &input);
 
     let rust_events: Vec<ProtocolMachineTraceEvent> = rust_result
         .replay
@@ -645,14 +644,7 @@ fn test_reference_simulator_parity_three_role_ring_loop() {
 #[test]
 fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
     let fixtures = [ping_pong_loop_fixture(), three_role_ring_fixture()];
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        assert!(
-            !strict_simulation_trace_validation_required() && !strict_protocol_machine_runner_required(),
-            "strict simulation trace validation is enabled but the protocol-machine runner is unavailable"
-        );
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     for fixture in fixtures {
         let rust_result = run_rust_scenario(&fixture);
@@ -663,9 +655,7 @@ fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
             .iter()
             .filter_map(obs_to_semantic_audit_event)
             .collect();
-        let Some(validation) = validate_sim_trace_or_skip(&runner, &input, &rust_events) else {
-            return;
-        };
+        let validation = validate_sim_trace(&runner, &input, &rust_events);
 
         assert!(
             validation.valid,
@@ -678,14 +668,7 @@ fn test_rust_simulator_trace_validates_under_lean_reference_rules() {
 #[test]
 fn test_lean_reference_validation_rejects_tampered_simulator_trace() {
     let fixture = ping_pong_loop_fixture();
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        assert!(
-            !strict_simulation_trace_validation_required() && !strict_protocol_machine_runner_required(),
-            "strict simulation trace validation is enabled but the protocol-machine runner is unavailable"
-        );
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let rust_result = run_rust_scenario(&fixture);
     let input = to_sim_run_input(&fixture);
@@ -702,9 +685,7 @@ fn test_lean_reference_validation_rejects_tampered_simulator_trace() {
         .expect("simulator trace must contain a message event");
     first_message.label = Some("tampered_sim_label".to_string());
 
-    let Some(validation) = validate_sim_trace_or_skip(&runner, &input, &rust_events) else {
-        return;
-    };
+    let validation = validate_sim_trace(&runner, &input, &rust_events);
 
     assert!(
         !validation.valid,

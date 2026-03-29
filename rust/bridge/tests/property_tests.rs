@@ -20,6 +20,12 @@ struct GeneratedProtocol {
     local_types: BTreeMap<String, LocalTypeR>,
 }
 
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
 fn singleton_protocol() -> GeneratedProtocol {
     let mut local_types = BTreeMap::new();
     local_types.insert("Solo".to_string(), LocalTypeR::End);
@@ -315,6 +321,9 @@ proptest! {
             .map_err(proptest::test_runner::TestCaseError::fail)?;
 
         let Some(runner) = ProtocolMachineRunner::try_new() else {
+            if strict_protocol_machine_runner_required() {
+                ProtocolMachineRunner::require_available();
+            }
             return Ok(());
         };
 
@@ -343,6 +352,9 @@ proptest! {
     ) {
         let local_ok = runtime_check_invariant(&protocol, &claims);
         let Some(runner) = ProtocolMachineRunner::try_new() else {
+            if strict_protocol_machine_runner_required() {
+                ProtocolMachineRunner::require_available();
+            }
             return Ok(());
         };
 

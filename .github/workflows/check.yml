@@ -35,6 +35,8 @@ jobs:
         run: just check-workflow-actions
       - name: Check verification inventory freshness
         run: just check-verification-inventory
+      - name: Audit bridge normalization ledger
+        run: just check-bridge-normalization
       - name: Validate source doc DSL snippets
         run: just check-source-doc-snippets
       - name: Check Lean metrics freshness

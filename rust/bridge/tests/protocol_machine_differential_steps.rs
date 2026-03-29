@@ -26,18 +26,12 @@ fn strict_protocol_machine_runner_required() -> bool {
         .unwrap_or(false)
 }
 
-fn protocol_machine_runner() -> Option<ProtocolMachineRunner> {
-    match ProtocolMachineRunner::try_new() {
-        Some(runner) => Some(runner),
-        None => {
-            assert!(
-                !strict_protocol_machine_runner_required(),
-                "strict protocol-machine runner verification is enabled but the Lean runner is unavailable"
-            );
-            eprintln!("SKIPPED: Lean protocol-machine runner not available");
-            None
-        }
+fn protocol_machine_runner() -> ProtocolMachineRunner {
+    if strict_protocol_machine_runner_required() {
+        ProtocolMachineRunner::require_available();
     }
+    ProtocolMachineRunner::try_new()
+        .expect("Lean protocol-machine runner must be available for differential step tests")
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -148,10 +142,6 @@ fn canonical_event(event: &ProtocolMachineTraceEvent) -> serde_json::Value {
         "output_digest": event.output_digest,
         "passed": event.passed
     })
-}
-
-fn lean_trace_is_load_only(trace: &[ProtocolMachineTraceEvent]) -> bool {
-    !trace.is_empty() && trace.iter().all(|ev| ev.kind == "opened")
 }
 
 fn obs_to_semantic_audit_event(ev: &ObsEvent) -> Option<ProtocolMachineTraceEvent> {
@@ -350,13 +340,6 @@ fn assert_step_indexed_equivalence(
     let lean_output = runner
         .run_protocol_machine(&input)
         .unwrap_or_else(|e| panic!("run lean protocol machine for {}: {e}", fixture.name));
-    if lean_trace_is_load_only(&lean_output.trace) {
-        eprintln!(
-            "SKIPPED: Lean protocol-machine runner produced load-only trace for {}",
-            fixture.name
-        );
-        return;
-    }
     let lean_steps = lean_output.step_states.clone();
     let lean_events: Vec<TickedObsEvent<ProtocolMachineTraceEvent>> = lean_steps
         .iter()
@@ -368,13 +351,11 @@ fn assert_step_indexed_equivalence(
         })
         .collect();
     let lean_normalized = normalize_semantic_audit(&lean_events);
-    if lean_normalized.is_empty() && !rust_normalized.is_empty() {
-        eprintln!(
-            "SKIPPED: Lean protocol-machine runner emitted no step-level observables for {}",
-            fixture.name
-        );
-        return;
-    }
+    assert!(
+        !lean_normalized.is_empty() || rust_normalized.is_empty(),
+        "Lean protocol-machine runner emitted no step-level observables for {}",
+        fixture.name
+    );
 
     let min_len = rust_normalized.len().min(lean_normalized.len());
     for idx in 0..min_len {
@@ -472,9 +453,7 @@ fn assert_step_indexed_equivalence(
 
 #[test]
 fn tier1_step_indexed_correspondence() {
-    let Some(runner) = protocol_machine_runner() else {
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let fixtures = [
         test_choreographies::ping_pong(),
@@ -488,9 +467,7 @@ fn tier1_step_indexed_correspondence() {
 
 #[test]
 fn tier2_step_indexed_correspondence() {
-    let Some(runner) = protocol_machine_runner() else {
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let fixture = test_choreographies::tier2_control_flow::binary_choice();
     assert_step_indexed_equivalence(&fixture, 320, &runner);

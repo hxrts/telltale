@@ -23,18 +23,12 @@ fn strict_protocol_machine_runner_required() -> bool {
         .unwrap_or(false)
 }
 
-fn protocol_machine_runner() -> Option<ProtocolMachineRunner> {
-    match ProtocolMachineRunner::try_new() {
-        Some(runner) => Some(runner),
-        None => {
-            assert!(
-                !strict_protocol_machine_runner_required(),
-                "strict protocol-machine runner verification is enabled but the Lean runner is unavailable"
-            );
-            eprintln!("SKIPPED: Lean protocol-machine runner not available");
-            None
-        }
+fn protocol_machine_runner() -> ProtocolMachineRunner {
+    if strict_protocol_machine_runner_required() {
+        ProtocolMachineRunner::require_available();
     }
+    ProtocolMachineRunner::try_new()
+        .expect("Lean protocol-machine runner must be available for correspondence tests")
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -285,10 +279,6 @@ fn fixture_to_choreography_json(
     }
 }
 
-fn lean_trace_is_load_only(trace: &[ProtocolMachineTraceEvent]) -> bool {
-    !trace.is_empty() && trace.iter().all(|ev| ev.kind == "opened")
-}
-
 fn assert_stepwise_prefix_equivalent(
     fixture_name: &str,
     result: &telltale_bridge::ComparisonResult,
@@ -310,17 +300,11 @@ fn test_protocol_machine_semantic_audit_correspondence_ping_pong() {
     let fixture = test_choreographies::ping_pong();
     let rust_output = run_rust_vm(&fixture, 200).expect("run rust ProtocolMachine");
 
-    let Some(runner) = protocol_machine_runner() else {
-        return;
-    };
+    let runner = protocol_machine_runner();
     let choreography = fixture_to_choreography_json(&fixture);
     let result = runner
         .compare_execution(&choreography, &rust_output)
         .expect("compare execution");
-    if lean_trace_is_load_only(&result.lean_output.trace) {
-        eprintln!("SKIPPED: Lean protocol-machine runner produced load-only trace");
-        return;
-    }
     assert!(
         result.equivalent,
         "trace mismatch for ping_pong: {:?}",
@@ -341,9 +325,7 @@ fn test_protocol_machine_semantic_audit_correspondence_all_tier1() {
         test_choreographies::chain(),
     ];
 
-    let Some(runner) = protocol_machine_runner() else {
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     for fixture in fixtures {
         let rust_output = run_rust_vm(&fixture, 250)
@@ -352,10 +334,6 @@ fn test_protocol_machine_semantic_audit_correspondence_all_tier1() {
         let result = runner
             .compare_execution(&choreography, &rust_output)
             .unwrap_or_else(|err| panic!("compare execution for {}: {err}", fixture.name));
-        if lean_trace_is_load_only(&result.lean_output.trace) {
-            eprintln!("SKIPPED: Lean protocol-machine runner produced load-only trace");
-            return;
-        }
 
         assert!(
             result.equivalent,
@@ -381,9 +359,7 @@ fn test_protocol_machine_semantic_audit_correspondence_tier2_to_tier4() {
         test_choreographies::tier4_classical::queue_observer(),
     ];
 
-    let Some(runner) = protocol_machine_runner() else {
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     for fixture in fixtures {
         let rust_output = run_rust_vm(&fixture, 300)
@@ -392,10 +368,6 @@ fn test_protocol_machine_semantic_audit_correspondence_tier2_to_tier4() {
         let result = runner
             .compare_execution(&choreography, &rust_output)
             .unwrap_or_else(|err| panic!("compare execution for {}: {err}", fixture.name));
-        if lean_trace_is_load_only(&result.lean_output.trace) {
-            eprintln!("SKIPPED: Lean protocol-machine runner produced load-only trace");
-            return;
-        }
 
         assert!(
             result.equivalent,

@@ -129,10 +129,13 @@ fn strict_protocol_machine_runner_required() -> bool {
         .unwrap_or(false)
 }
 
-fn unsupported_reconfiguration_validation(stderr: &str) -> bool {
-    stderr.contains("validateReconfigurationTransition")
-        || stderr.contains("unknown operation")
-        || stderr.contains("unsupported operation")
+fn protocol_machine_runner() -> ProtocolMachineRunner {
+    if strict_protocol_machine_runner_required() {
+        ProtocolMachineRunner::require_available();
+    }
+    ProtocolMachineRunner::try_new().expect(
+        "Lean protocol-machine runner must be available for reconfiguration admission tests",
+    )
 }
 
 #[test]
@@ -600,12 +603,7 @@ fn exported_reconfiguration_claims_reject_runtime_without_matching_capabilities(
 
 #[test]
 fn exported_reconfiguration_transition_matches_lean_reference_event() {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        if strict_protocol_machine_runner_required() {
-            ProtocolMachineRunner::require_available();
-        }
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let exported = exported_bundle(InvariantClaims {
         distributed: DistributedClaims {
@@ -643,26 +641,15 @@ fn exported_reconfiguration_transition_matches_lean_reference_event() {
         .reconfigure_bundle(0, ["Bob", "Dora", "Carol"])
         .expect("apply accepted reconfiguration");
 
-    let validation = match runner.validate_reconfiguration_transition(
-        &rust_event.artifact_id,
-        &policy,
-        0,
-        &rust_event.previous_members,
-        &rust_event.next_members,
-    ) {
-        Ok(validation) => validation,
-        Err(telltale_bridge::ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_reconfiguration_validation(&stderr) =>
-        {
-            assert!(
-                !strict_protocol_machine_runner_required(),
-                "strict protocol-machine runner verification is enabled but validateReconfigurationTransition is unsupported: {stderr}"
-            );
-            eprintln!("SKIPPED: validateReconfigurationTransition unsupported: {stderr}");
-            return;
-        }
-        Err(err) => panic!("lean reconfiguration validation should execute: {err}"),
-    };
+    let validation = runner
+        .validate_reconfiguration_transition(
+            &rust_event.artifact_id,
+            &policy,
+            0,
+            &rust_event.previous_members,
+            &rust_event.next_members,
+        )
+        .unwrap_or_else(|err| panic!("lean reconfiguration validation should execute: {err}"));
 
     assert!(
         validation.valid,
@@ -674,12 +661,7 @@ fn exported_reconfiguration_transition_matches_lean_reference_event() {
 
 #[test]
 fn invalid_reconfiguration_transition_matches_lean_rejection() {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        if strict_protocol_machine_runner_required() {
-            ProtocolMachineRunner::require_available();
-        }
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let exported = exported_bundle(InvariantClaims {
         distributed: DistributedClaims {
@@ -721,26 +703,15 @@ fn invalid_reconfiguration_transition_matches_lean_rejection() {
         CompositionError::OverlapRequiredViolation { .. }
     ));
 
-    let validation = match runner.validate_reconfiguration_transition(
-        "cert/bridge-reconfig-invalid",
-        &policy,
-        0,
-        &["Alice".to_string(), "Bob".to_string()],
-        &["Carol".to_string(), "Dora".to_string()],
-    ) {
-        Ok(validation) => validation,
-        Err(telltale_bridge::ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_reconfiguration_validation(&stderr) =>
-        {
-            assert!(
-                !strict_protocol_machine_runner_required(),
-                "strict protocol-machine runner verification is enabled but validateReconfigurationTransition is unsupported: {stderr}"
-            );
-            eprintln!("SKIPPED: validateReconfigurationTransition unsupported: {stderr}");
-            return;
-        }
-        Err(err) => panic!("lean reconfiguration validation should execute: {err}"),
-    };
+    let validation = runner
+        .validate_reconfiguration_transition(
+            "cert/bridge-reconfig-invalid",
+            &policy,
+            0,
+            &["Alice".to_string(), "Bob".to_string()],
+            &["Carol".to_string(), "Dora".to_string()],
+        )
+        .unwrap_or_else(|err| panic!("lean reconfiguration validation should execute: {err}"));
 
     assert!(!validation.valid, "invalid transition must reject in Lean");
     assert!(
@@ -762,12 +733,7 @@ fn invalid_reconfiguration_transition_matches_lean_rejection() {
 
 #[test]
 fn reconfiguration_plan_with_runtime_topology_artifacts_matches_lean_step_validation() {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        if strict_protocol_machine_runner_required() {
-            ProtocolMachineRunner::require_available();
-        }
-        return;
-    };
+    let runner = protocol_machine_runner();
 
     let exported = exported_bundle(InvariantClaims {
         distributed: DistributedClaims {
@@ -886,26 +852,15 @@ fn reconfiguration_plan_with_runtime_topology_artifacts_matches_lean_step_valida
     );
 
     for phase in &execution.phases {
-        let validation = match runner.validate_reconfiguration_transition(
-            &phase.event.artifact_id,
-            &policy,
-            phase.event.epoch.saturating_sub(1),
-            &phase.event.previous_members,
-            &phase.event.next_members,
-        ) {
-            Ok(validation) => validation,
-            Err(telltale_bridge::ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-                if unsupported_reconfiguration_validation(&stderr) =>
-            {
-                assert!(
-                    !strict_protocol_machine_runner_required(),
-                    "strict protocol-machine runner verification is enabled but validateReconfigurationTransition is unsupported: {stderr}"
-                );
-                eprintln!("SKIPPED: validateReconfigurationTransition unsupported: {stderr}");
-                return;
-            }
-            Err(err) => panic!("lean reconfiguration validation should execute: {err}"),
-        };
+        let validation = runner
+            .validate_reconfiguration_transition(
+                &phase.event.artifact_id,
+                &policy,
+                phase.event.epoch.saturating_sub(1),
+                &phase.event.previous_members,
+                &phase.event.next_members,
+            )
+            .unwrap_or_else(|err| panic!("lean reconfiguration validation should execute: {err}"));
         assert!(
             validation.valid,
             "accepted reconfiguration plan phase should validate in Lean: {:?}",

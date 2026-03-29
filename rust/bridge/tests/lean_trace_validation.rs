@@ -26,8 +26,6 @@ enum TraceValidationOutcome {
     Invalid {
         errors: Vec<telltale_bridge::LeanStructuredError>,
     },
-    MissingRunner,
-    UnsupportedOperation(String),
 }
 
 fn strict_protocol_machine_trace_validation_required() -> bool {
@@ -40,13 +38,6 @@ fn strict_protocol_machine_runner_required() -> bool {
     std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
         .map(|value| value != "0")
         .unwrap_or(false)
-}
-
-fn unsupported_validate_trace(stderr: &str) -> bool {
-    stderr.contains("validateTrace")
-        || stderr.contains("unknown operation")
-        || stderr.contains("unsupported operation")
-        || stderr.contains("missing choreographies")
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -253,14 +244,13 @@ fn validate_trace(
     fixture: &test_choreographies::ProtocolFixture,
     trace: &[ProtocolMachineTraceEvent],
 ) -> Result<TraceValidationOutcome, ProtocolMachineRunnerError> {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        if strict_protocol_machine_trace_validation_required()
-            || strict_protocol_machine_runner_required()
-        {
-            ProtocolMachineRunner::require_available();
-        }
-        return Ok(TraceValidationOutcome::MissingRunner);
-    };
+    if strict_protocol_machine_trace_validation_required()
+        || strict_protocol_machine_runner_required()
+    {
+        ProtocolMachineRunner::require_available();
+    }
+    let runner = ProtocolMachineRunner::try_new()
+        .expect("Lean protocol-machine runner must be available for trace validation tests");
 
     let choreography = ChoreographyJson {
         schema_version: canonical_schema_version(),
@@ -273,15 +263,6 @@ fn validate_trace(
         Ok(validation) => Ok(TraceValidationOutcome::Invalid {
             errors: validation.errors,
         }),
-        Err(ProtocolMachineRunnerError::ProcessFailed { stderr, .. })
-            if unsupported_validate_trace(&stderr) =>
-        {
-            assert!(
-                !strict_protocol_machine_trace_validation_required(),
-                "strict protocol-machine trace validation is enabled but validateTrace is unsupported: {stderr}"
-            );
-            Ok(TraceValidationOutcome::UnsupportedOperation(stderr))
-        }
         Err(err) => Err(err),
     }
 }
@@ -309,19 +290,6 @@ fn lean_validate_trace_support_matrix_is_explicit() {
         .expect("validate_trace support probe should not hard-fail")
     {
         TraceValidationOutcome::Valid | TraceValidationOutcome::Invalid { .. } => {}
-        TraceValidationOutcome::MissingRunner => {
-            assert!(
-                !strict_protocol_machine_runner_required(),
-                "strict protocol-machine runner verification is enabled but the runner is unavailable"
-            );
-            eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        }
-        TraceValidationOutcome::UnsupportedOperation(stderr) => {
-            assert!(
-                unsupported_validate_trace(&stderr),
-                "unsupported validateTrace path should preserve classifier diagnostic"
-            );
-        }
     }
 }
 
@@ -331,17 +299,6 @@ fn lean_accepts_rust_protocol_machine_trace_corpus() {
         let trace = run_rust_semantic_audit(&fixture, 128);
         match validate_trace(&fixture, &trace).expect("validate_trace should not hard-fail") {
             TraceValidationOutcome::Valid => {}
-            TraceValidationOutcome::MissingRunner => {
-                eprintln!("SKIPPED: Lean protocol-machine runner not available");
-                return;
-            }
-            TraceValidationOutcome::UnsupportedOperation(stderr) => {
-                eprintln!(
-                    "SKIPPED: validateTrace unsupported for {}: {stderr}",
-                    fixture.name
-                );
-                return;
-            }
             TraceValidationOutcome::Invalid { errors } => panic!(
                 "Lean validateTrace rejected accepted Rust trace for {}: {:?}",
                 fixture.name, errors
@@ -370,12 +327,6 @@ fn lean_rejects_tampered_protocol_machine_trace_with_structured_errors() {
                 errors
             );
         }
-        TraceValidationOutcome::MissingRunner => {
-            eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        }
-        TraceValidationOutcome::UnsupportedOperation(stderr) => {
-            eprintln!("SKIPPED: validateTrace unsupported: {stderr}");
-        }
         TraceValidationOutcome::Valid => {
             panic!("tampered protocol-machine trace unexpectedly validated");
         }
@@ -384,13 +335,12 @@ fn lean_rejects_tampered_protocol_machine_trace_with_structured_errors() {
 
 #[test]
 fn lean_accepts_projectable_authority_control_flow_trace_corpus() {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        if strict_protocol_machine_runner_required() {
-            ProtocolMachineRunner::require_available();
-        }
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        return;
-    };
+    if strict_protocol_machine_runner_required() {
+        ProtocolMachineRunner::require_available();
+    }
+    let runner = ProtocolMachineRunner::try_new().expect(
+        "Lean protocol-machine runner must be available for authority control-flow trace validation",
+    );
 
     for fixture in [
         "call_plain_communication",

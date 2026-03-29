@@ -69,6 +69,18 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Runtime substrate | Target-aware wrapper contracts | `rust/runtime/tests/runtime_substrate_contracts.rs`, `rust/runtime/tests/wasm_compat.rs` | Native and WASM wrapper seams now have direct regression coverage for `spawn`, `spawn_local`, and deterministic clock/RNG discipline, and deterministic assurance suites are guarded against accidental `SystemClock` / `SystemRng` drift |
 | Recovery | Long-horizon differential harness | `rust/bridge/tests/reconfiguration_recovery_harness.rs` | Ownership-transfer replay artifacts, bridge export/import, topology-derived placement artifacts, atomic multi-step reconfiguration plans, snapshot/restore recovery, and deterministic suffix replay now execute as one end-to-end recovery family with explicit divergence detection |
 
+## Bridge Normalization Trust Surface
+
+The Lean bridge still contains a small amount of trusted normalization logic.
+That logic is intentionally narrow and is audited explicitly in CI by
+`just check-bridge-normalization`.
+
+| Surface | Normalization rule | Why permitted | Enforcing artifacts |
+|---|---|---|---|
+| semantic-audit tick normalization | Normalize only `tick`, and only per extracted session id | Absolute cross-session scheduling order is not semantic protocol truth; per-session observable order is | `rust/bridge/src/protocol_machine_trace.rs`, `rust/bridge/tests/protocol_machine_correspondence_tests.rs`, `rust/bridge/tests/protocol_machine_differential_steps.rs` |
+| session-status ordering | Sort session-status rows by `sid` before comparison | Output list order is not semantic; `sid` and `terminal` remain exact comparison fields | `rust/bridge/src/protocol_machine_runner.rs` |
+| runner JSON schema backfill | Inject missing `schema_version` fields only at the root, nested trace/session/step-event nodes, and semantic-object export | Older runner payloads may omit nested schema tags; the bridge must not synthesize semantic fields | `rust/bridge/src/protocol_machine_runner_json_parsing.rs`, `scripts/check/bridge-normalization-ledger.sh` |
+
 ## Explicit Unsupported / Fail-Closed Notes
 
 No explicit unsupported or fail-closed implementation-gap notes remain in the

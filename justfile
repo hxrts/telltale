@@ -61,6 +61,7 @@ ci-dry-run lane="fast":
     just check-workflow-actions-regression
     just check-workflow-actions
     just check-verification-inventory
+    just check-bridge-normalization
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
     just check-lean-metrics
@@ -271,6 +272,11 @@ check-style-boundaries:
 # Keep a small authoritative verification inventory aligned with source-of-truth metrics.
 check-verification-inventory:
     ./scripts/check/verification-inventory.sh
+
+# Audit the trusted bridge normalization surface so new compared fields or
+# schema backfills cannot appear silently.
+check-bridge-normalization:
+    ./scripts/check/bridge-normalization-ledger.sh
 
 # Run the highest-signal semantic assurance suites directly.
 check-semantic-assurance:

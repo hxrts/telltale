@@ -67,6 +67,11 @@ jobs:
           mkdir -p artifacts
           just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
 
+      - name: Audit bridge normalization ledger
+        run: |
+          mkdir -p artifacts
+          just check-bridge-normalization | tee artifacts/check-bridge-normalization.log
+
       - name: Run strict Lean bridge verification lane
         run: |
           mkdir -p artifacts

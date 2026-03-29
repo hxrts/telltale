@@ -10,7 +10,6 @@ use telltale_bridge::{
 #[derive(Debug)]
 enum BundleVerificationOutcome {
     Verified(InvariantVerificationResult),
-    MissingRunner,
 }
 
 fn strict_protocol_bundle_verification_required() -> bool {
@@ -28,14 +27,11 @@ fn strict_protocol_machine_runner_required() -> bool {
 fn verify_bundle(
     bundle: &telltale_bridge::ProtocolBundle,
 ) -> Result<BundleVerificationOutcome, ProtocolMachineRunnerError> {
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        if strict_protocol_bundle_verification_required()
-            || strict_protocol_machine_runner_required()
-        {
-            ProtocolMachineRunner::require_available();
-        }
-        return Ok(BundleVerificationOutcome::MissingRunner);
-    };
+    if strict_protocol_bundle_verification_required() || strict_protocol_machine_runner_required() {
+        ProtocolMachineRunner::require_available();
+    }
+    let runner = ProtocolMachineRunner::try_new()
+        .expect("Lean protocol-machine runner must be available for invariant verification");
 
     runner
         .verify_invariants(bundle)
@@ -47,10 +43,6 @@ fn verified_result_or_skip(
 ) -> Option<InvariantVerificationResult> {
     match outcome {
         Ok(BundleVerificationOutcome::Verified(result)) => Some(result),
-        Ok(BundleVerificationOutcome::MissingRunner) => {
-            eprintln!("SKIPPED: Lean protocol-machine runner not available");
-            None
-        }
         Err(err) => panic!("verify_invariants failed unexpectedly: {err}"),
     }
 }
@@ -58,10 +50,11 @@ fn verified_result_or_skip(
 #[test]
 fn test_verify_protocol_bundle_classifies_expected_stderr_patterns() {
     let fixture = test_choreographies::tier3_distributed::simple_majority();
-    let Some(runner) = ProtocolMachineRunner::try_new() else {
-        eprintln!("SKIPPED: Lean protocol-machine runner not available");
-        return;
-    };
+    if strict_protocol_machine_runner_required() {
+        ProtocolMachineRunner::require_available();
+    }
+    let runner = ProtocolMachineRunner::try_new()
+        .expect("Lean protocol-machine runner must be available for invariant verification");
     let result = runner
         .verify_invariants(&fixture.to_bundle())
         .expect("verifyProtocolBundle should execute");
@@ -81,13 +74,6 @@ fn test_verify_protocol_bundle_support_matrix_is_explicit() {
                 result.valid,
                 "supported verifyProtocolBundle path should accept the valid quorum fixture"
             );
-        }
-        BundleVerificationOutcome::MissingRunner => {
-            assert!(
-                !strict_protocol_machine_runner_required(),
-                "strict protocol-machine runner verification is enabled but the runner is unavailable"
-            );
-            eprintln!("SKIPPED: Lean protocol-machine runner not available");
         }
     }
 }

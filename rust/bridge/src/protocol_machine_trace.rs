@@ -1,4 +1,16 @@
 //! Semantic-audit normalization helpers for cross-runtime comparison.
+//!
+//! Bridge normalization ledger for semantic-audit comparison:
+//! - `tick`: semantically normalized per extracted session id so traces can be
+//!   compared independent of cross-session scheduler interleavings.
+//! - `session`: used only to derive the per-session normalization bucket and
+//!   then compared exactly.
+//! - all other event payload fields are compared exactly after normalization.
+//! - events without any extractable session identifier are left untouched.
+//!
+//! This module intentionally does not perform schema backfills or display/debug
+//! cleanup. Schema-compatibility backfills live in
+//! `protocol_machine_runner_json_parsing.rs`.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -137,6 +149,9 @@ fn event_session_from_value(value: &Value) -> Option<usize> {
 
 /// Normalize tick values per session so traces can be compared independent of
 /// cross-session scheduling interleavings.
+///
+/// This is the only semantic normalization applied to protocol-machine audit
+/// events. The event payload itself is preserved exactly.
 #[must_use]
 pub fn normalize_semantic_audit<E>(
     trace: &[crate::semantic_objects::TickedObsEvent<E>],
@@ -244,6 +259,49 @@ mod tests {
         assert_eq!(normalized[0].tick, 0);
         assert_eq!(normalized[1].tick, 0);
         assert_eq!(normalized[2].tick, 1);
+    }
+
+    #[test]
+    fn normalize_semantic_audit_preserves_event_payloads() {
+        let trace = vec![
+            TickedObsEvent {
+                tick: 9,
+                event: json!({
+                    "session": 7,
+                    "kind": "sent",
+                    "sender": "A",
+                    "receiver": "B",
+                    "label": "ping"
+                }),
+            },
+            TickedObsEvent {
+                tick: 12,
+                event: json!({
+                    "session": 7,
+                    "kind": "received",
+                    "sender": "A",
+                    "receiver": "B",
+                    "label": "ping"
+                }),
+            },
+        ];
+
+        let normalized = normalize_semantic_audit(&trace);
+        assert_eq!(normalized[0].tick, 0);
+        assert_eq!(normalized[1].tick, 1);
+        assert_eq!(normalized[0].event, trace[0].event);
+        assert_eq!(normalized[1].event, trace[1].event);
+    }
+
+    #[test]
+    fn normalize_semantic_audit_leaves_non_session_events_untouched() {
+        let trace = vec![TickedObsEvent {
+            tick: 42,
+            event: json!({"kind": "halted", "target": "3"}),
+        }];
+
+        let normalized = normalize_semantic_audit(&trace);
+        assert_eq!(normalized, trace);
     }
 
     #[test]

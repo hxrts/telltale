@@ -25,6 +25,10 @@ echo "run strict protocol-bundle verification corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
   cargo test -p telltale-bridge --test invariant_verification -- --nocapture
 
+echo "run strict bridge property corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+  cargo test -p telltale-bridge --test property_tests -- --nocapture
+
 echo "run strict reconfiguration correspondence corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
   cargo test -p telltale-bridge --test protocol_bundle_admission_contracts -- --nocapture
@@ -38,5 +42,13 @@ echo "run strict simulator trace validation corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
 TELLTALE_REQUIRE_SIMULATION_TRACE_VALIDATION=1 \
   cargo test -p telltale-simulator --test lean_reference_parity -- --nocapture
+
+echo "run strict protocol-machine correspondence corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+  cargo test -p telltale-bridge --test protocol_machine_correspondence_tests -- --nocapture
+
+echo "run strict protocol-machine differential-step corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+  cargo test -p telltale-bridge --test protocol_machine_differential_steps -- --nocapture
 
 echo "lean-bridge-strict: ok"
