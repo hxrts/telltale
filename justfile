@@ -71,6 +71,7 @@ ci-dry-run lane="fast":
     just check-lean-bridge-strict
     just check-compiler-pipeline
     just check-deadlock-automation
+    just check-authority-metatheory
     just check-concrete-refinement
     just check-handler-contracts
     just check-extension-dispatch
@@ -188,6 +189,11 @@ check-deadlock-automation:
     cargo test -p telltale-types test_reaches_communication_matches_practical_fragment_intent -- --nocapture
     TELLTALE_REQUIRE_LEAN_PROJECTION_RUNNER=1 cargo test -p telltale-bridge --test regular_practical_fragment_checks -- --nocapture
     cargo test --test dsl_runtime_semantics_tests generated_proof_status_exposes_ -- --nocapture
+
+# Run the explicit authority-metatheory theorem slice and runtime support-matrix suites.
+check-authority-metatheory:
+    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build Runtime.Proofs.AuthorityMetatheory
+    cargo test --test dsl_runtime_semantics_tests authority_metatheory_ -- --nocapture
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":

@@ -343,6 +343,27 @@ pub enum LanguageTier {
     ProofOnly,
 }
 
+/// Strongest theorem story currently justified for authority-bearing constructs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AuthorityMetatheoryTier {
+    /// No authority-specific semantic obligations beyond ordinary session coordination.
+    SessionTypedCoordination,
+    /// The supported authority slice lives in the protocol-machine semantic-object layer:
+    /// evidence-bearing reads plus canonical publication/materialization.
+    EvidencePublicationSemanticObjects,
+    /// The protocol uses authority/runtime features that currently remain outside the
+    /// supported authority theorem slice.
+    RuntimeSemanticOnly,
+}
+
+/// Explicit authority-metatheory status for one parsed specification.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AuthorityMetatheoryStatus {
+    pub strongest_tier: AuthorityMetatheoryTier,
+    pub diagnostic: String,
+}
+
 /// Explicit language-tier status for one parsed specification.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LanguageTierStatus {
@@ -861,6 +882,29 @@ impl Choreography {
             protocol_machine_executable,
             theory_convertible,
             proof_only: matches!(strongest_tier, LanguageTier::ProofOnly),
+            diagnostic,
+        }
+    }
+
+    #[must_use]
+    pub fn authority_metatheory_status(&self) -> AuthorityMetatheoryStatus {
+        let strongest_tier = authority_metatheory_tier(&self.protocol);
+        let diagnostic = match authority_metatheory_blocker(&self.protocol) {
+            Some(blocker) => format!(
+                "authority-bearing constructs remain executable, but the supported theorem slice stops before this runtime semantic surface: {blocker}"
+            ),
+            None => match strongest_tier {
+                AuthorityMetatheoryTier::SessionTypedCoordination =>
+                    "the protocol stays within ordinary session-typed coordination; no authority-specific semantic proof obligations are introduced".to_string(),
+                AuthorityMetatheoryTier::EvidencePublicationSemanticObjects =>
+                    "the protocol stays within the supported authority theorem slice: evidence-bearing reads and canonical publication/materialization are justified at the protocol-machine semantic-object layer, while session typing continues to cover only the coordination skeleton".to_string(),
+                AuthorityMetatheoryTier::RuntimeSemanticOnly =>
+                    "authority-bearing runtime semantics are present, but they currently sit outside the supported theorem slice".to_string(),
+            },
+        };
+
+        AuthorityMetatheoryStatus {
+            strongest_tier,
             diagnostic,
         }
     }
@@ -1387,6 +1431,96 @@ fn find_session_projection_blocker(protocol: &Protocol) -> Option<&'static str> 
         Protocol::Parallel { protocols } => {
             protocols.iter().find_map(find_session_projection_blocker)
         }
+        Protocol::Var(_) | Protocol::End => None,
+    }
+}
+
+fn authority_metatheory_tier(protocol: &Protocol) -> AuthorityMetatheoryTier {
+    match protocol {
+        Protocol::Begin { .. }
+        | Protocol::Await { .. }
+        | Protocol::Resolve { .. }
+        | Protocol::Invalidate { .. }
+        | Protocol::Case { .. }
+        | Protocol::Timeout { .. }
+        | Protocol::Handoff { .. }
+        | Protocol::DependentWork { .. }
+        | Protocol::Parallel { .. }
+        | Protocol::Extension { .. } => AuthorityMetatheoryTier::RuntimeSemanticOnly,
+        Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. } => authority_metatheory_tier(continuation)
+            .max(AuthorityMetatheoryTier::EvidencePublicationSemanticObjects),
+        Protocol::Let {
+            expr, continuation, ..
+        } => {
+            let expr_tier = match expr {
+                super::AuthorityExpr::Check { .. } | super::AuthorityExpr::Observe { .. } => {
+                    AuthorityMetatheoryTier::EvidencePublicationSemanticObjects
+                }
+                super::AuthorityExpr::Transfer { .. } => {
+                    AuthorityMetatheoryTier::RuntimeSemanticOnly
+                }
+                super::AuthorityExpr::Var(_)
+                | super::AuthorityExpr::Constructor { .. }
+                | super::AuthorityExpr::Call { .. } => {
+                    AuthorityMetatheoryTier::SessionTypedCoordination
+                }
+            };
+            expr_tier.max(authority_metatheory_tier(continuation))
+        }
+        Protocol::Choice { branches, .. } => branches
+            .iter()
+            .map(|branch| {
+                let guard_tier = match branch.guard.as_ref() {
+                    Some(ChoiceGuard::Evidence { .. }) => {
+                        AuthorityMetatheoryTier::EvidencePublicationSemanticObjects
+                    }
+                    Some(ChoiceGuard::Predicate(_)) | None => {
+                        AuthorityMetatheoryTier::SessionTypedCoordination
+                    }
+                };
+                guard_tier.max(authority_metatheory_tier(&branch.protocol))
+            })
+            .max()
+            .unwrap_or(AuthorityMetatheoryTier::SessionTypedCoordination),
+        Protocol::Send { continuation, .. } | Protocol::Broadcast { continuation, .. } => {
+            authority_metatheory_tier(continuation)
+        }
+        Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => authority_metatheory_tier(body),
+        Protocol::Var(_) | Protocol::End => AuthorityMetatheoryTier::SessionTypedCoordination,
+    }
+}
+
+fn authority_metatheory_blocker(protocol: &Protocol) -> Option<&'static str> {
+    match protocol {
+        Protocol::Begin { .. }
+        | Protocol::Await { .. }
+        | Protocol::Resolve { .. }
+        | Protocol::Invalidate { .. } => {
+            Some("explicit commitment lifecycle still relies on protocol-machine semantic obligations")
+        }
+        Protocol::Case { .. } => Some("authority-local case/of still relies on runtime semantic obligations"),
+        Protocol::Timeout { .. } => Some("timeout/cancellation still relies on runtime progress semantics"),
+        Protocol::Handoff { .. } => Some("semantic handoff is still justified through protocol-machine conservation rather than the small authority theorem slice"),
+        Protocol::DependentWork { .. } => Some("dependent work remains a protocol-machine semantic obligation"),
+        Protocol::Parallel { .. } => Some("parallel authority composition remains outside the supported authority theorem slice"),
+        Protocol::Extension { .. } => Some("extension dispatch remains outside the authority theorem slice"),
+        Protocol::Let { expr, continuation, .. } => match expr {
+            super::AuthorityExpr::Transfer { .. } => {
+                Some("transfer receipts remain part of the wider runtime authority lifecycle")
+            }
+            _ => authority_metatheory_blocker(continuation),
+        },
+        Protocol::Choice { branches, .. } => branches
+            .iter()
+            .find_map(|branch| authority_metatheory_blocker(&branch.protocol)),
+        Protocol::Send { continuation, .. }
+        | Protocol::Broadcast { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. } => authority_metatheory_blocker(continuation),
+        Protocol::Loop { body, .. } | Protocol::Rec { body, .. } => authority_metatheory_blocker(body),
         Protocol::Var(_) | Protocol::End => None,
     }
 }

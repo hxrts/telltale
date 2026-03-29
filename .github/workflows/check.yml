@@ -53,6 +53,8 @@ jobs:
         run: just check-compiler-pipeline
       - name: Run deadlock automation suites
         run: just check-deadlock-automation
+      - name: Run authority metatheory suites
+        run: just check-authority-metatheory
       - name: Run concrete refinement suites
         run: just check-concrete-refinement
       - name: Run handler contract suites

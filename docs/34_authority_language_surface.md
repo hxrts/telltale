@@ -217,6 +217,36 @@ Current cross-construct rule:
 - rejected programs fail closed when linear assets diverge across branches, timeout/cancel paths, loop iterations, recursive unfoldings, or parallel arms
 - observational bindings remain separated from authoritative evidence under these control-flow forms
 
+## Authority Metatheory Boundary
+
+The authority theorem story is intentionally narrower than the executable DSL surface.
+
+Current proof-plane split:
+
+- ordinary communication, recursion, and other coordination-only structure remain part of the session-typed theorem story
+- the supported authority-bearing theorem slice lives in the protocol-machine semantic-object layer, not in a generalized session-type extension
+
+Current supported authority theorem slice:
+
+- evidence-bearing reads introduced by `authoritative let`, `observe let`, and evidence guards
+- canonical publication/materialization paths introduced by `publish ... as ...` and `materialize ... from ...`
+- explicit progress contracts for parity-critical operations protecting those paths
+
+Current runtime-semantic-only authority surfaces:
+
+- `case/of`
+- `timeout ... on timeout ... on cancel ...`
+- `par`
+- transfer-produced receipts and their consumption
+- `handoff`
+- `dependent work`
+- explicit commitment lifecycle forms such as `begin`, `await`, `resolve`, and `invalidate`
+
+These runtime-semantic-only forms are still executable and still covered by the
+protocol-machine conservation theorems. The important limit is narrower: they
+are not currently claimed as part of the smallest authority-specific theorem
+slice.
+
 ## Effect Declarations and Uses
 
 `effect` declarations are nominal interfaces.

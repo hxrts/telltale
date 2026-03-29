@@ -11,7 +11,7 @@ use telltale_language::ast::convert::{choreography_to_global, local_to_local_r};
 use telltale_language::ast::{
     annotation::{Annotations, ProtocolAnnotation},
     choreography::TheoremPackDeclaration,
-    Choreography, LocalType, MessageType, Protocol, Role, ValidationError,
+    AuthorityMetatheoryTier, Choreography, LocalType, MessageType, Protocol, Role, ValidationError,
 };
 use telltale_language::compiler::parser::parse_choreography_file;
 use telltale_language::extensions::{CodegenContext, ExtensionValidationError, ProtocolExtension};
@@ -92,6 +92,33 @@ protocol AuthorityFlow uses Runtime =
   let receipt = transfer Session from Coordinator to Worker
   handoff acceptInvite to Worker with receipt
   Coordinator -> Worker : Commit
+"#;
+
+const AUTHORITY_PUBLICATION_SLICE_DSL: &str = r#"
+effect Runtime
+  authoritative ready : Session -> Result ReadyErr ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
+
+type ReadyErr =
+  | NotReady
+
+type alias ReadyWitness =
+{
+  epoch : Int
+}
+
+protocol AuthorityPublicationSlice uses Runtime =
+  roles Coordinator, Worker
+  authoritative let witness = check Runtime.ready(commitSession)
+  publish witness as AcceptedPublication
+  materialize acceptedProof from AcceptedPublication
+  Coordinator -> Worker : Commit(witness)
 "#;
 
 const PROOF_BUNDLE_DSL: &str = r#"
@@ -801,6 +828,97 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
         err.to_string().contains("Parallel"),
         "parallel theory-conversion blocker should remain explicit, got {err}"
     );
+}
+
+#[test]
+fn authority_metatheory_tier_distinguishes_supported_slice_from_runtime_only_surfaces() {
+    let plain = telltale_language::parse_choreography_str(SIMPLE_DSL).expect("parse simple DSL");
+    assert_eq!(
+        plain.authority_metatheory_status().strongest_tier,
+        AuthorityMetatheoryTier::SessionTypedCoordination
+    );
+
+    let publication = telltale_language::parse_choreography_str(AUTHORITY_PUBLICATION_SLICE_DSL)
+        .expect("parse authority publication slice");
+    publication
+        .validate()
+        .expect("validate authority publication slice");
+    let publication_status = publication.authority_metatheory_status();
+    assert_eq!(
+        publication_status.strongest_tier,
+        AuthorityMetatheoryTier::EvidencePublicationSemanticObjects
+    );
+    assert!(
+        publication_status
+            .diagnostic
+            .contains("evidence-bearing reads and canonical publication/materialization"),
+        "semantic slice diagnostic should stay explicit, got {}",
+        publication_status.diagnostic
+    );
+
+    let full =
+        telltale_language::parse_choreography_str(AUTHORITY_DSL).expect("parse authority DSL");
+    full.validate().expect("validate authority DSL");
+    let full_status = full.authority_metatheory_status();
+    assert_eq!(
+        full_status.strongest_tier,
+        AuthorityMetatheoryTier::RuntimeSemanticOnly
+    );
+    assert!(
+        full_status.diagnostic.contains("transfer receipts"),
+        "runtime-only blocker should stay explicit, got {}",
+        full_status.diagnostic
+    );
+}
+
+#[test]
+fn authority_metatheory_support_matrix_is_explicit_for_authority_corpus() {
+    let call_plain = parse_choreography_file(&authority_pass_fixture("call_plain_communication"))
+        .expect("parse plain call fixture");
+    assert_eq!(
+        call_plain.authority_metatheory_status().strongest_tier,
+        AuthorityMetatheoryTier::SessionTypedCoordination
+    );
+
+    for fixture in [
+        "choice_observational_binding",
+        "loop_authoritative_binding",
+        "recursion_authoritative_binding",
+    ] {
+        let choreography =
+            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        assert_eq!(
+            choreography.authority_metatheory_status().strongest_tier,
+            AuthorityMetatheoryTier::EvidencePublicationSemanticObjects,
+            "{fixture} should remain in the supported evidence/publication theorem slice"
+        );
+    }
+
+    for (fixture, blocker) in [
+        ("case_authoritative_binding", "case/of"),
+        ("timeout_observational_binding", "timeout/cancellation"),
+        ("parallel_observational_binding", "parallel"),
+    ] {
+        let choreography =
+            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+        choreography
+            .validate()
+            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+        let status = choreography.authority_metatheory_status();
+        assert_eq!(
+            status.strongest_tier,
+            AuthorityMetatheoryTier::RuntimeSemanticOnly,
+            "{fixture} must stay outside the supported authority theorem slice"
+        );
+        assert!(
+            status.diagnostic.contains(blocker),
+            "{fixture} should report an explicit runtime-only blocker, got {}",
+            status.diagnostic
+        );
+    }
 }
 
 #[test]

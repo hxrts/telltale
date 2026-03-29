@@ -92,6 +92,11 @@ jobs:
           mkdir -p artifacts
           just check-deadlock-automation | tee artifacts/check-deadlock-automation.log
 
+      - name: Run authority metatheory suites
+        run: |
+          mkdir -p artifacts
+          just check-authority-metatheory | tee artifacts/check-authority-metatheory.log
+
       - name: Run concrete refinement suites
         run: |
           mkdir -p artifacts
@@ -241,6 +246,11 @@ jobs:
         run: |
           mkdir -p artifacts
           just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
+
+      - name: Run authority metatheory suites
+        run: |
+          mkdir -p artifacts
+          just check-authority-metatheory | tee artifacts/check-authority-metatheory.log
 
       - name: Run handler contract suites
         run: |
