@@ -83,7 +83,9 @@ assert_gate_fails() {
 
 # Mutation ledger:
 # - bridge normalization ledger drift should be rejected by bridge-normalization-ledger.sh
+# - source-derived capability/authority docs drift should be rejected by docs-as-contract.sh
 # - verification inventory metric drift should be rejected by verification-inventory.sh
+# - package manifest resource drift should be rejected by package-artifacts.sh
 # - release package registry drift should be rejected by release-recovery.sh
 # - package resource escapes should be rejected by package-resource-audit.sh
 
@@ -97,6 +99,28 @@ assert_gate_fails \
   "missing bridge normalization ledger row for 'semantic-audit tick normalization'" \
   ./scripts/check/bridge-normalization-ledger.sh
 restore_now docs/32_testing_verification_inventory.md "${doc_backup}"
+
+admission_doc_backup="$(backup_file docs/25_capability_admission.md)"
+replace_once \
+  docs/25_capability_admission.md \
+  '| `protocol_envelope_bridge` |' \
+  '| `phase16_mutation_boundary` |'
+assert_gate_fails \
+  "capability admission docs row mutation" \
+  "missing expected docs row:" \
+  ./scripts/check/docs-as-contract.sh
+restore_now docs/25_capability_admission.md "${admission_doc_backup}"
+
+authority_doc_backup="$(backup_file docs/34_authority_language_surface.md)"
+replace_once \
+  docs/34_authority_language_surface.md \
+  '| `par` with observational binding |' \
+  '| `phase16_parallel_mutation` |'
+assert_gate_fails \
+  "authority language docs row mutation" \
+  "missing expected docs row:" \
+  ./scripts/check/docs-as-contract.sh
+restore_now docs/34_authority_language_surface.md "${authority_doc_backup}"
 
 replace_once \
   docs/32_testing_verification_inventory.md \
@@ -116,6 +140,17 @@ assert_gate_fails \
   "telltale-runtime: package resource embed escapes crate root" \
   ./scripts/check/package-resource-audit.sh
 rm -f rust/runtime/src/__phase10_package_resource_probe.rs
+
+runtime_manifest_backup="$(backup_file rust/runtime/Cargo.toml)"
+replace_once \
+  rust/runtime/Cargo.toml \
+  'readme = "../../README.md"' \
+  'readme = "../../PHASE16_MISSING_README.md"'
+assert_gate_fails \
+  "package manifest readme mutation" \
+  "error: telltale-runtime: manifest readme path missing: ../../PHASE16_MISSING_README.md" \
+  ./scripts/check/package-artifacts.sh
+restore_now rust/runtime/Cargo.toml "${runtime_manifest_backup}"
 
 release_packages_backup="$(backup_file scripts/lib/release-packages.sh)"
 replace_once \

@@ -1,5 +1,20 @@
 use super::*;
 use crate::bridge_normalization::{SchemaVersionBackfillPath, SCHEMA_VERSION_BACKFILL_PATHS};
+use std::collections::BTreeSet;
+
+const RUN_OUTPUT_ALLOWED_KEYS: &[&str] = &[
+    "schema_version",
+    "trace",
+    "sessions",
+    "steps_executed",
+    "concurrency",
+    "status",
+    "effect_trace",
+    "effect_exchanges",
+    "output_condition_trace",
+    "step_states",
+    "semantic_objects",
+];
 
 fn inject_field_if_missing(object: &mut serde_json::Map<String, Value>, key: &str, value: Value) {
     object.entry(key.to_string()).or_insert(value);
@@ -80,6 +95,7 @@ fn backfill_protocol_machine_run_output_schema_versions(mut value: Value) -> Val
 pub(super) fn parse_protocol_machine_run_output(
     value: Value,
 ) -> Result<ProtocolMachineRunOutput, ProtocolMachineRunnerError> {
+    reject_unknown_protocol_machine_run_output_fields(&value)?;
     let normalized = backfill_protocol_machine_run_output_schema_versions(value);
     let output: ProtocolMachineRunOutput = serde_json::from_value(normalized)
         .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
@@ -89,6 +105,23 @@ pub(super) fn parse_protocol_machine_run_output(
     )
     .map_err(ProtocolMachineRunnerError::ParseError)?;
     Ok(output)
+}
+
+fn reject_unknown_protocol_machine_run_output_fields(
+    value: &Value,
+) -> Result<(), ProtocolMachineRunnerError> {
+    let Some(root) = value.as_object() else {
+        return Ok(());
+    };
+
+    let allowed: BTreeSet<&str> = RUN_OUTPUT_ALLOWED_KEYS.iter().copied().collect();
+    if let Some(unknown) = root.keys().find(|key| !allowed.contains(key.as_str())) {
+        return Err(ProtocolMachineRunnerError::ParseError(format!(
+            "unknown field `{unknown}` in ProtocolMachineRunOutput"
+        )));
+    }
+
+    Ok(())
 }
 
 pub(super) fn parse_sim_run_output(
@@ -358,5 +391,22 @@ mod tests {
         let err = parse_protocol_machine_run_output(payload)
             .expect_err("unsupported schema version must fail closed");
         assert!(matches!(err, ProtocolMachineRunnerError::ParseError(_)));
+    }
+
+    #[test]
+    fn parse_protocol_machine_run_output_rejects_unknown_top_level_fields() {
+        let mut payload = minimal_run_output_json();
+        payload
+            .as_object_mut()
+            .expect("root object")
+            .insert("phase16_mutation".to_string(), json!(true));
+
+        let err = parse_protocol_machine_run_output(payload)
+            .expect_err("unknown top-level fields must fail closed");
+        assert!(
+            err.to_string()
+                .contains("unknown field `phase16_mutation` in ProtocolMachineRunOutput"),
+            "unexpected error: {err}"
+        );
     }
 }

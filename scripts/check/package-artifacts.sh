@@ -48,6 +48,22 @@ extract_manifest_rust_version() {
   ' "${manifest_path}"
 }
 
+extract_manifest_package_path_field() {
+  local manifest_path="$1"
+  local field_name="$2"
+  awk -v field_name="${field_name}" '
+    /^\[package\]/ { in_package = 1; next }
+    /^\[/ { in_package = 0 }
+    in_package && $1 == field_name {
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", $0)
+      sub("^[^=]+=[[:space:]]*\"", "", $0)
+      sub(/"$/, "", $0)
+      print $0
+      exit
+    }
+  ' "${manifest_path}"
+}
+
 extract_lockfile_version() {
   local lockfile_path="$1"
   local package="$2"
@@ -87,6 +103,20 @@ for package in "${RELEASE_PACKAGES[@]}"; do
   if [[ "${manifest_version}" != "${workspace_version}" ]]; then
     echo "error: version mismatch for ${package}: ${manifest_version} != ${workspace_version}" >&2
     exit 1
+  fi
+done
+
+echo "== validate package manifest resources =="
+for package in "${RELEASE_PACKAGES[@]}"; do
+  manifest="$(manifest_path "${package}")"
+  manifest_dir="$(dirname "${manifest}")"
+  readme_path="$(extract_manifest_package_path_field "${manifest}" "readme")"
+  if [[ -n "${readme_path}" ]]; then
+    resolved_readme="$(cd "${manifest_dir}" && python3 -c 'import os,sys; print(os.path.normpath(sys.argv[1]))' "${readme_path}")"
+    if [[ ! -f "${manifest_dir}/${resolved_readme}" ]]; then
+      echo "error: ${package}: manifest readme path missing: ${readme_path}" >&2
+      exit 1
+    fi
   fi
 done
 
