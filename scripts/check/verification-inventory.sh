@@ -143,6 +143,7 @@ long_horizon_recovery_harness_suites=(
 
 artifact_release_assurance_suites=(
   scripts/check/package-artifacts.sh
+  scripts/check/package-provenance.sh
   scripts/check/package-resource-audit.sh
   scripts/check/release-recovery.sh
 )

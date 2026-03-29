@@ -45,7 +45,7 @@ The numeric rows in this section are source-derived and checked by
 | Runtime substrate boundary assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Handler contract boundary assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Long-horizon recovery differential harness suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Artifact and release assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Artifact and release assurance suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Mutation fail-closed assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Concrete protocol-machine refinement suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Compiler and serialization pipeline suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -105,6 +105,28 @@ For the current claim:
 - `par`, `case/of`, `timeout`, and any other fail-closed or runtime-only forms
   are outside both the current formal claim and that future proof-target subset
 
+## Artifact Correspondence Claim
+
+For the current public claim, the shipped first-party crate artifacts are
+covered only by operational artifact correspondence, not by mechanized proof.
+
+More concretely, the current release/artifact claim is:
+
+- every publishable first-party crate tarball for the released version is built
+  from the checked workspace manifests for that version
+- the packaged tarballs compiled by the artifact lane are the same tarballs
+  whose hashes, sizes, git revision, toolchain versions, and critical embedded
+  resource hashes are recorded in the provenance manifest under
+  `target/package-artifact-tarballs/provenance.json`
+- critical embedded resources on the shipped path, including packaged README
+  files, the embedded runtime grammar, and release metadata like the WASM
+  example lockfile, are part of the audited artifact pipeline rather than an
+  unchecked side channel
+
+This is still narrower than a fully reproduced, mechanically proved binary
+build pipeline. Cargo, crates.io, git hosting, and the local build toolchain
+remain explicit external assumptions.
+
 ## Out of Scope / Assumption Boundaries
 
 The current public claim does not include:
@@ -128,7 +150,7 @@ The current trusted computing base for the public claim is:
 | Rust/Lean bridge normalization and interchange | comparison/equality surface between Rust and Lean | `just check-bridge-normalization`, strict correspondence suites |
 | Rust runtime implementation | shipped executable semantics are still comparison-checked, not fully proved | strict correspondence, semantic assurance, refinement slice |
 | First-party handlers/transports | external impurity boundary for the runtime | handler-contract, transport-contract, and runtime-boundary suites |
-| Release/package scripts and generated resources | artifact identity path from workspace to published crates | package-artifact, release-recovery, and docs-as-contract gates |
+| Release/package scripts and generated resources | artifact identity path from workspace to published crates | package-artifact, package-provenance, release-recovery, and docs-as-contract gates |
 | Cargo / crates.io / git / toolchains | external delivery/build platform | operational checks only |
 
 If that TCB shrinks or the claim broadens, this section must be updated before a
@@ -159,7 +181,7 @@ than duplicating their inner gate lists by hand.
 |---|---|---|---|---|
 | Fast structural verification | `just check-fast-structure` | `justfile`, `scripts/check/ci-assurance-lanes.sh`, `scripts/check/formal-claim-scope.sh`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `scripts/check/source-doc-snippets.sh`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Focused assurance | `just check-focused-assurance` | `justfile`, strict Lean bridge suites, compiler pipeline suites, metatheory/refinement/runtime boundary suites | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
-| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-provenance.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | PR-critical assurance | `just check-pr-critical` | `justfile`, `.github/workflows/check.yml`, `.github/workflows/verify.yml` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Scheduled deep assurance | `just check-deep-assurance` | `justfile`, `.github/workflows/verify.yml`, scale-budget and larger-corpus verification lanes | `just ci-dry-run full`, direct local recipe use | `verify.yml` |
 
@@ -189,7 +211,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Runtime substrate | Target-aware wrapper contracts | `rust/runtime/tests/runtime_substrate_contracts.rs`, `rust/runtime/tests/wasm_compat.rs` | Native and WASM wrapper seams now have direct regression coverage for `spawn`, `spawn_local`, and deterministic clock/RNG discipline, and deterministic assurance suites are guarded against accidental `SystemClock` / `SystemRng` drift |
 | Handler contract boundary | Machine-checkable contract profiles for first-party handlers and transports, plus fail-closed extension dispatch | `rust/runtime/tests/handler_contracts.rs`, `rust/runtime/tests/transport_contracts.rs` | `ChoreoHandler` and the first-party transport families now have explicit machine-checkable contract ledgers that separate protocol-semantic obligations from policy choices, validate shipped production and harness profiles mechanically, and prove deterministic registered-only extension dispatch plus fail-closed unregistered behavior through runtime tests; user-supplied third-party handlers/transports remain outside the formal claim unless they separately satisfy the same contract |
 | Recovery | Long-horizon differential harness | `rust/bridge/tests/reconfiguration_recovery_harness.rs` | Ownership-transfer replay artifacts, bridge export/import, topology-derived placement artifacts, atomic multi-step reconfiguration plans, snapshot/restore recovery, and deterministic suffix replay now execute as one end-to-end recovery family with explicit divergence detection |
-| Artifact / release | Packaged-crate and resume verification | `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | Every publishable crate now goes through the `cargo publish --dry-run --locked --no-verify` packaging path, package-manifest resource paths are checked before packaging, the full packaged crate set is compiled from extracted tarballs, external consumer canaries for `telltale`, `telltale-runtime`, and `telltale-bridge` run outside the workspace layout with exact last-line stdout assertions, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
+| Artifact / release | Packaged-crate, provenance, and resume verification | `scripts/check/package-artifacts.sh`, `scripts/check/package-provenance.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | Every publishable crate now goes through the `cargo publish --dry-run --locked --no-verify` packaging path, package-manifest resource paths are checked before packaging, the full packaged crate set is compiled from extracted tarballs, critical embedded resources are compared byte-for-byte against source, external consumer canaries for `telltale`, `telltale-runtime`, and `telltale-bridge` run outside the workspace layout with exact last-line stdout assertions, a provenance manifest records tarball hashes plus source/resource/toolchain metadata for the packaged set, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
 | Mutation pressure | Direct fail-closed perturbation suites | `rust/machine/src/runtime_contracts.rs`, `scripts/check/fail-closed-mutations.sh` | Representative bridge payload, theorem-boundary, source-derived docs-row, package-registry, package-manifest, package-resource, and inventory mutations are injected directly against the narrow owning gates so drift is rejected before broader integration lanes run |
 | Concrete refinement | Exact cooperative/Lean/threaded state-slice parity plus Lean proof-connected slice | `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/machine/tests/lean_protocol_machine_equivalence.rs`, `rust/machine/tests/threaded_equivalence.rs` | The first concrete protocol-machine refinement slice now compares coroutine/session/scheduler state exactly across Rust, Lean, and canonical threaded execution, exports bounded `u64` bridge fields fail-closed, and is connected to dedicated Lean refinement theorems over the same slice |
 | Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | This pipeline is operationally checked, not part of the current formal claim: the supported DSL subset runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes, and bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |

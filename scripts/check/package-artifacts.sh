@@ -18,6 +18,15 @@ require_command() {
   }
 }
 
+hash_file() {
+  local path="$1"
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${path}" | awk '{print $1}'
+  else
+    shasum -a 256 "${path}" | awk '{print $1}'
+  fi
+}
+
 extract_manifest_version() {
   local manifest_path="$1"
   awk '
@@ -92,9 +101,15 @@ package_target_dir="${ROOT_DIR}/target/package-artifact-audit"
 saved_tarball_dir="${ROOT_DIR}/target/package-artifact-tarballs"
 
 require_command cargo
+require_command git
 require_command python3
 require_command tar
 require_command rg
+require_command rustc
+if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+  echo "error: sha256sum or shasum is required" >&2
+  exit 2
+fi
 
 echo "== validate publishable crate versions =="
 for package in "${RELEASE_PACKAGES[@]}"; do
@@ -275,6 +290,15 @@ tarball_path() {
   echo "${saved_tarball_dir}/${package}-${workspace_version}.crate"
 }
 
+extract_packaged_file_to_tmp() {
+  local package="$1"
+  local packaged_path="$2"
+  local dest_path="$3"
+  local tarball
+  tarball="$(tarball_path "${package}")"
+  tar -xOf "${tarball}" "${package}-${workspace_version}/${packaged_path}" > "${dest_path}"
+}
+
 assert_tarball_contains() {
   local package="$1"
   local needle="$2"
@@ -291,14 +315,37 @@ assert_tarball_contains() {
   }
 }
 
+assert_packaged_file_matches_source() {
+  local package="$1"
+  local packaged_path="$2"
+  local source_path="$3"
+  local tmpfile expected actual
+  [[ -f "${source_path}" ]] || {
+    echo "error: source path missing for ${package}: ${source_path}" >&2
+    exit 1
+  }
+  tmpfile="$(mktemp)"
+  extract_packaged_file_to_tmp "${package}" "${packaged_path}" "${tmpfile}"
+  expected="$(hash_file "${source_path}")"
+  actual="$(hash_file "${tmpfile}")"
+  rm -f "${tmpfile}"
+  if [[ "${expected}" != "${actual}" ]]; then
+    echo "error: ${package} packaged ${packaged_path} does not match source ${source_path}" >&2
+    exit 1
+  fi
+}
+
 smoke_packaged_crate() {
   local package="$1"
   shift
-  local tarball tmpdir crate_root status
+  local tarball tmpdir crate_root packaged_dir status
   tarball="$(tarball_path "${package}")"
   tmpdir="$(mktemp -d)"
   tar -xf "${tarball}" -C "${tmpdir}"
   crate_root="${tmpdir}/${package}-${workspace_version}"
+  packaged_dir="${tmpdir}/packaged"
+  prepare_packaged_registry "${packaged_dir}"
+  write_patch_section "${crate_root}/Cargo.toml" "${packaged_dir}"
   set +e
   (
     cd "${crate_root}"
@@ -405,6 +452,12 @@ assert_tarball_contains telltale-bridge "README.md"
   exit 1
 }
 
+echo "== verify packaged resource contents =="
+assert_packaged_file_matches_source telltale "README.md" "${ROOT_DIR}/README.md"
+assert_packaged_file_matches_source telltale-runtime "README.md" "${ROOT_DIR}/README.md"
+assert_packaged_file_matches_source telltale-runtime "src/compiler/choreography.pest" "${ROOT_DIR}/rust/runtime/src/compiler/choreography.pest"
+assert_packaged_file_matches_source telltale-bridge "README.md" "${ROOT_DIR}/README.md"
+
 echo "== smoke check packaged telltale crate =="
 smoke_packaged_crate telltale cargo check --lib --features full
 smoke_packaged_crate telltale cargo check --lib --target wasm32-unknown-unknown --features wasm
@@ -476,5 +529,79 @@ fn main() {
 }' \
   'bridge canary ok: {"branches":[{"continuation":{"kind":"end"},"label":{"name":"ping","sort":"unit"}}],"kind":"comm","receiver":"Server","sender":"Client"}' \
   cargo run --quiet
+
+echo "== write package provenance manifest =="
+export PACKAGE_ARTIFACT_DIR="${saved_tarball_dir}"
+export PACKAGE_WORKSPACE_VERSION="${workspace_version}"
+export PACKAGE_GIT_HEAD="$(git rev-parse HEAD)"
+export PACKAGE_RUSTC_VERSION="$(rustc --version)"
+export PACKAGE_CARGO_VERSION="$(cargo --version)"
+export PACKAGE_WASM_LOCK_SHA256="$(hash_file "${WASM_EXAMPLE_LOCK_PATH}")"
+python3 - <<'PY'
+import json
+import os
+import pathlib
+import subprocess
+
+root = pathlib.Path.cwd()
+artifact_dir = pathlib.Path(os.environ["PACKAGE_ARTIFACT_DIR"])
+workspace_version = os.environ["PACKAGE_WORKSPACE_VERSION"]
+git_head = os.environ["PACKAGE_GIT_HEAD"]
+rustc_version = os.environ["PACKAGE_RUSTC_VERSION"]
+cargo_version = os.environ["PACKAGE_CARGO_VERSION"]
+wasm_lock_sha256 = os.environ["PACKAGE_WASM_LOCK_SHA256"]
+
+packages = [
+    "telltale-types",
+    "telltale-language",
+    "telltale-theory",
+    "telltale-macros",
+    "telltale-machine",
+    "telltale",
+    "telltale-runtime",
+    "telltale-transport",
+    "telltale-simulator",
+    "telltale-bridge",
+]
+
+def sha256(path: pathlib.Path) -> str:
+    if subprocess.run(["which", "sha256sum"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+        return subprocess.check_output(["sha256sum", str(path)], text=True).split()[0]
+    return subprocess.check_output(["shasum", "-a", "256", str(path)], text=True).split()[0]
+
+resource_files = {
+    "telltale:README.md": root / "README.md",
+    "telltale-runtime:README.md": root / "README.md",
+    "telltale-runtime:src/compiler/choreography.pest": root / "rust/runtime/src/compiler/choreography.pest",
+    "telltale-bridge:README.md": root / "README.md",
+    "examples/wasm/README.md": root / "examples/wasm/README.md",
+    "examples/wasm/harness.sh": root / "examples/wasm/harness.sh",
+}
+
+manifest = {
+    "workspace_version": workspace_version,
+    "git_head": git_head,
+    "rustc_version": rustc_version,
+    "cargo_version": cargo_version,
+    "wasm_example_lock_sha256": wasm_lock_sha256,
+    "tarballs": [],
+    "resource_hashes": {
+        key: sha256(path) for key, path in resource_files.items()
+    },
+}
+
+for package in packages:
+    tarball = artifact_dir / f"{package}-{workspace_version}.crate"
+    manifest["tarballs"].append(
+        {
+            "package": package,
+            "file": tarball.name,
+            "sha256": sha256(tarball),
+            "size_bytes": tarball.stat().st_size,
+        }
+    )
+
+(artifact_dir / "provenance.json").write_text(json.dumps(manifest, indent=2) + "\n")
+PY
 
 echo "package-artifacts: ok"

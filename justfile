@@ -380,6 +380,7 @@ check-verification-inventory:
 # resource boundaries and release-script resume behavior.
 check-package-artifacts:
     ./scripts/check/package-artifacts.sh
+    ./scripts/check/package-provenance.sh
     ./scripts/check/package-resource-audit.sh
     ./scripts/check/release-recovery.sh
 

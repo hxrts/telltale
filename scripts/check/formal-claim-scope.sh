@@ -29,6 +29,7 @@ require_pattern docs/32_testing_verification_inventory.md 'blanket public claim 
 require_pattern docs/32_testing_verification_inventory.md 'formally verified" end to end.' "verification inventory must explicitly reject the blanket end-to-end formal-verification claim"
 require_pattern docs/32_testing_verification_inventory.md "## Claimed Surface" "verification inventory must describe the claimed surface"
 require_pattern docs/32_testing_verification_inventory.md "## Compiler and Macro Claim Boundary" "verification inventory must define the compiler and macro claim boundary"
+require_pattern docs/32_testing_verification_inventory.md "## Artifact Correspondence Claim" "verification inventory must define the artifact correspondence claim"
 require_pattern docs/32_testing_verification_inventory.md "the current public formal-verification claim does not include any Rust parser," "verification inventory must explicitly exclude Rust compiler paths from the current formal claim"
 require_pattern docs/32_testing_verification_inventory.md '`tell!` macro expansion are outside the formal claim' "verification inventory must explicitly exclude tell! macro expansion from the current formal claim"
 require_pattern docs/32_testing_verification_inventory.md "## Out of Scope / Assumption Boundaries" "verification inventory must describe assumption boundaries"
