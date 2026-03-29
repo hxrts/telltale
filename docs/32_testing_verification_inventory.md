@@ -24,7 +24,7 @@ The numeric rows in this section are source-derived and checked by
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 9 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 10 | `rust/macros/tests/macro_ui.rs` |
-| Property buckets with executable assurance suites | 21 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Property buckets with executable assurance suites | 22 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Lean-backed correspondence strict suites | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -51,6 +51,7 @@ The numeric rows in this section are source-derived and checked by
 | Compiler and serialization pipeline suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Deadlock automation fragment assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Docs-as-contract assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Deterministic scale and budget assurance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
 ## Gate Ownership
@@ -97,6 +98,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | The supported DSL subset now runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes; bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |
 | Deadlock automation | Lean-sound regular-fragment checker mirrored into Rust diagnostics | `rust/types/src/local.rs`, `rust/bridge/tests/regular_practical_fragment_checks.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | The automatic deadlock-discharge fragment is now mechanically characterized as closed + contractive projected locals whose full unfold exposes send/recv, checked first in Lean on `SessionTypes.LocalTypeR`, mirrored in Rust only for macro/proof-status diagnostics, and exercised end to end through bridge parity and generated `proof_status` surfaces |
 | Public docs as contract | Source-derived capability/admission, authority-support, and trust-surface tables | `rust/tests/docs_contract_tests.rs`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh` | The highest-value public verification/capability docs now separate source-derived tables from explanatory prose, and those rows are checked mechanically against runtime-contract, DSL-tier, and bridge-ledger facts |
+| Deterministic scale budgets | Larger supported corpora with structural size envelopes | `rust/bridge/tests/scale_budget_contracts.rs` | Larger lowering/projection corpora, longer record/replay histories, larger reconfiguration snapshots, and larger Lean bridge payloads now run as deterministic structural-budget gates with exact replay/snapshot equality and explicit serialized-size envelopes rather than ambient wall-clock benchmarks |
 
 ## Bridge Normalization Trust Surface
 

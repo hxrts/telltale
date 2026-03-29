@@ -142,6 +142,7 @@ check-focused-assurance:
     just check-authority-metatheory
     just check-concrete-refinement
     just check-transported-theorem-boundary
+    just check-scale-budgets
     just check-handler-contracts
     just check-extension-dispatch
     just check-semantic-assurance
@@ -236,6 +237,10 @@ check-deadlock-automation:
 check-authority-metatheory:
     LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build Runtime.Proofs.AuthorityMetatheory
     cargo test --test dsl_runtime_semantics_tests authority_metatheory_ -- --nocapture
+
+# Run deterministic larger-corpus structural budget suites.
+check-scale-budgets:
+    ./scripts/check/scale-budgets.sh
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":
