@@ -30,6 +30,19 @@ The three papers establish a mechanized metatheory for asynchronous buffered mul
 
 The `papers/` directory contains manuscripts and [reproducibility documentation](papers/ARTIFACT.md). PDFs: [Paper 1](https://hxrts.com/telltale/papers/paper1.pdf), [Paper 2](https://hxrts.com/telltale/papers/paper2.pdf), [Paper 3](https://hxrts.com/telltale/papers/paper3.pdf). Citation metadata is in `papers/CITATION.cff`.
 
+## Formal Verification
+
+Telltale is formally verified for the declared shipped surface documented in
+[docs/32_testing_verification_inventory.md](docs/32_testing_verification_inventory.md), under the
+listed public assumptions and TCB.
+
+That declared shipped surface includes the Lean semantics/theorems, the
+theorem-defined Rust↔Lean protocol-machine runtime correspondence core, the
+shipped first-party handler/transport contract boundary, and the shipped
+first-party crate artifacts through the audited artifact-correspondence
+pipeline. Rust compiler/macro entry paths and third-party integrations remain
+outside that formal claim unless stated otherwise in the verification inventory.
+
 ## Quick Start
 
 ```bash

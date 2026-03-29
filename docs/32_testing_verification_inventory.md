@@ -56,20 +56,22 @@ The numeric rows in this section are source-derived and checked by
 
 ## Current Formal Verification Claim
 
-Telltale does not currently make the blanket public claim that "Telltale is
-formally verified" end to end.
+Telltale is formally verified for the declared shipped surface documented in
+this inventory, under the assumptions listed in the public TCB ledger below.
 
-The current public claim is:
+The exact public claim is:
 
-> Telltale has formally verified Lean models and theorems for its session-type,
-> projection, protocol-machine, and conservation-property semantics; strict
-> deterministic Rust↔Lean correspondence for the declared supported corpora; and
-> operational verification for the shipped first-party Rust artifacts and
-> release surface.
+> Telltale is formally verified for its declared shipped surface: the Lean
+> session-type, projection, protocol-machine, and conservation-property models
+> and theorems; the theorem-defined Rust↔Lean protocol-machine runtime
+> correspondence core for the audited supported corpus; the shipped first-party
+> handler/transport boundary as documented by machine-checkable contract
+> profiles; and the shipped first-party crate artifacts through the audited
+> artifact-correspondence pipeline.
 
-That claim is intentionally narrower than "the shipped Rust implementation is
-mechanically proved correct end to end." The remaining gap is tracked in
-`work/verification.md`.
+This does not mean every Rust API, compiler helper, macro path, plugin, or
+third-party integration is mechanically proved. Anything outside the declared
+shipped surface is listed explicitly below and is not part of the formal claim.
 
 ## Claimed Surface
 
@@ -139,6 +141,23 @@ The current public claim does not include:
 - cryptographic hardness assumptions beyond standard SHA-256-style assumptions
 - a blanket claim that every shipped Rust code path is mechanically proved
 
+## Final Surface Audit
+
+This table is the final public audit of which major surfaces are inside the
+formal claim and which are deliberately outside it.
+
+| Surface | Claim status | Note |
+|---|---|---|
+| Lean `SessionTypes`, `SessionCoTypes`, `Choreography`, `Protocol`, and `Runtime` semantics/theorems | inside | Core mechanized proof surface |
+| Theorem-defined protocol-machine runtime core (`ConcreteScheduledStep`, claimed state/transition/event slice) | inside | Exact Rust↔Lean refinement/correspondence surface |
+| First-party documented handlers (`InMemoryHandler`, `TelltaleHandler`, middleware profiles) | inside | Included through machine-checkable contract profiles |
+| First-party documented transports (`InMemoryChannelTransport`, runtime topology TCP helper, `telltale-transport` TCP transport) | inside | Included through machine-checkable contract profiles |
+| First-party packaged crate tarballs and embedded resources | inside | Included through the operational artifact-correspondence and provenance pipeline |
+| Rust parser, lowering, projection, import/export helpers | outside | Publicly supported but outside the formal claim; guarded operationally |
+| `tell!` and other proc-macro convenience surfaces | outside | Publicly supported but outside the formal claim; guarded operationally |
+| User-supplied third-party handlers, transports, plugins, and deployment adapters | outside | Remain assumption-boundary integrations unless separately justified |
+| External build/delivery infrastructure (`cargo`, crates.io, git hosting, toolchains, OS) | assumption boundary | Explicit public TCB items rather than proved surfaces |
+
 ## Public TCB Ledger
 
 The current trusted computing base for the public claim is:
@@ -155,6 +174,31 @@ The current trusted computing base for the public claim is:
 
 If that TCB shrinks or the claim broadens, this section must be updated before a
 broader public wording is used.
+
+## Final Public Claim Text
+
+Use this exact wording in docs, release material, and summaries:
+
+> Telltale is formally verified for the declared shipped surface documented in
+> the verification inventory, under the listed public assumptions and TCB.
+
+Supporting scope statement:
+
+> The declared shipped surface includes the Lean semantics/theorems, the
+> theorem-defined Rust↔Lean protocol-machine runtime correspondence core, the
+> shipped first-party handler/transport contract boundary, and the shipped
+> first-party crate artifacts through the audited artifact-correspondence
+> pipeline. It does not include Rust compiler/macro entry paths or third-party
+> integrations unless stated otherwise.
+
+Supporting TCB statement:
+
+> The remaining public TCB consists of the Lean kernel and imported proof
+> libraries, the minimized Rust/Lean bridge/interchange layer, the comparison-
+> checked Rust runtime implementation for the claim-critical surface, the
+> documented first-party handler/transport boundary, the audited release/package
+> and generated-resource pipeline, and external build/delivery infrastructure
+> such as Cargo, crates.io, git hosting, and the underlying toolchains.
 
 ## Refinement Coverage Map
 
