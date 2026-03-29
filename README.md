@@ -34,7 +34,7 @@ The `papers/` directory contains manuscripts and [reproducibility documentation]
 
 Telltale is formally verified for the declared shipped surface documented in
 [docs/32_testing_verification_inventory.md](docs/32_testing_verification_inventory.md), under the
-listed public assumptions and TCB.
+listed public assumptions and trusted base.
 
 That declared shipped surface includes the Lean semantics/theorems, the
 theorem-defined Rust↔Lean protocol-machine runtime correspondence core, the
