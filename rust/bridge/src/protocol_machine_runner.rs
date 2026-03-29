@@ -603,8 +603,7 @@ impl ProtocolMachineRunner {
         let rust_normalized = normalize_semantic_audit(&rust_ticked);
         let lean_normalized = normalize_semantic_audit(&lean_ticked);
         let semantic_audit_equivalent = semantic_audits_equivalent(&rust_ticked, &lean_ticked);
-        let session_statuses_equivalent = normalized_session_statuses(&rust_output.sessions)
-            == normalized_session_statuses(&lean_output.sessions);
+        let session_statuses_equivalent = rust_output.sessions == lean_output.sessions;
         let diff = compute_execution_diff(
             &rust_normalized,
             &lean_normalized,
@@ -744,18 +743,6 @@ pub fn compute_trace_diff(
     }))
 }
 
-/// Canonicalize session-status output for comparison.
-///
-/// Only output ordering is normalized here. `sid` and `terminal` remain exact
-/// comparison fields once the list has been sorted.
-fn normalized_session_statuses(
-    sessions: &[ProtocolMachineSessionStatus],
-) -> Vec<ProtocolMachineSessionStatus> {
-    let mut normalized = sessions.to_vec();
-    normalized.sort_by_key(|session| session.sid);
-    normalized
-}
-
 fn compute_execution_diff(
     rust_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
     lean_trace: &[TickedObsEvent<ProtocolMachineTraceEvent>],
@@ -766,8 +753,6 @@ fn compute_execution_diff(
         return Some(diff);
     }
 
-    let rust_sessions = normalized_session_statuses(rust_sessions);
-    let lean_sessions = normalized_session_statuses(lean_sessions);
     if rust_sessions != lean_sessions {
         return Some(serde_json::json!({
             "kind": "session_status_mismatch",
@@ -949,8 +934,8 @@ mod tests {
     }
 
     #[test]
-    fn normalized_session_statuses_sorts_without_changing_terminality() {
-        let statuses = vec![
+    fn compute_execution_diff_rejects_session_status_order_mismatch_exactly() {
+        let rust_statuses = vec![
             ProtocolMachineSessionStatus {
                 schema_version: crate::schema::canonical_schema_version(),
                 sid: 3,
@@ -962,12 +947,22 @@ mod tests {
                 terminal: false,
             },
         ];
+        let lean_statuses = vec![
+            ProtocolMachineSessionStatus {
+                schema_version: crate::schema::canonical_schema_version(),
+                sid: 1,
+                terminal: false,
+            },
+            ProtocolMachineSessionStatus {
+                schema_version: crate::schema::canonical_schema_version(),
+                sid: 3,
+                terminal: true,
+            },
+        ];
 
-        let normalized = normalized_session_statuses(&statuses);
-        assert_eq!(normalized[0].sid, 1);
-        assert!(!normalized[0].terminal);
-        assert_eq!(normalized[1].sid, 3);
-        assert!(normalized[1].terminal);
+        let diff = compute_execution_diff(&[], &[], &rust_statuses, &lean_statuses)
+            .expect("exact comparison must reject session-order drift");
+        assert_eq!(diff["kind"], "session_status_mismatch");
     }
 
     #[test]

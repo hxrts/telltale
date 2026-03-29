@@ -85,11 +85,14 @@ The Lean bridge still contains a small amount of trusted normalization logic.
 That logic is intentionally narrow and is audited explicitly in CI by
 `just check-bridge-normalization`.
 
-| Surface | Normalization rule | Why permitted | Enforcing artifacts |
-|---|---|---|---|
-| semantic-audit tick normalization | Normalize only `tick`, and only per extracted session id | Absolute cross-session scheduling order is not semantic protocol truth; per-session observable order is | `rust/bridge/src/protocol_machine_trace.rs`, `rust/bridge/tests/protocol_machine_correspondence_tests.rs`, `rust/bridge/tests/protocol_machine_differential_steps.rs` |
-| session-status ordering | Sort session-status rows by `sid` before comparison | Output list order is not semantic; `sid` and `terminal` remain exact comparison fields | `rust/bridge/src/protocol_machine_runner.rs` |
-| runner JSON schema backfill | Inject missing `schema_version` fields only at the root, nested trace/session/step-event nodes, and semantic-object export | Older runner payloads may omit nested schema tags; the bridge must not synthesize semantic fields | `rust/bridge/src/protocol_machine_runner_json_parsing.rs`, `scripts/check/bridge-normalization-ledger.sh` |
+| Surface | Normalization rule | Classification | Why permitted | Enforcing artifacts |
+|---|---|---|---|---|
+| semantic-audit tick normalization | Normalize only `tick`, and only per extracted session id | irreducible trusted comparison logic | Absolute cross-session scheduling order is not semantic protocol truth; per-session observable order is | `rust/bridge/src/protocol_machine_trace.rs`, `rust/bridge/tests/protocol_machine_correspondence_tests.rs`, `rust/bridge/tests/protocol_machine_differential_steps.rs` |
+| runner JSON schema backfill | Inject missing `schema_version` fields only at the root, nested trace/session/step-event nodes, and semantic-object export | compatibility-only, removable by schema tightening | Older runner payloads may omit nested schema tags; the bridge must not synthesize semantic fields | `rust/bridge/src/protocol_machine_runner_json_parsing.rs`, `scripts/check/bridge-normalization-ledger.sh` |
+
+Session-status ordering is no longer part of the trusted comparison surface.
+Both the Lean runner and Rust-side correspondence harness now emit session rows
+in canonical `sid` order, so comparison is exact rather than normalized.
 
 ## Explicit Unsupported / Fail-Closed Notes
 

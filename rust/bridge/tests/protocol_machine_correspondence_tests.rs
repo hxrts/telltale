@@ -201,7 +201,7 @@ fn run_rust_vm(
         .iter()
         .filter_map(obs_to_semantic_audit_event)
         .collect();
-    let sessions = machine
+    let mut sessions: Vec<_> = machine
         .sessions()
         .session_ids()
         .into_iter()
@@ -220,6 +220,7 @@ fn run_rust_vm(
                 .unwrap_or(false),
         })
         .collect();
+    sessions.sort_by_key(|session| session.sid);
 
     let effect_trace = machine
         .effect_trace()

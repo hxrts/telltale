@@ -1,5 +1,22 @@
 use super::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SchemaVersionBackfillPath {
+    Root,
+    TraceEvent,
+    SessionStatus,
+    StepEvent,
+    SemanticObjects,
+}
+
+const SCHEMA_VERSION_BACKFILL_PATHS: &[SchemaVersionBackfillPath] = &[
+    SchemaVersionBackfillPath::Root,
+    SchemaVersionBackfillPath::TraceEvent,
+    SchemaVersionBackfillPath::SessionStatus,
+    SchemaVersionBackfillPath::StepEvent,
+    SchemaVersionBackfillPath::SemanticObjects,
+];
+
 fn inject_field_if_missing(object: &mut serde_json::Map<String, Value>, key: &str, value: Value) {
     object.entry(key.to_string()).or_insert(value);
 }
@@ -19,39 +36,57 @@ fn backfill_protocol_machine_run_output_schema_versions(mut value: Value) -> Val
         return value;
     };
 
-    inject_field_if_missing(root, "schema_version", bridge_schema.clone());
-
-    if let Some(Value::Array(trace)) = root.get_mut("trace") {
-        for event in trace.iter_mut() {
-            if let Some(obj) = event.as_object_mut() {
-                inject_field_if_missing(obj, "schema_version", bridge_schema.clone());
+    for path in SCHEMA_VERSION_BACKFILL_PATHS {
+        match path {
+            SchemaVersionBackfillPath::Root => {
+                inject_field_if_missing(root, "schema_version", bridge_schema.clone());
             }
-        }
-    }
-
-    if let Some(Value::Array(sessions)) = root.get_mut("sessions") {
-        for session in sessions.iter_mut() {
-            if let Some(obj) = session.as_object_mut() {
-                inject_field_if_missing(obj, "schema_version", bridge_schema.clone());
-            }
-        }
-    }
-
-    if let Some(Value::Array(step_states)) = root.get_mut("step_states") {
-        for step in step_states.iter_mut() {
-            if let Some(step_obj) = step.as_object_mut() {
-                if let Some(event) = step_obj.get_mut("event") {
-                    if let Some(event_obj) = event.as_object_mut() {
-                        inject_field_if_missing(event_obj, "schema_version", bridge_schema.clone());
+            SchemaVersionBackfillPath::TraceEvent => {
+                if let Some(Value::Array(trace)) = root.get_mut("trace") {
+                    for event in trace.iter_mut() {
+                        if let Some(obj) = event.as_object_mut() {
+                            inject_field_if_missing(obj, "schema_version", bridge_schema.clone());
+                        }
                     }
                 }
             }
-        }
-    }
-
-    if let Some(semantic_objects) = root.get_mut("semantic_objects") {
-        if let Some(obj) = semantic_objects.as_object_mut() {
-            inject_field_if_missing(obj, "schema_version", semantic_objects_schema);
+            SchemaVersionBackfillPath::SessionStatus => {
+                if let Some(Value::Array(sessions)) = root.get_mut("sessions") {
+                    for session in sessions.iter_mut() {
+                        if let Some(obj) = session.as_object_mut() {
+                            inject_field_if_missing(obj, "schema_version", bridge_schema.clone());
+                        }
+                    }
+                }
+            }
+            SchemaVersionBackfillPath::StepEvent => {
+                if let Some(Value::Array(step_states)) = root.get_mut("step_states") {
+                    for step in step_states.iter_mut() {
+                        if let Some(step_obj) = step.as_object_mut() {
+                            if let Some(event) = step_obj.get_mut("event") {
+                                if let Some(event_obj) = event.as_object_mut() {
+                                    inject_field_if_missing(
+                                        event_obj,
+                                        "schema_version",
+                                        bridge_schema.clone(),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            SchemaVersionBackfillPath::SemanticObjects => {
+                if let Some(semantic_objects) = root.get_mut("semantic_objects") {
+                    if let Some(obj) = semantic_objects.as_object_mut() {
+                        inject_field_if_missing(
+                            obj,
+                            "schema_version",
+                            semantic_objects_schema.clone(),
+                        );
+                    }
+                }
+            }
         }
     }
 
@@ -289,6 +324,20 @@ mod tests {
 
         assert_eq!(backfilled["trace"][0]["kind"], input["trace"][0]["kind"]);
         assert!(backfilled["sessions"][0].get("terminal").is_some());
+    }
+
+    #[test]
+    fn schema_backfill_paths_are_canonical_and_narrow() {
+        assert_eq!(
+            SCHEMA_VERSION_BACKFILL_PATHS,
+            &[
+                SchemaVersionBackfillPath::Root,
+                SchemaVersionBackfillPath::TraceEvent,
+                SchemaVersionBackfillPath::SessionStatus,
+                SchemaVersionBackfillPath::StepEvent,
+                SchemaVersionBackfillPath::SemanticObjects,
+            ]
+        );
     }
 
     #[test]

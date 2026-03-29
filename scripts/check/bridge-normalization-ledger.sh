@@ -91,7 +91,6 @@ fi
 
 for needle in \
   "semantic-audit tick normalization" \
-  "session-status ordering" \
   "runner JSON schema backfill"
 do
   if ! rg -q "${needle}" docs/32_testing_verification_inventory.md; then
@@ -100,6 +99,35 @@ do
     )
   fi
 done
+
+for needle in \
+  "irreducible trusted comparison logic" \
+  "compatibility-only, removable by schema tightening"
+do
+  if ! rg -q "${needle}" docs/32_testing_verification_inventory.md; then
+    errors+=(
+      "docs/32_testing_verification_inventory.md: missing bridge normalization classification '${needle}'"
+    )
+  fi
+done
+
+if rg -q "session-status ordering" docs/32_testing_verification_inventory.md; then
+  errors+=(
+    "docs/32_testing_verification_inventory.md: session-status ordering should no longer be listed as trusted normalization"
+  )
+fi
+
+if rg -q "fn normalized_session_statuses" rust/bridge/src/protocol_machine_runner.rs; then
+  errors+=(
+    "rust/bridge/src/protocol_machine_runner.rs: session-status comparison must be exact; normalized_session_statuses should not exist"
+  )
+fi
+
+if ! rg -q "sortedSessionStatusesJson" lean/Runtime/Tests/ProtocolMachineRunner.lean; then
+  errors+=(
+    "lean/Runtime/Tests/ProtocolMachineRunner.lean: missing canonical source-side session-status ordering helper"
+  )
+fi
 
 if [[ "${#errors[@]}" -gt 0 ]]; then
   printf 'bridge-normalization-ledger: found %d issue(s)\n' "${#errors[@]}" >&2

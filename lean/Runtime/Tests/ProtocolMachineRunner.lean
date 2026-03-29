@@ -124,6 +124,14 @@ def bufferedMessageCountsJson (sessions : SessionStore UnitVerify) : Json :=
   Json.mkObj <| (bufferedMessageCounts sessions).map (fun p =>
     (toString p.fst, Json.num p.snd))
 
+def sortedSessionStatusesJson (st : RunnerState) : Array Json :=
+  ((st.sessions.map (fun p =>
+      let sid : SessionId := p.fst
+      (sid, Json.mkObj
+        [ ("sid", Json.num sid)
+        , ("terminal", Json.bool (sessionTerminal st sid)) ]))).toArray.qsort
+        (fun left right => left.1 < right.1)).map Prod.snd
+
 def blockReasonTag : BlockReason UnitGuard → String
   | .recvWait _ _ => "recv_wait"
   | .sendWait _ => "send_wait"
@@ -1016,12 +1024,7 @@ def main : IO Unit := do
   let traceBase :=
     st'.obsTrace.foldr (fun ev acc => bridgeEventsForObs ev ++ acc) []
   let traceJson := Json.arr ((mergeBridgeTraceEvents traceBase (syntheticLifecycleEvents stepStates)).toArray)
-  let sessionsJson := Json.arr (st'.sessions.map (fun p =>
-    let sid : SessionId := p.fst
-    Json.mkObj
-      [ ("sid", Json.num sid)
-      , ("terminal", Json.bool (sessionTerminal st' sid)) ])
-    |>.toArray)
+  let sessionsJson := Json.arr (sortedSessionStatusesJson st')
   let status := if allTerminal st' then "completed" else "stuck"
   let out := Json.mkObj
     [ ("trace", traceJson)
