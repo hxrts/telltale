@@ -54,6 +54,64 @@ The numeric rows in this section are source-derived and checked by
 | Deterministic scale and budget assurance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
+## Current Formal Verification Claim
+
+Telltale does not currently make the blanket public claim that "Telltale is
+formally verified" end to end.
+
+The current public claim is:
+
+> Telltale has formally verified Lean models and theorems for its session-type,
+> projection, protocol-machine, and conservation-property semantics; strict
+> deterministic Rust↔Lean correspondence for the declared supported corpora; and
+> operational verification for the shipped first-party Rust artifacts and
+> release surface.
+
+That claim is intentionally narrower than "the shipped Rust implementation is
+mechanically proved correct end to end." The remaining gap is tracked in
+`work/verification.md`.
+
+## Claimed Surface
+
+The current proved or proof-backed claimed surface is:
+
+- the Lean `SessionTypes`, `SessionCoTypes`, `Choreography`, `Protocol`, and
+  `Runtime` models and theorem libraries
+- the supported DSL subset explicitly described in the property coverage table
+  for parser -> projection -> theory-conversion -> protocol-machine lowering
+- the strict Rust↔Lean correspondence corpora and comparison contracts tracked
+  in the Lean correspondence rows below
+- the packaged first-party crates and binaries only at the level of
+  operationally checked artifact/release assurance, not full mechanized proof
+
+## Out of Scope / Assumption Boundaries
+
+The current public claim does not include:
+
+- user-supplied handlers, transports, plugins, or deployment adapters
+- third-party infrastructure or deployment environments
+- Cargo, crates.io, git hosting, OS, compiler, and toolchain correctness beyond
+  the documented operational checks
+- cryptographic hardness assumptions beyond standard SHA-256-style assumptions
+- a blanket claim that every shipped Rust code path is mechanically proved
+
+## Public TCB Ledger
+
+The current trusted computing base for the public claim is:
+
+| Component | Why it remains trusted | Current enforcement |
+|---|---|---|
+| Lean kernel and imported proof libraries | theorem checker and proof environment | Lean build + code map + proof targets |
+| Lean model definitions | theorems are only as correct as the modeled semantics | Lean proof suites and docs inventory |
+| Rust/Lean bridge normalization and interchange | comparison/equality surface between Rust and Lean | `just check-bridge-normalization`, strict correspondence suites |
+| Rust runtime implementation | shipped executable semantics are still comparison-checked, not fully proved | strict correspondence, semantic assurance, refinement slice |
+| First-party handlers/transports | external impurity boundary for the runtime | handler-contract and runtime-boundary suites |
+| Release/package scripts and generated resources | artifact identity path from workspace to published crates | package-artifact, release-recovery, and docs-as-contract gates |
+| Cargo / crates.io / git / toolchains | external delivery/build platform | operational checks only |
+
+If that TCB shrinks or the claim broadens, this section must be updated before a
+broader public wording is used.
+
 ## Gate Ownership
 
 The verification surface is organized around three canonical just-entry lanes.
@@ -62,7 +120,7 @@ than duplicating their inner gate lists by hand.
 
 | Gate | Canonical entry point | Primary owning files | Local run surface | GitHub run surface |
 |---|---|---|---|---|
-| Fast structural verification | `just check-fast-structure` | `justfile`, `scripts/check/ci-assurance-lanes.sh`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `scripts/check/source-doc-snippets.sh`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Fast structural verification | `just check-fast-structure` | `justfile`, `scripts/check/ci-assurance-lanes.sh`, `scripts/check/formal-claim-scope.sh`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `scripts/check/source-doc-snippets.sh`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Focused assurance | `just check-focused-assurance` | `justfile`, strict Lean bridge suites, compiler pipeline suites, metatheory/refinement/runtime boundary suites | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | PR-critical assurance | `just check-pr-critical` | `justfile`, `.github/workflows/check.yml`, `.github/workflows/verify.yml` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |

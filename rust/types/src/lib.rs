@@ -2,7 +2,7 @@
 //!
 //! This crate provides the foundational type definitions for multiparty session types.
 //! All types are designed to match their corresponding Lean definitions exactly,
-//! enabling formal verification and proof correspondence.
+//! enabling proof correspondence with the Lean formalization.
 //!
 //! # Lean Correspondence
 //!

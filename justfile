@@ -137,6 +137,7 @@ check-fast-structure:
       export TMPDIR="/tmp"
     fi
     just check-ci-assurance-lanes
+    just check-formal-claim-scope
     just check-workflow-actions-regression
     just check-workflow-actions
     just check-verification-inventory
@@ -173,6 +174,10 @@ check-focused-assurance:
 # Verify that CI/workflow ownership flows through the canonical PR/deep lane recipes.
 check-ci-assurance-lanes:
     ./scripts/check/ci-assurance-lanes.sh
+
+# Verify that the public formal-verification claim, scope, and TCB wording stay exact.
+check-formal-claim-scope:
+    ./scripts/check/formal-claim-scope.sh
 
 # Rust style guide lint check (comprehensive)
 lint:

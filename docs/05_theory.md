@@ -310,7 +310,11 @@ The index `0` refers to the innermost binder. The index `1` refers to the next e
 
 ## Telltale Implementation
 
-Telltale implements these concepts in Rust with formal verification in Lean.
+Telltale implements these concepts in Rust and backs them with a substantial
+Lean formalization. The Lean model and theorem libraries are mechanically
+verified; the shipped Rust implementation is connected to them through strict
+correspondence and operational assurance rather than a blanket end-to-end proof
+claim today.
 
 ### Rust Types
 

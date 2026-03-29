@@ -157,8 +157,8 @@ the deciding role. This ensures the decision to continue is fused with the first
 saving a round trip compared to sending a separate "continue" signal.
 
 This desugaring converts the `RoleDecides` loop into standard multiparty session type
-constructs (choice + recursion), enabling formal verification in Lean and compatibility
-with standard MPST projection algorithms.
+constructs (choice + recursion), keeping the surface inside the Lean-modeled theory
+fragment and compatible with standard MPST projection algorithms.
 
 ```tell
 loop repeat 5

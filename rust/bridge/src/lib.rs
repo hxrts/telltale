@@ -1,8 +1,8 @@
 //! Lean verification bridge for Telltale protocol-machine artifacts.
 //!
 //! This crate provides bidirectional conversion between Rust protocol/session
-//! artifacts and Lean-compatible JSON format, enabling formal verification of
-//! protocol-machine properties in Lean.
+//! artifacts and Lean-compatible JSON format, enabling proof-backed Lean
+//! validation of protocol-machine properties.
 //!
 //! # Features
 //!
