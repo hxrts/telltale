@@ -82,6 +82,11 @@ jobs:
           mkdir -p artifacts
           just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
 
+      - name: Run fail-closed mutation suites
+        run: |
+          mkdir -p artifacts
+          just check-fail-closed-mutations | tee artifacts/check-fail-closed-mutations.log
+
       - name: Run compiler pipeline suites
         run: |
           mkdir -p artifacts

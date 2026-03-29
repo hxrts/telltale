@@ -62,6 +62,7 @@ ci-dry-run lane="fast":
     just check-workflow-actions
     just check-verification-inventory
     just check-bridge-normalization
+    just check-fail-closed-mutations
     just check-package-artifacts
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
@@ -174,6 +175,12 @@ check-tooling-convergence:
 # Validate source markdown DSL snippets against the real parser.
 check-source-doc-snippets:
     ./scripts/check/source-doc-snippets.sh
+
+# Deliberately perturb narrow verification boundaries and prove each gate fails closed.
+check-fail-closed-mutations:
+    cargo test -p telltale-bridge --lib parse_protocol_machine_run_output_rejects_ -- --nocapture
+    cargo test -p telltale-machine transported_theorem_boundary_fail_closes_ -- --nocapture
+    ./scripts/check/fail-closed-mutations.sh
 
 # Run the deterministic extension statement parsing/dispatch regression suites.
 check-extension-dispatch:

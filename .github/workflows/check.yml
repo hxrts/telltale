@@ -37,6 +37,8 @@ jobs:
         run: just check-verification-inventory
       - name: Audit bridge normalization ledger
         run: just check-bridge-normalization
+      - name: Run fail-closed mutation suites
+        run: just check-fail-closed-mutations
       - name: Check packaged crate artifacts
         run: just check-package-artifacts
       - name: Validate source doc DSL snippets

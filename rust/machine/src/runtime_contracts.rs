@@ -57,6 +57,26 @@ pub struct TransportedTheoremBoundaryEntry {
     pub assumption_boundary: Option<String>,
 }
 
+/// Reasons the transported-theorem ledger and runtime profile can be inconsistent.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransportedTheoremBoundaryValidationError {
+    /// Rust runtime admission consumes a theorem family that is not classified as
+    /// runtime-critical in the boundary ledger.
+    RustAdmissionKeyNotRuntimeCritical(String),
+    /// A runtime-critical theorem consumed only by Lean lost its explicit
+    /// assumption boundary marker.
+    LeanOnlyRuntimeCriticalMissingAssumptionBoundary(String),
+    /// A Rust-runtime-consumed theorem family is missing from the runtime
+    /// execution profile eligibility set.
+    RuntimeProfileMissingRustAdmissionKey(String),
+    /// A Rust-runtime-consumed theorem family is present in the runtime profile
+    /// but disabled.
+    RuntimeProfileDisablesRustAdmissionKey(String),
+    /// The runtime profile enables a theorem family that is not classified as a
+    /// Rust-runtime-consumed theorem boundary entry.
+    RuntimeProfileEnablesUnknownRustAdmissionKey(String),
+}
+
 /// Determinism artifact inventory used for runtime profile validation.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DeterminismArtifacts {
@@ -474,6 +494,71 @@ pub fn rust_runtime_critical_transport_theorem_keys() -> Vec<String> {
         .collect()
 }
 
+/// Validate that the canonical transported-theorem ledger and shipped runtime
+/// execution-profile keys stay in exact correspondence.
+pub fn validate_transported_theorem_boundary_consistency(
+    boundary: &[TransportedTheoremBoundaryEntry],
+    profile: &ProtocolMachineExecutionProfile,
+) -> Result<(), TransportedTheoremBoundaryValidationError> {
+    use TransportedTheoremBoundaryValidationError::{
+        LeanOnlyRuntimeCriticalMissingAssumptionBoundary, RuntimeProfileDisablesRustAdmissionKey,
+        RuntimeProfileEnablesUnknownRustAdmissionKey, RuntimeProfileMissingRustAdmissionKey,
+        RustAdmissionKeyNotRuntimeCritical,
+    };
+    use TransportedTheoremUsageClass::RuntimeCriticalInstantiatedPremise;
+
+    let rust_runtime_keys: BTreeSet<_> = boundary
+        .iter()
+        .filter(|entry| entry.consumed_by_rust_runtime_admission)
+        .map(|entry| entry.key.as_str())
+        .collect();
+    let enabled_profile_keys: BTreeSet<_> = profile
+        .theorem_pack_eligibility
+        .iter()
+        .filter_map(|(key, enabled)| enabled.then_some(key.as_str()))
+        .collect();
+
+    for entry in boundary {
+        if entry.consumed_by_rust_runtime_admission
+            && !matches!(entry.usage_class, RuntimeCriticalInstantiatedPremise)
+        {
+            return Err(RustAdmissionKeyNotRuntimeCritical(entry.key.clone()));
+        }
+        if matches!(entry.usage_class, RuntimeCriticalInstantiatedPremise)
+            && !entry.consumed_by_rust_runtime_admission
+            && entry.consumed_by_lean_runtime_gate
+            && entry.assumption_boundary.is_none()
+        {
+            return Err(LeanOnlyRuntimeCriticalMissingAssumptionBoundary(
+                entry.key.clone(),
+            ));
+        }
+        if entry.consumed_by_rust_runtime_admission {
+            match profile
+                .theorem_pack_eligibility
+                .iter()
+                .find(|(key, _)| key == &entry.key)
+            {
+                None => return Err(RuntimeProfileMissingRustAdmissionKey(entry.key.clone())),
+                Some((_, false)) => {
+                    return Err(RuntimeProfileDisablesRustAdmissionKey(entry.key.clone()))
+                }
+                Some((_, true)) => {}
+            }
+        }
+    }
+
+    for key in enabled_profile_keys {
+        if !rust_runtime_keys.contains(key) {
+            return Err(RuntimeProfileEnablesUnknownRustAdmissionKey(
+                key.to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 impl RuntimeCapability {
     const ALL: [Self; 4] = [
         Self::LiveMigration,
@@ -826,15 +911,20 @@ mod tests {
     fn transported_theorem_boundary_makes_rust_runtime_subset_exact() {
         let boundary = transported_theorem_boundary();
         let rust_runtime_keys = rust_runtime_critical_transport_theorem_keys();
-        let profile_keys: Vec<_> = ProtocolMachineExecutionProfile::full()
+        let profile = ProtocolMachineExecutionProfile::full();
+        let profile_keys: Vec<_> = profile
             .theorem_pack_eligibility
-            .into_iter()
-            .map(|(key, _)| key)
+            .iter()
+            .map(|(key, _)| key.clone())
             .collect();
 
         assert_eq!(
             rust_runtime_keys, profile_keys,
             "shipped Rust runtime admission must consume exactly the classified runtime-critical theorem keys"
+        );
+        assert_eq!(
+            validate_transported_theorem_boundary_consistency(&boundary, &profile),
+            Ok(())
         );
         assert!(
             boundary.iter().any(|entry| {
@@ -859,5 +949,80 @@ mod tests {
                 entry.key
             );
         }
+    }
+
+    #[test]
+    fn transported_theorem_boundary_fail_closes_when_runtime_profile_key_drifts() {
+        let boundary = transported_theorem_boundary();
+        let mut profile = ProtocolMachineExecutionProfile::full();
+        profile.theorem_pack_eligibility[0].0 = "protocol_machine_envelope_adherence_typo".into();
+
+        assert_eq!(
+            validate_transported_theorem_boundary_consistency(&boundary, &profile),
+            Err(
+                TransportedTheoremBoundaryValidationError::RuntimeProfileMissingRustAdmissionKey(
+                    "protocol_machine_envelope_adherence".into()
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn transported_theorem_boundary_fail_closes_when_runtime_profile_enables_unknown_key() {
+        let boundary = transported_theorem_boundary();
+        let mut profile = ProtocolMachineExecutionProfile::full();
+        profile
+            .theorem_pack_eligibility
+            .push(("unknown_runtime_boundary".into(), true));
+
+        assert_eq!(
+            validate_transported_theorem_boundary_consistency(&boundary, &profile),
+            Err(
+                TransportedTheoremBoundaryValidationError::RuntimeProfileEnablesUnknownRustAdmissionKey(
+                    "unknown_runtime_boundary".into()
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn transported_theorem_boundary_fail_closes_when_runtime_classification_drifts() {
+        let mut boundary = transported_theorem_boundary();
+        let profile = ProtocolMachineExecutionProfile::full();
+        let bridge_entry = boundary
+            .iter_mut()
+            .find(|entry| entry.key == "protocol_envelope_bridge")
+            .expect("canonical boundary should classify protocol_envelope_bridge");
+        bridge_entry.usage_class = TransportedTheoremUsageClass::BlackBoxPremiseOnly;
+
+        assert_eq!(
+            validate_transported_theorem_boundary_consistency(&boundary, &profile),
+            Err(
+                TransportedTheoremBoundaryValidationError::RustAdmissionKeyNotRuntimeCritical(
+                    "protocol_envelope_bridge".into()
+                )
+            )
+        );
+    }
+
+    #[test]
+    fn transported_theorem_boundary_fail_closes_when_lean_only_runtime_critical_entry_loses_assumption_boundary(
+    ) {
+        let mut boundary = transported_theorem_boundary();
+        let profile = ProtocolMachineExecutionProfile::full();
+        let byzantine = boundary
+            .iter_mut()
+            .find(|entry| entry.key == "byzantine_safety_characterization")
+            .expect("canonical boundary should classify byzantine_safety_characterization");
+        byzantine.assumption_boundary = None;
+
+        assert_eq!(
+            validate_transported_theorem_boundary_consistency(&boundary, &profile),
+            Err(
+                TransportedTheoremBoundaryValidationError::LeanOnlyRuntimeCriticalMissingAssumptionBoundary(
+                    "byzantine_safety_characterization".into()
+                )
+            )
+        );
     }
 }

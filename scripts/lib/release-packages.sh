@@ -37,6 +37,9 @@ manifest_path() {
     telltale-transport) echo "rust/transport/Cargo.toml" ;;
     telltale-simulator) echo "rust/simulator/Cargo.toml" ;;
     telltale-bridge) echo "rust/bridge/Cargo.toml" ;;
-    *) return 1 ;;
+    *)
+      echo "unknown package: ${crate}" >&2
+      return 1
+      ;;
   esac
 }
