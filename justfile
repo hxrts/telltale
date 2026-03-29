@@ -57,35 +57,16 @@ ci-dry-run lane="fast":
       export TMPDIR="/tmp"
     fi
     cargo fmt --all -- --check
-    # Fail fast on generated docs/metrics drift before the expensive build/test lanes.
-    just check-workflow-actions-regression
-    just check-workflow-actions
-    just check-verification-inventory
-    just check-bridge-normalization
-    just check-fail-closed-mutations
+    # Fail fast on structural/docs/schema drift before the heavier assurance lanes.
+    just check-fast-structure
+    just check-focused-assurance
     just check-package-artifacts
-    just check-source-doc-snippets
-    just check-lean-metrics-minimal-env
-    just check-lean-metrics
-    just check-tooling-convergence
-    just check-lean-prebuilt
-    just check-lean-bridge-strict
-    just check-compiler-pipeline
-    just check-deadlock-automation
-    just check-authority-metatheory
-    just check-concrete-refinement
-    just check-transported-theorem-boundary
-    just check-handler-contracts
-    just check-extension-dispatch
-    just check-semantic-assurance
-    just check-runtime-boundaries
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
     cargo test --workspace --all-targets --all-features
     just check-arch
     just check-arch-lean
-    just check-lean-dependency-pins
     just check-capability-gates
     just check-release-conformance
     just check-telltale-style
@@ -123,6 +104,47 @@ ci-dry-run lane="fast":
 # Mirror the markdown link-check action used in GitHub check.yml docs lane
 check-doc-links-ci:
     find docs -name '*.md' -print0 | xargs -0 npx --yes markdown-link-check --config .github/config/markdown-link-check.json
+
+# Canonical fast-fail structural lane: workflow definitions, ledgers, docs snippets,
+# Lean bootstrap state, and other cheap schema/convergence gates.
+check-fast-structure:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    just check-workflow-actions-regression
+    just check-workflow-actions
+    just check-verification-inventory
+    just check-bridge-normalization
+    just check-fail-closed-mutations
+    just check-source-doc-snippets
+    just check-lean-metrics-minimal-env
+    just check-lean-metrics
+    just check-tooling-convergence
+    just check-lean-prebuilt
+    just check-lean-dependency-pins
+
+# Canonical focused assurance lane: strict Lean-backed correspondence and the
+# highest-signal semantic/property suites that should fail before broad workspace tests.
+check-focused-assurance:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    just check-lean-bridge-strict
+    just check-compiler-pipeline
+    just check-deadlock-automation
+    just check-authority-metatheory
+    just check-concrete-refinement
+    just check-transported-theorem-boundary
+    just check-handler-contracts
+    just check-extension-dispatch
+    just check-semantic-assurance
+    just check-runtime-boundaries
 
 # Rust style guide lint check (comprehensive)
 lint:
@@ -178,6 +200,12 @@ check-source-doc-snippets:
 
 # Deliberately perturb narrow verification boundaries and prove each gate fails closed.
 check-fail-closed-mutations:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
     cargo test -p telltale-bridge --lib parse_protocol_machine_run_output_rejects_ -- --nocapture
     cargo test -p telltale-machine transported_theorem_boundary_fail_closes_ -- --nocapture
     ./scripts/check/fail-closed-mutations.sh

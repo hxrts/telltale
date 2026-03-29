@@ -180,6 +180,12 @@ forbidden_inventory_gap_phrases=(
   "fail-closed placeholder"
 )
 
+gate_ownership_recipes=(
+  check-fast-structure
+  check-focused-assurance
+  check-package-artifacts
+)
+
 # ── Helpers ───────────────────────────────────────────────────────────
 
 # Extract the documented value for a named metric from the inventory doc.
@@ -377,6 +383,18 @@ check_metric "Explicit unsupported or fail-closed property notes" "$actual_expli
 for phrase in "${forbidden_inventory_gap_phrases[@]}"; do
   if rg -Fq "$phrase" docs/32_testing_verification_inventory.md; then
     errors+=("docs/32_testing_verification_inventory.md: stale gap phrase remains in inventory: ${phrase}")
+  fi
+done
+
+if ! rg -q "^## Gate Ownership" docs/32_testing_verification_inventory.md; then
+  errors+=("docs/32_testing_verification_inventory.md: missing 'Gate Ownership' section")
+fi
+
+for recipe in "${gate_ownership_recipes[@]}"; do
+  recipe_code_span="$(printf '`just %s`' "${recipe}")"
+  recipe_command_count "${recipe}" >/dev/null
+  if ! rg -Fq "${recipe_code_span}" docs/32_testing_verification_inventory.md; then
+    errors+=("docs/32_testing_verification_inventory.md: missing gate ownership entry for ${recipe}")
   fi
 done
 

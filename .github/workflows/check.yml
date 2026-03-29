@@ -31,44 +31,12 @@ jobs:
           args: --all -- --check
       - name: Install just
         run: cargo install just --locked
-      - name: Check workflow action references
-        run: just check-workflow-actions
-      - name: Check verification inventory freshness
-        run: just check-verification-inventory
-      - name: Audit bridge normalization ledger
-        run: just check-bridge-normalization
-      - name: Run fail-closed mutation suites
-        run: just check-fail-closed-mutations
+      - name: Run fast structural verification lane
+        run: just check-fast-structure
+      - name: Run focused assurance lane
+        run: just check-focused-assurance
       - name: Check packaged crate artifacts
         run: just check-package-artifacts
-      - name: Validate source doc DSL snippets
-        run: just check-source-doc-snippets
-      - name: Check Lean metrics freshness
-        run: just check-lean-metrics
-      - name: Run tooling convergence checks
-        run: just check-tooling-convergence
-      - name: Check Lean prebuilt artifacts
-        run: just check-lean-prebuilt
-      - name: Run strict Lean bridge verification lane
-        run: just check-lean-bridge-strict
-      - name: Run compiler pipeline suites
-        run: just check-compiler-pipeline
-      - name: Run deadlock automation suites
-        run: just check-deadlock-automation
-      - name: Run authority metatheory suites
-        run: just check-authority-metatheory
-      - name: Run concrete refinement suites
-        run: just check-concrete-refinement
-      - name: Run transported theorem boundary suites
-        run: just check-transported-theorem-boundary
-      - name: Run handler contract suites
-        run: just check-handler-contracts
-      - name: Run extension dispatch suites
-        run: just check-extension-dispatch
-      - name: Run semantic assurance suites
-        run: just check-semantic-assurance
-      - name: Run runtime boundary suites
-        run: just check-runtime-boundaries
       - name: Build sources
         uses: actions-rs/cargo@v1
         with:

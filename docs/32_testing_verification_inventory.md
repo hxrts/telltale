@@ -49,6 +49,18 @@ When one of these values changes legitimately:
 | Deadlock automation fragment assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
+## Gate Ownership
+
+The verification surface is organized around three canonical just-entry lanes.
+`just ci-dry-run`, `check.yml`, and `verify.yml` should call these names rather
+than duplicating their inner gate lists by hand.
+
+| Gate | Canonical entry point | Primary owning files | Local run surface | GitHub run surface |
+|---|---|---|---|---|
+| Fast structural verification | `just check-fast-structure` | `justfile`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `scripts/check/source-doc-snippets.sh`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Focused assurance | `just check-focused-assurance` | `justfile`, strict Lean bridge suites, compiler pipeline suites, metatheory/refinement/runtime boundary suites | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+
 ## Property Coverage Baseline
 
 This baseline records whether each conserved-property bucket has at least one

@@ -37,100 +37,20 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
-      - name: Check workflow action references
+      - name: Run fast structural verification lane
         run: |
           mkdir -p artifacts
-          just check-workflow-actions | tee artifacts/check-workflow-actions.log
+          just check-fast-structure | tee artifacts/check-fast-structure.log
 
-      - name: Check verification inventory freshness
+      - name: Run focused assurance lane
         run: |
           mkdir -p artifacts
-          just check-verification-inventory | tee artifacts/check-verification-inventory.log
+          just check-focused-assurance | tee artifacts/check-focused-assurance.log
 
-      - name: Validate source doc DSL snippets
-        run: |
-          mkdir -p artifacts
-          just check-source-doc-snippets | tee artifacts/check-source-doc-snippets.log
-
-      - name: Check Lean metrics freshness
-        run: |
-          mkdir -p artifacts
-          just check-lean-metrics | tee artifacts/check-lean-metrics.log
-
-      - name: Run tooling convergence checks
-        run: |
-          mkdir -p artifacts
-          just check-tooling-convergence | tee artifacts/check-tooling-convergence.log
-
-      - name: Check Lean prebuilt artifacts
-        run: |
-          mkdir -p artifacts
-          just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
-
-      - name: Audit bridge normalization ledger
-        run: |
-          mkdir -p artifacts
-          just check-bridge-normalization | tee artifacts/check-bridge-normalization.log
-
-      - name: Check packaged crate artifacts
+      - name: Run packaged artifact assurance lane
         run: |
           mkdir -p artifacts
           just check-package-artifacts | tee artifacts/check-package-artifacts.log
-
-      - name: Run strict Lean bridge verification lane
-        run: |
-          mkdir -p artifacts
-          just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
-
-      - name: Run fail-closed mutation suites
-        run: |
-          mkdir -p artifacts
-          just check-fail-closed-mutations | tee artifacts/check-fail-closed-mutations.log
-
-      - name: Run compiler pipeline suites
-        run: |
-          mkdir -p artifacts
-          just check-compiler-pipeline | tee artifacts/check-compiler-pipeline.log
-
-      - name: Run deadlock automation suites
-        run: |
-          mkdir -p artifacts
-          just check-deadlock-automation | tee artifacts/check-deadlock-automation.log
-
-      - name: Run authority metatheory suites
-        run: |
-          mkdir -p artifacts
-          just check-authority-metatheory | tee artifacts/check-authority-metatheory.log
-
-      - name: Run concrete refinement suites
-        run: |
-          mkdir -p artifacts
-          just check-concrete-refinement | tee artifacts/check-concrete-refinement.log
-
-      - name: Run transported theorem boundary suites
-        run: |
-          mkdir -p artifacts
-          just check-transported-theorem-boundary | tee artifacts/check-transported-theorem-boundary.log
-
-      - name: Run handler contract suites
-        run: |
-          mkdir -p artifacts
-          just check-handler-contracts | tee artifacts/check-handler-contracts.log
-
-      - name: Run extension dispatch suites
-        run: |
-          mkdir -p artifacts
-          just check-extension-dispatch | tee artifacts/check-extension-dispatch.log
-
-      - name: Run semantic assurance suites
-        run: |
-          mkdir -p artifacts
-          just check-semantic-assurance | tee artifacts/check-semantic-assurance.log
-
-      - name: Run runtime boundary suites
-        run: |
-          mkdir -p artifacts
-          just check-runtime-boundaries | tee artifacts/check-runtime-boundaries.log
 
       - name: Run Lean architecture/style checks
         run: |
@@ -222,70 +142,20 @@ jobs:
       - name: Install just
         run: cargo install just --locked
 
-      - name: Check workflow action references
+      - name: Run fast structural verification lane
         run: |
           mkdir -p artifacts
-          just check-workflow-actions | tee artifacts/check-workflow-actions.log
+          just check-fast-structure | tee artifacts/check-fast-structure.log
 
-      - name: Check verification inventory freshness
+      - name: Run focused assurance lane
         run: |
           mkdir -p artifacts
-          just check-verification-inventory | tee artifacts/check-verification-inventory.log
+          just check-focused-assurance | tee artifacts/check-focused-assurance.log
 
-      - name: Validate source doc DSL snippets
+      - name: Run packaged artifact assurance lane
         run: |
           mkdir -p artifacts
-          just check-source-doc-snippets | tee artifacts/check-source-doc-snippets.log
-
-      - name: Check Lean metrics freshness
-        run: |
-          mkdir -p artifacts
-          just check-lean-metrics | tee artifacts/check-lean-metrics.log
-
-      - name: Run tooling convergence checks
-        run: |
-          mkdir -p artifacts
-          just check-tooling-convergence | tee artifacts/check-tooling-convergence.log
-
-      - name: Check Lean prebuilt artifacts
-        run: |
-          mkdir -p artifacts
-          just check-lean-prebuilt | tee artifacts/check-lean-prebuilt.log
-
-      - name: Run strict Lean bridge verification lane
-        run: |
-          mkdir -p artifacts
-          just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
-
-      - name: Run authority metatheory suites
-        run: |
-          mkdir -p artifacts
-          just check-authority-metatheory | tee artifacts/check-authority-metatheory.log
-
-      - name: Run transported theorem boundary suites
-        run: |
-          mkdir -p artifacts
-          just check-transported-theorem-boundary | tee artifacts/check-transported-theorem-boundary.log
-
-      - name: Run handler contract suites
-        run: |
-          mkdir -p artifacts
-          just check-handler-contracts | tee artifacts/check-handler-contracts.log
-
-      - name: Run extension dispatch suites
-        run: |
-          mkdir -p artifacts
-          just check-extension-dispatch | tee artifacts/check-extension-dispatch.log
-
-      - name: Run semantic assurance suites
-        run: |
-          mkdir -p artifacts
-          just check-semantic-assurance | tee artifacts/check-semantic-assurance.log
-
-      - name: Run runtime boundary suites
-        run: |
-          mkdir -p artifacts
-          just check-runtime-boundaries | tee artifacts/check-runtime-boundaries.log
+          just check-package-artifacts | tee artifacts/check-package-artifacts.log
 
       - name: Run Lean architecture/style checks
         run: |
