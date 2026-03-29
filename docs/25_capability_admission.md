@@ -122,7 +122,7 @@ The following rows are source-derived and checked against
 
 | Key | Usage class | Rust runtime admission | Lean runtime gate | Assumption boundary |
 |---|---|---|---|---|
-| `byzantine_safety_characterization` | `runtime_critical_instantiated_premise` | no | yes | Lean theorem-pack gate only; Rust runtime admission does not currently consume this key. |
+| `byzantine_safety_characterization` | `runtime_critical_instantiated_premise` | no | yes | Lean theorem-pack gate only. Rust runtime admission does not currently consume this key. |
 | `protocol_machine_envelope_adherence` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
 | `protocol_machine_envelope_admission` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
 | `protocol_envelope_bridge` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
