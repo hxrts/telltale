@@ -7,6 +7,7 @@
 //! represented as data structures that can be analyzed, transformed, and interpreted.
 
 pub mod algebra;
+pub mod contract;
 pub mod extension;
 pub mod handler;
 pub mod handlers;
@@ -18,6 +19,12 @@ pub mod registry;
 pub use algebra::{
     Effect, InterpretResult, InterpreterState, Program, ProgramBuilder, ProgramError,
     ProgramMessage,
+};
+pub use contract::{
+    validate_handler_contract_profile, validated_contract_profile, DeliveryModel,
+    DocumentedHandlerContract, ExtensionDispatchContract, ExtensionDispatchMode,
+    HandlerContractProfile, HandlerContractTier, HandlerContractViolation,
+    ProtocolSemanticContract, RetryPolicy, TimeoutPolicy, TransportPolicyContract,
 };
 pub use extension::{ExtensionEffect, ExtensionError};
 pub use handler::{

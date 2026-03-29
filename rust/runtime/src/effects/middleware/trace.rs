@@ -7,6 +7,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::{Duration, Instant};
 use tracing::{debug, trace, warn};
 
+use crate::effects::contract::{DocumentedHandlerContract, HandlerContractProfile};
 use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
@@ -27,6 +28,20 @@ impl<H> Trace<H> {
             inner,
             prefix: prefix.into(),
         }
+    }
+}
+
+impl<H> DocumentedHandlerContract for Trace<H>
+where
+    H: DocumentedHandlerContract,
+{
+    fn contract_profile() -> HandlerContractProfile {
+        let mut profile = H::contract_profile();
+        profile.handler_name = std::any::type_name::<Self>();
+        profile
+            .notes
+            .push("trace middleware may observe operations but must not change semantic outcomes");
+        profile
     }
 }
 

@@ -55,6 +55,8 @@ jobs:
         run: just check-deadlock-automation
       - name: Run concrete refinement suites
         run: just check-concrete-refinement
+      - name: Run handler contract suites
+        run: just check-handler-contracts
       - name: Run extension dispatch suites
         run: just check-extension-dispatch
       - name: Run semantic assurance suites

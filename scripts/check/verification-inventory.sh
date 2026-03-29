@@ -131,6 +131,10 @@ runtime_substrate_boundary_suites=(
   rust/runtime/tests/wasm_compat.rs
 )
 
+handler_contract_boundary_suites=(
+  rust/runtime/tests/handler_contracts.rs
+)
+
 long_horizon_recovery_harness_suites=(
   rust/bridge/tests/reconfiguration_recovery_harness.rs
 )
@@ -301,6 +305,7 @@ actual_agreement_composition_runtime_semantic_suites=$(count_list "${agreement_c
 actual_extension_middleware_semantic_hardening_suites=$(count_list "${extension_middleware_semantic_hardening_suites[@]}")
 actual_generated_topology_transport_public_path_suites=$(count_list "${generated_topology_transport_public_path_suites[@]}")
 actual_runtime_substrate_boundary_suites=$(count_list "${runtime_substrate_boundary_suites[@]}")
+actual_handler_contract_boundary_suites=$(count_list "${handler_contract_boundary_suites[@]}")
 actual_long_horizon_recovery_harness_suites=$(count_list "${long_horizon_recovery_harness_suites[@]}")
 actual_artifact_release_assurance_suites=$(count_list "${artifact_release_assurance_suites[@]}")
 actual_concrete_protocol_machine_refinement_suites=$(count_list "${concrete_protocol_machine_refinement_suites[@]}")
@@ -323,6 +328,7 @@ actual_executable_property_buckets=$(
     bucket_has_coverage "$actual_extension_middleware_semantic_hardening_suites"
     bucket_has_coverage "$actual_generated_topology_transport_public_path_suites"
     bucket_has_coverage "$actual_runtime_substrate_boundary_suites"
+    bucket_has_coverage "$actual_handler_contract_boundary_suites"
     bucket_has_coverage "$actual_long_horizon_recovery_harness_suites"
     bucket_has_coverage "$actual_artifact_release_assurance_suites"
     bucket_has_coverage "$actual_concrete_protocol_machine_refinement_suites"
@@ -330,7 +336,7 @@ actual_executable_property_buckets=$(
     bucket_has_coverage "$actual_deadlock_automation_fragment_suites"
   ) | awk '{sum += $1} END {print sum + 0}'
 )
-actual_lacking_property_buckets=$((18 - actual_executable_property_buckets))
+actual_lacking_property_buckets=$((19 - actual_executable_property_buckets))
 
 check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
 check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
@@ -351,6 +357,7 @@ check_metric "Agreement and composition runtime semantic suites" "$actual_agreem
 check_metric "Extension and middleware semantic hardening suites" "$actual_extension_middleware_semantic_hardening_suites"
 check_metric "Generated topology and transport public-path suites" "$actual_generated_topology_transport_public_path_suites"
 check_metric "Runtime substrate boundary assurance suites" "$actual_runtime_substrate_boundary_suites"
+check_metric "Handler contract boundary assurance suites" "$actual_handler_contract_boundary_suites"
 check_metric "Long-horizon recovery differential harness suites" "$actual_long_horizon_recovery_harness_suites"
 check_metric "Artifact and release assurance suites" "$actual_artifact_release_assurance_suites"
 check_metric "Concrete protocol-machine refinement suites" "$actual_concrete_protocol_machine_refinement_suites"

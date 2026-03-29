@@ -10,6 +10,8 @@
 //! - **Choreographic Logic**: Pure protocol specification (what to do)
 //! - **Effect Handlers**: Runtime implementation (how to do it)
 //! - **Interpreters**: Execute choreographic programs using handlers
+//! - **Contract Profiles**: Machine-checkable statements of semantic obligations
+//!   versus transport-policy freedom, defined in `effects::contract`
 //!
 //! # Example
 //!
@@ -43,6 +45,11 @@ use std::fmt::Debug;
 use std::time::Duration;
 use thiserror::Error;
 
+use crate::effects::contract::{
+    DeliveryModel, DocumentedHandlerContract, ExtensionDispatchContract, ExtensionDispatchMode,
+    HandlerContractProfile, HandlerContractTier, ProtocolSemanticContract, RetryPolicy,
+    TimeoutPolicy, TransportPolicyContract,
+};
 use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::identifiers::RoleName;
 
@@ -478,6 +485,37 @@ impl<R: RoleId> NoOpHandler<R> {
 impl<R: RoleId> Default for NoOpHandler<R> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<R: RoleId> DocumentedHandlerContract for NoOpHandler<R> {
+    fn contract_profile() -> HandlerContractProfile {
+        HandlerContractProfile {
+            handler_name: std::any::type_name::<Self>(),
+            tier: HandlerContractTier::ObservationalHarness,
+            semantics: ProtocolSemanticContract {
+                typed_send_recv_roundtrip: false,
+                exact_choice_label_preservation: false,
+                fail_closed_transport_errors: true,
+                timeouts_scoped_to_enforcing_role: true,
+                deterministic_for_regression: true,
+                can_materialize_values: false,
+            },
+            transport: TransportPolicyContract {
+                delivery_model: DeliveryModel::NoTransport,
+                retry_policy: RetryPolicy::None,
+                timeout_policy: TimeoutPolicy::EnforcingRoleOnly,
+            },
+            extension_dispatch: ExtensionDispatchContract {
+                mode: ExtensionDispatchMode::Unsupported,
+                fail_closed_when_unregistered: false,
+                type_exact_before_side_effects: false,
+            },
+            notes: vec![
+                "send/choose succeed as no-op observability aids",
+                "recv/offer intentionally fail closed instead of inventing values",
+            ],
+        }
     }
 }
 

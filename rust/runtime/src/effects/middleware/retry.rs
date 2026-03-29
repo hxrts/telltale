@@ -8,6 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 use tracing::debug;
 
+use crate::effects::contract::{DocumentedHandlerContract, HandlerContractProfile, RetryPolicy};
 use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
@@ -34,6 +35,21 @@ impl<H> Retry<H> {
             max_retries,
             base_delay,
         }
+    }
+}
+
+impl<H> DocumentedHandlerContract for Retry<H>
+where
+    H: DocumentedHandlerContract,
+{
+    fn contract_profile() -> HandlerContractProfile {
+        let mut profile = H::contract_profile();
+        profile.handler_name = std::any::type_name::<Self>();
+        profile.transport.retry_policy = RetryPolicy::ExternalMiddleware;
+        profile.notes.push(
+            "retry middleware may repeat send attempts but must not widen the handler's semantic contract",
+        );
+        profile
     }
 }
 

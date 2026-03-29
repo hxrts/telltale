@@ -42,9 +42,12 @@ pub use compiler::{
 pub use effects::middleware::{Metrics, Retry, Trace};
 pub use effects::NoOpHandler;
 pub use effects::{
-    interpret, ChoreoHandler, ChoreoHandlerExt, ChoreoResult, ChoreographyError, Effect, Endpoint,
-    InterpretResult, InterpreterState, LabelId, MessageTag, Program, ProgramBuilder,
-    ProgramMessage, RoleId,
+    interpret, validate_handler_contract_profile, validated_contract_profile, ChoreoHandler,
+    ChoreoHandlerExt, ChoreoResult, ChoreographyError, DeliveryModel, DocumentedHandlerContract,
+    Effect, Endpoint, ExtensionDispatchContract, ExtensionDispatchMode, HandlerContractProfile,
+    HandlerContractTier, HandlerContractViolation, InterpretResult, InterpreterState, LabelId,
+    MessageTag, Program, ProgramBuilder, ProgramMessage, ProtocolSemanticContract, RetryPolicy,
+    RoleId, TimeoutPolicy, TransportPolicyContract,
 };
 pub use effects::{InMemoryHandler, RecordedEvent, RecordingHandler};
 pub use effects::{TelltaleEndpoint, TelltaleHandler, TelltaleSession};

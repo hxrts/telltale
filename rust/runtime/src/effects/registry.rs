@@ -1,7 +1,10 @@
 //! Extension handler registry for type-safe extension dispatch
 
 use crate::effects::extension::{ExtensionEffect, ExtensionError};
-use crate::effects::{Endpoint, RoleId};
+use crate::effects::{
+    contract::{ExtensionDispatchContract, ExtensionDispatchMode},
+    Endpoint, RoleId,
+};
 use std::any::TypeId;
 use std::collections::HashMap;
 use std::future::Future;
@@ -31,6 +34,8 @@ pub type ExtensionHandler<E, R> = Box<
 ///
 /// Handlers must register extension types they support. Unregistered
 /// extensions cause runtime errors (fail-fast behavior).
+/// The machine-checkable dispatch contract is available through
+/// [`ExtensionRegistry::dispatch_contract`].
 ///
 /// # Example
 ///
@@ -95,6 +100,16 @@ impl<E: Endpoint, R: RoleId> ExtensionRegistry<E, R> {
         Ok(())
     }
 
+    /// Machine-checkable dispatch contract for all extension registries.
+    #[must_use]
+    pub fn dispatch_contract() -> ExtensionDispatchContract {
+        ExtensionDispatchContract {
+            mode: ExtensionDispatchMode::RegisteredOnlyTypeExact,
+            fail_closed_when_unregistered: true,
+            type_exact_before_side_effects: true,
+        }
+    }
+
     /// Handle an extension effect
     ///
     /// # Errors
@@ -121,6 +136,12 @@ impl<E: Endpoint, R: RoleId> ExtensionRegistry<E, R> {
     #[must_use]
     pub fn is_registered<Ext: ExtensionEffect<R> + 'static>(&self) -> bool {
         self.handlers.contains_key(&TypeId::of::<Ext>())
+    }
+
+    /// Number of registered extension handlers.
+    #[must_use]
+    pub fn registered_handler_count(&self) -> usize {
+        self.handlers.len()
     }
 
     /// Merge another registry into this one

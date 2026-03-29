@@ -7,6 +7,11 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
+use crate::effects::contract::{
+    DeliveryModel, DocumentedHandlerContract, ExtensionDispatchContract, ExtensionDispatchMode,
+    HandlerContractProfile, HandlerContractTier, ProtocolSemanticContract, RetryPolicy,
+    TimeoutPolicy, TransportPolicyContract,
+};
 use crate::effects::{ChoreoHandler, ChoreoResult, ChoreographyError, RoleId};
 
 /// Recording handler for testing - captures all effects for verification
@@ -44,6 +49,37 @@ impl<R: RoleId> RecordingHandler<R> {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clear();
+    }
+}
+
+impl<R: RoleId> DocumentedHandlerContract for RecordingHandler<R> {
+    fn contract_profile() -> HandlerContractProfile {
+        HandlerContractProfile {
+            handler_name: std::any::type_name::<Self>(),
+            tier: HandlerContractTier::ObservationalHarness,
+            semantics: ProtocolSemanticContract {
+                typed_send_recv_roundtrip: false,
+                exact_choice_label_preservation: true,
+                fail_closed_transport_errors: true,
+                timeouts_scoped_to_enforcing_role: true,
+                deterministic_for_regression: true,
+                can_materialize_values: false,
+            },
+            transport: TransportPolicyContract {
+                delivery_model: DeliveryModel::ScriptedHarness,
+                retry_policy: RetryPolicy::None,
+                timeout_policy: TimeoutPolicy::EnforcingRoleOnly,
+            },
+            extension_dispatch: ExtensionDispatchContract {
+                mode: ExtensionDispatchMode::Unsupported,
+                fail_closed_when_unregistered: false,
+                type_exact_before_side_effects: false,
+            },
+            notes: vec![
+                "captures exact operation order for regression use",
+                "recv/offer intentionally fail closed after recording the attempted effect",
+            ],
+        }
     }
 }
 

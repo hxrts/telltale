@@ -2,6 +2,11 @@ use super::{
     async_trait, ChoreoHandler, ChoreoResult, ChoreographyError, DeserializeOwned, RoleId,
     Serialize,
 };
+use crate::effects::contract::{
+    DeliveryModel, DocumentedHandlerContract, ExtensionDispatchContract, ExtensionDispatchMode,
+    HandlerContractProfile, HandlerContractTier, ProtocolSemanticContract, RetryPolicy,
+    TimeoutPolicy, TransportPolicyContract,
+};
 use std::collections::VecDeque;
 
 /// A mock handler that records operations and provides scripted responses
@@ -46,6 +51,37 @@ impl<R: RoleId> MockHandler<R> {
 
     pub fn clear_operations(&mut self) {
         self.recorded_operations.clear();
+    }
+}
+
+impl<R: RoleId> DocumentedHandlerContract for MockHandler<R> {
+    fn contract_profile() -> HandlerContractProfile {
+        HandlerContractProfile {
+            handler_name: std::any::type_name::<Self>(),
+            tier: HandlerContractTier::ObservationalHarness,
+            semantics: ProtocolSemanticContract {
+                typed_send_recv_roundtrip: false,
+                exact_choice_label_preservation: true,
+                fail_closed_transport_errors: true,
+                timeouts_scoped_to_enforcing_role: true,
+                deterministic_for_regression: true,
+                can_materialize_values: true,
+            },
+            transport: TransportPolicyContract {
+                delivery_model: DeliveryModel::ScriptedHarness,
+                retry_policy: RetryPolicy::None,
+                timeout_policy: TimeoutPolicy::PassThrough,
+            },
+            extension_dispatch: ExtensionDispatchContract {
+                mode: ExtensionDispatchMode::Unsupported,
+                fail_closed_when_unregistered: false,
+                type_exact_before_side_effects: false,
+            },
+            notes: vec![
+                "values and labels come only from an explicit scripted response queue",
+                "missing scripted responses fail closed instead of synthesizing protocol progress",
+            ],
+        }
     }
 }
 

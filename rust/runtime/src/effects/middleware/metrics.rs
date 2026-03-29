@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use serde::{de::DeserializeOwned, Serialize};
 use std::time::Duration;
 
+use crate::effects::contract::{DocumentedHandlerContract, HandlerContractProfile};
 use crate::effects::registry::{ExtensibleHandler, ExtensionRegistry};
 use crate::effects::{ChoreoHandler, ChoreoResult, RoleId};
 
@@ -38,6 +39,20 @@ impl<H> Metrics<H> {
 
     pub fn error_count(&self) -> u64 {
         self.error_count.load(std::sync::atomic::Ordering::Relaxed)
+    }
+}
+
+impl<H> DocumentedHandlerContract for Metrics<H>
+where
+    H: DocumentedHandlerContract,
+{
+    fn contract_profile() -> HandlerContractProfile {
+        let mut profile = H::contract_profile();
+        profile.handler_name = std::any::type_name::<Self>();
+        profile
+            .notes
+            .push("metrics middleware may count outcomes but must not alter payloads or labels");
+        profile
     }
 }
 

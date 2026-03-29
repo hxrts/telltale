@@ -72,6 +72,7 @@ ci-dry-run lane="fast":
     just check-compiler-pipeline
     just check-deadlock-automation
     just check-concrete-refinement
+    just check-handler-contracts
     just check-extension-dispatch
     just check-semantic-assurance
     just check-runtime-boundaries
@@ -176,6 +177,10 @@ check-source-doc-snippets:
 check-extension-dispatch:
     cargo test -p telltale-runtime --test extension_integration -- --nocapture
     cargo test -p telltale-runtime --features test-utils --test middleware_semantic_hardening -- --nocapture
+
+# Run the machine-checkable handler contract boundary suites.
+check-handler-contracts:
+    cargo test -p telltale-runtime --test handler_contracts -- --nocapture
 
 # Run the Lean-backed regular-fragment deadlock automation suites.
 check-deadlock-automation:
