@@ -30,6 +30,8 @@ require_pattern docs/32_testing_verification_inventory.md 'formally verified" en
 require_pattern docs/32_testing_verification_inventory.md "## Claimed Surface" "verification inventory must describe the claimed surface"
 require_pattern docs/32_testing_verification_inventory.md "## Out of Scope / Assumption Boundaries" "verification inventory must describe assumption boundaries"
 require_pattern docs/32_testing_verification_inventory.md "## Public TCB Ledger" "verification inventory must carry the public TCB ledger"
+require_pattern docs/32_testing_verification_inventory.md "## Refinement Coverage Map" "verification inventory must map the current refinement coverage"
+require_pattern docs/32_testing_verification_inventory.md '| Per-step event stream, `session_type_counts`, `ready_queue`, and `blocked` snapshots |' "verification inventory refinement map must include the per-step state boundary"
 require_pattern docs/32_testing_verification_inventory.md "| Rust/Lean bridge normalization and interchange |" "verification inventory TCB ledger must include the bridge trust surface"
 require_pattern docs/32_testing_verification_inventory.md "| Release/package scripts and generated resources |" "verification inventory TCB ledger must include artifact/release trust"
 

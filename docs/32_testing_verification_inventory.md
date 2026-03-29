@@ -112,6 +112,21 @@ The current trusted computing base for the public claim is:
 If that TCB shrinks or the claim broadens, this section must be updated before a
 broader public wording is used.
 
+## Refinement Coverage Map
+
+This map names the current protocol-machine state surfaces that matter to the
+claimed runtime story and shows whether they are already inside the exact
+Rust↔Lean refinement slice.
+
+| Runtime state component | Rust surface | Lean surface | Current refinement status | Note |
+|---|---|---|---|---|
+| Coroutine identity, program counter, status, owned-endpoint count, progress-token count | `rust/machine/src/refinement.rs` (`CoroutineRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteCoroutineSlice`) | exact slice | Compared exactly across cooperative, Lean, and threaded executions today |
+| Session id, role count, local-type entry count, buffered-message count, epoch | `rust/machine/src/refinement.rs` (`SessionRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteSessionSlice`) | exact slice | This is the current session-level refinement surface |
+| Scheduler ready queue, blocked-set tags, step count | `rust/machine/src/refinement.rs` (`SchedulerRefinementSlice`) | `lean/Runtime/Proofs/ProtocolMachine/ConcreteRefinement.lean` (`ConcreteSchedulerSlice`) | exact slice | The canonical scheduler slice is compared exactly today |
+| Per-step event stream, `session_type_counts`, `ready_queue`, and `blocked` snapshots | `rust/bridge/src/protocol_machine_runner.rs` (`ProtocolMachineStepState`) | `lean/Runtime/Tests/ProtocolMachineRunner.lean` step-state JSON export | strict correspondence, not yet part of the proved refinement slice | Deterministic parity exists, but this surface is still compared through the bridge runner rather than covered by the current Lean refinement theorem |
+| Effect exchanges and output-condition trace | `rust/bridge/src/protocol_machine_runner.rs` (`effect_exchanges`, `output_condition_trace`) | Lean runner JSON export and strict bridge suites | strict correspondence, not yet part of the proved refinement slice | Compared in strict lanes, not yet in the concrete refinement theorem |
+| Semantic-object families (handoffs, progress contracts, publications, agreement state, transformation obligations) | `rust/machine/src/engine/runtime_exec/introspection.rs`, `rust/machine/src/threaded/runtime_introspection.rs` | `lean/Runtime/Proofs/ProtocolMachine/SemanticObjects/*` | theorem-backed separately, not yet folded into one full refinement slice | Conservation theorems and strict comparison exist, but Phase 20 is the work to unify them into a single end-to-end runtime refinement claim |
+
 ## Gate Ownership
 
 The verification surface is organized around three canonical just-entry lanes.
