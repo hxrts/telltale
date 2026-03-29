@@ -86,6 +86,7 @@ mod nested;
 pub mod output_condition;
 pub mod owned;
 pub mod persistence;
+pub mod refinement;
 pub mod runtime_contracts;
 mod scheduler;
 pub mod semantic_objects;
@@ -157,6 +158,10 @@ pub mod model {
     /// State-level session, ownership, and edge objects.
     pub mod state {
         pub use crate::engine::{ObsEvent, ProtocolMachineState};
+        pub use crate::refinement::{
+            CoroutineRefinementSlice, ProtocolMachineRefinementSlice, RefinementSliceError,
+            SchedulerRefinementSlice, SessionRefinementSlice,
+        };
         pub use crate::session::{
             decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
             AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
@@ -310,6 +315,10 @@ pub use output_condition::{
 };
 pub use owned::OwnedSession;
 pub use persistence::{NoopPersistence, PersistenceModel};
+pub use refinement::{
+    CoroutineRefinementSlice, ProtocolMachineRefinementSlice, RefinementSliceError,
+    SchedulerRefinementSlice, SessionRefinementSlice,
+};
 pub use runtime_contracts::{
     admit_protocol_machine_runtime, determinism_profile_supported,
     enforce_protocol_machine_runtime_gates, execution_profile_supported,

@@ -1,4 +1,151 @@
 impl ThreadedProtocolMachine {
+    /// Export the concrete runtime slice used for exact refinement checks.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the exported counts do not fit the bridge-safe `u64` schema.
+    pub fn refinement_slice(
+        &self,
+    ) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
+        let coroutines = self
+            .coroutines
+            .iter()
+            .map(|coro| {
+                let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
+                Ok::<_, RefinementSliceError>(crate::refinement::CoroutineRefinementSlice {
+                    coro_id: u64::try_from(guard.id).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "coroutine.id",
+                            value: guard.id,
+                        }
+                    })?,
+                    session_id: u64::try_from(guard.session_id).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "coroutine.session_id",
+                            value: guard.session_id,
+                        }
+                    })?,
+                    pc: u64::try_from(guard.pc).map_err(|_| RefinementSliceError::CountOverflow {
+                        field: "coroutine.pc",
+                        value: guard.pc,
+                    })?,
+                    status: coro_status_tag(&guard.status).to_string(),
+                    owned_endpoints: u64::try_from(guard.owned_endpoints.len()).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "coroutine.owned_endpoints",
+                            value: guard.owned_endpoints.len(),
+                        }
+                    })?,
+                    progress_tokens: u64::try_from(guard.progress_tokens.len()).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "coroutine.progress_tokens",
+                            value: guard.progress_tokens.len(),
+                        }
+                    })?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let sessions = self
+            .sessions
+            .sessions
+            .read()
+            .expect("threaded ProtocolMachine lock poisoned")
+            .values()
+            .map(|session| {
+                let guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+                let buffered_messages =
+                    guard.buffers.values().try_fold(0_u64, |acc, buffer| {
+                        Ok::<_, RefinementSliceError>(
+                            acc + u64::try_from(buffer.len()).map_err(|_| {
+                                RefinementSliceError::CountOverflow {
+                                    field: "session.buffered_messages",
+                                    value: buffer.len(),
+                                }
+                            })?,
+                        )
+                    })?;
+                Ok::<_, RefinementSliceError>(SessionRefinementSlice {
+                    sid: u64::try_from(guard.sid).map_err(|_| RefinementSliceError::CountOverflow {
+                        field: "session.sid",
+                        value: guard.sid,
+                    })?,
+                    role_count: u64::try_from(guard.roles.len()).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "session.role_count",
+                            value: guard.roles.len(),
+                        }
+                    })?,
+                    local_type_entries: u64::try_from(guard.local_types.len()).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "session.local_type_entries",
+                            value: guard.local_types.len(),
+                        }
+                    })?,
+                    buffer_edges: u64::try_from(guard.buffers.len()).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "session.buffer_edges",
+                            value: guard.buffers.len(),
+                        }
+                    })?,
+                    buffered_messages,
+                    status: crate::refinement::session_status_tag(&guard.status).to_string(),
+                    epoch: u64::try_from(guard.epoch).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "session.epoch",
+                            value: guard.epoch,
+                        }
+                    })?,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let ready_queue = self
+            .scheduler
+            .ready_snapshot()
+            .into_iter()
+            .map(|id| {
+                u64::try_from(id).map_err(|_| RefinementSliceError::CountOverflow {
+                    field: "scheduler.ready_queue",
+                    value: id,
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let blocked = self
+            .scheduler
+            .blocked_snapshot()
+            .into_iter()
+            .map(|(id, reason)| {
+                Ok::<_, RefinementSliceError>((
+                    u64::try_from(id).map_err(|_| RefinementSliceError::CountOverflow {
+                        field: "scheduler.blocked",
+                        value: id,
+                    })?,
+                    block_reason_tag(&reason).to_string(),
+                ))
+            })
+            .collect::<Result<std::collections::BTreeMap<_, _>, _>>()?;
+        let scheduler = SchedulerRefinementSlice {
+            ready_queue,
+            blocked,
+            step_count: u64::try_from(self.scheduler.step_count()).map_err(|_| {
+                RefinementSliceError::CountOverflow {
+                    field: "scheduler.step_count",
+                    value: self.scheduler.step_count(),
+                }
+            })?,
+        };
+        Ok(ProtocolMachineRefinementSlice {
+            coroutines,
+            sessions,
+            scheduler,
+        })
+    }
+
     /// Get the observable trace.
     #[must_use]
     pub fn trace(&self) -> &[ObsEvent] {

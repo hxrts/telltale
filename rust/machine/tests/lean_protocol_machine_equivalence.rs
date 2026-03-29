@@ -119,4 +119,27 @@ fn test_lean_semantic_audit_matches_rust() {
         .collect();
 
     assert_eq!(lean_trace, rust_trace, "Lean and Rust traces diverged");
+
+    let rust_slice = machine.refinement_slice().expect("export refinement slice");
+    let rust_session_type_counts = rust_slice
+        .sessions
+        .iter()
+        .map(|session| (session.sid, session.local_type_entries))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let rust_buffered_message_counts = rust_slice
+        .sessions
+        .iter()
+        .map(|session| (session.sid, session.buffered_messages))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let lean_last_step = lean_out
+        .step_states
+        .last()
+        .expect("lean run should export final step state");
+    assert_eq!(lean_last_step.session_type_counts, rust_session_type_counts);
+    assert_eq!(
+        lean_last_step.buffered_message_counts,
+        rust_buffered_message_counts
+    );
+    assert_eq!(lean_last_step.ready_queue, rust_slice.scheduler.ready_queue);
+    assert_eq!(lean_last_step.blocked, rust_slice.scheduler.blocked);
 }

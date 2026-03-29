@@ -147,6 +147,15 @@ pub struct ProtocolMachineStepState {
     /// Per-session local-type counts after this step.
     #[serde(default)]
     pub session_type_counts: BTreeMap<u64, u64>,
+    /// Per-session buffered message counts after this step.
+    #[serde(default)]
+    pub buffered_message_counts: BTreeMap<u64, u64>,
+    /// Global ready-queue order after this step.
+    #[serde(default)]
+    pub ready_queue: Vec<u64>,
+    /// Blocked coroutine ids mapped to coarse reason tags after this step.
+    #[serde(default)]
+    pub blocked: BTreeMap<u64, String>,
     /// Optional event emitted by this scheduler step.
     #[serde(default)]
     pub event: Option<ProtocolMachineTraceEvent>,

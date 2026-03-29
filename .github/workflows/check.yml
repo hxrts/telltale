@@ -49,6 +49,8 @@ jobs:
         run: just check-lean-prebuilt
       - name: Run strict Lean bridge verification lane
         run: just check-lean-bridge-strict
+      - name: Run concrete refinement suites
+        run: just check-concrete-refinement
       - name: Run extension dispatch suites
         run: just check-extension-dispatch
       - name: Run semantic assurance suites

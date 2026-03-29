@@ -22,7 +22,7 @@ use telltale_machine::ProgressState;
 use telltale_machine::ThreadedProtocolMachine;
 use telltale_machine::{
     ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
-    ProtocolMachineSemanticObjects,
+    ProtocolMachineRefinementSlice, ProtocolMachineSemanticObjects,
 };
 use test_support::{
     choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
@@ -148,6 +148,33 @@ fn run_semantic_objects(
     (coop.semantic_objects(), threaded.semantic_objects())
 }
 
+fn run_refinement_slices(
+    image: &telltale_machine::runtime::loader::CodeImage,
+) -> (
+    ProtocolMachineRefinementSlice,
+    ProtocolMachineRefinementSlice,
+) {
+    let handler = PassthroughHandler;
+
+    let mut coop = ProtocolMachine::new(ProtocolMachineConfig::default());
+    coop.load_choreography(image).expect("load image");
+    coop.run(&handler, 64).expect("cooperative run");
+
+    let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    threaded.load_choreography(image).expect("load image");
+    threaded
+        .run_concurrent(&handler, 64, 1)
+        .expect("threaded run at canonical concurrency=1");
+
+    (
+        coop.refinement_slice()
+            .expect("export cooperative refinement slice"),
+        threaded
+            .refinement_slice()
+            .expect("export threaded refinement slice"),
+    )
+}
+
 #[allow(clippy::too_many_lines)]
 fn normalize_semantic_objects(
     mut objects: ProtocolMachineSemanticObjects,
@@ -267,6 +294,14 @@ fn normalize_semantic_objects(
     objects
 }
 
+fn normalize_refinement_slice(
+    mut slice: ProtocolMachineRefinementSlice,
+) -> ProtocolMachineRefinementSlice {
+    slice.coroutines.sort_by_key(|coro| coro.coro_id);
+    slice.sessions.sort_by_key(|session| session.sid);
+    slice
+}
+
 #[derive(Debug, Default)]
 struct FlakySendHandler {
     counter: AtomicUsize,
@@ -352,6 +387,16 @@ fn test_semantic_object_exports_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let (coop_semantic_objects, threaded_semantic_objects) = run_semantic_objects(&image);
     assert_eq!(coop_semantic_objects, threaded_semantic_objects);
+}
+
+#[test]
+fn test_refinement_slices_match_across_drivers_at_canonical_concurrency() {
+    let image = simple_send_recv_image("A", "B", "msg");
+    let (coop_slice, threaded_slice) = run_refinement_slices(&image);
+    assert_eq!(
+        normalize_refinement_slice(coop_slice),
+        normalize_refinement_slice(threaded_slice)
+    );
 }
 
 #[test]

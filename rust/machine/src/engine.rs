@@ -56,6 +56,9 @@ use crate::kernel::{KernelMachine, ProtocolMachineKernel};
 use crate::loader::CodeImage;
 use crate::output_condition::{OutputConditionCheck, OutputConditionPolicy};
 use crate::persistence::{NoopPersistence, PersistenceModel};
+use crate::refinement::{
+    cooperative_refinement_slice, ProtocolMachineRefinementSlice, RefinementSliceError,
+};
 use crate::scheduler::{SchedPolicy, Scheduler};
 use crate::semantic_objects::{
     protocol_machine_semantic_objects, OperationInstance, OperationPhase, OutstandingEffect,

@@ -69,6 +69,7 @@ ci-dry-run lane="fast":
     just check-tooling-convergence
     just check-lean-prebuilt
     just check-lean-bridge-strict
+    just check-concrete-refinement
     just check-extension-dispatch
     just check-semantic-assurance
     just check-runtime-boundaries
@@ -285,6 +286,14 @@ check-package-artifacts:
 # schema backfills cannot appear silently.
 check-bridge-normalization:
     ./scripts/check/bridge-normalization-ledger.sh
+
+# Run the first concrete protocol-machine refinement slice across Lean,
+# cooperative Rust, and canonical threaded execution.
+check-concrete-refinement:
+    cargo test -p telltale-bridge --test protocol_machine_differential_steps -- --nocapture
+    cargo test -p telltale-machine --test lean_protocol_machine_equivalence -- --nocapture
+    cargo test -p telltale-machine test_reschedule_moves_selected_coro_to_back_of_ready_queue -- --nocapture
+    cargo test -p telltale-machine --features multi-thread --test threaded_equivalence test_refinement_slices_match_across_drivers_at_canonical_concurrency -- --exact --nocapture
 
 # Run the highest-signal semantic assurance suites directly.
 check-semantic-assurance:

@@ -92,6 +92,9 @@ struct RustStepState {
     event: Option<TickedObsEvent<ProtocolMachineTraceEvent>>,
     pre_session_type_counts: BTreeMap<u64, u64>,
     session_type_counts: BTreeMap<u64, u64>,
+    buffered_message_counts: BTreeMap<u64, u64>,
+    ready_queue: Vec<u64>,
+    blocked: BTreeMap<u64, String>,
     session_type_deltas: BTreeMap<u64, i64>,
 }
 
@@ -274,6 +277,14 @@ fn run_rust_step_states(
         let after_counts = session_type_counts(&machine);
         let deltas = session_type_deltas(&before_counts, &after_counts);
         let step_meta = machine.last_sched_step().cloned();
+        let refinement = machine
+            .refinement_slice()
+            .map_err(|e| format!("export refinement slice: {e}"))?;
+        let buffered_message_counts = refinement
+            .sessions
+            .iter()
+            .map(|session| (session.sid, session.buffered_messages))
+            .collect();
 
         out.push(RustStepState {
             step_index: step_index as u64,
@@ -292,6 +303,9 @@ fn run_rust_step_states(
             event,
             pre_session_type_counts: before_counts,
             session_type_counts: after_counts,
+            buffered_message_counts,
+            ready_queue: refinement.scheduler.ready_queue,
+            blocked: refinement.scheduler.blocked,
             session_type_deltas: deltas,
         });
 
@@ -418,6 +432,9 @@ fn assert_step_indexed_equivalence(
             if rust_step.selected_coro != lean_step.selected_coro
                 || rust_step.exec_status != lean_step.exec_status
                 || rust_step.session_type_counts != lean_step.session_type_counts
+                || rust_step.buffered_message_counts != lean_step.buffered_message_counts
+                || rust_step.ready_queue != lean_step.ready_queue
+                || rust_step.blocked != lean_step.blocked
                 || rust_step.session_type_deltas != lean_deltas
                 || rust_step.event.as_ref().map(|e| canonical_event(&e.event))
                     != lean_step.event.as_ref().map(canonical_event)
@@ -433,6 +450,9 @@ fn assert_step_indexed_equivalence(
                             "selected_coro": rust_step.selected_coro,
                             "exec_status": rust_step.exec_status,
                             "session_type_counts": rust_step.session_type_counts,
+                            "buffered_message_counts": rust_step.buffered_message_counts,
+                            "ready_queue": rust_step.ready_queue,
+                            "blocked": rust_step.blocked,
                             "session_type_deltas": rust_step.session_type_deltas,
                             "event": rust_step.event.as_ref().map(|e| canonical_event(&e.event)),
                         },
@@ -440,6 +460,9 @@ fn assert_step_indexed_equivalence(
                             "selected_coro": lean_step.selected_coro,
                             "exec_status": lean_step.exec_status,
                             "session_type_counts": lean_step.session_type_counts,
+                            "buffered_message_counts": lean_step.buffered_message_counts,
+                            "ready_queue": lean_step.ready_queue,
+                            "blocked": lean_step.blocked,
                             "session_type_deltas": lean_deltas,
                             "event": lean_step.event.as_ref().map(canonical_event),
                         }

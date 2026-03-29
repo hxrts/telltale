@@ -113,6 +113,33 @@ def sessionTypeCountsJson (sessions : SessionStore UnitVerify) : Json :=
   Json.mkObj <| (sessionTypeCounts sessions).map (fun p =>
     (toString p.fst, Json.num p.snd))
 
+def bufferedMessageCounts (sessions : SessionStore UnitVerify) : List (SessionId × Nat) :=
+  sessions.map (fun p =>
+    let sid := p.fst
+    let count := p.snd.buffers.foldl (fun acc entry => acc + entry.snd.length) 0
+    (sid, count))
+
+def bufferedMessageCountsJson (sessions : SessionStore UnitVerify) : Json :=
+  Json.mkObj <| (bufferedMessageCounts sessions).map (fun p =>
+    (toString p.fst, Json.num p.snd))
+
+def blockReasonTag : BlockReason UnitGuard → String
+  | .recvWait _ _ => "recv_wait"
+  | .sendWait _ => "send_wait"
+  | .acquireDenied _ => "acquire_denied"
+  | .invokeWait _ => "invoke_wait"
+  | .consensusWait _ => "consensus_wait"
+  | .spawnWait => "spawn_wait"
+  | .closeWait _ => "close_wait"
+
+def blockedStateJson (sched : SchedState UnitGuard) : Json :=
+  Json.mkObj <|
+    sched.blockedSet.toList.map (fun p =>
+      (toString p.1, Json.str (blockReasonTag p.2)))
+
+def readyQueueJson (sched : SchedState UnitGuard) : Json :=
+  Json.arr <| sched.readyQueue.map Json.num |>.toArray
+
 def selectedEndpointTypeJson (st : RunnerState) (cid : CoroutineId) : Json :=
   match st.coroutines[cid]? with
   | none => Json.null
@@ -260,6 +287,9 @@ def runWithStepStatesAux (fuel : Nat) (st : RunnerState)
               , ("selected_type", selectedEndpointTypeJson stNext cid)
               , ("exec_status", Json.str (execStatusTag res.status))
               , ("session_type_counts", sessionTypeCountsJson stNext.sessions)
+              , ("buffered_message_counts", bufferedMessageCountsJson stNext.sessions)
+              , ("ready_queue", readyQueueJson stNext.sched)
+              , ("blocked", blockedStateJson stNext.sched)
               , ("event", stepEventToJson stNext.clock cid res.status res.event) ]
           let acc' := stepJson :: acc
           if allTerminal stNext then

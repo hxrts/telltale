@@ -82,6 +82,11 @@ jobs:
           mkdir -p artifacts
           just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
 
+      - name: Run concrete refinement suites
+        run: |
+          mkdir -p artifacts
+          just check-concrete-refinement | tee artifacts/check-concrete-refinement.log
+
       - name: Run extension dispatch suites
         run: |
           mkdir -p artifacts

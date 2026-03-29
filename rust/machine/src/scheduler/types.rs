@@ -221,6 +221,9 @@ impl Scheduler {
 
     fn remove_from_global_ready(&mut self, coro_id: usize) {
         self.ready_set.remove(&coro_id);
+        if let Some(position) = self.ready_queue.iter().position(|queued| *queued == coro_id) {
+            let _ = self.ready_queue.remove(position);
+        }
     }
 
     fn next_lane_with_ready(&mut self) -> Option<LaneId> {

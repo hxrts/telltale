@@ -56,6 +56,18 @@ mod tests {
     }
 
     #[test]
+    fn test_reschedule_moves_selected_coro_to_back_of_ready_queue() {
+        let mut sched = Scheduler::new(SchedPolicy::Cooperative);
+        sched.add_ready(0);
+        sched.add_ready(1);
+
+        assert_eq!(sched.schedule(), Some(0));
+        sched.reschedule(0);
+
+        assert_eq!(sched.ready_snapshot(), vec![1, 0]);
+    }
+
+    #[test]
     fn test_priority_fixed_map_prefers_higher_weight() {
         let mut priorities = BTreeMap::new();
         priorities.insert(1, 10);

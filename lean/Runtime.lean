@@ -27,6 +27,7 @@ import Runtime.Proofs.ReconfigurationObserver
 import Runtime.Proofs.Conservation.API
 import Runtime.Proofs.Lowering.API
 import Runtime.Proofs.ProtocolMachine.Effects
+import Runtime.Proofs.ProtocolMachine.ConcreteRefinement
 import Runtime.Proofs.ProtocolMachine.Speculation
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress

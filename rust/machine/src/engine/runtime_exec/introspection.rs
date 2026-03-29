@@ -1,4 +1,15 @@
 impl ProtocolMachine {
+    /// Export the concrete runtime slice used for exact Rust/Lean refinement checks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the exported counts do not fit the bridge-safe `u64` schema.
+    pub fn refinement_slice(
+        &self,
+    ) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
+        cooperative_refinement_slice(&self.coroutines, &self.sessions, &self.sched)
+    }
+
     fn combined_authority_audit_log(&self) -> Vec<AuthorityAuditRecord> {
         let mut out = self.authority_audit_log.as_slice().to_vec();
         for sid in self.sessions.session_ids() {
