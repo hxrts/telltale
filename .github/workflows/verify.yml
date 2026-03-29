@@ -82,6 +82,11 @@ jobs:
           mkdir -p artifacts
           just check-lean-bridge-strict | tee artifacts/check-lean-bridge-strict.log
 
+      - name: Run compiler pipeline suites
+        run: |
+          mkdir -p artifacts
+          just check-compiler-pipeline | tee artifacts/check-compiler-pipeline.log
+
       - name: Run concrete refinement suites
         run: |
           mkdir -p artifacts

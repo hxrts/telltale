@@ -3,7 +3,8 @@
 //! These tests invoke the Lean validator binary to validate that
 //! Rust projections match the formally verified Lean implementation.
 //!
-//! Tests gracefully skip when the Lean binary is not available.
+//! Tests fail closed in strict lanes and otherwise skip locally when the Lean
+//! binary is not available.
 
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
@@ -13,10 +14,22 @@ use telltale_bridge::export::{global_to_json, local_to_json};
 use telltale_bridge::{LeanRunner, Validator};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
+const STRICT_ENV: &str = "TELLTALE_REQUIRE_LEAN_VALIDATOR";
+
+fn strict_projection_required() -> bool {
+    std::env::var(STRICT_ENV)
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
 /// Helper macro to skip tests when Lean binary is unavailable.
 macro_rules! skip_without_lean {
     () => {
         if !LeanRunner::is_available() {
+            assert!(
+                !strict_projection_required(),
+                "strict projection verification is enabled but telltale_validator is unavailable"
+            );
             eprintln!(
                 "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable."
             );

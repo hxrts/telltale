@@ -69,6 +69,7 @@ ci-dry-run lane="fast":
     just check-tooling-convergence
     just check-lean-prebuilt
     just check-lean-bridge-strict
+    just check-compiler-pipeline
     just check-concrete-refinement
     just check-extension-dispatch
     just check-semantic-assurance
@@ -294,6 +295,15 @@ check-concrete-refinement:
     cargo test -p telltale-machine --test lean_protocol_machine_equivalence -- --nocapture
     cargo test -p telltale-machine test_reschedule_moves_selected_coro_to_back_of_ready_queue -- --nocapture
     cargo test -p telltale-machine --features multi-thread --test threaded_equivalence test_refinement_slices_match_across_drivers_at_canonical_concurrency -- --exact --nocapture
+
+# Run the DSL -> lowering -> export/import -> Lean projection compiler pipeline suites.
+check-compiler-pipeline:
+    cargo test -p telltale-bridge --test compiler_pipeline_conformance -- --nocapture
+    cargo test -p telltale-bridge --test projection_equivalence -- --nocapture
+    cargo test -p telltale-bridge --test proptest_json_roundtrip -- --nocapture
+    TELLTALE_REQUIRE_LEAN_VALIDATOR=1 cargo test -p telltale-bridge --test lean_integration_tests -- --nocapture
+    TELLTALE_REQUIRE_LEAN_VALIDATOR=1 cargo test -p telltale-bridge --test merge_semantics_tests -- --nocapture
+    TELLTALE_REQUIRE_LEAN_VALIDATOR=1 cargo test -p telltale-bridge --test proptest_projection -- --nocapture
 
 # Run the highest-signal semantic assurance suites directly.
 check-semantic-assurance:

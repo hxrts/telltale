@@ -22,6 +22,14 @@ use telltale_bridge::{global_to_json, local_to_json, LeanRunner};
 use telltale_theory::projection::{project, project_all};
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
+const STRICT_ENV: &str = "TELLTALE_REQUIRE_LEAN_VALIDATOR";
+
+fn strict_projection_required() -> bool {
+    std::env::var(STRICT_ENV)
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
 /// Deterministic seed for property-based tests.
 const DETERMINISTIC_SEED: [u8; 32] = [
     0x50, 0x72, 0x6F, 0x6A, 0x65, 0x63, 0x74, 0x69, // "Projecti"
@@ -34,6 +42,10 @@ const DETERMINISTIC_SEED: [u8; 32] = [
 macro_rules! skip_without_lean {
     () => {
         if !LeanRunner::is_available() {
+            assert!(
+                !strict_projection_required(),
+                "strict projection verification is enabled but telltale_validator is unavailable"
+            );
             eprintln!(
                 "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable."
             );

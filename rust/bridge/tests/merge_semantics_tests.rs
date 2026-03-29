@@ -19,10 +19,22 @@ use telltale_theory::projection::project;
 use telltale_types::merge::{can_merge, merge};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
+const STRICT_ENV: &str = "TELLTALE_REQUIRE_LEAN_VALIDATOR";
+
+fn strict_projection_required() -> bool {
+    std::env::var(STRICT_ENV)
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
 /// Helper macro to skip tests when Lean binary is unavailable.
 macro_rules! skip_without_lean {
     () => {
         if !LeanRunner::is_available() {
+            assert!(
+                !strict_projection_required(),
+                "strict projection verification is enabled but telltale_validator is unavailable"
+            );
             eprintln!(
                 "SKIPPED: Lean binary not available. Run `cd lean && lake build telltale_validator` to enable."
             );

@@ -27,6 +27,24 @@ pub enum ImportError {
 
     #[error("Expected object, got: {0}")]
     ExpectedObject(String),
+
+    #[error("Unexpected field '{field}' in {context}")]
+    UnexpectedField { context: String, field: String },
+}
+
+fn ensure_only_fields(json: &Value, context: &str, allowed: &[&str]) -> Result<(), ImportError> {
+    let object = json
+        .as_object()
+        .ok_or_else(|| ImportError::ExpectedObject(json.to_string()))?;
+    for field in object.keys() {
+        if !allowed.iter().any(|allowed_field| allowed_field == field) {
+            return Err(ImportError::UnexpectedField {
+                context: context.to_string(),
+                field: field.clone(),
+            });
+        }
+    }
+    Ok(())
 }
 
 fn required_field<'a>(json: &'a Value, field: &str) -> Result<&'a Value, ImportError> {
@@ -51,6 +69,11 @@ fn required_array<'a>(json: &'a Value, field: &str) -> Result<&'a [Value], Impor
 }
 
 fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
+    ensure_only_fields(
+        json,
+        "global comm",
+        &["kind", "sender", "receiver", "branches"],
+    )?;
     let sender = required_str(json, "sender")?;
     let receiver = required_str(json, "receiver")?;
     let branches = parse_global_branches(required_array(json, "branches")?)?;
@@ -64,6 +87,7 @@ fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
 fn parse_global_branches(branches: &[Value]) -> Result<Vec<(Label, GlobalType)>, ImportError> {
     let mut parsed = Vec::with_capacity(branches.len());
     for branch in branches {
+        ensure_only_fields(branch, "global branch", &["label", "continuation"])?;
         let label = parse_label(
             branch
                 .get("label")
@@ -80,12 +104,14 @@ fn parse_global_branches(branches: &[Value]) -> Result<Vec<(Label, GlobalType)>,
 }
 
 fn parse_global_rec(json: &Value) -> Result<GlobalType, ImportError> {
+    ensure_only_fields(json, "global rec", &["kind", "var", "body"])?;
     let var = required_str(json, "var")?;
     let body = json_to_global(required_field(json, "body")?)?;
     Ok(GlobalType::mu(var, body))
 }
 
 fn parse_global_var(json: &Value) -> Result<GlobalType, ImportError> {
+    ensure_only_fields(json, "global var", &["kind", "name"])?;
     Ok(GlobalType::var(required_str(json, "name")?))
 }
 
@@ -108,7 +134,10 @@ pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
         .ok_or_else(|| ImportError::MissingField("kind".to_string()))?;
 
     match kind {
-        "end" => Ok(GlobalType::End),
+        "end" => {
+            ensure_only_fields(json, "global end", &["kind"])?;
+            Ok(GlobalType::End)
+        }
         "comm" => parse_global_comm(json),
         "rec" => parse_global_rec(json),
         "var" => parse_global_var(json),
@@ -121,6 +150,7 @@ fn parse_local_branches(
 ) -> Result<Vec<(Label, Option<ValType>, LocalTypeR)>, ImportError> {
     let mut parsed = Vec::with_capacity(branches.len());
     for branch in branches {
+        ensure_only_fields(branch, "local branch", &["label", "continuation"])?;
         let label = parse_label(
             branch
                 .get("label")
@@ -137,24 +167,28 @@ fn parse_local_branches(
 }
 
 fn parse_local_send(json: &Value) -> Result<LocalTypeR, ImportError> {
+    ensure_only_fields(json, "local send", &["kind", "partner", "branches"])?;
     let partner = required_str(json, "partner")?;
     let branches = parse_local_branches(required_array(json, "branches")?)?;
     Ok(LocalTypeR::Send { partner, branches })
 }
 
 fn parse_local_recv(json: &Value) -> Result<LocalTypeR, ImportError> {
+    ensure_only_fields(json, "local recv", &["kind", "partner", "branches"])?;
     let partner = required_str(json, "partner")?;
     let branches = parse_local_branches(required_array(json, "branches")?)?;
     Ok(LocalTypeR::Recv { partner, branches })
 }
 
 fn parse_local_rec(json: &Value) -> Result<LocalTypeR, ImportError> {
+    ensure_only_fields(json, "local rec", &["kind", "var", "body"])?;
     let var = required_str(json, "var")?;
     let body = json_to_local(required_field(json, "body")?)?;
     Ok(LocalTypeR::mu(var, body))
 }
 
 fn parse_local_var(json: &Value) -> Result<LocalTypeR, ImportError> {
+    ensure_only_fields(json, "local var", &["kind", "name"])?;
     Ok(LocalTypeR::var(required_str(json, "name")?))
 }
 
@@ -177,7 +211,10 @@ pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
         .ok_or_else(|| ImportError::MissingField("kind".to_string()))?;
 
     match kind {
-        "end" => Ok(LocalTypeR::End),
+        "end" => {
+            ensure_only_fields(json, "local end", &["kind"])?;
+            Ok(LocalTypeR::End)
+        }
         "send" => parse_local_send(json),
         "recv" => parse_local_recv(json),
         "rec" => parse_local_rec(json),
@@ -188,6 +225,7 @@ pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
 
 /// Parse a Label from JSON.
 fn parse_label(json: &Value) -> Result<Label, ImportError> {
+    ensure_only_fields(json, "label", &["name", "sort"])?;
     let name = json
         .get("name")
         .and_then(|v| v.as_str())
@@ -215,6 +253,13 @@ fn parse_sort(json: &Value) -> Result<PayloadSort, ImportError> {
             other => Err(ImportError::InvalidSort(other.to_string())),
         }
     } else if let Some(obj) = json.as_object() {
+        if obj.len() != 1 {
+            let unexpected = obj.keys().cloned().collect::<Vec<_>>().join(", ");
+            return Err(ImportError::UnexpectedField {
+                context: "sort".to_string(),
+                field: unexpected,
+            });
+        }
         if let Some(arr) = obj.get("prod").and_then(|v| v.as_array()) {
             if arr.len() == 2 {
                 let left = parse_sort(&arr[0])?;
@@ -291,6 +336,20 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_global_rejects_unknown_field() {
+        let json = json!({
+            "kind": "end",
+            "extra": true
+        });
+        let err = json_to_global(&json).expect_err("unknown fields must fail closed");
+        assert!(matches!(
+            err,
+            ImportError::UnexpectedField { context, field }
+            if context == "global end" && field == "extra"
+        ));
+    }
+
+    #[test]
     fn test_parse_global_rec() {
         let json = json!({
             "kind": "rec",
@@ -335,6 +394,41 @@ mod tests {
             }
             _ => panic!("Expected Send"),
         }
+    }
+
+    #[test]
+    fn test_parse_local_rejects_unknown_field() {
+        let json = json!({
+            "kind": "send",
+            "partner": "B",
+            "branches": [],
+            "extra": true
+        });
+        let err = json_to_local(&json).expect_err("unknown fields must fail closed");
+        assert!(matches!(
+            err,
+            ImportError::UnexpectedField { context, field }
+            if context == "local send" && field == "extra"
+        ));
+    }
+
+    #[test]
+    fn test_parse_label_rejects_unknown_field() {
+        let json = json!({
+            "kind": "comm",
+            "sender": "A",
+            "receiver": "B",
+            "branches": [{
+                "label": { "name": "msg", "sort": "unit", "extra": true },
+                "continuation": { "kind": "end" }
+            }]
+        });
+        let err = json_to_global(&json).expect_err("unknown label fields must fail closed");
+        assert!(matches!(
+            err,
+            ImportError::UnexpectedField { context, field }
+            if context == "label" && field == "extra"
+        ));
     }
 
     #[test]

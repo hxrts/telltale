@@ -21,7 +21,7 @@ When one of these values changes legitimately:
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 9 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 10 | `rust/macros/tests/macro_ui.rs` |
-| Property buckets with executable assurance suites | 16 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Property buckets with executable assurance suites | 17 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Lean-backed correspondence strict suites | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -43,6 +43,7 @@ When one of these values changes legitimately:
 | Long-horizon recovery differential harness suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Artifact and release assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Concrete protocol-machine refinement suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Compiler and serialization pipeline suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
 ## Property Coverage Baseline
@@ -72,6 +73,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Recovery | Long-horizon differential harness | `rust/bridge/tests/reconfiguration_recovery_harness.rs` | Ownership-transfer replay artifacts, bridge export/import, topology-derived placement artifacts, atomic multi-step reconfiguration plans, snapshot/restore recovery, and deterministic suffix replay now execute as one end-to-end recovery family with explicit divergence detection |
 | Artifact / release | Packaged-crate and resume verification | `scripts/check/package-artifacts.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | Every publishable crate now goes through `cargo publish --dry-run --locked`, packaged tarballs for `telltale`, `telltale-runtime`, and `telltale-bridge` are smoke-checked from extraction roots, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
 | Concrete refinement | Exact cooperative/Lean/threaded state-slice parity plus Lean proof-connected slice | `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/machine/tests/lean_protocol_machine_equivalence.rs`, `rust/machine/tests/threaded_equivalence.rs` | The first concrete protocol-machine refinement slice now compares coroutine/session/scheduler state exactly across Rust, Lean, and canonical threaded execution, exports bounded `u64` bridge fields fail-closed, and is connected to dedicated Lean refinement theorems over the same slice |
+| Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | The supported DSL subset now runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes; bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |
 
 ## Bridge Normalization Trust Surface
 

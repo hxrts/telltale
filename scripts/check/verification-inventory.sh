@@ -147,6 +147,14 @@ concrete_protocol_machine_refinement_suites=(
   rust/machine/tests/threaded_equivalence.rs
 )
 
+compiler_serialization_pipeline_suites=(
+  rust/bridge/tests/compiler_pipeline_conformance.rs
+  rust/bridge/tests/projection_equivalence.rs
+  rust/bridge/tests/proptest_json_roundtrip.rs
+  rust/bridge/tests/lean_integration_tests.rs
+  rust/bridge/tests/merge_semantics_tests.rs
+)
+
 explicit_unsupported_fail_closed_notes=()
 
 forbidden_inventory_gap_phrases=(
@@ -290,6 +298,7 @@ actual_runtime_substrate_boundary_suites=$(count_list "${runtime_substrate_bound
 actual_long_horizon_recovery_harness_suites=$(count_list "${long_horizon_recovery_harness_suites[@]}")
 actual_artifact_release_assurance_suites=$(count_list "${artifact_release_assurance_suites[@]}")
 actual_concrete_protocol_machine_refinement_suites=$(count_list "${concrete_protocol_machine_refinement_suites[@]}")
+actual_compiler_serialization_pipeline_suites=$(count_list "${compiler_serialization_pipeline_suites[@]}")
 actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupported_fail_closed_notes[@]}")
 
 actual_executable_property_buckets=$(
@@ -310,9 +319,10 @@ actual_executable_property_buckets=$(
     bucket_has_coverage "$actual_long_horizon_recovery_harness_suites"
     bucket_has_coverage "$actual_artifact_release_assurance_suites"
     bucket_has_coverage "$actual_concrete_protocol_machine_refinement_suites"
+    bucket_has_coverage "$actual_compiler_serialization_pipeline_suites"
   ) | awk '{sum += $1} END {print sum + 0}'
 )
-actual_lacking_property_buckets=$((16 - actual_executable_property_buckets))
+actual_lacking_property_buckets=$((17 - actual_executable_property_buckets))
 
 check_metric "Property buckets with executable assurance suites" "$actual_executable_property_buckets"
 check_metric "Property buckets currently lacking executable assurance suites" "$actual_lacking_property_buckets"
@@ -336,6 +346,7 @@ check_metric "Runtime substrate boundary assurance suites" "$actual_runtime_subs
 check_metric "Long-horizon recovery differential harness suites" "$actual_long_horizon_recovery_harness_suites"
 check_metric "Artifact and release assurance suites" "$actual_artifact_release_assurance_suites"
 check_metric "Concrete protocol-machine refinement suites" "$actual_concrete_protocol_machine_refinement_suites"
+check_metric "Compiler and serialization pipeline suites" "$actual_compiler_serialization_pipeline_suites"
 check_metric "Explicit unsupported or fail-closed property notes" "$actual_explicit_unsupported_fail_closed_notes"
 
 for phrase in "${forbidden_inventory_gap_phrases[@]}"; do
