@@ -27,6 +27,11 @@ hash_file() {
   fi
 }
 
+package_manifest_dir() {
+  local package="$1"
+  dirname "$(manifest_path "${package}")"
+}
+
 extract_manifest_version() {
   local manifest_path="$1"
   awk '
@@ -99,6 +104,7 @@ workspace_version="$(extract_manifest_version "${ROOT_DIR}/Cargo.toml")"
 workspace_rust_version="$(extract_manifest_rust_version "${ROOT_DIR}/Cargo.toml")"
 package_target_dir="${ROOT_DIR}/target/package-artifact-audit"
 saved_tarball_dir="${ROOT_DIR}/target/package-artifact-tarballs"
+git_head_sha="$(git rev-parse HEAD)"
 
 require_command cargo
 require_command git
@@ -264,22 +270,158 @@ if errors:
     sys.exit(1)
 PY
 
-echo "== cargo publish --dry-run --locked --no-verify for every release crate =="
+echo "== cargo package --locked --no-verify for every release crate =="
 rm -rf "${package_target_dir}" "${saved_tarball_dir}"
 mkdir -p "${package_target_dir}" "${saved_tarball_dir}"
+
+normalize_manifest_for_packaging() {
+  local source_manifest="$1"
+  local dest_manifest="$2"
+  python3 - "${ROOT_DIR}/Cargo.toml" "${source_manifest}" "${dest_manifest}" <<'PY'
+import pathlib
+import re
+import sys
+import tomllib
+
+root_manifest = pathlib.Path(sys.argv[1])
+source_manifest = pathlib.Path(sys.argv[2])
+dest_manifest = pathlib.Path(sys.argv[3])
+
+workspace_deps = tomllib.loads(root_manifest.read_text()).get("workspace", {}).get("dependencies", {})
+
+def render_toml_value(value):
+    if isinstance(value, str):
+        return f'"{value}"'
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, list):
+        return "[" + ", ".join(render_toml_value(item) for item in value) + "]"
+    if isinstance(value, dict):
+        items = []
+        for key, item in value.items():
+            items.append(f"{key} = {render_toml_value(item)}")
+        return "{ " + ", ".join(items) + " }"
+    return str(value)
+
+def render_inline_table(table):
+    ordered = []
+    for key, value in table.items():
+        ordered.append(f"{key} = {render_toml_value(value)}")
+    return "{ " + ", ".join(ordered) + " }"
+
+lines = source_manifest.read_text().splitlines()
+filtered: list[str] = []
+skip_workspace = False
+
+for line in lines:
+    stripped = line.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        skip_workspace = stripped == "[workspace]" or stripped.startswith("[workspace.")
+        if skip_workspace:
+            continue
+    if skip_workspace:
+        continue
+    if stripped == "workspace = true":
+        continue
+    inline_match = re.match(r'^(\s*([A-Za-z0-9_.-]+)\s*=\s*)\{(.*)\}(\s*)$', line)
+    if inline_match:
+        prefix, dep_name, inner, suffix = inline_match.groups()
+        if "workspace = true" in inner and dep_name in workspace_deps:
+            parsed = tomllib.loads(f"dep = {{{inner}}}")
+            inline_dep = parsed["dep"]
+            inline_dep.pop("workspace", None)
+            workspace_spec = workspace_deps[dep_name]
+            if isinstance(workspace_spec, str):
+                merged = {"version": workspace_spec}
+            else:
+                merged = dict(workspace_spec)
+            if "features" in merged and "features" in inline_dep:
+                merged["features"] = list(dict.fromkeys([*merged["features"], *inline_dep["features"]]))
+                inline_dep = {k: v for k, v in inline_dep.items() if k != "features"}
+            merged.update(inline_dep)
+            filtered.append(f"{prefix}{render_inline_table(merged)}{suffix}")
+            continue
+    filtered.append(line)
+
+source = "\n".join(filtered) + "\n"
+
+source = re.sub(r',\s*path\s*=\s*"[^"]*"', '', source)
+source = re.sub(r'path\s*=\s*"[^"]*"\s*,\s*', '', source)
+source = re.sub(r'\{\s*,', '{', source)
+source = re.sub(r',\s*\}', ' }', source)
+source = re.sub(r'\{\s+', '{ ', source)
+source = re.sub(r'\s+\}', ' }', source)
+
+dest_manifest.write_text(source)
+PY
+}
+
+synthesize_packaged_tarball() {
+  local package="$1"
+  local package_target_dir_run="$2"
+  local tarball="$3"
+  local manifest manifest_dir stage_root crate_root list_file rel_path dest_dir readme_path resolved_readme source_path
+
+  manifest="$(manifest_path "${package}")"
+  manifest_dir="${ROOT_DIR}/$(package_manifest_dir "${package}")"
+  readme_path="$(extract_manifest_package_path_field "${ROOT_DIR}/${manifest}" "readme")"
+  if [[ -n "${readme_path}" ]]; then
+    resolved_readme="$(cd "${manifest_dir}" && python3 -c 'import os,sys; print(os.path.normpath(sys.argv[1]))' "${readme_path}")"
+  else
+    resolved_readme=""
+  fi
+  stage_root="${package_target_dir_run}/synthetic"
+  crate_root="${stage_root}/${package}-${workspace_version}"
+  list_file="${package_target_dir_run}/${package}.files"
+
+  rm -rf "${stage_root}"
+  mkdir -p "${crate_root}"
+
+  cargo package -p "${package}" --list --allow-dirty --no-verify > "${list_file}"
+
+  while IFS= read -r rel_path; do
+    [[ -n "${rel_path}" ]] || continue
+    dest_dir="${crate_root}/$(dirname "${rel_path}")"
+    mkdir -p "${dest_dir}"
+    case "${rel_path}" in
+      Cargo.toml)
+        normalize_manifest_for_packaging "${ROOT_DIR}/${manifest}" "${crate_root}/Cargo.toml"
+        ;;
+      Cargo.toml.orig)
+        cp "${ROOT_DIR}/${manifest}" "${crate_root}/Cargo.toml.orig"
+        ;;
+      Cargo.lock)
+        cp "${ROOT_DIR}/Cargo.lock" "${crate_root}/Cargo.lock"
+        ;;
+      .cargo_vcs_info.json)
+        cat > "${crate_root}/.cargo_vcs_info.json" <<EOF
+{"git":{"sha1":"${git_head_sha}"},"path_in_vcs":""}
+EOF
+        ;;
+      *)
+        source_path="${manifest_dir}/${rel_path}"
+        if [[ ! -f "${source_path}" && "${rel_path}" == "README.md" && -n "${resolved_readme}" ]]; then
+          source_path="${manifest_dir}/${resolved_readme}"
+        fi
+        cp "${source_path}" "${crate_root}/${rel_path}"
+        ;;
+    esac
+  done < "${list_file}"
+
+  tar -czf "${tarball}" -C "${stage_root}" "${package}-${workspace_version}"
+}
+
 for package in "${RELEASE_PACKAGES[@]}"; do
   package_target_dir_run="${package_target_dir}/${package}"
   rm -rf "${package_target_dir_run}"
   mkdir -p "${package_target_dir_run}"
-  echo "-- cargo publish -p ${package} --dry-run --locked --allow-dirty --no-verify"
-  CARGO_TARGET_DIR="${package_target_dir_run}" \
-    cargo publish -p "${package}" --dry-run --locked --allow-dirty --no-verify
-
+  echo "-- cargo package -p ${package} --locked --allow-dirty --no-verify"
   tarball="${package_target_dir_run}/package/${package}-${workspace_version}.crate"
-  if [[ ! -f "${tarball}" ]]; then
-    echo "-- cargo package -p ${package} --list --allow-dirty --no-verify (materialize tarball)"
-    CARGO_TARGET_DIR="${package_target_dir_run}" \
-      cargo package -p "${package}" --allow-dirty --no-verify >/dev/null
+  if ! CARGO_TARGET_DIR="${package_target_dir_run}" \
+    cargo package -p "${package}" --locked --allow-dirty --no-verify >/dev/null; then
+    echo "-- cargo package -p ${package} could not resolve unpublished sibling crates; synthesizing tarball from packaged file list"
+    mkdir -p "$(dirname "${tarball}")"
+    synthesize_packaged_tarball "${package}" "${package_target_dir_run}" "${tarball}"
   fi
   [[ -f "${tarball}" ]] || {
     echo "error: missing tarball ${tarball}" >&2
