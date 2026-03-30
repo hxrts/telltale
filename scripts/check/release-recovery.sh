@@ -140,6 +140,7 @@ fail_marker="${tmpdir}/fail-once.marker"
 echo "== simulate partial release failure =="
 if env \
   PATH="${fakebin}:${PATH}" \
+  CARGO_REGISTRY_TOKEN="fake-token" \
   TELLTALE_FAKE_PUBLISHED_FILE="${published_file}" \
   TELLTALE_FAKE_PUBLISH_LOG="${publish_log}" \
   TELLTALE_FAKE_VERSION="${workspace_version}" \
@@ -162,6 +163,7 @@ fi
 echo "== simulate release resume =="
 env \
   PATH="${fakebin}:${PATH}" \
+  CARGO_REGISTRY_TOKEN="fake-token" \
   TELLTALE_FAKE_PUBLISHED_FILE="${published_file}" \
   TELLTALE_FAKE_PUBLISH_LOG="${publish_log}" \
   TELLTALE_FAKE_VERSION="${workspace_version}" \
