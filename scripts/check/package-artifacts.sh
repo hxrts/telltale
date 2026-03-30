@@ -275,6 +275,11 @@ for package in "${RELEASE_PACKAGES[@]}"; do
     cargo publish -p "${package}" --dry-run --locked --allow-dirty --no-verify
 
   tarball="${package_target_dir_run}/package/${package}-${workspace_version}.crate"
+  if [[ ! -f "${tarball}" ]]; then
+    echo "-- cargo package -p ${package} --list --allow-dirty --no-verify (materialize tarball)"
+    CARGO_TARGET_DIR="${package_target_dir_run}" \
+      cargo package -p "${package}" --allow-dirty --no-verify >/dev/null
+  fi
   [[ -f "${tarball}" ]] || {
     echo "error: missing tarball ${tarball}" >&2
     exit 1
