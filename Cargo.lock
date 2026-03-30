@@ -411,6 +411,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
+name = "crunchy"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
+
+[[package]]
 name = "crypto-common"
 version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -529,7 +535,7 @@ checksum = "c566da967934c6c7ee0458a9773de9b2a685bd2ce26a3b28ddfc740e640182f5"
 dependencies = [
  "az",
  "bytemuck",
- "half",
+ "half 2.7.1",
  "typenum",
 ]
 
@@ -692,6 +698,17 @@ name = "half"
 version = "1.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1b43ede17f21864e81be2fa654110bf1e793774238d86ef8555c37e6519c0403"
+
+[[package]]
+name = "half"
+version = "2.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ea2d84b969582b4b1864a92dc5d27cd2b77b622a8d79306834f1be5ba20d84b"
+dependencies = [
+ "cfg-if",
+ "crunchy",
+ "zerocopy",
+]
 
 [[package]]
 name = "hashbrown"
@@ -1397,7 +1414,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
 dependencies = [
- "half",
+ "half 1.8.3",
  "serde",
 ]
 
@@ -1560,7 +1577,7 @@ checksum = "591ef38edfb78ca4771ee32cf494cb8771944bee237a9b91fc9c1424ac4b777b"
 
 [[package]]
 name = "telltale"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1598,7 +1615,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-bridge"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -1619,7 +1636,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -1646,7 +1663,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -1668,7 +1685,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "futures",
  "proc-macro2",
@@ -1681,7 +1698,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-runtime"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -1725,7 +1742,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-simulator"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "assert_matches",
  "getrandom 0.2.17",
@@ -1742,7 +1759,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "assert_matches",
  "criterion",
@@ -1754,7 +1771,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-transport"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "async-trait",
  "telltale-runtime",
@@ -1767,7 +1784,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "assert_matches",
  "fixed",
@@ -1953,7 +1970,7 @@ dependencies = [
  "toml_datetime 1.1.0+spec-1.1.0",
  "toml_parser",
  "toml_writer",
- "winnow 1.0.0",
+ "winnow 1.0.1",
 ]
 
 [[package]]
@@ -1994,7 +2011,7 @@ version = "1.1.0+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2334f11ee363607eb04df9b8fc8a13ca1715a72ba8662a26ac285c98aabb4011"
 dependencies = [
- "winnow 1.0.0",
+ "winnow 1.0.1",
 ]
 
 [[package]]
@@ -2416,9 +2433,9 @@ dependencies = [
 
 [[package]]
 name = "winnow"
-version = "1.0.0"
+version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a90e88e4667264a994d34e6d1ab2d26d398dcdca8b7f52bec8668957517fc7d8"
+checksum = "09dac053f1cd375980747450bfc7250c264eaae0583872e845c0c7cd578872b5"
 
 [[package]]
 name = "wit-bindgen"
@@ -2510,18 +2527,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.47"
+version = "0.8.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efbb2a062be311f2ba113ce66f697a4dc589f85e78a4aea276200804cea0ed87"
+checksum = "eed437bf9d6692032087e337407a86f04cd8d6a16a37199ed57949d415bd68e9"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.47"
+version = "0.8.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e8bc7269b54418e7aeeef514aa68f8690b8c0489a06b0136e5f57c4c5ccab89"
+checksum = "70e3cd084b1788766f53af483dd21f93881ff30d7320490ec3ef7526d203bad4"
 dependencies = [
  "proc-macro2",
  "quote",

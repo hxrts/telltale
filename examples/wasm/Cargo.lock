@@ -891,7 +891,7 @@ dependencies = [
 
 [[package]]
 name = "telltale"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -921,7 +921,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -938,7 +938,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -954,7 +954,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -964,7 +964,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "telltale-types",
  "thiserror",
@@ -972,7 +972,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "8.0.0"
+version = "9.0.0"
 dependencies = [
  "fixed",
  "serde",
@@ -1559,18 +1559,18 @@ dependencies = [
 
 [[package]]
 name = "zerocopy"
-version = "0.8.47"
+version = "0.8.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efbb2a062be311f2ba113ce66f697a4dc589f85e78a4aea276200804cea0ed87"
+checksum = "eed437bf9d6692032087e337407a86f04cd8d6a16a37199ed57949d415bd68e9"
 dependencies = [
  "zerocopy-derive",
 ]
 
 [[package]]
 name = "zerocopy-derive"
-version = "0.8.47"
+version = "0.8.48"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e8bc7269b54418e7aeeef514aa68f8690b8c0489a06b0136e5f57c4c5ccab89"
+checksum = "70e3cd084b1788766f53af483dd21f93881ff30d7320490ec3ef7526d203bad4"
 dependencies = [
  "proc-macro2",
  "quote",

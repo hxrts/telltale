@@ -27,7 +27,7 @@ Enable the `wasm` feature on the choreography crate.
 
 ```toml
 [dependencies]
-telltale-runtime = { version = "8.0.0", features = ["wasm"] }
+telltale-runtime = { version = "9.0.0", features = ["wasm"] }
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
 ```
