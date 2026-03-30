@@ -69,8 +69,6 @@ ci-dry-run lane="fast":
     just check-doc-quality
     just perf-baseline check
     just perf-baseline sla
-    # Benchmark target compilation checks
-    just bench-check
     just book
     # WASM compilation checks
     just wasm-check
@@ -80,6 +78,10 @@ ci-dry-run lane="fast":
     just telltale-lean-check
     just telltale-lean-check-extended
     just telltale-lean-check-failing
+    just check-parity
+    just check-capability-gates
+    # Benchmark target compilation checks
+    just bench-check
     if [[ "{{lane}}" == "full" ]]; then
       just check-deep-assurance
     fi

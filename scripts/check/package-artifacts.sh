@@ -103,6 +103,7 @@ saved_tarball_dir="${ROOT_DIR}/target/package-artifact-tarballs"
 require_command cargo
 require_command git
 require_command python3
+require_command rustup
 require_command tar
 require_command rg
 require_command rustc
@@ -275,6 +276,11 @@ for package in "${RELEASE_PACKAGES[@]}"; do
     cargo publish -p "${package}" --dry-run --locked --allow-dirty --no-verify
 
   tarball="${package_target_dir_run}/package/${package}-${workspace_version}.crate"
+  if [[ ! -f "${tarball}" ]]; then
+    echo "-- cargo package -p ${package} --list --allow-dirty --no-verify (materialize tarball)"
+    CARGO_TARGET_DIR="${package_target_dir_run}" \
+      cargo package -p "${package}" --allow-dirty --no-verify >/dev/null
+  fi
   [[ -f "${tarball}" ]] || {
     echo "error: missing tarball ${tarball}" >&2
     exit 1
@@ -447,6 +453,13 @@ run_consumer_canary() {
   return 0
 }
 
+ensure_rust_target_installed() {
+  local target="$1"
+  if ! rustup target list --installed | grep -qx "${target}"; then
+    rustup target add "${target}"
+  fi
+}
+
 echo "== verify packaged resource presence =="
 assert_tarball_contains telltale "README.md"
 assert_tarball_contains telltale-runtime "README.md"
@@ -469,6 +482,7 @@ assert_packaged_file_matches_source telltale-bridge "README.md" "${ROOT_DIR}/REA
 
 echo "== smoke check packaged telltale crate =="
 smoke_packaged_crate telltale cargo check --lib --features full
+ensure_rust_target_installed wasm32-unknown-unknown
 smoke_packaged_crate telltale cargo check --lib --target wasm32-unknown-unknown --features wasm
 
 echo "== smoke check packaged telltale-runtime crate =="

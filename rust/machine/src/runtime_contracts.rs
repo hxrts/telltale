@@ -289,7 +289,7 @@ fn runtime_critical_transported_theorem_entries() -> Vec<TransportedTheoremBound
             false,
             true,
             Some(
-                "Lean theorem-pack gate only; Rust runtime admission does not currently consume this key.",
+                "Lean theorem-pack gate only. Rust runtime admission does not currently consume this key.",
             ),
         ),
         boundary_entry(

@@ -75,7 +75,7 @@ pub fn bridge_normalization_ledger() -> Vec<BridgeNormalizationEntry> {
         surface: "semantic-audit tick normalization",
         rule: "Normalize only `tick`, and only per extracted session id",
         classification: BridgeNormalizationClassification::IrreducibleTrustedComparisonLogic,
-        rationale: "Absolute cross-session scheduling order is not semantic protocol truth; per-session observable order is",
+        rationale: "Absolute cross-session scheduling order is not semantic protocol truth. Per-session observable order is.",
         artifacts: &[
             "rust/bridge/src/protocol_machine_trace.rs",
             "rust/bridge/tests/protocol_machine_correspondence_tests.rs",

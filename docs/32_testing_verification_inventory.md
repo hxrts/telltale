@@ -272,9 +272,15 @@ The rows in this table are source-derived and checked by
 `telltale_bridge::bridge_normalization_ledger()` via
 `scripts/check/bridge-normalization-ledger.sh`.
 
-| Surface | Normalization rule | Classification | Why permitted | Enforcing artifacts |
-|---|---|---|---|---|
-| semantic-audit tick normalization | Normalize only `tick`, and only per extracted session id | irreducible trusted comparison logic | Absolute cross-session scheduling order is not semantic protocol truth. Per-session observable order is | `rust/bridge/src/protocol_machine_trace.rs`, `rust/bridge/tests/protocol_machine_correspondence_tests.rs`, `rust/bridge/tests/protocol_machine_differential_steps.rs` |
+| Surface | Normalization rule | Classification | Why permitted |
+|---|---|---|---|
+| semantic-audit tick normalization | Normalize only `tick`, and only per extracted session id | irreducible trusted comparison logic | Absolute cross-session scheduling order is not semantic protocol truth. Per-session observable order is. |
+
+Enforcing artifacts:
+
+- `rust/bridge/src/protocol_machine_trace.rs`
+- `rust/bridge/tests/protocol_machine_correspondence_tests.rs`
+- `rust/bridge/tests/protocol_machine_differential_steps.rs`
 Session-status ordering is no longer part of the trusted comparison surface.
 Both the Lean runner and Rust-side correspondence harness now emit session rows
 in canonical `sid` order, so comparison is exact rather than normalized.
