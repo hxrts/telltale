@@ -320,7 +320,7 @@ Theory conversion is narrower than projection today:
 ### Source-Derived Support Matrix
 
 The following rows are source-derived from the checked authority fixture corpus
-and validated by `rust/tests/docs_contract_tests.rs`.
+and validated by `rust/bridge/tests/docs_contract_tests.rs`.
 
 | Fixture surface | Protocol-machine executable | Session-projectable | Theory-convertible | Authority theorem tier | Explicit blocker |
 |---|---|---|---|---|---|

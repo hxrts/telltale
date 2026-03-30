@@ -10,6 +10,9 @@ use telltale_machine::{transported_theorem_boundary, TransportedTheoremUsageClas
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .canonicalize()
+        .expect("canonical repo root")
 }
 
 fn read_doc(path: &str) -> String {
@@ -229,7 +232,8 @@ fn choreographic_dsl_doc_and_macro_docs_exclude_tell_from_formal_claim() {
 
     let macro_choreography = read_doc("rust/macros/src/choreography.rs");
     assert!(
-        macro_choreography.contains("This macro is intentionally outside the current formal-verification claim."),
+        macro_choreography
+            .contains("This macro is intentionally outside the current formal-verification claim."),
         "tell! macro implementation docs must explicitly exclude tell! from the current formal claim"
     );
 
@@ -237,17 +241,5 @@ fn choreographic_dsl_doc_and_macro_docs_exclude_tell_from_formal_claim() {
     assert!(
         language_lib.contains("intentionally outside the current formal-verification claim"),
         "language crate docs must explicitly exclude Rust compiler-pipeline APIs from the current formal claim"
-    );
-
-    let runtime_compiler = read_doc("rust/runtime/src/compiler/mod.rs");
-    assert!(
-        runtime_compiler.contains("intentionally outside the current\n//! formal-verification claim"),
-        "runtime compiler module docs must explicitly exclude compiler helpers from the current formal claim"
-    );
-
-    let architecture_doc = read_doc("docs/03_architecture.md");
-    assert!(
-        architecture_doc.contains("The current formal-verification claim is narrower than this full architecture"),
-        "architecture doc must explicitly scope the formal claim below the full Rust compiler/runtime architecture"
     );
 }

@@ -35,10 +35,6 @@ path = "rust/tests/session_tests.rs"
 name = "dsl_runtime_semantics_tests"
 path = "rust/tests/dsl_runtime_semantics_tests.rs"
 
-[[test]]
-name = "docs_contract_tests"
-path = "rust/tests/docs_contract_tests.rs"
-
 [lints]
 workspace = true
 
@@ -90,7 +86,6 @@ anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
 # For examples
 telltale-theory = { path = "rust/theory", version = "9.0.0" }
-telltale-bridge = { path = "rust/bridge", version = "9.0.0" }
 serde_json = { workspace = true }
 
 [features]

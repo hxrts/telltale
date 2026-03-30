@@ -174,7 +174,7 @@ deadlock_automation_fragment_suites=(
 )
 
 docs_as_contract_assurance_suites=(
-  rust/tests/docs_contract_tests.rs
+  rust/bridge/tests/docs_contract_tests.rs
   scripts/check/verification-inventory.sh
   scripts/check/bridge-normalization-ledger.sh
 )

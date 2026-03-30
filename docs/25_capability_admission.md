@@ -118,7 +118,7 @@ than a shipped Rust admission dependency today:
 
 The following rows are source-derived and checked against
 `telltale_machine::transported_theorem_boundary()` by
-`rust/tests/docs_contract_tests.rs`.
+`rust/bridge/tests/docs_contract_tests.rs`.
 
 | Key | Usage class | Rust runtime admission | Lean runtime gate | Assumption boundary |
 |---|---|---|---|---|
