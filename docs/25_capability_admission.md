@@ -6,6 +6,11 @@ Admission is not the same thing as current ownership.
 Admission answers whether a runtime/profile/configuration is allowed in principle.
 Ownership answers who may currently drive session-local host mutation for one live session or fragment.
 
+Within the broader first-class protocol-critical capability model, admission is
+only one class beside ownership, evidence, and transition capability surfaces.
+Admission decides whether execution is allowed in principle. It does not itself
+prove current session authority or canonical semantic truth.
+
 ## Gate Layers
 
 Admission is enforced across Lean theorem-pack surfaces and Rust runtime checks.
@@ -17,6 +22,11 @@ Admission is enforced across Lean theorem-pack surfaces and Rust runtime checks.
 | Lean admission logic | `Runtime/Adequacy/EnvelopeCore/AdmissionLogic.lean` |
 | Rust runtime gates | `rust/machine/src/runtime_contracts.rs` |
 | Rust composition admission | `rust/machine/src/composition.rs` |
+
+The canonical cross-cutting capability taxonomy now lives in:
+
+- `rust/machine/src/capabilities.rs`
+- `lean/Runtime/Proofs/Capabilities.lean`
 
 ## Runtime Gate Flow
 

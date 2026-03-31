@@ -31,6 +31,53 @@ Keep logic in the host when:
 | receipt | typed proof that a transfer or handoff was staged/committed |
 | typed failure | an explicit `Err`, cancellation, or timeout outcome rather than host-local absence |
 
+## Canonical Capability Classes
+
+Telltale's first-class capability model is intentionally narrow.
+
+| Class | Main question | Current examples |
+|---|---|---|
+| `admission` | may this runtime/profile/configuration run at all? | theorem-pack eligibility, runtime contracts, determinism profile gates |
+| `ownership` | who may currently mutate one live session or fragment? | `OwnershipCapability` |
+| `evidence` | why is a protocol-critical branch or finalization step justified? | `ReadinessWitness`, `AuthoritativeRead`, `MaterializationProof`, `CanonicalHandle` |
+| `transition` | what explicit object authorizes handoff, cutover, or reconfiguration? | `OwnershipReceipt`, semantic handoff, reconfiguration transition artifacts |
+
+The canonical Rust source-of-truth boundary for these classes is:
+
+- `rust/machine/src/capabilities.rs`
+- `rust/machine/src/runtime_contracts.rs`
+- `rust/machine/src/session/overview.rs`
+- `rust/machine/src/semantic_objects.rs`
+- `rust/machine/src/composition.rs`
+
+The canonical Lean theorem/model boundary is:
+
+- `lean/Runtime/Proofs/Capabilities.lean`
+- `lean/Runtime/Proofs/AuthorityMetatheory.lean`
+- `lean/Runtime/Proofs/Conservation/Authority.lean`
+- `lean/Runtime/Proofs/Conservation/Evidence.lean`
+- `lean/Runtime/Proofs/ReconfigurationObserver.lean`
+- `lean/Runtime/Proofs/TheoremPack/AdmissionBoundary.lean`
+
+### Source-Derived Boundary Rows
+
+The rows below are source-derived and checked against
+`telltale_machine::protocol_critical_capability_boundary()` by
+`rust/bridge/tests/docs_contract_tests.rs`.
+
+| Surface | Class | Lifecycle | Rust boundary | Lean boundary | Rationale |
+|---|---|---|---|---|---|
+| `runtime_admission` | `admission` | `issued`, `rejected` | `rust/machine/src/runtime_contracts.rs` | `lean/Runtime/Proofs/TheoremPack/AdmissionBoundary.lean` | Admits or rejects runtime/profile execution before protocol-critical execution begins. |
+| `theorem_pack_capabilities` | `admission` | `issued`, `rejected` | `rust/machine/src/composition.rs` | `lean/Runtime/Proofs/TheoremPack/API.lean` | Carries proof-backed eligibility that higher-level runtime admission consumes. |
+| `ownership_capability` | `ownership` | `issued`, `invalidated`, `expired`, `rejected` | `rust/machine/src/session/overview.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Proves which actor may currently mutate session-local protocol-critical state. |
+| `readiness_witness` | `evidence` | `issued`, `consumed`, `rejected`, `invalidated`, `expired` | `rust/machine/src/session/overview.rs` | `lean/Runtime/Proofs/AuthorityMetatheory.lean` | Justifies a protocol-critical readiness decision under one live owner generation. |
+| `authoritative_read` | `evidence` | `issued`, `consumed`, `rejected` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Evidence.lean` | Carries evidence-bearing protocol input that may author canonical truth. |
+| `materialization_proof` | `evidence` | `issued`, `consumed`, `rejected` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Evidence.lean` | Witnesses proof-bearing success on the sanctioned materialization path. |
+| `canonical_handle` | `evidence` | `issued`, `consumed`, `rejected`, `invalidated` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Evidence.lean` | Provides the strong reference required on parity-critical follow-on paths. |
+| `ownership_receipt` | `transition` | `issued`, `committed`, `rolled_back`, `rejected`, `invalidated`, `expired` | `rust/machine/src/session/overview.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Stages and commits explicit ownership transfer rather than ambient authority mutation. |
+| `semantic_handoff` | `transition` | `committed`, `rolled_back`, `rejected`, `invalidated` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Represents explicit protocol-visible authority transfer and old-owner revocation. |
+| `reconfiguration_transition` | `transition` | `issued`, `committed`, `rolled_back`, `rejected` | `rust/machine/src/composition.rs` | `lean/Runtime/Proofs/ReconfigurationObserver.lean` | Captures protocol-critical cutover and membership/runtime transition artifacts. |
+
 ## Language Shape
 
 The current language surface uses a small set of explicit forms:

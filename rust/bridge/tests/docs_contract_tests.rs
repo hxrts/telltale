@@ -6,7 +6,11 @@ use std::path::PathBuf;
 use telltale_bridge::bridge_normalization_ledger;
 use telltale_language::ast::{choreography_to_global, AuthorityMetatheoryTier};
 use telltale_language::parse_choreography_file;
-use telltale_machine::{transported_theorem_boundary, TransportedTheoremUsageClass};
+use telltale_machine::{
+    protocol_critical_capability_boundary, transported_theorem_boundary,
+    ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
+    TransportedTheoremUsageClass,
+};
 
 fn repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -38,6 +42,27 @@ fn yes_no(value: bool) -> &'static str {
         "yes"
     } else {
         "no"
+    }
+}
+
+fn capability_class_name(class: ProtocolCriticalCapabilityClass) -> &'static str {
+    match class {
+        ProtocolCriticalCapabilityClass::Admission => "`admission`",
+        ProtocolCriticalCapabilityClass::Ownership => "`ownership`",
+        ProtocolCriticalCapabilityClass::Evidence => "`evidence`",
+        ProtocolCriticalCapabilityClass::Transition => "`transition`",
+    }
+}
+
+fn lifecycle_name(state: ProtocolCriticalCapabilityLifecycleState) -> &'static str {
+    match state {
+        ProtocolCriticalCapabilityLifecycleState::Issued => "`issued`",
+        ProtocolCriticalCapabilityLifecycleState::Consumed => "`consumed`",
+        ProtocolCriticalCapabilityLifecycleState::Rejected => "`rejected`",
+        ProtocolCriticalCapabilityLifecycleState::Invalidated => "`invalidated`",
+        ProtocolCriticalCapabilityLifecycleState::Committed => "`committed`",
+        ProtocolCriticalCapabilityLifecycleState::RolledBack => "`rolled_back`",
+        ProtocolCriticalCapabilityLifecycleState::Expired => "`expired`",
     }
 }
 
@@ -88,6 +113,34 @@ fn capability_admission_source_derived_boundary_rows_match_runtime_contracts() {
             yes_no(entry.consumed_by_rust_runtime_admission),
             yes_no(entry.consumed_by_lean_runtime_gate),
             assumption_boundary
+        );
+        assert_contains_row(&doc, &row);
+    }
+}
+
+#[test]
+fn authority_evidence_doc_source_derived_boundary_rows_match_capability_inventory() {
+    let doc = read_doc("docs/35_protocol_authority_evidence.md");
+    assert!(
+        doc.contains("Source-Derived Boundary Rows"),
+        "authority/evidence doc should explicitly mark source-derived boundary rows"
+    );
+
+    for entry in protocol_critical_capability_boundary() {
+        let lifecycle = entry
+            .lifecycle
+            .into_iter()
+            .map(lifecycle_name)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let row = format!(
+            "| `{}` | {} | {} | `{}` | `{}` | {} |",
+            entry.surface,
+            capability_class_name(entry.class),
+            lifecycle,
+            entry.rust_module,
+            entry.lean_module,
+            entry.rationale
         );
         assert_contains_row(&doc, &row);
     }

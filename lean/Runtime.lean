@@ -25,6 +25,7 @@ import Runtime.Proofs.EffectBisim.RationalFragment
 import Runtime.Proofs.BridgeStrengthening
 import Runtime.Proofs.ReconfigurationObserver
 import Runtime.Proofs.AuthorityMetatheory
+import Runtime.Proofs.Capabilities
 import Runtime.Proofs.Conservation.API
 import Runtime.Proofs.Lowering.API
 import Runtime.Proofs.ProtocolMachine.Effects

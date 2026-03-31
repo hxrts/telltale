@@ -58,6 +58,7 @@ use cfg_if::cfg_if;
 pub mod architecture;
 pub mod bridge;
 pub mod buffer;
+pub mod capabilities;
 pub mod clock;
 pub mod commit_common;
 /// Communication replay modes and consumption state for deterministic and speculatively
@@ -157,6 +158,12 @@ pub mod model {
 
     /// State-level session, ownership, and edge objects.
     pub mod state {
+        pub use crate::capabilities::{
+            lean_first_class_capability_module_boundary,
+            protocol_critical_capability_boundary, rust_first_class_capability_module_boundary,
+            ProtocolCriticalCapabilityBoundaryEntry, ProtocolCriticalCapabilityClass,
+            ProtocolCriticalCapabilityLifecycleState,
+        };
         pub use crate::engine::{ObsEvent, ProtocolMachineState};
         pub use crate::refinement::{
             CoroutineRefinementSlice, ProtocolMachineRefinementSlice, RefinementSliceError,
@@ -263,6 +270,11 @@ pub use architecture::{
 pub use bridge::{
     EffectGuardBridge, IdentityGuardBridge, IdentityPersistenceBridge, IdentityVerificationBridge,
     PersistenceEffectBridge,
+};
+pub use capabilities::{
+    lean_first_class_capability_module_boundary, protocol_critical_capability_boundary,
+    rust_first_class_capability_module_boundary, ProtocolCriticalCapabilityBoundaryEntry,
+    ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
 };
 pub use clock::SimClock;
 pub use communication_replay::{

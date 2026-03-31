@@ -15,6 +15,17 @@ The canonical exported semantic surface is the semantic-object family:
 `CanonicalHandle`, `PublicationEvent`, `ProgressContract`, and
 `ProgressTransition`.
 
+The first-class protocol-critical capability boundary is intentionally split
+into four classes:
+
+- admission capability surfaces
+- ownership capability surfaces
+- evidence/finalization capability surfaces
+- transition capability surfaces
+
+The source-of-truth Rust and Lean boundaries for that taxonomy are
+`rust/machine/src/capabilities.rs` and `lean/Runtime/Proofs/Capabilities.lean`.
+
 The canonical round model is one semantic step when concurrency is nonzero. Threaded execution is admitted as an extension only when the wave certificate gate is satisfied.
 
 ## Engine Roles
