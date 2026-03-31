@@ -262,6 +262,8 @@ pub struct ProtocolMachineRunner {
 impl ProtocolMachineRunner {
     /// Default path to the protocol-machine runner binary (relative to workspace root).
     pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/protocol_machine_runner";
+    /// Fallback source-backed launcher for the protocol-machine runner.
+    pub const FALLBACK_SCRIPT_PATH: &'static str = "scripts/lean/protocol-machine-runner.sh";
     /// Default timeout for protocol-machine runner process invocations.
     pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 
@@ -353,9 +355,17 @@ impl ProtocolMachineRunner {
     }
 
     fn get_binary_path() -> Option<PathBuf> {
-        Self::find_workspace_root()
-            .map(|root| root.join(Self::DEFAULT_BINARY_PATH))
-            .filter(|p| p.exists())
+        Self::find_workspace_root().and_then(|root| {
+            let native = root.join(Self::DEFAULT_BINARY_PATH);
+            if native.is_file() {
+                return Some(native);
+            }
+            let fallback = root.join(Self::FALLBACK_SCRIPT_PATH);
+            if fallback.is_file() {
+                return Some(fallback);
+            }
+            None
+        })
     }
 
     /// Create a new protocol-machine runner with the default binary path.
@@ -414,10 +424,13 @@ impl ProtocolMachineRunner {
                 ║  To build Lean runners:                                          ║\n\
                 ║    cd lean && lake build protocol_machine_runner                 ║\n\
                 ║                                                                  ║\n\
+                ║  Fallback launcher:                                              ║\n\
+                ║    scripts/lean/protocol-machine-runner.sh                       ║\n\
+                ║                                                                  ║\n\
                 ║  Or with Nix:                                                    ║\n\
                 ║    nix develop --command bash -c \"cd lean && lake build protocol_machine_runner\" ║\n\
                 ║                                                                  ║\n\
-                ║  Expected path: {path}          \n\
+                ║  Expected native path: {path}   \n\
                 ╚══════════════════════════════════════════════════════════════════╝\n",
                 path = Self::DEFAULT_BINARY_PATH
             );
@@ -718,6 +731,18 @@ impl ProtocolMachineRunner {
             errors: parse_structured_errors(&response),
             event,
         })
+    }
+
+    /// Compare first-class capability/finalization/runtime-upgrade objects against the Lean facade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lean invocation fails or output cannot be decoded.
+    pub fn inspect_capability_model(
+        &self,
+        payload: &Value,
+    ) -> Result<Value, ProtocolMachineRunnerError> {
+        self.run_validation_operation("inspectCapabilityModel", payload)
     }
 }
 

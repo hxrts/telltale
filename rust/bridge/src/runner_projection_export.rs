@@ -5,12 +5,23 @@ impl LeanRunner {
     /// Default path to the protocol-machine runner binary (relative to workspace root).
     pub const PROTOCOL_MACHINE_RUNNER_BINARY_PATH: &'static str =
         "lean/.lake/build/bin/protocol_machine_runner";
+    /// Fallback source-backed launcher for the protocol-machine runner.
+    pub const PROTOCOL_MACHINE_RUNNER_FALLBACK_PATH: &'static str =
+        "scripts/lean/protocol-machine-runner.sh";
 
     /// Get the full path to the protocol-machine runner binary.
     fn get_protocol_machine_runner_path() -> Option<PathBuf> {
-        Self::find_workspace_root()
-            .map(|root| root.join(Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH))
-            .filter(|p| p.exists())
+        Self::find_workspace_root().and_then(|root| {
+            let native = root.join(Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH);
+            if native.is_file() {
+                return Some(native);
+            }
+            let fallback = root.join(Self::PROTOCOL_MACHINE_RUNNER_FALLBACK_PATH);
+            if fallback.is_file() {
+                return Some(fallback);
+            }
+            None
+        })
     }
 
     /// Check if the validator binary is available for projection export.
