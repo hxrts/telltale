@@ -13,10 +13,14 @@ It serves as the stable lookup for terminology and notation.
 | local type | Per-role protocol view used for runtime typing and progression. | [Theory](05_theory.md), [Session Lifecycle](14_session_lifecycle.md) |
 | effect handler | Runtime boundary that interprets protocol-machine or choreography actions. | [Choreography Effect Handlers](09_effect_handlers.md), [Effect Handlers and Session Types](11_effect_session_bridge.md) |
 | theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](23_lean_verification.md), [Capability and Admission](25_capability_admission.md) |
+| capability taxonomy | The four first-class protocol-critical capability classes: admission, ownership, evidence, transition. | [Capability Model](38_capability_model.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 | admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](25_capability_admission.md) |
 | ownership capability | Runtime host authority token carrying owner label, generation, and scope. | [Effect Handlers and Session Types](11_effect_session_bridge.md), [Session Lifecycle](14_session_lifecycle.md) |
 | evidence | Typed proof object or witness consumed by protocol-critical authority flow. | [Authority Language Surface](34_authority_language_surface.md) |
 | receipt | Single-use transfer or handoff proof emitted by an explicit ownership/delegation path. | [Session Lifecycle](14_session_lifecycle.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
+| finalization subsystem | The explicit runtime/Lean model that classifies observed, authoritative, materialized, canonical, invalidated, and rejected semantic paths. | [Protocol Machine Architecture](12_protocol_machine_architecture.md), [Capability Model](38_capability_model.md) |
+| canonical handle | Non-forgeable runtime reference proving a materialized/publication path is consumable as canonical truth. | [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md), [Capability Model](38_capability_model.md) |
+| transition artifact | Receipt, handoff, or reconfiguration/runtime-upgrade object that carries explicit transfer or cutover authority. | [Capability Model](38_capability_model.md), [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) |
 | linear binding | Binding that the compiler requires to be consumed exactly once. | [Choreographic DSL](06_choreographic_dsl.md), [Authority Language Surface](34_authority_language_surface.md) |
 | `Result` | Built-in success/failure sum form with `Ok` and `Err`. | [Choreographic DSL](06_choreographic_dsl.md) |
 | `Maybe` | Built-in optional-value sum form with `Just` and `Nothing`. | [Choreographic DSL](06_choreographic_dsl.md) |

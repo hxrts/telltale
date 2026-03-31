@@ -54,6 +54,7 @@ The semantic objects layer lives under `Runtime/protocol machine/Model/SemanticO
 | Semantic handoff activation and delegation bridge | `Runtime/protocol machine/Model/SemanticObjects/SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` |
 | Authoritative-read commitment and publication projection | `Runtime/protocol machine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` |
 | Materialization-proof adequacy and canonical-handle adequacy | `Runtime/protocol machine/Model/SemanticObjects/MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` |
+| First-class capability/finalization and runtime-upgrade facade | `lean/Runtime/Proofs/CapabilityModel.lean`, `lean/Runtime/Tests/ProtocolMachineRunner.lean` |
 | Progress-contract semantics and escalation lemmas | `Runtime/protocol machine/Model/SemanticObjects/ProgressContracts.lean`, `ProgressContractsLemmas.lean` |
 | Transformation-local obligation bundles | `Runtime/protocol machine/Model/SemanticObjects/TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` |
 | Replay-failure exactness | `Runtime/protocol machine/Model/SemanticObjects/ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` |
@@ -73,6 +74,11 @@ Runtime proof inventory is exported through theorem-pack modules.
 | `Runtime/Adequacy/EnvelopeCore/AdmissionLogic.lean` | admission soundness, completeness, diagnostics vocabulary |
 
 These APIs are consumed by Rust runtime gates and composition admission checks.
+
+The capability/finalization bridge surface is also consumed directly by the
+strict correspondence lane through `inspectCapabilityModel`, which keeps the
+Lean model for finalization paths and runtime-upgrade artifacts in executable
+alignment with Rust.
 
 ## Premise-Scoped Interfaces
 

@@ -387,6 +387,19 @@ Choreographies specify the global protocol once and projection generates local c
 
 Effect handlers are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. Internal handlers realize scheduling, dispatch, and replay. External handlers realize storage, network, and domain-specific integrations. See [Choreography Effect Handlers](09_effect_handlers.md) for the async surface and [Effect Handlers and Session Types](11_effect_session_bridge.md) for the protocol-machine boundary.
 
+### Why Capability Semantics Are First Class
+
+Telltale treats protocol-critical capability semantics as part of the model,
+not as an application policy layer bolted on later. Admission gates, live
+ownership, evidence/finalization artifacts, and transition artifacts all change
+protocol-visible truth or determine who may change it. They therefore belong in
+the runtime/Lean boundary.
+
+The important non-goal is scope control. Telltale does not try to become a
+general-purpose host authorization framework. Product-specific user/resource
+policy remains outside the model unless it changes protocol-critical semantics
+and can be represented as typed runtime/Lean objects.
+
 ### Why Session Types
 
 Session types provide compile-time guarantees about protocol compliance. The Rust type system enforces that each role follows their protocol correctly. Type checking prevents message ordering and payload-shape violations at compile time. Global deadlock claims remain assumption-scoped in the theory results.

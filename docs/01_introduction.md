@@ -18,11 +18,24 @@ Choreographic programming builds on global types. A choreography describes compu
 
 Telltale enforces conservation over six properties: evidence, authority, identity, commitment, structure, and premise. These properties are mutually constitutive. A coherent protocol state is a simultaneous assignment of all six. See [Conservation Framework](37_conservation_framework.md) for the conservation laws, erasure and reduction principles, and the closed semantic core object set.
 
+Within that conservation framework, protocol-critical capability semantics are
+first class. The runtime and Lean model distinguish four capability classes:
+admission, ownership, evidence, and transition. This taxonomy is intentionally
+narrow. It covers protocol-critical authority, evidence, finalization, and
+handoff/reconfiguration semantics, but it does not attempt to absorb general
+host application authorization. See [Capability Model](38_capability_model.md).
+
 ## Runtime Architecture
 
 The execution architecture has three layers. The protocol machine is a deterministic small-step reducer that commits all protocol-visible truth. The guest runtime wraps the protocol machine with typed effect interfaces and concrete handlers. The host runtime is the surrounding application that provides time, storage, network, and process lifecycle.
 
 Typed effect interfaces are the operational vocabulary between the protocol machine and the world. Internal handlers realize scheduling, dispatch, and replay. External handlers realize storage, network, and domain-specific integrations. See [Architecture](03_architecture.md) and [Protocol Machine Architecture](12_protocol_machine_architecture.md) for details.
+
+The protocol machine also derives a first-class finalization subsystem from its
+semantic objects. Observed reads, authoritative reads, publications,
+materialization proofs, canonical handles, receipts, and semantic handoffs are
+not just helpers. They are explicit replay-visible objects in the runtime and
+the Lean model.
 
 ## Effect Handlers
 
@@ -80,6 +93,7 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md) | Reference | Normative |
 | [Semantic Runtime Name Parity](36_semantic_runtime_name_parity.md) | Reference | Normative |
 | [Conservation Framework](37_conservation_framework.md) | Concept | Normative |
+| [Capability Model](38_capability_model.md) | Reference | Normative |
 
 ## Paths by Role
 

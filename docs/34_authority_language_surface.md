@@ -202,6 +202,19 @@ Current compiler rules:
 query results. `authoritative let` and `observe let` are the explicit binding
 forms for protocol-critical authoritative and observational reads.
 
+## DSL Capability Mapping
+
+| DSL form | Capability class | Canonical lifecycle states |
+|---|---|---|
+| `authoritative let x = check ...` | `evidence` | `issued`, `consumed`, `rejected` |
+| `observe let x = observe ...` | `evidence` | observational-only input, never canonical directly |
+| `let receipt = transfer ...` | `transition` | `issued`, `committed`, `rolled_back`, `rejected`, `invalidated`, `expired` |
+| `publish witness as Publication` | `evidence` | authoritative publication path |
+| `materialize proof from Publication` | `evidence` | `materialized`, `rejected` |
+| `handoff op to Role with receipt` | `transition` | `committed`, `rolled_back`, `invalidated` |
+| `case/of` over evidence | control-flow over evidence | must preserve linear assets and remain exhaustive |
+| `timeout ... on timeout ... on cancel ...` | evidence/transition-adjacent control-flow | explicit timeout/cancellation outcomes with replay-visible lifecycle |
+
 Current linear classification:
 
 - `transfer ...` bindings are linear first-class transition receipts

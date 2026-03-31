@@ -8,7 +8,7 @@ how evidence-bearing decisions are expected to behave.
 Telltale owns protocol-critical authority flow. It does not own arbitrary host
 application state.
 More concretely: first-class protocol-critical capability semantics are in
-scope; general host application authorization is out of scope.
+scope, and general host application authorization is out of scope.
 
 Use Telltale authority/evidence features when:
 
@@ -119,7 +119,7 @@ canonical protocol truth:
 
 | Stage | Meaning |
 |---|---|
-| `observed` | only observational reads/effects exist; nothing canonical may be consumed |
+| `observed` | only observational reads/effects exist, and nothing canonical may be consumed |
 | `authoritative` | typed authoritative evidence exists, but no proof-bearing materialization has succeeded yet |
 | `materialized` | proof-bearing success exists, but canonical publication/handle pairing is not complete yet |
 | `canonical` | proof-bearing publication plus canonical handle make the path consumable as protocol truth |

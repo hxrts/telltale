@@ -90,6 +90,15 @@ Key exports:
   `CanonicalHandle`, `PublicationEvent`, `Region`, `ProgressContract`,
   `ProgressTransition`,
   `ProtocolMachineSemanticObjects`
+- first-class capability/finalization taxonomy:
+  `ProtocolCriticalCapabilityClass`,
+  `ProtocolCriticalCapabilityLifecycleState`,
+  `ProtocolCriticalCapabilityArtifact`,
+  `ProtocolCriticalCapabilityLifecycleRecord`,
+  `ProtocolMachineFinalization`,
+  `FinalizationPath`,
+  `FinalizationReadClass`,
+  `FinalizationStage`
 - proof-carrying runtime profiles:
   `ProtocolMachineExecutionProfile`, `ProtocolMachineFairnessAssumption`,
   `ProtocolMachineAdmissibilityClass`,
@@ -98,7 +107,8 @@ Key exports:
   `operation_instances()`, `outstanding_effects()`, `semantic_objects()`,
   `progress_contracts()`, `progress_transitions()`, `publication_events()`,
   `require_authoritative_read()`,
-  `require_canonical_handle()`, `semantic_audit_log()`,
+  `require_canonical_handle()`, `protocol_machine_finalization()`,
+  `capability_lifecycle_audit_log()`, `semantic_audit_log()`,
   `canonical_replay_fragment()`
 
 `GuestRuntime` is the Telltale-owned runtime instantiated around the protocol

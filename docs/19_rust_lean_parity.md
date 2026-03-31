@@ -15,6 +15,7 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 | `FlowPolicy` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/machine/src/engine/` | Aligned |
 | `FlowPredicate` variants | `Runtime/protocol machine/Model/Knowledge.lean` | `rust/machine/src/engine/` | Aligned |
 | `OutputConditionPolicy` | `Runtime/protocol machine/Model/OutputCondition.lean` | `rust/machine/src/output_condition.rs` | Aligned |
+| Capability/finalization model (`FinalizationPath`, `FinalizationReadClass`, `FinalizationStage`, `RuntimeUpgradeArtifact`) | `lean/Runtime/Proofs/CapabilityModel.lean`, `Runtime/Tests/ProtocolMachineRunner.lean` | `rust/machine/src/semantic_objects.rs`, `rust/machine/src/composition.rs`, `rust/machine/src/capabilities.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/machine/src/coroutine.rs` | Aligned |
 | `ProgressToken` fields | `Runtime/protocol machine/Model/State.lean` | `rust/machine/src/coroutine.rs` | Aligned |
 | `CommunicationReplayMode` variants | `Runtime/protocol machine/Model/Config.lean` | `rust/machine/src/communication_replay/mod.rs` | Aligned |
@@ -123,6 +124,12 @@ Parity on these objects covers owner identity, phase/status, budget/invalidation
 `TransformationObligation` parity covers transformed fragments, affected operations/effects, transport vs invalidation policy, and publication transfer or revocation.
 Bridge-side execution comparison reports these handoff and invalidation surfaces separately from raw trace equivalence.
 This prevents stale-owner and late-result mismatches from hiding inside otherwise equivalent instruction traces.
+
+The same strict bridge layer now also compares the first-class
+capability/finalization/transition facade exported by
+`inspectCapabilityModel`. That lane checks canonical vs invalidated
+finalization paths and committed-cutover vs rolled-back runtime-upgrade
+artifacts directly, instead of treating them as documentation-only structure.
 
 Canonical layout mapping for this family is:
 

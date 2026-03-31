@@ -338,6 +338,21 @@ Session types realize one of six conserved properties in Telltale: structure con
 
 The other five conserved properties extend the guarantees beyond what session types alone provide. Evidence conservation governs the integrity of witnesses and attestations. Authority conservation enforces single-owner exclusivity over resources. Identity conservation tracks stable object references across retries and handoffs. Commitment conservation ensures that all outstanding effects resolve to a terminal class. Premise conservation makes environmental assumptions explicit and triggers escalation on violation.
 
+In the current runtime/Lean architecture, those conserved properties are not
+left abstract. They are carried by a narrow capability taxonomy:
+
+- `admission` for theorem-pack and runtime-profile eligibility
+- `ownership` for current live mutation authority
+- `evidence` for authoritative reads, publication/materialization, and
+  canonical-handle/finalization objects
+- `transition` for receipts, semantic handoff, and reconfiguration/runtime
+  upgrade artifacts
+
+This is how the session-type and conservation theorems connect to the concrete
+protocol-machine model: structure remains the session-type core, while the other
+conserved properties are realized by explicit typed objects rather than ambient
+host state.
+
 These six properties are mutually constitutive. A violation in any one property can manifest as a failure in any other. The conservation framework is the organizing principle that connects session-type theory to the full runtime architecture. See [Conservation Framework](37_conservation_framework.md) for the conservation laws, reduction principle, and eliminated bug classes.
 
 ## Further Reading

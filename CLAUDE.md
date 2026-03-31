@@ -8,6 +8,18 @@ Telltale is a session-typed execution system for protocol-critical concurrent an
 
 The system enables writing distributed protocols from a global viewpoint with automatic projection to local session types for each participant. Multiparty session types provide compile-time safety guarantees. The protocol machine is a deterministic small-step reducer that commits all protocol-visible truth. Typed effect interfaces form the operational vocabulary between the protocol machine and the world.
 
+Protocol-critical capability semantics are first class in the runtime/model
+boundary. The canonical taxonomy is:
+
+- admission
+- ownership
+- evidence
+- transition
+
+This taxonomy is intentionally narrow. It covers protocol-critical authority,
+finalization, handoff, and reconfiguration semantics. It does not cover general
+host application authorization.
+
 The Lean 4 formalization provides mechanized proofs of preservation, progress, coherence, and harmony for asynchronous buffered multiparty session types. See `lean/CODE_MAP.md` for generated metrics.
 
 ## Parity Policy
@@ -203,6 +215,11 @@ Projection transforms global choreographies to local session types (`rust/langua
 Content addressing assigns cryptographic identities to protocol artifacts (`rust/types/src/content_id.rs`).
 
 Conservation framework: the six conserved properties (evidence, authority, identity, commitment, structure, premise) organize all protocol-critical behavior. See `docs/37_conservation_framework.md`.
+
+Capability model: protocol-critical capability semantics use the four-class
+taxonomy above. Finalization is explicit via `ProtocolMachineFinalization`,
+`FinalizationPath`, `FinalizationReadClass`, and `FinalizationStage`. See
+`docs/38_capability_model.md`.
 
 ## Development Environment
 
