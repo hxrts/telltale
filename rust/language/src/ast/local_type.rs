@@ -245,7 +245,7 @@ mod tests {
         ];
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());
-        assert_eq!(lt.labels(), vec!["accept", "data"]);
+        assert_eq!(lt.head_labels(), vec!["accept", "data"]);
     }
 
     #[test]
