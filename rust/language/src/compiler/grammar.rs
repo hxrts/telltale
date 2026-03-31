@@ -171,26 +171,6 @@ impl GrammarComposer {
         Ok(statements)
     }
 
-    /// Validate that the base grammar has the required extension points
-    ///
-    /// Note: `validate_base_grammar_cached` is preferred for production use.
-    /// This method is kept for testing and API compatibility.
-    #[cfg(test)]
-    fn validate_base_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
-        let required_rules = ["statement = _{", "send_stmt", "broadcast_stmt"];
-
-        for rule in &required_rules {
-            if !grammar.contains(rule) {
-                return Err(GrammarCompositionError::InvalidBaseGrammar(format!(
-                    "Missing required rule: {}",
-                    rule
-                )));
-            }
-        }
-
-        Ok(())
-    }
-
     /// Optimized validation with static patterns and early exit
     fn validate_base_grammar_cached(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
         // Use static patterns for better performance
@@ -203,42 +183,6 @@ impl GrammarComposer {
                     pattern
                 )));
             }
-        }
-
-        Ok(())
-    }
-
-    /// Validate the composed grammar for common issues
-    ///
-    /// Note: `validate_composed_grammar_cached` is preferred for production use.
-    /// This method is kept for testing and API compatibility.
-    #[cfg(test)]
-    fn validate_composed_grammar(&self, grammar: &str) -> Result<(), GrammarCompositionError> {
-        // Check for duplicate rule names
-        let mut rule_names = HashSet::new();
-
-        for line in grammar.lines() {
-            let line = line.trim();
-            if line.contains(" = {") && !line.starts_with("//") {
-                if let Some(rule_name) = line.split(" = {").next() {
-                    let rule_name = rule_name.trim();
-                    if rule_names.contains(rule_name) {
-                        return Err(GrammarCompositionError::DuplicateRule(
-                            rule_name.to_string(),
-                        ));
-                    }
-                    rule_names.insert(rule_name.to_string());
-                }
-            }
-        }
-
-        // Basic syntax validation (check balanced braces outside of string literals)
-        let (open_braces, close_braces) = count_braces_outside_quotes(grammar);
-
-        if open_braces != close_braces {
-            return Err(GrammarCompositionError::SyntaxError(
-                "Unbalanced braces in composed grammar".to_string(),
-            ));
         }
 
         Ok(())
@@ -531,12 +475,12 @@ mod tests {
         let mut composer = GrammarComposer::new();
 
         // Test base grammar validation
-        let valid_result = composer.validate_base_grammar(&composer.base_grammar);
+        let valid_result = composer.validate_base_grammar_cached(&composer.base_grammar);
         assert!(valid_result.is_ok(), "Base grammar should be valid");
 
         // Test composed grammar validation
         let composed = composer.compose().unwrap();
-        let validation_result = composer.validate_composed_grammar(&composed);
+        let validation_result = composer.validate_composed_grammar_cached(&composed);
         assert!(
             validation_result.is_ok(),
             "Composed grammar should be valid"

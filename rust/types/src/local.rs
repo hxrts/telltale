@@ -506,12 +506,6 @@ impl LocalTypeR {
         }
     }
 
-    /// Backward-compatible alias for `head_labels`.
-    #[must_use]
-    pub fn labels(&self) -> Vec<String> {
-        self.head_labels()
-    }
-
     /// Extract all labels that appear anywhere in the local type.
     #[must_use]
     pub fn all_labels(&self) -> Vec<String> {
@@ -766,7 +760,6 @@ mod tests {
         let lt = LocalTypeR::recv_choice("A", branches);
         assert!(lt.well_formed());
         assert_eq!(lt.head_labels(), vec!["accept", "data"]);
-        assert_eq!(lt.labels(), vec!["accept", "data"]);
     }
 
     #[test]

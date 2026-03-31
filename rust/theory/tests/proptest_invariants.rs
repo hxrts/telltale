@@ -356,8 +356,8 @@ fn prop_merge_is_commutative() {
 
     if let (Ok(r1), Ok(r2)) = (m1, m2) {
         // Results should have same labels (order may differ)
-        let labels1: std::collections::HashSet<_> = r1.labels().into_iter().collect();
-        let labels2: std::collections::HashSet<_> = r2.labels().into_iter().collect();
+        let labels1: std::collections::HashSet<_> = r1.head_labels().into_iter().collect();
+        let labels2: std::collections::HashSet<_> = r2.head_labels().into_iter().collect();
         assert_eq!(labels1, labels2);
     }
 }
