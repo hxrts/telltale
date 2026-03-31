@@ -91,17 +91,17 @@ The system eliminates these classes of bugs by construction. Each maps to a viol
 
 The conservation framework is realized through a closed set of semantic objects. All protocol-visible language features must lower to these objects or to pure structural session terms. If a feature cannot be reduced to this semantic core, it is not admitted as part of the model.
 
-| Object | Role |
-|---|---|
-| `Region` | Locality and framing domain for structured coordination |
-| `OperationInstance` | Stable identity for one semantic operation across retries, handoff, and replay |
-| `OutstandingEffect` | One unresolved capability invocation with explicit lifecycle state |
-| `SemanticHandoff` | Explicit transfer of responsibility and authority between actors |
-| `AuthoritativeRead` | Proof-carrying read surface that may support semantic commitment |
-| `ObservedRead` | Non-authoritative read surface for rendering, diagnostics, or advisory logic |
-| `MaterializationProof` | Typed proof that a canonical artifact has been materially established |
-| `CanonicalHandle` | Non-forgeable reference obtained from authoritative materialization |
-| `ProgressContract` | Explicit liveness and budget contract governing waits and escalation |
+| Object | Role | Capability class |
+|---|---|---|
+| `Region` | Locality and framing domain for structured coordination | structural context |
+| `OperationInstance` | Stable identity for one semantic operation across retries, handoff, and replay | identity carrier |
+| `OutstandingEffect` | One unresolved capability invocation with explicit lifecycle state | commitment/evidence support |
+| `SemanticHandoff` | Explicit transfer of responsibility and authority between actors | `transition` |
+| `AuthoritativeRead` | Proof-carrying read surface that may support semantic commitment | `evidence` |
+| `ObservedRead` | Non-authoritative read surface for rendering, diagnostics, or advisory logic | `evidence` |
+| `MaterializationProof` | Typed proof that a canonical artifact has been materially established | `evidence` |
+| `CanonicalHandle` | Non-forgeable reference obtained from authoritative materialization | `evidence` |
+| `ProgressContract` | Explicit liveness and budget contract governing waits and escalation | premise/commitment support |
 
 These objects are first-class in the Lean formalization, represented canonically in Rust, and referenced in the protocol machine semantic audit surface. See [Protocol Machine Architecture](12_protocol_machine_architecture.md) for the runtime accessors and [Lean Verification](23_lean_verification.md) for the proof surfaces.
 

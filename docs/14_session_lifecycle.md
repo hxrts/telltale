@@ -48,6 +48,12 @@ Default runtime rules:
 - rollback is claim-specific, so failing one staged transfer does not tear down unrelated ownership state
 - fragment-scoped ownership attenuates authority and does not imply full-session mutation rights
 
+In the canonical capability taxonomy, this lifecycle section spans:
+
+- `ownership` capability state for the live owner
+- `transition` lifecycle state for transfer receipts and semantic handoff
+- `evidence` lifecycle state for readiness, cancellation, and timeout witnesses
+
 ## Ownership Failure Mapping
 
 Ownership failures map into session terminal behavior as follows.

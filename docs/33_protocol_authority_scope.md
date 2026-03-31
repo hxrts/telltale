@@ -7,6 +7,11 @@ The goal is to move more protocol-critical correctness into the
 protocol machine/DSL/theory boundary without turning Telltale into a general-purpose
 application runtime.
 
+Scope boundary:
+
+- first-class protocol-critical capability semantics are in scope
+- general host application authorization is out of scope
+
 ## Classification
 
 ### Move Into The Telltale Protocol-Machine/Effect Layer

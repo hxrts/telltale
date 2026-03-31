@@ -230,6 +230,52 @@ fn authority_language_source_derived_support_matrix_matches_fixture_statuses() {
 }
 
 #[test]
+fn capability_scope_docs_keep_general_host_auth_out_of_scope() {
+    let inventory = read_doc("docs/32_testing_verification_inventory.md");
+    let authority_scope = read_doc("docs/33_protocol_authority_scope.md");
+    let authority_evidence = read_doc("docs/35_protocol_authority_evidence.md");
+    let effect_bridge = read_doc("docs/11_effect_session_bridge.md");
+
+    for (name, doc) in [
+        ("verification inventory", inventory.as_str()),
+        ("authority scope", authority_scope.as_str()),
+        ("authority evidence", authority_evidence.as_str()),
+    ] {
+        let lower = doc.to_ascii_lowercase();
+        assert!(
+            lower.contains("general host application authorization is out of scope"),
+            "{name} doc must explicitly keep general host application authorization out of scope"
+        );
+    }
+
+    assert!(
+        effect_bridge.contains("It is not a\ngeneral host authorization framework.")
+            || effect_bridge.contains("It is not a general host authorization framework."),
+        "effect/session bridge doc must explicitly reject host-authorization scope creep"
+    );
+}
+
+#[test]
+fn authority_evidence_doc_keeps_language_capability_mapping_table_in_sync() {
+    let doc = read_doc("docs/35_protocol_authority_evidence.md");
+    assert!(
+        doc.contains("| DSL form | Capability class | Lifecycle emphasis |"),
+        "authority/evidence doc must carry the language capability mapping table"
+    );
+
+    for row in [
+        "| `authoritative let x = check ...` | `evidence` | issued -> consumed/rejected |",
+        "| `observe let x = observe ...` | `evidence` | observed-only input, never canonical directly |",
+        "| `let receipt = transfer ...` | `transition` | issued -> committed/rolled_back/rejected/invalidated |",
+        "| `publish witness as Publication` | `evidence` | authoritative -> published |",
+        "| `materialize proof from Publication` | `evidence` | materialized/rejected |",
+        "| `handoff op to Role with receipt` | `transition` | committed/rolled_back/invalidated |",
+    ] {
+        assert_contains_row(&doc, row);
+    }
+}
+
+#[test]
 fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
     let doc = read_doc("docs/32_testing_verification_inventory.md");
 
@@ -242,6 +288,8 @@ fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
         "## Compiler and Macro Claim Boundary",
         "the current public formal-verification claim does not include any Rust parser,",
         "`tell!` macro expansion are outside the formal claim",
+        "First-class protocol-critical capability semantics are in scope.",
+        "General host application authorization is out of scope.",
     ] {
         assert!(
             doc.contains(needle),

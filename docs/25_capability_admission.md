@@ -10,6 +10,7 @@ Within the broader first-class protocol-critical capability model, admission is
 only one class beside ownership, evidence, and transition capability surfaces.
 Admission decides whether execution is allowed in principle. It does not itself
 prove current session authority or canonical semantic truth.
+It also does not provide a general-purpose application authorization system.
 
 ## Gate Layers
 

@@ -39,6 +39,9 @@ into four classes:
 
 The source-of-truth Rust and Lean boundaries for that taxonomy are
 `rust/machine/src/capabilities.rs` and `lean/Runtime/Proofs/Capabilities.lean`.
+The bridge-facing strict correspondence surface for the first-class
+capability/finalization model is `rust/bridge/tests/capability_model_correspondence.rs`
+against `inspectCapabilityModel` in the Lean runner.
 
 The canonical round model is one semantic step when concurrency is nonzero. Threaded execution is admitted as an extension only when the wave certificate gate is satisfied.
 

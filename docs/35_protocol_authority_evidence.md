@@ -7,6 +7,8 @@ how evidence-bearing decisions are expected to behave.
 
 Telltale owns protocol-critical authority flow. It does not own arbitrary host
 application state.
+More concretely: first-class protocol-critical capability semantics are in
+scope; general host application authorization is out of scope.
 
 Use Telltale authority/evidence features when:
 
@@ -161,6 +163,17 @@ handoff acceptInvite to Worker with receipt
 
 Receipts and transfer-like bindings are linear and must be consumed exactly
 once.
+
+Capability-class mapping for the language surface:
+
+| DSL form | Capability class | Lifecycle emphasis |
+|---|---|---|
+| `authoritative let x = check ...` | `evidence` | issued -> consumed/rejected |
+| `observe let x = observe ...` | `evidence` | observed-only input, never canonical directly |
+| `let receipt = transfer ...` | `transition` | issued -> committed/rolled_back/rejected/invalidated |
+| `publish witness as Publication` | `evidence` | authoritative -> published |
+| `materialize proof from Publication` | `evidence` | materialized/rejected |
+| `handoff op to Role with receipt` | `transition` | committed/rolled_back/invalidated |
 
 The runtime follows the same linear rule for timeout and cancellation
 evidence. Timeout expiry is modeled as a state transition on the exact stored

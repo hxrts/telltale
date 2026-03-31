@@ -9,6 +9,10 @@ It is centered on typed `EffectRequest` and `EffectOutcome` values.
 Use this document when integrating Telltale into another execution environment.
 Use [Choreography Effect Handlers](09_effect_handlers.md) when implementing async handlers for generated choreography code.
 
+This bridge is for protocol-critical capability and evidence flow. It is not a
+general host authorization framework. Arbitrary application auth, policy, and
+resource-permission systems remain outside this boundary.
+
 ## Three-Layer Contract
 
 Telltale uses three layers.

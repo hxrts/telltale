@@ -27,6 +27,7 @@ lean_correspondence_strict_suites=(
   rust/bridge/tests/protocol_bundle_admission_contracts.rs
   rust/bridge/tests/protocol_machine_correspondence_tests.rs
   rust/bridge/tests/protocol_machine_differential_steps.rs
+  rust/bridge/tests/capability_model_correspondence.rs
   rust/simulator/tests/lean_reference_parity.rs
 )
 

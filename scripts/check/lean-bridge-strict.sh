@@ -60,4 +60,8 @@ echo "run strict protocol-machine differential-step corpus"
 TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
   cargo test -p telltale-bridge --test protocol_machine_differential_steps -- --nocapture
 
+echo "run strict capability-model correspondence corpus"
+TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER=1 \
+  cargo test -p telltale-bridge --test capability_model_correspondence -- --nocapture
+
 echo "lean-bridge-strict: ok"

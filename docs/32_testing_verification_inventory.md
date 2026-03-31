@@ -27,7 +27,7 @@ The numeric rows in this section are source-derived and checked by
 | Property buckets with executable assurance suites | 22 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Lean-backed correspondence strict suites | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
+| Lean-backed correspondence strict suites | 7 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Identity and replay semantic assurance suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Commitment and progress semantic assurance suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Cross-mode semantic parity suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
@@ -81,6 +81,9 @@ The current proved or proof-backed claimed surface is:
   `Runtime` models and theorem libraries
 - the strict Rust↔Lean correspondence corpora and comparison contracts tracked
   in the Lean correspondence rows below
+- the first-class protocol-critical capability/finalization/transition model
+  carried by the Lean capability-model surface and its strict Rust↔Lean bridge
+  correspondence suite
 - the packaged first-party crates and binaries only at the level of
   operationally checked artifact/release assurance, not full mechanized proof
 
@@ -131,6 +134,9 @@ remain explicit external assumptions.
 
 ## Out of Scope / Assumption Boundaries
 
+First-class protocol-critical capability semantics are in scope.
+General host application authorization is out of scope.
+
 The current public claim does not include:
 
 - Rust parser/lowering/projection/import-export and `tell!` macro expansion
@@ -140,6 +146,8 @@ The current public claim does not include:
   the documented operational checks
 - cryptographic hardness assumptions beyond standard SHA-256-style assumptions
 - a blanket claim that every shipped Rust code path is mechanically proved
+- general host application authorization or arbitrary app-policy capability
+  systems unrelated to protocol-critical semantics
 
 ## Final Surface Audit
 
@@ -238,9 +246,9 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 
 | Property bucket | Executable status | High-signal suites | Current note |
 |---|---|---|---|
-| Evidence | Spot checks | `rust/machine/tests/ownership_contracts.rs`, `rust/machine/tests/conformance_lean.rs` | Evidence-bearing paths are exercised directly in runtime and Lean-backed spot checks. The current theorem-focused authority slice starts from authoritative reads plus canonical publication/materialization rather than the whole authority lifecycle family |
-| Authority | Cross-path checks | `rust/machine/tests/ownership_contracts.rs`, `rust/simulator/tests/ownership_faults.rs` | The supported authority theorem slice is now explicit: evidence-bearing reads and canonical publication/materialization are justified at the semantic-object layer, while broader lifecycle surfaces still rely on the wider protocol-machine conservation theorems |
-| Lean correspondence | Strict executable validation checks | `rust/bridge/tests/lean_trace_validation.rs`, `rust/bridge/tests/property_tests.rs`, `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/bridge/tests/protocol_machine_correspondence_tests.rs`, `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/simulator/tests/lean_reference_parity.rs` | `validateTrace`, `validateSimulationTrace`, `runSimulation`, `verifyProtocolBundle`, deterministic reconfiguration-transition validation, epoch-aware multi-step reconfiguration phase validation, exact normalized simulator-trace parity, full protocol-machine event-stream parity, session-status parity, and step-indexed scheduler-state parity now execute in strict deterministic lanes for the supported corpus |
+| Evidence | Spot checks | `rust/machine/tests/ownership_contracts.rs`, `rust/machine/tests/conformance_lean.rs` | Evidence-bearing paths are exercised directly in runtime and Lean-backed spot checks. The current theorem-focused authority slice starts from authoritative reads plus canonical publication/materialization and the explicit finalization/canonical-handle subsystem rather than the whole authority lifecycle family |
+| Authority | Cross-path checks | `rust/machine/tests/ownership_contracts.rs`, `rust/simulator/tests/ownership_faults.rs` | The supported authority theorem slice is now explicit: evidence-bearing reads, transfer receipts, semantic handoff, and canonical publication/materialization are justified at the semantic-object and lifecycle layer, while broader host-policy lifecycle surfaces still rely on the wider protocol-machine conservation theorems |
+| Lean correspondence | Strict executable validation checks | `rust/bridge/tests/lean_trace_validation.rs`, `rust/bridge/tests/property_tests.rs`, `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/bridge/tests/protocol_machine_correspondence_tests.rs`, `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/bridge/tests/capability_model_correspondence.rs`, `rust/simulator/tests/lean_reference_parity.rs` | `validateTrace`, `validateSimulationTrace`, `runSimulation`, `verifyProtocolBundle`, deterministic reconfiguration-transition validation, epoch-aware multi-step reconfiguration phase validation, explicit capability/finalization/transition-model correspondence, exact normalized simulator-trace parity, full protocol-machine event-stream parity, session-status parity, and step-indexed scheduler-state parity now execute in strict deterministic lanes for the supported corpus |
 | Identity | Cross-path checks | `rust/machine/tests/serialization_replay.rs`, `rust/machine/tests/replay_persistence_identity.rs`, `rust/bridge/tests/semantic_object_roundtrip.rs`, `rust/bridge/tests/protocol_machine_cross_target_tests.rs`, `rust/bridge/tests/reconfiguration_recovery_harness.rs` | Replay, snapshot/restore, canonical fragment roundtrip, semantic-object identity, ownership-transfer replay artifacts, and bridge-exported reconfiguration snapshot identity are now checked as one differential family across multiple surfaces |
 | Commitment | Spot + path checks | `rust/machine/tests/unit/protocol_machine/tests_semantic_state.rs`, `rust/machine/tests/conformance_lean.rs`, `rust/machine/tests/threaded_equivalence.rs`, `rust/machine/src/runtime_contracts.rs` | Progress and terminalization are covered across runtime contracts, lifecycle harnesses, and cross-driver parity |
 | Commitment | Deterministic lifecycle harness | `rust/machine/src/engine/runtime_exec/semantic_state.rs` | Seeded lifecycle and adversarial corpus now exercise terminalization, invalidation, proof-gaps, and progress escalation as one semantic state machine |
