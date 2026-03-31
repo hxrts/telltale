@@ -12,7 +12,7 @@ Run `just artifact-check`. Then inspect `papers/artifact_manifest.json` and [Art
 
 ### 1. Rust Library
 
-The `rust/` project implements the operational model from the paper series. Protocols are written once with the `tell!` macro and projected to local session types, typed effect interfaces, and authority/evidence constructs for each role.
+The `rust/` project implements the operational model from the paper series. Protocols are written once with the `tell!` macro and projected to local session types, typed effect interfaces, and authority/evidence constructs for each role. The DSL features the following features:
 
 - Protocol machine for deterministic execution with session type enforcement
 - Declared effect boundaries where host logic implements generated Rust traits
@@ -32,16 +32,10 @@ The `papers/` directory contains manuscripts and [reproducibility documentation]
 
 ## Formal Verification
 
-Telltale is formally verified for the declared shipped surface documented in
-[docs/32_testing_verification_inventory.md](docs/32_testing_verification_inventory.md), under the
-listed public assumptions and trusted base.
+Telltale is formally verified for the shipped surface documented in
+[docs/32_testing_verification_inventory.md](docs/32_testing_verification_inventory.md), under the listed public assumptions and trusted base.
 
-That declared shipped surface includes the Lean semantics/theorems, the
-theorem-defined Rust↔Lean protocol-machine runtime correspondence core, the
-shipped first-party handler/transport contract boundary, and the shipped
-first-party crate artifacts through the audited artifact-correspondence
-pipeline. Rust compiler/macro entry paths and third-party integrations remain
-outside that formal claim unless stated otherwise in the verification inventory.
+The claim covers the Lean semantics and theorems, the theorem-defined Rust↔Lean core protocol-machine runtime correspondence, the shipped first-party handler and transport contract boundary, and the shipped first-party crate artifacts through the audited artifact-correspondence pipeline. Compiler, macro, and third-party integration paths are excluded unless the verification inventory says otherwise.
 
 ## Quick Start
 
