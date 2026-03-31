@@ -259,6 +259,14 @@ pub fn evaluate_contracts(
         failures
             .push("parity-critical semantic operations are missing progress contracts".to_string());
     }
+    if config.parity_progress_contracts
+        && !semantic_objects.parity_critical_operations_have_canonical_handles()
+    {
+        failures.push(
+            "parity-critical semantic operations are missing explicit canonical-handle paths"
+                .to_string(),
+        );
+    }
 
     if config.canonical_publication_uniqueness {
         let unique_publications = semantic_objects
@@ -272,8 +280,9 @@ pub fn evaluate_contracts(
     }
 
     if config.authoritative_observed_separation {
+        let finalization = semantic_objects.finalization();
         for observed in &semantic_objects.observed_reads {
-            if semantic_objects
+            if finalization
                 .require_authoritative_read(&observed.read_id)
                 .is_ok()
             {
@@ -282,9 +291,15 @@ pub fn evaluate_contracts(
                     observed.read_id
                 ));
             }
+            if !finalization.observed_read_is_noncanonical(&observed.read_id) {
+                failures.push(format!(
+                    "observed read `{}` reached canonical truth without explicit materialization",
+                    observed.read_id
+                ));
+            }
         }
         for authoritative in &semantic_objects.authoritative_reads {
-            if semantic_objects
+            if finalization
                 .require_authoritative_read(&authoritative.read_id)
                 .is_err()
             {
@@ -456,6 +471,21 @@ fn check_semantic_object_coherence(
             failures.push(format!(
                 "publication `{}` is proof-backed but missing a canonical handle",
                 publication.publication_id
+            ));
+        }
+    }
+
+    for operation in &semantic_objects.operation_instances {
+        if !operation.requires_explicit_finalization() {
+            continue;
+        }
+        let path = semantic_objects
+            .finalization()
+            .path_for_operation(operation);
+        if matches!(path.stage, telltale_machine::FinalizationStage::Observed) {
+            failures.push(format!(
+                "parity-critical operation `{}` remained on an observed-only path",
+                operation.operation_id
             ));
         }
     }

@@ -75,11 +75,11 @@ pub mod dsl {
             AgreementContract, AgreementEvidence, AgreementEvidenceKind, AgreementLevel,
             AgreementProfile, AgreementRule, AgreementState, AuthoritativeRead,
             AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-            CanonicalHandleKind, DelegationStatus, FinalizationOutcome, MaterializationProof,
-            ObservedRead, OperationInstance, OperationPhase, OperationVisibility,
-            OutstandingEffectStatus, OwnershipScope, PrestateBinding, ProgressContract,
-            ProgressState, PublicationEvent, PublicationObserverClass, PublicationStatus,
-            SemanticHandoff,
+            CanonicalHandleKind, DelegationStatus, FinalizationOutcome, FinalizationPath,
+            FinalizationReadClass, FinalizationStage, MaterializationProof, ObservedRead,
+            OperationInstance, OperationPhase, OperationVisibility, OutstandingEffectStatus,
+            OwnershipScope, PrestateBinding, ProgressContract, ProgressState, PublicationEvent,
+            PublicationObserverClass, PublicationStatus, SemanticHandoff,
         };
     }
 

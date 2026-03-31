@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cfg_if::cfg_if;
 use telltale_machine::coroutine::Value;
-use telltale_machine::instr::{ImmValue, Instr};
+use telltale_machine::instr::{Endpoint, ImmValue, Instr};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
@@ -17,9 +17,11 @@ use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
     protocol_machine_semantic_objects, run_loaded_protocol_machine_record_replay_conformance,
-    AuthoritativeReadKind, CanonicalHandleKind, DelegationStatus, Edge, OperationInstance,
-    OperationPhase, OwnershipError, OwnershipScope, ProgressState, ProtocolMachine,
-    ProtocolMachineConfig, PublicationStatus, SemanticAuditRecord, SessionHostMutation,
+    AuthoritativeReadKind, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
+    CanonicalHandleKind, DelegationAuditRecord, DelegationReceipt, DelegationStatus, Edge,
+    FinalizationReadClass, FinalizationStage, OperationInstance, OperationPhase, OutstandingEffect,
+    OwnershipError, OwnershipScope, ProgressState, ProtocolMachine, ProtocolMachineConfig,
+    PublicationStatus, ReadinessWitness, SemanticAuditRecord, SessionHostMutation,
 };
 use telltale_types::{GlobalType, LocalTypeR, ValType};
 use test_support::simple_send_recv_image;
@@ -339,6 +341,112 @@ fn ownership_observed_reads_are_rejected_on_semantic_paths() {
         .require_authoritative_read(&observed.read_id)
         .expect_err("observational reads must be rejected on semantic paths");
     assert!(err.to_string().contains("observed read"));
+    assert!(
+        machine
+            .semantic_objects()
+            .finalization()
+            .observed_read_is_noncanonical(&observed.read_id),
+        "observed reads must stay non-canonical until explicit proof-bearing materialization"
+    );
+}
+
+#[test]
+fn ownership_finalization_path_marks_observed_only_results_noncanonical() {
+    let objects = protocol_machine_semantic_objects(
+        &[],
+        &[],
+        &[OperationInstance {
+            operation_id: "effect:1".to_string(),
+            session: Some(1),
+            owner_id: Some("runtime/owner".to_string()),
+            kind: "readChannel".to_string(),
+            phase: OperationPhase::Succeeded,
+            handler_identity: Some("host/runtime".to_string()),
+            effect_ids: vec![7],
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: None,
+            budget_ticks: Some(1),
+            requires_proof: false,
+        }],
+        &[OutstandingEffect {
+            effect_id: 7,
+            operation_id: "effect:1".to_string(),
+            session: Some(1),
+            owner_id: Some("runtime/owner".to_string()),
+            effect_interface: Some("runtime/io".to_string()),
+            effect_operation: Some("read".to_string()),
+            effect_kind: "read".to_string(),
+            handler_identity: "host/runtime".to_string(),
+            status: telltale_machine::OutstandingEffectStatus::Succeeded,
+            ordering_key: 1,
+            budget_ticks: Some(1),
+            retry_policy: "never".to_string(),
+            invalidation_token: "inv#1".to_string(),
+            completed_at_tick: Some(1),
+            inputs: serde_json::json!({}),
+            outputs: serde_json::json!({"value": "ok"}),
+        }],
+        &[],
+        &[],
+        &[],
+    );
+
+    let path = objects
+        .finalization()
+        .path_for_operation_id("effect:1")
+        .expect("finalization path");
+    assert_eq!(path.read_class, FinalizationReadClass::ObservedOnly);
+    assert_eq!(path.stage, FinalizationStage::Observed);
+    assert_eq!(path.observed_read_ids, vec!["effect:7".to_string()]);
+}
+
+#[test]
+fn ownership_finalization_path_marks_authoritative_reads_explicitly() {
+    let witness = ReadinessWitness {
+        witness_id: 7,
+        session_id: 1,
+        owner_id: "runtime/owner".to_string(),
+        generation: 0,
+        scope: OwnershipScope::Session,
+        predicate_ref: "session.ready".to_string(),
+    };
+    let objects = protocol_machine_semantic_objects(
+        &[AuthorityAuditRecord {
+            tick: Some(1),
+            event: AuthorityAuditEvent::Issued,
+            artifact: AuthorityArtifact::Readiness(witness),
+            reason: None,
+        }],
+        &[],
+        &[OperationInstance {
+            operation_id: "gate:1".to_string(),
+            session: Some(1),
+            owner_id: Some("runtime/owner".to_string()),
+            kind: "gate".to_string(),
+            phase: OperationPhase::Succeeded,
+            handler_identity: Some("host/runtime".to_string()),
+            effect_ids: Vec::new(),
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: None,
+            budget_ticks: Some(1),
+            requires_proof: false,
+        }],
+        &[],
+        &[],
+        &[],
+        &[],
+    );
+
+    let path = objects
+        .finalization()
+        .path_for_operation_id("gate:1")
+        .expect("finalization path");
+    assert_eq!(path.read_class, FinalizationReadClass::AuthoritativeOnly);
+    assert_eq!(path.stage, FinalizationStage::Authoritative);
+    assert_eq!(
+        path.authoritative_read_ids,
+        vec!["readiness:7:Issued".to_string()]
+    );
 }
 
 #[test]
@@ -374,6 +482,15 @@ fn ownership_proof_bearing_success_is_enforced_for_publication() {
         publication.reason.as_deref(),
         Some("proof-bearing success required")
     );
+    let path = objects
+        .finalization()
+        .path_for_operation_id("accept:1")
+        .expect("finalization path");
+    assert_eq!(path.stage, FinalizationStage::Rejected);
+    assert_eq!(
+        path.rejected_publication_ids,
+        vec![publication.publication_id.clone()]
+    );
 }
 
 #[test]
@@ -388,6 +505,21 @@ fn ownership_canonical_handle_is_required_on_parity_critical_paths() {
         .canonical_handles
         .first()
         .expect("successful output-condition checks should yield a canonical handle");
+    let operation = semantic_objects
+        .operation_instances
+        .iter()
+        .find(|operation| operation.operation_id.starts_with("materialization:"))
+        .expect("materialization operation");
+    let path = semantic_objects
+        .finalization()
+        .path_for_operation(operation);
+    assert_eq!(path.stage, FinalizationStage::Canonical);
+    assert!(
+        path.canonical_handle_ids
+            .iter()
+            .any(|id| id == &handle.handle_id),
+        "materialized canonical path should carry the issued canonical handle"
+    );
     let bound = machine
         .require_canonical_handle(&handle.handle_id)
         .expect("existing canonical handle must bind");
@@ -397,6 +529,70 @@ fn ownership_canonical_handle_is_required_on_parity_critical_paths() {
         .require_canonical_handle("materialization:missing")
         .expect_err("missing canonical handles must be rejected");
     assert!(err.to_string().contains("canonical handle"));
+}
+
+#[test]
+fn ownership_handoff_invalidates_finalization_path_for_affected_operations() {
+    let objects = protocol_machine_semantic_objects(
+        &[],
+        &[DelegationAuditRecord {
+            tick: 9,
+            receipt: DelegationReceipt {
+                receipt_id: 9,
+                session: 1,
+                endpoint: Endpoint {
+                    sid: 1,
+                    role: "A".to_string(),
+                },
+                from_coro: 0,
+                to_coro: 1,
+                scope: OwnershipScope::Fragments(BTreeSet::from(["A".to_string()])),
+            },
+            status: telltale_machine::DelegationStatus::Committed,
+            reason: None,
+        }],
+        &[OperationInstance {
+            operation_id: "effect:1".to_string(),
+            session: Some(1),
+            owner_id: Some("runtime/owner".to_string()),
+            kind: "receive".to_string(),
+            phase: OperationPhase::Blocked,
+            handler_identity: Some("host/runtime".to_string()),
+            effect_ids: vec![7],
+            dependent_operation_ids: Vec::new(),
+            terminal_publication: None,
+            budget_ticks: Some(9),
+            requires_proof: false,
+        }],
+        &[OutstandingEffect {
+            effect_id: 7,
+            operation_id: "effect:1".to_string(),
+            session: Some(1),
+            owner_id: Some("runtime/owner".to_string()),
+            effect_interface: Some("runtime/io".to_string()),
+            effect_operation: Some("recv".to_string()),
+            effect_kind: "recv".to_string(),
+            handler_identity: "host/runtime".to_string(),
+            status: telltale_machine::OutstandingEffectStatus::Invalidated,
+            ordering_key: 9,
+            budget_ticks: Some(9),
+            retry_policy: "never".to_string(),
+            invalidation_token: "handoff#9".to_string(),
+            completed_at_tick: Some(9),
+            inputs: serde_json::json!({}),
+            outputs: serde_json::json!({}),
+        }],
+        &[],
+        &[],
+        &[],
+    );
+
+    let path = objects
+        .finalization()
+        .path_for_operation_id("effect:1")
+        .expect("finalization path");
+    assert_eq!(path.stage, FinalizationStage::Invalidated);
+    assert_eq!(path.invalidated_by_handoff_ids, vec![9]);
 }
 
 #[test]

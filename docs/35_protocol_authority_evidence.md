@@ -78,6 +78,32 @@ The rows below are source-derived and checked against
 | `semantic_handoff` | `transition` | `committed`, `rolled_back`, `rejected`, `invalidated` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Represents explicit protocol-visible authority transfer and old-owner revocation. |
 | `reconfiguration_transition` | `transition` | `issued`, `committed`, `rolled_back`, `rejected` | `rust/machine/src/composition.rs` | `lean/Runtime/Proofs/ReconfigurationObserver.lean` | Captures protocol-critical cutover and membership/runtime transition artifacts. |
 
+## First-Class Finalization Subsystem
+
+Canonical protocol truth is also modeled explicitly rather than inferred from
+scattered helper methods. The runtime derives one stable finalization view from
+the semantic-object bundle:
+
+- `ProtocolMachineFinalization`
+- `FinalizationPath`
+- `FinalizationReadClass`
+- `FinalizationStage`
+
+This is the claim-critical boundary between provisional observation and
+canonical protocol truth:
+
+| Stage | Meaning |
+|---|---|
+| `observed` | only observational reads/effects exist; nothing canonical may be consumed |
+| `authoritative` | typed authoritative evidence exists, but no proof-bearing materialization has succeeded yet |
+| `materialized` | proof-bearing success exists, but canonical publication/handle pairing is not complete yet |
+| `canonical` | proof-bearing publication plus canonical handle make the path consumable as protocol truth |
+| `invalidated` | an explicit handoff or transition revoked the path before canonical reuse |
+| `rejected` | proof-bearing publication or repair failed and the path stays non-canonical |
+
+Observed reads may never become canonical truth directly. They must pass
+through the explicit evidence and materialization path first.
+
 ## Language Shape
 
 The current language surface uses a small set of explicit forms:

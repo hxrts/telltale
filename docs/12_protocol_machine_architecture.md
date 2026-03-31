@@ -15,6 +15,20 @@ The canonical exported semantic surface is the semantic-object family:
 `CanonicalHandle`, `PublicationEvent`, `ProgressContract`, and
 `ProgressTransition`.
 
+Canonicalization is not implicit in those object lists. The runtime derives a
+first-class finalization subsystem from them in
+`rust/machine/src/semantic_objects.rs`:
+
+- `ProtocolMachineFinalization`
+- `FinalizationPath`
+- `FinalizationReadClass`
+- `FinalizationStage`
+
+That subsystem is the explicit runtime boundary between provisional
+observation, authoritative evidence, proof-bearing materialization, canonical
+publication/handle issuance, invalidation after handoff, and rejected
+publication paths.
+
 The first-class protocol-critical capability boundary is intentionally split
 into four classes:
 

@@ -172,6 +172,28 @@ pub enum FinalizationOutcome {
     TimedOut,
 }
 
+/// Read-side classification for one derived finalization path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinalizationReadClass {
+    None,
+    ObservedOnly,
+    AuthoritativeOnly,
+    Mixed,
+}
+
+/// Canonicalization stage for one derived finalization path.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FinalizationStage {
+    Observed,
+    Authoritative,
+    Materialized,
+    Canonical,
+    Invalidated,
+    Rejected,
+}
+
 /// Ownership scope carried by the canonical semantic-object family.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OwnershipScope {
@@ -469,6 +491,43 @@ pub struct ProgressTransition {
     pub reason: Option<String>,
 }
 
+/// Explicit derived finalization view for one protocol-critical operation path.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct FinalizationPath {
+    pub operation_id: String,
+    pub session: Option<SessionId>,
+    pub owner_id: Option<FragmentOwnerId>,
+    pub read_class: FinalizationReadClass,
+    pub stage: FinalizationStage,
+    pub observed_read_ids: Vec<String>,
+    pub authoritative_read_ids: Vec<String>,
+    pub proof_ids: Vec<String>,
+    pub canonical_handle_ids: Vec<String>,
+    pub publication_ids: Vec<String>,
+    pub invalidated_by_handoff_ids: Vec<u64>,
+    pub rejected_publication_ids: Vec<String>,
+}
+
+/// Stable claim-critical finalization subsystem derived from semantic objects.
+#[derive(Debug, Clone, Copy)]
+pub struct ProtocolMachineFinalization<'a> {
+    objects: &'a ProtocolMachineSemanticObjects,
+}
+
+impl FinalizationPath {
+    /// Whether this path reaches canonical truth.
+    #[must_use]
+    pub fn is_canonical(&self) -> bool {
+        self.stage == FinalizationStage::Canonical
+    }
+
+    /// Whether this path is explicitly invalidated by a transfer/handoff.
+    #[must_use]
+    pub fn is_invalidated(&self) -> bool {
+        self.stage == FinalizationStage::Invalidated
+    }
+}
+
 impl PrestateBinding {
     #[must_use]
     pub fn binds_operation(&self, operation: &OperationInstance) -> bool {
@@ -601,6 +660,12 @@ impl OperationInstance {
     #[must_use]
     pub fn is_parity_critical(&self) -> bool {
         self.requires_proof || self.terminal_publication.is_some()
+    }
+
+    /// Whether the operation must traverse the explicit canonical finalization path.
+    #[must_use]
+    pub fn requires_explicit_finalization(&self) -> bool {
+        self.requires_proof || self.terminal_publication.as_deref() == Some("handoff.committed")
     }
 
     /// Whether commitment state and agreement state align on terminal truth.
@@ -779,29 +844,19 @@ impl Default for ProtocolMachineSemanticObjects {
 }
 
 impl ProtocolMachineSemanticObjects {
+    /// Stable derived finalization subsystem for protocol-critical truth transitions.
+    #[must_use]
+    pub const fn finalization(&self) -> ProtocolMachineFinalization<'_> {
+        ProtocolMachineFinalization { objects: self }
+    }
+
     /// Require one semantic-path read to be authoritative rather than observational.
     ///
     /// # Errors
     ///
     /// Returns a descriptive error when the read is observational or unknown.
     pub fn require_authoritative_read(&self, read_id: &str) -> Result<&AuthoritativeRead, String> {
-        if let Some(read) = self
-            .authoritative_reads
-            .iter()
-            .find(|read| read.read_id == read_id)
-        {
-            return Ok(read);
-        }
-        if self
-            .observed_reads
-            .iter()
-            .any(|read| read.read_id == read_id)
-        {
-            return Err(format!(
-                "observed read `{read_id}` may not be consumed on a semantic path; use an AuthoritativeRead instead"
-            ));
-        }
-        Err(format!("semantic read `{read_id}` is unknown"))
+        self.finalization().require_authoritative_read(read_id)
     }
 
     /// Require one strong canonical handle on a parity-critical path.
@@ -810,11 +865,22 @@ impl ProtocolMachineSemanticObjects {
     ///
     /// Returns a descriptive error when the handle is missing.
     pub fn require_canonical_handle(&self, handle_id: &str) -> Result<&CanonicalHandle, String> {
-        self.canonical_handles
+        self.finalization().require_canonical_handle(handle_id)
+    }
+
+    /// Whether every parity-critical operation has an explicit canonical handle path.
+    #[must_use]
+    pub fn parity_critical_operations_have_canonical_handles(&self) -> bool {
+        self.operation_instances
             .iter()
-            .find(|handle| handle.handle_id == handle_id)
-            .ok_or_else(|| {
-                format!("canonical handle `{handle_id}` is required on this parity-critical path")
+            .filter(|operation| operation.requires_explicit_finalization())
+            .all(|operation| {
+                let path = self.finalization().path_for_operation(operation);
+                !path.canonical_handle_ids.is_empty()
+                    || matches!(
+                        path.stage,
+                        FinalizationStage::Rejected | FinalizationStage::Invalidated
+                    )
             })
     }
 
@@ -886,7 +952,13 @@ impl ProtocolMachineSemanticObjects {
     /// Whether one operation has explicit finalization backing.
     #[must_use]
     pub fn finalization_backed(&self, operation: &OperationInstance) -> bool {
-        self.agreement_contracts.iter().any(|contract| {
+        matches!(
+            self.finalization().path_for_operation(operation).stage,
+            FinalizationStage::Materialized
+                | FinalizationStage::Canonical
+                | FinalizationStage::Rejected
+                | FinalizationStage::Invalidated
+        ) && self.agreement_contracts.iter().any(|contract| {
             contract.tracks_operation(operation)
                 && self.prestate_bindings.iter().any(|binding| {
                     self.agreement_evidence.iter().any(|evidence| {
@@ -896,6 +968,214 @@ impl ProtocolMachineSemanticObjects {
                     })
                 })
         })
+    }
+}
+
+impl<'a> ProtocolMachineFinalization<'a> {
+    /// Require one semantic-path read to be authoritative rather than observational.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive error when the read is observational or unknown.
+    pub fn require_authoritative_read(
+        &self,
+        read_id: &str,
+    ) -> Result<&'a AuthoritativeRead, String> {
+        if let Some(read) = self
+            .objects
+            .authoritative_reads
+            .iter()
+            .find(|read| read.read_id == read_id)
+        {
+            return Ok(read);
+        }
+        if self
+            .objects
+            .observed_reads
+            .iter()
+            .any(|read| read.read_id == read_id)
+        {
+            return Err(format!(
+                "observed read `{read_id}` may not be consumed on a canonical semantic path; materialize it through authoritative evidence first"
+            ));
+        }
+        Err(format!("semantic read `{read_id}` is unknown"))
+    }
+
+    /// Require one strong canonical handle on a parity-critical path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a descriptive error when the handle is missing.
+    pub fn require_canonical_handle(&self, handle_id: &str) -> Result<&'a CanonicalHandle, String> {
+        self.objects
+            .canonical_handles
+            .iter()
+            .find(|handle| handle.handle_id == handle_id)
+            .ok_or_else(|| {
+                format!("canonical handle `{handle_id}` is required on this parity-critical path")
+            })
+    }
+
+    /// Whether one observed read remains non-canonical unless an explicit proof-bearing path exists.
+    #[must_use]
+    pub fn observed_read_is_noncanonical(&self, read_id: &str) -> bool {
+        let Some(read) = self
+            .objects
+            .observed_reads
+            .iter()
+            .find(|candidate| candidate.read_id == read_id)
+        else {
+            return false;
+        };
+
+        let operation_id = self
+            .objects
+            .outstanding_effects
+            .iter()
+            .find(|effect| effect.effect_id == read.effect_id)
+            .map(|effect| effect.operation_id.as_str());
+
+        operation_id
+            .and_then(|operation_id| self.path_for_operation_id(operation_id))
+            .is_none_or(|path| !path.is_canonical())
+    }
+
+    /// Derive the explicit finalization path for one operation id.
+    #[must_use]
+    pub fn path_for_operation_id(&self, operation_id: &str) -> Option<FinalizationPath> {
+        self.objects
+            .operation_instances
+            .iter()
+            .find(|operation| operation.operation_id == operation_id)
+            .map(|operation| self.path_for_operation(operation))
+    }
+
+    /// Derive the explicit finalization path for one operation.
+    #[must_use]
+    pub fn path_for_operation(&self, operation: &OperationInstance) -> FinalizationPath {
+        let observed_read_ids: Vec<_> = self
+            .objects
+            .observed_reads
+            .iter()
+            .filter(|read| {
+                self.objects.outstanding_effects.iter().any(|effect| {
+                    effect.effect_id == read.effect_id
+                        && effect.operation_id == operation.operation_id
+                })
+            })
+            .map(|read| read.read_id.clone())
+            .collect();
+
+        let authoritative_read_ids: Vec<_> = self
+            .objects
+            .authoritative_reads
+            .iter()
+            .filter(|read| {
+                read.session == operation.session
+                    && (read.owner_id == operation.owner_id
+                        || operation.owner_id.is_none()
+                        || read.owner_id.is_none())
+            })
+            .map(|read| read.read_id.clone())
+            .collect();
+
+        let publications: Vec<_> = self
+            .objects
+            .publication_events
+            .iter()
+            .filter(|publication| publication.operation_id == operation.operation_id)
+            .collect();
+        let publication_ids: Vec<_> = publications
+            .iter()
+            .map(|publication| publication.publication_id.clone())
+            .collect();
+        let rejected_publication_ids: Vec<_> = publications
+            .iter()
+            .filter(|publication| publication.status == PublicationStatus::Rejected)
+            .map(|publication| publication.publication_id.clone())
+            .collect();
+
+        let mut proof_ids: Vec<_> = publications
+            .iter()
+            .filter_map(|publication| publication.proof_ref.clone())
+            .collect();
+        if let Some(proof_id) = operation.operation_id.strip_prefix("materialization:") {
+            push_unique(&mut proof_ids, proof_id.to_string());
+        }
+
+        let mut canonical_handle_ids: Vec<_> = publications
+            .iter()
+            .filter_map(|publication| publication.handle_ref.clone())
+            .collect();
+        for handle in &self.objects.canonical_handles {
+            if handle
+                .proof_ref
+                .as_ref()
+                .is_some_and(|proof_ref| proof_ids.contains(proof_ref))
+                || handle.handle_id == operation.operation_id
+            {
+                push_unique(&mut canonical_handle_ids, handle.handle_id.clone());
+            }
+        }
+
+        let invalidated_by_handoff_ids: Vec<_> = self
+            .objects
+            .transformation_obligations
+            .iter()
+            .filter(|obligation| {
+                obligation
+                    .affected_operation_ids
+                    .iter()
+                    .any(|operation_id| operation_id == &operation.operation_id)
+                    && (!obligation.invalidated_effect_ids.is_empty()
+                        || matches!(obligation.status, DelegationStatus::Committed))
+            })
+            .map(|obligation| obligation.handoff_id)
+            .collect();
+
+        let read_class = match (
+            observed_read_ids.is_empty(),
+            authoritative_read_ids.is_empty(),
+        ) {
+            (true, true) => FinalizationReadClass::None,
+            (false, true) => FinalizationReadClass::ObservedOnly,
+            (true, false) => FinalizationReadClass::AuthoritativeOnly,
+            (false, false) => FinalizationReadClass::Mixed,
+        };
+
+        let stage = if !invalidated_by_handoff_ids.is_empty() {
+            FinalizationStage::Invalidated
+        } else if !rejected_publication_ids.is_empty() {
+            FinalizationStage::Rejected
+        } else if publications.iter().any(|publication| {
+            publication.status == PublicationStatus::Published
+                && publication.proof_ref.is_some()
+                && publication.handle_ref.is_some()
+        }) {
+            FinalizationStage::Canonical
+        } else if !proof_ids.is_empty() {
+            FinalizationStage::Materialized
+        } else if !authoritative_read_ids.is_empty() {
+            FinalizationStage::Authoritative
+        } else {
+            FinalizationStage::Observed
+        };
+
+        FinalizationPath {
+            operation_id: operation.operation_id.clone(),
+            session: operation.session,
+            owner_id: operation.owner_id.clone(),
+            read_class,
+            stage,
+            observed_read_ids,
+            authoritative_read_ids,
+            proof_ids,
+            canonical_handle_ids,
+            publication_ids,
+            invalidated_by_handoff_ids,
+            rejected_publication_ids,
+        }
     }
 }
 

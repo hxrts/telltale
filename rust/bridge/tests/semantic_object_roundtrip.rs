@@ -103,4 +103,20 @@ fn semantic_object_schema_roundtrips_from_protocol_machine_objects() {
         decoded.operation_instances.len() >= decoded.outstanding_effects.len(),
         "semantic-object bridge schema should preserve operation/effect correspondence"
     );
+
+    let operation = machine
+        .semantic_objects()
+        .operation_instances
+        .iter()
+        .find(|operation| operation.operation_id.starts_with("materialization:"))
+        .expect("materialization operation")
+        .clone();
+    assert_eq!(
+        machine
+            .semantic_objects()
+            .finalization()
+            .path_for_operation(&operation),
+        decoded.finalization().path_for_operation(&operation),
+        "bridge roundtrip should preserve first-class finalization paths"
+    );
 }

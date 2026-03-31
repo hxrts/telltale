@@ -159,10 +159,9 @@ pub mod model {
     /// State-level session, ownership, and edge objects.
     pub mod state {
         pub use crate::capabilities::{
-            lean_first_class_capability_module_boundary,
-            protocol_critical_capability_boundary, rust_first_class_capability_module_boundary,
-            ProtocolCriticalCapabilityBoundaryEntry, ProtocolCriticalCapabilityClass,
-            ProtocolCriticalCapabilityLifecycleState,
+            lean_first_class_capability_module_boundary, protocol_critical_capability_boundary,
+            rust_first_class_capability_module_boundary, ProtocolCriticalCapabilityBoundaryEntry,
+            ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
         };
         pub use crate::engine::{ObsEvent, ProtocolMachineState};
         pub use crate::refinement::{
@@ -194,12 +193,14 @@ pub mod model {
             protocol_machine_semantic_objects, AgreementContract, AgreementEvidence,
             AgreementEvidenceKind, AgreementLevel, AgreementProfile, AgreementRule, AgreementState,
             AuthoritativeRead, AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle,
-            CanonicalHandleKind, DelegationStatus, FinalizationOutcome, MaterializationProof,
-            ObservedRead, OperationInstance, OperationPhase, OperationVisibility,
-            OutstandingEffect, OutstandingEffectStatus, OwnershipScope, PrestateBinding,
-            ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
-            PublicationEvent, PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
-            TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
+            CanonicalHandleKind, DelegationStatus, FinalizationOutcome, FinalizationPath,
+            FinalizationReadClass, FinalizationStage, MaterializationProof, ObservedRead,
+            OperationInstance, OperationPhase, OperationVisibility, OutstandingEffect,
+            OutstandingEffectStatus, OwnershipScope, PrestateBinding, ProgressContract,
+            ProgressState, ProgressTransition, ProtocolMachineFinalization,
+            ProtocolMachineSemanticObjects, PublicationEvent, PublicationObserverClass,
+            PublicationStatus, Region, SemanticHandoff, TransformationObligation,
+            SEMANTIC_OBJECTS_SCHEMA_VERSION,
         };
     }
 }
@@ -354,9 +355,10 @@ pub use semantic_objects::{
     protocol_machine_semantic_objects, AgreementContract, AgreementEvidence, AgreementEvidenceKind,
     AgreementLevel, AgreementProfile, AgreementRule, AgreementState, AuthoritativeRead,
     AuthoritativeReadKind, AuthoritativeReadLifecycle, CanonicalHandle, CanonicalHandleKind,
-    FinalizationOutcome, MaterializationProof, ObservedRead, OperationInstance, OperationPhase,
-    OperationVisibility, OutstandingEffect, OutstandingEffectStatus, PrestateBinding,
-    ProgressContract, ProgressState, ProgressTransition, ProtocolMachineSemanticObjects,
+    FinalizationOutcome, FinalizationPath, FinalizationReadClass, FinalizationStage,
+    MaterializationProof, ObservedRead, OperationInstance, OperationPhase, OperationVisibility,
+    OutstandingEffect, OutstandingEffectStatus, PrestateBinding, ProgressContract, ProgressState,
+    ProgressTransition, ProtocolMachineFinalization, ProtocolMachineSemanticObjects,
     PublicationEvent, PublicationObserverClass, PublicationStatus, Region, SemanticHandoff,
     TransformationObligation, SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
