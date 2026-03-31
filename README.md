@@ -32,7 +32,7 @@ The `papers/` directory contains manuscripts and [reproducibility documentation]
 
 ## Formal Verification
 
-Telltale is formally verified for the shipped surface documented in
+Telltale is formally verified for the declared shipped surface documented in
 [docs/32_testing_verification_inventory.md](docs/32_testing_verification_inventory.md), under the listed public assumptions and trusted base.
 
 The claim covers the Lean semantics and theorems, the theorem-defined Rust↔Lean core protocol-machine runtime correspondence, the shipped first-party handler and transport contract boundary, and the shipped first-party crate artifacts through the audited artifact-correspondence pipeline. Compiler, macro, and third-party integration paths are excluded unless the verification inventory says otherwise.
