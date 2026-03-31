@@ -662,22 +662,28 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     let canonical_handle = materialization.canonical_handle("handle#1", &materialization_proof);
     let semantic_handoff = handoff.semantic_handoff(9, 1, 0, 1);
 
+    assert_eq!(authoritative.binding_name, "witness");
     assert_eq!(authoritative.effect_interface, "Runtime");
     assert_eq!(authoritative.effect_operation, "ready");
     assert_eq!(
         authoritative_read.predicate_ref.as_deref(),
         Some("Runtime.ready")
     );
+    assert_eq!(observed.binding_name, "presence");
     assert_eq!(observed.effect_interface, "Runtime");
     assert_eq!(observed.effect_operation, "watchPresence");
     assert_eq!(observed_read.effect_id, 7);
+    assert_eq!(publication.publication_name, "AcceptedPublication");
     assert_eq!(publication_event.publication, "AcceptedPublication");
+    assert_eq!(materialization.proof_name, "acceptedProof");
+    assert_eq!(materialization.publication_name, "AcceptedPublication");
     assert_eq!(
         materialization_proof.witness_ref.as_deref(),
         Some("AcceptedPublication")
     );
     assert_eq!(canonical_handle.proof_ref.as_deref(), Some("proof#1"));
     assert_eq!(handoff.target_role, "Worker");
+    assert_eq!(handoff.receipt_name, "receipt");
     assert_eq!(semantic_handoff.activated_owner_id, "Worker");
     const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
     const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);

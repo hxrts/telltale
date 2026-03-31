@@ -41,6 +41,122 @@ pub enum ProtocolCriticalCapabilityLifecycleState {
     Expired,
 }
 
+/// Canonical first-class artifact carried by the capability/evidence lifecycle audit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProtocolCriticalCapabilityArtifact {
+    /// Live ownership capability for one session or fragment.
+    OwnershipCapability(crate::session::OwnershipCapability),
+    /// Explicit ownership-transfer receipt.
+    OwnershipReceipt(crate::session::OwnershipReceipt),
+    /// Readiness witness for one protocol-critical check.
+    ReadinessWitness(crate::session::ReadinessWitness),
+    /// Cancellation witness for one terminated ownership path.
+    CancellationWitness(crate::session::CancellationWitness),
+    /// Timeout witness for one topology timeout.
+    TimeoutWitness(crate::session::TimeoutWitness),
+    /// Explicit delegation/handoff receipt.
+    DelegationReceipt(crate::transfer_semantics::DelegationReceipt),
+}
+
+impl ProtocolCriticalCapabilityArtifact {
+    /// Canonical capability class for this artifact.
+    #[must_use]
+    pub fn class(&self) -> ProtocolCriticalCapabilityClass {
+        match self {
+            Self::OwnershipCapability(_) => ProtocolCriticalCapabilityClass::Ownership,
+            Self::OwnershipReceipt(_) | Self::DelegationReceipt(_) => {
+                ProtocolCriticalCapabilityClass::Transition
+            }
+            Self::ReadinessWitness(_) | Self::CancellationWitness(_) | Self::TimeoutWitness(_) => {
+                ProtocolCriticalCapabilityClass::Evidence
+            }
+        }
+    }
+}
+
+/// Stable lifecycle audit record for first-class capability/evidence objects.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProtocolCriticalCapabilityLifecycleRecord {
+    /// Runtime tick associated with the lifecycle event, when available.
+    pub tick: Option<u64>,
+    /// Artifact whose lifecycle changed.
+    pub artifact: ProtocolCriticalCapabilityArtifact,
+    /// Lifecycle state reached by the artifact.
+    pub lifecycle: ProtocolCriticalCapabilityLifecycleState,
+    /// Optional rejection/rollback/invalidity reason.
+    pub reason: Option<String>,
+}
+
+fn from_authority_audit_record(
+    record: &crate::session::AuthorityAuditRecord,
+) -> ProtocolCriticalCapabilityLifecycleRecord {
+    use crate::session::AuthorityArtifact;
+    let artifact = match &record.artifact {
+        AuthorityArtifact::OwnershipCapability(capability) => {
+            ProtocolCriticalCapabilityArtifact::OwnershipCapability(capability.clone())
+        }
+        AuthorityArtifact::OwnershipReceipt(receipt) => {
+            ProtocolCriticalCapabilityArtifact::OwnershipReceipt(receipt.clone())
+        }
+        AuthorityArtifact::Readiness(witness) => {
+            ProtocolCriticalCapabilityArtifact::ReadinessWitness(witness.clone())
+        }
+        AuthorityArtifact::Cancellation(witness) => {
+            ProtocolCriticalCapabilityArtifact::CancellationWitness(witness.clone())
+        }
+        AuthorityArtifact::Timeout(witness) => {
+            ProtocolCriticalCapabilityArtifact::TimeoutWitness(witness.clone())
+        }
+    };
+
+    ProtocolCriticalCapabilityLifecycleRecord {
+        tick: record.tick,
+        artifact,
+        lifecycle: record.event.into(),
+        reason: record.reason.clone(),
+    }
+}
+
+fn from_delegation_audit_record(
+    record: &crate::transfer_semantics::DelegationAuditRecord,
+) -> ProtocolCriticalCapabilityLifecycleRecord {
+    let lifecycle = match record.status {
+        crate::transfer_semantics::DelegationStatus::Committed => {
+            ProtocolCriticalCapabilityLifecycleState::Committed
+        }
+        crate::transfer_semantics::DelegationStatus::RolledBack => {
+            ProtocolCriticalCapabilityLifecycleState::RolledBack
+        }
+    };
+    ProtocolCriticalCapabilityLifecycleRecord {
+        tick: Some(record.tick),
+        artifact: ProtocolCriticalCapabilityArtifact::DelegationReceipt(record.receipt.clone()),
+        lifecycle,
+        reason: record.reason.clone(),
+    }
+}
+
+/// Canonical lifecycle audit log for protocol-critical capabilities/evidence.
+#[must_use]
+pub fn capability_lifecycle_audit_log_v1(
+    authority_audit_log: &[crate::session::AuthorityAuditRecord],
+    delegation_audit_log: &[crate::transfer_semantics::DelegationAuditRecord],
+) -> Vec<ProtocolCriticalCapabilityLifecycleRecord> {
+    let mut records: Vec<_> = authority_audit_log
+        .iter()
+        .map(from_authority_audit_record)
+        .chain(
+            delegation_audit_log
+                .iter()
+                .map(from_delegation_audit_record),
+        )
+        .collect();
+    // Preserve the real intra-tick linearization from the underlying runtime
+    // logs instead of reconstructing a synthetic lifecycle order.
+    records.sort_by_key(|record| record.tick.unwrap_or(0));
+    records
+}
+
 /// One source-derived row in the protocol-critical capability boundary ledger.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProtocolCriticalCapabilityBoundaryEntry {

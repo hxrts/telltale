@@ -220,6 +220,14 @@ impl ThreadedProtocolMachine {
         )
     }
 
+    /// Get canonical capability/evidence lifecycle audit records.
+    #[must_use]
+    pub fn capability_lifecycle_audit_log(
+        &self,
+    ) -> Vec<crate::ProtocolCriticalCapabilityLifecycleRecord> {
+        crate::capability_lifecycle_audit_log_v1(&[], &self.delegation_audit_log)
+    }
+
     /// Get canonical semantic objects derived from handoff, effect, and
     /// output-condition surfaces.
     #[must_use]

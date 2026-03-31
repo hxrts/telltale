@@ -1211,7 +1211,7 @@ fn test_lean_abort_policy_is_deterministic_and_scoped() {
         assert_eq!(machine.crashed_sites(), &before_crashed);
         assert_eq!(machine.partitioned_edges(), &before_partitioned);
         assert_eq!(machine.corrupted_edges(), &before_corrupted);
-        assert_eq!(machine.timed_out_sites(), &before_timed_out);
+        assert_eq!(machine.timed_out_sites(), before_timed_out);
         assert!(
             machine.trace().len() > before_trace_len,
             "abort step should append at least one observable event"

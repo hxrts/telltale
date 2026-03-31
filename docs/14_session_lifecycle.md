@@ -14,7 +14,7 @@ A session stores role membership, per-endpoint local types, directed buffers, ed
 | `edge_handlers` | Per-edge runtime handler binding |
 | `edge_traces`, auth fields | Coherence and authenticated trace material |
 | `status`, `epoch` | Lifecycle phase and close epoch counter |
-| ownership state | current owner capability, transfer-in-progress state, issued readiness witnesses, consumed witness ids, and terminal ownership reason |
+| ownership state | current owner capability, transfer-in-progress state, issued readiness/cancellation/timeout witnesses, consumed witness ids, and terminal ownership reason |
 
 The protocol machine also tracks communication replay-consumption state at runtime scope (`off`, `sequence`, `nullifier`). This state is keyed by session-qualified edges and contributes to canonical replay artifacts.
 
@@ -36,7 +36,7 @@ Session ownership is tracked separately from capability admission.
 | ownership generation | increments on transfer or scope attenuation so stale handles fail closed |
 | pending transfer receipt | explicit staged transfer that must commit or roll back |
 | readiness witness | single-use proof that a protocol-critical check succeeded under one live owner generation |
-| authority audit log | deterministic issuance/consumption history for readiness and cancellation witnesses |
+| authority audit log | deterministic issuance, consumption, invalidation, rollback, rejection, and expiry history for first-class ownership/receipt/witness objects |
 | terminal ownership reason | recorded reason when owner death or transfer failure forces cancellation or fault |
 
 Default runtime rules:
@@ -44,6 +44,7 @@ Default runtime rules:
 - at most one current owner exists for one active session ownership unit
 - transfer is explicit and uses a receipt
 - readiness witnesses are single-use and generation-bound
+- timeout activation stores and later expires the exact issued timeout witness rather than reconstructing timeout evidence from ambient clock state
 - rollback is claim-specific, so failing one staged transfer does not tear down unrelated ownership state
 - fragment-scoped ownership attenuates authority and does not imply full-session mutation rights
 
@@ -83,7 +84,7 @@ Deterministic ordering rules:
 
 These events are part of replay-visible observability. Host integrations should not reconstruct this ordering indirectly from final statuses.
 
-Canonical replay artifacts retain these lifecycle-visible events through `semantic_audit_log`. That surface also includes authority witness issuance/consumption and delegation completion records. Embedders and simulator harnesses should prefer the canonical semantic audit surface over custom post-hoc reconstruction from raw logs.
+Canonical replay artifacts retain these lifecycle-visible events through `semantic_audit_log`. That surface also includes authority witness issuance/consumption and delegation completion records. The stricter lifecycle export for protocol-critical ownership, receipt, and witness objects is `capability_lifecycle_audit_log()`. Embedders and simulator harnesses should prefer these canonical audit surfaces over custom post-hoc reconstruction from raw logs.
 Choreography-level `timeout ... on timeout ... on cancel ...` lowering maps its
 protocol-visible timeout and cancellation outcomes to this same explicit lifecycle
 event family.

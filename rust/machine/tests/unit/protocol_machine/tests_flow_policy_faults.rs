@@ -245,6 +245,12 @@
             other => panic!("expected timeout witness, got {other:?}"),
         }
         assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
+        let active_timeout = machine
+            .timeout_witnesses()
+            .get("A")
+            .expect("active timeout witness for A");
+        assert_eq!(active_timeout.witness_id, 0);
+        assert_eq!(active_timeout.until_tick, 21);
         assert!(machine.obs_trace().iter().any(|event| matches!(
             event,
             ObsEvent::TimeoutIssued {
@@ -253,6 +259,153 @@
                 ..
             } if site == "A"
         )));
+    }
+
+    #[test]
+    fn test_timeout_expiration_uses_the_same_issued_witness() {
+        let image = CodeImage {
+            programs: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), vec![Instr::Halt]);
+                m
+            },
+            global_type: GlobalType::End,
+            local_types: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), LocalTypeR::End);
+                m
+            },
+        };
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        let _ = machine
+            .step(&TimeoutOnTickOneHandler)
+            .expect("timeout topology ingress should not fault");
+
+        let issued = machine
+            .timeout_witnesses()
+            .get("A")
+            .expect("issued timeout witness")
+            .clone();
+        machine.clock.tick = issued.until_tick;
+        machine.prune_expired_timeouts();
+
+        assert!(
+            !machine.timeout_witnesses().contains_key("A"),
+            "expired witness should be removed from active timeout state"
+        );
+        let audit = machine.authority_audit_log();
+        assert_eq!(audit.len(), 2);
+        assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
+        assert_eq!(audit[1].event, AuthorityAuditEvent::Expired);
+        match &audit[1].artifact {
+            AuthorityArtifact::Timeout(expired) => assert_eq!(expired, &issued),
+            other => panic!("expected expired timeout witness, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_new_timeout_invalidates_prior_witness_before_replacement() {
+        struct TimeoutOnTickOneAndTwoHandler;
+
+        impl EffectHandler for TimeoutOnTickOneAndTwoHandler {
+            fn handle_send(
+                &self,
+                _role: &str,
+                _partner: &str,
+                _label: &str,
+                _state: &[Value],
+            ) -> EffectResult<Value> {
+                EffectResult::success(Value::Nat(1))
+            }
+
+            fn handle_recv(
+                &self,
+                _role: &str,
+                _partner: &str,
+                _label: &str,
+                _state: &mut Vec<Value>,
+                _payload: &Value,
+            ) -> EffectResult<()> {
+                EffectResult::success(())
+            }
+
+            fn handle_choose(
+                &self,
+                _role: &str,
+                _partner: &str,
+                labels: &[String],
+                _state: &[Value],
+            ) -> EffectResult<String> {
+                match labels.first().cloned() {
+                    Some(label) => EffectResult::success(label),
+                    None => {
+                        EffectResult::failure(EffectFailure::invalid_input("no labels available"))
+                    }
+                }
+            }
+
+            fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+                EffectResult::success(())
+            }
+
+            fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+                match tick {
+                    1 => EffectResult::success(vec![TopologyPerturbation::Timeout {
+                        site: "A".to_string(),
+                        duration: Duration::from_millis(20),
+                    }]),
+                    2 => EffectResult::success(vec![TopologyPerturbation::Timeout {
+                        site: "A".to_string(),
+                        duration: Duration::from_millis(40),
+                    }]),
+                    _ => EffectResult::success(Vec::new()),
+                }
+            }
+        }
+
+        let image = CodeImage {
+            programs: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), vec![Instr::Halt]);
+                m
+            },
+            global_type: GlobalType::End,
+            local_types: {
+                let mut m = BTreeMap::new();
+                m.insert("A".to_string(), LocalTypeR::End);
+                m
+            },
+        };
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine.load_choreography(&image).expect("load choreography");
+        let _ = machine
+            .step(&TimeoutOnTickOneAndTwoHandler)
+            .expect("first timeout ingress should not fault");
+        let first = machine
+            .timeout_witnesses()
+            .get("A")
+            .expect("first timeout witness")
+            .clone();
+        let _ = machine
+            .step(&TimeoutOnTickOneAndTwoHandler)
+            .expect("second timeout ingress should not fault");
+
+        let audit = machine.authority_audit_log();
+        assert_eq!(audit.len(), 3);
+        assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
+        assert_eq!(audit[1].event, AuthorityAuditEvent::Invalidated);
+        assert_eq!(audit[2].event, AuthorityAuditEvent::Issued);
+        match &audit[1].artifact {
+            AuthorityArtifact::Timeout(invalidated) => assert_eq!(invalidated, &first),
+            other => panic!("expected invalidated timeout witness, got {other:?}"),
+        }
+        let active = machine
+            .timeout_witnesses()
+            .get("A")
+            .expect("replacement timeout witness");
+        assert_ne!(active.witness_id, first.witness_id);
+        assert_eq!(active.until_tick, 42);
     }
 
     #[test]

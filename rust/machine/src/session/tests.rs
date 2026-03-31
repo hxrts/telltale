@@ -634,11 +634,13 @@
         );
 
         let audit = store.authority_audit_log(sid).expect("authority audit log");
-        assert_eq!(audit.len(), 3);
-        assert!(matches!(audit[0].artifact, AuthorityArtifact::Readiness(_)));
+        assert_eq!(audit.len(), 4);
+        assert!(matches!(audit[0].artifact, AuthorityArtifact::OwnershipCapability(_)));
         assert_eq!(audit[0].event, AuthorityAuditEvent::Issued);
-        assert_eq!(audit[1].event, AuthorityAuditEvent::Consumed);
-        assert_eq!(audit[2].event, AuthorityAuditEvent::Rejected);
+        assert!(matches!(audit[1].artifact, AuthorityArtifact::Readiness(_)));
+        assert_eq!(audit[1].event, AuthorityAuditEvent::Issued);
+        assert_eq!(audit[2].event, AuthorityAuditEvent::Consumed);
+        assert_eq!(audit[3].event, AuthorityAuditEvent::Rejected);
     }
 
     #[test]
@@ -865,6 +867,76 @@
                 claim_id: receipt2.claim_id,
                 reason: "commit witness missing".to_string(),
             })
+        );
+    }
+
+    #[test]
+    fn stale_and_forged_transfer_receipts_fail_closed_and_audit_rejection() {
+        let mut store = SessionStore::new();
+        let sid = store.open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &default_types(),
+        );
+        let owner = store
+            .claim_ownership(sid, "owner/a", OwnershipScope::Session)
+            .expect("claim ownership");
+        let receipt = store
+            .begin_ownership_transfer(&owner, "owner/b", OwnershipScope::Session)
+            .expect("stage transfer");
+
+        let _committed = store
+            .commit_ownership_transfer(&receipt)
+            .expect("commit transfer");
+
+        let reused = store
+            .commit_ownership_transfer(&receipt)
+            .expect_err("reused receipt must fail closed");
+        assert!(matches!(
+            reused,
+            OwnershipError::TransferNotPending { session_id } if session_id == sid
+        ));
+
+        let live_owner = store
+            .current_ownership(sid)
+            .expect("current owner after committed transfer")
+            .clone();
+        let staged = store
+            .begin_ownership_transfer(&live_owner, "owner/c", OwnershipScope::Session)
+            .expect("stage second transfer");
+        let forged = OwnershipReceipt {
+            claim_id: staged.claim_id.saturating_add(99),
+            ..staged.clone()
+        };
+        let mismatch = store
+            .rollback_ownership_transfer(&forged)
+            .expect_err("forged receipt must fail closed");
+        assert!(matches!(
+            mismatch,
+            OwnershipError::ReceiptMismatch {
+                session_id,
+                claim_id,
+                ..
+            } if session_id == sid && claim_id == forged.claim_id
+        ));
+
+        let audit = store.authority_audit_log(sid).expect("authority audit log");
+        let rejected_receipts: Vec<_> = audit
+            .iter()
+            .filter_map(|record| match (&record.artifact, record.event) {
+                (AuthorityArtifact::OwnershipReceipt(audit_receipt), AuthorityAuditEvent::Rejected) => {
+                    Some(audit_receipt.claim_id)
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            rejected_receipts.contains(&receipt.claim_id),
+            "reused receipt should emit a rejected audit record"
+        );
+        assert!(
+            rejected_receipts.contains(&forged.claim_id),
+            "forged receipt should emit a rejected audit record"
         );
     }
 

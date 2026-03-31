@@ -125,6 +125,7 @@ Runtime ownership details:
 
 - session-local host mutation flows through an ownership capability carrying owner label, generation, and scope
 - transfer is staged with explicit receipts
+- readiness, cancellation, and timeout witnesses are first-class runtime objects with explicit lifecycle transitions
 - delegation emits auditable transfer records
 - host assertion mode can reject transfer events that do not have matching committed audit records
 - language-level authority/evidence constructs must lower to these runtime
@@ -161,6 +162,8 @@ Runtime accessors:
 - `ProtocolMachine::semantic_audit_log()`
 - `ThreadedGuestRuntime::semantic_audit_log()`
 - `canonical_replay_fragment().semantic_audit_log`
+- `ProtocolMachine::capability_lifecycle_audit_log()`
+- `ThreadedGuestRuntime::capability_lifecycle_audit_log()`
 
 This keeps replay, simulator harnesses, and parity checks aligned on one derived semantic audit vocabulary.
 Language-level authority checks are expected to arrive at this same audit

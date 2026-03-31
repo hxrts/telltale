@@ -159,9 +159,11 @@ pub mod model {
     /// State-level session, ownership, and edge objects.
     pub mod state {
         pub use crate::capabilities::{
-            lean_first_class_capability_module_boundary, protocol_critical_capability_boundary,
-            rust_first_class_capability_module_boundary, ProtocolCriticalCapabilityBoundaryEntry,
-            ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
+            capability_lifecycle_audit_log_v1, lean_first_class_capability_module_boundary,
+            protocol_critical_capability_boundary, rust_first_class_capability_module_boundary,
+            ProtocolCriticalCapabilityArtifact, ProtocolCriticalCapabilityBoundaryEntry,
+            ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleRecord,
+            ProtocolCriticalCapabilityLifecycleState,
         };
         pub use crate::engine::{ObsEvent, ProtocolMachineState};
         pub use crate::refinement::{
@@ -287,9 +289,11 @@ pub use bridge::{
     PersistenceEffectBridge,
 };
 pub use capabilities::{
-    lean_first_class_capability_module_boundary, protocol_critical_capability_boundary,
-    rust_first_class_capability_module_boundary, ProtocolCriticalCapabilityBoundaryEntry,
-    ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
+    capability_lifecycle_audit_log_v1, lean_first_class_capability_module_boundary,
+    protocol_critical_capability_boundary, rust_first_class_capability_module_boundary,
+    ProtocolCriticalCapabilityArtifact, ProtocolCriticalCapabilityBoundaryEntry,
+    ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleRecord,
+    ProtocolCriticalCapabilityLifecycleState,
 };
 pub use clock::SimClock;
 pub use communication_replay::{

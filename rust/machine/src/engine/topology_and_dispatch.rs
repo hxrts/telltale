@@ -1,5 +1,5 @@
 impl ProtocolMachine {
-    fn issue_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
+    fn next_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
         let witness = TimeoutWitness {
             witness_id: self.next_authority_witness_id,
             site: site.to_string(),
@@ -7,6 +7,10 @@ impl ProtocolMachine {
             until_tick,
         };
         self.next_authority_witness_id = self.next_authority_witness_id.saturating_add(1);
+        witness
+    }
+
+    fn audit_issued_timeout_witness(&mut self, witness: &TimeoutWitness) {
         self.authority_audit_log.push(
             AuthorityAuditRecord {
                 tick: Some(self.clock.tick),
@@ -16,7 +20,6 @@ impl ProtocolMachine {
             },
             &self.config.observability_retention,
         );
-        witness
     }
 
     fn duration_to_ticks(&self, duration: Duration) -> u64 {
@@ -31,14 +34,24 @@ impl ProtocolMachine {
 
     fn prune_expired_timeouts(&mut self) {
         let tick = self.clock.tick;
-        let expired_roles: Vec<String> = self
+        let expired_witnesses: Vec<TimeoutWitness> = self
             .timed_out_sites
             .iter()
-            .filter_map(|(role, until_tick)| (*until_tick <= tick).then_some(role.clone()))
+            .filter_map(|(_, witness)| (witness.until_tick <= tick).then_some(witness.clone()))
             .collect();
-        if !expired_roles.is_empty() {
-            for role in &expired_roles {
-                self.timed_out_sites.remove(role);
+        if !expired_witnesses.is_empty() {
+            for witness in &expired_witnesses {
+                self.timed_out_sites.remove(&witness.site);
+                self.authority_audit_log.push(
+                    AuthorityAuditRecord {
+                        tick: Some(tick),
+                        artifact: AuthorityArtifact::Timeout(witness.clone()),
+                        event: AuthorityAuditEvent::Expired,
+                        reason: Some("timeout horizon elapsed".to_string()),
+                    },
+                    &self.config.observability_retention,
+                );
+                let role = &witness.site;
                 let coro_ids = self.role_coroutines.get(role).cloned().unwrap_or_default();
                 for coro_id in coro_ids {
                     self.timed_out_coro_ids.remove(&coro_id);
@@ -271,8 +284,20 @@ impl ProtocolMachine {
                     .clock
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
-                let witness = self.issue_timeout_witness(site, until_tick);
-                self.timed_out_sites.insert(site.clone(), until_tick);
+                let witness = self.next_timeout_witness(site, until_tick);
+                if let Some(previous) = self.timed_out_sites.remove(site) {
+                    self.authority_audit_log.push(
+                        AuthorityAuditRecord {
+                            tick: Some(self.clock.tick),
+                            artifact: AuthorityArtifact::Timeout(previous),
+                            event: AuthorityAuditEvent::Invalidated,
+                            reason: Some("replaced by newer timeout witness".to_string()),
+                        },
+                        &self.config.observability_retention,
+                    );
+                }
+                self.audit_issued_timeout_witness(&witness);
+                self.timed_out_sites.insert(site.clone(), witness.clone());
                 self.obs_trace.push(
                     ObsEvent::TimeoutIssued {
                         tick: self.clock.tick,

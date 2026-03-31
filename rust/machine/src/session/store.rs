@@ -317,6 +317,12 @@ impl SessionStore {
             scope,
         };
         session.ownership.current = Some(capability.clone());
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(capability.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
         Ok(capability)
     }
 
@@ -337,6 +343,12 @@ impl SessionStore {
                 claim_id: pending.receipt.claim_id,
             });
         }
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(capability.clone()),
+            AuthorityAuditEvent::Invalidated,
+            Some("ownership released".to_string()),
+        );
         session.ownership.current = None;
         Ok(())
     }
@@ -374,6 +386,12 @@ impl SessionStore {
         session.ownership.pending_transfer = Some(PendingOwnershipTransfer {
             receipt: receipt.clone(),
         });
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
         Ok(receipt)
     }
 
@@ -394,11 +412,23 @@ impl SessionStore {
             });
         };
         let Some(pending) = session.ownership.pending_transfer.as_ref() else {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("receipt is no longer pending".to_string()),
+            );
             return Err(OwnershipError::TransferNotPending {
                 session_id: receipt.session_id,
             });
         };
         if pending.receipt != *receipt {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("receipt payload mismatch".to_string()),
+            );
             return Err(OwnershipError::ReceiptMismatch {
                 session_id: receipt.session_id,
                 claim_id: receipt.claim_id,
@@ -419,8 +449,27 @@ impl SessionStore {
             generation: receipt.to_generation,
             scope: receipt.scope.clone(),
         };
+        let old_capability = current.clone();
         session.ownership.current = Some(capability.clone());
         session.ownership.pending_transfer = None;
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(old_capability),
+            AuthorityAuditEvent::Invalidated,
+            Some("ownership transferred".to_string()),
+        );
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+            AuthorityAuditEvent::Committed,
+            None,
+        );
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(capability.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
         Ok(capability)
     }
 
@@ -436,17 +485,35 @@ impl SessionStore {
         let session = self.session_mut_or_error(receipt.session_id)?;
         Self::ensure_mutable_ownership(session)?;
         let Some(pending) = session.ownership.pending_transfer.as_ref() else {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("receipt is no longer pending".to_string()),
+            );
             return Err(OwnershipError::TransferNotPending {
                 session_id: receipt.session_id,
             });
         };
         if pending.receipt != *receipt {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some("receipt payload mismatch".to_string()),
+            );
             return Err(OwnershipError::ReceiptMismatch {
                 session_id: receipt.session_id,
                 claim_id: receipt.claim_id,
             });
         }
         session.ownership.pending_transfer = None;
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+            AuthorityAuditEvent::RolledBack,
+            None,
+        );
         Ok(())
     }
 
@@ -474,7 +541,19 @@ impl SessionStore {
             generation: capability.generation.saturating_add(1),
             scope: new_scope,
         };
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(capability.clone()),
+            AuthorityAuditEvent::Invalidated,
+            Some("ownership scope attenuated".to_string()),
+        );
         session.ownership.current = Some(next.clone());
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(next.clone()),
+            AuthorityAuditEvent::Issued,
+            None,
+        );
         Ok(next)
     }
 
@@ -636,7 +715,7 @@ impl SessionStore {
     ) -> Result<CancellationWitness, OwnershipError> {
         let session = self.session_mut_or_error(sid)?;
         Self::ensure_mutable_ownership(session)?;
-        let Some(current) = session.ownership.current.as_ref() else {
+        let Some(current) = session.ownership.current.clone() else {
             return Err(OwnershipError::Unclaimed { session_id: sid });
         };
         if current.owner_id != owner_id {
@@ -664,6 +743,12 @@ impl SessionStore {
         session.ownership.current = None;
         session.ownership.pending_transfer = None;
         session.ownership.terminal_reason = Some(reason);
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipCapability(current),
+            AuthorityAuditEvent::Invalidated,
+            Some("owner died".to_string()),
+        );
         Self::push_authority_audit(
             session,
             AuthorityArtifact::Cancellation(witness.clone()),
@@ -707,9 +792,23 @@ impl SessionStore {
             generation: receipt.from_generation,
             reason: reason.clone(),
         };
+        if let Some(current) = session.ownership.current.clone() {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipCapability(current),
+                AuthorityAuditEvent::Invalidated,
+                Some("transfer abandoned".to_string()),
+            );
+        }
         session.ownership.current = None;
         session.ownership.pending_transfer = None;
         session.ownership.terminal_reason = Some(reason);
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+            AuthorityAuditEvent::RolledBack,
+            Some("transfer abandoned".to_string()),
+        );
         Self::push_authority_audit(
             session,
             AuthorityArtifact::Cancellation(witness.clone()),
@@ -751,9 +850,23 @@ impl SessionStore {
         session.status = SessionStatus::Faulted {
             reason: format!("ownership transfer commit failed: {reason}"),
         };
+        if let Some(current) = session.ownership.current.clone() {
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipCapability(current),
+                AuthorityAuditEvent::Invalidated,
+                Some("transfer commit failed".to_string()),
+            );
+        }
         session.ownership.current = None;
         session.ownership.pending_transfer = None;
         session.ownership.terminal_reason = Some(terminal);
+        Self::push_authority_audit(
+            session,
+            AuthorityArtifact::OwnershipReceipt(receipt.clone()),
+            AuthorityAuditEvent::RolledBack,
+            Some(reason),
+        );
         Ok(())
     }
 

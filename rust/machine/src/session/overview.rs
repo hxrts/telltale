@@ -423,6 +423,10 @@ pub struct TimeoutWitness {
 /// Typed authority artifact emitted or consumed by the runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AuthorityArtifact {
+    /// Live ownership capability issued or invalidated by the session store.
+    OwnershipCapability(OwnershipCapability),
+    /// Explicit ownership-transfer receipt issued/committed/rolled back.
+    OwnershipReceipt(OwnershipReceipt),
     /// Readiness witness issued or consumed by an owner-gated flow.
     Readiness(ReadinessWitness),
     /// Cancellation witness issued by ownership failure handling.
@@ -438,8 +442,30 @@ pub enum AuthorityAuditEvent {
     Issued,
     /// Artifact was consumed exactly once.
     Consumed,
+    /// Artifact became invalid because later semantic state revoked it.
+    Invalidated,
+    /// Transition artifact committed and became canonical.
+    Committed,
+    /// Transition artifact rolled back and did not become canonical.
+    RolledBack,
     /// Artifact was rejected.
     Rejected,
+    /// Artifact aged out of its validity window.
+    Expired,
+}
+
+impl From<AuthorityAuditEvent> for crate::capabilities::ProtocolCriticalCapabilityLifecycleState {
+    fn from(event: AuthorityAuditEvent) -> Self {
+        match event {
+            AuthorityAuditEvent::Issued => Self::Issued,
+            AuthorityAuditEvent::Consumed => Self::Consumed,
+            AuthorityAuditEvent::Invalidated => Self::Invalidated,
+            AuthorityAuditEvent::Committed => Self::Committed,
+            AuthorityAuditEvent::RolledBack => Self::RolledBack,
+            AuthorityAuditEvent::Rejected => Self::Rejected,
+            AuthorityAuditEvent::Expired => Self::Expired,
+        }
+    }
 }
 
 /// Deterministic audit record for witness issuance or consumption.

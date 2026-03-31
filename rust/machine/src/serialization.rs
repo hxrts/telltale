@@ -284,6 +284,8 @@ pub fn canonical_effect_trace(trace: &[EffectTraceEntry]) -> Vec<EffectTraceEntr
 
 fn authority_artifact_session(artifact: &AuthorityArtifact) -> Option<SessionId> {
     match artifact {
+        AuthorityArtifact::OwnershipCapability(capability) => Some(capability.session_id),
+        AuthorityArtifact::OwnershipReceipt(receipt) => Some(receipt.session_id),
         AuthorityArtifact::Readiness(witness) => Some(witness.session_id),
         AuthorityArtifact::Cancellation(witness) => Some(witness.session_id),
         AuthorityArtifact::Timeout(_) => None,

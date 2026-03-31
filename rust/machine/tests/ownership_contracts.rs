@@ -8,10 +8,12 @@ mod test_support;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cfg_if::cfg_if;
+use std::time::Duration;
 use telltale_machine::coroutine::Value;
 use telltale_machine::instr::{Endpoint, ImmValue, Instr};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
+    TopologyPerturbation,
 };
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
@@ -20,7 +22,8 @@ use telltale_machine::{
     AuthoritativeReadKind, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
     CanonicalHandleKind, DelegationAuditRecord, DelegationReceipt, DelegationStatus, Edge,
     FinalizationReadClass, FinalizationStage, OperationInstance, OperationPhase, OutstandingEffect,
-    OwnershipError, OwnershipScope, ProgressState, ProtocolMachine, ProtocolMachineConfig,
+    OwnershipError, OwnershipScope, ProgressState, ProtocolCriticalCapabilityArtifact,
+    ProtocolCriticalCapabilityLifecycleState, ProtocolMachine, ProtocolMachineConfig,
     PublicationStatus, ReadinessWitness, SemanticAuditRecord, SessionHostMutation,
 };
 use telltale_types::{GlobalType, LocalTypeR, ValType};
@@ -76,6 +79,67 @@ impl EffectHandler for NoopHandler {
 
     fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
         EffectResult::success(())
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct TimeoutReplacementHandler;
+
+impl EffectHandler for TimeoutReplacementHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Unit)
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+        }
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        match tick {
+            1 => EffectResult::success(vec![TopologyPerturbation::Timeout {
+                site: "A".to_string(),
+                duration: Duration::from_millis(20),
+            }]),
+            2 => EffectResult::success(vec![TopologyPerturbation::Timeout {
+                site: "A".to_string(),
+                duration: Duration::from_millis(40),
+            }]),
+            _ => EffectResult::success(Vec::new()),
+        }
     }
 }
 
@@ -164,6 +228,125 @@ fn ownership_owned_session_transfer_invalidates_stale_handles() {
             ..
         }
     ));
+}
+
+#[test]
+fn ownership_transfer_exposes_first_class_capability_lifecycle_audit() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = machine
+        .load_choreography_owned(&image, "runtime/owner")
+        .expect("owned open should succeed");
+    let receipt = owned
+        .begin_transfer(
+            &mut machine,
+            "runtime/worker",
+            OwnershipScope::Fragments(BTreeSet::from(["A".to_string()])),
+        )
+        .expect("transfer staging should succeed");
+    let _narrowed = owned
+        .commit_transfer(&mut machine, &receipt)
+        .expect("transfer commit should succeed");
+
+    let lifecycle = machine.capability_lifecycle_audit_log();
+    assert!(
+        lifecycle.iter().any(|record| matches!(
+            (&record.artifact, record.lifecycle),
+            (
+                ProtocolCriticalCapabilityArtifact::OwnershipCapability(capability),
+                ProtocolCriticalCapabilityLifecycleState::Issued,
+            ) if capability.owner_id == "runtime/owner" && capability.generation == 0
+        )),
+        "expected issued lifecycle record for the initial ownership capability"
+    );
+    assert!(
+        lifecycle.iter().any(|record| matches!(
+            (&record.artifact, record.lifecycle),
+            (
+                ProtocolCriticalCapabilityArtifact::OwnershipReceipt(staged_receipt),
+                ProtocolCriticalCapabilityLifecycleState::Issued,
+            ) if staged_receipt.claim_id == receipt.claim_id
+        )),
+        "expected issued lifecycle record for the staged transfer receipt"
+    );
+    assert!(
+        lifecycle.iter().any(|record| matches!(
+            (&record.artifact, record.lifecycle),
+            (
+                ProtocolCriticalCapabilityArtifact::OwnershipReceipt(committed_receipt),
+                ProtocolCriticalCapabilityLifecycleState::Committed,
+            ) if committed_receipt.claim_id == receipt.claim_id
+        )),
+        "expected committed lifecycle record for the transfer receipt"
+    );
+    assert!(
+        lifecycle.iter().any(|record| matches!(
+            (&record.artifact, record.lifecycle),
+            (
+                ProtocolCriticalCapabilityArtifact::OwnershipCapability(capability),
+                ProtocolCriticalCapabilityLifecycleState::Invalidated,
+            ) if capability.owner_id == "runtime/owner" && capability.generation == 0
+        )),
+        "expected invalidation lifecycle record for the old ownership capability"
+    );
+    assert!(
+        lifecycle.iter().any(|record| matches!(
+            (&record.artifact, record.lifecycle),
+            (
+                ProtocolCriticalCapabilityArtifact::OwnershipCapability(capability),
+                ProtocolCriticalCapabilityLifecycleState::Issued,
+            ) if capability.owner_id == "runtime/worker" && capability.generation == 1
+        )),
+        "expected issued lifecycle record for the committed target capability"
+    );
+}
+
+#[test]
+fn timeout_replacement_preserves_linear_lifecycle_order_in_capability_audit() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
+
+    let _ = machine
+        .step(&TimeoutReplacementHandler)
+        .expect("first timeout ingress should not fault");
+    let _ = machine
+        .step(&TimeoutReplacementHandler)
+        .expect("second timeout ingress should not fault");
+
+    let timeout_lifecycle: Vec<_> = machine
+        .capability_lifecycle_audit_log()
+        .into_iter()
+        .filter_map(|record| match record.artifact {
+            ProtocolCriticalCapabilityArtifact::TimeoutWitness(witness) if witness.site == "A" => {
+                Some((witness, record.lifecycle))
+            }
+            _ => None,
+        })
+        .collect();
+
+    assert_eq!(timeout_lifecycle.len(), 3);
+    assert_eq!(
+        timeout_lifecycle
+            .iter()
+            .map(|(_, lifecycle)| *lifecycle)
+            .collect::<Vec<_>>(),
+        vec![
+            ProtocolCriticalCapabilityLifecycleState::Issued,
+            ProtocolCriticalCapabilityLifecycleState::Invalidated,
+            ProtocolCriticalCapabilityLifecycleState::Issued,
+        ]
+    );
+    assert_eq!(
+        timeout_lifecycle[0].0.witness_id,
+        timeout_lifecycle[1].0.witness_id
+    );
+    assert_ne!(
+        timeout_lifecycle[1].0.witness_id,
+        timeout_lifecycle[2].0.witness_id
+    );
 }
 
 #[test]

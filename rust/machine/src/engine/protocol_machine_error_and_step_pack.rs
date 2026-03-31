@@ -290,7 +290,7 @@ where
     crashed_sites: BTreeSet<SiteId>,
     partitioned_edges: BTreeSet<(SiteId, SiteId)>,
     corrupted_edges: BTreeMap<(SiteId, SiteId), CorruptionType>,
-    timed_out_sites: BTreeMap<SiteId, u64>,
+    timed_out_sites: BTreeMap<SiteId, TimeoutWitness>,
     last_sched_step: Option<SchedStepDebug>,
     #[serde(skip, default)]
     last_pre_dispatch_state: Option<crate::refinement::ProtocolMachineRefinementSlice>,

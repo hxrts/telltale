@@ -31,6 +31,15 @@ Keep logic in the host when:
 | receipt | typed proof that a transfer or handoff was staged/committed |
 | typed failure | an explicit `Err`, cancellation, or timeout outcome rather than host-local absence |
 
+Protocol-critical authority/evidence objects are intentionally linear. They do
+not become valid by convention or post-hoc reconstruction. The runtime issues,
+consumes, invalidates, rolls back, rejects, or expires explicit objects and
+exports those transitions through one stable lifecycle audit surface:
+
+- `ProtocolMachine::capability_lifecycle_audit_log()`
+- `ThreadedGuestRuntime::capability_lifecycle_audit_log()`
+- `telltale_machine::capability_lifecycle_audit_log_v1(...)`
+
 ## Canonical Capability Classes
 
 Telltale's first-class capability model is intentionally narrow.
@@ -153,6 +162,11 @@ handoff acceptInvite to Worker with receipt
 Receipts and transfer-like bindings are linear and must be consumed exactly
 once.
 
+The runtime follows the same linear rule for timeout and cancellation
+evidence. Timeout expiry is modeled as a state transition on the exact stored
+`TimeoutWitness`, not as an inferred event derived later from ambient clock
+state.
+
 ## Runtime Meaning
 
 Language-level authority checks are expected to lower into the existing runtime
@@ -163,6 +177,8 @@ authority surfaces:
 - invalid or missing evidence fails closed
 - timeout and cancellation become explicit observable/runtime-audit outcomes
 - transfer/delegation emits explicit receipts and audit records
+- stale capability, receipt, and witness reuse are rejected and retained in the
+  lifecycle audit rather than being silently ignored
 
 This keeps the user-facing language aligned with:
 

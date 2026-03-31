@@ -86,18 +86,9 @@ impl ProtocolMachine {
                 out.extend_from_slice(records);
             }
         }
-        out.sort_by(|lhs, rhs| {
-            let lhs_key = (
-                lhs.tick.unwrap_or(0),
-                serde_json::to_string(lhs).unwrap_or_default(),
-            );
-            let rhs_key = (
-                rhs.tick.unwrap_or(0),
-                serde_json::to_string(rhs).unwrap_or_default(),
-            );
-            lhs_key.cmp(&rhs_key)
-        });
-        out.dedup_by(|lhs, rhs| lhs == rhs);
+        // Preserve source-log order within a tick so lifecycle exports retain
+        // the exact linearization the runtime emitted.
+        out.sort_by_key(|record| record.tick.unwrap_or(0));
         out
     }
 
@@ -247,6 +238,18 @@ impl ProtocolMachine {
         )
     }
 
+    /// Get canonical capability/evidence lifecycle audit records.
+    #[must_use]
+    pub fn capability_lifecycle_audit_log(
+        &self,
+    ) -> Vec<crate::ProtocolCriticalCapabilityLifecycleRecord> {
+        let authority_audit_log = self.combined_authority_audit_log();
+        crate::capability_lifecycle_audit_log_v1(
+            authority_audit_log.as_slice(),
+            self.delegation_audit_log.as_slice(),
+        )
+    }
+
     /// Get canonical semantic objects derived from authority, handoff, effect,
     /// and output-condition surfaces.
     #[must_use]
@@ -386,7 +389,7 @@ impl ProtocolMachine {
         let timed_out_sites = self
             .timed_out_sites
             .iter()
-            .map(|(site, until_tick)| (site.clone(), *until_tick))
+            .map(|(site, witness)| (site.clone(), witness.until_tick))
             .collect();
         canonical_replay_fragment_v1(
             self.obs_trace.as_slice(),
@@ -429,7 +432,16 @@ impl ProtocolMachine {
 
     /// Active site timeouts.
     #[must_use]
-    pub fn timed_out_sites(&self) -> &BTreeMap<SiteId, u64> {
+    pub fn timed_out_sites(&self) -> BTreeMap<SiteId, u64> {
+        self.timed_out_sites
+            .iter()
+            .map(|(site, witness)| (site.clone(), witness.until_tick))
+            .collect()
+    }
+
+    /// Active timeout witnesses keyed by site.
+    #[must_use]
+    pub fn timeout_witnesses(&self) -> &BTreeMap<SiteId, TimeoutWitness> {
         &self.timed_out_sites
     }
 }

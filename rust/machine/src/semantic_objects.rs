@@ -1202,49 +1202,55 @@ fn progress_state_for_operation_phase(phase: OperationPhase) -> ProgressState {
     }
 }
 
-fn authority_read_lifecycle(event: AuthorityAuditEvent) -> AuthoritativeReadLifecycle {
+fn authority_read_lifecycle(event: AuthorityAuditEvent) -> Option<AuthoritativeReadLifecycle> {
     match event {
-        AuthorityAuditEvent::Issued => AuthoritativeReadLifecycle::Issued,
-        AuthorityAuditEvent::Consumed => AuthoritativeReadLifecycle::Consumed,
-        AuthorityAuditEvent::Rejected => AuthoritativeReadLifecycle::Rejected,
+        AuthorityAuditEvent::Issued => Some(AuthoritativeReadLifecycle::Issued),
+        AuthorityAuditEvent::Consumed => Some(AuthoritativeReadLifecycle::Consumed),
+        AuthorityAuditEvent::Rejected => Some(AuthoritativeReadLifecycle::Rejected),
+        AuthorityAuditEvent::Invalidated
+        | AuthorityAuditEvent::Committed
+        | AuthorityAuditEvent::RolledBack
+        | AuthorityAuditEvent::Expired => None,
     }
 }
 
-fn authority_read_from_record(record: &AuthorityAuditRecord) -> AuthoritativeRead {
+fn authority_read_from_record(record: &AuthorityAuditRecord) -> Option<AuthoritativeRead> {
+    let lifecycle = authority_read_lifecycle(record.event)?;
     match &record.artifact {
-        AuthorityArtifact::Readiness(witness) => AuthoritativeRead {
+        AuthorityArtifact::Readiness(witness) => Some(AuthoritativeRead {
             read_id: format!("readiness:{}:{:?}", witness.witness_id, record.event),
             session: Some(witness.session_id),
             owner_id: Some(witness.owner_id.clone()),
             kind: AuthoritativeReadKind::Readiness,
-            lifecycle: authority_read_lifecycle(record.event),
+            lifecycle,
             predicate_ref: Some(witness.predicate_ref.clone()),
             witness_id: Some(witness.witness_id),
             generation: Some(witness.generation),
             reason: record.reason.clone(),
-        },
-        AuthorityArtifact::Cancellation(witness) => AuthoritativeRead {
+        }),
+        AuthorityArtifact::Cancellation(witness) => Some(AuthoritativeRead {
             read_id: format!("cancellation:{}:{:?}", witness.witness_id, record.event),
             session: Some(witness.session_id),
             owner_id: Some(witness.owner_id.clone()),
             kind: AuthoritativeReadKind::Cancellation,
-            lifecycle: authority_read_lifecycle(record.event),
+            lifecycle,
             predicate_ref: None,
             witness_id: Some(witness.witness_id),
             generation: Some(witness.generation),
             reason: record.reason.clone(),
-        },
-        AuthorityArtifact::Timeout(witness) => AuthoritativeRead {
+        }),
+        AuthorityArtifact::Timeout(witness) => Some(AuthoritativeRead {
             read_id: format!("timeout:{}:{:?}", witness.witness_id, record.event),
             session: None,
             owner_id: None,
             kind: AuthoritativeReadKind::Timeout,
-            lifecycle: authority_read_lifecycle(record.event),
+            lifecycle,
             predicate_ref: None,
             witness_id: Some(witness.witness_id),
             generation: None,
             reason: record.reason.clone(),
-        },
+        }),
+        AuthorityArtifact::OwnershipCapability(_) | AuthorityArtifact::OwnershipReceipt(_) => None,
     }
 }
 
@@ -1646,7 +1652,7 @@ pub fn protocol_machine_semantic_objects(
 
     let mut authoritative_reads: Vec<_> = authority_audit_log
         .iter()
-        .map(authority_read_from_record)
+        .filter_map(authority_read_from_record)
         .collect();
     authoritative_reads.extend(
         output_condition_checks
