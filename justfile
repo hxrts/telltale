@@ -543,8 +543,10 @@ wasm-test:
     #!/usr/bin/env bash
     set -euo pipefail
     shim_root="$(mktemp -d)"
-    wasm_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-test.XXXXXX")"
+    wasm_target="target/wasm-test/node"
     trap 'rm -rf "$shim_root" "$wasm_target"' EXIT
+    rm -rf "$wasm_target"
+    mkdir -p "$(dirname "$wasm_target")"
     mkdir -p "$shim_root/env"
     cat >"$shim_root/env/index.js" <<'EOF'
     module.exports = new Proxy(
@@ -567,10 +569,12 @@ wasm-test-all:
     #!/usr/bin/env bash
     set -euo pipefail
     shim_root="$(mktemp -d)"
-    machine_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-machine.XXXXXX")"
-    choreo_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-choreo.XXXXXX")"
-    example_target="$(mktemp -d "${TMPDIR:-/tmp}/telltale-wasm-example.XXXXXX")"
+    machine_target="target/wasm-test-all/machine"
+    choreo_target="target/wasm-test-all/choreo"
+    example_target="target/wasm-test-all/example"
     trap 'rm -rf "$shim_root" "$machine_target" "$choreo_target" "$example_target"' EXIT
+    rm -rf "$machine_target" "$choreo_target" "$example_target"
+    mkdir -p "$(dirname "$machine_target")"
     mkdir -p "$shim_root/env"
     cat >"$shim_root/env/index.js" <<'EOF'
     module.exports = new Proxy(

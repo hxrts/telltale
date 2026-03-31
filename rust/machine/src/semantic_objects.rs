@@ -978,7 +978,7 @@ impl<'a> ProtocolMachineFinalization<'a> {
     ///
     /// Returns a descriptive error when the read is observational or unknown.
     pub fn require_authoritative_read(
-        &self,
+        self,
         read_id: &str,
     ) -> Result<&'a AuthoritativeRead, String> {
         if let Some(read) = self
@@ -1007,7 +1007,7 @@ impl<'a> ProtocolMachineFinalization<'a> {
     /// # Errors
     ///
     /// Returns a descriptive error when the handle is missing.
-    pub fn require_canonical_handle(&self, handle_id: &str) -> Result<&'a CanonicalHandle, String> {
+    pub fn require_canonical_handle(self, handle_id: &str) -> Result<&'a CanonicalHandle, String> {
         self.objects
             .canonical_handles
             .iter()
@@ -1019,7 +1019,7 @@ impl<'a> ProtocolMachineFinalization<'a> {
 
     /// Whether one observed read remains non-canonical unless an explicit proof-bearing path exists.
     #[must_use]
-    pub fn observed_read_is_noncanonical(&self, read_id: &str) -> bool {
+    pub fn observed_read_is_noncanonical(self, read_id: &str) -> bool {
         let Some(read) = self
             .objects
             .observed_reads
@@ -1038,12 +1038,12 @@ impl<'a> ProtocolMachineFinalization<'a> {
 
         operation_id
             .and_then(|operation_id| self.path_for_operation_id(operation_id))
-            .is_none_or(|path| !path.is_canonical())
+            .map_or(true, |path| !path.is_canonical())
     }
 
     /// Derive the explicit finalization path for one operation id.
     #[must_use]
-    pub fn path_for_operation_id(&self, operation_id: &str) -> Option<FinalizationPath> {
+    pub fn path_for_operation_id(self, operation_id: &str) -> Option<FinalizationPath> {
         self.objects
             .operation_instances
             .iter()
@@ -1053,86 +1053,16 @@ impl<'a> ProtocolMachineFinalization<'a> {
 
     /// Derive the explicit finalization path for one operation.
     #[must_use]
-    pub fn path_for_operation(&self, operation: &OperationInstance) -> FinalizationPath {
-        let observed_read_ids: Vec<_> = self
-            .objects
-            .observed_reads
-            .iter()
-            .filter(|read| {
-                self.objects.outstanding_effects.iter().any(|effect| {
-                    effect.effect_id == read.effect_id
-                        && effect.operation_id == operation.operation_id
-                })
-            })
-            .map(|read| read.read_id.clone())
-            .collect();
-
-        let authoritative_read_ids: Vec<_> = self
-            .objects
-            .authoritative_reads
-            .iter()
-            .filter(|read| {
-                read.session == operation.session
-                    && (read.owner_id == operation.owner_id
-                        || operation.owner_id.is_none()
-                        || read.owner_id.is_none())
-            })
-            .map(|read| read.read_id.clone())
-            .collect();
-
-        let publications: Vec<_> = self
-            .objects
-            .publication_events
-            .iter()
-            .filter(|publication| publication.operation_id == operation.operation_id)
-            .collect();
-        let publication_ids: Vec<_> = publications
-            .iter()
-            .map(|publication| publication.publication_id.clone())
-            .collect();
-        let rejected_publication_ids: Vec<_> = publications
-            .iter()
-            .filter(|publication| publication.status == PublicationStatus::Rejected)
-            .map(|publication| publication.publication_id.clone())
-            .collect();
-
-        let mut proof_ids: Vec<_> = publications
-            .iter()
-            .filter_map(|publication| publication.proof_ref.clone())
-            .collect();
-        if let Some(proof_id) = operation.operation_id.strip_prefix("materialization:") {
-            push_unique(&mut proof_ids, proof_id.to_string());
-        }
-
-        let mut canonical_handle_ids: Vec<_> = publications
-            .iter()
-            .filter_map(|publication| publication.handle_ref.clone())
-            .collect();
-        for handle in &self.objects.canonical_handles {
-            if handle
-                .proof_ref
-                .as_ref()
-                .is_some_and(|proof_ref| proof_ids.contains(proof_ref))
-                || handle.handle_id == operation.operation_id
-            {
-                push_unique(&mut canonical_handle_ids, handle.handle_id.clone());
-            }
-        }
-
-        let invalidated_by_handoff_ids: Vec<_> = self
-            .objects
-            .transformation_obligations
-            .iter()
-            .filter(|obligation| {
-                obligation
-                    .affected_operation_ids
-                    .iter()
-                    .any(|operation_id| operation_id == &operation.operation_id)
-                    && (!obligation.invalidated_effect_ids.is_empty()
-                        || matches!(obligation.status, DelegationStatus::Committed))
-            })
-            .map(|obligation| obligation.handoff_id)
-            .collect();
+    pub fn path_for_operation(self, operation: &OperationInstance) -> FinalizationPath {
+        let observed_read_ids = self.observed_read_ids_for_operation(operation);
+        let authoritative_read_ids = self.authoritative_read_ids_for_operation(operation);
+        let publications = self.publications_for_operation(operation);
+        let publication_ids = self.publication_ids(&publications);
+        let rejected_publication_ids = self.rejected_publication_ids(&publications);
+        let proof_ids = self.proof_ids_for_operation(operation, &publications);
+        let canonical_handle_ids =
+            self.canonical_handle_ids_for_operation(operation, &publications, &proof_ids);
+        let invalidated_by_handoff_ids = self.invalidated_handoff_ids_for_operation(operation);
 
         let read_class = match (
             observed_read_ids.is_empty(),
@@ -1176,6 +1106,113 @@ impl<'a> ProtocolMachineFinalization<'a> {
             invalidated_by_handoff_ids,
             rejected_publication_ids,
         }
+    }
+
+    fn observed_read_ids_for_operation(self, operation: &OperationInstance) -> Vec<String> {
+        self.objects
+            .observed_reads
+            .iter()
+            .filter(|read| {
+                self.objects.outstanding_effects.iter().any(|effect| {
+                    effect.effect_id == read.effect_id
+                        && effect.operation_id == operation.operation_id
+                })
+            })
+            .map(|read| read.read_id.clone())
+            .collect()
+    }
+
+    fn authoritative_read_ids_for_operation(self, operation: &OperationInstance) -> Vec<String> {
+        self.objects
+            .authoritative_reads
+            .iter()
+            .filter(|read| {
+                read.session == operation.session
+                    && (read.owner_id == operation.owner_id
+                        || operation.owner_id.is_none()
+                        || read.owner_id.is_none())
+            })
+            .map(|read| read.read_id.clone())
+            .collect()
+    }
+
+    fn publications_for_operation(
+        self,
+        operation: &OperationInstance,
+    ) -> Vec<&'a PublicationEvent> {
+        self.objects
+            .publication_events
+            .iter()
+            .filter(|publication| publication.operation_id == operation.operation_id)
+            .collect()
+    }
+
+    fn publication_ids(self, publications: &[&'a PublicationEvent]) -> Vec<String> {
+        publications
+            .iter()
+            .map(|publication| publication.publication_id.clone())
+            .collect()
+    }
+
+    fn rejected_publication_ids(self, publications: &[&'a PublicationEvent]) -> Vec<String> {
+        publications
+            .iter()
+            .filter(|publication| publication.status == PublicationStatus::Rejected)
+            .map(|publication| publication.publication_id.clone())
+            .collect()
+    }
+
+    fn proof_ids_for_operation(
+        self,
+        operation: &OperationInstance,
+        publications: &[&'a PublicationEvent],
+    ) -> Vec<String> {
+        let mut proof_ids: Vec<_> = publications
+            .iter()
+            .filter_map(|publication| publication.proof_ref.clone())
+            .collect();
+        if let Some(proof_id) = operation.operation_id.strip_prefix("materialization:") {
+            push_unique(&mut proof_ids, proof_id.to_string());
+        }
+        proof_ids
+    }
+
+    fn canonical_handle_ids_for_operation(
+        self,
+        operation: &OperationInstance,
+        publications: &[&'a PublicationEvent],
+        proof_ids: &[String],
+    ) -> Vec<String> {
+        let mut canonical_handle_ids: Vec<_> = publications
+            .iter()
+            .filter_map(|publication| publication.handle_ref.clone())
+            .collect();
+        for handle in &self.objects.canonical_handles {
+            let proof_backed = handle
+                .proof_ref
+                .as_ref()
+                .is_some_and(|proof_ref| proof_ids.contains(proof_ref));
+            if proof_backed || handle.handle_id == operation.operation_id {
+                push_unique(&mut canonical_handle_ids, handle.handle_id.clone());
+            }
+        }
+        canonical_handle_ids
+    }
+
+    fn invalidated_handoff_ids_for_operation(self, operation: &OperationInstance) -> Vec<u64> {
+        self.objects
+            .transformation_obligations
+            .iter()
+            .filter(|obligation| {
+                obligation
+                    .affected_operation_ids
+                    .iter()
+                    .any(|operation_id| operation_id == &operation.operation_id)
+                    && (!obligation.invalidated_effect_ids.is_empty()
+                        || matches!(obligation.status, DelegationStatus::Committed))
+            })
+            .map(|obligation| obligation.handoff_id)
+            .collect()
     }
 }
 

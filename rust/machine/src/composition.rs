@@ -689,123 +689,172 @@ impl ComposedRuntime {
         state: &ReconfigurationRuntimeState,
         request: &RuntimeUpgradeRequest,
     ) -> Result<(), CompositionError> {
-        if request.plan.steps.is_empty() {
-            return Err(CompositionError::InvalidReconfigurationPlan {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-                reason: format!(
-                    "runtime upgrade `{}` must contain at least one plan step",
-                    request.upgrade_id
-                ),
-            });
+        Self::validate_runtime_upgrade_nonempty(bundle, request)?;
+        Self::validate_runtime_upgrade_carried_sets(bundle, request)?;
+        Self::validate_runtime_upgrade_execution_constraint(config, bundle, request)?;
+        Self::validate_runtime_upgrade_ownership_continuity(bundle, state, request)?;
+        Self::validate_runtime_upgrade_pending_effects(bundle, request)?;
+        Self::validate_runtime_upgrade_publication_continuity(bundle, request)?;
+        Ok(())
+    }
+
+    fn invalid_runtime_upgrade_plan(
+        bundle: &ProtocolBundle,
+        upgrade_id: &str,
+        reason: impl Into<String>,
+    ) -> CompositionError {
+        CompositionError::InvalidReconfigurationPlan {
+            artifact_id: bundle.certificate.artifact_id.clone(),
+            reason: format!("runtime upgrade `{upgrade_id}` {}", reason.into()),
         }
-        if !request
+    }
+
+    fn validate_runtime_upgrade_nonempty(
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
+        if request.plan.steps.is_empty() {
+            return Err(Self::invalid_runtime_upgrade_plan(
+                bundle,
+                &request.upgrade_id,
+                "must contain at least one plan step",
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_runtime_upgrade_carried_sets(
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
+        let duplicate_publication = request
             .carried_publication_ids
             .iter()
-            .all(|publication_id| !request.invalidated_publication_ids.contains(publication_id))
-        {
-            return Err(CompositionError::InvalidReconfigurationPlan {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-                reason: format!(
-                    "runtime upgrade `{}` may not both carry and invalidate the same canonical publication",
-                    request.upgrade_id
-                ),
-            });
+            .any(|publication_id| request.invalidated_publication_ids.contains(publication_id));
+        if duplicate_publication {
+            return Err(Self::invalid_runtime_upgrade_plan(
+                bundle,
+                &request.upgrade_id,
+                "may not both carry and invalidate the same canonical publication",
+            ));
         }
-        if !request
+
+        let duplicate_obligation = request
             .carried_obligation_ids
             .iter()
-            .all(|obligation_id| !request.invalidated_obligation_ids.contains(obligation_id))
-        {
-            return Err(CompositionError::InvalidReconfigurationPlan {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-                reason: format!(
-                    "runtime upgrade `{}` may not both carry and invalidate the same obligation",
-                    request.upgrade_id
-                ),
-            });
+            .any(|obligation_id| request.invalidated_obligation_ids.contains(obligation_id));
+        if duplicate_obligation {
+            return Err(Self::invalid_runtime_upgrade_plan(
+                bundle,
+                &request.upgrade_id,
+                "may not both carry and invalidate the same obligation",
+            ));
         }
+        Ok(())
+    }
+
+    fn validate_runtime_upgrade_execution_constraint(
+        config: &ProtocolMachineConfig,
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
         match request.compatibility.execution_constraint {
             RuntimeUpgradeExecutionConstraint::PreserveBundleProfile => {
                 let profile = bundle.certificate.theorem_pack.execution_profile();
-                if !execution_profile_supported(
+                if execution_profile_supported(
                     &profile,
                     config,
                     bundle.certificate.runtime_contracts.as_ref(),
                 ) {
-                    return Err(CompositionError::InvalidReconfigurationPlan {
-                        artifact_id: bundle.certificate.artifact_id.clone(),
-                        reason: format!(
-                            "runtime upgrade `{}` requires preserving the admitted execution profile",
-                            request.upgrade_id
-                        ),
-                    });
+                    Ok(())
+                } else {
+                    Err(Self::invalid_runtime_upgrade_plan(
+                        bundle,
+                        &request.upgrade_id,
+                        "requires preserving the admitted execution profile",
+                    ))
                 }
             }
             RuntimeUpgradeExecutionConstraint::MixedDeterminismAllowed => {
                 let Some(runtime_contracts) = bundle.certificate.runtime_contracts.as_ref() else {
-                    return Err(CompositionError::InvalidReconfigurationPlan {
-                        artifact_id: bundle.certificate.artifact_id.clone(),
-                        reason: format!(
-                            "runtime upgrade `{}` requires runtime contracts for mixed determinism",
-                            request.upgrade_id
-                        ),
-                    });
+                    return Err(Self::invalid_runtime_upgrade_plan(
+                        bundle,
+                        &request.upgrade_id,
+                        "requires runtime contracts for mixed determinism",
+                    ));
                 };
-                if !runtime_contracts.can_use_mixed_determinism_profiles {
-                    return Err(CompositionError::InvalidReconfigurationPlan {
-                        artifact_id: bundle.certificate.artifact_id.clone(),
-                        reason: format!(
-                            "runtime upgrade `{}` requires mixed-determinism admission",
-                            request.upgrade_id
-                        ),
-                    });
+                if runtime_contracts.can_use_mixed_determinism_profiles {
+                    Ok(())
+                } else {
+                    Err(Self::invalid_runtime_upgrade_plan(
+                        bundle,
+                        &request.upgrade_id,
+                        "requires mixed-determinism admission",
+                    ))
                 }
             }
         }
-        if request.compatibility.ownership_continuity_required {
-            let first_members = request.plan.steps[0]
-                .next_members
-                .iter()
-                .cloned()
-                .collect::<BTreeSet<_>>();
-            if state.active_members.is_empty() || state.active_members.is_disjoint(&first_members) {
-                return Err(CompositionError::InvalidReconfigurationPlan {
-                    artifact_id: bundle.certificate.artifact_id.clone(),
-                    reason: format!(
-                        "runtime upgrade `{}` requires ownership continuity across the first cutover",
-                        request.upgrade_id
-                    ),
-                });
-            }
+    }
+
+    fn validate_runtime_upgrade_ownership_continuity(
+        bundle: &ProtocolBundle,
+        state: &ReconfigurationRuntimeState,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
+        if !request.compatibility.ownership_continuity_required {
+            return Ok(());
         }
-        if matches!(
+
+        let first_members = request.plan.steps[0]
+            .next_members
+            .iter()
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        if state.active_members.is_empty() || state.active_members.is_disjoint(&first_members) {
+            return Err(Self::invalid_runtime_upgrade_plan(
+                bundle,
+                &request.upgrade_id,
+                "requires ownership continuity across the first cutover",
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_runtime_upgrade_pending_effects(
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
+        let missing_pending_effect_policy = matches!(
             request.compatibility.pending_effect_treatment,
             PendingEffectTreatment::InvalidateBlocked
         ) && request.carried_obligation_ids.is_empty()
-            && request.invalidated_obligation_ids.is_empty()
-        {
-            return Err(CompositionError::InvalidReconfigurationPlan {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-                reason: format!(
-                    "runtime upgrade `{}` must make pending-effect treatment explicit",
-                    request.upgrade_id
-                ),
-            });
+            && request.invalidated_obligation_ids.is_empty();
+        if missing_pending_effect_policy {
+            return Err(Self::invalid_runtime_upgrade_plan(
+                bundle,
+                &request.upgrade_id,
+                "must make pending-effect treatment explicit",
+            ));
         }
-        if matches!(
-            request.compatibility.canonical_publication_continuity,
-            CanonicalPublicationContinuity::PreserveCanonicalTruth
-        ) && !request.invalidated_publication_ids.is_empty()
-        {
-            return Err(CompositionError::InvalidReconfigurationPlan {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-                reason: format!(
-                    "runtime upgrade `{}` may not invalidate canonical publications when continuity is required",
-                    request.upgrade_id
-                ),
-            });
-        }
+        Ok(())
+    }
 
+    fn validate_runtime_upgrade_publication_continuity(
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
+        let invalidates_canonical_publications =
+            matches!(
+                request.compatibility.canonical_publication_continuity,
+                CanonicalPublicationContinuity::PreserveCanonicalTruth
+            ) && !request.invalidated_publication_ids.is_empty();
+        if invalidates_canonical_publications {
+            return Err(Self::invalid_runtime_upgrade_plan(
+                bundle,
+                &request.upgrade_id,
+                "may not invalidate canonical publications when continuity is required",
+            ));
+        }
         Ok(())
     }
 
@@ -1110,144 +1159,191 @@ impl ComposedRuntime {
             .bundles
             .get(bundle_idx)
             .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?;
-        let Some(policy) = bundle.reconfiguration_policy.as_ref() else {
-            return Err(CompositionError::ReconfigurationDisabled {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-            });
-        };
+        let policy = Self::require_reconfiguration_policy(bundle)?;
         let config = self.machine.config().clone();
         let state = self
             .reconfiguration_states
             .get_mut(bundle_idx)
             .ok_or(CompositionError::InvalidBundleIndex { bundle_idx })?
             .as_mut()
-            .ok_or_else(|| CompositionError::ReconfigurationDisabled {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-            })?;
+            .ok_or_else(|| Self::reconfiguration_disabled(bundle))?;
         let initial_members = state.active_members.iter().cloned().collect::<Vec<_>>();
-
-        let staged = RuntimeUpgradeArtifact {
-            upgrade_id: request.upgrade_id.clone(),
-            phase: TransitionArtifactPhase::Staged,
-            previous_members: initial_members.clone(),
-            next_members: request
-                .plan
-                .steps
-                .last()
-                .map(|step| step.next_members.clone())
-                .unwrap_or_default(),
-            compatibility: request.compatibility.clone(),
-            carried_publication_ids: request.carried_publication_ids.clone(),
-            invalidated_publication_ids: request.invalidated_publication_ids.clone(),
-            carried_obligation_ids: request.carried_obligation_ids.clone(),
-            invalidated_obligation_ids: request.invalidated_obligation_ids.clone(),
-            reason: None,
-        };
+        let next_members = Self::runtime_upgrade_target_members(request);
+        let staged = Self::runtime_upgrade_artifact(
+            request,
+            TransitionArtifactPhase::Staged,
+            initial_members.clone(),
+            next_members.clone(),
+            None,
+        );
 
         if let Err(err) = Self::validate_runtime_upgrade_request(&config, bundle, state, request) {
-            let execution = RuntimeUpgradeExecution {
-                artifact_id: bundle.certificate.artifact_id.clone(),
-                upgrade_id: request.upgrade_id.clone(),
-                final_members: initial_members.clone(),
-                artifacts: vec![
+            let execution = Self::failed_runtime_upgrade_execution(
+                bundle,
+                request,
+                initial_members.clone(),
+                vec![
                     staged,
-                    RuntimeUpgradeArtifact {
-                        upgrade_id: request.upgrade_id.clone(),
-                        phase: TransitionArtifactPhase::Failed,
-                        previous_members: initial_members.clone(),
-                        next_members: initial_members.clone(),
-                        compatibility: request.compatibility.clone(),
-                        carried_publication_ids: request.carried_publication_ids.clone(),
-                        invalidated_publication_ids: request.invalidated_publication_ids.clone(),
-                        carried_obligation_ids: request.carried_obligation_ids.clone(),
-                        invalidated_obligation_ids: request.invalidated_obligation_ids.clone(),
-                        reason: Some(err.to_string()),
-                    },
+                    Self::runtime_upgrade_artifact(
+                        request,
+                        TransitionArtifactPhase::Failed,
+                        initial_members.clone(),
+                        initial_members.clone(),
+                        Some(err.to_string()),
+                    ),
                 ],
-            };
+            );
             state.runtime_upgrades.push(execution);
             return Err(err);
         }
 
-        let admitted = RuntimeUpgradeArtifact {
-            upgrade_id: request.upgrade_id.clone(),
-            phase: TransitionArtifactPhase::Admitted,
-            previous_members: initial_members.clone(),
-            next_members: staged.next_members.clone(),
-            compatibility: request.compatibility.clone(),
-            carried_publication_ids: request.carried_publication_ids.clone(),
-            invalidated_publication_ids: request.invalidated_publication_ids.clone(),
-            carried_obligation_ids: request.carried_obligation_ids.clone(),
-            invalidated_obligation_ids: request.invalidated_obligation_ids.clone(),
-            reason: None,
-        };
+        let admitted = Self::runtime_upgrade_artifact(
+            request,
+            TransitionArtifactPhase::Admitted,
+            initial_members.clone(),
+            next_members,
+            None,
+        );
 
         let mut simulated = state.clone();
-        let execution_result = (|| {
-            for step in &request.plan.steps {
-                let (next_members, _placements, _transport_boundaries) =
-                    Self::validate_plan_step(&bundle.certificate.artifact_id, step)?;
-                Self::simulate_reconfiguration_transition(
-                    &bundle.certificate.artifact_id,
-                    policy,
-                    &mut simulated,
-                    next_members,
-                )?;
-            }
-            Ok::<(), CompositionError>(())
-        })();
+        let execution_result =
+            Self::simulate_runtime_upgrade_steps(bundle, policy, &mut simulated, request);
 
         match execution_result {
             Ok(()) => {
-                let committed = RuntimeUpgradeArtifact {
-                    upgrade_id: request.upgrade_id.clone(),
-                    phase: TransitionArtifactPhase::CommittedCutover,
-                    previous_members: initial_members.clone(),
-                    next_members: simulated.active_members.iter().cloned().collect(),
-                    compatibility: request.compatibility.clone(),
-                    carried_publication_ids: request.carried_publication_ids.clone(),
-                    invalidated_publication_ids: request.invalidated_publication_ids.clone(),
-                    carried_obligation_ids: request.carried_obligation_ids.clone(),
-                    invalidated_obligation_ids: request.invalidated_obligation_ids.clone(),
-                    reason: None,
-                };
-                let execution = RuntimeUpgradeExecution {
-                    artifact_id: bundle.certificate.artifact_id.clone(),
-                    upgrade_id: request.upgrade_id.clone(),
-                    final_members: simulated.active_members.iter().cloned().collect(),
-                    artifacts: vec![staged, admitted, committed],
-                };
+                let execution = Self::committed_runtime_upgrade_execution(
+                    bundle,
+                    request,
+                    &simulated,
+                    initial_members.clone(),
+                    staged,
+                    admitted,
+                );
                 simulated.runtime_upgrades.push(execution.clone());
                 *state = simulated;
                 Ok(execution)
             }
             Err(err) => {
-                let execution = RuntimeUpgradeExecution {
-                    artifact_id: bundle.certificate.artifact_id.clone(),
-                    upgrade_id: request.upgrade_id.clone(),
-                    final_members: initial_members.clone(),
-                    artifacts: vec![
+                let execution = Self::failed_runtime_upgrade_execution(
+                    bundle,
+                    request,
+                    initial_members.clone(),
+                    vec![
                         staged,
                         admitted,
-                        RuntimeUpgradeArtifact {
-                            upgrade_id: request.upgrade_id.clone(),
-                            phase: TransitionArtifactPhase::RolledBack,
-                            previous_members: initial_members.clone(),
-                            next_members: initial_members.clone(),
-                            compatibility: request.compatibility.clone(),
-                            carried_publication_ids: request.carried_publication_ids.clone(),
-                            invalidated_publication_ids: request
-                                .invalidated_publication_ids
-                                .clone(),
-                            carried_obligation_ids: request.carried_obligation_ids.clone(),
-                            invalidated_obligation_ids: request.invalidated_obligation_ids.clone(),
-                            reason: Some(err.to_string()),
-                        },
+                        Self::runtime_upgrade_artifact(
+                            request,
+                            TransitionArtifactPhase::RolledBack,
+                            initial_members.clone(),
+                            initial_members.clone(),
+                            Some(err.to_string()),
+                        ),
                     ],
-                };
+                );
                 state.runtime_upgrades.push(execution);
                 Err(err)
             }
+        }
+    }
+
+    fn reconfiguration_disabled(bundle: &ProtocolBundle) -> CompositionError {
+        CompositionError::ReconfigurationDisabled {
+            artifact_id: bundle.certificate.artifact_id.clone(),
+        }
+    }
+
+    fn require_reconfiguration_policy(
+        bundle: &ProtocolBundle,
+    ) -> Result<&ReconfigurationPolicy, CompositionError> {
+        bundle
+            .reconfiguration_policy
+            .as_ref()
+            .ok_or_else(|| Self::reconfiguration_disabled(bundle))
+    }
+
+    fn runtime_upgrade_target_members(request: &RuntimeUpgradeRequest) -> Vec<String> {
+        request
+            .plan
+            .steps
+            .last()
+            .map(|step| step.next_members.clone())
+            .unwrap_or_default()
+    }
+
+    fn simulate_runtime_upgrade_steps(
+        bundle: &ProtocolBundle,
+        policy: &ReconfigurationPolicy,
+        simulated: &mut ReconfigurationRuntimeState,
+        request: &RuntimeUpgradeRequest,
+    ) -> Result<(), CompositionError> {
+        for step in &request.plan.steps {
+            let (next_members, _placements, _transport_boundaries) =
+                Self::validate_plan_step(&bundle.certificate.artifact_id, step)?;
+            Self::simulate_reconfiguration_transition(
+                &bundle.certificate.artifact_id,
+                policy,
+                simulated,
+                next_members,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn committed_runtime_upgrade_execution(
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+        simulated: &ReconfigurationRuntimeState,
+        initial_members: Vec<String>,
+        staged: RuntimeUpgradeArtifact,
+        admitted: RuntimeUpgradeArtifact,
+    ) -> RuntimeUpgradeExecution {
+        let committed = Self::runtime_upgrade_artifact(
+            request,
+            TransitionArtifactPhase::CommittedCutover,
+            initial_members,
+            simulated.active_members.iter().cloned().collect(),
+            None,
+        );
+        RuntimeUpgradeExecution {
+            artifact_id: bundle.certificate.artifact_id.clone(),
+            upgrade_id: request.upgrade_id.clone(),
+            final_members: simulated.active_members.iter().cloned().collect(),
+            artifacts: vec![staged, admitted, committed],
+        }
+    }
+
+    fn runtime_upgrade_artifact(
+        request: &RuntimeUpgradeRequest,
+        phase: TransitionArtifactPhase,
+        previous_members: Vec<String>,
+        next_members: Vec<String>,
+        reason: Option<String>,
+    ) -> RuntimeUpgradeArtifact {
+        RuntimeUpgradeArtifact {
+            upgrade_id: request.upgrade_id.clone(),
+            phase,
+            previous_members,
+            next_members,
+            compatibility: request.compatibility.clone(),
+            carried_publication_ids: request.carried_publication_ids.clone(),
+            invalidated_publication_ids: request.invalidated_publication_ids.clone(),
+            carried_obligation_ids: request.carried_obligation_ids.clone(),
+            invalidated_obligation_ids: request.invalidated_obligation_ids.clone(),
+            reason,
+        }
+    }
+
+    fn failed_runtime_upgrade_execution(
+        bundle: &ProtocolBundle,
+        request: &RuntimeUpgradeRequest,
+        final_members: Vec<String>,
+        artifacts: Vec<RuntimeUpgradeArtifact>,
+    ) -> RuntimeUpgradeExecution {
+        RuntimeUpgradeExecution {
+            artifact_id: bundle.certificate.artifact_id.clone(),
+            upgrade_id: request.upgrade_id.clone(),
+            final_members,
+            artifacts,
         }
     }
 

@@ -633,16 +633,7 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     choreography.validate().expect("validate authority surface");
 
     let effect_metadata = choreography.effect_contract_declarations();
-    assert!(effect_metadata.iter().any(|op| {
-        op.interface_name == "Runtime"
-            && op.operation_name == "ready"
-            && op.semantic_class == "authoritative"
-    }));
-    assert!(effect_metadata.iter().any(|op| {
-        op.interface_name == "Runtime"
-            && op.operation_name == "watchPresence"
-            && op.semantic_class == "observational"
-    }));
+    assert_effect_contract_metadata(&effect_metadata);
 
     let authoritative =
         MacroAuthorityFlow::authority::authoritative_binding("witness").expect("auth binding");
@@ -667,72 +658,179 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
         canonical_handle_metadata.canonical_handle("handle#1", &materialization_proof);
     let semantic_handoff = handoff.semantic_handoff(9, 1, 0, 1);
 
-    assert_eq!(authoritative.binding_name, "witness");
-    assert_eq!(authoritative.effect_interface, "Runtime");
-    assert_eq!(authoritative.effect_operation, "ready");
-    assert_eq!(
+    assert_authority_read_metadata(
+        authoritative.binding_name,
+        authoritative.effect_interface,
+        authoritative.effect_operation,
         authoritative.capability_class,
+        authoritative.read_class,
+        &authoritative_read,
+    );
+    assert_observational_read_metadata(
+        observed.binding_name,
+        observed.effect_interface,
+        observed.effect_operation,
+        observed.read_class,
+        &observed_read,
+    );
+    assert_publication_metadata(
+        publication.publication_name,
+        publication.capability_class,
+        publication.finalization_stage,
+        &publication_event,
+    );
+    assert_materialization_and_handle_metadata(
+        materialization.proof_name,
+        materialization.publication_name,
+        materialization.capability_class,
+        &materialization_proof,
+        canonical_handle_metadata.proof_name,
+        canonical_handle_metadata.handle_kind,
+        &canonical_handle,
+    );
+    assert_transition_metadata(
+        receipt.binding_name,
+        receipt.subject,
+        receipt.from_role,
+        receipt.to_role,
+        receipt.capability_class,
+        handoff.target_role,
+        handoff.receipt_name,
+        handoff.capability_class,
+        &semantic_handoff,
+    );
+    const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
+    const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
+}
+
+fn assert_effect_contract_metadata(
+    effect_metadata: &[telltale_language::ast::choreography::EffectContractDeclaration],
+) {
+    assert!(effect_metadata.iter().any(|op| {
+        op.interface_name == "Runtime"
+            && op.operation_name == "ready"
+            && op.semantic_class == "authoritative"
+    }));
+    assert!(effect_metadata.iter().any(|op| {
+        op.interface_name == "Runtime"
+            && op.operation_name == "watchPresence"
+            && op.semantic_class == "observational"
+    }));
+}
+
+fn assert_authority_read_metadata(
+    binding_name: &str,
+    effect_interface: &str,
+    effect_operation: &str,
+    capability_class: telltale::dsl::semantic::ProtocolCriticalCapabilityClass,
+    read_class: telltale::dsl::semantic::FinalizationReadClass,
+    authoritative_read: &telltale_machine::semantic_objects::AuthoritativeRead,
+) {
+    assert_eq!(binding_name, "witness");
+    assert_eq!(effect_interface, "Runtime");
+    assert_eq!(effect_operation, "ready");
+    assert_eq!(
+        capability_class,
         telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
     );
     assert_eq!(
-        authoritative.read_class,
+        read_class,
         telltale::dsl::semantic::FinalizationReadClass::AuthoritativeOnly
     );
     assert_eq!(
         authoritative_read.predicate_ref.as_deref(),
         Some("Runtime.ready")
     );
-    assert_eq!(observed.binding_name, "presence");
-    assert_eq!(observed.effect_interface, "Runtime");
-    assert_eq!(observed.effect_operation, "watchPresence");
+}
+
+fn assert_observational_read_metadata(
+    binding_name: &str,
+    effect_interface: &str,
+    effect_operation: &str,
+    read_class: telltale::dsl::semantic::FinalizationReadClass,
+    observed_read: &telltale_machine::semantic_objects::ObservedRead,
+) {
+    assert_eq!(binding_name, "presence");
+    assert_eq!(effect_interface, "Runtime");
+    assert_eq!(effect_operation, "watchPresence");
     assert_eq!(
-        observed.read_class,
+        read_class,
         telltale::dsl::semantic::FinalizationReadClass::ObservedOnly
     );
     assert_eq!(observed_read.effect_id, 7);
-    assert_eq!(publication.publication_name, "AcceptedPublication");
+}
+
+fn assert_publication_metadata(
+    publication_name: &str,
+    publication_capability_class: telltale::dsl::semantic::ProtocolCriticalCapabilityClass,
+    publication_finalization_stage: telltale::dsl::semantic::FinalizationStage,
+    publication_event: &telltale_machine::semantic_objects::PublicationEvent,
+) {
+    assert_eq!(publication_name, "AcceptedPublication");
     assert_eq!(
-        publication.capability_class,
+        publication_capability_class,
         telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
     );
     assert_eq!(
-        publication.finalization_stage,
+        publication_finalization_stage,
         telltale::dsl::semantic::FinalizationStage::Authoritative
     );
     assert_eq!(publication_event.publication, "AcceptedPublication");
-    assert_eq!(materialization.proof_name, "acceptedProof");
-    assert_eq!(materialization.publication_name, "AcceptedPublication");
+}
+
+fn assert_materialization_and_handle_metadata(
+    proof_name: &str,
+    materialization_publication_name: &str,
+    materialization_capability_class: telltale::dsl::semantic::ProtocolCriticalCapabilityClass,
+    materialization_proof: &telltale_machine::semantic_objects::MaterializationProof,
+    canonical_handle_proof_name: &str,
+    canonical_handle_kind: telltale::dsl::semantic::CanonicalHandleKind,
+    canonical_handle: &telltale_machine::semantic_objects::CanonicalHandle,
+) {
+    assert_eq!(proof_name, "acceptedProof");
+    assert_eq!(materialization_publication_name, "AcceptedPublication");
     assert_eq!(
-        materialization.capability_class,
+        materialization_capability_class,
         telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
     );
     assert_eq!(
         materialization_proof.witness_ref.as_deref(),
         Some("AcceptedPublication")
     );
-    assert_eq!(canonical_handle_metadata.proof_name, "acceptedProof");
+    assert_eq!(canonical_handle_proof_name, "acceptedProof");
     assert_eq!(
-        canonical_handle_metadata.handle_kind,
+        canonical_handle_kind,
         telltale::dsl::semantic::CanonicalHandleKind::Materialization
     );
     assert_eq!(canonical_handle.proof_ref.as_deref(), Some("proof#1"));
-    assert_eq!(receipt.binding_name, "receipt");
-    assert_eq!(receipt.subject, "Session");
-    assert_eq!(receipt.from_role, "Coordinator");
-    assert_eq!(receipt.to_role, "Worker");
+}
+
+fn assert_transition_metadata(
+    receipt_binding_name: &str,
+    receipt_subject: &str,
+    receipt_from_role: &str,
+    receipt_to_role: &str,
+    receipt_capability_class: telltale::dsl::semantic::ProtocolCriticalCapabilityClass,
+    handoff_target_role: &str,
+    handoff_receipt_name: &str,
+    handoff_capability_class: telltale::dsl::semantic::ProtocolCriticalCapabilityClass,
+    semantic_handoff: &telltale_machine::semantic_objects::SemanticHandoff,
+) {
+    assert_eq!(receipt_binding_name, "receipt");
+    assert_eq!(receipt_subject, "Session");
+    assert_eq!(receipt_from_role, "Coordinator");
+    assert_eq!(receipt_to_role, "Worker");
     assert_eq!(
-        receipt.capability_class,
+        receipt_capability_class,
         telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Transition
     );
-    assert_eq!(handoff.target_role, "Worker");
-    assert_eq!(handoff.receipt_name, "receipt");
+    assert_eq!(handoff_target_role, "Worker");
+    assert_eq!(handoff_receipt_name, "receipt");
     assert_eq!(
-        handoff.capability_class,
+        handoff_capability_class,
         telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Transition
     );
     assert_eq!(semantic_handoff.activated_owner_id, "Worker");
-    const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
-    const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
 }
 
 #[test]
