@@ -146,7 +146,9 @@ let receipt = transfer Session from Coordinator to Worker
 handoff acceptInvite to Worker with receipt
 ```
 
-Transfers produce linear values that the compiler requires to be consumed exactly once.
+Transfers produce first-class transition receipts. The compiler requires each
+receipt to be consumed exactly once, and the runtime/Lean model treats the
+receipt as a transition artifact rather than an untyped helper value.
 
 ### Local Helper Expression
 
@@ -196,13 +198,15 @@ Current compiler rules:
 
 ## Let and Linearity
 
-`let` is the normal binding form for authority values, receipts, and query results.
+`let` is the normal binding form for transition receipts and non-authoritative
+query results. `authoritative let` and `observe let` are the explicit binding
+forms for protocol-critical authoritative and observational reads.
 
 Current linear classification:
 
-- `transfer ...` bindings are linear
-- `check ...` bindings are not linear by default
-- `observe ...` bindings are not linear and may not be used where authoritative evidence is required
+- `transfer ...` bindings are linear first-class transition receipts
+- `authoritative let check ...` bindings are first-class evidence reads
+- `observe let observe ...` bindings are first-class observational reads and may not be used where authoritative evidence is required
 
 Current linear rules:
 
@@ -216,6 +220,22 @@ Current cross-construct rule:
 - the parser and protocol-machine surface support `choice`, `case`, `timeout`, `loop`, `par`, `call`, and recursion with explicit linear preservation checks
 - rejected programs fail closed when linear assets diverge across branches, timeout/cancel paths, loop iterations, recursive unfoldings, or parallel arms
 - observational bindings remain separated from authoritative evidence under these control-flow forms
+
+## Explicit Scope Boundary
+
+The DSL currently gives first-class meaning to:
+
+- authoritative reads
+- observed reads
+- transfer receipts
+- publication events
+- materialization proofs
+- canonical handles
+- semantic handoffs
+
+The DSL does not currently give first-class syntax to runtime upgrades or
+reconfiguration statements. Those remain runtime/model surfaces, not
+choreography statements, until they have a real shared Rust and Lean meaning.
 
 ## Authority Metatheory Boundary
 

@@ -3359,6 +3359,23 @@ protocol WatchFlow uses Runtime =
     }
 
     #[test]
+    fn test_reject_unsupported_runtime_upgrade_surface() {
+        let input = r#"
+protocol UpgradeFlow =
+  roles Coordinator, Worker
+  upgrade runtime to Epoch2
+  Coordinator -> Worker : Commit
+"#;
+
+        let err = parse_choreography_str(input)
+            .expect_err("runtime upgrade surface must remain outside the DSL");
+        assert!(
+            err.to_string().contains("upgrade") || err.to_string().contains("unexpected"),
+            "unexpected parse error: {err}"
+        );
+    }
+
+    #[test]
     fn test_parse_fragments_operations_and_guest_runtime_metadata() {
         let input = r#"
 fragment ChannelMembership(channel)

@@ -44,13 +44,26 @@ fn main() {
     let authoritative = AuthorityFlow::authority::authoritative_binding("witness").unwrap();
     let publication = AuthorityFlow::authority::publication("AcceptedPublication").unwrap();
     let materialization = AuthorityFlow::authority::materialization("acceptedProof").unwrap();
+    let canonical_handle = AuthorityFlow::authority::canonical_handle("acceptedProof").unwrap();
+    let receipt = AuthorityFlow::authority::receipt("receipt").unwrap();
     let proof = materialization.materialization_proof("proof#1", "Runtime.ready", "digest:ready");
-    let handle = materialization.canonical_handle("handle#1", &proof);
+    let handle = canonical_handle.canonical_handle("handle#1", &proof);
     let handoff = AuthorityFlow::authority::handoff("acceptInvite").unwrap();
 
     assert_eq!(observed.binding_name, "presence");
     assert_eq!(authoritative.binding_name, "witness");
+    assert_eq!(
+        authoritative.capability_class,
+        telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
+    );
     assert_eq!(publication.publication_name, "AcceptedPublication");
+    assert_eq!(
+        canonical_handle.handle_kind,
+        telltale::dsl::semantic::CanonicalHandleKind::Materialization
+    );
+    assert_eq!(receipt.subject, "Session");
+    assert_eq!(receipt.from_role, "Coordinator");
+    assert_eq!(receipt.to_role, "Worker");
     assert_eq!(handle.proof_ref.as_deref(), Some("proof#1"));
     assert_eq!(handoff.target_role, "Worker");
     let ready = AuthorityFlow::effects::runtime::operation("ready").unwrap();

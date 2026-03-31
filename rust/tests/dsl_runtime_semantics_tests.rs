@@ -652,6 +652,10 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
         MacroAuthorityFlow::authority::publication("AcceptedPublication").expect("publication");
     let materialization =
         MacroAuthorityFlow::authority::materialization("acceptedProof").expect("materialization");
+    let canonical_handle_metadata =
+        MacroAuthorityFlow::authority::canonical_handle("acceptedProof")
+            .expect("canonical handle metadata");
+    let receipt = MacroAuthorityFlow::authority::receipt("receipt").expect("receipt");
     let handoff = MacroAuthorityFlow::authority::handoff("acceptInvite").expect("semantic handoff");
 
     let authoritative_read = authoritative.authoritative_read("read#1");
@@ -659,12 +663,21 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     let publication_event = publication.publication_event("publication#1", "acceptInvite");
     let materialization_proof =
         materialization.materialization_proof("proof#1", "Runtime.ready", "digest:ready");
-    let canonical_handle = materialization.canonical_handle("handle#1", &materialization_proof);
+    let canonical_handle =
+        canonical_handle_metadata.canonical_handle("handle#1", &materialization_proof);
     let semantic_handoff = handoff.semantic_handoff(9, 1, 0, 1);
 
     assert_eq!(authoritative.binding_name, "witness");
     assert_eq!(authoritative.effect_interface, "Runtime");
     assert_eq!(authoritative.effect_operation, "ready");
+    assert_eq!(
+        authoritative.capability_class,
+        telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
+    );
+    assert_eq!(
+        authoritative.read_class,
+        telltale::dsl::semantic::FinalizationReadClass::AuthoritativeOnly
+    );
     assert_eq!(
         authoritative_read.predicate_ref.as_deref(),
         Some("Runtime.ready")
@@ -672,18 +685,51 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
     assert_eq!(observed.binding_name, "presence");
     assert_eq!(observed.effect_interface, "Runtime");
     assert_eq!(observed.effect_operation, "watchPresence");
+    assert_eq!(
+        observed.read_class,
+        telltale::dsl::semantic::FinalizationReadClass::ObservedOnly
+    );
     assert_eq!(observed_read.effect_id, 7);
     assert_eq!(publication.publication_name, "AcceptedPublication");
+    assert_eq!(
+        publication.capability_class,
+        telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
+    );
+    assert_eq!(
+        publication.finalization_stage,
+        telltale::dsl::semantic::FinalizationStage::Authoritative
+    );
     assert_eq!(publication_event.publication, "AcceptedPublication");
     assert_eq!(materialization.proof_name, "acceptedProof");
     assert_eq!(materialization.publication_name, "AcceptedPublication");
     assert_eq!(
+        materialization.capability_class,
+        telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Evidence
+    );
+    assert_eq!(
         materialization_proof.witness_ref.as_deref(),
         Some("AcceptedPublication")
     );
+    assert_eq!(canonical_handle_metadata.proof_name, "acceptedProof");
+    assert_eq!(
+        canonical_handle_metadata.handle_kind,
+        telltale::dsl::semantic::CanonicalHandleKind::Materialization
+    );
     assert_eq!(canonical_handle.proof_ref.as_deref(), Some("proof#1"));
+    assert_eq!(receipt.binding_name, "receipt");
+    assert_eq!(receipt.subject, "Session");
+    assert_eq!(receipt.from_role, "Coordinator");
+    assert_eq!(receipt.to_role, "Worker");
+    assert_eq!(
+        receipt.capability_class,
+        telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Transition
+    );
     assert_eq!(handoff.target_role, "Worker");
     assert_eq!(handoff.receipt_name, "receipt");
+    assert_eq!(
+        handoff.capability_class,
+        telltale::dsl::semantic::ProtocolCriticalCapabilityClass::Transition
+    );
     assert_eq!(semantic_handoff.activated_owner_id, "Worker");
     const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
     const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);

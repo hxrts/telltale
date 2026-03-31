@@ -1508,7 +1508,9 @@ fn authority_metatheory_blocker(protocol: &Protocol) -> Option<&'static str> {
         Protocol::Extension { .. } => Some("extension dispatch remains outside the authority theorem slice"),
         Protocol::Let { expr, continuation, .. } => match expr {
             super::AuthorityExpr::Transfer { .. } => {
-                Some("transfer receipts remain part of the wider runtime authority lifecycle")
+                Some(
+                    "transfer receipts are first-class transition artifacts but still rely on the wider runtime authority lifecycle",
+                )
             }
             _ => authority_metatheory_blocker(continuation),
         },

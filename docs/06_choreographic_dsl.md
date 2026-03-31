@@ -421,6 +421,10 @@ The accepted DSL still includes protocol-visible semantic statements such as
 `publish`, `materialize`, `handoff`, `dependent work`, `begin`, `await`, and
 `resolve`.
 
+Runtime upgrade or reconfiguration statements are not part of the choreography
+DSL today. They remain explicit runtime/model surfaces until they have a real
+shared Rust and Lean semantics.
+
 #### 12) Authority and Failure Surface
 
 The authority/failure additions keep the language expression-oriented and
@@ -514,7 +518,8 @@ handoff acceptInvite to Worker with receipt
 ```
 
 Authority queries use explicit `observe let` or `authoritative let` bindings.
-Linear transfer receipts still use ordinary `let`.
+Linear transfer receipts still use ordinary `let`, but the resulting receipt is
+a first-class transition artifact rather than an untyped helper value.
 
 ##### Typed Timeout and Cancellation Blocks
 
@@ -552,6 +557,13 @@ handoff acceptInvite to Worker with receipt
 
 Bindings produced by transfer-like authority operations are linear. The
 compiler rejects duplicate use and implicit discard.
+
+The first-class capability/finalization mapping for this DSL surface is:
+
+- authoritative and observational reads: evidence/finalization inputs
+- transfer receipts and handoffs: transition artifacts
+- publications, materialization proofs, and canonical handles: evidence-side
+  finalization objects
 
 ##### Scoped Bindings with `let ... in`
 

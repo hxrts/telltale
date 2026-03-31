@@ -81,6 +81,9 @@ pub mod dsl {
             OwnershipScope, PrestateBinding, ProgressContract, ProgressState, PublicationEvent,
             PublicationObserverClass, PublicationStatus, SemanticHandoff,
         };
+        pub use telltale_machine::{
+            ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
+        };
     }
 
     /// Opaque role identifier used by generated effect interfaces.

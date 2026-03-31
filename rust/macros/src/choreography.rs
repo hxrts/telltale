@@ -818,6 +818,7 @@ struct AuthoritySurfaceCollector {
     observed_reads: BTreeMap<String, (String, String)>,
     publications: BTreeMap<String, String>,
     materializations: BTreeMap<String, String>,
+    receipts: BTreeMap<String, (String, String, String)>,
     handoffs: BTreeMap<String, (String, String)>,
 }
 
@@ -837,6 +838,8 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                     binding_name: #binding_name,
                     effect_interface: #effect_interface,
                     effect_operation: #effect_operation,
+                    capability_class: ProtocolCriticalCapabilityClass::Evidence,
+                    read_class: FinalizationReadClass::AuthoritativeOnly,
                 }
             }
         })
@@ -853,6 +856,8 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                     binding_name: #binding_name,
                     effect_interface: #effect_interface,
                     effect_operation: #effect_operation,
+                    capability_class: ProtocolCriticalCapabilityClass::Evidence,
+                    read_class: FinalizationReadClass::ObservedOnly,
                 }
             }
         })
@@ -867,6 +872,8 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                 PublicationMetadata {
                     publication_name: #publication_name,
                     witness_name: #witness_name,
+                    capability_class: ProtocolCriticalCapabilityClass::Evidence,
+                    finalization_stage: FinalizationStage::Authoritative,
                 }
             }
         })
@@ -881,6 +888,42 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                 MaterializationMetadata {
                     proof_name: #proof_name,
                     publication_name: #publication_name,
+                    capability_class: ProtocolCriticalCapabilityClass::Evidence,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    let canonical_handles = collector
+        .materializations
+        .iter()
+        .map(|(proof_name, publication_name)| {
+            let proof_name = LitStr::new(proof_name, Span::call_site());
+            let publication_name = LitStr::new(publication_name, Span::call_site());
+            quote! {
+                CanonicalHandleMetadata {
+                    proof_name: #proof_name,
+                    publication_name: #publication_name,
+                    handle_kind: CanonicalHandleKind::Materialization,
+                    capability_class: ProtocolCriticalCapabilityClass::Evidence,
+                }
+            }
+        })
+        .collect::<Vec<_>>();
+    let receipts = collector
+        .receipts
+        .iter()
+        .map(|(binding_name, (subject, from_role, to_role))| {
+            let binding_name = LitStr::new(binding_name, Span::call_site());
+            let subject = LitStr::new(subject, Span::call_site());
+            let from_role = LitStr::new(from_role, Span::call_site());
+            let to_role = LitStr::new(to_role, Span::call_site());
+            quote! {
+                ReceiptMetadata {
+                    binding_name: #binding_name,
+                    subject: #subject,
+                    from_role: #from_role,
+                    to_role: #to_role,
+                    capability_class: ProtocolCriticalCapabilityClass::Transition,
                 }
             }
         })
@@ -897,6 +940,7 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                     operation_name: #operation_name,
                     target_role: #target_role,
                     receipt_name: #receipt_name,
+                    capability_class: ProtocolCriticalCapabilityClass::Transition,
                 }
             }
         })
@@ -911,10 +955,13 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                 CanonicalHandle,
                 CanonicalHandleKind,
                 DelegationStatus,
+                FinalizationReadClass,
+                FinalizationStage,
                 MaterializationProof,
                 ObservedRead,
                 OutstandingEffectStatus,
                 OwnershipScope,
+                ProtocolCriticalCapabilityClass,
                 PublicationEvent,
                 PublicationObserverClass,
                 PublicationStatus,
@@ -926,6 +973,8 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                 pub binding_name: &'static str,
                 pub effect_interface: &'static str,
                 pub effect_operation: &'static str,
+                pub capability_class: ProtocolCriticalCapabilityClass,
+                pub read_class: FinalizationReadClass,
             }
 
             impl AuthorityReadMetadata {
@@ -977,6 +1026,8 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
             pub struct PublicationMetadata {
                 pub publication_name: &'static str,
                 pub witness_name: &'static str,
+                pub capability_class: ProtocolCriticalCapabilityClass,
+                pub finalization_stage: FinalizationStage,
             }
 
             impl PublicationMetadata {
@@ -1005,6 +1056,7 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
             pub struct MaterializationMetadata {
                 pub proof_name: &'static str,
                 pub publication_name: &'static str,
+                pub capability_class: ProtocolCriticalCapabilityClass,
             }
 
             impl MaterializationMetadata {
@@ -1026,6 +1078,36 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                 }
 
                 #[must_use]
+                pub fn canonical_handle_metadata(&self) -> CanonicalHandleMetadata {
+                    CanonicalHandleMetadata {
+                        proof_name: self.proof_name,
+                        publication_name: self.publication_name,
+                        handle_kind: CanonicalHandleKind::Materialization,
+                        capability_class: ProtocolCriticalCapabilityClass::Evidence,
+                    }
+                }
+
+                #[must_use]
+                pub fn canonical_handle(
+                    &self,
+                    handle_id: impl Into<::std::string::String>,
+                    proof: &MaterializationProof,
+                ) -> CanonicalHandle {
+                    self.canonical_handle_metadata()
+                        .canonical_handle(handle_id, proof)
+                }
+            }
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct CanonicalHandleMetadata {
+                pub proof_name: &'static str,
+                pub publication_name: &'static str,
+                pub handle_kind: CanonicalHandleKind,
+                pub capability_class: ProtocolCriticalCapabilityClass,
+            }
+
+            impl CanonicalHandleMetadata {
+                #[must_use]
                 pub fn canonical_handle(
                     &self,
                     handle_id: impl Into<::std::string::String>,
@@ -1035,10 +1117,19 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                         handle_id: handle_id.into(),
                         session: None,
                         owner_id: None,
-                        kind: CanonicalHandleKind::Materialization,
+                        kind: self.handle_kind,
                         proof_ref: ::std::option::Option::Some(proof.proof_id.clone()),
                     }
                 }
+            }
+
+            #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+            pub struct ReceiptMetadata {
+                pub binding_name: &'static str,
+                pub subject: &'static str,
+                pub from_role: &'static str,
+                pub to_role: &'static str,
+                pub capability_class: ProtocolCriticalCapabilityClass,
             }
 
             #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -1046,6 +1137,7 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
                 pub operation_name: &'static str,
                 pub target_role: &'static str,
                 pub receipt_name: &'static str,
+                pub capability_class: ProtocolCriticalCapabilityClass,
             }
 
             impl HandoffMetadata {
@@ -1081,6 +1173,10 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
             #[allow(dead_code)]
             pub const MATERIALIZATIONS: &[MaterializationMetadata] = &[#(#materializations),*];
             #[allow(dead_code)]
+            pub const CANONICAL_HANDLES: &[CanonicalHandleMetadata] = &[#(#canonical_handles),*];
+            #[allow(dead_code)]
+            pub const RECEIPTS: &[ReceiptMetadata] = &[#(#receipts),*];
+            #[allow(dead_code)]
             pub const HANDOFFS: &[HandoffMetadata] = &[#(#handoffs),*];
 
             #[must_use]
@@ -1101,6 +1197,16 @@ fn generate_authority_module(choreography: &Choreography) -> Result<TokenStream>
             #[must_use]
             pub fn materialization(name: &str) -> Option<&'static MaterializationMetadata> {
                 MATERIALIZATIONS.iter().find(|entry| entry.proof_name == name)
+            }
+
+            #[must_use]
+            pub fn canonical_handle(name: &str) -> Option<&'static CanonicalHandleMetadata> {
+                CANONICAL_HANDLES.iter().find(|entry| entry.proof_name == name)
+            }
+
+            #[must_use]
+            pub fn receipt(name: &str) -> Option<&'static ReceiptMetadata> {
+                RECEIPTS.iter().find(|entry| entry.binding_name == name)
             }
 
             #[must_use]
@@ -1149,6 +1255,16 @@ fn collect_authority_surfaces(protocol: &Protocol, collector: &mut AuthoritySurf
                     collector
                         .observed_reads
                         .insert(name.clone(), (effect.clone(), operation.clone()));
+                }
+                (AuthorityBindingMode::Plain, AuthorityExpr::Transfer { subject, from, to }) => {
+                    collector.receipts.insert(
+                        name.clone(),
+                        (
+                            subject.trim().to_string(),
+                            from.trim().to_string(),
+                            to.trim().to_string(),
+                        ),
+                    );
                 }
                 _ => {}
             }

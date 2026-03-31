@@ -51,14 +51,16 @@ effect Audit
 
 protocol CommitFlow uses Runtime, Audit =
   roles Coordinator, Worker, Client
-  let readiness = check Runtime.ready(session)
+  authoritative let readiness = check Runtime.ready(session)
   case readiness of
     | Ok(witness) =>
         Coordinator -> Worker : Commit(witness)
     | Err(reason) =>
         Coordinator -> Client : Retry(reason)
   let receipt = transfer Session from Coordinator to Worker
-  Worker -> Client : TransferAccepted(receipt)
+  publish receipt as TransferPublication
+  materialize transferProof from TransferPublication
+  handoff acceptInvite to Worker with receipt
   timeout 5s Coordinator at
     Worker -> Coordinator : Ready
   on timeout =>
