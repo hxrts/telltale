@@ -203,6 +203,20 @@ pub mod model {
             SEMANTIC_OBJECTS_SCHEMA_VERSION,
         };
     }
+
+    /// Canonical transition and reconfiguration artifacts.
+    pub mod transitions {
+        pub use crate::composition::{
+            ReconfigurationEvent, ReconfigurationPhaseArtifact, ReconfigurationPlan,
+            ReconfigurationPlanExecution, ReconfigurationPlanStep, ReconfigurationPolicy,
+            ReconfigurationRuntimeSnapshot, RuntimeUpgradeExecution, RuntimeUpgradeRequest,
+        };
+        pub use telltale_types::{
+            CanonicalPublicationContinuity, PendingEffectTreatment, RuntimeUpgradeArtifact,
+            RuntimeUpgradeCompatibility, RuntimeUpgradeExecutionConstraint,
+            TransitionArtifactPhase,
+        };
+    }
 }
 
 /// Canonical runtime surface aligned with Lean `Runtime.ProtocolMachine.Runtime`.
@@ -288,7 +302,8 @@ pub use composition::{
     ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
     MemoryUsage, ProtocolBundle, ReconfigurationEvent, ReconfigurationPlan,
     ReconfigurationPlanExecution, ReconfigurationPlanStep, ReconfigurationPolicy,
-    ReconfigurationRuntimeSnapshot, SchedulerCapability, TheoremPackCapabilities,
+    ReconfigurationRuntimeSnapshot, RuntimeUpgradeExecution, RuntimeUpgradeRequest,
+    SchedulerCapability, TheoremPackCapabilities,
 };
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
@@ -374,6 +389,10 @@ pub use session::{
     OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
     SessionHostMutation, SessionId, SessionStore, SessionStoreMemoryUsage,
     SessionStoreRetainedBytes, TimeoutWitness,
+};
+pub use telltale_types::{
+    CanonicalPublicationContinuity, PendingEffectTreatment, RuntimeUpgradeArtifact,
+    RuntimeUpgradeCompatibility, RuntimeUpgradeExecutionConstraint, TransitionArtifactPhase,
 };
 pub use trace::{
     normalize_trace, normalize_trace_v1, obs_session, strict_trace, with_tick, NormalizedTraceV1,

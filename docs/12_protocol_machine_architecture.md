@@ -227,6 +227,29 @@ supports deterministic multi-step reconfiguration plans with:
 - serializable reconfiguration snapshots that preserve membership history and
   executed plan artifacts across recovery
 
+Typesafe runtime upgrade is now modeled as a specialized transition family
+inside that same reconfiguration subsystem rather than as an ambient host
+story. The canonical upgrade surfaces are:
+
+- `RuntimeUpgradeRequest`
+- `RuntimeUpgradeExecution`
+- `RuntimeUpgradeArtifact`
+- `TransitionArtifactPhase`
+
+Each runtime upgrade records an explicit staged, admitted, committed-cutover,
+rolled-back, or failed artifact sequence. The admitted cutover contract is
+explicit about:
+
+- execution-profile compatibility
+- ownership continuity across the first cutover
+- pending-effect treatment
+- canonical publication continuity
+
+Those upgrade artifacts are serialized inside
+`ReconfigurationRuntimeSnapshot.runtime_upgrades`, so replay, recovery, and
+bridge-facing export can distinguish committed cutover from rollback/failure
+instead of inferring it from final membership alone.
+
 These artifacts stay transport agnostic. They record resolved placement facts
 and boundary classes (`in_process`, `shared_memory`, `network`) rather than any
 deployment-product-specific backend details.

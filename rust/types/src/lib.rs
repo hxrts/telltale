@@ -46,8 +46,10 @@ pub use label::Label;
 pub use local::LocalTypeR;
 pub use merge::{can_merge, merge, merge_all, MergeError, MergeResult};
 pub use reconfiguration::{
-    canonical_transport_boundaries, canonicalize_placement_observations, PlacementKind,
-    PlacementObservation, TransportBoundaryKind, TransportBoundaryObservation,
+    canonical_transport_boundaries, canonicalize_placement_observations,
+    CanonicalPublicationContinuity, PendingEffectTreatment, PlacementKind, PlacementObservation,
+    RuntimeUpgradeArtifact, RuntimeUpgradeCompatibility, RuntimeUpgradeExecutionConstraint,
+    TransitionArtifactPhase, TransportBoundaryKind, TransportBoundaryObservation,
 };
 pub use role::{Role, RoleSet};
 pub use units::{

@@ -97,6 +97,90 @@ pub struct TransportBoundaryObservation {
     pub cross_region: bool,
 }
 
+/// Canonical phase for a transition or runtime-upgrade artifact.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TransitionArtifactPhase {
+    /// Transition is staged but not yet admitted.
+    Staged,
+    /// Transition passed admission and compatibility checks.
+    Admitted,
+    /// Transition committed a new active runtime cutover.
+    CommittedCutover,
+    /// Transition was rolled back after staging/admission.
+    RolledBack,
+    /// Transition failed before commit.
+    Failed,
+}
+
+/// Pending-effect treatment required for a specialized runtime upgrade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingEffectTreatment {
+    /// Pending effects are carried across the cutover.
+    PreservePending,
+    /// Blocked/invalidated effects must be made explicit before cutover.
+    InvalidateBlocked,
+}
+
+/// Canonical publication continuity policy required for a runtime upgrade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CanonicalPublicationContinuity {
+    /// Existing canonical publications/handles must stay valid across the cutover.
+    PreserveCanonicalTruth,
+    /// Canonical publications may be invalidated and re-issued.
+    ReissueCanonicalTruth,
+}
+
+/// Execution-profile constraint required for a runtime upgrade.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RuntimeUpgradeExecutionConstraint {
+    /// Preserve the admitted proof-carrying bundle profile.
+    PreserveBundleProfile,
+    /// Requires theorem-pack/runtime support for mixed determinism profiles.
+    MixedDeterminismAllowed,
+}
+
+/// Canonical compatibility contract for one specialized runtime upgrade.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct RuntimeUpgradeCompatibility {
+    /// Execution-profile constraint for the upgrade.
+    pub execution_constraint: RuntimeUpgradeExecutionConstraint,
+    /// Whether ownership continuity must be preserved across the cutover.
+    pub ownership_continuity_required: bool,
+    /// Pending-effect treatment policy.
+    pub pending_effect_treatment: PendingEffectTreatment,
+    /// Canonical publication continuity policy.
+    pub canonical_publication_continuity: CanonicalPublicationContinuity,
+}
+
+/// Canonical serialized artifact for one runtime-upgrade transition phase.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+pub struct RuntimeUpgradeArtifact {
+    /// Stable upgrade identifier.
+    pub upgrade_id: String,
+    /// Phase represented by this artifact.
+    pub phase: TransitionArtifactPhase,
+    /// Canonical sorted members before this phase.
+    pub previous_members: Vec<String>,
+    /// Canonical sorted members after this phase.
+    pub next_members: Vec<String>,
+    /// Compatibility contract admitted for this upgrade.
+    pub compatibility: RuntimeUpgradeCompatibility,
+    /// Canonical publication ids carried into the new runtime.
+    pub carried_publication_ids: Vec<String>,
+    /// Canonical publication ids invalidated by the cutover.
+    pub invalidated_publication_ids: Vec<String>,
+    /// Stable obligation ids carried into the new runtime.
+    pub carried_obligation_ids: Vec<String>,
+    /// Stable obligation ids invalidated by the cutover.
+    pub invalidated_obligation_ids: Vec<String>,
+    /// Optional failure/rollback reason.
+    pub reason: Option<String>,
+}
+
 #[derive(Debug, Clone)]
 struct ResolvedPlacement {
     node_key: String,

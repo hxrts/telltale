@@ -15,11 +15,16 @@ use telltale_machine::{
     run_loaded_protocol_machine_record_replay_conformance, ComposedRuntime, CompositionCertificate,
     CompositionError, MemoryBudget, ProtocolBundle, ProtocolMachine, ProtocolMachineConfig,
     ReconfigurationPlan, ReconfigurationPlanExecution, ReconfigurationPlanStep,
-    ReconfigurationRuntimeSnapshot, RuntimeContracts, TheoremPackCapabilities,
+    ReconfigurationRuntimeSnapshot, RuntimeContracts, RuntimeUpgradeCompatibility,
+    RuntimeUpgradeExecution, RuntimeUpgradeExecutionConstraint, RuntimeUpgradeRequest,
+    TheoremPackCapabilities,
 };
 use telltale_machine::{DelegationStatus, ObsEvent, OwnershipScope, SemanticAuditRecord};
 use telltale_runtime::{Region, RoleName, Topology, TopologyEndpoint};
-use telltale_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{
+    CanonicalPublicationContinuity, GlobalType, Label, LocalTypeR, PendingEffectTreatment,
+    TransitionArtifactPhase,
+};
 
 fn simple_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
     let global = GlobalType::send("A", "B", Label::new("Ping"), GlobalType::End);
@@ -260,6 +265,24 @@ fn cutover_plan() -> ReconfigurationPlan {
     }
 }
 
+fn runtime_upgrade_request(upgrade_id: &str, plan: ReconfigurationPlan) -> RuntimeUpgradeRequest {
+    RuntimeUpgradeRequest {
+        upgrade_id: upgrade_id.to_string(),
+        plan,
+        compatibility: RuntimeUpgradeCompatibility {
+            execution_constraint: RuntimeUpgradeExecutionConstraint::PreserveBundleProfile,
+            ownership_continuity_required: true,
+            pending_effect_treatment: PendingEffectTreatment::PreservePending,
+            canonical_publication_continuity:
+                CanonicalPublicationContinuity::PreserveCanonicalTruth,
+        },
+        carried_publication_ids: vec![format!("publication/{upgrade_id}")],
+        invalidated_publication_ids: Vec::new(),
+        carried_obligation_ids: vec![format!("obligation/{upgrade_id}")],
+        invalidated_obligation_ids: Vec::new(),
+    }
+}
+
 #[derive(Debug)]
 struct RecoveryView {
     ownership_transfer: OwnershipTransferView,
@@ -356,6 +379,125 @@ fn recovery_harness_detects_tampered_snapshot_divergence() {
     let error = restored
         .restore_bundle_reconfiguration_snapshot(0, tampered_snapshot)
         .expect_err("tampered snapshot must reject");
+    assert!(matches!(
+        error,
+        CompositionError::InvalidReconfigurationPlan { .. }
+    ));
+}
+
+#[derive(Debug)]
+struct RuntimeUpgradeRecoveryView {
+    ownership_transfer: OwnershipTransferView,
+    suffix_execution: RuntimeUpgradeExecution,
+    final_snapshot: ReconfigurationRuntimeSnapshot,
+    runtime_upgrades: Vec<RuntimeUpgradeExecution>,
+}
+
+fn drive_runtime_upgrade_history_with_optional_restore(
+    restore_after_prefix: bool,
+) -> RuntimeUpgradeRecoveryView {
+    let ownership_transfer = ownership_transfer_view();
+    let mut runtime = configured_runtime("cert/runtime-upgrade-recovery");
+    runtime
+        .seed_bundle_membership(0, ["Alice", "Bob"])
+        .expect("seed initial members");
+    runtime
+        .execute_runtime_upgrade(
+            0,
+            &runtime_upgrade_request("upgrade/prepare", prepare_plan()),
+        )
+        .expect("execute prefix runtime upgrade");
+    let saved_snapshot = serde_json::from_str::<ReconfigurationRuntimeSnapshot>(
+        &serde_json::to_string(
+            &runtime
+                .bundle_reconfiguration_snapshot(0)
+                .expect("snapshot after prefix runtime upgrade"),
+        )
+        .expect("serialize runtime-upgrade snapshot"),
+    )
+    .expect("deserialize runtime-upgrade snapshot");
+
+    let mut runtime = if restore_after_prefix {
+        let mut restored = configured_runtime("cert/runtime-upgrade-recovery");
+        restored
+            .restore_bundle_reconfiguration_snapshot(0, saved_snapshot)
+            .expect("restore runtime-upgrade snapshot");
+        restored
+    } else {
+        runtime
+    };
+    let suffix_execution = runtime
+        .execute_runtime_upgrade(
+            0,
+            &runtime_upgrade_request("upgrade/cutover", cutover_plan()),
+        )
+        .expect("execute suffix runtime upgrade");
+    RuntimeUpgradeRecoveryView {
+        ownership_transfer,
+        suffix_execution,
+        final_snapshot: serde_json::from_str(
+            &serde_json::to_string(
+                &runtime
+                    .bundle_reconfiguration_snapshot(0)
+                    .expect("final runtime-upgrade snapshot"),
+            )
+            .expect("serialize final runtime-upgrade snapshot"),
+        )
+        .expect("deserialize final runtime-upgrade snapshot"),
+        runtime_upgrades: runtime
+            .bundle_runtime_upgrade_executions(0)
+            .expect("runtime upgrade execution history")
+            .to_vec(),
+    }
+}
+
+#[test]
+fn recovery_harness_replays_equivalent_runtime_upgrade_histories_to_same_semantic_truth() {
+    let straight_line = drive_runtime_upgrade_history_with_optional_restore(false);
+    let restored = drive_runtime_upgrade_history_with_optional_restore(true);
+
+    assert_eq!(
+        restored.ownership_transfer,
+        straight_line.ownership_transfer
+    );
+    assert_eq!(restored.suffix_execution, straight_line.suffix_execution);
+    assert_eq!(restored.final_snapshot, straight_line.final_snapshot);
+    assert_eq!(restored.runtime_upgrades, straight_line.runtime_upgrades);
+    assert_eq!(
+        restored
+            .final_snapshot
+            .runtime_upgrades
+            .last()
+            .expect("final runtime-upgrade execution")
+            .artifacts
+            .last()
+            .expect("committed cutover artifact")
+            .phase,
+        TransitionArtifactPhase::CommittedCutover
+    );
+}
+
+#[test]
+fn recovery_harness_detects_tampered_runtime_upgrade_snapshot_divergence() {
+    let mut runtime = configured_runtime("cert/runtime-upgrade-recovery-negative");
+    runtime
+        .seed_bundle_membership(0, ["Alice", "Bob"])
+        .expect("seed initial members");
+    runtime
+        .execute_runtime_upgrade(
+            0,
+            &runtime_upgrade_request("upgrade/prepare", prepare_plan()),
+        )
+        .expect("execute prefix runtime upgrade");
+    let mut tampered_snapshot = runtime
+        .bundle_reconfiguration_snapshot(0)
+        .expect("snapshot after prefix runtime upgrade");
+    tampered_snapshot.runtime_upgrades[0].artifacts.clear();
+
+    let mut restored = configured_runtime("cert/runtime-upgrade-recovery-negative");
+    let error = restored
+        .restore_bundle_reconfiguration_snapshot(0, tampered_snapshot)
+        .expect_err("tampered runtime-upgrade snapshot must reject");
     assert!(matches!(
         error,
         CompositionError::InvalidReconfigurationPlan { .. }

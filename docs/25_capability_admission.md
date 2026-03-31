@@ -154,6 +154,30 @@ This path guarantees that admitted bundles carry both semantic and operational e
 
 When composition metadata defines fragment or bundle boundaries, runtime ownership should derive from that metadata rather than from ad hoc host-side reconstruction. Admission decides whether the bundle may run. Ownership decides who may currently drive it.
 
+## Runtime Upgrade Admission
+
+Typesafe runtime upgrade is treated as a specialized transition family layered
+on top of composition admission, not as an unmodeled host escape hatch.
+
+The runtime-upgrade admission contract is carried by:
+
+- `RuntimeUpgradeRequest`
+- `RuntimeUpgradeCompatibility`
+- `RuntimeUpgradeArtifact`
+
+An admitted upgrade must make the following transition requirements explicit:
+
+| Requirement | Current Rust enforcement |
+|---|---|
+| execution-profile compatibility | `RuntimeUpgradeExecutionConstraint` validated in `rust/machine/src/composition.rs` |
+| ownership continuity across the first cutover | overlap check against the currently active member set |
+| pending-effect treatment | `PendingEffectTreatment` must be explicit and fail closed on invalidated/blocked obligations |
+| canonical publication continuity | `CanonicalPublicationContinuity` rejects invalidation when continuity is required |
+
+The runtime records staged, admitted, committed-cutover, rolled-back, and
+failed artifacts explicitly. Those artifacts are replay-visible through
+`ReconfigurationRuntimeSnapshot.runtime_upgrades`.
+
 ## Admission Diagnostics
 
 Lean and Rust both expose structured rejection categories.

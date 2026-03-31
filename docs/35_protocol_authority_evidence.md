@@ -78,6 +78,20 @@ The rows below are source-derived and checked against
 | `semantic_handoff` | `transition` | `committed`, `rolled_back`, `rejected`, `invalidated` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Represents explicit protocol-visible authority transfer and old-owner revocation. |
 | `reconfiguration_transition` | `transition` | `issued`, `committed`, `rolled_back`, `rejected` | `rust/machine/src/composition.rs` | `lean/Runtime/Proofs/ReconfigurationObserver.lean` | Captures protocol-critical cutover and membership/runtime transition artifacts. |
 
+Runtime upgrade is intentionally not a separate ambient authority system. It is
+a specialized transition-capability family inside the same reconfiguration
+subsystem. The canonical Rust objects are:
+
+- `RuntimeUpgradeRequest`
+- `RuntimeUpgradeExecution`
+- `RuntimeUpgradeArtifact`
+- `RuntimeUpgradeCompatibility`
+
+Those objects make staged, admitted, committed-cutover, rolled-back, and
+failed transition phases replay-visible, along with the cutover contract for
+ownership continuity, pending-effect treatment, and canonical publication
+continuity.
+
 ## First-Class Finalization Subsystem
 
 Canonical protocol truth is also modeled explicitly rather than inferred from
