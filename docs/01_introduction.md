@@ -18,12 +18,9 @@ Choreographic programming builds on global types. A choreography describes compu
 
 Telltale enforces conservation over six properties: evidence, authority, identity, commitment, structure, and premise. These properties are mutually constitutive. A coherent protocol state is a simultaneous assignment of all six. See [Conservation Framework](37_conservation_framework.md) for the conservation laws, erasure and reduction principles, and the closed semantic core object set.
 
-Within that conservation framework, protocol-critical capability semantics are
-first class. The runtime and Lean model distinguish four capability classes:
-admission, ownership, evidence, and transition. This taxonomy is intentionally
-narrow. It covers protocol-critical authority, evidence, finalization, and
-handoff/reconfiguration semantics, but it does not attempt to absorb general
-host application authorization. See [Capability Model](38_capability_model.md).
+Within that conservation framework, protocol-critical capability semantics are first class. The runtime and Lean model distinguish four capability classes: admission, ownership, evidence, and transition. This taxonomy covers protocol-critical authority, finalization, and handoff/reconfiguration semantics. It does not attempt to absorb general host application authorization.
+
+See [Capability Model](38_capability_model.md) for the full taxonomy.
 
 ## Runtime Architecture
 
@@ -49,7 +46,7 @@ The protocol machine compiles local types to bytecode instructions. It manages s
 
 ## Lean Verification
 
-The Lean 4 formalization spans roughly 647 files and 131k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
+The Lean 4 formalization spans roughly 653 files and 133k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
 The `telltale-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](23_lean_verification.md) for the verification pipeline.
 

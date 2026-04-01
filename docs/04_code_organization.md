@@ -15,12 +15,14 @@ telltale/
 │   ├── src/                Root package source (`telltale` lib path)
 │   ├── types/              Core protocol types (telltale-types)
 │   ├── theory/             Session type algorithms (telltale-theory)
-│   ├── choreography/       DSL, projection glue, and effect runtime
-│   ├── lean-bridge/        Lean export/import/validation
-│   ├── machine/             Protocol machine and guest runtime
-│   ├── simulator/          Protocol-machine-backed simulation
-│   ├── macros/             Procedural macros
-│   └── transport/          Production transports (workspace member)
+│   ├── language/           DSL parser, AST, projection, codegen (telltale-language)
+│   ├── runtime/            Effect handlers, topology, testing (telltale-runtime)
+│   ├── machine/            Protocol machine and guest runtime (telltale-machine)
+│   ├── simulator/          Protocol-machine-backed simulation (telltale-simulator)
+│   ├── bridge/             Lean export/import/validation (telltale-bridge)
+│   ├── macros/             Procedural macros (telltale-macros)
+│   ├── transport/          Production transports (telltale-transport)
+│   └── lints/              Custom lint checks (telltale-lints)
 ├── lean/                   Lean 4 formalization
 ├── docs/                   mdBook documentation
 └── examples/               Example protocols

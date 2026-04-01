@@ -106,80 +106,17 @@ This struct holds the protocol name and optional namespace. It contains particip
 
 The `Protocol` enum defines all protocol actions.
 
-```rust
-pub enum Protocol {
-    Send {
-        from: Role,
-        to: Role,
-        message: MessageType,
-        continuation: Box<Protocol>,
-        annotations: Annotations,
-        from_annotations: Annotations,
-        to_annotations: Annotations,
-    },
-    Broadcast {
-        from: Role,
-        to_all: NonEmptyVec<Role>,
-        message: MessageType,
-        continuation: Box<Protocol>,
-        annotations: Annotations,
-        from_annotations: Annotations,
-    },
-    Choice {
-        role: Role,
-        branches: NonEmptyVec<Branch>,
-        annotations: Annotations,
-    },
-    Let {
-        name: String,
-        expr: AuthorityExpr,
-        linear: bool,
-        continuation: Box<Protocol>,
-    },
-    Case {
-        expr: AuthorityExpr,
-        branches: NonEmptyVec<CaseBranch>,
-    },
-    Timeout {
-        role: Role,
-        duration_ms: u64,
-        body: Box<Protocol>,
-        on_timeout: Box<Protocol>,
-        on_cancel: Option<Box<Protocol>>,
-    },
-    Loop { condition: Option<Condition>, body: Box<Protocol> },
-    Parallel { protocols: NonEmptyVec<Protocol> },
-    Rec { label: Ident, body: Box<Protocol> },
-    Var(Ident),
-    Publish {
-        event: String,
-        arg: Option<String>,
-        continuation: Box<Protocol>,
-    },
-    Handoff {
-        operation: String,
-        target: Role,
-        receipt: String,
-        continuation: Box<Protocol>,
-    },
-    DependentWork {
-        name: String,
-        arg: Option<String>,
-        required_for: String,
-        continuation: Box<Protocol>,
-    },
-    Extension {
-        extension: Box<dyn ProtocolExtension>,
-        continuation: Box<Protocol>,
-        annotations: Annotations,
-    },
-    End,
-}
-```
+The `Protocol` enum in `rust/language/src/ast/protocol.rs` is a recursive tree structure with variants for all DSL constructs. Key variant families include:
 
-`Protocol` is a recursive tree structure. It includes support for annotations at multiple levels. Broadcasts, choices, parallel composition, recursive definitions, authority bindings, case matching, and timeouts are supported. Semantic publication, ownership handoff, and dependent work declarations support runtime lifecycle coordination.
+- Communication: `Send`, `Broadcast`
+- Branching: `Choice`, `Case`
+- Authority: `Let` (with `AuthorityBindingMode`), `Publish`, `PublishAuthority`, `Materialize`, `Handoff`
+- Commitment lifecycle: `Begin`, `Await`, `Resolve`, `Invalidate`
+- Control flow: `Rec`, `Var`, `Loop`, `Parallel`, `Timeout`, `DependentWork`
+- Extensibility: `Extension`
+- Termination: `End`
 
-`NonEmptyVec` is used where the DSL enforces at least one branch.
+`NonEmptyVec` is used where the DSL enforces at least one branch. See the source file for the full definition.
 
 ### Parser Module
 
@@ -199,7 +136,7 @@ entry point expects the canonical `.tell` source extension.
 
 ### Projection Module
 
-The projection module is located in `rust/runtime/src/compiler/projection.rs`. Projection transforms a global protocol into a local view for each role.
+The projection module is located in `rust/language/src/compiler/projection.rs`. Projection transforms a global protocol into a local view for each role.
 
 The algorithm determines what each participant should do.
 
@@ -211,7 +148,7 @@ Projection handles merging parallel branches. It also detects conflicts between 
 
 ### Code Generation Module
 
-The codegen module is located in `rust/runtime/src/compiler/codegen/`. It converts local types into Rust session types and effect programs.
+The codegen module is located in `rust/language/src/compiler/codegen/`. It converts local types into Rust session types and effect programs.
 
 The generator creates compile-time type-safe protocol implementations.
 
