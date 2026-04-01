@@ -568,13 +568,14 @@ wasm-test:
 wasm-test-all:
     #!/usr/bin/env bash
     set -euo pipefail
-    shim_root="$(mktemp -d)"
-    machine_target="target/wasm-test-all/machine"
-    choreo_target="target/wasm-test-all/choreo"
-    example_target="target/wasm-test-all/example"
-    trap 'rm -rf "$shim_root" "$machine_target" "$choreo_target" "$example_target"' EXIT
-    rm -rf "$machine_target" "$choreo_target" "$example_target"
-    mkdir -p "$(dirname "$machine_target")"
+    repo_root="$PWD"
+    mkdir -p "$repo_root/.tmp"
+    wasm_root="$(mktemp -d "$repo_root/.tmp/wasm-test-all.XXXXXX")"
+    shim_root="$wasm_root/shim"
+    machine_target="$wasm_root/machine"
+    choreo_target="$wasm_root/choreo"
+    example_target="$wasm_root/example"
+    trap 'rm -rf "$wasm_root"' EXIT
     mkdir -p "$shim_root/env"
     cat >"$shim_root/env/index.js" <<'EOF'
     module.exports = new Proxy(
