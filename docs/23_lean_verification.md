@@ -36,29 +36,29 @@ The protocol-machine model is centered under `lean/Runtime/ProtocolMachine`.
 
 | Surface | Location |
 |---|---|
-| Core instruction and state model | `Runtime/protocol machine/Model/*` |
-| Executable semantics | `Runtime/protocol machine/Semantics/*` |
-| Runtime adapters and monitor | `Runtime/protocol machine/Runtime/*` |
-| Composition and domain instances | `Runtime/protocol machine/Composition.lean` |
+| Core instruction and state model | `Runtime/ProtocolMachine/Model/*` |
+| Executable semantics | `Runtime/ProtocolMachine/Semantics/*` |
+| Runtime adapters and monitor | `Runtime/ProtocolMachine/Runtime/*` |
+| Composition and domain instances | `Runtime/ProtocolMachine/Composition.lean` |
 
-The effect model uses the current split `EffectRuntime` and `EffectSpec`. Monitor typing lives in `Runtime/protocol machine/Runtime/Monitor.lean`.
+The effect model uses the current split `EffectRuntime` and `EffectSpec`. Monitor typing lives in `Runtime/ProtocolMachine/Runtime/Monitor.lean`.
 
 ## Semantic Objects Model
 
-The semantic objects layer lives under `Runtime/protocol machine/Model/SemanticObjects/`.
+The semantic objects layer lives under `Runtime/ProtocolMachine/Model/SemanticObjects/`.
 
 | Surface | Location |
 |---|---|
-| Identity, ownership, observed-read discipline | `Runtime/protocol machine/Model/SemanticObjects/Core.lean`, `Invariants.lean` |
-| Deferred-effect admissibility and stale late-result rejection | `Runtime/protocol machine/Model/SemanticObjects/OutstandingEffects.lean`, `OutstandingEffectsLemmas.lean` |
-| Semantic handoff activation and delegation bridge | `Runtime/protocol machine/Model/SemanticObjects/SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` |
-| Authoritative-read commitment and publication projection | `Runtime/protocol machine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` |
-| Materialization-proof adequacy and canonical-handle adequacy | `Runtime/protocol machine/Model/SemanticObjects/MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` |
+| Identity, ownership, observed-read discipline | `Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean`, `Invariants.lean` |
+| Deferred-effect admissibility and stale late-result rejection | `Runtime/ProtocolMachine/Model/SemanticObjects/OutstandingEffects.lean`, `OutstandingEffectsLemmas.lean` |
+| Semantic handoff activation and delegation bridge | `Runtime/ProtocolMachine/Model/SemanticObjects/SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` |
+| Authoritative-read commitment and publication projection | `Runtime/ProtocolMachine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` |
+| Materialization-proof adequacy and canonical-handle adequacy | `Runtime/ProtocolMachine/Model/SemanticObjects/MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` |
 | First-class capability/finalization and runtime-upgrade facade | `lean/Runtime/Proofs/CapabilityModel.lean`, `lean/Runtime/Tests/ProtocolMachineRunner.lean` |
-| Progress-contract semantics and escalation lemmas | `Runtime/protocol machine/Model/SemanticObjects/ProgressContracts.lean`, `ProgressContractsLemmas.lean` |
-| Transformation-local obligation bundles | `Runtime/protocol machine/Model/SemanticObjects/TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` |
-| Replay-failure exactness | `Runtime/protocol machine/Model/SemanticObjects/ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` |
-| Cross-target progress and dependent work | `Runtime/protocol machine/Model/SemanticObjects/CrossTargetProgressDependentWork.lean`, `CrossTargetProgressDependentWorkLemmas.lean` |
+| Progress-contract semantics and escalation lemmas | `Runtime/ProtocolMachine/Model/SemanticObjects/ProgressContracts.lean`, `ProgressContractsLemmas.lean` |
+| Transformation-local obligation bundles | `Runtime/ProtocolMachine/Model/SemanticObjects/TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` |
+| Replay-failure exactness | `Runtime/ProtocolMachine/Model/SemanticObjects/ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` |
+| Cross-target progress and dependent work | `Runtime/ProtocolMachine/Model/SemanticObjects/CrossTargetProgressDependentWork.lean`, `CrossTargetProgressDependentWorkLemmas.lean` |
 
 Semantic-object theorem families attach to theorem-pack proof spaces through `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
 
