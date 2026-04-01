@@ -1,6 +1,6 @@
 [package]
 name = "telltale-runtime"
-version = "9.0.0"
+version = "10.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
@@ -16,11 +16,11 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [dependencies]
-telltale = { path = "../..", version = "9.0.0" }
-telltale-macros = { path = "../macros", version = "9.0.0" }
-telltale-language = { path = "../language", version = "9.0.0" }
-telltale-types = { path = "../types", version = "9.0.0" }
-telltale-theory = { path = "../theory", version = "9.0.0" }
+telltale = { path = "../..", version = "10.0.0" }
+telltale-macros = { path = "../macros", version = "10.0.0" }
+telltale-language = { path = "../language", version = "10.0.0" }
+telltale-types = { path = "../types", version = "10.0.0" }
+telltale-theory = { path = "../theory", version = "10.0.0" }
 futures = { workspace = true }
 async-trait = { workspace = true }
 async-recursion = { workspace = true }
