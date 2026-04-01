@@ -323,11 +323,11 @@ request/outcome model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`.
 |---|---|---|
 | `EffectHandler` execution boundary | `EffectRuntime.exec` | executable effect semantics |
 | handler typing obligation | `EffectSpec.handlerType` | typing-level effect contract |
-| typed request/outcome model | `Runtime/protocol machine/Model/Effects.lean` | shared effect-interface metadata plus request/outcome correspondence |
+| typed request/outcome model | `Runtime/ProtocolMachine/Model/Effects.lean` | shared effect-interface metadata plus request/outcome correspondence |
 | invoke typing | `WellTypedInstr.wt_invoke` in `lean/Runtime/ProtocolMachine/Runtime/Monitor.lean` | ties invoke to handler type |
 | behavioral equivalence | `Runtime/Proofs/EffectBisim/*` | observer-level bisimulation bridge |
 | config equivalence bridge | `Runtime/Proofs/EffectBisim/ConfigEquivBridge.lean` | links protocol quotient and effect bisimulation |
-| composed effect domains | `Runtime/Proofs/protocol machine/DomainComposition.lean` | sum and product composition instances |
+| composed effect domains | `Runtime/Proofs/ProtocolMachine/DomainComposition.lean` | sum and product composition instances |
 
 ## Glossary
 
