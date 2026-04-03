@@ -183,7 +183,7 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for witness emission, counterexample minimization, and decision/execution result alignment.
 - [x] Update docs to explain which checks are theorem-decision procedures and which are empirical simulator analyses.
 - [x] Remove boolean-only or string-only legacy checker outputs where the new witness/certificate surface replaces them. No duplicate old/new result APIs.
-- [ ] Make a git commit for Phase 13.
+- [x] Make a git commit for Phase 13.
 
 ## Phase 14: Budgeted Fault and Adversary Models
 
