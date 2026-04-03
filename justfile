@@ -127,6 +127,18 @@ check-deep-assurance:
 
 # Mirror the markdown link-check action used in GitHub check.yml docs lane
 check-doc-links-ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    # Match GitHub's fresh checkout by hiding generated docs artifacts.
+    generated=()
+    for f in docs/SUMMARY.md docs/book; do
+      if [[ -e "$f" ]]; then
+        mv "$f" "$f.__ci_stash__"
+        generated+=("$f")
+      fi
+    done
+    restore() { for f in "${generated[@]}"; do [[ -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; }
+    trap restore EXIT
     find docs -name '*.md' -print0 | xargs -0 npx --yes markdown-link-check --config .github/config/markdown-link-check.json
 
 # Canonical fast-fail structural lane: workflow definitions, ledgers, docs snippets,
