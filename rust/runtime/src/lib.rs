@@ -26,10 +26,10 @@ pub mod effects;
 pub mod extensions;
 pub mod heap;
 pub mod identifiers;
-pub mod util;
 pub mod testing;
 pub mod topology;
 pub mod tracing;
+pub mod util;
 
 // Re-export utility-layer support types
 pub use util::{SystemClock, SystemRng};
@@ -61,7 +61,6 @@ pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
 };
-pub use util::{spawn, spawn_local};
 pub use topology::{
     parse_topology, validate_transport_contract_profile, validated_transport_contract_profile,
     ByteMessage, DocumentedTransportContract, InMemoryChannelTransport, Location, ParsedTopology,
@@ -72,6 +71,7 @@ pub use topology::{
     TransportMessage, TransportOperationalContract, TransportResult, TransportSemanticContract,
     TransportStartupMode, TransportType,
 };
+pub use util::{spawn, spawn_local};
 
 // Re-export heap types for resource management
 pub use heap::{
