@@ -2469,6 +2469,65 @@ protocol RoleAnnotatedBroadcast =
     }
 
     #[test]
+    fn test_parse_sender_role_annotation_ident_list_value() {
+        let input = r#"
+protocol RoleAnnotatedSend =
+  roles Alice, Bob
+  Alice {
+    leak : (External, Neighbor),
+  } -> Bob : Message
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender annotation block with ident-list value: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send {
+                from_annotations, ..
+            } => {
+                assert_eq!(
+                    from_annotations.custom("leak"),
+                    Some("(External, Neighbor)")
+                );
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
+    fn test_parse_sender_role_annotation_integer_list_value() {
+        let input = r#"
+protocol RoleAnnotatedSend =
+  roles Alice, Bob
+  Alice {
+    leakage_budget : [1, 0, 0],
+  } -> Bob : Message
+"#;
+
+        let result = parse_choreography_str(input);
+        assert!(
+            result.is_ok(),
+            "Failed to parse sender annotation block with integer-list value: {:?}",
+            result.err()
+        );
+
+        let choreo = result.unwrap();
+        match &choreo.protocol {
+            Protocol::Send {
+                from_annotations, ..
+            } => {
+                assert_eq!(from_annotations.custom("leakage_budget"), Some("[1, 0, 0]"));
+            }
+            _ => panic!("Expected Send"),
+        }
+    }
+
+    #[test]
     fn test_reject_sender_metadata_in_square_brackets() {
         let input = r#"
 protocol InvalidRoleMetadata =

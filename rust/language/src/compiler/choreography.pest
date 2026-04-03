@@ -116,6 +116,7 @@ topology_kind = { "cluster" | "ring" | "mesh" }
 topology_members = { ident ~ ("," ~ ident)* }
 fragment_decl = { "fragment" ~ ident ~ ident_list? }
 ident_list = { "(" ~ ident ~ ("," ~ ident)* ~ ")" }
+integer_list = { "[" ~ integer ~ ("," ~ integer)* ~ "]" }
 operation_decl = { "operation" ~ ident ~ operation_params? ~ "at" ~ role_ref ~ operation_within? ~ operation_progress? ~ operation_agreement? ~ operation_compose? ~ "=" ~ protocol_body }
 operation_params = { "(" ~ operation_param_decl ~ ("," ~ operation_param_decl)* ~ ")" }
 operation_param_decl = { ident ~ ":" ~ type_expr }
@@ -248,7 +249,7 @@ annotated_sender_ref = { role_ref ~ role_metadata_record? }
 role_metadata_record = { "{" ~ role_annotation_entries? ~ "}" }
 role_annotation_entries = { role_annotation_entry ~ ("," ~ role_annotation_entry)* ~ ","? }
 role_annotation_entry = { ident ~ ":" ~ role_annotation_value }
-role_annotation_value = { string | duration | integer | ident }
+role_annotation_value = { string | duration | integer_list | ident_list | integer | ident }
 
 // Role reference (can be simple or indexed)
 role_ref = { ident ~ role_index? }
