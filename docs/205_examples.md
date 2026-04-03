@@ -41,10 +41,22 @@ Theory examples in `examples/theory/`:
 - `async_subtyping.rs`: async-subtyping checks and subtype relation examples
 - `bounded_recursion.rs`: bounded recursion strategies with configurable depth
 
-Generated-interface examples in `rust/runtime/examples/`:
+Runtime examples in `rust/runtime/examples/`:
 
-- `authority_surface.rs`:inspect `effect` declarations and proof-backed parser metadata
-- `telltale_client_server.rs` and `three_party_negotiation.rs`:runtime-oriented examples behind `native-examples`
+- `authority_surface.rs`: inspect `effect` declarations and proof-backed parser metadata
+- `choreography_tour.rs`: comprehensive DSL feature tour (modules, choice, dynamic roles, ranges, recursion, projection)
+- `macro_choreography.rs`: programmatic choreography construction with the algebraic effect API
+- `extension_example.rs`: DSL extension system with custom grammar rules and parsers
+- `extension_capability.rs`: role-specific capability validation extension
+- `extension_logging.rs`: basic logging extension for choreography execution
+- `extension_workflow.rs`: complete workflow with multiple extension types (`native-examples`)
+- `topology_integration.rs`: local and explicit placement topology configuration
+- `parameterized_roles_full.rs`: parameterized roles test suite (concrete arrays, indexed access, symbolic params)
+- `roles_parameterized.rs`: parameterized roles parsing without proc macro
+- `debug_param_roles.rs`: debugging utility for parameterized role parsing
+- `error_demo.rs`: enhanced error reporting with span information
+- `tcp_ping_pong.rs`: TCP transport for real network communication (`native-examples`)
+- `telltale_client_server.rs` and `three_party_negotiation.rs`: runtime-oriented examples (`native-examples`)
 
 ## Common Patterns
 
