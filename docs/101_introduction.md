@@ -71,12 +71,11 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Protocol-Machine Simulation Runner](502_simulation_runner.md) | Reference | Normative |
 | [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md) | Guide | Mixed |
 | [Protocol-Machine Simulation Materials](504_simulation_materials.md) | Reference | Informative |
-| [Rust-Lean Parity](703_rust_lean_parity.md) | Reference | Normative |
+| [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) | Reference | Normative |
 | [Content Addressing](801_content_addressing.md) | Reference | Mixed |
 | [Resource Heap](802_resource_heap.md) | Reference | Mixed |
 | [Topology](803_topology.md) | Guide | Mixed |
 | [Lean Verification](701_lean_verification.md) | Reference | Mixed |
-| [Lean-Rust Bridge](702_lean_rust_bridge.md) | Reference | Normative |
 | [Capability and Admission](602_capability_admission.md) | Reference | Normative |
 | [Theorem Program](705_theorem_program.md) | Concept | Mixed |
 | [Distributed and Classical Families](706_distributed_classical_families.md) | Reference | Mixed |
@@ -104,7 +103,7 @@ Start with [Architecture](104_architecture.md). Then read [Effect Handlers and S
 
 ### Paper Reviewers
 
-Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](701_lean_verification.md), and [Lean-Rust Bridge](702_lean_rust_bridge.md). Continue with [Capability and Admission](602_capability_admission.md) and [Theorem Program](705_theorem_program.md). See [Distributed and Classical Families](706_distributed_classical_families.md) and [Glossary and Notation Index](807_glossary_notation.md) for reference.
+Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](701_lean_verification.md), and [Rust-Lean Bridge and Parity](703_rust_lean_parity.md). Continue with [Capability and Admission](602_capability_admission.md) and [Theorem Program](705_theorem_program.md). See [Distributed and Classical Families](706_distributed_classical_families.md) and [Glossary and Notation Index](807_glossary_notation.md) for reference.
 
 ## Further Reading
 

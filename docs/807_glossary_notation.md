@@ -30,11 +30,11 @@ It serves as the stable lookup for terminology and notation.
 | ownership epoch | Generation used to invalidate stale owner handles after transfer or scope attenuation. | [Session Lifecycle](403_session_lifecycle.md) |
 | canonical ingress | Sanctioned host event entry path such as `topology_events`, `send_decision`, `handle_recv`, or `step`. | [Effect Handlers and Session Types](303_effect_session_bridge.md) |
 | stale-owner rejection | Fail-closed behavior when a prior ownership capability is reused after transfer or attenuation. | [Effect Handlers and Session Types](303_effect_session_bridge.md), [Session Lifecycle](403_session_lifecycle.md) |
-| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Parity](703_rust_lean_parity.md) |
-| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Parity](703_rust_lean_parity.md) |
+| envelope | Declared refinement boundary for higher-concurrency and profile-scoped behavior. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) |
+| determinism profile | Runtime trace-equivalence contract mode such as `Full` or `Replay`. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) |
 | communication replay mode | Transport replay-consumption policy: `off`, `sequence`, or `nullifier`. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Session Lifecycle](403_session_lifecycle.md) |
 | communication nullifier | Domain-separated digest of canonical communication identity used for one-time receive consumption checks. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Session Lifecycle](403_session_lifecycle.md) |
-| consumption root | Deterministic accumulator root over communication replay-consumption state. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Parity](703_rust_lean_parity.md) |
+| consumption root | Deterministic accumulator root over communication replay-consumption state. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) |
 | protocol machine | Single-thread execution engine (`ProtocolMachine`) that runs projected local types with session type monitoring. | [Protocol Machine Architecture](401_protocol_machine_architecture.md) |
 | guest runtime | Telltale-owned driver (`GuestRuntime`) instantiated around the protocol machine for simulation and runtime integration. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [API Reference](805_api_reference.md) |
 | effect handler | Host-runtime boundary trait (`EffectHandler`) implemented by embedders and simulators. | [Effect Handlers and Session Types](303_effect_session_bridge.md), [API Reference](805_api_reference.md) |
@@ -68,9 +68,9 @@ It serves as the stable lookup for terminology and notation.
 | `?T.S` | Receive `T`, then continue as `S`. | [Theory](103_theory.md) |
 | `end` | Session termination state. | [Theory](103_theory.md) |
 | `Consume` | Recursive receiver-side trace alignment kernel used in coherence proofs. | [Theory](103_theory.md), [Theorem Program](705_theorem_program.md) |
-| `n = 1` | Canonical single-step concurrency regime for exact parity. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Parity](703_rust_lean_parity.md) |
-| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Parity](703_rust_lean_parity.md) |
-| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Parity](703_rust_lean_parity.md) |
+| `n = 1` | Canonical single-step concurrency regime for exact parity. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) |
+| `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) |
+| `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) |
 | `off`, `sequence`, `nullifier` | Communication replay-consumption modes. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Session Lifecycle](403_session_lifecycle.md) |
 | `telltale.comm.identity.v1` | Domain-separation tag for canonical communication identity schema. | [Protocol Machine Architecture](401_protocol_machine_architecture.md) |
 | `case ... of` | Exhaustive sum-pattern branching over forms such as `Result` and `Maybe`. | [Choreographic DSL](202_choreographic_dsl.md), [Authority Language Surface](604_authority_language_surface.md) |
@@ -90,5 +90,5 @@ Prefer existing symbols from this index unless precision requires a different on
 - [Conservation Framework](102_conservation_framework.md)
 - [Theory](103_theory.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
 - [Theorem Program](705_theorem_program.md)

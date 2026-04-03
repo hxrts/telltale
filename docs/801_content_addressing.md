@@ -24,7 +24,7 @@ pub struct ContentId<H: Hasher = DefaultContentHasher> {
 `DefaultContentHasher` is the central policy alias for content addressing and currently resolves to `Blake3Hasher`. SHA-256 remains available as an explicit alternative behind the `sha256` crate feature when compatibility matters. A custom `Hasher` implementation can still trade off speed or proof system constraints.
 
 The runtime heap reuses the same `Hasher` abstraction, but it does not share the same byte-level encoding contract.
-Heap resources use the runtime-local canonical format described in [Heap Encoding and Commitments](808_heap_encoding_commitments.md).
+Heap resources use the runtime-local canonical format described in [Resource Heap](802_resource_heap.md).
 That separation is intentional.
 
 ## Contentable

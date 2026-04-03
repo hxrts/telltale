@@ -11,8 +11,12 @@ It adds deterministic middleware for faults, network behavior, property monitori
 It also provides a harness API for external integration testing.
 
 Materials are the simulator's abstraction for domain state evolution.
-A material defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`.
+A material model defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`, how an effect handler is constructed, and how default per-role initial states are derived.
 This keeps protocol structure separate from model-specific dynamics.
+
+The simulator-facing abstraction is `MaterialModel` in `rust/simulator/src/material.rs`.
+The scenario file format still uses the built-in `MaterialParams` enum as a serde-tagged catalog for shipped material families.
+`MaterialParams` implements `MaterialModel`, but custom Rust integrations may implement `MaterialModel` directly without modifying the scenario schema.
 
 The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
@@ -33,7 +37,8 @@ This path runs protocol-machine execution, scenario middleware, replay capture, 
 It is the recommended integration lane for external projects.
 
 Use `DirectAdapter` when the host already owns the `EffectHandler`.
-Use `MaterialAdapter` when scenario material parameters should construct the handler and initial states.
+Use `MaterialAdapter::from_scenario(...)` when built-in scenario material parameters should construct the handler and initial states.
+Use `MaterialAdapter::new(...)` or `MaterialAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `MaterialModel`.
 
 ## Generated Effect Helpers
 
@@ -65,5 +70,4 @@ just sim-run artifacts/sim_integration.toml
 
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Lean-Rust Bridge](702_lean_rust_bridge.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)

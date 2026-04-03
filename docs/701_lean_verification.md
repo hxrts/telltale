@@ -43,6 +43,20 @@ The protocol-machine model is centered under `lean/Runtime/ProtocolMachine`.
 
 The effect model uses the current split `EffectRuntime` and `EffectSpec`. Monitor typing lives in `Runtime/ProtocolMachine/Runtime/Monitor.lean`.
 
+## Heap Verification and Parity Surface
+
+The runtime heap now has a focused Lean mirror for the contract that must stay stable across implementations.
+
+| Surface | Location |
+|---|---|
+| Canonical heap bytes, tagged preimages, ordering rules, replay interpreter | `Runtime/Resources/HeapModel.lean` |
+| Determinism lemmas for the executable heap model | `Runtime/Proofs/Heap.lean` |
+| Executable heap parity runner | `Runtime/Tests/HeapParityRunner.lean` |
+
+This Lean heap lane is intentionally narrower than a full cryptographic model.
+Lean owns canonical encoding, tagged preimages, active/nullifier ordering, proof-index semantics, and deterministic replay for the published fixture corpus.
+The BLAKE3 digest function remains an operational assumption checked through the published heap vectors and the Rust↔Lean bridge suite.
+
 ## Semantic Objects Model
 
 The semantic objects layer lives under `Runtime/ProtocolMachine/Model/SemanticObjects/`.
@@ -112,11 +126,11 @@ Lean and Rust alignment is checked by automation lanes.
 | Type and schema parity | `just check-parity --types` |
 | Conformance-specific parity lane | `just check-parity --conformance` |
 | Consolidated parity lane | `just check-parity --all` |
+| Heap parity lane | `cargo test -p telltale-bridge --test heap_lean_parity` |
 
 ## Related Docs
 
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
-- [Lean-Rust Bridge](702_lean_rust_bridge.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
 - [Capability and Admission](602_capability_admission.md)
 - [Distributed and Classical Families](706_distributed_classical_families.md)

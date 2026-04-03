@@ -46,8 +46,7 @@
 # Formal Verification
 
 - [Lean Verification](701_lean_verification.md)
-- [Lean-Rust Bridge](702_lean_rust_bridge.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
 - [Semantic Runtime Name Parity](704_semantic_runtime_name_parity.md)
 - [Theorem Program](705_theorem_program.md)
 - [Distributed and Classical Families](706_distributed_classical_families.md)
@@ -61,5 +60,3 @@
 - [API Reference](805_api_reference.md)
 - [Verification Inventory](806_verification_inventory.md)
 - [Glossary and Notation Index](807_glossary_notation.md)
-- [Heap Encoding and Commitments](808_heap_encoding_commitments.md)
-- [Heap Determinism Contract](809_heap_determinism.md)

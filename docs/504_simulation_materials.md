@@ -5,13 +5,36 @@ It also records current implementation limits.
 
 ## Material Handlers
 
-Telltale treats materials as a separate abstraction because protocol structure and domain dynamics are different concerns.
+Telltale treats materials as a separate abstraction, keeping protocol structure and domain dynamics as different concerns.
 The choreography and local types define who may communicate and in what order.
 A material defines how role-local state evolves when protocol-visible effects occur.
 
 This separation lets one simulator runner support multiple deterministic state-transition models.
 It keeps replay, fault semantics, and analysis independent of any one domain model.
 It also gives Rust and Lean parity checks a stable boundary for step semantics.
+
+The simulator-facing Rust abstraction is `MaterialModel` in `rust/simulator/src/material.rs`.
+A `MaterialModel` supplies three things:
+
+- a stable layer name for diagnostics and registry-style dispatch
+- a `Box<dyn EffectHandler>` via `build_handler()`
+- default per-role initial states via `derive_initial_states(roles)`
+
+This is the open extension point for custom Rust integrations.
+Callers can implement `MaterialModel` for any deterministic mean-field, Hamiltonian, continuum-field, or other state-evolution family without editing the built-in simulator catalog.
+
+Lean mirrors this executable boundary under `lean/Runtime/Simulation/Material.lean` and
+includes a Lean-native `MaterialModel`, `MaterialHandler`, built-in `MaterialParams` catalog, and initial-state derivation for the shipped material families.
+This is still an executable parity layer rather than a mirror of Rust trait objects or serde-driven scenario parsing.
+
+The built-in scenario format remains intentionally narrower.
+`Scenario.material` still deserializes into the serde-tagged `MaterialParams` enum, which currently ships:
+
+- `mean_field`
+- `hamiltonian`
+- `continuum_field`
+
+`MaterialParams` implements `MaterialModel`, so the built-in scenario path and the general Rust extension path share the same simulator boundary.
 
 Simulator material handlers implement deterministic `EffectHandler::step` updates over fixed-point state.
 The runner stores material state in coroutine registers starting at register `2`.
@@ -21,8 +44,14 @@ The sampled trace reads that numeric suffix back out as `Vec<FixedQ32>`.
 - `HamiltonianHandler` tracks peer position and force state with leapfrog integration.
 - `ContinuumFieldHandler` tracks peer field values with a two-phase diffusion update.
 
-Construct handlers directly or through `handler_from_material(...)`.
-Use `MaterialAdapter` when scenario material parameters should drive both handler construction and initial state derivation.
+Construct handlers directly, through `handler_from_model(...)`, or through `handler_from_material(...)` for the built-in config enum.
+Use `MaterialAdapter::from_scenario(...)` when built-in scenario material parameters should drive both handler construction and initial state derivation.
+Use `MaterialAdapter::new(...)` or `MaterialAdapter::from_boxed_model(...)` when a host integration wants the harness to own a custom `MaterialModel`.
+
+The harness exposes both helper lanes:
+
+- `derive_initial_states(&Scenario)` for the built-in scenario schema
+- `derive_initial_states_for_model(&dyn MaterialModel, roles)` for arbitrary material-model implementations
 
 ## Distributed Simulation
 
@@ -71,4 +100,4 @@ The `run` binary controls JSON emission through CLI flags.
 - [Protocol-Machine Simulation](501_simulation_overview.md)
 - [Protocol-Machine Simulation Runner](502_simulation_runner.md)
 - [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)

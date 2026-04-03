@@ -10,8 +10,9 @@ The heap is a `telltale-runtime` utility.
 It is not the same system as the type-level content addressing in `telltale-types`.
 The runtime heap uses the shared `Hasher` abstraction with its own canonical heap encoding and commitment logic.
 
-The heap abstraction is currently Rust-only.
-The resource concepts correspond loosely to `lean/Runtime/Resources/ResourceModel.lean`, but the heap container and Merkle utilities do not currently have a first-class Lean mirror.
+The heap now has a focused Lean parity mirror.
+`lean/Runtime/Resources/HeapModel.lean` mirrors canonical bytes, tagged preimages, ordering rules, proof-index semantics, and deterministic replay for the published heap corpus.
+Digest computation remains Rust-side and is checked against published vectors rather than reimplemented in Lean.
 
 ## Resource Identifiers
 
@@ -113,7 +114,8 @@ let commitment = HeapCommitment::from_heap(&heap);
 
 `prove(...)` generates an inclusion proof by leaf index in the current active-resource ordering.
 That ordering follows `BTreeMap` iteration over active `ResourceId` keys.
-`resource_leaf_hash(...)`, `nullifier_leaf_hash(...)`, and `merkle_node_hash(...)` expose the leaf and node hashing rules directly.
+`resource_id_preimage(...)`, `resource_leaf_preimage(...)`, `nullifier_leaf_preimage(...)`, `merkle_node_preimage(...)`, and `heap_commitment_preimage(...)` expose the tagged preimage rules directly.
+`resource_leaf_hash(...)`, `nullifier_leaf_hash(...)`, and `merkle_node_hash(...)` then hash those preimages.
 `HeapCommitment::hash()` then hashes a tagged preimage that contains the two roots and the counter.
 
 ## Error Types
@@ -143,13 +145,66 @@ Nested heap values are encoded as full canonical child values.
 The heap also uses tagged preimages for `ResourceId`, resource-leaf hashes, nullifier-leaf hashes, Merkle internal nodes, and `HeapCommitment::hash()`.
 Those tagged preimages are part of the public heap contract.
 
+### Canonical Encoding Model
+
+The heap uses a runtime-local canonical binary format.
+It does not reuse the type-level artifact encoding in [Content Addressing](801_content_addressing.md).
+The current format is versioned by `HEAP_ENCODING_VERSION`.
+
+Every canonical heap value starts with the same prelude.
+The prelude is the four-byte magic value `TTHP`, followed by the little-endian encoding version, followed by a one-byte type tag.
+The remainder of the byte sequence is the canonical body for that tagged value.
+
+Strings and byte slices use explicit little-endian `u32` length prefixes.
+Counters and numeric fields use little-endian integer encoding.
+Nested heap values are encoded as full canonical child values.
+
+### Covered Types
+
 `ChannelState` encoding includes sender, receiver, queue length, and every queued `MessagePayload` in order.
 `Message` encoding includes source, destination, label, full payload bytes, and sequence number.
 `Session` and `Value` resources encode all of their current semantic fields.
 
-The heap canonical format is still runtime-local.
-It is not the same artifact encoding used by `telltale-types::Contentable`.
-See [Heap Encoding and Commitments](808_heap_encoding_commitments.md) for the byte-level contract.
+The current canonical encoding also covers `MessagePayload`, `ChannelState`, `Message`, and `Resource`.
+`Resource::Session` includes role and `type_hash`.
+`Resource::Value` includes `tag` and full `data`.
+
+### Resource Identity
+
+`ResourceId` remains allocation-unique in the current design.
+The heap computes it from a tagged preimage that contains the canonical resource bytes and the little-endian allocation counter.
+The digest uses the selected heap hasher, which defaults to `DefaultHeapHasher`.
+
+This design keeps repeated allocations of identical semantic resources distinct.
+It also ties the ID contract directly to the canonical heap encoding boundary.
+
+### Merkle Leaves and Commitments
+
+Active-resource leaves hash a tagged preimage that contains the `ResourceId` digest and the canonical resource bytes.
+Nullifier leaves hash a distinct tagged preimage that contains the `ResourceId` digest bytes.
+Internal Merkle nodes hash a tagged preimage that contains the left child digest and the right child digest.
+`HeapCommitment` stores the active-resource root, the nullifier root, and the allocation counter.
+`HeapCommitment::hash()` hashes a tagged preimage that contains those three values.
+
+The allocation counter remains part of the authoritative commitment contract.
+This keeps the commitment aligned with allocation history rather than only current live content.
+The current heap model treats that history as semantically relevant.
+
+### Cross-Implementation Expectations
+
+Another implementation should reproduce canonical bytes exactly.
+It should also preserve active-resource ordering and nullifier ordering exactly.
+The published heap test vectors are the conformance target for that behavior.
+The current published vector file is `rust/runtime/tests/data/heap_vectors_v1.json`.
+
+The runtime heap now has a Lean parity mirror for canonical bytes and tagged preimages.
+That mirror lives in `lean/Runtime/Resources/HeapModel.lean` and is exercised through `lean/Runtime/Tests/HeapParityRunner.lean`.
+
+The digest algorithm itself is still treated as an operational conformance target.
+Rust and Lean must agree on the published heap vectors exactly, but Lean does not currently reimplement BLAKE3.
+This section therefore defines both the boundary that an external embedder must match and the boundary that the current Rust↔Lean heap lane enforces.
+
+See [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) for the Lean mirror boundary.
 
 ## Determinism Contract
 
@@ -158,8 +213,42 @@ Active-resource ordering follows `ResourceId` ordering in the heap `BTreeMap`.
 Consumed-resource ordering follows the same `ResourceId` ordering in the nullifier `BTreeSet`.
 Merkle proof indices refer to that exact active-resource order.
 
+### Ordering Rules
+
+Active resources are ordered by `ResourceId`.
+`ResourceId` ordering compares digest bytes first and allocation counter second.
+`Heap::active_resources()` uses that order because the heap stores resources in a `BTreeMap`.
+
+Consumed resource IDs are ordered by the same `ResourceId` ordering.
+`Heap::consumed_ids()` uses that order because the heap stores nullifiers in a `BTreeSet`.
+Merkle leaves follow the iteration order of `active_resources()`.
+Merkle proof indices refer to that exact active-leaf order.
+
+### Replay Contract
+
 Repeated executions of the same heap operation sequence must yield the same `ResourceId` values, proof paths, and `HeapCommitment` values.
+This contract is sequence-sensitive.
+If allocation order changes, the allocation counter changes.
+That changes `ResourceId` values and therefore changes commitments.
+
+### Commitment Authority
+
 `HeapCommitment` is the authoritative cryptographic summary of heap state.
+`HeapCommitment::hash()` is the only supported single-value digest for that state.
+The heap no longer exposes a separate debug-only state fingerprint.
+
+### Order-Insensitive Operations
+
+Some operations are deterministic even when their input lists are permuted.
+`consume_many(...)` is one example.
+If the same set of resource IDs is consumed successfully, the resulting nullifier set and heap commitment must match regardless of argument order.
+
+### Scope
+
+This contract now has a focused Lean mirror.
+`lean/Runtime/Resources/HeapModel.lean` mirrors active/nullifier ordering, proof-index semantics, and deterministic replay for the published heap corpus.
+The published vectors and the strict Rust↔Lean heap parity suite are the current conformance boundary for other implementations.
+
 Use [Content Addressing](801_content_addressing.md) for the type-level artifact identity system.
 Use [Choreography Effect Handlers](301_effect_handlers.md) for choreography runtime integration.
-See [Heap Determinism Contract](809_heap_determinism.md) for the explicit ordering and replay rules.
+See [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) for the Rust↔Lean conformance lane.

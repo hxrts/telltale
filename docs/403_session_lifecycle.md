@@ -228,4 +228,4 @@ Risk notes:
 
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)

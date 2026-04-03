@@ -44,13 +44,13 @@ See `rust/types/src/lib.rs` for re-exports.
 
 Session-type algorithms and executable theory checks.
 
-Key exports:
+Key modules:
 
-- Projection: `project`, `project_all`, `MemoizedProjector`
+- Projection: `telltale_theory::projection::{project, project_all, MemoizedProjector}`
 - Merge, duality, well-formedness, and semantics checks
-- Subtyping surfaces (feature-gated): `async_subtype`, `sync_subtype`
+- Subtyping (feature-gated): `telltale_theory::subtyping::{async_subtype, sync_subtype}`
 
-See `rust/theory/src/lib.rs` for the complete feature-gated API.
+Exports are module-scoped, not re-exported at crate root. See `rust/theory/src/lib.rs` for the complete feature-gated API.
 
 ### `telltale-runtime`
 
@@ -66,6 +66,9 @@ Key exports:
   `CanonicalHeapEncoding`, `CanonicalHeapEncoder`, `HEAP_ENCODING_MAGIC`,
   `HEAP_ENCODING_VERSION`, `resource_leaf_hash`, `nullifier_leaf_hash`,
   `merkle_node_hash`, `MerkleTree`, `HeapCommitment`
+- Heap preimage helpers (module-scoped, not at crate root):
+  `telltale_runtime::heap::{resource_id_preimage, resource_leaf_preimage,
+  nullifier_leaf_preimage, merkle_node_preimage, heap_commitment_preimage}`
 - Extensions: `ExtensionRegistry`, `GrammarExtension`, `ProtocolExtension`
 
 See `rust/runtime/src/lib.rs` for the full export surface.
@@ -108,7 +111,7 @@ Key exports:
   `ProtocolMachineExecutionProfile`, `ProtocolMachineFairnessAssumption`,
   `ProtocolMachineAdmissibilityClass`,
   `ProtocolMachineEscalationWindowClass`
-- runtime introspection:
+- runtime introspection (methods on `ProtocolMachine` / `GuestRuntime`):
   `operation_instances()`, `outstanding_effects()`, `semantic_objects()`,
   `progress_contracts()`, `progress_transitions()`, `publication_events()`,
   `require_authoritative_read()`,
@@ -165,10 +168,11 @@ Key exports:
 
 - `global_to_json`, `local_to_json`, `json_to_global`, `json_to_local`
 - `LeanRunner`, `Validator`, `ValidationResult`
+- `HeapParityRunner`, `HeapParityOutput`
 - `ProtocolMachineSemanticObjects` and semantic-object schema helpers
   These come from the same canonical semantic-object family as `telltale_machine::model::semantic_objects`, not a bridge-local duplicate.
 
-See [Lean-Rust Bridge](702_lean_rust_bridge.md) for details.
+See [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) for details.
 
 ### `telltale-transport`
 

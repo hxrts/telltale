@@ -1,10 +1,136 @@
-# Rust-Lean Parity
+# Rust-Lean Bridge and Parity
 
-This document defines the Lean/Rust parity contract for protocol-machine behavior, choreography projection, semantic-object schemas, and deviation governance.
+This document defines the typed Rust↔Lean bridge surface and the parity contract enforced across that boundary for protocol-machine behavior, choreography projection, semantic-object schemas, and deviation governance.
 
 ## Contract Levels
 
 Parity is enforced at two levels. Level 1 covers policy and data shape parity for shared runtime encodings. Level 2 covers behavior parity for executable traces under the declared concurrency envelope.
+
+## Bridge Scope
+
+The `telltale-bridge` crate is the typed boundary between Rust artifacts and Lean validation entrypoints.
+It handles JSON conversion, schema versioning, runner invocation, trace comparison, semantic-object export, and typed invariant bundle export.
+
+The bridge does not define protocol-machine semantics.
+Semantics remain in `telltale-machine`, `telltale-theory`, and Lean runtime modules.
+Host-runtime handlers also remain outside the bridge and re-enter through typed effect surfaces.
+
+This document covers the bridge behavior implemented in `rust/bridge/src`:
+
+- `export`
+- `import`
+- `schema`
+- `runner`
+- `protocol_machine_runner`
+- `heap_parity_runner`
+- `sim_reference`
+- `semantic_objects`
+- `protocol_machine_trace`
+- `invariants`
+- `equivalence`
+- `validate`
+
+## Bridge Crate Surface
+
+The canonical public bridge surface uses:
+
+- `LeanRunner`
+- `ProtocolMachineRunner`
+- `HeapParityRunner`
+- `ProtocolMachineRunInput`
+- `ProtocolMachineRunOutput`
+- `HeapParityOutput`
+- `ProtocolMachineSemanticObjects`
+
+No public legacy compatibility modules are part of the supported bridge story.
+
+## Features and Binaries
+
+The crate has feature-gated modules and binaries.
+The default feature set enables Lean runner integration.
+
+```toml
+[features]
+default = ["runner"]
+cli = ["clap"]
+runner = ["telltale-theory"]
+exporter = ["telltale-runtime", "anyhow", "bpaf"]
+golden = ["clap", "anyhow", "runner"]
+
+[[bin]]
+name = "lean-bridge"
+required-features = ["cli"]
+
+[[bin]]
+name = "lean-bridge-exporter"
+required-features = ["exporter"]
+
+[[bin]]
+name = "golden"
+required-features = ["golden"]
+```
+
+`runner` controls `LeanRunner`, `ProtocolMachineRunner`, `HeapParityRunner`, and the equivalence modules.
+Without `runner`, conversion and schema modules remain available.
+
+## Conversion and Schema Families
+
+`export::global_to_json()` and `export::local_to_json()` map Rust protocol types into Lean-compatible JSON.
+`import::json_to_global()` and `import::json_to_local()` parse those JSON forms back into `GlobalType` and `LocalTypeR`.
+
+The bridge defines three main schema families with explicit version constants:
+
+| Family | Version Constant | Value | Primary Payloads |
+|---|---|---|---|
+| Lean bridge core | `LEAN_BRIDGE_SCHEMA_VERSION` | `lean_bridge.v1` | `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `SimRunInput`, `SimRunOutput`, replay bundles |
+| Protocol bundles | `PROTOCOL_BUNDLE_SCHEMA_VERSION` | `protocol_bundle.v1` | `ProtocolBundle` |
+| Protocol-machine semantic objects | `SEMANTIC_OBJECTS_SCHEMA_VERSION` | `protocol_machine.semantic_objects.v1` | `ProtocolMachineSemanticObjects` export payloads |
+
+`schema::ensure_supported_schema_version()` rejects unsupported bridge-core versions.
+Unsupported or missing schema versions are rejected rather than normalized.
+
+## Lean Runners
+
+`LeanRunner` invokes the validator binary at `lean/.lake/build/bin/telltale_validator`.
+It supports validation and projection export workflows.
+
+`ProtocolMachineRunner` invokes `lean/.lake/build/bin/protocol_machine_runner`.
+It serializes `ProtocolMachineRunInput` to stdin and parses `ProtocolMachineRunOutput` from stdout.
+It also exposes `validate_trace()`, `run_reference_simulation()`, `validate_simulation_trace()`, `verify_invariants()`, and `compare_execution()`.
+
+`HeapParityRunner` invokes `lean/.lake/build/bin/heap_parity_runner`.
+It loads the published heap parity corpus and returns typed `HeapParityOutput` values for strict Rust↔Lean comparison.
+
+## Semantic Objects and Trace Normalization
+
+`semantic_objects` provides the canonical bridge payloads for the protocol-machine semantic-object family.
+`ProtocolMachineRunOutput.semantic_objects` and `ProtocolMachineRunOutput.effect_exchanges` are the canonical bridge-side exports for semantic runtime state and typed effect exchange data.
+
+`protocol_machine_trace::event_session()` extracts session ids from common event shapes.
+`normalize_semantic_audit()` rewrites tick values into per-session local counters.
+`semantic_audits_equivalent()` and `observationally_equivalent()` compare traces after that normalization.
+
+## Invariant, Equivalence, and Validator Utilities
+
+`invariants` defines typed claim schemas for Lean-side protocol bundle verification through `ProtocolBundle`.
+`equivalence::EquivalenceChecker` supports both golden-file comparison and live Lean comparison.
+`validate::Validator` provides lightweight checks for projection, roundtrip, and subtype-related workflows that do not require full protocol-machine execution.
+
+## Bridge Test and Tooling Lanes
+
+Bridge tests in `rust/bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, protocol-machine correspondence, and heap parity.
+Examples include:
+
+- `lean_integration_tests.rs`
+- `lean_trace_validation.rs`
+- `projection_runner_tests.rs`
+- `protocol_machine_correspondence_tests.rs`
+- `protocol_machine_differential_steps.rs`
+- `heap_lean_parity.rs`
+- `capability_model_correspondence.rs`
+- `protocol_bundle_admission_contracts.rs`
+
+These lanes align with repository-level gates such as `just check-parity --types`, `just check-parity --suite`, and `just check-capability-gates`.
 
 ## Protocol-Machine Policy and Data Shapes
 
@@ -97,14 +223,50 @@ The following surfaces are intentionally outside direct Lean parity. They must b
 
 Projection cross-validation is exercised through `rust/bridge/tests/projection_runner_tests.rs`. Tests skip per test when the Lean validator binary is unavailable. Skipping one test must not terminate the rest of the suite.
 
-## Heap Conformance Boundary
+## Heap Parity Surface
 
-The runtime heap does not yet have a first-class Lean mirror.
-Its container operations, Merkle helpers, and proof utilities are therefore still Rust-first.
+The runtime heap now has a focused Lean mirror for the parts of the contract that must remain cross-implementation stable.
 
-The current parity-ready boundary is the canonical heap encoding and vector surface documented in [Heap Encoding and Commitments](808_heap_encoding_commitments.md) and [Heap Determinism Contract](809_heap_determinism.md).
-The machine-readable conformance target is `rust/runtime/tests/data/heap_vectors_v1.json`.
-Any future Lean or external implementation should match those vectors before broader parity claims are made.
+| Surface | Lean Surface | Rust Surface | Status |
+|---|---|---|---|
+| Canonical resource bytes and tagged preimages | `lean/Runtime/Resources/HeapModel.lean` | `rust/runtime/src/heap/encoding.rs`, `rust/runtime/src/heap/resource.rs` | Aligned |
+| Active/nullifier ordering and replay interpreter | `lean/Runtime/Resources/HeapModel.lean`, `lean/Runtime/Proofs/Heap.lean` | `rust/runtime/src/heap/heap_impl.rs` | Aligned |
+| Proof-index and sibling-direction semantics | `lean/Runtime/Resources/HeapModel.lean` | `rust/runtime/src/heap/merkle.rs` | Aligned |
+| Published heap parity corpus | `lean/Runtime/Tests/HeapParityRunner.lean` | `rust/runtime/tests/data/heap_lean_parity_v1.json`, `rust/bridge/tests/heap_lean_parity.rs` | Aligned |
+
+This heap lane is narrower than a full cryptographic equivalence proof.
+Lean does not currently implement BLAKE3.
+Instead, Lean reconstructs canonical bytes, tagged preimages, ordering, proof-path structure, and deterministic replay from the published corpus, and Rust must match the published digest values exactly.
+
+The authoritative digest corpus remains the published heap vector set documented in [Resource Heap](802_resource_heap.md).
+`rust/runtime/tests/data/heap_vectors_v1.json` remains the minimal public digest vector file.
+`rust/runtime/tests/data/heap_lean_parity_v1.json` is the richer Rust↔Lean parity corpus.
+
+### Heap Enforcement
+
+The Lean heap surface is split into three files:
+
+| Surface | Location |
+|---|---|
+| Executable heap model | `lean/Runtime/Resources/HeapModel.lean` |
+| Basic determinism lemmas | `lean/Runtime/Proofs/Heap.lean` |
+| Executable parity runner | `lean/Runtime/Tests/HeapParityRunner.lean` |
+
+The strict Rust↔Lean heap suite is `rust/bridge/tests/heap_lean_parity.rs`.
+It runs the Lean executable, recomputes the same values in Rust through public heap APIs, and checks that both sides match the published corpus exactly.
+
+This lane justifies a stronger statement than “heap behavior is only tested in Rust,” but it is still not a full theorem-backed digest proof.
+
+Current claim:
+
+- Lean and Rust agree on canonical heap bytes, tagged preimages, ordering, proof-path structure, and deterministic replay for the published heap corpus.
+- Rust produces the authoritative digest values, and those values must match the published vectors exactly.
+
+Not yet claimed:
+
+- a pure Lean implementation of BLAKE3
+- a theorem that the Rust digest implementation is cryptographically correct
+- full mechanized heap refinement against all runtime heap code paths
 
 ## State Schema
 
@@ -259,6 +421,8 @@ On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints` provi
 ## Simulator Material Mirror
 
 Lean includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`. Rust material handlers live under `rust/simulator/src/material_handlers/`.
+The mirror now includes a Lean-native material-model boundary in `lean/Runtime/Simulation/Material.lean`, including built-in catalog dispatch and default initial-state derivation for shipped material families.
+It remains an executable parity layer, not a mirror of Rust trait objects or serde-based scenario parsing.
 
 Parity fixtures are enforced by:
 

@@ -119,4 +119,4 @@ Replay artifacts preserve the observable and semantic data needed for determinis
 - [Protocol-Machine Simulation](501_simulation_overview.md)
 - [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
 - [Protocol-Machine Simulation Materials](504_simulation_materials.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
