@@ -26,6 +26,7 @@ use crate::scenario::{
 };
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
+use telltale_machine::model::state::SessionState;
 
 /// (coroutine_id, role_name) pair.
 type CoroInfo = Vec<(usize, String)>;
@@ -69,6 +70,72 @@ fn init_coro_regs(
         machine.overwrite_coroutine_registers(*coro_id, 2, &vals)?;
     }
     Ok(())
+}
+
+fn productive_event_count(events: &[ObsEvent]) -> u64 {
+    u64::try_from(
+        events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    ObsEvent::Sent { .. }
+                        | ObsEvent::Received { .. }
+                        | ObsEvent::Offered { .. }
+                        | ObsEvent::Chose { .. }
+                )
+            })
+            .count(),
+    )
+    .unwrap_or(u64::MAX)
+}
+
+fn session_depth_budget(
+    snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
+) -> u64 {
+    snapshots
+        .values()
+        .flat_map(|session| session.local_types.values())
+        .map(|entry| u64::try_from(type_depth(&entry.current)).unwrap_or(u64::MAX))
+        .fold(0u64, u64::saturating_add)
+}
+
+fn session_weighted_measure(
+    snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
+) -> u64 {
+    let depth = session_depth_budget(snapshots);
+    let buffers = snapshots
+        .values()
+        .flat_map(|session| session.buffers.values())
+        .map(|buffer| u64::try_from(buffer.len()).unwrap_or(u64::MAX))
+        .fold(0u64, u64::saturating_add);
+    depth.saturating_mul(2).saturating_add(buffers)
+}
+
+fn contains_recursion(lt: &LocalTypeR) -> bool {
+    match lt {
+        LocalTypeR::Mu { body, .. } => contains_recursion(body),
+        LocalTypeR::Var(_) => true,
+        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+            branches.iter().any(|(_, _, cont)| contains_recursion(cont))
+        }
+        LocalTypeR::End => false,
+    }
+}
+
+fn type_depth(lt: &LocalTypeR) -> usize {
+    match lt {
+        LocalTypeR::End | LocalTypeR::Var(_) => 0,
+        LocalTypeR::Mu { body, .. } => type_depth(body),
+        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
+            let max_branch = branches
+                .iter()
+                .map(|(_, _, cont)| type_depth(cont))
+                .max()
+                .unwrap_or(0);
+            1 + max_branch
+        }
+    }
 }
 
 /// A choreography specification for concurrent execution.
@@ -254,6 +321,8 @@ pub struct ScenarioStats {
     pub execution_regime: ExecutionRegime,
     /// Resolved theorem/profile information for this run.
     pub theorem_profile: ResolvedTheoremProfile,
+    /// Theorem-native progress summary derived from session snapshots and productive events.
+    pub theorem_progress: TheoremProgressSummary,
     /// Resolved execution backend.
     pub backend: ResolvedExecutionBackend,
     /// Resolved scheduler concurrency value.
@@ -270,6 +339,143 @@ pub struct ScenarioStats {
     pub total_invoked_events: usize,
     /// Number of checkpoint writes attempted by interval policy.
     pub checkpoint_writes: usize,
+}
+
+/// Theorem-native progress summary for one scenario run.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct TheoremProgressSummary {
+    /// Initial weighted measure `W = 2 * depth + buffer`.
+    pub initial_weighted_measure: u64,
+    /// Initial exact productive-step budget for recursion-free protocols.
+    pub initial_depth_budget: u64,
+    /// Productive communication events observed during the run.
+    pub productive_step_count: u64,
+    /// Final weighted measure after execution.
+    pub remaining_weighted_measure: u64,
+    /// Weighted measure consumed over the run.
+    pub weighted_measure_consumed: u64,
+    /// Scheduler-lifted bound summary.
+    pub scheduler_lift: SchedulerLiftSummary,
+    /// Critical-capacity summary for supported scenarios.
+    pub critical_capacity: CriticalCapacitySummary,
+}
+
+/// Scheduler-lift summary for theorem-native step bounds.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SchedulerLiftSummary {
+    /// Whether only productive exactness is available or a conservative total-step bound exists.
+    pub mode: SchedulerLiftMode,
+    /// Conservative total-step upper bound when the selected scheduler profile admits one.
+    pub total_step_upper_bound: Option<u64>,
+}
+
+/// Scheduler-lift availability class.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SchedulerLiftMode {
+    /// Only productive-step accounting is reported exactly.
+    ProductiveExactOnly,
+    /// A conservative total-step bound is available.
+    ConservativeTotalStepBound,
+}
+
+/// Critical-capacity classification summary.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct CriticalCapacitySummary {
+    /// Threshold used for classification when available.
+    pub threshold: Option<u64>,
+    /// Phase classification relative to the threshold.
+    pub phase: CriticalCapacityPhase,
+}
+
+/// Critical-capacity phase classification.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CriticalCapacityPhase {
+    /// The scenario does not currently admit theorem-native phase classification.
+    Unsupported,
+    /// Observed productive load stayed below the threshold.
+    BelowThreshold,
+    /// Observed productive load saturated the threshold exactly.
+    AtThreshold,
+    /// Observed productive load exceeded the threshold.
+    AboveThreshold,
+}
+
+fn scheduler_lift_summary(
+    theorem_profile: &ResolvedTheoremProfile,
+    initial_weighted_measure: u64,
+    scheduler_concurrency: u64,
+) -> SchedulerLiftSummary {
+    if theorem_profile.eligibility == crate::scenario::TheoremEligibility::EnvelopeBounded {
+        SchedulerLiftSummary {
+            mode: SchedulerLiftMode::ConservativeTotalStepBound,
+            total_step_upper_bound: Some(
+                initial_weighted_measure.saturating_mul(scheduler_concurrency.max(1)),
+            ),
+        }
+    } else {
+        SchedulerLiftSummary {
+            mode: SchedulerLiftMode::ProductiveExactOnly,
+            total_step_upper_bound: None,
+        }
+    }
+}
+
+fn critical_capacity_summary(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    productive_step_count: u64,
+    initial_depth_budget: u64,
+) -> CriticalCapacitySummary {
+    if local_types.values().any(contains_recursion) {
+        return CriticalCapacitySummary {
+            threshold: None,
+            phase: CriticalCapacityPhase::Unsupported,
+        };
+    }
+
+    let phase = match productive_step_count.cmp(&initial_depth_budget) {
+        std::cmp::Ordering::Less => CriticalCapacityPhase::BelowThreshold,
+        std::cmp::Ordering::Equal => CriticalCapacityPhase::AtThreshold,
+        std::cmp::Ordering::Greater => CriticalCapacityPhase::AboveThreshold,
+    };
+
+    CriticalCapacitySummary {
+        threshold: Some(initial_depth_budget),
+        phase,
+    }
+}
+
+fn theorem_progress_summary(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    initial_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
+    final_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
+    productive_step_count: u64,
+    theorem_profile: &ResolvedTheoremProfile,
+    scheduler_concurrency: u64,
+) -> TheoremProgressSummary {
+    let initial_depth_budget = session_depth_budget(initial_snapshots);
+    let initial_weighted_measure = session_weighted_measure(initial_snapshots);
+    let remaining_weighted_measure = session_weighted_measure(final_snapshots);
+
+    TheoremProgressSummary {
+        initial_weighted_measure,
+        initial_depth_budget,
+        productive_step_count,
+        remaining_weighted_measure,
+        weighted_measure_consumed: initial_weighted_measure
+            .saturating_sub(remaining_weighted_measure),
+        scheduler_lift: scheduler_lift_summary(
+            theorem_profile,
+            initial_weighted_measure,
+            scheduler_concurrency,
+        ),
+        critical_capacity: critical_capacity_summary(
+            local_types,
+            productive_step_count,
+            initial_depth_budget,
+        ),
+    }
 }
 
 /// Run a choreography with scenario-defined middleware (faults/network/properties).
@@ -309,6 +515,7 @@ pub fn run_with_scenario(
         initial_states.clone()
     };
     init_coro_regs(&mut machine, &coro_info, &resolved_initial_states)?;
+    let initial_session_snapshots = machine.session_snapshots();
 
     let mut trace = Trace::new();
     let max_rounds = scenario.steps.saturating_sub(1);
@@ -393,6 +600,16 @@ pub fn run_with_scenario(
     let output_condition_trace = machine.output_condition_checks().to_vec();
     let semantic_audit_log = machine.semantic_audit_log();
     let semantic_objects = machine.semantic_objects();
+    let final_session_snapshots = machine.session_snapshots();
+    let productive_step_count = productive_event_count(&obs_trace);
+    let theorem_progress = theorem_progress_summary(
+        local_types,
+        &initial_session_snapshots,
+        &final_session_snapshots,
+        productive_step_count,
+        &theorem_profile,
+        resolved_execution.scheduler_concurrency,
+    );
     let total_invoked_events = obs_trace
         .iter()
         .filter(|event| matches!(event, ObsEvent::Invoked { .. }))
@@ -414,6 +631,7 @@ pub fn run_with_scenario(
             seed: scenario.seed,
             execution_regime: resolved_execution.regime(),
             theorem_profile,
+            theorem_progress,
             backend: resolved_execution.backend,
             scheduler_concurrency: resolved_execution.scheduler_concurrency,
             worker_threads: resolved_execution.worker_threads,

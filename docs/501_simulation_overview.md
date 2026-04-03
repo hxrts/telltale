@@ -28,6 +28,9 @@ The simulator also exposes a separate theorem/profile layer through `Scenario.th
 This layer records scheduler profile, envelope profile, and transport/fault assumption bundle independently of raw execution settings.
 That separation lets one execution be interpreted under different theorem-side contracts without changing the runtime behavior itself.
 
+When theorem-indexed reporting is enabled, `ScenarioStats` also includes a theorem-native progress summary.
+That summary reports weighted progress potential, productive communication count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification separately from raw transport counters.
+
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
 

@@ -75,6 +75,19 @@ It carries:
 The resolved theorem profile is emitted in both `ScenarioStats` and `ScenarioReplayArtifact`.
 Its `eligibility` reports whether the run admits exact theorem-backed reporting, only envelope-bounded reporting, or no theorem-backed reporting under the declared profile.
 
+`ScenarioStats.theorem_progress` adds the theorem-native quantitative summary:
+
+- `initial_weighted_measure`
+- `initial_depth_budget`
+- `productive_step_count`
+- `remaining_weighted_measure`
+- `weighted_measure_consumed`
+- `scheduler_lift`
+- `critical_capacity`
+
+These values are intentionally distinct from raw counters such as queue length, message count, or observable-event count.
+They summarize the run in the vocabulary of the weighted-measure and scheduling-bound proofs instead.
+
 ## Harness API
 
 `SimulationHarness` is the stable integration path for external projects.

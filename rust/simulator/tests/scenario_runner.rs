@@ -14,7 +14,7 @@ use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware}
 use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
-use telltale_simulator::runner::{run, run_with_scenario};
+use telltale_simulator::runner::{run, run_with_scenario, CriticalCapacityPhase, SchedulerLiftMode};
 use telltale_simulator::scenario::{
     ExecutionRegime, ResolvedExecutionBackend, Scenario, TheoremAssumptionBundle,
     TheoremEligibility, TheoremEnvelopeProfile, TheoremSchedulerProfile,
@@ -99,6 +99,28 @@ fn simple_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
     (global, local_types)
 }
 
+fn finite_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
+    let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+
+    let mut local_types = BTreeMap::new();
+    local_types.insert(
+        "A".to_string(),
+        LocalTypeR::Send {
+            partner: "B".into(),
+            branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
+        },
+    );
+    local_types.insert(
+        "B".to_string(),
+        LocalTypeR::Recv {
+            partner: "A".into(),
+            branches: vec![(Label::new("msg"), None, LocalTypeR::End)],
+        },
+    );
+
+    (global, local_types)
+}
+
 fn write_initial_states(machine: &mut SimulationMachine, sid: usize, initial_states: &BTreeMap<String, Vec<FixedQ32>>) {
     let coro_info = machine
         .session_coroutines(sid)
@@ -175,6 +197,14 @@ step_size = "0.01"
         TheoremEligibility::Exact
     );
     assert_eq!(result.replay.theorem_profile, result.stats.theorem_profile);
+    assert_eq!(
+        result.stats.theorem_progress.critical_capacity.phase,
+        CriticalCapacityPhase::Unsupported
+    );
+    assert_eq!(
+        result.stats.theorem_progress.scheduler_lift.mode,
+        SchedulerLiftMode::ProductiveExactOnly
+    );
     assert_eq!(result.stats.backend, ResolvedExecutionBackend::Canonical);
     assert_eq!(result.stats.scheduler_concurrency, 1);
     assert_eq!(result.stats.worker_threads, 1);
@@ -204,6 +234,103 @@ step_size = "0.01"
                 }
             )),
         "scenario replay should include structured semantic effect observations"
+    );
+}
+
+#[test]
+fn theorem_progress_summary_reports_descent_and_phase_boundary_for_supported_runs() {
+    let (global, local_types) = finite_protocol();
+    let scenario_toml = r#"
+name = "finite_progress_summary"
+roles = ["A", "B"]
+steps = 4
+seed = 5
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "canonical_exact"
+envelope_profile = "exact"
+assumption_bundle = "fault_free_transport"
+"#;
+    let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
+    let initial_states = BTreeMap::from([
+        ("A".to_string(), Vec::new()),
+        ("B".to_string(), Vec::new()),
+    ]);
+
+    let result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("finite scenario run");
+
+    assert_eq!(result.stats.theorem_progress.initial_depth_budget, 2);
+    assert_eq!(result.stats.theorem_progress.initial_weighted_measure, 4);
+    assert_eq!(result.stats.theorem_progress.productive_step_count, 2);
+    assert_eq!(result.stats.theorem_progress.remaining_weighted_measure, 0);
+    assert_eq!(result.stats.theorem_progress.weighted_measure_consumed, 4);
+    assert_eq!(
+        result.stats.theorem_progress.scheduler_lift.mode,
+        SchedulerLiftMode::ProductiveExactOnly
+    );
+    assert_eq!(
+        result.stats.theorem_progress.critical_capacity.threshold,
+        Some(2)
+    );
+    assert_eq!(
+        result.stats.theorem_progress.critical_capacity.phase,
+        CriticalCapacityPhase::AtThreshold
+    );
+}
+
+#[test]
+fn theorem_progress_summary_reports_scheduler_lift_for_envelope_runs() {
+    let (global, local_types) = finite_protocol();
+    let scenario_toml = r#"
+name = "finite_threaded_envelope"
+roles = ["A", "B"]
+steps = 4
+seed = 5
+
+[execution]
+backend = "threaded"
+scheduler_concurrency = 2
+worker_threads = 2
+
+[theorem]
+scheduler_profile = "threaded_envelope"
+envelope_profile = "protocol_machine_envelope_adherence"
+assumption_bundle = "fault_free_transport"
+"#;
+    let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
+    let initial_states = BTreeMap::from([
+        ("A".to_string(), Vec::new()),
+        ("B".to_string(), Vec::new()),
+    ]);
+
+    let result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("threaded envelope run");
+
+    assert_eq!(
+        result.stats.theorem_progress.scheduler_lift.mode,
+        SchedulerLiftMode::ConservativeTotalStepBound
+    );
+    assert_eq!(
+        result.stats.theorem_progress.scheduler_lift.total_step_upper_bound,
+        Some(8)
     );
 }
 

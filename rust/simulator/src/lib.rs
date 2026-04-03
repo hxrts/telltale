@@ -56,4 +56,8 @@ pub use material_handlers::{
 pub use network::{NetworkConfig, NetworkModel};
 pub use property::{Property, PropertyMonitor};
 pub use rng::SimRng;
+pub use runner::{
+    CriticalCapacityPhase, CriticalCapacitySummary, SchedulerLiftMode, SchedulerLiftSummary,
+    TheoremProgressSummary,
+};
 pub use telltale_machine::model::effects::EffectHandler;

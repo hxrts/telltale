@@ -144,14 +144,14 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 
 ## Phase 10: Capacity, Stability, and Phase Classification
 
-- [ ] Add weighted-measure accounting to simulator runs so each scenario can report protocol-level progress potential, productive-step count, and remaining budget.
-- [ ] Expose scheduler-lifted total-step bounds when the selected scheduler profile provides them, and report when only productive exactness is available.
-- [ ] Add critical-capacity and phase-classification reporting for supported scenarios, including below/at/above threshold classification.
-- [ ] Keep theorem-native classifications distinct from raw transport counters such as queue length or message count.
-- [ ] Add targeted tests for weighted-measure descent reporting, productive-step accounting, and phase-boundary classification.
-- [ ] Update simulator docs and examples to explain theorem-native run summaries.
-- [ ] Remove any superseded approximate or transport-counter-only summary code that overlaps with the new theorem-native reporting surface. No compatibility summaries.
-- [ ] Make a git commit for Phase 10.
+- [x] Add weighted-measure accounting to simulator runs so each scenario can report protocol-level progress potential, productive-step count, and remaining budget.
+- [x] Expose scheduler-lifted total-step bounds when the selected scheduler profile provides them, and report when only productive exactness is available.
+- [x] Add critical-capacity and phase-classification reporting for supported scenarios, including below/at/above threshold classification.
+- [x] Keep theorem-native classifications distinct from raw transport counters such as queue length or message count.
+- [x] Add targeted tests for weighted-measure descent reporting, productive-step accounting, and phase-boundary classification.
+- [x] Update simulator docs and examples to explain theorem-native run summaries.
+- [x] Remove any superseded approximate or transport-counter-only summary code that overlaps with the new theorem-native reporting surface. No compatibility summaries.
+- [x] Make a git commit for Phase 10.
 
 ## Phase 11: Reconfiguration-Native Topology and Handoff
 

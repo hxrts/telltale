@@ -55,6 +55,10 @@ The theorem block does not change runtime execution.
 It declares which theorem-side contract the caller wants the run to be interpreted under.
 The simulator resolves that declaration against the actual execution regime and reports eligibility in `ScenarioStats.theorem_profile` and `ScenarioReplayArtifact.theorem_profile`.
 
+For recursion-free scenarios, the simulator also derives theorem-native progress quantities in `ScenarioStats.theorem_progress`.
+These include weighted measure `W = 2 * depth + buffer`, productive-step count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification.
+Recursive scenarios still receive the weighted summary, but critical-capacity classification is currently reported as unsupported.
+
 ## Scenario Example
 
 ```toml
