@@ -26,13 +26,13 @@ pub mod effects;
 pub mod extensions;
 pub mod heap;
 pub mod identifiers;
-pub mod runtime;
+pub mod util;
 pub mod testing;
 pub mod topology;
 pub mod tracing;
 
-// Re-export runtime support types
-pub use runtime::{SystemClock, SystemRng};
+// Re-export utility-layer support types
+pub use util::{SystemClock, SystemRng};
 
 // Re-export typed identifiers
 pub use identifiers::{Endpoint as TopologyEndpoint, Namespace, Region, RoleName};
@@ -61,7 +61,7 @@ pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError, ProjectionContext, ProtocolExtension, StatementParser,
 };
-pub use runtime::{spawn, spawn_local};
+pub use util::{spawn, spawn_local};
 pub use topology::{
     parse_topology, validate_transport_contract_profile, validated_transport_contract_profile,
     ByteMessage, DocumentedTransportContract, InMemoryChannelTransport, Location, ParsedTopology,

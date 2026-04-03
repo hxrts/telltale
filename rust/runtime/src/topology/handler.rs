@@ -8,7 +8,7 @@ use super::{
     TransportResult,
 };
 use crate::identifiers::RoleName;
-use crate::runtime::sync::RwLock;
+use crate::util::sync::RwLock;
 use crate::{read_lock, write_lock};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, OnceLock};

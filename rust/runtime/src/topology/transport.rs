@@ -12,8 +12,8 @@ use super::{
 use crate::identifiers::RoleName;
 use crate::mutex_lock;
 #[cfg(not(target_arch = "wasm32"))]
-use crate::runtime::spawn::spawn;
-use crate::runtime::sync::{mpsc, Mutex};
+use crate::util::spawn::spawn;
+use crate::util::sync::{mpsc, Mutex};
 use async_trait::async_trait;
 use cfg_if::cfg_if;
 #[cfg(target_arch = "wasm32")]

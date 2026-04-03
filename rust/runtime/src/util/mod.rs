@@ -1,4 +1,4 @@
-//! Runtime support for choreographic protocol execution
+//! Utility support for choreographic protocol execution.
 //!
 //! This module provides:
 //!
@@ -6,26 +6,26 @@
 //!
 //! # Architecture
 //!
-//! The runtime module provides the infrastructure for executing generated
+//! The utility layer provides the infrastructure for executing generated
 //! protocol code on native and WASM targets. Execution itself is modeled
 //! through the effect system in [`crate::effects`]; this module is only the
-//! platform/runtime support layer.
+//! platform support layer.
 //!
 //! ```text
 //! ┌─────────────────────────────────────────────────────────────┐
-//! │                    Generated Code                            │
+//! │                    Generated Code                           │
 //! │          Effect Programs + ChoreoHandler                    │
 //! └─────────────────────────────────────────────────────────────┘
 //!                              │
 //!                              ▼
 //! ┌─────────────────────────────────────────────────────────────┐
-//! │                   Runtime Utilities                          │
-//! │          spawn(), spawn_local(), clocks                      │
+//! │                   Runtime Utilities                         │
+//! │          spawn(), spawn_local(), clocks                     │
 //! └─────────────────────────────────────────────────────────────┘
 //!                              │
 //!                              ▼
 //! ┌─────────────────────────────────────────────────────────────┐
-//! │                 Transport Implementation                     │
+//! │                 Transport Implementation                    │
 //! │              Handlers / Transport Layers                    │
 //! └─────────────────────────────────────────────────────────────┘
 //! ```

@@ -199,7 +199,7 @@ impl EnvelopeBuilder {
     ///
     /// For deterministic simulation, use controlled timestamps (or leave unset
     /// to default to 0). For production contexts with real timestamps, use
-    /// `SystemClock::timestamp_ns()` from the runtime module.
+    /// `SystemClock::timestamp_ns()` from the utility layer.
     #[must_use]
     pub fn timestamp(mut self, timestamp_ns: u64) -> Self {
         self.timestamp_ns = Some(timestamp_ns);
