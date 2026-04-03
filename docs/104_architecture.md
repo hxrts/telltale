@@ -236,6 +236,8 @@ The protocol machine provides a bytecode execution model for local types. The `t
 
 The protocol machine maintains session state with bounded message buffers. Each coroutine references its assigned program by ID. The scheduler policies are observationally equivalent per the Lean model. Nested protocol machines can be hosted inside a coroutine for hierarchical simulation.
 
+The choreography runtime also includes a deterministic heap utility for explicit resource tracking and heap commitments. That heap now uses a versioned canonical encoding boundary for resource identity and Merkle inputs. See [Resource Heap](802_resource_heap.md) and [Heap Encoding and Commitments](808_heap_encoding_commitments.md) for the heap-side contract.
+
 At the embedding boundary, the protocol machine distinguishes current host ownership from protocol typing and capability admission. Production host integrations use `load_choreography_owned(...)` and `OwnedSession` for explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers.
 
 Delegation and reconfiguration paths emit explicit receipts and audit records. See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for details on the underlying bytecode protocol-machine architecture.

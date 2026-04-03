@@ -8,7 +8,7 @@ This module lives in `telltale_runtime::heap`.
 
 The heap is a `telltale-runtime` utility.
 It is not the same system as the type-level content addressing in `telltale-types`.
-The runtime heap uses the shared `Hasher` abstraction with its own heap-local encoding and commitment logic.
+The runtime heap uses the shared `Hasher` abstraction with its own canonical heap encoding and commitment logic.
 
 The heap abstraction is currently Rust-only.
 The resource concepts correspond loosely to `lean/Runtime/Resources/ResourceModel.lean`, but the heap container and Merkle utilities do not currently have a first-class Lean mirror.
@@ -18,7 +18,7 @@ The resource concepts correspond loosely to `lean/Runtime/Resources/ResourceMode
 Resources are identified by `ResourceId`.
 Each ID stores a hasher digest and an allocation counter.
 The current default uses the shared BLAKE3 policy through `DefaultContentHasher`.
-The identifier is computed by hashing the resource byte encoding plus the allocation counter.
+The identifier is computed by hashing the canonical resource bytes plus the allocation counter.
 
 ```rust
 pub struct ResourceId<H: Hasher = DefaultContentHasher> {
@@ -134,13 +134,18 @@ In the current implementation, `NotFound` and `AlreadyConsumed` are the main ope
 
 ## Serialization and Hashing Notes
 
-The current resource byte encoding is a simplified bespoke format.
-It is not the same canonical serialization system used by `telltale-types::Contentable`.
-It also does not encode every field in full detail.
+The heap uses a versioned canonical binary format.
+Every canonical heap value starts with the `TTHP` magic prefix, a little-endian encoding version, and a one-byte type tag.
+Strings and byte slices use explicit little-endian `u32` length prefixes.
+Nested heap values are encoded as full canonical child values.
 
-For example, channel encoding currently includes sender, receiver, and queue length rather than the full queued payload contents.
-Message encoding currently includes source, destination, label, and sequence number, but not the full payload bytes.
-The heap should therefore be understood as using a deterministic runtime-local identifier scheme, not as a general canonical content-addressing layer.
+`ChannelState` encoding includes sender, receiver, queue length, and every queued `MessagePayload` in order.
+`Message` encoding includes source, destination, label, full payload bytes, and sequence number.
+`Session` and `Value` resources encode all of their current semantic fields.
+
+The heap canonical format is still runtime-local.
+It is not the same artifact encoding used by `telltale-types::Contentable`.
+See [Heap Encoding and Commitments](808_heap_encoding_commitments.md) for the byte-level contract.
 
 ## Determinism Notes
 

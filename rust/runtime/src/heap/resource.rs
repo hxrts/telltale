@@ -16,6 +16,11 @@
 //! Resource concepts correspond to `lean/Runtime/Resources/ResourceModel.lean`.
 //! The specific Rust types (`ResourceId`, `Resource`, `HeapError`) are Rust-only.
 
+use super::encoding::{
+    tag_channel_state, tag_message, tag_message_payload, tag_resource_channel,
+    tag_resource_message, tag_resource_session, tag_resource_value, CanonicalHeapEncoder,
+    CanonicalHeapEncoding,
+};
 use std::fmt;
 use std::hash::{Hash, Hasher as StdHasher};
 use std::marker::PhantomData;
@@ -47,7 +52,7 @@ impl<H: Hasher> ResourceId<H> {
 
     /// Create a ResourceId from a resource and allocation counter.
     pub fn from_resource(resource: &Resource, counter: u64) -> Self {
-        let content_bytes = resource.to_bytes();
+        let content_bytes = resource.canonical_bytes();
         let counter_bytes = counter.to_le_bytes();
         let mut bytes = Vec::with_capacity(content_bytes.len() + counter_bytes.len());
         bytes.extend_from_slice(&content_bytes);
@@ -145,6 +150,17 @@ pub struct MessagePayload {
     pub payload: Vec<u8>,
 }
 
+impl CanonicalHeapEncoding for MessagePayload {
+    fn encode_canonical_body(&self, encoder: &mut CanonicalHeapEncoder) {
+        encoder.string(&self.label);
+        encoder.bytes(&self.payload);
+    }
+
+    fn canonical_tag(&self) -> u8 {
+        tag_message_payload()
+    }
+}
+
 impl MessagePayload {
     /// Create a new message payload.
     pub fn new(label: impl Into<String>, payload: Vec<u8>) -> Self {
@@ -164,6 +180,21 @@ pub struct ChannelState {
     pub receiver: String,
     /// Pending messages in the channel
     pub queue: Vec<MessagePayload>,
+}
+
+impl CanonicalHeapEncoding for ChannelState {
+    fn encode_canonical_body(&self, encoder: &mut CanonicalHeapEncoder) {
+        encoder.string(&self.sender);
+        encoder.string(&self.receiver);
+        encoder.u32(self.queue.len() as u32);
+        for payload in &self.queue {
+            encoder.nested(payload);
+        }
+    }
+
+    fn canonical_tag(&self) -> u8 {
+        tag_channel_state()
+    }
 }
 
 impl ChannelState {
@@ -193,6 +224,19 @@ pub struct Message {
     pub content: MessagePayload,
     /// Sequence number for ordering
     pub seq_no: u64,
+}
+
+impl CanonicalHeapEncoding for Message {
+    fn encode_canonical_body(&self, encoder: &mut CanonicalHeapEncoder) {
+        encoder.string(&self.source);
+        encoder.string(&self.dest);
+        encoder.nested(&self.content);
+        encoder.u64(self.seq_no);
+    }
+
+    fn canonical_tag(&self) -> u8 {
+        tag_message()
+    }
 }
 
 impl Message {
@@ -281,48 +325,38 @@ impl Resource {
         }
     }
 
-    /// Serialize the resource to bytes for content addressing.
+    /// Serialize the resource to canonical heap bytes.
     ///
-    /// This is used for computing the content hash. A production
-    /// implementation would use DAG-CBOR or similar canonical serialization.
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
+    /// The heap derives resource identity and Merkle leaves from this
+    /// versioned canonical encoding.
+    pub fn canonical_bytes(&self) -> Vec<u8> {
+        self.to_canonical_bytes()
+    }
+}
 
+impl CanonicalHeapEncoding for Resource {
+    fn encode_canonical_body(&self, encoder: &mut CanonicalHeapEncoder) {
         match self {
-            Resource::Channel(cs) => {
-                bytes.extend_from_slice(b"channel:");
-                bytes.extend_from_slice(cs.sender.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(cs.receiver.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(&cs.queue.len().to_le_bytes());
-            }
-            Resource::Message(msg) => {
-                bytes.extend_from_slice(b"message:");
-                bytes.extend_from_slice(msg.source.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(msg.dest.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(msg.content.label.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(&msg.seq_no.to_le_bytes());
-            }
+            Resource::Channel(channel) => encoder.nested(channel),
+            Resource::Message(message) => encoder.nested(message),
             Resource::Session { role, type_hash } => {
-                bytes.extend_from_slice(b"session:");
-                bytes.extend_from_slice(role.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(&type_hash.to_le_bytes());
+                encoder.string(role);
+                encoder.u64(*type_hash);
             }
             Resource::Value { tag, data } => {
-                bytes.extend_from_slice(b"value:");
-                bytes.extend_from_slice(tag.as_bytes());
-                bytes.push(0);
-                bytes.extend_from_slice(&data.len().to_le_bytes());
-                bytes.extend_from_slice(data);
+                encoder.string(tag);
+                encoder.bytes(data);
             }
         }
+    }
 
-        bytes
+    fn canonical_tag(&self) -> u8 {
+        match self {
+            Resource::Channel(_) => tag_resource_channel(),
+            Resource::Message(_) => tag_resource_message(),
+            Resource::Session { .. } => tag_resource_session(),
+            Resource::Value { .. } => tag_resource_value(),
+        }
     }
 }
 
@@ -382,6 +416,7 @@ impl<H: Hasher> std::error::Error for HeapError<H> {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::heap::{HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION};
     use telltale_types::{Blake3Hasher, DefaultContentHasher, Hasher};
 
     #[test]
@@ -409,14 +444,84 @@ mod tests {
     }
 
     #[test]
-    fn test_resource_to_bytes() {
+    fn test_resource_canonical_bytes_use_versioned_encoding() {
         let channel = Resource::channel("Alice", "Bob");
-        let bytes = channel.to_bytes();
-        assert!(bytes.starts_with(b"channel:"));
+        let bytes = channel.canonical_bytes();
+        assert_eq!(&bytes[..4], &HEAP_ENCODING_MAGIC);
+        assert_eq!(&bytes[4..6], &HEAP_ENCODING_VERSION.to_le_bytes());
 
-        let msg = Resource::message("Alice", "Bob", "Hello", vec![1, 2, 3], 42);
-        let bytes = msg.to_bytes();
-        assert!(bytes.starts_with(b"message:"));
+        let message = Resource::message("Alice", "Bob", "Hello", vec![1, 2, 3], 42);
+        let bytes = message.canonical_bytes();
+        assert_eq!(&bytes[..4], &HEAP_ENCODING_MAGIC);
+        assert_eq!(&bytes[4..6], &HEAP_ENCODING_VERSION.to_le_bytes());
+    }
+
+    #[test]
+    fn test_channel_encoding_includes_full_queue_payloads() {
+        let channel = Resource::Channel(ChannelState {
+            sender: "Alice".into(),
+            receiver: "Bob".into(),
+            queue: vec![
+                MessagePayload::new("Ping", vec![1, 2, 3]),
+                MessagePayload::new("Pong", vec![4, 5, 6]),
+            ],
+        });
+        let bytes = channel.canonical_bytes();
+
+        assert!(bytes.windows(4).any(|window| window == b"Ping"));
+        assert!(bytes.windows(4).any(|window| window == b"Pong"));
+        assert!(bytes.windows(3).any(|window| window == [1, 2, 3]));
+        assert!(bytes.windows(3).any(|window| window == [4, 5, 6]));
+    }
+
+    #[test]
+    fn test_message_encoding_includes_full_payload_bytes() {
+        let message = Resource::message("Alice", "Bob", "Hello", vec![7, 8, 9, 10], 42);
+        let bytes = message.canonical_bytes();
+
+        assert!(bytes.windows(5).any(|window| window == b"Hello"));
+        assert!(bytes.windows(4).any(|window| window == [7, 8, 9, 10]));
+    }
+
+    #[test]
+    fn test_canonical_encoding_is_stable_per_resource_kind() {
+        let channel = Resource::Channel(ChannelState {
+            sender: "Alice".into(),
+            receiver: "Bob".into(),
+            queue: vec![MessagePayload::new("Ping", vec![1, 2, 3])],
+        });
+        let message = Resource::message("Alice", "Bob", "Hello", vec![1, 2, 3], 7);
+        let session = Resource::session("Alice", 12345);
+        let value = Resource::value("blob", vec![9, 8, 7]);
+
+        assert_eq!(channel.canonical_bytes(), channel.canonical_bytes());
+        assert_eq!(message.canonical_bytes(), message.canonical_bytes());
+        assert_eq!(session.canonical_bytes(), session.canonical_bytes());
+        assert_eq!(value.canonical_bytes(), value.canonical_bytes());
+    }
+
+    #[test]
+    fn test_canonical_encoding_distinguishes_semantic_changes() {
+        let left = Resource::message("Alice", "Bob", "Hello", vec![1, 2, 3], 7);
+        let right = Resource::message("Alice", "Bob", "Hello", vec![1, 2, 4], 7);
+
+        assert_ne!(left.canonical_bytes(), right.canonical_bytes());
+    }
+
+    #[test]
+    fn test_canonical_encoding_matches_for_semantically_identical_values() {
+        let left = Resource::Channel(ChannelState {
+            sender: "Alice".into(),
+            receiver: "Bob".into(),
+            queue: vec![MessagePayload::new("Ping", vec![1, 2, 3])],
+        });
+        let right = Resource::Channel(ChannelState {
+            sender: "Alice".into(),
+            receiver: "Bob".into(),
+            queue: vec![MessagePayload::new("Ping", vec![1, 2, 3])],
+        });
+
+        assert_eq!(left.canonical_bytes(), right.canonical_bytes());
     }
 
     #[test]

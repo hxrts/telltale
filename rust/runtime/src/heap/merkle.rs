@@ -75,7 +75,7 @@ fn hash_pair<H: Hasher>(left: &H::Digest, right: &H::Digest) -> H::Digest {
 
 /// Compute hash of a `(ResourceId, Resource)` leaf.
 fn hash_leaf<H: Hasher>(rid: &ResourceId<H>, resource: &Resource) -> H::Digest {
-    let resource_bytes = resource.to_bytes();
+    let resource_bytes = resource.canonical_bytes();
     let mut bytes = Vec::with_capacity(rid.as_bytes().len() + resource_bytes.len());
     bytes.extend_from_slice(rid.as_bytes());
     bytes.extend_from_slice(&resource_bytes);

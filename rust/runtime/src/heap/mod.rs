@@ -44,9 +44,13 @@
 //! ```
 
 mod heap_impl;
+mod encoding;
 mod merkle;
 mod resource;
 
+pub use encoding::{
+    CanonicalHeapEncoder, CanonicalHeapEncoding, HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
+};
 pub use heap_impl::Heap;
 pub use merkle::{Direction, HeapCommitment, MerkleProof, MerkleTree, ProofStep};
 pub use resource::{ChannelState, HeapError, Message, MessagePayload, Resource, ResourceId};

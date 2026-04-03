@@ -61,3 +61,4 @@
 - [API Reference](805_api_reference.md)
 - [Verification Inventory](806_verification_inventory.md)
 - [Glossary and Notation Index](807_glossary_notation.md)
+- [Heap Encoding and Commitments](808_heap_encoding_commitments.md)
