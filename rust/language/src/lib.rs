@@ -16,13 +16,14 @@ pub mod ast;
 pub mod compiler;
 pub mod effect_spec;
 pub mod extensions;
+pub mod integration;
 
 pub use ast::{
-    AgreementProfileDeclaration, Choreography, Condition, EffectInterfaceDeclaration,
-    ExecutionProfileDeclaration, GuestRuntimeDeclaration, LanguageTier, LanguageTierStatus,
-    LocalType, MessageType, OperationAgreementAttachment, OperationDeclaration, Protocol,
-    RegionDeclaration, Role, RoleSetDeclaration, TheoremPackDeclaration, TopologyDeclaration,
-    TypeDeclaration,
+    AgreementProfileDeclaration, Choreography, Condition, DslAnnotationEntry,
+    EffectInterfaceDeclaration, ExecutionProfileDeclaration, GuestRuntimeDeclaration, LanguageTier,
+    LanguageTierStatus, LocalType, MessageType, OperationAgreementAttachment, OperationDeclaration,
+    Protocol, RegionDeclaration, Role, RoleSetDeclaration, TheoremPackDeclaration,
+    TopologyDeclaration, TypeDeclaration,
 };
 pub use compiler::codegen::{
     generate_choreography_code, generate_choreography_code_with_annotations,
@@ -45,4 +46,9 @@ pub use effect_spec::{
 pub use extensions::{
     CodegenContext, ExtensionRegistry, ExtensionValidationError, GrammarExtension, ParseContext,
     ParseError as ExtensionParseError, ProjectionContext, ProtocolExtension, StatementParser,
+};
+pub use integration::{
+    collect_choreography_annotation_records, collect_protocol_annotation_records,
+    compile_choreography, compile_choreography_ast, AnnotationScope, CompileArtifactsError,
+    CompiledChoreography, ProtocolAnnotationRecord,
 };

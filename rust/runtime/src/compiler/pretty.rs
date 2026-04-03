@@ -539,12 +539,11 @@ fn format_role_ref(role: &Role) -> String {
 
 fn format_sender_term(role: &Role, annotations: &Annotations) -> String {
     let mut out = format_role_ref(role);
-    let mut entries: Vec<_> = annotations.dsl_map().into_iter().collect();
-    entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+    let entries = annotations.dsl_entries();
     if !entries.is_empty() {
         let formatted = entries
             .into_iter()
-            .map(|(key, value)| format!("{key} : {value}"))
+            .map(|entry| format!("{} : {}", entry.key, entry.value))
             .collect::<Vec<_>>()
             .join(", ");
         out.push_str(" { ");
@@ -558,11 +557,17 @@ fn merge_sender_annotations(
     sender_annotations: &Annotations,
     statement_annotations: &Annotations,
 ) -> Annotations {
-    let mut merged = sender_annotations.dsl_map();
-    for (key, value) in statement_annotations.dsl_map() {
-        merged.entry(key).or_insert(value);
+    let mut merged = sender_annotations.dsl_entries();
+    let mut existing_keys = merged
+        .iter()
+        .map(|entry| entry.key.clone())
+        .collect::<std::collections::BTreeSet<_>>();
+    for entry in statement_annotations.dsl_entries() {
+        if existing_keys.insert(entry.key.clone()) {
+            merged.push(entry);
+        }
     }
-    Annotations::from_dsl_map(&merged)
+    Annotations::from_dsl_entries(&merged)
 }
 
 fn normalize_surface_type_string(s: &str) -> String {

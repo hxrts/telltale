@@ -38,6 +38,13 @@ pub mod channel;
 // Re-export core types (always available)
 pub use futures;
 pub use serde;
+pub use telltale_language::{
+    collect_choreography_annotation_records, collect_protocol_annotation_records,
+    compile_choreography, compile_choreography_ast, parse_choreography_str, project,
+    AnnotationScope, Choreography, CompileArtifactsError, CompiledChoreography, LocalType,
+    MessageType as DslMessageType, ProjectionError, Protocol as DslProtocol,
+    ProtocolAnnotationRecord, Role as ChoreographyRole,
+};
 pub use telltale_types as types;
 pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 

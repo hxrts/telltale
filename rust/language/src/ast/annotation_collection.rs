@@ -1,4 +1,4 @@
-use super::ProtocolAnnotation;
+use super::{DslAnnotationEntry, ProtocolAnnotation};
 use std::collections::HashMap;
 use std::time::Duration;
 
@@ -29,28 +29,51 @@ impl Annotations {
         Self { items }
     }
 
-    pub fn from_dsl_map(map: &HashMap<String, String>) -> Self {
+    /// Create from ordered raw DSL entries.
+    ///
+    /// Entry order is preserved exactly. Known annotations are lowered to their
+    /// typed variants; unknown entries remain `Custom`.
+    #[must_use]
+    pub fn from_dsl_entries(entries: &[DslAnnotationEntry]) -> Self {
         let mut items = Vec::new();
+        let mut timed_choice = false;
+        let mut timeout_ms = None;
 
-        if map.get("timed_choice").is_some_and(|v| v == "true") {
-            let duration = map
-                .get("timeout_ms")
-                .and_then(|v| v.parse::<u64>().ok())
-                .map(Duration::from_millis)
-                .unwrap_or_else(|| Duration::from_secs(5));
-            items.push(ProtocolAnnotation::TimedChoice { duration });
-        }
-
-        let mut entries: Vec<_> = map.iter().collect();
-        entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
-        for (key, value) in entries {
-            if key == "timed_choice" || key == "timeout_ms" {
+        for entry in entries {
+            if entry.key == "timed_choice" && entry.value == "true" {
+                timed_choice = true;
                 continue;
             }
-            items.push(ProtocolAnnotation::parse_dsl_entry(key, value));
+            if entry.key == "timeout_ms" {
+                timeout_ms = entry.value.parse::<u64>().ok().map(Duration::from_millis);
+                continue;
+            }
+            items.push(ProtocolAnnotation::parse_dsl_entry(
+                &entry.key,
+                &entry.value,
+            ));
+        }
+
+        if timed_choice || timeout_ms.is_some() {
+            items.insert(
+                0,
+                ProtocolAnnotation::TimedChoice {
+                    duration: timeout_ms.unwrap_or_else(|| Duration::from_secs(5)),
+                },
+            );
         }
 
         Self { items }
+    }
+
+    pub fn from_dsl_map(map: &HashMap<String, String>) -> Self {
+        let mut entries: Vec<_> = map.iter().collect();
+        entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+        let entries = entries
+            .into_iter()
+            .map(|(key, value)| DslAnnotationEntry::new(key.clone(), value.clone()))
+            .collect::<Vec<_>>();
+        Self::from_dsl_entries(&entries)
     }
 
     pub fn dsl_map(&self) -> HashMap<String, String> {
@@ -63,6 +86,20 @@ impl Annotations {
         }
 
         map
+    }
+
+    /// Return raw DSL entries in stable order.
+    #[must_use]
+    pub fn dsl_entries(&self) -> Vec<DslAnnotationEntry> {
+        self.items
+            .iter()
+            .flat_map(|annotation| {
+                annotation
+                    .dsl_entries()
+                    .into_iter()
+                    .map(|(key, value)| DslAnnotationEntry::new(key, value))
+            })
+            .collect()
     }
 
     /// Add an annotation.
@@ -194,6 +231,15 @@ impl Annotations {
         self.items.iter().find_map(|a| a.custom_value(key))
     }
 
+    /// Get every custom annotation value for a key in source order.
+    #[must_use]
+    pub fn custom_values(&self, key: &str) -> Vec<&str> {
+        self.items
+            .iter()
+            .filter_map(|annotation| annotation.custom_value(key))
+            .collect()
+    }
+
     /// Merge annotations from another set.
     pub fn merge(&mut self, other: &Annotations) {
         self.items.extend(other.items.iter().cloned());
@@ -293,6 +339,35 @@ mod tests {
         let restored = anns.dsl_map();
         assert_eq!(restored.get("timed_choice"), Some(&"true".to_string()));
         assert_eq!(restored.get("timeout_ms"), Some(&"5000".to_string()));
+    }
+
+    #[test]
+    fn test_dsl_entries_preserve_order() {
+        let entries = vec![
+            DslAnnotationEntry::new("guard_capability", "chat:send"),
+            DslAnnotationEntry::new("flow_cost", "10"),
+            DslAnnotationEntry::new("journal_facts", "sent"),
+        ];
+
+        let annotations = Annotations::from_dsl_entries(&entries);
+        let restored = annotations.dsl_entries();
+
+        assert_eq!(restored, entries);
+    }
+
+    #[test]
+    fn test_custom_values_preserve_duplicates() {
+        let entries = vec![
+            DslAnnotationEntry::new("guard_capability", "chat:send"),
+            DslAnnotationEntry::new("guard_capability", "chat:audit"),
+        ];
+
+        let annotations = Annotations::from_dsl_entries(&entries);
+        assert_eq!(
+            annotations.custom_values("guard_capability"),
+            vec!["chat:send", "chat:audit"]
+        );
+        assert_eq!(annotations.custom("guard_capability"), Some("chat:send"));
     }
 
     #[test]

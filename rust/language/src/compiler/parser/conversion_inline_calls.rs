@@ -36,7 +36,7 @@ pub(crate) fn inline_calls(
                 result.push(Statement::Choice {
                     role: role.clone(),
                     branches: new_branches,
-                    annotations: HashMap::new(),
+                    annotations: Vec::new(),
                 });
             }
             Statement::Loop { condition, body } => {

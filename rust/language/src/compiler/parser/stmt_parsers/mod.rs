@@ -2,9 +2,9 @@
 //!
 //! This module contains parsers for each statement type in the choreography DSL.
 
-use crate::ast::Role;
+use crate::ast::{DslAnnotationEntry, Role};
 use proc_macro2::TokenStream;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use super::error::{ErrorSpan, ParseError};
 use super::role::parse_role_ref;
@@ -60,8 +60,8 @@ fn parse_role_annotation_value(pair: pest::iterators::Pair<Rule>) -> String {
 fn parse_role_annotation_block(
     pair: pest::iterators::Pair<Rule>,
     input: &str,
-) -> std::result::Result<HashMap<String, String>, ParseError> {
-    let mut annotations = HashMap::new();
+) -> std::result::Result<Vec<DslAnnotationEntry>, ParseError> {
+    let mut annotations = Vec::new();
 
     for item in pair.into_inner() {
         if item.as_rule() != Rule::role_annotation_entries {
@@ -90,7 +90,7 @@ fn parse_role_annotation_block(
                 "role annotation entry is missing a value",
             )?;
             let value = parse_role_annotation_value(value_pair);
-            annotations.insert(key, value);
+            annotations.push(DslAnnotationEntry::new(key, value));
         }
     }
 
@@ -110,11 +110,11 @@ fn is_statement_annotation_key(key: &str) -> bool {
     )
 }
 
-fn extract_statement_annotations(annotations: &HashMap<String, String>) -> HashMap<String, String> {
+fn extract_statement_annotations(annotations: &[DslAnnotationEntry]) -> Vec<DslAnnotationEntry> {
     annotations
         .iter()
-        .filter(|(key, _)| is_statement_annotation_key(key))
-        .map(|(key, value)| (key.clone(), value.clone()))
+        .filter(|entry| is_statement_annotation_key(&entry.key))
+        .cloned()
         .collect()
 }
 
@@ -122,10 +122,10 @@ fn parse_annotated_sender_ref(
     pair: pest::iterators::Pair<Rule>,
     declared_roles: &HashSet<String>,
     input: &str,
-) -> std::result::Result<(Role, HashMap<String, String>), ParseError> {
+) -> std::result::Result<(Role, Vec<DslAnnotationEntry>), ParseError> {
     let span = pair.as_span();
     let mut role: Option<Role> = None;
-    let mut annotations = HashMap::new();
+    let mut annotations = Vec::new();
 
     for item in pair.into_inner() {
         match item.as_rule() {

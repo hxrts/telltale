@@ -46,7 +46,7 @@ pub use telltale_types::{
 };
 
 // Re-export DSL-specific types
-pub use annotation::{Annotations, ProtocolAnnotation};
+pub use annotation::{Annotations, DslAnnotationEntry, ProtocolAnnotation};
 pub use choreography::{
     AgreementProfileDeclaration, AuthorityMetatheoryStatus, AuthorityMetatheoryTier,
     ChildEffectAggregation, ChildEffectAggregationPolicy, Choreography, EffectAuthorityClass,

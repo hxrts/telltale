@@ -222,7 +222,7 @@ pub(crate) fn parse_choice_stmt(
     Ok(Statement::Choice {
         role,
         branches,
-        annotations: HashMap::new(),
+        annotations: Vec::new(),
     })
 }
 

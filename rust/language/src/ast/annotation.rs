@@ -14,12 +14,36 @@
 //! - Enables pattern matching in code generation
 //! - Preserves extensibility for future annotation types
 
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 #[path = "annotation_collection.rs"]
 mod collection;
 
 pub use collection::Annotations;
+
+/// One raw annotation entry as it appeared in the DSL.
+///
+/// Telltale preserves these entries in source order for downstream integrations
+/// that treat annotation ordering as semantically meaningful.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DslAnnotationEntry {
+    /// Annotation key as parsed from the DSL surface.
+    pub key: String,
+    /// Annotation value as parsed from the DSL surface.
+    pub value: String,
+}
+
+impl DslAnnotationEntry {
+    /// Construct one raw DSL annotation entry.
+    #[must_use]
+    pub fn new(key: impl Into<String>, value: impl Into<String>) -> Self {
+        Self {
+            key: key.into(),
+            value: value.into(),
+        }
+    }
+}
 
 /// A typed annotation on a protocol statement.
 ///

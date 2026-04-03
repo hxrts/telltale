@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use super::super::role::parse_role_ref;
 use super::super::statement::parse_message;
@@ -23,7 +23,7 @@ pub(crate) fn parse_send_stmt(
         Rule::annotated_sender_ref => parse_annotated_sender_ref(from_pair, declared_roles, input)?,
         Rule::role_ref => (
             parse_role_ref(from_pair, declared_roles, input)?,
-            HashMap::new(),
+            Vec::new(),
         ),
         _ => {
             return Err(syntax_error(
@@ -47,7 +47,7 @@ pub(crate) fn parse_send_stmt(
         message,
         annotations,
         from_annotations,
-        to_annotations: HashMap::new(),
+        to_annotations: Vec::new(),
     })
 }
 
@@ -65,7 +65,7 @@ pub(crate) fn parse_broadcast_stmt(
         Rule::annotated_sender_ref => parse_annotated_sender_ref(from_pair, declared_roles, input)?,
         Rule::role_ref => (
             parse_role_ref(from_pair, declared_roles, input)?,
-            HashMap::new(),
+            Vec::new(),
         ),
         _ => {
             return Err(syntax_error(

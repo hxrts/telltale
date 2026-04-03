@@ -3,10 +3,11 @@
 //! These types represent the intermediate parse tree before conversion
 //! to the final Protocol AST.
 
-use crate::ast::{AuthorityBindingMode, CommitmentOutcome, ProgressAttachment, Role};
+use crate::ast::{
+    AuthorityBindingMode, CommitmentOutcome, DslAnnotationEntry, ProgressAttachment, Role,
+};
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use std::collections::HashMap;
 use syn::{BinOp, Expr, Lit, UnOp};
 
 /// Choreography statement types
@@ -49,20 +50,20 @@ pub(crate) enum Statement {
         from: Role,
         to: Role,
         message: MessageSpec,
-        annotations: HashMap<String, String>,
-        from_annotations: HashMap<String, String>,
-        to_annotations: HashMap<String, String>,
+        annotations: Vec<DslAnnotationEntry>,
+        from_annotations: Vec<DslAnnotationEntry>,
+        to_annotations: Vec<DslAnnotationEntry>,
     },
     Broadcast {
         from: Role,
         message: MessageSpec,
-        annotations: HashMap<String, String>,
-        from_annotations: HashMap<String, String>,
+        annotations: Vec<DslAnnotationEntry>,
+        from_annotations: Vec<DslAnnotationEntry>,
     },
     Choice {
         role: Role,
         branches: Vec<ChoiceBranch>,
-        annotations: HashMap<String, String>,
+        annotations: Vec<DslAnnotationEntry>,
     },
     Loop {
         condition: Option<crate::ast::Condition>,
