@@ -18,7 +18,6 @@
 //! The heap abstraction is currently Rust-only. Resource concepts
 //! correspond to `lean/Runtime/Resources/ResourceModel.lean`.
 
-use super::merkle::{HeapCommitment, MerkleProof, MerkleTree};
 use super::resource::{HeapError, Resource, ResourceId};
 use std::collections::{BTreeMap, BTreeSet};
 use telltale_types::{DefaultContentHasher, Hasher};
@@ -221,6 +220,7 @@ impl<H: Hasher> Heap<H> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::heap::{HeapCommitment, MerkleProof, MerkleTree};
     use telltale_types::DefaultContentHasher;
 
     #[test]

@@ -73,6 +73,10 @@ This does not mean every Rust API, compiler helper, macro path, plugin, or
 third-party integration is mechanically proved. Anything outside the declared
 shipped surface is listed explicitly below and is not part of the formal claim.
 
+The runtime heap is currently in that operational lane.
+Its canonical bytes, commitment hashes, and replay contract are checked through published vectors and runtime tests.
+They are not yet part of the first-class Lean proof surface.
+
 ## Claimed Surface
 
 The current proved or proof-backed claimed surface is:

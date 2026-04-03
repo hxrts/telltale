@@ -97,6 +97,15 @@ The following surfaces are intentionally outside direct Lean parity. They must b
 
 Projection cross-validation is exercised through `rust/bridge/tests/projection_runner_tests.rs`. Tests skip per test when the Lean validator binary is unavailable. Skipping one test must not terminate the rest of the suite.
 
+## Heap Conformance Boundary
+
+The runtime heap does not yet have a first-class Lean mirror.
+Its container operations, Merkle helpers, and proof utilities are therefore still Rust-first.
+
+The current parity-ready boundary is the canonical heap encoding and vector surface documented in [Heap Encoding and Commitments](808_heap_encoding_commitments.md) and [Heap Determinism Contract](809_heap_determinism.md).
+The machine-readable conformance target is `rust/runtime/tests/data/heap_vectors_v1.json`.
+Any future Lean or external implementation should match those vectors before broader parity claims are made.
+
 ## State Schema
 
 Lean and Rust schemas remain shape-equivalent on safety-visible and replay-visible fields. Runtime-only helper fields are permitted when they do not alter observable semantics.

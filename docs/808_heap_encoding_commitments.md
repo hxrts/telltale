@@ -56,6 +56,7 @@ See [API Reference](805_api_reference.md) for the exported runtime heap types.
 Another implementation should reproduce canonical bytes exactly.
 It should also preserve active-resource ordering and nullifier ordering exactly.
 The published heap test vectors are the conformance target for that behavior.
+The current published vector file is `rust/runtime/tests/data/heap_vectors_v1.json`.
 
 The heap container and Merkle utilities are still Rust-first.
 This document defines the boundary that a parity lane or external embedder must match.
