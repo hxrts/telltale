@@ -1,114 +1,65 @@
-//! Test suite verifying that external-demo inherits basic telltale features
-//!
-//! This test validates the core requirement: 3rd party projects should be able to
-//! import telltale, get basic features, and use choreography! syntax.
+use external_demo::{
+    aura_effect_handlers, choreography, compile_choreography, Contentable, DefaultContentId,
+};
 
-use external_demo::choreography;
-use external_demo::prelude::*;
-use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
-use serde::{Deserialize, Serialize};
-use telltale::channel;
+trait RandomEffects {
+    fn random_bytes(&self, len: usize) -> Vec<u8>;
+}
 
-// Common type definitions needed for generated code
-#[allow(dead_code)]
-type Channel = channel::Bidirectional<UnboundedSender<Label>, UnboundedReceiver<Label>>;
-
-// Message types for basic tests
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Message;
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Request;
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Response;
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct Data;
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ImportRequest;
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BasicFeatures;
-
-#[allow(dead_code)]
-#[derive(telltale::Message)]
-enum Label {
-    Message(Message),
-    Request(Request),
-    Response(Response),
-    Data(Data),
-    ImportRequest(ImportRequest),
-    BasicFeatures(BasicFeatures),
+aura_effect_handlers! {
+    trait_name: RandomEffects,
+    mock: {
+        struct_name: MockRandomHandler,
+        methods: {
+            random_bytes(len: usize) -> Vec<u8> => {
+                vec![0; len]
+            },
+        },
+    },
+    real: {
+        struct_name: RealRandomHandler,
+        methods: {
+            random_bytes(len: usize) -> Vec<u8> => {
+                vec![7; len]
+            },
+        },
+    },
 }
 
 #[test]
-fn test_basic_choreography_inheritance() {
-    // Test that basic choreography syntax works exactly like telltale
+fn external_demo_reexports_current_telltale_surface() {
     choreography! {
-        protocol BasicExample = {
-            roles Alice, Bob
-            Alice -> Bob : Message
-        }
+        protocol BasicExample =
+          roles Alice, Bob
+          Alice -> Bob : Ping
+          Bob -> Alice : Pong
     }
 
-    // If this compiles, basic feature inheritance is working
+    let compiled = compile_choreography(
+        r#"
+protocol BasicExample =
+  roles Alice, Bob
+  Alice -> Bob : Ping
+  Bob -> Alice : Pong
+"#,
+    )
+    .expect("compile choreography");
+
+    let global = compiled.try_global_type().expect("global type");
+    let content_id: DefaultContentId = global.content_id_default().expect("content id");
+    let _roles = BasicExample::sessions::setup();
+
+    assert_eq!(compiled.role_names(), vec!["Alice", "Bob"]);
+    assert!(compiled.local_type("Alice").is_some());
+    assert!(compiled.local_type("Bob").is_some());
+    assert_eq!(content_id, global.content_id_default().expect("content id"));
 }
 
 #[test]
-fn test_simple_client_server() {
-    // Test simple client-server protocol
-    choreography! {
-        protocol ClientServer = {
-            roles Client, Server
-            Client -> Server : Request
-            Server -> Client : Response
-        }
-    }
-}
+fn external_demo_macros_stay_domain_specific() {
+    let mock = MockRandomHandler::new();
+    let real = RealRandomHandler::new();
 
-#[test]
-fn test_another_two_party_protocol() {
-    // Test another two-party communication
-    choreography! {
-        protocol AnotherExample = {
-            roles Sender, Receiver
-
-            Sender -> Receiver : Data
-        }
-    }
-}
-
-/// Integration test that verifies the core requirement is met
-#[test]
-fn test_core_requirement_fulfilled() {
-    // This test embodies the core requirement:
-    // "3rd party developers can import telltale, get all features,
-    //  and use choreography! macro syntax"
-
-    // 1. Import telltale (✓ - via external_demo re-export)
-    // 2. Get basic features (✓ - basic syntax works above)
-    // 3. Use choreography! macro syntax (✓ - direct DSL syntax works)
-
-    use telltale_runtime::compiler::{ExtensionParser, GrammarComposer};
-    use telltale_runtime::extensions::ExtensionRegistry;
-
-    // Verify extension system integration
-    let _registry = ExtensionRegistry::new();
-    let _composer = GrammarComposer::new();
-    let _parser = ExtensionParser::new();
-
-    // Verify choreography macro works with basic syntax
-    choreography! {
-        protocol RequirementValidation = {
-            roles ThirdParty, TelltaleAura
-
-            // This validates that 3rd parties get basic functionality
-            ThirdParty -> TelltaleAura : ImportRequest
-            TelltaleAura -> ThirdParty : BasicFeatures
-        }
-    }
-
-    // If this test compiles and runs, the core requirement is fulfilled ✓
+    assert_eq!(mock.random_bytes(4), vec![0, 0, 0, 0]);
+    assert_eq!(real.random_bytes(3), vec![7, 7, 7]);
 }

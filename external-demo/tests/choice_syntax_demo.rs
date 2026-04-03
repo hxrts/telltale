@@ -1,70 +1,51 @@
-//! Demonstration of correct choice construct syntax for external-demo
-//!
-//! This test shows the working syntax for choice constructs and provides
-//! a corrected version of the user's original request.
-
-use telltale_runtime::{extensions::ExtensionRegistry, parse_and_generate_with_extensions};
+use external_demo::compile_choreography;
 
 #[test]
-fn demo_correct_choice_syntax() {
-    println!("=== Choice Constructs ARE Supported! ===\n");
+fn modern_choice_syntax_is_accepted() {
+    let compiled = compile_choreography(
+        r#"
+protocol TestChoice =
+  roles Alice, Bob
+  choice Alice at
+    | Option1 =>
+      Alice -> Bob : Message1
+    | Option2 =>
+      Alice -> Bob : Message2
+"#,
+    )
+    .expect("compile choreography");
 
-    // The user's original request (DOESN'T WORK):
-    let original_request = r#"
-protocol TestChoice = {
+    assert_eq!(compiled.role_names(), vec!["Alice", "Bob"]);
+}
+
+#[test]
+fn legacy_brace_protocol_syntax_is_rejected() {
+    let legacy = r#"
+protocol PingPong = {
     roles Alice, Bob
-
-    choice Alice {
-        option1: Alice -> Bob : Message1
-        option2: Alice -> Bob : Message2
-    }
+    Alice -> Bob : Ping
+    Bob -> Alice : Pong
 }
 "#;
 
-    // The CORRECTED syntax that WORKS:
-    let corrected_syntax = r#"
+    assert!(compile_choreography(legacy).is_err());
+}
+
+#[test]
+fn legacy_choice_block_syntax_is_rejected() {
+    let legacy = r#"
 protocol TestChoice = {
     roles Alice, Bob
-
     choice at Alice {
-        option1 -> {
+        Option1 -> {
             Alice -> Bob : Message1
         }
-        option2 -> {
+        Option2 -> {
             Alice -> Bob : Message2
         }
     }
 }
 "#;
 
-    println!("✗ ORIGINAL SYNTAX (doesn't work):");
-    println!("{}", original_request);
-
-    println!("✓ CORRECTED SYNTAX (works!):");
-    println!("{}", corrected_syntax);
-
-    let registry = ExtensionRegistry::new();
-
-    // Test original (should fail)
-    match parse_and_generate_with_extensions(original_request, &registry) {
-        Ok(_) => println!("Unexpected: Original syntax worked"),
-        Err(_) => println!("✓ Confirmed: Original syntax fails as expected"),
-    }
-
-    // Test corrected (should work)
-    match parse_and_generate_with_extensions(corrected_syntax, &registry) {
-        Ok(_) => println!("✓ SUCCESS: Corrected syntax works perfectly!"),
-        Err(e) => {
-            println!("✗ ERROR: Corrected syntax failed: {}", e);
-            panic!("This should work!");
-        }
-    }
-
-    println!("\n=== Key Differences ===");
-    println!("1. Use 'choice at Role' (or 'case choose Role of')");
-    println!("2. Each branch uses 'label ->' with a block");
-    println!("3. The parser generates session types automatically");
-    println!("\n=== Result ===");
-    println!("Choice constructs ARE supported by parse_and_generate_with_extensions!");
-    println!("The advanced parser can handle choice constructs correctly.");
+    assert!(compile_choreography(legacy).is_err());
 }

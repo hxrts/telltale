@@ -1,54 +1,13 @@
 //! External Demo Macros - Proc Macro Crate
 //!
-//! This crate provides additional proc macros for the external demo,
-//! demonstrating how 3rd party projects can create their own macros
-//! while still using telltale's choreography! macro for protocols.
+//! This crate provides downstream-specific proc macros that complement the
+//! upstream `tell!` choreography macro. Protocol compilation should go through
+//! Telltale directly; this crate only owns macros that are genuinely specific
+//! to the external demo.
 
 use proc_macro::TokenStream;
 
-mod choreography;
 mod effect_handlers;
-
-/// Full-featured choreography! macro with ALL telltale features
-///
-/// This macro provides access to ALL telltale features including:
-/// - Module declarations: `module my_protocol exposing (MyProtocol)`
-/// - Parameterized roles: `Worker[N]`, `Signer[*]`
-/// - Choice constructs: `choice at Role { ... }`
-/// - Loop constructs: `loop repeat N { ... }`, `loop decide by Role { ... }`
-/// - Extension system integration
-///
-/// # Example
-///
-/// ```ignore
-/// use external_demo::choreography;
-///
-/// choreography! {
-///     module threshold_ceremony exposing (ThresholdExample)
-///     protocol ThresholdExample = {
-///         roles Coordinator, Signer[N]
-///
-///         choice at Coordinator {
-///             start_ceremony -> {
-///                 Coordinator -> Signer[*] : StartRequest
-///                 Signer[*] -> Coordinator : Commitment
-///                 Coordinator -> Signer[*] : Challenge
-///                 Signer[*] -> Coordinator : Response
-///             }
-///             abort -> {
-///                 Coordinator -> Signer[*] : Abort
-///             }
-///         }
-///     }
-/// }
-/// ```
-#[proc_macro]
-pub fn choreography(input: TokenStream) -> TokenStream {
-    match choreography::choreography_impl(input.into()) {
-        Ok(output) => output.into(),
-        Err(err) => err.to_compile_error().into(),
-    }
-}
 
 /// Generate effect handler implementations with mock and real variants
 ///

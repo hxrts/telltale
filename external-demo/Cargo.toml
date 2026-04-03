@@ -7,21 +7,8 @@ edition = "2021"
 [workspace]
 
 [dependencies]
-# Re-export all telltale functionality
 telltale = { path = ".." }
-telltale-runtime = { path = "../rust/runtime" }
-telltale-macros = { path = "../rust/macros" }
-
-# Import our proc macros from the separate crate
 external-demo-macros = { path = "../external-demo-macros" }
-
-# Dependencies needed for extension system
-proc-macro2 = "1.0"
-quote = "1.0"
-syn = { version = "2.0", features = ["full"] }
-
-# Additional dependencies for examples
-tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

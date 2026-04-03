@@ -1,91 +1,90 @@
 #![allow(clippy::type_complexity)]
 
-//! External Demo - Full Telltale-Aura Integration
+//! External demo crate for downstream Telltale integrations.
 //!
-//! This crate demonstrates how external projects integrate with telltale
-//! and the choreography DSL. It serves as a reference implementation for
-//! third-party crates that want to use the MPST library.
-//!
-//! # Architecture
-//!
-//! ```text
-//! external-demo/              ← Regular crate (re-exports telltale)
-//! external-demo-macros/       ← Proc-macro crate (custom macros)
-//! ```
+//! This crate is intentionally thin. It demonstrates the recommended
+//! integration path for third-party crates:
+//! - re-export the `tell!` macro under a domain-friendly name
+//! - use `compile_choreography(...)` for validated AST + projection work
+//! - consume ordered annotation records from the authoritative AST
+//! - rely on the central default content-hash policy
 //!
 //! # Usage
 //!
 //! ```ignore
-//! use external_demo::prelude::*;
+//! use external_demo::{choreography, compile_choreography};
 //!
-//! // Define choreography using the macro
 //! choreography! {
-//!     protocol Example = {
-//!         roles Alice, Bob
-//!
-//!         Alice -> Bob : Request
-//!         Bob -> Alice : Response
-//!     }
+//!     protocol Example =
+//!       roles Alice, Bob
+//!       Alice -> Bob : Request
+//!       Bob -> Alice : Response
 //! }
+//!
+//! let compiled = compile_choreography(
+//!     "protocol Example =\n  roles Alice, Bob\n  Alice -> Bob : Request\n  Bob -> Alice : Response\n",
+//! )?;
 //! ```
 
-// Re-export the choreography macro
-pub use external_demo_macros::choreography;
+pub use external_demo_macros::aura_effect_handlers;
+pub use telltale::tell as choreography;
+pub use telltale::types::{
+    Blake3Hasher, ContentIdBlake3, Contentable, DefaultContentHasher, DefaultContentId,
+};
+pub use telltale::{
+    collect_choreography_annotation_records, collect_protocol_annotation_records,
+    compile_choreography, compile_choreography_ast, parse_choreography_str, project,
+    AnnotationScope, Choreography, ChoreographyRole, CompileArtifactsError, CompiledChoreography,
+    DslMessageType, DslProtocol, LocalType, ProjectionError, ProtocolAnnotationRecord,
+};
 
-// Prelude module for convenient imports
+/// Prelude module for downstream demo code.
 pub mod prelude {
-    // Core session types and macros from telltale
+    pub use telltale::types::{
+        Blake3Hasher, ContentIdBlake3, Contentable, DefaultContentHasher, DefaultContentId,
+        GlobalType, Label, LocalTypeR, PayloadSort,
+    };
     pub use telltale::{
         channel::Bidirectional, session, try_session, Branch, End, Message, Receive, Role, Roles,
         Select, Send,
     };
-
-    // Choreography types
-    pub use telltale_runtime::{
-        ast::{Choreography, LocalType, MessageType, Protocol, Role as ChoreographyRole},
-        compiler::{parser::parse_choreography_str_with_extensions, GrammarComposer},
-        extensions::{ExtensionRegistry, ProtocolExtension},
-        runtime::{ChoreographicAdapter, ProtocolContext, RoleId},
+    pub use telltale::{
+        collect_choreography_annotation_records, collect_protocol_annotation_records,
+        compile_choreography, compile_choreography_ast, parse_choreography_str, project,
+        AnnotationScope, Choreography, ChoreographyRole, CompileArtifactsError,
+        CompiledChoreography, DslMessageType, DslProtocol, LocalType, ProjectionError,
+        ProtocolAnnotationRecord,
     };
 
-    // Re-export futures for async support
+    pub use external_demo_macros::aura_effect_handlers;
     pub use futures::{channel::mpsc, executor, try_join};
-
-    // Re-export our custom macro
-    pub use external_demo_macros::choreography;
+    pub use telltale::tell as choreography;
 }
 
-// Extension definitions for Aura
-pub mod aura_extensions;
-
-// Re-export aura extensions
-pub use aura_extensions::{create_aura_extension_registry, register_aura_extensions};
-
-// Re-export specific types to avoid ambiguity
-// Users should use prelude::* or import from these explicitly
-
-/// Core telltale types for session type programming
+/// Session-typed runtime surface from `telltale`.
 pub mod session {
     pub use telltale::{
         channel, session, try_session, Branch, End, Message, Receive, Role, Roles, Select, Send,
     };
 }
 
-/// Choreography DSL types and tools
-pub mod choreography_dsl {
-    pub use telltale_runtime::{
-        ast, compiler, extensions, runtime, simulation, testing, tracing,
+/// Recommended integration API surface for downstream crates.
+pub mod integration {
+    pub use telltale::{
+        collect_choreography_annotation_records, collect_protocol_annotation_records,
+        compile_choreography, compile_choreography_ast, parse_choreography_str, project,
+        AnnotationScope, Choreography, ChoreographyRole, CompileArtifactsError,
+        CompiledChoreography, DslMessageType, DslProtocol, LocalType, ProjectionError,
+        ProtocolAnnotationRecord,
     };
 }
 
-/// Initialize the Aura extension system
-///
-/// This function configures the extension registry with Aura-specific
-/// grammar extensions and statement parsers.
-pub fn init_aura_extensions() -> telltale_runtime::extensions::ExtensionRegistry {
-    let mut registry = telltale_runtime::extensions::ExtensionRegistry::new();
-    aura_extensions::register_aura_extensions(&mut registry);
-    registry
+/// Content-addressing policy surface for downstream crates.
+pub mod hashing {
+    pub use telltale::types::{
+        Blake3Hasher, ContentId, ContentIdBlake3, Contentable, DefaultContentHasher,
+        DefaultContentId, Hasher,
+    };
 }
 
 #[cfg(test)]
@@ -93,16 +92,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_extension_registry_initialization() {
-        let registry = init_aura_extensions();
-        // Verify extensions are registered
-        assert!(registry.grammar_extensions().count() > 0);
+    fn prelude_exposes_modern_integration_surface() {
+        let _compile = compile_choreography;
+        let _hash: Option<DefaultContentId> = None;
     }
 
     #[test]
-    fn test_prelude_imports() {
-        // Verify prelude provides necessary types
+    fn prelude_imports_compile() {
         use crate::prelude::*;
-        let _registry = ExtensionRegistry::new();
+
+        let _compile = compile_choreography;
+        let _content_id: Option<DefaultContentId> = None;
     }
 }
