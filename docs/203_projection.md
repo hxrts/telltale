@@ -256,7 +256,7 @@ This distinction is critical for protocol safety. The Rust implementation matche
 
 When a role appears in zero branches, the projection is `End`. When a role appears in one branch, that projection is used. When a role appears in two or more branches, projections are merged if compatible. An error occurs if conflicts exist.
 
-### 6. Dynamic Role Projection
+## Dynamic Role Projection
 
 The default `project()` entry point does not resolve runtime role families on its own.
 Unresolved symbolic, wildcard, or runtime role parameters return projection errors.
