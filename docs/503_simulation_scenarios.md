@@ -34,11 +34,13 @@ pub struct Scenario {
 ```rust
 pub struct ExecutionSpec {
     pub backend: ExecutionBackend,
+    pub scheduler_policy: SchedulerPolicySpec,
     pub scheduler_concurrency: Option<u64>,
     pub worker_threads: Option<u64>,
 }
 ```
 
+`scheduler_policy` selects the underlying protocol-machine scheduling discipline.
 `scheduler_concurrency` controls how much scheduler work one simulator round may admit.
 `worker_threads` controls physical parallelism for the threaded backend only.
 Canonical execution requires both values to resolve to `1`.
@@ -71,6 +73,7 @@ checkpoint_interval = 25
 
 [execution]
 backend = "threaded"
+scheduler_policy = "round_robin"
 scheduler_concurrency = 2
 worker_threads = 4
 

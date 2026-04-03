@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
-use crate::analysis::NormalizedObservability;
+use crate::analysis::{compare_observability, NormalizedObservability, ObservabilityRelation};
 use crate::backend::SimulationMachine;
 use crate::fault::{
     AdversaryBudgetRecord, AdversarySummary, AssumptionDiagnostic, AssumptionFailureClass,
@@ -14,6 +14,7 @@ use crate::fault::{
 };
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
 use telltale_machine::model::output_condition::OutputConditionCheck;
+use telltale_machine::model::scheduler_types::{PriorityPolicy, SchedPolicy};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
@@ -28,7 +29,8 @@ use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
 use crate::reconfiguration::{ReconfigurationRecord, ReconfigurationSummary};
 use crate::scenario::{
-    ExecutionRegime, ResolvedExecutionBackend, ResolvedTheoremProfile, Scenario,
+    ExecutionRegime, ResolvedExecutionBackend, ResolvedSchedulerPolicy, ResolvedTheoremProfile,
+    Scenario,
 };
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
@@ -345,6 +347,8 @@ pub struct ScenarioStats {
     pub theorem_profile: ResolvedTheoremProfile,
     /// Theorem-native progress summary derived from session snapshots and productive events.
     pub theorem_progress: TheoremProgressSummary,
+    /// Scheduler-facing theorem/native execution profile summary for the run.
+    pub scheduler_profile: SchedulerProfileSummary,
     /// Reconfiguration accounting summary kept separate from theorem progress descent.
     pub reconfiguration_summary: ReconfigurationSummary,
     /// Adversary-budget summary for the run.
@@ -382,29 +386,82 @@ pub struct TheoremProgressSummary {
     pub remaining_weighted_measure: u64,
     /// Weighted measure consumed over the run.
     pub weighted_measure_consumed: u64,
-    /// Scheduler-lifted bound summary.
-    pub scheduler_lift: SchedulerLiftSummary,
     /// Critical-capacity summary for supported scenarios.
     pub critical_capacity: CriticalCapacitySummary,
 }
 
-/// Scheduler-lift summary for theorem-native step bounds.
+/// Scheduler-profile summary for theorem-native scheduling semantics.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub struct SchedulerLiftSummary {
+pub struct SchedulerProfileSummary {
+    /// Resolved implementation scheduler policy.
+    pub implementation_policy: ResolvedSchedulerPolicy,
+    /// Resolved theorem-facing scheduler profile.
+    pub theorem_profile: crate::scenario::TheoremSchedulerProfile,
+    /// Whether productive-step accounting remains exact.
+    pub productive_exactness: bool,
     /// Whether only productive exactness is available or a conservative total-step bound exists.
-    pub mode: SchedulerLiftMode,
+    pub total_step_mode: SchedulerBoundMode,
     /// Conservative total-step upper bound when the selected scheduler profile admits one.
     pub total_step_upper_bound: Option<u64>,
+    /// Fairness premise required by the implementation policy.
+    pub fairness_requirement: SchedulerFairnessRequirement,
+    /// Envelope/adherence status under the theorem profile.
+    pub envelope_status: SchedulerEnvelopeStatus,
 }
 
-/// Scheduler-lift availability class.
+/// Scheduler-bound availability class.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum SchedulerLiftMode {
+pub enum SchedulerBoundMode {
     /// Only productive-step accounting is reported exactly.
     ProductiveExactOnly,
     /// A conservative total-step bound is available.
     ConservativeTotalStepBound,
+}
+
+/// Fairness premise required by the scheduler policy.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SchedulerFairnessRequirement {
+    /// Fairness depends on roles yielding cooperatively.
+    ExplicitYieldFairness,
+    /// Fairness depends on round-robin queue rotation.
+    RoundRobinQueueFairness,
+    /// Fairness depends on aging priority promotion.
+    AgingPriorityFairness,
+    /// Fairness depends on token-weighted priority discipline.
+    TokenWeightedFairness,
+    /// Fairness depends on progress-token availability.
+    ProgressTokenFairness,
+}
+
+/// Envelope/adherence status for the resolved scheduler profile.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SchedulerEnvelopeStatus {
+    /// The run is theorem-exact for this scheduler profile.
+    Exact,
+    /// The run is admitted under envelope adherence only.
+    EnvelopeAdherent,
+    /// The run is admitted under the broader envelope admission contract.
+    EnvelopeAdmitted,
+    /// The declared scheduler profile is not theorem-backed for this run.
+    Ineligible,
+}
+
+/// Cross-run scheduler comparison anchored to normalized observability.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct SchedulerComparison {
+    /// Baseline run scheduler profile.
+    pub baseline: SchedulerProfileSummary,
+    /// Candidate run scheduler profile.
+    pub candidate: SchedulerProfileSummary,
+    /// Raw-vs-normalized observability relation between the runs.
+    pub observability_relation: ObservabilityRelation,
+    /// Whether theorem-backed eligibility matches across the runs.
+    pub theorem_eligibility_match: bool,
+    /// Whether the difference is performance/classification-only rather than semantic.
+    pub performance_only_difference: bool,
 }
 
 /// Critical-capacity classification summary.
@@ -430,23 +487,102 @@ pub enum CriticalCapacityPhase {
     AboveThreshold,
 }
 
-fn scheduler_lift_summary(
+fn scheduler_profile_summary(
+    resolved_policy: ResolvedSchedulerPolicy,
     theorem_profile: &ResolvedTheoremProfile,
     initial_weighted_measure: u64,
     scheduler_concurrency: u64,
-) -> SchedulerLiftSummary {
-    if theorem_profile.eligibility == crate::scenario::TheoremEligibility::EnvelopeBounded {
-        SchedulerLiftSummary {
-            mode: SchedulerLiftMode::ConservativeTotalStepBound,
-            total_step_upper_bound: Some(
-                initial_weighted_measure.saturating_mul(scheduler_concurrency.max(1)),
-            ),
+) -> SchedulerProfileSummary {
+    let (total_step_mode, total_step_upper_bound) =
+        if theorem_profile.eligibility == crate::scenario::TheoremEligibility::EnvelopeBounded {
+            (
+                SchedulerBoundMode::ConservativeTotalStepBound,
+                Some(initial_weighted_measure.saturating_mul(scheduler_concurrency.max(1))),
+            )
+        } else {
+            (SchedulerBoundMode::ProductiveExactOnly, None)
+        };
+
+    let fairness_requirement = match resolved_policy {
+        ResolvedSchedulerPolicy::Cooperative => SchedulerFairnessRequirement::ExplicitYieldFairness,
+        ResolvedSchedulerPolicy::RoundRobin => {
+            SchedulerFairnessRequirement::RoundRobinQueueFairness
         }
+        ResolvedSchedulerPolicy::PriorityAging => {
+            SchedulerFairnessRequirement::AgingPriorityFairness
+        }
+        ResolvedSchedulerPolicy::PriorityTokenWeighted => {
+            SchedulerFairnessRequirement::TokenWeightedFairness
+        }
+        ResolvedSchedulerPolicy::ProgressAware => {
+            SchedulerFairnessRequirement::ProgressTokenFairness
+        }
+    };
+
+    let envelope_status = if theorem_profile.eligibility
+        == crate::scenario::TheoremEligibility::Ineligible
+    {
+        SchedulerEnvelopeStatus::Ineligible
     } else {
-        SchedulerLiftSummary {
-            mode: SchedulerLiftMode::ProductiveExactOnly,
-            total_step_upper_bound: None,
+        match theorem_profile.envelope_profile {
+            crate::scenario::TheoremEnvelopeProfile::Exact => SchedulerEnvelopeStatus::Exact,
+            crate::scenario::TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdherence => {
+                SchedulerEnvelopeStatus::EnvelopeAdherent
+            }
+            crate::scenario::TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdmission => {
+                SchedulerEnvelopeStatus::EnvelopeAdmitted
+            }
+            crate::scenario::TheoremEnvelopeProfile::None
+            | crate::scenario::TheoremEnvelopeProfile::Auto => SchedulerEnvelopeStatus::Ineligible,
         }
+    };
+
+    SchedulerProfileSummary {
+        implementation_policy: resolved_policy,
+        theorem_profile: theorem_profile.scheduler_profile,
+        productive_exactness: true,
+        total_step_mode,
+        total_step_upper_bound,
+        fairness_requirement,
+        envelope_status,
+    }
+}
+
+fn machine_scheduler_policy(policy: ResolvedSchedulerPolicy) -> SchedPolicy {
+    match policy {
+        ResolvedSchedulerPolicy::Cooperative => SchedPolicy::Cooperative,
+        ResolvedSchedulerPolicy::RoundRobin => SchedPolicy::RoundRobin,
+        ResolvedSchedulerPolicy::PriorityAging => SchedPolicy::Priority(PriorityPolicy::Aging),
+        ResolvedSchedulerPolicy::PriorityTokenWeighted => {
+            SchedPolicy::Priority(PriorityPolicy::TokenWeighted)
+        }
+        ResolvedSchedulerPolicy::ProgressAware => SchedPolicy::ProgressAware,
+    }
+}
+
+/// Compare two scenario runs through their scheduler-profile summaries and normalized observability.
+pub fn compare_scheduler_runs(
+    baseline: &ScenarioResult,
+    candidate: &ScenarioResult,
+) -> SchedulerComparison {
+    let observability = compare_observability(
+        &baseline.replay.obs_trace,
+        &baseline.replay.reconfiguration_trace,
+        &baseline.analysis.normalized_observability,
+        &candidate.replay.obs_trace,
+        &candidate.replay.reconfiguration_trace,
+        &candidate.analysis.normalized_observability,
+    );
+    let theorem_eligibility_match =
+        baseline.stats.theorem_profile.eligibility == candidate.stats.theorem_profile.eligibility;
+
+    SchedulerComparison {
+        baseline: baseline.stats.scheduler_profile.clone(),
+        candidate: candidate.stats.scheduler_profile.clone(),
+        observability_relation: observability.relation,
+        theorem_eligibility_match,
+        performance_only_difference: theorem_eligibility_match
+            && observability.relation != ObservabilityRelation::SafetyVisibleDivergence,
     }
 }
 
@@ -479,8 +615,6 @@ fn theorem_progress_summary(
     initial_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
     final_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
     productive_step_count: u64,
-    theorem_profile: &ResolvedTheoremProfile,
-    scheduler_concurrency: u64,
 ) -> TheoremProgressSummary {
     let initial_depth_budget = session_depth_budget(initial_snapshots);
     let initial_weighted_measure = session_weighted_measure(initial_snapshots);
@@ -493,11 +627,6 @@ fn theorem_progress_summary(
         remaining_weighted_measure,
         weighted_measure_consumed: initial_weighted_measure
             .saturating_sub(remaining_weighted_measure),
-        scheduler_lift: scheduler_lift_summary(
-            theorem_profile,
-            initial_weighted_measure,
-            scheduler_concurrency,
-        ),
         critical_capacity: critical_capacity_summary(
             local_types,
             productive_step_count,
@@ -550,7 +679,9 @@ pub fn run_with_scenario(
             "scenario checkpoints currently require the canonical simulator backend".to_string(),
         );
     }
-    let mut machine = SimulationMachine::new(ProtocolMachineConfig::default(), &resolved_execution);
+    let mut machine_config = ProtocolMachineConfig::default();
+    machine_config.sched_policy = machine_scheduler_policy(resolved_execution.scheduler_policy);
+    let mut machine = SimulationMachine::new(machine_config, &resolved_execution);
     let sid = machine
         .load_choreography_owned(&image, "sim/scenario")
         .map_err(|e| format!("load error: {e}"))?;
@@ -664,7 +795,11 @@ pub fn run_with_scenario(
         &initial_session_snapshots,
         &final_session_snapshots,
         productive_step_count,
+    );
+    let scheduler_profile = scheduler_profile_summary(
+        resolved_execution.scheduler_policy,
         &theorem_profile,
+        theorem_progress.initial_weighted_measure,
         resolved_execution.scheduler_concurrency,
     );
     let total_invoked_events = obs_trace
@@ -696,6 +831,7 @@ pub fn run_with_scenario(
             execution_regime: resolved_execution.regime(),
             theorem_profile,
             theorem_progress,
+            scheduler_profile,
             reconfiguration_summary,
             adversary_summary,
             assumption_diagnostics,

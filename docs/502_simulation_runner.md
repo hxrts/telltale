@@ -54,6 +54,7 @@ Use the smaller entry points when only sampled state traces are needed.
 That resolution decides:
 
 - which machine backend to use
+- which scheduler policy the protocol machine runs under
 - how many scheduler lanes one round may use
 - how many worker threads the threaded backend may use
 
@@ -86,11 +87,21 @@ Its `eligibility` reports whether the run admits exact theorem-backed reporting,
 - `productive_step_count`
 - `remaining_weighted_measure`
 - `weighted_measure_consumed`
-- `scheduler_lift`
 - `critical_capacity`
 
 These values are intentionally distinct from raw counters such as queue length, message count, or observable-event count.
 They summarize the run in the vocabulary of the weighted-measure and scheduling-bound proofs instead.
+
+`ScenarioStats.scheduler_profile` is the scheduler-facing companion report.
+It records:
+
+- `implementation_policy`
+- `theorem_profile`
+- `productive_exactness`
+- `total_step_mode`
+- `total_step_upper_bound`
+- `fairness_requirement`
+- `envelope_status`
 
 `ScenarioStats.reconfiguration_summary` is separate again.
 It reports:

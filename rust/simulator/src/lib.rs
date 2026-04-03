@@ -80,7 +80,8 @@ pub use reconfiguration::{
 };
 pub use rng::SimRng;
 pub use runner::{
-    CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact, SchedulerLiftMode,
-    SchedulerLiftSummary, TheoremProgressSummary,
+    compare_scheduler_runs, CriticalCapacityPhase, CriticalCapacitySummary,
+    ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus,
+    SchedulerFairnessRequirement, SchedulerProfileSummary, TheoremProgressSummary,
 };
 pub use telltale_machine::model::effects::EffectHandler;

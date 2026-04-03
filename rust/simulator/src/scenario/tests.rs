@@ -56,6 +56,7 @@ fn test_default_seed_when_missing() {
     assert_eq!(scenario.seed, 0);
     let execution = scenario.resolved_execution().expect("resolve execution");
     assert_eq!(execution.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(execution.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
     assert_eq!(execution.scheduler_concurrency, 1);
     assert_eq!(execution.worker_threads, 1);
     assert_eq!(execution.regime(), ExecutionRegime::CanonicalExact);
@@ -228,6 +229,7 @@ fn test_auto_execution_serializes_in_ci_environment() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(resolved.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
     assert_eq!(resolved.scheduler_concurrency, 1);
     assert_eq!(resolved.worker_threads, 1);
 }
@@ -242,6 +244,7 @@ fn test_auto_execution_defaults_to_authoritative_serialized_outside_ci() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(resolved.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
     assert_eq!(resolved.scheduler_concurrency, 1);
     assert_eq!(resolved.worker_threads, 1);
 }
@@ -250,6 +253,7 @@ fn test_auto_execution_defaults_to_authoritative_serialized_outside_ci() {
 fn test_explicit_threaded_execution_keeps_parallel_defaults() {
     let spec = ExecutionSpec {
         backend: ExecutionBackend::Threaded,
+        scheduler_policy: SchedulerPolicySpec::Auto,
         scheduler_concurrency: None,
         worker_threads: None,
     };
@@ -260,15 +264,37 @@ fn test_explicit_threaded_execution_keeps_parallel_defaults() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Threaded);
+    assert_eq!(resolved.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
     assert_eq!(resolved.scheduler_concurrency, 6);
     assert_eq!(resolved.worker_threads, 6);
     assert_eq!(resolved.regime(), ExecutionRegime::ThreadedEnvelopeBounded);
 }
 
 #[test]
+fn test_explicit_scheduler_policy_resolves() {
+    let spec = ExecutionSpec {
+        backend: ExecutionBackend::Canonical,
+        scheduler_policy: SchedulerPolicySpec::ProgressAware,
+        scheduler_concurrency: Some(1),
+        worker_threads: Some(1),
+    };
+    let resolved = spec
+        .resolve_for(ExecutionEnvironment {
+            available_parallelism: 4,
+            threaded_available: true,
+        })
+        .expect("resolve execution");
+    assert_eq!(
+        resolved.scheduler_policy,
+        ResolvedSchedulerPolicy::ProgressAware
+    );
+}
+
+#[test]
 fn test_threaded_execution_regime_is_exact_at_scheduler_concurrency_one() {
     let spec = ExecutionSpec {
         backend: ExecutionBackend::Threaded,
+        scheduler_policy: SchedulerPolicySpec::Auto,
         scheduler_concurrency: Some(1),
         worker_threads: Some(4),
     };

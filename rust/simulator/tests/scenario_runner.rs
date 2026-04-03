@@ -17,7 +17,7 @@ use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::reconfiguration::{ReconfigurationAction, ReconfigurationEffectKind};
 use telltale_simulator::runner::{
-    run, run_with_scenario, CriticalCapacityPhase, SchedulerLiftMode,
+    compare_scheduler_runs, run, run_with_scenario, CriticalCapacityPhase, SchedulerBoundMode,
 };
 use telltale_simulator::scenario::{
     ExecutionRegime, ResolvedExecutionBackend, Scenario, TheoremAssumptionBundle,
@@ -234,8 +234,8 @@ step_size = "0.01"
         CriticalCapacityPhase::Unsupported
     );
     assert_eq!(
-        result.stats.theorem_progress.scheduler_lift.mode,
-        SchedulerLiftMode::ProductiveExactOnly
+        result.stats.scheduler_profile.total_step_mode,
+        SchedulerBoundMode::ProductiveExactOnly
     );
     assert_eq!(result.stats.backend, ResolvedExecutionBackend::Canonical);
     assert_eq!(result.stats.scheduler_concurrency, 1);
@@ -382,8 +382,8 @@ assumption_bundle = "fault_free_transport"
     assert_eq!(result.stats.theorem_progress.remaining_weighted_measure, 0);
     assert_eq!(result.stats.theorem_progress.weighted_measure_consumed, 4);
     assert_eq!(
-        result.stats.theorem_progress.scheduler_lift.mode,
-        SchedulerLiftMode::ProductiveExactOnly
+        result.stats.scheduler_profile.total_step_mode,
+        SchedulerBoundMode::ProductiveExactOnly
     );
     assert_eq!(
         result.stats.theorem_progress.critical_capacity.threshold,
@@ -396,7 +396,7 @@ assumption_bundle = "fault_free_transport"
 }
 
 #[test]
-fn theorem_progress_summary_reports_scheduler_lift_for_envelope_runs() {
+fn scheduler_profile_reports_conservative_bounds_for_envelope_runs() {
     let (global, local_types) = finite_protocol();
     let scenario_toml = r#"
 name = "finite_threaded_envelope"
@@ -428,17 +428,78 @@ assumption_bundle = "fault_free_transport"
     .expect("threaded envelope run");
 
     assert_eq!(
-        result.stats.theorem_progress.scheduler_lift.mode,
-        SchedulerLiftMode::ConservativeTotalStepBound
+        result.stats.scheduler_profile.total_step_mode,
+        SchedulerBoundMode::ConservativeTotalStepBound
     );
     assert_eq!(
-        result
-            .stats
-            .theorem_progress
-            .scheduler_lift
-            .total_step_upper_bound,
+        result.stats.scheduler_profile.total_step_upper_bound,
         Some(8)
     );
+}
+
+#[test]
+fn scheduler_comparison_distinguishes_policy_from_semantic_divergence() {
+    let (global, local_types) = finite_protocol();
+    let baseline = Scenario::parse(
+        r#"
+name = "scheduler_compare_baseline"
+roles = ["A", "B"]
+steps = 4
+
+[execution]
+backend = "canonical"
+scheduler_policy = "cooperative"
+scheduler_concurrency = 1
+worker_threads = 1
+"#,
+    )
+    .expect("parse baseline");
+    let candidate = Scenario::parse(
+        r#"
+name = "scheduler_compare_candidate"
+roles = ["A", "B"]
+steps = 4
+
+[execution]
+backend = "canonical"
+scheduler_policy = "progress_aware"
+scheduler_concurrency = 1
+worker_threads = 1
+"#,
+    )
+    .expect("parse candidate");
+    let initial_states =
+        BTreeMap::from([("A".to_string(), Vec::new()), ("B".to_string(), Vec::new())]);
+
+    let baseline_result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &baseline,
+        &PassthroughHandler,
+    )
+    .expect("baseline run");
+    let candidate_result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &candidate,
+        &PassthroughHandler,
+    )
+    .expect("candidate run");
+
+    let comparison = compare_scheduler_runs(&baseline_result, &candidate_result);
+    assert_ne!(
+        baseline_result
+            .stats
+            .scheduler_profile
+            .implementation_policy,
+        candidate_result
+            .stats
+            .scheduler_profile
+            .implementation_policy
+    );
+    assert!(comparison.performance_only_difference);
 }
 
 #[test]

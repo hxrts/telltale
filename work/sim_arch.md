@@ -194,17 +194,17 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for budget accounting, failure classification, and assumption-bundle diagnostics.
 - [x] Update docs to describe budgeted adversary surfaces and their theorem-side meaning.
 - [x] Remove any superseded low-level-only fault reporting paths once budget/accounting-aware surfaces exist, except where raw packet events remain intentionally foundational.
-- [ ] Make a git commit for Phase 14.
+- [x] Make a git commit for Phase 14.
 
 ## Phase 15: Scheduler Semantics as a First-Class Surface
 
-- [ ] Extend execution configuration so scheduler policy is described in theorem-native terms in addition to implementation terms.
-- [ ] Report productive exactness, total-step conservative bounds, fairness requirements, and envelope/adherence status for each scheduler profile.
-- [ ] Add comparison tools for canonical, threaded, and alternative scheduler policies that distinguish semantic differences from performance-only differences.
-- [ ] Keep canonical replay as the authoritative lane while making scheduler-specific performance runs comparable through normalized metrics and theorem eligibility.
-- [ ] Add targeted tests for scheduler-profile reporting and cross-scheduler classification stability.
-- [ ] Update docs and examples to frame scheduler choice as both an execution policy and a theorem-profile choice.
-- [ ] Remove stale scheduler reporting/config surfaces that become redundant once first-class scheduler profiles exist. Do not keep old and new policy vocabularies in parallel.
+- [x] Extend execution configuration so scheduler policy is described in theorem-native terms in addition to implementation terms.
+- [x] Report productive exactness, total-step conservative bounds, fairness requirements, and envelope/adherence status for each scheduler profile.
+- [x] Add comparison tools for canonical, threaded, and alternative scheduler policies that distinguish semantic differences from performance-only differences.
+- [x] Keep canonical replay as the authoritative lane while making scheduler-specific performance runs comparable through normalized metrics and theorem eligibility.
+- [x] Add targeted tests for scheduler-profile reporting and cross-scheduler classification stability.
+- [x] Update docs and examples to frame scheduler choice as both an execution policy and a theorem-profile choice.
+- [x] Remove stale scheduler reporting/config surfaces that become redundant once first-class scheduler profiles exist. Do not keep old and new policy vocabularies in parallel.
 - [ ] Make a git commit for Phase 15.
 
 ## Phase 16: Approximation and Limit-Regime Ladders

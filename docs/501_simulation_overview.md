@@ -21,7 +21,7 @@ The scenario file format can optionally use the built-in `MaterialParams` enum a
 
 The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
 Execution policy is now explicit through `Scenario.execution`.
-This separates backend choice from scheduler concurrency and worker-thread count.
+This separates backend choice from scheduler policy, scheduler concurrency, and worker-thread count.
 The default `auto` policy resolves to the authoritative canonical execution lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
 Throughput-oriented parallelism remains available through explicit threaded execution settings and through batch execution.
 

@@ -64,6 +64,9 @@ pub struct ExecutionSpec {
     /// Execution backend selection.
     #[serde(default)]
     pub backend: ExecutionBackend,
+    /// Scheduler policy selection.
+    #[serde(default)]
+    pub scheduler_policy: SchedulerPolicySpec,
     /// Scheduler lane width for one protocol-machine round.
     ///
     /// `None` lets the simulator choose the authoritative default for this backend.
@@ -99,11 +102,48 @@ pub enum ResolvedExecutionBackend {
     Threaded,
 }
 
+/// Requested scheduler policy for one simulator run.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SchedulerPolicySpec {
+    /// Choose the simulator's default scheduler policy.
+    #[default]
+    Auto,
+    /// Cooperative scheduler semantics.
+    Cooperative,
+    /// Round-robin scheduler semantics.
+    RoundRobin,
+    /// Aging priority scheduler semantics.
+    PriorityAging,
+    /// Token-weighted priority scheduler semantics.
+    PriorityTokenWeighted,
+    /// Progress-aware scheduler semantics.
+    ProgressAware,
+}
+
+/// Resolved scheduler policy after applying simulator defaults.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ResolvedSchedulerPolicy {
+    /// Cooperative single-lane scheduler policy.
+    Cooperative,
+    /// Basic round-robin scheduler policy.
+    RoundRobin,
+    /// Aging priority scheduler policy.
+    PriorityAging,
+    /// Token-weighted priority scheduler policy.
+    PriorityTokenWeighted,
+    /// Progress-aware scheduler policy.
+    ProgressAware,
+}
+
 /// Fully resolved execution settings used by one simulator run.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ResolvedExecution {
     /// Resolved backend.
     pub backend: ResolvedExecutionBackend,
+    /// Resolved scheduler policy.
+    pub scheduler_policy: ResolvedSchedulerPolicy,
     /// Scheduler lane width.
     pub scheduler_concurrency: u64,
     /// Worker-thread count.
@@ -480,6 +520,18 @@ impl ExecutionSpec {
             }
         };
 
+        let scheduler_policy = match self.scheduler_policy {
+            SchedulerPolicySpec::Auto | SchedulerPolicySpec::Cooperative => {
+                ResolvedSchedulerPolicy::Cooperative
+            }
+            SchedulerPolicySpec::RoundRobin => ResolvedSchedulerPolicy::RoundRobin,
+            SchedulerPolicySpec::PriorityAging => ResolvedSchedulerPolicy::PriorityAging,
+            SchedulerPolicySpec::PriorityTokenWeighted => {
+                ResolvedSchedulerPolicy::PriorityTokenWeighted
+            }
+            SchedulerPolicySpec::ProgressAware => ResolvedSchedulerPolicy::ProgressAware,
+        };
+
         let parallel_default = env.available_parallelism.max(1);
         let scheduler_concurrency =
             self.scheduler_concurrency
@@ -505,6 +557,7 @@ impl ExecutionSpec {
 
         Ok(ResolvedExecution {
             backend,
+            scheduler_policy,
             scheduler_concurrency,
             worker_threads,
         })
