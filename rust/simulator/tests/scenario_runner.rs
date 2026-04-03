@@ -13,7 +13,7 @@ use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware}
 use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
-use telltale_simulator::runner::run_with_scenario;
+use telltale_simulator::runner::{run, run_with_scenario};
 use telltale_simulator::scenario::Scenario;
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
@@ -204,6 +204,37 @@ fn generated_effect_scenario_builder_records_effect_outcomes() {
 }
 
 #[test]
+fn run_samples_initial_state_plus_one_record_per_round() {
+    let (global, local_types) = simple_protocol();
+    let mut initial_states = BTreeMap::new();
+    initial_states.insert(
+        "A".to_string(),
+        vec![FixedQ32::half(), FixedQ32::half()],
+    );
+    initial_states.insert(
+        "B".to_string(),
+        vec![FixedQ32::half(), FixedQ32::half()],
+    );
+
+    let trace = run(&local_types, &global, &initial_states, 4, &PassthroughHandler)
+        .expect("round-based run");
+
+    let a_steps = trace
+        .records_for_role("A")
+        .into_iter()
+        .map(|record| record.step)
+        .collect::<Vec<_>>();
+    let b_steps = trace
+        .records_for_role("B")
+        .into_iter()
+        .map(|record| record.step)
+        .collect::<Vec<_>>();
+
+    assert_eq!(a_steps, vec![0, 1, 2, 3]);
+    assert_eq!(b_steps, vec![0, 1, 2, 3]);
+}
+
+#[test]
 fn shared_execution_engine_matches_scenario_runner_semantics() {
     let (global, local_types) = simple_protocol();
     let scenario_toml = r#"
@@ -263,10 +294,7 @@ loss_probability = "0.0"
     )
     .expect("build middleware");
     let concurrency = usize::try_from(scenario.concurrency).expect("concurrency fits usize");
-    let max_rounds = scenario
-        .steps
-        .saturating_mul(u64::try_from(local_types.len()).expect("role count fits u64"))
-        .saturating_mul(10);
+    let max_rounds = scenario.steps.saturating_sub(1);
     let mut monitor = scenario
         .property_monitor()
         .expect("build property monitor")

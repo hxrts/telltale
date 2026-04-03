@@ -29,26 +29,6 @@ type CoroInfo = Vec<(usize, String)>;
 
 // Simulator handlers implement the same external-handler boundary used by the guest runtime.
 
-/// Count active (Send/Recv) nodes per role in one Mu body traversal.
-// RECURSION_SAFE: follows finite local-type branches after mu unfolding.
-fn active_per_role(lt: &LocalTypeR) -> usize {
-    match lt {
-        LocalTypeR::Send { branches, .. } | LocalTypeR::Recv { branches, .. } => {
-            1 + branches
-                .iter()
-                .map(|(_, _, cont)| active_per_role(cont))
-                .max()
-                .unwrap_or(0)
-        }
-        LocalTypeR::Mu { body, .. } => active_per_role(body),
-        LocalTypeR::Var(_) | LocalTypeR::End => 0,
-    }
-}
-
-fn active_steps_per_session(local_types: &BTreeMap<String, LocalTypeR>) -> usize {
-    local_types.values().map(active_per_role).max().unwrap_or(0)
-}
-
 /// Record state for all roles in a coroutine set.
 fn record_all_roles(
     machine: &ProtocolMachine,
@@ -90,57 +70,6 @@ fn init_coro_regs(
     Ok(())
 }
 
-/// Count newly appended `Invoked` events and advance trace cursor.
-fn count_new_invokes(trace: &[ObsEvent], prev_trace_len: &mut usize) -> usize {
-    let count = trace[*prev_trace_len..]
-        .iter()
-        .filter(|e| matches!(e, ObsEvent::Invoked { .. }))
-        .count();
-    *prev_trace_len = trace.len();
-    count
-}
-
-/// Collect sessions referenced by newly appended `Invoked` events.
-fn collect_invoked_sessions(
-    trace: &[ObsEvent],
-    prev_trace_len: &mut usize,
-    coro_to_session: &BTreeMap<usize, usize>,
-) -> Vec<usize> {
-    let sessions = trace[*prev_trace_len..]
-        .iter()
-        .filter_map(|event| match event {
-            ObsEvent::Invoked { coro_id, .. } => coro_to_session.get(coro_id).copied(),
-            _ => None,
-        })
-        .collect::<Vec<_>>();
-    *prev_trace_len = trace.len();
-    sessions
-}
-
-/// Advance invoke-driven sampling counters and emit step records as needed.
-fn advance_sampling(
-    invoke_count: &mut usize,
-    active_count: &mut usize,
-    step_idx: &mut usize,
-    num_roles: usize,
-    apr: usize,
-    steps: usize,
-    mut record_step: impl FnMut(usize),
-) {
-    while *invoke_count >= num_roles && *step_idx < steps {
-        *invoke_count -= num_roles;
-        record_step(*step_idx);
-        *step_idx += 1;
-        *active_count += 1;
-
-        if *active_count >= apr && *step_idx < steps {
-            *active_count = 0;
-            record_step(*step_idx);
-            *step_idx += 1;
-        }
-    }
-}
-
 /// A choreography specification for concurrent execution.
 pub struct ChoreographySpec {
     /// Local types per role.
@@ -167,7 +96,7 @@ pub fn run_concurrent(
 ) -> Result<Vec<Trace>, String> {
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
 
-    let mut session_infos: Vec<(usize, CoroInfo, usize)> = Vec::new();
+    let mut session_infos: Vec<(usize, CoroInfo)> = Vec::new();
 
     for (session_idx, spec) in specs.iter().enumerate() {
         let image = CodeImage::from_local_types(&spec.local_types, &spec.global_type);
@@ -178,77 +107,43 @@ pub fn run_concurrent(
 
         let coros = machine.session_coroutines(sid);
         let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
-        let num_roles = coro_info.len();
-
         init_coro_regs(&mut machine, &coro_info, &spec.initial_states)?;
-        session_infos.push((sid, coro_info, num_roles));
+        session_infos.push((sid, coro_info));
     }
 
-    // Coroutine ID → session index.
-    let mut coro_to_session: BTreeMap<usize, usize> = BTreeMap::new();
-    for (session_idx, (_sid, coro_info, _)) in session_infos.iter().enumerate() {
-        for (coro_id, _) in coro_info {
-            coro_to_session.insert(*coro_id, session_idx);
-        }
-    }
-
-    let per_session_apr: Vec<usize> = specs
-        .iter()
-        .map(|s| active_steps_per_session(&s.local_types))
-        .collect();
-
-    let total_roles: usize = session_infos.iter().map(|(_, _, n)| *n).sum();
-    let max_vm_steps = steps * total_roles * 10;
-    let mut prev_trace_len = 0;
-    let mut per_session_invokes: Vec<usize> = vec![0; specs.len()];
-    let mut per_session_active: Vec<usize> = vec![0; specs.len()];
+    let max_rounds = steps.saturating_sub(1);
     let mut per_session_step: Vec<usize> = vec![0; specs.len()];
     let mut traces: Vec<Trace> = (0..specs.len()).map(|_| Trace::new()).collect();
 
     // Record initial state (step 0 = Mu step).
-    for (si, (_sid, coro_info, _)) in session_infos.iter().enumerate() {
+    for (si, (_sid, coro_info)) in session_infos.iter().enumerate() {
         if steps > 0 {
             record_all_roles(&machine, coro_info, 0, &mut traces[si]);
             per_session_step[si] = 1;
         }
     }
 
-    for _ in 0..max_vm_steps {
+    for _ in 0..max_rounds {
         if per_session_step.iter().all(|&s| s >= steps) {
             break;
         }
 
-        match machine.step(handler) {
+        match machine.step_round(handler, 1) {
             Ok(StepResult::AllDone | StepResult::Stuck) => break,
             Ok(StepResult::Continue) => {}
             Err(e) => return Err(format!("protocol machine error: {e}")),
         }
 
-        let invoked_sessions: Vec<usize> = {
-            let current_trace = machine.trace();
-            collect_invoked_sessions(current_trace, &mut prev_trace_len, &coro_to_session)
-        };
-
-        for si in invoked_sessions {
-            per_session_invokes[si] += 1;
-            let (_sid, coro_info, num_roles) = &session_infos[si];
-            let apr = per_session_apr[si];
-            advance_sampling(
-                &mut per_session_invokes[si],
-                &mut per_session_active[si],
-                &mut per_session_step[si],
-                *num_roles,
-                apr,
-                steps,
-                |sample_step| {
-                    record_all_roles(&machine, coro_info, sample_step, &mut traces[si]);
-                },
-            );
+        for (si, (_sid, coro_info)) in session_infos.iter().enumerate() {
+            if per_session_step[si] < steps {
+                record_all_roles(&machine, coro_info, per_session_step[si], &mut traces[si]);
+                per_session_step[si] += 1;
+            }
         }
     }
 
     // Fall back to final state if no intermediate records.
-    for (i, (_sid, coro_info, _)) in session_infos.iter().enumerate() {
+    for (i, (_sid, coro_info)) in session_infos.iter().enumerate() {
         if traces[i].records.is_empty() {
             record_all_roles(&machine, coro_info, steps.saturating_sub(1), &mut traces[i]);
         }
@@ -259,9 +154,9 @@ pub fn run_concurrent(
 
 /// Run a choreography through the protocol machine and return a simulator-compatible trace.
 ///
-/// The compiler emits `Invoke` after every Send/Recv. The scheduler has N
-/// active steps + 1 Mu step per round. Every `num_roles` Invoked events
-/// = 1 active scheduler step. After N active steps, record 1 Mu step.
+/// Sampling is round-based. Step `0` records the initial state before any
+/// scheduler rounds run, and each subsequent step records the state after one
+/// completed protocol-machine round.
 ///
 /// # Errors
 ///
@@ -283,18 +178,11 @@ pub fn run(
 
     let coros = machine.session_coroutines(sid);
     let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
-    let num_roles = coro_info.len();
-
     init_coro_regs(&mut machine, &coro_info, initial_states)?;
 
     let mut trace = Trace::new();
 
-    let apr = active_steps_per_session(local_types);
-
-    let max_vm_steps = steps * num_roles * 10;
-    let mut prev_trace_len = 0;
-    let mut invoke_count: usize = 0;
-    let mut active_count: usize = 0;
+    let max_rounds = steps.saturating_sub(1);
     let mut step_idx: usize = 0;
 
     // Record initial state (step 0 = Mu step).
@@ -303,28 +191,19 @@ pub fn run(
         step_idx = 1;
     }
 
-    for _ in 0..max_vm_steps {
+    for _ in 0..max_rounds {
         if step_idx >= steps {
             break;
         }
 
-        match machine.step(handler) {
+        match machine.step_round(handler, 1) {
             Ok(StepResult::AllDone | StepResult::Stuck) => break,
             Ok(StepResult::Continue) => {}
             Err(e) => return Err(format!("protocol machine error: {e}")),
         }
 
-        let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
-        invoke_count += new_invokes;
-        advance_sampling(
-            &mut invoke_count,
-            &mut active_count,
-            &mut step_idx,
-            num_roles,
-            apr,
-            steps,
-            |sample_step| record_all_roles(&machine, &coro_info, sample_step, &mut trace),
-        );
+        record_all_roles(&machine, &coro_info, step_idx, &mut trace);
+        step_idx += 1;
     }
 
     if trace.records.is_empty() {
@@ -402,8 +281,6 @@ pub fn run_with_scenario(
 
     let coros = machine.session_coroutines(sid);
     let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
-    let num_roles = coro_info.len();
-
     let resolved_initial_states = if initial_states.is_empty() {
         derive_initial_states(scenario)?
     } else {
@@ -412,14 +289,7 @@ pub fn run_with_scenario(
     init_coro_regs(&mut machine, &coro_info, &resolved_initial_states)?;
 
     let mut trace = Trace::new();
-    let apr = active_steps_per_session(local_types);
-
-    let num_roles_u64 =
-        u64::try_from(num_roles).map_err(|_| format!("num_roles {num_roles} exceeds u64"))?;
-    let max_vm_rounds = scenario
-        .steps
-        .saturating_mul(num_roles_u64)
-        .saturating_mul(10);
+    let max_rounds = scenario.steps.saturating_sub(1);
     let steps_limit = usize::try_from(scenario.steps)
         .map_err(|_| format!("scenario.steps {} exceeds usize", scenario.steps))?;
     let concurrency = usize::try_from(scenario.concurrency).map_err(|_| {
@@ -428,9 +298,6 @@ pub fn run_with_scenario(
             scenario.concurrency
         )
     })?;
-    let mut prev_trace_len = 0;
-    let mut invoke_count: usize = 0;
-    let mut active_count: usize = 0;
     let mut step_idx: usize = 0;
     let mut checkpoint_writes: usize = 0;
 
@@ -461,23 +328,14 @@ pub fn run_with_scenario(
         scenario,
         &middleware,
         concurrency,
-        max_vm_rounds,
+        max_rounds,
         |machine, _completed_rounds| {
             if step_idx >= steps_limit {
                 return Ok(());
             }
 
-            let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
-            invoke_count += new_invokes;
-            advance_sampling(
-                &mut invoke_count,
-                &mut active_count,
-                &mut step_idx,
-                num_roles,
-                apr,
-                steps_limit,
-                |sample_step| record_all_roles(machine, &coro_info, sample_step, &mut trace),
-            );
+            record_all_roles(machine, &coro_info, step_idx, &mut trace);
+            step_idx += 1;
 
             let ctx = PropertyContext {
                 tick: machine.clock().tick,

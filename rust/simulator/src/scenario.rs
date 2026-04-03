@@ -11,10 +11,7 @@ use telltale_types::FixedQ32;
 use crate::fault::{Fault, FaultSchedule, ScheduledFault, Trigger};
 use crate::material::MaterialParams;
 use crate::network::{LinkPolicy, NetworkConfig, Partition};
-use crate::property::{parse_predicate, Property, PropertyMonitor};
-use invariants::parse_invariant;
-
-mod invariants;
+use crate::property::{parse_predicate, parse_property, Property, PropertyMonitor};
 mod validation;
 
 /// A simulation scenario loaded from TOML.
@@ -332,7 +329,7 @@ impl Scenario {
         };
         let mut props = Vec::new();
         for inv in &spec.invariants {
-            props.push(parse_invariant(inv)?);
+            props.push(parse_property(inv)?);
         }
         for liv in &spec.liveness {
             let pre = parse_predicate(&liv.precondition)?;
