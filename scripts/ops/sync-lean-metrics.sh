@@ -199,7 +199,7 @@ for ((i=0; i<${#LIB_NAMES[@]}; i++)); do
 done
 
 # ── Write Metrics to CODE_MAP.md ───────────────────────────────────────
-TODAY="$(date +%F)"
+TODAY="$(TZ=UTC date +%F)"
 
 before_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
 

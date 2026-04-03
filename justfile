@@ -476,7 +476,7 @@ check-lean-metrics:
 
 # Verify lean-metrics freshness without assuming optional local tools are on PATH.
 check-lean-metrics-minimal-env:
-    env PATH="/usr/bin:/bin" bash ./scripts/ops/sync-lean-metrics.sh --check
+    env PATH="/usr/bin:/bin" TZ=UTC bash ./scripts/ops/sync-lean-metrics.sh --check
 
 # Sync reproducibility rows in all three papers (pinned commit, DOI, Lean stats).
 paper-repro-sync:
