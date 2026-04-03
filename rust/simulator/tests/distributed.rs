@@ -11,7 +11,7 @@ use telltale_machine::{
     ObsEvent, ProtocolMachine, ProtocolMachineConfig, PublicationStatus,
     SEMANTIC_OBJECTS_SCHEMA_VERSION,
 };
-use telltale_simulator::distributed::DistributedSimBuilder;
+use telltale_simulator::distributed::{DistributedSimBuilder, NestedExecutionContract};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 struct NoOpHandler;
@@ -284,6 +284,30 @@ fn test_distributed_two_site() {
 }
 
 #[test]
+fn distributed_simulation_exposes_nested_execution_contract() {
+    let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
+    let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
+
+    let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
+    let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
+
+    let contract = NestedExecutionContract {
+        outer_scheduler_concurrency: 3,
+        inner_rounds_per_step: 2,
+    };
+
+    let simulation = DistributedSimBuilder::new()
+        .add_site("site_A", vec![inner_image.clone()])
+        .add_site("site_B", vec![inner_image])
+        .inter_site(outer_image)
+        .execution_contract(contract)
+        .build(&ProtocolMachineConfig::default())
+        .expect("build distributed simulation");
+
+    assert_eq!(simulation.execution_contract(), contract);
+}
+
+#[test]
 fn test_nested_matches_flat_per_site() {
     let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
     let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
@@ -328,18 +352,22 @@ fn test_distributed_concurrency_configuration() {
     let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
     let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
 
+    let contract = NestedExecutionContract {
+        outer_scheduler_concurrency: 2,
+        inner_rounds_per_step: 3,
+    };
+
     let builder = DistributedSimBuilder::new()
         .add_site("site_A", vec![inner_image.clone()])
         .add_site("site_B", vec![inner_image])
         .inter_site(outer_image)
-        .outer_concurrency(2)
-        .inner_rounds_per_step(3);
+        .execution_contract(contract);
 
     let mut sim = builder
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
-    assert_eq!(sim.outer_concurrency(), 2);
+    assert_eq!(sim.execution_contract(), contract);
     assert_eq!(sim.handler().rounds_per_step(), 3);
 
     sim.run(50).expect("run outer machine");
@@ -359,8 +387,10 @@ fn nested_distributed_sites_export_semantic_objects_not_just_traces() {
         .add_site("site_A", vec![inner_image.clone()])
         .add_site("site_B", vec![inner_image])
         .inter_site(outer_image)
-        .outer_concurrency(2)
-        .inner_rounds_per_step(2);
+        .execution_contract(NestedExecutionContract {
+            outer_scheduler_concurrency: 2,
+            inner_rounds_per_step: 2,
+        });
 
     let mut sim = builder
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
@@ -399,8 +429,10 @@ fn distributed_harness_replays_identical_semantic_outcomes_for_identical_inputs(
             .add_site("site_A", vec![inner_image.clone()])
             .add_site("site_B", vec![inner_image.clone()])
             .inter_site(outer_image.clone())
-            .outer_concurrency(2)
-            .inner_rounds_per_step(2);
+            .execution_contract(NestedExecutionContract {
+                outer_scheduler_concurrency: 2,
+                inner_rounds_per_step: 2,
+            });
 
         let mut sim = builder
             .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))

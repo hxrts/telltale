@@ -60,8 +60,12 @@ The harness exposes both helper lanes:
 Each site owns a local set of `CodeImage` protocols and one effect handler.
 Site names must match outer protocol roles.
 
-The builder also supports `outer_concurrency(...)` and `inner_rounds_per_step(...)`.
-`DistributedSimulation::run(max_rounds)` advances outer and inner runtimes with the configured coupling.
+Nested execution is now explicit through one `NestedExecutionContract`.
+That contract records outer scheduler concurrency and inner rounds-per-step, and `DistributedSimulation::execution_contract()` exposes the resolved outer/inner VM structure directly.
+`DistributedSimulation::run(max_rounds)` advances outer and inner runtimes with that declared coupling.
+
+This nested-VM contract is distinct from worker-thread tuning.
+Outer scheduler concurrency changes simulation semantics; worker-thread count is still a performance concern of the underlying threaded machine backend.
 
 ## Post-run Analysis
 

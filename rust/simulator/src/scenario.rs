@@ -54,12 +54,12 @@ pub struct ExecutionSpec {
     pub backend: ExecutionBackend,
     /// Scheduler lane width for one protocol-machine round.
     ///
-    /// `None` lets the simulator choose an environment-aware default.
+    /// `None` lets the simulator choose the authoritative default for this backend.
     #[serde(default)]
     pub scheduler_concurrency: Option<u64>,
     /// Number of worker threads for the threaded backend.
     ///
-    /// `None` lets the simulator choose an environment-aware default.
+    /// `None` lets the simulator choose the default for this backend.
     #[serde(default)]
     pub worker_threads: Option<u64>,
 }
@@ -68,7 +68,7 @@ pub struct ExecutionSpec {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ExecutionBackend {
-    /// Choose a backend automatically from the current environment.
+    /// Choose the simulator's authoritative default execution lane.
     #[default]
     Auto,
     /// Use the canonical single-thread protocol machine.
@@ -96,13 +96,22 @@ pub struct ResolvedExecution {
     pub scheduler_concurrency: u64,
     /// Worker-thread count.
     pub worker_threads: u64,
-    /// True when CI forced serialized defaults for auto execution.
-    pub ci_serialized_default: bool,
+}
+
+/// Proof-side execution regime classification for one resolved simulator run.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionRegime {
+    /// Canonical single-thread execution; authoritative exact replay/debug lane.
+    CanonicalExact,
+    /// Threaded execution at scheduler concurrency `1`; exact with respect to the canonical lane.
+    ThreadedExact,
+    /// Threaded execution at scheduler concurrency `> 1`; authoritative only modulo the declared envelope contract.
+    ThreadedEnvelopeBounded,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct ExecutionEnvironment {
-    ci: bool,
     available_parallelism: u64,
     threaded_available: bool,
 }
@@ -307,19 +316,11 @@ fn default_link_enabled() -> bool {
 }
 
 fn current_execution_environment() -> ExecutionEnvironment {
-    let ci = std::env::var("CI")
-        .ok()
-        .map(|value| {
-            let normalized = value.trim().to_ascii_lowercase();
-            !(normalized.is_empty() || normalized == "0" || normalized == "false")
-        })
-        .unwrap_or(false);
     let available_parallelism = std::thread::available_parallelism()
         .map(|n| u64::try_from(n.get()).unwrap_or(u64::MAX))
         .unwrap_or(1)
         .max(1);
     ExecutionEnvironment {
-        ci,
         available_parallelism,
         threaded_available: cfg!(feature = "multi-thread"),
     }
@@ -336,11 +337,8 @@ impl ExecutionSpec {
 
         let backend = match self.backend {
             ExecutionBackend::Auto => {
-                if env.ci || !env.threaded_available {
-                    ResolvedExecutionBackend::Canonical
-                } else {
-                    ResolvedExecutionBackend::Threaded
-                }
+                let _ = env;
+                ResolvedExecutionBackend::Canonical
             }
             ExecutionBackend::Canonical => ResolvedExecutionBackend::Canonical,
             ExecutionBackend::Threaded => {
@@ -356,23 +354,14 @@ impl ExecutionSpec {
         };
 
         let parallel_default = env.available_parallelism.max(1);
-        let ci_serialized_default = matches!(self.backend, ExecutionBackend::Auto) && env.ci;
         let scheduler_concurrency = self.scheduler_concurrency.unwrap_or_else(|| match self.backend
         {
-            ExecutionBackend::Auto if env.ci => 1,
-            ExecutionBackend::Auto => match backend {
-                ResolvedExecutionBackend::Canonical => 1,
-                ResolvedExecutionBackend::Threaded => parallel_default,
-            },
+            ExecutionBackend::Auto => 1,
             ExecutionBackend::Canonical => 1,
             ExecutionBackend::Threaded => parallel_default,
         });
         let worker_threads = self.worker_threads.unwrap_or_else(|| match self.backend {
-            ExecutionBackend::Auto if env.ci => 1,
-            ExecutionBackend::Auto => match backend {
-                ResolvedExecutionBackend::Canonical => 1,
-                ResolvedExecutionBackend::Threaded => parallel_default,
-            },
+            ExecutionBackend::Auto => 1,
             ExecutionBackend::Canonical => 1,
             ExecutionBackend::Threaded => parallel_default,
         });
@@ -390,8 +379,21 @@ impl ExecutionSpec {
             backend,
             scheduler_concurrency,
             worker_threads,
-            ci_serialized_default,
         })
+    }
+}
+
+impl ResolvedExecution {
+    /// Classify this execution in the proof-side concurrency regime lattice.
+    #[must_use]
+    pub fn regime(&self) -> ExecutionRegime {
+        match self.backend {
+            ResolvedExecutionBackend::Canonical => ExecutionRegime::CanonicalExact,
+            ResolvedExecutionBackend::Threaded if self.scheduler_concurrency <= 1 => {
+                ExecutionRegime::ThreadedExact
+            }
+            ResolvedExecutionBackend::Threaded => ExecutionRegime::ThreadedEnvelopeBounded,
+        }
     }
 }
 
@@ -450,7 +452,7 @@ impl Scenario {
         self.network.as_ref().map(NetworkSpec::to_config)
     }
 
-    /// Resolve execution settings after applying environment-aware defaults.
+    /// Resolve execution settings after applying simulator defaults and capability checks.
     ///
     /// # Errors
     ///

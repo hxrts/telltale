@@ -42,6 +42,7 @@ mod value_conv;
 pub use contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
 };
+pub use distributed::{DistributedSimBuilder, DistributedSimulation, NestedExecutionContract};
 pub use harness::{
     derive_initial_states, derive_initial_states_for_model, BatchConfig, BatchRunResult,
     DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, MaterialAdapter, SimulationHarness,

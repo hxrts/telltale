@@ -21,8 +21,8 @@ The scenario file format can optionally use the built-in `MaterialParams` enum a
 The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
 Execution policy is now explicit through `Scenario.execution`.
 This separates backend choice from scheduler concurrency and worker-thread count.
-The default `auto` policy uses threaded execution outside CI when the simulator is built with the threaded machine feature.
-In CI, the same `auto` policy resolves to serialized canonical execution.
+The default `auto` policy resolves to the authoritative canonical execution lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
+Throughput-oriented parallelism remains available through explicit threaded execution settings and through batch execution.
 
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
@@ -48,7 +48,11 @@ If the host adapter supplies initial states directly, the base `Scenario` does n
 
 `SimulationHarness` also supports deterministic batched execution through `run_batch(...)` and `run_batch_with(...)`.
 Batch execution parallelizes independent runs while preserving result order by input index.
-Like single-run `auto` execution, the default batch worker count is host parallelism outside CI and `1` in CI.
+Unlike single-run `auto` execution, batch worker defaults are still throughput-oriented: host parallelism outside CI and `1` in CI.
+
+Distributed simulation has a separate outer/inner execution surface.
+`DistributedSimBuilder` now accepts one explicit `NestedExecutionContract` describing outer scheduler concurrency and inner rounds-per-step.
+That nested-VM contract is distinct from worker-thread count and other performance-only parallelism controls.
 
 ## Generated Effect Helpers
 

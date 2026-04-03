@@ -9,7 +9,7 @@ It covers the TOML schema, fault injection, network modeling, properties, checkp
 `seed` defaults to `0`.
 `material` is optional and is only required by built-in material-driven surfaces such as `MaterialAdapter::from_scenario(...)`, `derive_initial_states(&Scenario)`, and the simulator CLI binaries.
 Execution defaults are resolved through `Scenario.execution`.
-`backend = "auto"` uses threaded execution outside CI when the simulator is built with the threaded machine feature, and canonical serialized execution in CI.
+`backend = "auto"` resolves to the authoritative canonical lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
 
 ```rust
 pub struct Scenario {
@@ -39,6 +39,7 @@ pub struct ExecutionSpec {
 `scheduler_concurrency` controls how much scheduler work one simulator round may admit.
 `worker_threads` controls physical parallelism for the threaded backend only.
 Canonical execution requires both values to resolve to `1`.
+Threaded execution with `scheduler_concurrency = 1` remains exact with respect to the canonical lane, while `scheduler_concurrency > 1` is only authoritative modulo the declared concurrency envelope.
 
 ## Scenario Example
 

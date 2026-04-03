@@ -40,10 +40,10 @@ fn main() {
             .collect(),
         stats: StatsOutput {
             seed: result.stats.seed,
+            execution_regime: result.stats.execution_regime,
             backend: result.stats.backend,
             scheduler_concurrency: result.stats.scheduler_concurrency,
             worker_threads: result.stats.worker_threads,
-            ci_serialized_default: result.stats.ci_serialized_default,
             rounds_executed: result.stats.rounds_executed,
             final_tick: result.stats.final_tick,
             total_obs_events: u64::try_from(result.stats.total_obs_events).unwrap_or(u64::MAX),
@@ -137,10 +137,10 @@ struct ViolationOutput {
 #[derive(Debug, Serialize)]
 struct StatsOutput {
     seed: u64,
+    execution_regime: telltale_simulator::scenario::ExecutionRegime,
     backend: telltale_simulator::scenario::ResolvedExecutionBackend,
     scheduler_concurrency: u64,
     worker_threads: u64,
-    ci_serialized_default: bool,
     rounds_executed: u64,
     final_tick: u64,
     total_obs_events: u64,

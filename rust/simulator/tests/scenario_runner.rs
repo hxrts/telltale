@@ -15,7 +15,7 @@ use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDispo
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::runner::{run, run_with_scenario};
-use telltale_simulator::scenario::{ResolvedExecutionBackend, Scenario};
+use telltale_simulator::scenario::{ExecutionRegime, ResolvedExecutionBackend, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -154,6 +154,7 @@ step_size = "0.01"
     .expect("scenario run");
 
     assert_eq!(result.stats.seed, 123);
+    assert_eq!(result.stats.execution_regime, ExecutionRegime::CanonicalExact);
     assert_eq!(result.stats.backend, ResolvedExecutionBackend::Canonical);
     assert_eq!(result.stats.scheduler_concurrency, 1);
     assert_eq!(result.stats.worker_threads, 1);

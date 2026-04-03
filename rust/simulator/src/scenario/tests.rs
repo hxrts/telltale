@@ -55,9 +55,10 @@ fn test_default_seed_when_missing() {
     let scenario = Scenario::parse(toml).expect("parse scenario");
     assert_eq!(scenario.seed, 0);
     let execution = scenario.resolved_execution().expect("resolve execution");
-    assert_eq!(execution.backend, ResolvedExecutionBackend::Threaded);
-    assert!(execution.scheduler_concurrency >= 1);
-    assert!(execution.worker_threads >= 1);
+    assert_eq!(execution.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(execution.scheduler_concurrency, 1);
+    assert_eq!(execution.worker_threads, 1);
+    assert_eq!(execution.regime(), ExecutionRegime::CanonicalExact);
 }
 
 #[test]
@@ -186,7 +187,6 @@ fn test_auto_execution_serializes_in_ci_environment() {
     let spec = ExecutionSpec::default();
     let resolved = spec
         .resolve_for(ExecutionEnvironment {
-            ci: true,
             available_parallelism: 8,
             threaded_available: true,
         })
@@ -194,7 +194,20 @@ fn test_auto_execution_serializes_in_ci_environment() {
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
     assert_eq!(resolved.scheduler_concurrency, 1);
     assert_eq!(resolved.worker_threads, 1);
-    assert!(resolved.ci_serialized_default);
+}
+
+#[test]
+fn test_auto_execution_defaults_to_authoritative_serialized_outside_ci() {
+    let spec = ExecutionSpec::default();
+    let resolved = spec
+        .resolve_for(ExecutionEnvironment {
+            available_parallelism: 6,
+            threaded_available: true,
+        })
+        .expect("resolve execution");
+    assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(resolved.scheduler_concurrency, 1);
+    assert_eq!(resolved.worker_threads, 1);
 }
 
 #[test]
@@ -206,7 +219,6 @@ fn test_explicit_threaded_execution_keeps_parallel_defaults() {
     };
     let resolved = spec
         .resolve_for(ExecutionEnvironment {
-            ci: false,
             available_parallelism: 6,
             threaded_available: true,
         })
@@ -214,7 +226,23 @@ fn test_explicit_threaded_execution_keeps_parallel_defaults() {
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Threaded);
     assert_eq!(resolved.scheduler_concurrency, 6);
     assert_eq!(resolved.worker_threads, 6);
-    assert!(!resolved.ci_serialized_default);
+    assert_eq!(resolved.regime(), ExecutionRegime::ThreadedEnvelopeBounded);
+}
+
+#[test]
+fn test_threaded_execution_regime_is_exact_at_scheduler_concurrency_one() {
+    let spec = ExecutionSpec {
+        backend: ExecutionBackend::Threaded,
+        scheduler_concurrency: Some(1),
+        worker_threads: Some(4),
+    };
+    let resolved = spec
+        .resolve_for(ExecutionEnvironment {
+            available_parallelism: 8,
+            threaded_available: true,
+        })
+        .expect("resolve execution");
+    assert_eq!(resolved.regime(), ExecutionRegime::ThreadedExact);
 }
 
 #[test]

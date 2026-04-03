@@ -8,7 +8,7 @@ use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_simulator::runner::run_with_scenario;
-use telltale_simulator::scenario::{ResolvedExecutionBackend, Scenario};
+use telltale_simulator::scenario::{ExecutionRegime, ResolvedExecutionBackend, Scenario};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -154,7 +154,32 @@ fn threaded_backend_reports_resolved_execution_settings() {
             .expect("threaded run");
 
     assert_eq!(result.stats.backend, ResolvedExecutionBackend::Threaded);
+    assert_eq!(
+        result.stats.execution_regime,
+        ExecutionRegime::ThreadedEnvelopeBounded
+    );
     assert_eq!(result.stats.scheduler_concurrency, 2);
     assert_eq!(result.stats.worker_threads, 2);
-    assert!(!result.stats.ci_serialized_default);
+}
+
+#[test]
+fn threaded_backend_is_worker_count_invariant_for_fixed_scheduler_concurrency() {
+    let (global, local_types) = simple_protocol();
+    let workers2 = scenario("threaded", 2, 2);
+    let workers4 = scenario("threaded", 2, 4);
+
+    let result2 =
+        run_with_scenario(&local_types, &global, &BTreeMap::new(), &workers2, &PassthroughHandler)
+            .expect("threaded run with two workers");
+    let result4 =
+        run_with_scenario(&local_types, &global, &BTreeMap::new(), &workers4, &PassthroughHandler)
+            .expect("threaded run with four workers");
+
+    assert_eq!(result2.replay.obs_trace, result4.replay.obs_trace);
+    assert_eq!(result2.replay.effect_trace, result4.replay.effect_trace);
+    assert_eq!(
+        result2.replay.output_condition_trace,
+        result4.replay.output_condition_trace
+    );
+    assert_eq!(result2.replay.semantic_objects, result4.replay.semantic_objects);
 }

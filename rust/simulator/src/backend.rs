@@ -11,7 +11,7 @@ use telltale_machine::model::state::{SessionId, SessionState};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
     ObsEvent, OwnedSession, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
-    SemanticAuditRecord, StepResult,
+    SemanticAuditRecord, StepResult, ThreadedRoundSemantics,
 };
 
 use crate::scenario::{ResolvedExecution, ResolvedExecutionBackend};
@@ -24,6 +24,10 @@ pub enum SimulationMachine {
 
 impl SimulationMachine {
     pub fn new(config: ProtocolMachineConfig, execution: &ResolvedExecution) -> Self {
+        let mut config = config;
+        // The simulator must opt into the proof-aligned threaded semantics explicitly
+        // rather than relying on the protocol-machine default transitively.
+        config.threaded_round_semantics = ThreadedRoundSemantics::CanonicalOneStep;
         match execution.backend {
             ResolvedExecutionBackend::Canonical => Self::Canonical(ProtocolMachine::new(config)),
             #[cfg(feature = "multi-thread")]

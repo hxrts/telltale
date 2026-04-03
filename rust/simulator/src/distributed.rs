@@ -8,12 +8,29 @@ use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::runtime::runner::NestedProtocolMachineHandler;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
+/// Explicit outer/inner execution contract for nested VM simulation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NestedExecutionContract {
+    /// Scheduler lane width for the outer protocol machine.
+    pub outer_scheduler_concurrency: usize,
+    /// Number of inner protocol-machine rounds attempted per outer handler callback.
+    pub inner_rounds_per_step: usize,
+}
+
+impl Default for NestedExecutionContract {
+    fn default() -> Self {
+        Self {
+            outer_scheduler_concurrency: 1,
+            inner_rounds_per_step: 1,
+        }
+    }
+}
+
 /// Builder for distributed simulations with nested inner ProtocolMachines.
 pub struct DistributedSimBuilder {
     sites: BTreeMap<String, Vec<CodeImage>>,
     inter_site: Option<CodeImage>,
-    outer_concurrency: usize,
-    inner_rounds_per_step: usize,
+    execution_contract: NestedExecutionContract,
 }
 
 impl DistributedSimBuilder {
@@ -23,8 +40,7 @@ impl DistributedSimBuilder {
         Self {
             sites: BTreeMap::new(),
             inter_site: None,
-            outer_concurrency: 1,
-            inner_rounds_per_step: 1,
+            execution_contract: NestedExecutionContract::default(),
         }
     }
 
@@ -42,17 +58,13 @@ impl DistributedSimBuilder {
         self
     }
 
-    /// Set outer ProtocolMachine scheduler concurrency.
+    /// Replace the explicit nested execution contract.
     #[must_use]
-    pub fn outer_concurrency(mut self, concurrency: usize) -> Self {
-        self.outer_concurrency = concurrency.max(1);
-        self
-    }
-
-    /// Set inner ProtocolMachine rounds attempted per outer handler callback.
-    #[must_use]
-    pub fn inner_rounds_per_step(mut self, rounds: usize) -> Self {
-        self.inner_rounds_per_step = rounds.max(1);
+    pub fn execution_contract(mut self, contract: NestedExecutionContract) -> Self {
+        self.execution_contract = NestedExecutionContract {
+            outer_scheduler_concurrency: contract.outer_scheduler_concurrency.max(1),
+            inner_rounds_per_step: contract.inner_rounds_per_step.max(1),
+        };
         self
     }
 
@@ -96,7 +108,8 @@ impl DistributedSimBuilder {
             .map_err(|e| format!("outer load error: {e}"))?;
 
         let mut nested =
-            NestedProtocolMachineHandler::new().with_rounds_per_step(self.inner_rounds_per_step);
+            NestedProtocolMachineHandler::new()
+                .with_rounds_per_step(self.execution_contract.inner_rounds_per_step);
 
         for (site, protocols) in self.sites {
             let mut inner_vm = ProtocolMachine::new(config.clone());
@@ -112,7 +125,7 @@ impl DistributedSimBuilder {
         Ok(DistributedSimulation {
             outer_vm,
             handler: nested,
-            outer_concurrency: self.outer_concurrency,
+            execution_contract: self.execution_contract,
         })
     }
 }
@@ -127,7 +140,7 @@ impl Default for DistributedSimBuilder {
 pub struct DistributedSimulation {
     outer_vm: ProtocolMachine,
     handler: NestedProtocolMachineHandler,
-    outer_concurrency: usize,
+    execution_contract: NestedExecutionContract,
 }
 
 impl DistributedSimulation {
@@ -138,7 +151,11 @@ impl DistributedSimulation {
     /// Returns a `ProtocolMachineError` if the outer ProtocolMachine faults.
     pub fn run(&mut self, max_rounds: usize) -> Result<(), ProtocolMachineError> {
         self.outer_vm
-            .run_concurrent(&self.handler, max_rounds, self.outer_concurrency)
+            .run_concurrent(
+                &self.handler,
+                max_rounds,
+                self.execution_contract.outer_scheduler_concurrency,
+            )
             .map(|_| ())
     }
 
@@ -154,10 +171,10 @@ impl DistributedSimulation {
         &self.handler
     }
 
-    /// Configured outer ProtocolMachine scheduler concurrency.
+    /// Configured nested execution contract.
     #[must_use]
-    pub fn outer_concurrency(&self) -> usize {
-        self.outer_concurrency
+    pub fn execution_contract(&self) -> NestedExecutionContract {
+        self.execution_contract
     }
 }
 

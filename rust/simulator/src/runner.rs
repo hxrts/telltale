@@ -21,7 +21,7 @@ use crate::checkpoint::CheckpointStore;
 use crate::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
-use crate::scenario::{ResolvedExecutionBackend, Scenario};
+use crate::scenario::{ExecutionRegime, ResolvedExecutionBackend, Scenario};
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
 
@@ -79,7 +79,7 @@ pub struct ChoreographySpec {
     pub initial_states: BTreeMap<String, Vec<FixedQ32>>,
 }
 
-/// Run multiple choreographies concurrently on a single protocol-machine instance.
+/// Run multiple choreographies on the canonical protocol-machine lane.
 ///
 /// Each choreography gets its own session namespace. Returns one trace per
 /// choreography, indexed in the same order as the input specs.
@@ -88,7 +88,7 @@ pub struct ChoreographySpec {
 ///
 /// Returns an error string if loading or execution fails.
 #[allow(clippy::cognitive_complexity)]
-pub fn run_concurrent(
+pub fn run_multi_session_canonical(
     specs: &[ChoreographySpec],
     steps: usize,
     handler: &dyn EffectHandler,
@@ -246,14 +246,14 @@ pub struct ScenarioReplayArtifact {
 pub struct ScenarioStats {
     /// Scenario seed used for middleware RNG.
     pub seed: u64,
+    /// Proof-side execution regime classification.
+    pub execution_regime: ExecutionRegime,
     /// Resolved execution backend.
     pub backend: ResolvedExecutionBackend,
     /// Resolved scheduler concurrency value.
     pub scheduler_concurrency: u64,
     /// Resolved worker-thread count.
     pub worker_threads: u64,
-    /// True when auto execution was serialized because the process is running in CI.
-    pub ci_serialized_default: bool,
     /// Number of protocol-machine rounds executed by the scenario loop.
     pub rounds_executed: u64,
     /// Final protocol-machine clock tick.
@@ -404,10 +404,10 @@ pub fn run_with_scenario(
         },
         stats: ScenarioStats {
             seed: scenario.seed,
+            execution_regime: resolved_execution.regime(),
             backend: resolved_execution.backend,
             scheduler_concurrency: resolved_execution.scheduler_concurrency,
             worker_threads: resolved_execution.worker_threads,
-            ci_serialized_default: resolved_execution.ci_serialized_default,
             rounds_executed,
             final_tick: machine.clock().tick,
             total_obs_events: machine.trace().len(),
