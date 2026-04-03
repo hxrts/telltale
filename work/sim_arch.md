@@ -155,13 +155,13 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 
 ## Phase 11: Reconfiguration-Native Topology and Handoff
 
-- [ ] Introduce first-class simulator reconfiguration operations for link, delegation, handoff, federation, and mode transition instead of modeling all topology changes as low-level transport events.
-- [ ] Reuse one canonical representation for reconfiguration traces across normal runs, replay, and analysis tooling.
-- [ ] Add explicit footprint/well-formedness validation for topology-changing operations before they enter the execution core.
-- [ ] Distinguish pure reconfiguration from budget-consuming transition choreography so conservation and descent are reported separately.
-- [ ] Add targeted tests for delegation safety, footprint-local updates, handoff replay, and reconfiguration/run equivalence.
-- [ ] Update docs to explain when a scenario should use transport faults versus semantic reconfiguration operations.
-- [ ] Remove legacy topology-change encodings that become redundant once first-class reconfiguration operations exist. Do not keep old ad hoc encodings as compatibility paths.
+- [x] Introduce first-class simulator reconfiguration operations for link, delegation, handoff, federation, and mode transition instead of modeling all topology changes as low-level transport events.
+- [x] Reuse one canonical representation for reconfiguration traces across normal runs, replay, and analysis tooling.
+- [x] Add explicit footprint/well-formedness validation for topology-changing operations before they enter the execution core.
+- [x] Distinguish pure reconfiguration from budget-consuming transition choreography so conservation and descent are reported separately.
+- [x] Add targeted tests for delegation safety, footprint-local updates, handoff replay, and reconfiguration/run equivalence.
+- [x] Update docs to explain when a scenario should use transport faults versus semantic reconfiguration operations.
+- [x] Remove legacy topology-change encodings that become redundant once first-class reconfiguration operations exist. Do not keep old ad hoc encodings as compatibility paths.
 - [ ] Make a git commit for Phase 11.
 
 ## Phase 12: Envelope-Aware Observability and Normalization

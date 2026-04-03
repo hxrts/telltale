@@ -32,7 +32,7 @@ pub struct ScenarioResult {
 `state` contains the numeric portion of the coroutine register file.
 The runner skips the first two reserved registers and samples material state starting at register `2`.
 
-`ScenarioReplayArtifact` contains observable events, effect traces, output-condition checks, semantic audit records, and `ProtocolMachineSemanticObjects`.
+`ScenarioReplayArtifact` contains observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, and a canonical simulator reconfiguration trace.
 These artifacts support deterministic replay and post-run validation.
 
 ## Runner Entry Points
@@ -87,6 +87,16 @@ Its `eligibility` reports whether the run admits exact theorem-backed reporting,
 
 These values are intentionally distinct from raw counters such as queue length, message count, or observable-event count.
 They summarize the run in the vocabulary of the weighted-measure and scheduling-bound proofs instead.
+
+`ScenarioStats.reconfiguration_summary` is separate again.
+It reports:
+
+- `applied_operations`
+- `pure_operations`
+- `transition_operations`
+- `transition_budget_consumed`
+
+This keeps semantic topology/authority cutover accounting distinct from theorem-native descent and productive-step reporting.
 
 ## Harness API
 
@@ -143,15 +153,16 @@ If no samples were produced during execution, the runner emits one fallback samp
 Scenario runs and replay now share the same execution core and use a fixed per-round order for determinism.
 
 1. Compute `next_tick` from the protocol-machine clock.
-2. Advance the fault schedule from newly visible observable events in `machine.trace()`.
-3. Deliver due delayed fault messages.
-4. When network middleware is active, route those due fault-delayed messages back through the network policy stage before they enter protocol-machine buffers.
-5. Deliver due network middleware queues.
-6. Update paused roles from active crash faults.
-7. Execute one protocol-machine round with the selected handler domain.
-8. Record one round-based trace sample when sampling is enabled.
-9. Run online property checks.
-10. Attempt checkpoint persistence when the interval policy triggers.
+2. Activate due simulator reconfiguration operations from newly visible observable events in `machine.trace()`.
+3. Advance the fault schedule from newly visible observable events in `machine.trace()`.
+4. Deliver due delayed fault messages.
+5. When network middleware is active, route those due fault-delayed messages back through the network policy stage before they enter protocol-machine buffers.
+6. Deliver due network middleware queues.
+7. Update paused roles from active crash faults.
+8. Execute one protocol-machine round with the selected handler domain.
+9. Record one round-based trace sample when sampling is enabled.
+10. Run online property checks.
+11. Attempt checkpoint persistence when the interval policy triggers.
 
 Checkpoint persistence is best-effort.
 Serialization and file-write failures do not fail the run.
@@ -171,7 +182,7 @@ The protocol machine remains deterministic given the same handler outcomes and s
 The canonical backend remains the authoritative replay and debugging lane.
 
 Record ordering is stable within each sampling pass.
-Replay artifacts preserve the observable and semantic data needed for deterministic post-run inspection.
+Replay artifacts preserve the observable, semantic, and reconfiguration data needed for deterministic post-run inspection.
 
 ## Related Docs
 

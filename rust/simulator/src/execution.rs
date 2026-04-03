@@ -8,13 +8,21 @@ use telltale_machine::StepResult;
 use crate::backend::SimulationMachine;
 use crate::fault::FaultInjector;
 use crate::network::NetworkModel;
+use crate::reconfiguration::{
+    ReconfigurationController, ReconfigurationRecord, ReconfigurationSummary,
+};
 use crate::rng::SimRng;
 use crate::scenario::Scenario;
 
-/// Shared middleware stack for one scenario execution.
-pub enum ScenarioMiddleware<'a> {
+enum ScenarioTransport<'a> {
     Fault(FaultInjector<&'a dyn EffectHandler>),
     Network(NetworkModel<FaultInjector<&'a dyn EffectHandler>>),
+}
+
+/// Shared middleware stack for one scenario execution.
+pub struct ScenarioMiddleware<'a> {
+    transport: ScenarioTransport<'a>,
+    reconfiguration: ReconfigurationController,
 }
 
 impl<'a> ScenarioMiddleware<'a> {
@@ -27,10 +35,19 @@ impl<'a> ScenarioMiddleware<'a> {
         let mut rng = SimRng::new(scenario.seed);
         let schedule = scenario.fault_schedule()?;
         let fault = FaultInjector::new(handler, schedule, rng.fork());
+        let reconfiguration =
+            ReconfigurationController::new(scenario.reconfiguration_schedule()?, rng.fork());
 
-        Ok(match scenario.network_config() {
-            Some(cfg) => Self::Network(NetworkModel::new(fault, cfg, rng.fork(), tick_duration)),
-            None => Self::Fault(fault),
+        let transport = if scenario.requires_network_model() {
+            let cfg = scenario.network_config().unwrap_or_default();
+            ScenarioTransport::Network(NetworkModel::new(fault, cfg, rng.fork(), tick_duration))
+        } else {
+            ScenarioTransport::Fault(fault)
+        };
+
+        Ok(Self {
+            transport,
+            reconfiguration,
         })
     }
 
@@ -40,8 +57,14 @@ impl<'a> ScenarioMiddleware<'a> {
         next_tick: u64,
         next_logical_step: u64,
     ) -> Result<(), String> {
-        match self {
-            Self::Network(net) => {
+        match &self.transport {
+            ScenarioTransport::Network(net) => {
+                self.reconfiguration.tick(
+                    next_tick,
+                    next_logical_step,
+                    machine.trace(),
+                    Some(net),
+                )?;
                 net.inner()
                     .tick(next_tick, next_logical_step, machine.trace())
                     .map_err(|e| format!("fault middleware tick: {e}"))?;
@@ -69,7 +92,13 @@ impl<'a> ScenarioMiddleware<'a> {
                 machine.set_paused_roles(&paused_roles);
                 Ok(())
             }
-            Self::Fault(fault) => {
+            ScenarioTransport::Fault(fault) => {
+                self.reconfiguration.tick(
+                    next_tick,
+                    next_logical_step,
+                    machine.trace(),
+                    Option::<&NetworkModel<FaultInjector<&'a dyn EffectHandler>>>::None,
+                )?;
                 fault
                     .tick(next_tick, next_logical_step, machine.trace())
                     .map_err(|e| format!("fault middleware tick: {e}"))?;
@@ -94,11 +123,21 @@ impl<'a> ScenarioMiddleware<'a> {
         machine: &mut SimulationMachine,
         concurrency: usize,
     ) -> Result<StepResult, String> {
-        match self {
-            Self::Network(net) => machine.step_round(net, concurrency),
-            Self::Fault(fault) => machine.step_round(fault, concurrency),
+        match &self.transport {
+            ScenarioTransport::Network(net) => machine.step_round(net, concurrency),
+            ScenarioTransport::Fault(fault) => machine.step_round(fault, concurrency),
         }
         .map_err(|e| format!("protocol machine error: {e}"))
+    }
+
+    /// Canonical applied reconfiguration trace.
+    pub fn reconfiguration_trace(&self) -> Result<Vec<ReconfigurationRecord>, String> {
+        self.reconfiguration.trace()
+    }
+
+    /// Reconfiguration accounting summary for the run.
+    pub fn reconfiguration_summary(&self) -> Result<ReconfigurationSummary, String> {
+        self.reconfiguration.summary()
     }
 }
 

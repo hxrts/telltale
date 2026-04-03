@@ -9,6 +9,7 @@ Detailed behavior lives in the focused pages linked below.
 The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for faults, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
+Simulator-visible topology and authority change now use a separate first-class reconfiguration program rather than fault-event encodings.
 
 Materials are the simulator's abstraction for domain state evolution.
 A material model defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`, how an effect handler is constructed, and how default per-role initial states are derived.
@@ -30,6 +31,7 @@ That separation lets one execution be interpreted under different theorem-side c
 
 When theorem-indexed reporting is enabled, `ScenarioStats` also includes a theorem-native progress summary.
 That summary reports weighted progress potential, productive communication count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification separately from raw transport counters.
+Reconfiguration accounting is reported separately again through `ScenarioStats.reconfiguration_summary` so pure reconfiguration and budget-consuming transition choreography do not get mixed into the descent/progress quantities.
 
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
@@ -68,6 +70,9 @@ The simulator also exposes generated effect-family helper types under `telltale_
 These APIs are useful when a project wants to script semantic outcomes for exported effect operations.
 Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
 They currently sit beside the harness API rather than inside it.
+
+Scenario replay artifacts now also retain a canonical `reconfiguration_trace`.
+That trace is shared across fresh runs, replay, and post-run analysis tooling so link cutovers, federation updates, handoffs, delegation, and mode transitions all use one simulator-facing representation.
 
 Use this lane when a downstream integration layer needs effect-centric fixtures.
 Do not document it as the default `SimulationHarness` workflow unless that wiring is added.

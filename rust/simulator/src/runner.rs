@@ -12,8 +12,8 @@ use telltale_machine::model::output_condition::OutputConditionCheck;
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
-    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
-    SemanticAuditRecord, StepResult,
+    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects, SemanticAuditRecord,
+    StepResult,
 };
 use telltale_types::{GlobalType, LocalTypeR};
 
@@ -21,6 +21,7 @@ use crate::checkpoint::CheckpointStore;
 use crate::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
+use crate::reconfiguration::{ReconfigurationRecord, ReconfigurationSummary};
 use crate::scenario::{
     ExecutionRegime, ResolvedExecutionBackend, ResolvedTheoremProfile, Scenario,
 };
@@ -311,6 +312,8 @@ pub struct ScenarioReplayArtifact {
     pub semantic_audit_log: Vec<SemanticAuditRecord>,
     /// Canonical semantic object export captured from the protocol-machine run.
     pub semantic_objects: ProtocolMachineSemanticObjects,
+    /// Canonical simulator reconfiguration trace captured from the shared execution core.
+    pub reconfiguration_trace: Vec<ReconfigurationRecord>,
 }
 
 /// Structured statistics emitted by scenario execution.
@@ -323,6 +326,8 @@ pub struct ScenarioStats {
     pub theorem_profile: ResolvedTheoremProfile,
     /// Theorem-native progress summary derived from session snapshots and productive events.
     pub theorem_progress: TheoremProgressSummary,
+    /// Reconfiguration accounting summary kept separate from theorem progress descent.
+    pub reconfiguration_summary: ReconfigurationSummary,
     /// Resolved execution backend.
     pub backend: ResolvedExecutionBackend,
     /// Resolved scheduler concurrency value.
@@ -494,8 +499,10 @@ pub fn run_with_scenario(
     let image = CodeImage::from_local_types(local_types, global_type);
     let resolved_execution = scenario.resolved_execution()?;
     let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
-    if matches!(resolved_execution.backend, ResolvedExecutionBackend::Threaded)
-        && scenario.checkpoint_interval.is_some()
+    if matches!(
+        resolved_execution.backend,
+        ResolvedExecutionBackend::Threaded
+    ) && scenario.checkpoint_interval.is_some()
     {
         return Err(
             "scenario checkpoints currently require the canonical simulator backend".to_string(),
@@ -545,12 +552,9 @@ pub fn run_with_scenario(
         CheckpointStore::with_dir(interval, dir)
     });
 
-    let middleware = ScenarioMiddleware::from_scenario(
-        scenario,
-        handler,
-        machine.clock().tick_duration,
-    )
-    .map_err(|e| format!("middleware setup: {e}"))?;
+    let middleware =
+        ScenarioMiddleware::from_scenario(scenario, handler, machine.clock().tick_duration)
+            .map_err(|e| format!("middleware setup: {e}"))?;
 
     let execution = execute_scenario_rounds(
         &mut machine,
@@ -600,6 +604,8 @@ pub fn run_with_scenario(
     let output_condition_trace = machine.output_condition_checks().to_vec();
     let semantic_audit_log = machine.semantic_audit_log();
     let semantic_objects = machine.semantic_objects();
+    let reconfiguration_trace = middleware.reconfiguration_trace()?;
+    let reconfiguration_summary = middleware.reconfiguration_summary()?;
     let final_session_snapshots = machine.session_snapshots();
     let productive_step_count = productive_event_count(&obs_trace);
     let theorem_progress = theorem_progress_summary(
@@ -626,12 +632,14 @@ pub fn run_with_scenario(
             output_condition_trace,
             semantic_audit_log,
             semantic_objects,
+            reconfiguration_trace,
         },
         stats: ScenarioStats {
             seed: scenario.seed,
             execution_regime: resolved_execution.regime(),
             theorem_profile,
             theorem_progress,
+            reconfiguration_summary,
             backend: resolved_execution.backend,
             scheduler_concurrency: resolved_execution.scheduler_concurrency,
             worker_threads: resolved_execution.worker_threads,

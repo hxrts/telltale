@@ -42,13 +42,6 @@ pub enum Fault {
         /// Duration in ticks before recovery. None means permanent.
         duration: Option<usize>,
     },
-    /// Partition roles into disconnected groups.
-    NetworkPartition {
-        /// Groups of roles that can communicate within but not across.
-        groups: Vec<Vec<String>>,
-        /// Duration in ticks before partition heals.
-        duration: usize,
-    },
 }
 
 /// When to activate a fault.
@@ -180,27 +173,6 @@ impl FaultState {
             }
         }
         one - p_not
-    }
-
-    fn partitioned(&self, from: &str, to: &str) -> bool {
-        for fault in &self.active {
-            if let Fault::NetworkPartition { groups, .. } = &fault.fault {
-                let mut from_group = None;
-                let mut to_group = None;
-                for (idx, group) in groups.iter().enumerate() {
-                    if group.iter().any(|r| r == from) {
-                        from_group = Some(idx);
-                    }
-                    if group.iter().any(|r| r == to) {
-                        to_group = Some(idx);
-                    }
-                }
-                if from_group != to_group {
-                    return true;
-                }
-            }
-        }
-        false
     }
 }
 
@@ -376,9 +348,6 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
         if state.is_crashed(role) {
             return EffectResult::failure(EffectFailure::topology_disruption("node crashed"));
         }
-        if state.partitioned(role, partner) {
-            return EffectResult::success(SendDecision::Drop);
-        }
         let drop_p = state.message_drop_probability();
         let zero = FixedQ32::zero();
         if drop_p > zero && state.rng.should_trigger(drop_p) {
@@ -512,7 +481,6 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
 fn fault_expiry(tick: u64, fault: &Fault, scheduled: Option<usize>) -> Option<u64> {
     let duration = match fault {
         Fault::NodeCrash { duration, .. } => duration.or(scheduled),
-        Fault::NetworkPartition { duration, .. } => Some(*duration),
         _ => scheduled,
     };
     duration.map(|d| {

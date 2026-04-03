@@ -26,6 +26,7 @@ pub fn deterministic_baseline(
         seed: 0,
         network: None,
         material: Some(material),
+        reconfigurations: Vec::new(),
         events: Vec::new(),
         properties: None,
         checkpoint_interval: None,
@@ -123,10 +124,6 @@ pub fn fault_to_action(fault: &Fault) -> Option<FaultActionSpec> {
         Fault::NodeCrash { role, duration } => Some(FaultActionSpec::NodeCrash {
             role: role.clone(),
             duration: duration.map(u64::try_from).transpose().ok()?,
-        }),
-        Fault::NetworkPartition { groups, duration } => Some(FaultActionSpec::NetworkPartition {
-            groups: groups.clone(),
-            duration: u64::try_from(*duration).ok()?,
         }),
     }
 }

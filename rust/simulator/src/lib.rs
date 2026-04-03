@@ -33,6 +33,7 @@ pub mod material_handlers;
 pub mod network;
 pub mod presets;
 pub mod property;
+pub mod reconfiguration;
 pub mod rng;
 pub mod runner;
 pub mod scenario;
@@ -45,8 +46,8 @@ pub use contracts::{
 pub use distributed::{DistributedSimBuilder, DistributedSimulation, NestedExecutionContract};
 pub use harness::{
     derive_initial_states, derive_initial_states_for_model, BatchConfig, BatchRunManifest,
-    BatchRunManifestEntry, BatchRunResult, DirectAdapter, HarnessConfig, HarnessSpec,
-    HostAdapter, MaterialAdapter, SimulationHarness,
+    BatchRunManifestEntry, BatchRunResult, DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter,
+    MaterialAdapter, SimulationHarness,
 };
 pub use material::{MaterialModel, MaterialParams};
 pub use material_handlers::{
@@ -55,6 +56,11 @@ pub use material_handlers::{
 };
 pub use network::{NetworkConfig, NetworkModel};
 pub use property::{Property, PropertyMonitor};
+pub use reconfiguration::{
+    ReconfigurationAction, ReconfigurationController, ReconfigurationEffect,
+    ReconfigurationEffectKind, ReconfigurationFootprint, ReconfigurationLink,
+    ReconfigurationRecord, ReconfigurationSummary, ScheduledReconfiguration,
+};
 pub use rng::SimRng;
 pub use runner::{
     CriticalCapacityPhase, CriticalCapacitySummary, SchedulerLiftMode, SchedulerLiftSummary,

@@ -81,14 +81,8 @@ impl HostAdapter for StateProvidingAdapter {
         _scenario: &Scenario,
     ) -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String> {
         let mut states = BTreeMap::new();
-        states.insert(
-            "A".to_string(),
-            vec![FixedQ32::half(), FixedQ32::half()],
-        );
-        states.insert(
-            "B".to_string(),
-            vec![FixedQ32::half(), FixedQ32::half()],
-        );
+        states.insert("A".to_string(), vec![FixedQ32::half(), FixedQ32::half()]);
+        states.insert("B".to_string(), vec![FixedQ32::half(), FixedQ32::half()]);
         Ok(Some(states))
     }
 }
@@ -138,6 +132,7 @@ fn scenario() -> Scenario {
             initial_state: vec![FixedQ32::half(), FixedQ32::half()],
             step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
         })),
+        reconfigurations: Vec::new(),
         events: Vec::new(),
         properties: None,
         checkpoint_interval: None,

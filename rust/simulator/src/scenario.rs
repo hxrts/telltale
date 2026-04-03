@@ -1,6 +1,6 @@
 //! TOML scenario format for simulation runs.
 //!
-//! A scenario specifies the roles, material layer, parameters, step count,
+//! A scenario specifies the roles, field/material layer, parameters, step count,
 //! and middleware configuration for a simulation.
 
 use serde::{Deserialize, Serialize};
@@ -10,8 +10,11 @@ use telltale_types::FixedQ32;
 
 use crate::fault::{Fault, FaultSchedule, ScheduledFault, Trigger};
 use crate::material::MaterialParams;
-use crate::network::{LinkPolicy, NetworkConfig, Partition};
+use crate::network::{LinkPolicy, NetworkConfig};
 use crate::property::{parse_predicate, parse_property, Property, PropertyMonitor};
+use crate::reconfiguration::{
+    ReconfigurationAction, ReconfigurationEffect, ScheduledReconfiguration,
+};
 mod validation;
 
 /// A simulation scenario loaded from TOML.
@@ -35,6 +38,9 @@ pub struct Scenario {
     /// Optional built-in material parameters for material-driven adapters.
     #[serde(default)]
     pub material: Option<MaterialParams>,
+    /// First-class simulator reconfiguration operations.
+    #[serde(default)]
+    pub reconfigurations: Vec<ReconfigurationSpec>,
     /// Fault injection events.
     #[serde(default)]
     pub events: Vec<EventSpec>,
@@ -221,9 +227,6 @@ pub struct NetworkSpec {
     /// Loss probability per message.
     #[serde(default)]
     pub loss_probability: FixedQ32,
-    /// Optional static partitions.
-    #[serde(default)]
-    pub partitions: Vec<PartitionSpec>,
     /// Optional per-link role policies.
     #[serde(default)]
     pub links: Vec<LinkSpec>,
@@ -237,23 +240,12 @@ impl NetworkSpec {
             base_latency: Duration::from_millis(self.base_latency_ms),
             latency_variance: self.latency_variance,
             loss_probability: self.loss_probability,
-            partitions: self
-                .partitions
-                .iter()
-                .map(|p| Partition {
-                    groups: p.groups.clone(),
-                    start_tick: p.start_tick,
-                    end_tick: p.end_tick,
-                })
-                .collect(),
             links: self
                 .links
                 .iter()
                 .map(|link| LinkPolicy {
                     from: link.from.clone(),
                     to: link.to.clone(),
-                    start_tick: link.start_tick,
-                    end_tick: link.end_tick,
                     enabled: link.enabled,
                     base_latency: link.base_latency_ms.map(Duration::from_millis),
                     latency_variance: link.latency_variance,
@@ -264,17 +256,6 @@ impl NetworkSpec {
     }
 }
 
-/// Partition specification for network configs.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PartitionSpec {
-    /// Groups of roles that can communicate within but not across.
-    pub groups: Vec<Vec<String>>,
-    /// Tick when the partition becomes active.
-    pub start_tick: u64,
-    /// Tick when the partition heals.
-    pub end_tick: u64,
-}
-
 /// Role-to-role link policy specification.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LinkSpec {
@@ -282,12 +263,6 @@ pub struct LinkSpec {
     pub from: String,
     /// Destination role.
     pub to: String,
-    /// Tick when this link policy becomes active.
-    #[serde(default)]
-    pub start_tick: Option<u64>,
-    /// Tick when this link policy becomes inactive.
-    #[serde(default)]
-    pub end_tick: Option<u64>,
     /// Whether this link is enabled while active.
     #[serde(default = "default_link_enabled")]
     pub enabled: bool,
@@ -300,6 +275,18 @@ pub struct LinkSpec {
     /// Optional loss probability override.
     #[serde(default)]
     pub loss_probability: Option<FixedQ32>,
+}
+
+/// First-class simulator reconfiguration operation specification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReconfigurationSpec {
+    /// When to activate the operation.
+    pub trigger: TriggerSpec,
+    /// What operation to apply.
+    pub action: ReconfigurationAction,
+    /// Whether the operation is pure or budget-consuming.
+    #[serde(default)]
+    pub effect: ReconfigurationEffect,
 }
 
 /// Fault injection event specification.
@@ -366,13 +353,6 @@ pub enum FaultActionSpec {
         role: String,
         /// Duration in ticks before recovery. None means permanent.
         duration: Option<u64>,
-    },
-    /// Partition roles into disconnected groups.
-    NetworkPartition {
-        /// Groups of roles that can communicate within but not across.
-        groups: Vec<Vec<String>>,
-        /// Duration in ticks before partition heals.
-        duration: u64,
     },
 }
 
@@ -447,12 +427,13 @@ impl ExecutionSpec {
         };
 
         let parallel_default = env.available_parallelism.max(1);
-        let scheduler_concurrency = self.scheduler_concurrency.unwrap_or_else(|| match self.backend
-        {
-            ExecutionBackend::Auto => 1,
-            ExecutionBackend::Canonical => 1,
-            ExecutionBackend::Threaded => parallel_default,
-        });
+        let scheduler_concurrency =
+            self.scheduler_concurrency
+                .unwrap_or_else(|| match self.backend {
+                    ExecutionBackend::Auto => 1,
+                    ExecutionBackend::Canonical => 1,
+                    ExecutionBackend::Threaded => parallel_default,
+                });
         let worker_threads = self.worker_threads.unwrap_or_else(|| match self.backend {
             ExecutionBackend::Auto => 1,
             ExecutionBackend::Canonical => 1,
@@ -520,7 +501,11 @@ impl Scenario {
             profile => profile,
         };
         let assumption_bundle = match self.theorem.assumption_bundle {
-            TheoremAssumptionBundle::Auto if self.network.is_none() && self.events.is_empty() => {
+            TheoremAssumptionBundle::Auto
+                if self.network.is_none()
+                    && self.events.is_empty()
+                    && self.reconfigurations.is_empty() =>
+            {
                 TheoremAssumptionBundle::FaultFreeTransport
             }
             TheoremAssumptionBundle::Auto => TheoremAssumptionBundle::ObservedTransport,
@@ -569,18 +554,22 @@ impl Scenario {
 
         let assumption_error = match assumption_bundle {
             TheoremAssumptionBundle::FaultFreeTransport
-                if self.network.is_some() || !self.events.is_empty() =>
+                if self.network.is_some()
+                    || !self.events.is_empty()
+                    || !self.reconfigurations.is_empty() =>
             {
                 Some(
-                    "assumption bundle fault_free_transport requires no network middleware and no injected faults"
+                    "assumption bundle fault_free_transport requires no network middleware, no injected faults, and no simulator reconfiguration program"
                         .to_string(),
                 )
             }
             _ => None,
         };
 
-        let eligibility_reason = scheduler_error.or(envelope_error).or(assumption_error).or_else(
-            || {
+        let eligibility_reason = scheduler_error
+            .or(envelope_error)
+            .or(assumption_error)
+            .or_else(|| {
                 if matches!(envelope_profile, TheoremEnvelopeProfile::None) {
                     Some(
                         "envelope profile none disables theorem-backed outputs for this run"
@@ -589,8 +578,7 @@ impl Scenario {
                 } else {
                     None
                 }
-            },
-        );
+            });
 
         let eligibility = if eligibility_reason.is_some() {
             TheoremEligibility::Ineligible
@@ -694,6 +682,16 @@ impl Scenario {
         self.network.as_ref().map(NetworkSpec::to_config)
     }
 
+    /// Whether this scenario requires the network model layer.
+    #[must_use]
+    pub fn requires_network_model(&self) -> bool {
+        self.network.is_some()
+            || self
+                .reconfigurations
+                .iter()
+                .any(|operation| operation.action.affects_network())
+    }
+
     /// Resolve execution settings after applying simulator defaults and capability checks.
     ///
     /// # Errors
@@ -719,6 +717,22 @@ impl Scenario {
             faults,
             max_concurrent: usize::MAX,
         })
+    }
+
+    /// Convert reconfiguration specs to one scheduled reconfiguration program.
+    pub fn reconfiguration_schedule(&self) -> Result<Vec<ScheduledReconfiguration>, String> {
+        self.reconfigurations
+            .iter()
+            .enumerate()
+            .map(|(idx, operation)| {
+                Ok(ScheduledReconfiguration {
+                    operation_id: format!("reconfiguration:{idx}"),
+                    trigger: operation.trigger.to_trigger()?,
+                    action: operation.action.clone(),
+                    effect: operation.effect.clone(),
+                })
+            })
+            .collect()
     }
 
     /// Build a property monitor from scenario properties.
@@ -814,10 +828,6 @@ impl FaultActionSpec {
                     Some(value) => Some(checked_u64_to_usize("event.node_crash.duration", *value)?),
                     None => None,
                 },
-            }),
-            FaultActionSpec::NetworkPartition { groups, duration } => Ok(Fault::NetworkPartition {
-                groups: groups.clone(),
-                duration: checked_u64_to_usize("event.network_partition.duration", *duration)?,
             }),
         }
     }

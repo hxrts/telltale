@@ -1,10 +1,11 @@
-use super::{validate_non_negative, validate_probability, Fault, Scenario};
+use super::{validate_non_negative, validate_probability, Scenario};
 use std::collections::BTreeSet;
 
 pub(super) fn validate_semantics(scenario: &Scenario) -> Result<(), String> {
     let role_set = validate_roles(scenario)?;
     validate_limits(scenario)?;
     validate_network(scenario, &role_set)?;
+    validate_reconfigurations(scenario, &role_set)?;
     validate_events(scenario, &role_set)?;
     if scenario.property_monitor()?.is_some() {
         // Property monitor configuration is validated by construction here.
@@ -42,47 +43,7 @@ fn validate_network(scenario: &Scenario, role_set: &BTreeSet<String>) -> Result<
     };
     validate_non_negative("network.latency_variance", network.latency_variance)?;
     validate_probability("network.loss_probability", network.loss_probability)?;
-    validate_network_partitions(network, role_set)?;
     validate_network_links(network, role_set)?;
-    Ok(())
-}
-
-fn validate_network_partitions(
-    network: &super::NetworkSpec,
-    role_set: &BTreeSet<String>,
-) -> Result<(), String> {
-    for (idx, partition) in network.partitions.iter().enumerate() {
-        if partition.start_tick > partition.end_tick {
-            return Err(format!(
-                "network.partitions[{idx}] has start_tick > end_tick"
-            ));
-        }
-        if partition.groups.is_empty() {
-            return Err(format!(
-                "network.partitions[{idx}] must define at least one group"
-            ));
-        }
-        let mut seen_partition_roles = BTreeSet::new();
-        for (group_idx, group) in partition.groups.iter().enumerate() {
-            if group.is_empty() {
-                return Err(format!(
-                    "network.partitions[{idx}].groups[{group_idx}] must not be empty"
-                ));
-            }
-            for role in group {
-                if !role_set.contains(role) {
-                    return Err(format!(
-                        "network.partitions[{idx}] references unknown role '{role}'"
-                    ));
-                }
-                if !seen_partition_roles.insert(role.clone()) {
-                    return Err(format!(
-                        "network.partitions[{idx}] role '{role}' appears in multiple groups"
-                    ));
-                }
-            }
-        }
-    }
     Ok(())
 }
 
@@ -109,11 +70,6 @@ fn validate_network_links(
                 link.from
             ));
         }
-        if let (Some(start), Some(end)) = (link.start_tick, link.end_tick) {
-            if start > end {
-                return Err(format!("network.links[{idx}] has start_tick > end_tick"));
-            }
-        }
         if let Some(loss) = link.loss_probability {
             validate_probability("network.links.loss_probability", loss)?;
         }
@@ -124,54 +80,202 @@ fn validate_network_links(
     Ok(())
 }
 
-fn validate_events(scenario: &Scenario, role_set: &BTreeSet<String>) -> Result<(), String> {
-    for (idx, event) in scenario.events.iter().enumerate() {
-        let _trigger = event.trigger.to_trigger()?;
-        match event.action.to_fault()? {
-            Fault::NodeCrash { role, .. } => {
-                if !role_set.contains(&role) {
+fn validate_reconfigurations(
+    scenario: &Scenario,
+    role_set: &BTreeSet<String>,
+) -> Result<(), String> {
+    for (idx, operation) in scenario.reconfigurations.iter().enumerate() {
+        let _trigger = operation.trigger.to_trigger()?;
+        match operation.effect.kind {
+            crate::reconfiguration::ReconfigurationEffectKind::Pure
+                if operation.effect.budget_cost != 0 =>
+            {
+                return Err(format!(
+                    "reconfigurations[{idx}] pure reconfiguration must not consume transition budget"
+                ));
+            }
+            crate::reconfiguration::ReconfigurationEffectKind::TransitionChoreography
+                if operation.effect.budget_cost == 0 =>
+            {
+                return Err(format!(
+                    "reconfigurations[{idx}] transition_choreography must declare budget_cost > 0"
+                ));
+            }
+            _ => {}
+        }
+        match &operation.action {
+            crate::reconfiguration::ReconfigurationAction::Link {
+                from,
+                to,
+                latency_variance,
+                loss_probability,
+                ..
+            } => {
+                validate_known_distinct_roles(idx, "reconfigurations", from, to, role_set, "link")?;
+                if let Some(loss) = loss_probability {
+                    validate_probability("reconfigurations.link.loss_probability", *loss)?;
+                }
+                if let Some(variance) = latency_variance {
+                    validate_non_negative("reconfigurations.link.latency_variance", *variance)?;
+                }
+            }
+            crate::reconfiguration::ReconfigurationAction::Delegation {
+                scope,
+                from_role,
+                to_role,
+            } => {
+                if scope.trim().is_empty() {
                     return Err(format!(
-                        "events[{idx}] node_crash references unknown role '{role}'"
+                        "reconfigurations[{idx}] delegation scope must not be empty"
+                    ));
+                }
+                validate_known_distinct_roles(
+                    idx,
+                    "reconfigurations",
+                    from_role,
+                    to_role,
+                    role_set,
+                    "delegation",
+                )?;
+            }
+            crate::reconfiguration::ReconfigurationAction::Handoff {
+                handoff_id,
+                from_role,
+                to_role,
+            } => {
+                if handoff_id.trim().is_empty() {
+                    return Err(format!(
+                        "reconfigurations[{idx}] handoff_id must not be empty"
+                    ));
+                }
+                validate_known_distinct_roles(
+                    idx,
+                    "reconfigurations",
+                    from_role,
+                    to_role,
+                    role_set,
+                    "handoff",
+                )?;
+            }
+            crate::reconfiguration::ReconfigurationAction::Federation {
+                federation,
+                enabled,
+                groups,
+            } => {
+                if federation.trim().is_empty() {
+                    return Err(format!(
+                        "reconfigurations[{idx}] federation name must not be empty"
+                    ));
+                }
+                if *enabled {
+                    validate_group_footprint(
+                        &format!("reconfigurations[{idx}].federation"),
+                        groups,
+                        role_set,
+                    )?;
+                } else if !groups.is_empty() {
+                    return Err(format!(
+                        "reconfigurations[{idx}] disabled federation updates must not declare groups"
                     ));
                 }
             }
-            Fault::NetworkPartition { groups, .. } => {
-                validate_event_network_partition(idx, &groups, role_set)?;
+            crate::reconfiguration::ReconfigurationAction::ModeTransition {
+                roles,
+                from_mode,
+                to_mode,
+            } => {
+                if roles.is_empty() {
+                    return Err(format!(
+                        "reconfigurations[{idx}] mode_transition must list at least one role"
+                    ));
+                }
+                if from_mode.trim().is_empty() || to_mode.trim().is_empty() {
+                    return Err(format!(
+                        "reconfigurations[{idx}] mode_transition modes must not be empty"
+                    ));
+                }
+                if from_mode == to_mode {
+                    return Err(format!(
+                        "reconfigurations[{idx}] mode_transition must change modes"
+                    ));
+                }
+                let mut seen = BTreeSet::new();
+                for role in roles {
+                    if !role_set.contains(role) {
+                        return Err(format!(
+                            "reconfigurations[{idx}] mode_transition references unknown role '{role}'"
+                        ));
+                    }
+                    if !seen.insert(role.clone()) {
+                        return Err(format!(
+                            "reconfigurations[{idx}] mode_transition role '{role}' appears multiple times"
+                        ));
+                    }
+                }
             }
-            Fault::MessageDrop { .. }
-            | Fault::MessageDelay { .. }
-            | Fault::MessageCorruption { .. } => {}
         }
     }
     Ok(())
 }
 
-fn validate_event_network_partition(
+fn validate_events(scenario: &Scenario, role_set: &BTreeSet<String>) -> Result<(), String> {
+    for (idx, event) in scenario.events.iter().enumerate() {
+        let _trigger = event.trigger.to_trigger()?;
+        if let super::FaultActionSpec::NodeCrash { role, .. } = &event.action {
+            if !role_set.contains(role) {
+                return Err(format!(
+                    "events[{idx}] node_crash references unknown role '{role}'"
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_known_distinct_roles(
     idx: usize,
+    surface: &str,
+    from: &str,
+    to: &str,
+    role_set: &BTreeSet<String>,
+    kind: &str,
+) -> Result<(), String> {
+    if !role_set.contains(from) {
+        return Err(format!(
+            "{surface}[{idx}] {kind} references unknown role '{from}'"
+        ));
+    }
+    if !role_set.contains(to) {
+        return Err(format!(
+            "{surface}[{idx}] {kind} references unknown role '{to}'"
+        ));
+    }
+    if from == to {
+        return Err(format!("{surface}[{idx}] {kind} must name distinct roles"));
+    }
+    Ok(())
+}
+
+fn validate_group_footprint(
+    surface: &str,
     groups: &[Vec<String>],
     role_set: &BTreeSet<String>,
 ) -> Result<(), String> {
     if groups.is_empty() {
-        return Err(format!(
-            "events[{idx}] network_partition must define at least one group"
-        ));
+        return Err(format!("{surface} must define at least one group"));
     }
     let mut seen = BTreeSet::new();
     for (group_idx, group) in groups.iter().enumerate() {
         if group.is_empty() {
-            return Err(format!(
-                "events[{idx}] network_partition group {group_idx} must not be empty"
-            ));
+            return Err(format!("{surface}.groups[{group_idx}] must not be empty"));
         }
         for role in group {
             if !role_set.contains(role) {
-                return Err(format!(
-                    "events[{idx}] network_partition references unknown role '{role}'"
-                ));
+                return Err(format!("{surface} references unknown role '{role}'"));
             }
             if !seen.insert(role.clone()) {
                 return Err(format!(
-                    "events[{idx}] network_partition role '{role}' appears in multiple groups"
+                    "{surface} role '{role}' appears in multiple groups"
                 ));
             }
         }

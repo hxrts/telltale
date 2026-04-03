@@ -62,9 +62,15 @@ fn test_default_seed_when_missing() {
     let theorem = scenario
         .resolved_theorem_profile()
         .expect("resolve theorem profile");
-    assert_eq!(theorem.scheduler_profile, TheoremSchedulerProfile::CanonicalExact);
+    assert_eq!(
+        theorem.scheduler_profile,
+        TheoremSchedulerProfile::CanonicalExact
+    );
     assert_eq!(theorem.envelope_profile, TheoremEnvelopeProfile::Exact);
-    assert_eq!(theorem.assumption_bundle, TheoremAssumptionBundle::FaultFreeTransport);
+    assert_eq!(
+        theorem.assumption_bundle,
+        TheoremAssumptionBundle::FaultFreeTransport
+    );
     assert_eq!(theorem.eligibility, TheoremEligibility::Exact);
 }
 
@@ -105,8 +111,6 @@ fn test_parse_network_link_topology() {
             [[network.links]]
             from = "A"
             to = "B"
-            start_tick = 3
-            end_tick = 9
             enabled = true
             base_latency_ms = 25
             latency_variance = "0.2"
@@ -125,8 +129,6 @@ fn test_parse_network_link_topology() {
     let ab = &cfg.links[0];
     assert_eq!(ab.from, "A");
     assert_eq!(ab.to, "B");
-    assert_eq!(ab.start_tick, Some(3));
-    assert_eq!(ab.end_tick, Some(9));
     assert!(ab.enabled);
     assert_eq!(ab.base_latency, Some(Duration::from_millis(25)));
     let expected_loss = FixedQ32::from_ratio(2, 5).expect("0.4");
@@ -140,8 +142,35 @@ fn test_parse_network_link_topology() {
     assert_eq!(bc.from, "B");
     assert_eq!(bc.to, "C");
     assert!(!bc.enabled);
-    assert_eq!(bc.start_tick, None);
-    assert_eq!(bc.end_tick, None);
+}
+
+#[test]
+fn test_parse_reconfiguration_program() {
+    let toml = r#"
+            name = "reconfiguration_program"
+            roles = ["A", "B", "C"]
+            steps = 10
+
+            [[reconfigurations]]
+            trigger = { at_tick = 2 }
+            effect = { kind = "pure" }
+            action = { type = "link", from = "A", to = "B", enabled = false }
+
+            [[reconfigurations]]
+            trigger = { after_step = 3 }
+            effect = { kind = "transition_choreography", budget_cost = 5 }
+            action = { type = "mode_transition", roles = ["B", "C"], from_mode = "mesh", to_mode = "relay" }
+        "#;
+
+    let scenario = Scenario::parse(toml).expect("parse scenario");
+    assert_eq!(scenario.reconfigurations.len(), 2);
+    assert!(scenario.requires_network_model());
+    let schedule = scenario
+        .reconfiguration_schedule()
+        .expect("build reconfiguration schedule");
+    assert_eq!(schedule.len(), 2);
+    assert_eq!(schedule[0].operation_id, "reconfiguration:0");
+    assert_eq!(schedule[1].operation_id, "reconfiguration:1");
 }
 
 #[test]
@@ -284,19 +313,39 @@ fn test_explicit_theorem_profile_can_make_the_same_execution_ineligible() {
         .resolved_theorem_profile()
         .expect("resolve theorem profile");
 
-    assert_eq!(theorem.scheduler_profile, TheoremSchedulerProfile::ThreadedEnvelope);
+    assert_eq!(
+        theorem.scheduler_profile,
+        TheoremSchedulerProfile::ThreadedEnvelope
+    );
     assert_eq!(
         theorem.envelope_profile,
         TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdherence
     );
-    assert_eq!(theorem.assumption_bundle, TheoremAssumptionBundle::FaultFreeTransport);
-    assert_eq!(theorem.eligibility, TheoremEligibility::Ineligible);
-    assert!(
-        theorem
-            .eligibility_reason
-            .expect("eligibility reason")
-            .contains("threaded_envelope")
+    assert_eq!(
+        theorem.assumption_bundle,
+        TheoremAssumptionBundle::FaultFreeTransport
     );
+    assert_eq!(theorem.eligibility, TheoremEligibility::Ineligible);
+    assert!(theorem
+        .eligibility_reason
+        .expect("eligibility reason")
+        .contains("threaded_envelope"));
+}
+
+#[test]
+fn test_reject_delegation_with_identical_roles() {
+    let toml = r#"
+            name = "bad_reconfiguration"
+            roles = ["A", "B"]
+            steps = 1
+
+            [[reconfigurations]]
+            trigger = { immediate = true }
+            action = { type = "delegation", scope = "owner", from_role = "A", to_role = "A" }
+        "#;
+
+    let error = Scenario::parse(toml).expect_err("identical delegation roles must fail");
+    assert!(error.contains("delegation"));
 }
 
 #[test]

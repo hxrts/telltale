@@ -1,7 +1,7 @@
 # Protocol-Machine Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
-It covers the TOML schema, fault injection, network modeling, properties, checkpointing, and current limits.
+It covers the TOML schema, fault injection, first-class reconfiguration, network modeling, properties, checkpointing, and current limits.
 
 ## Scenario Schema
 
@@ -21,6 +21,7 @@ pub struct Scenario {
     pub seed: u64,
     pub network: Option<NetworkSpec>,
     pub material: Option<MaterialParams>,
+    pub reconfigurations: Vec<ReconfigurationSpec>,
     pub events: Vec<EventSpec>,
     pub properties: Option<PropertiesSpec>,
     pub checkpoint_interval: Option<u64>,
@@ -28,7 +29,7 @@ pub struct Scenario {
 }
 ```
 
-`network`, `material`, `events`, `properties`, and `checkpoint_interval` are optional.
+`network`, `material`, `reconfigurations`, `events`, `properties`, and `checkpoint_interval` are optional.
 
 ```rust
 pub struct ExecutionSpec {
@@ -87,8 +88,12 @@ base_latency_ms = 20
 latency_variance = "0.10"
 loss_probability = "0.02"
 
-[[events]]
+[[reconfigurations]]
 trigger = { at_tick = 50 }
+action = { type = "link", from = "A", to = "B", enabled = false }
+
+[[events]]
+trigger = { at_tick = 75 }
 action = { type = "message_drop", probability = "0.25" }
 
 [properties]
@@ -103,7 +108,7 @@ The parser also accepts compatible numeric representations.
 `FaultInjector` wraps the inner handler.
 It manages activation, expiry, random triggers, delayed delivery, corruption, and crash state.
 
-Supported actions are `MessageDrop`, `MessageDelay`, `MessageCorruption`, `NodeCrash`, and `NetworkPartition`.
+Supported actions are `MessageDrop`, `MessageDelay`, `MessageCorruption`, and `NodeCrash`.
 Supported triggers are `Immediate`, `AtTick`, `AfterStep`, `Random`, and `OnEvent`.
 If a trigger declaration sets no trigger field, it defaults to `Immediate`.
 
@@ -111,18 +116,52 @@ An event must not set more than one trigger field at once.
 The parser rejects multi-trigger declarations.
 `Trigger::AfterStep` is evaluated against logical round count rather than raw tick count.
 
+Use fault events for transport disruption and runtime failure only.
+Do not encode topology change, handoff, federation cutover, or mode change as fault events.
+
+## Reconfiguration Program
+
+`Scenario.reconfigurations` is the first-class surface for simulator-visible topology and authority change.
+Each entry has the same trigger vocabulary as `events`, but it activates a semantic reconfiguration operation instead of a transport fault.
+
+```rust
+pub struct ReconfigurationSpec {
+    pub trigger: TriggerSpec,
+    pub action: ReconfigurationAction,
+    pub effect: ReconfigurationEffect,
+}
+```
+
+Supported actions are:
+
+- `link`: update one directed link policy
+- `delegation`: record an explicit delegation scope transfer between two roles
+- `handoff`: record an explicit handoff identifier plus revoked/activated roles
+- `federation`: activate or clear a named communication grouping policy
+- `mode_transition`: record a mode change for one or more roles
+
+`effect.kind = "pure"` records a pure reconfiguration and must not consume transition budget.
+`effect.kind = "transition_choreography"` records a separate cutover budget and must declare `budget_cost > 0`.
+
+The simulator validates reconfiguration footprints before execution.
+Unknown roles, duplicated federation members, same-source/same-target delegation, empty handoff ids, and zero-cost transition choreography are rejected at parse time.
+
 ## Network Middleware
 
 `NetworkModel` wraps `FaultInjector` when network simulation is enabled.
-It applies partition checks, link overrides, latency sampling, loss sampling, and deferred delivery.
+It applies federation connectivity checks, link overrides, latency sampling, loss sampling, and deferred delivery.
 
 Per-link policies match directed `(from, to)` pairs.
-A link policy is active only inside its optional tick window.
-When multiple link policies match, the last matching entry wins.
+`network.links` now describes the static baseline policy for a run.
+Dynamic link updates happen through `reconfigurations`.
+Reconfiguration-applied link overrides shadow the baseline policy for the affected directed edge only.
 
 Loss is evaluated before latency scheduling.
 Dropped messages never enter the in-flight queue.
 Zero effective latency produces immediate delivery.
+
+Use `network` for baseline transport parameters.
+Use `reconfigurations` for topology/federation/link cutovers.
 
 ## Property Monitoring
 

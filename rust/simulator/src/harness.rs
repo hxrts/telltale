@@ -314,16 +314,14 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
             for _ in 0..parallelism {
                 let tx = tx.clone();
                 let next = &next;
-                scope.spawn(move || {
-                    loop {
-                        let idx = next.fetch_add(1, Ordering::Relaxed);
-                        let Some(spec) = specs.get(idx) else {
-                            break;
-                        };
-                        let result = self.run(spec);
-                        if tx.send((idx, result)).is_err() {
-                            break;
-                        }
+                scope.spawn(move || loop {
+                    let idx = next.fetch_add(1, Ordering::Relaxed);
+                    let Some(spec) = specs.get(idx) else {
+                        break;
+                    };
+                    let result = self.run(spec);
+                    if tx.send((idx, result)).is_err() {
+                        break;
                     }
                 });
             }
@@ -539,6 +537,7 @@ mod tests {
                 initial_state: vec![FixedQ32::half(), FixedQ32::half()],
                 step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
             })),
+            reconfigurations: Vec::new(),
             events: Vec::new(),
             properties: None,
             checkpoint_interval: None,
@@ -663,7 +662,12 @@ mod tests {
 
         let adapter = MaterialAdapter::from_scenario(&spec_a.scenario).expect("material adapter");
         let harness = SimulationHarness::new(&adapter);
-        let batch = harness.run_batch_with(&[spec_a, spec_b], BatchConfig { parallelism: Some(2) });
+        let batch = harness.run_batch_with(
+            &[spec_a, spec_b],
+            BatchConfig {
+                parallelism: Some(2),
+            },
+        );
 
         assert_eq!(batch.parallelism, 2);
         assert_eq!(batch.manifest.parallelism, 2);

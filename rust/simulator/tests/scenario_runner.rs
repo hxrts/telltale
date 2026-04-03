@@ -3,18 +3,21 @@
 use std::collections::BTreeMap;
 
 use serde_json::json;
-use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, SemanticAuditRecord};
 use telltale_simulator::backend::SimulationMachine;
 use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
-use telltale_simulator::runner::{run, run_with_scenario, CriticalCapacityPhase, SchedulerLiftMode};
+use telltale_simulator::reconfiguration::{ReconfigurationAction, ReconfigurationEffectKind};
+use telltale_simulator::runner::{
+    run, run_with_scenario, CriticalCapacityPhase, SchedulerLiftMode,
+};
 use telltale_simulator::scenario::{
     ExecutionRegime, ResolvedExecutionBackend, Scenario, TheoremAssumptionBundle,
     TheoremEligibility, TheoremEnvelopeProfile, TheoremSchedulerProfile,
@@ -121,7 +124,11 @@ fn finite_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
     (global, local_types)
 }
 
-fn write_initial_states(machine: &mut SimulationMachine, sid: usize, initial_states: &BTreeMap<String, Vec<FixedQ32>>) {
+fn write_initial_states(
+    machine: &mut SimulationMachine,
+    sid: usize,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+) {
     let coro_info = machine
         .session_coroutines(sid)
         .iter()
@@ -179,7 +186,10 @@ step_size = "0.01"
     .expect("scenario run");
 
     assert_eq!(result.stats.seed, 123);
-    assert_eq!(result.stats.execution_regime, ExecutionRegime::CanonicalExact);
+    assert_eq!(
+        result.stats.execution_regime,
+        ExecutionRegime::CanonicalExact
+    );
     assert_eq!(
         result.stats.theorem_profile.scheduler_profile,
         TheoremSchedulerProfile::CanonicalExact
@@ -197,6 +207,8 @@ step_size = "0.01"
         TheoremEligibility::Exact
     );
     assert_eq!(result.replay.theorem_profile, result.stats.theorem_profile);
+    assert!(result.replay.reconfiguration_trace.is_empty());
+    assert_eq!(result.stats.reconfiguration_summary.applied_operations, 0);
     assert_eq!(
         result.stats.theorem_progress.critical_capacity.phase,
         CriticalCapacityPhase::Unsupported
@@ -257,10 +269,8 @@ envelope_profile = "exact"
 assumption_bundle = "fault_free_transport"
 "#;
     let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
-    let initial_states = BTreeMap::from([
-        ("A".to_string(), Vec::new()),
-        ("B".to_string(), Vec::new()),
-    ]);
+    let initial_states =
+        BTreeMap::from([("A".to_string(), Vec::new()), ("B".to_string(), Vec::new())]);
 
     let result = run_with_scenario(
         &local_types,
@@ -310,10 +320,8 @@ envelope_profile = "protocol_machine_envelope_adherence"
 assumption_bundle = "fault_free_transport"
 "#;
     let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
-    let initial_states = BTreeMap::from([
-        ("A".to_string(), Vec::new()),
-        ("B".to_string(), Vec::new()),
-    ]);
+    let initial_states =
+        BTreeMap::from([("A".to_string(), Vec::new()), ("B".to_string(), Vec::new())]);
 
     let result = run_with_scenario(
         &local_types,
@@ -329,7 +337,11 @@ assumption_bundle = "fault_free_transport"
         SchedulerLiftMode::ConservativeTotalStepBound
     );
     assert_eq!(
-        result.stats.theorem_progress.scheduler_lift.total_step_upper_bound,
+        result
+            .stats
+            .theorem_progress
+            .scheduler_lift
+            .total_step_upper_bound,
         Some(8)
     );
 }
@@ -409,7 +421,10 @@ step_size = "0.01"
     .expect("envelope theorem run");
 
     assert_eq!(exact_result.trace.records, envelope_result.trace.records);
-    assert_eq!(exact_result.replay.obs_trace, envelope_result.replay.obs_trace);
+    assert_eq!(
+        exact_result.replay.obs_trace,
+        envelope_result.replay.obs_trace
+    );
     assert_eq!(
         exact_result.replay.effect_trace,
         envelope_result.replay.effect_trace
@@ -426,6 +441,168 @@ step_size = "0.01"
     assert_eq!(
         envelope_result.stats.theorem_profile.eligibility,
         TheoremEligibility::EnvelopeBounded
+    );
+}
+
+#[test]
+fn pure_handoff_reconfiguration_preserves_runtime_behavior_and_enters_replay() {
+    let (global, local_types) = finite_protocol();
+    let base_toml = r#"
+name = "handoff_base"
+roles = ["A", "B"]
+steps = 4
+seed = 21
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "canonical_exact"
+envelope_profile = "exact"
+assumption_bundle = "fault_free_transport"
+"#;
+    let handoff_toml = r#"
+name = "handoff_reconfig"
+roles = ["A", "B"]
+steps = 4
+seed = 21
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "canonical_exact"
+envelope_profile = "exact"
+assumption_bundle = "observed_transport"
+
+[[reconfigurations]]
+trigger = { at_tick = 1 }
+action = { type = "handoff", handoff_id = "ownership#1", from_role = "A", to_role = "B" }
+"#;
+    let initial_states =
+        BTreeMap::from([("A".to_string(), Vec::new()), ("B".to_string(), Vec::new())]);
+    let base = Scenario::parse(base_toml).expect("parse base scenario");
+    let handoff = Scenario::parse(handoff_toml).expect("parse handoff scenario");
+
+    let base_result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &base,
+        &PassthroughHandler,
+    )
+    .expect("base run");
+    let handoff_result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &handoff,
+        &PassthroughHandler,
+    )
+    .expect("handoff run");
+
+    assert_eq!(base_result.trace.records, handoff_result.trace.records);
+    assert_eq!(
+        base_result.replay.obs_trace,
+        handoff_result.replay.obs_trace
+    );
+    assert_eq!(
+        base_result.stats.theorem_progress,
+        handoff_result.stats.theorem_progress
+    );
+    assert_eq!(handoff_result.replay.reconfiguration_trace.len(), 1);
+    let record = &handoff_result.replay.reconfiguration_trace[0];
+    assert_eq!(record.operation_id, "reconfiguration:0");
+    assert_eq!(record.tick, 1);
+    assert_eq!(record.logical_step, 1);
+    assert_eq!(
+        record.action,
+        ReconfigurationAction::Handoff {
+            handoff_id: "ownership#1".to_string(),
+            from_role: "A".to_string(),
+            to_role: "B".to_string(),
+        }
+    );
+    assert_eq!(
+        record.footprint.roles,
+        vec!["A".to_string(), "B".to_string()]
+    );
+    assert_eq!(record.effect.kind, ReconfigurationEffectKind::Pure);
+    assert_eq!(
+        handoff_result
+            .stats
+            .reconfiguration_summary
+            .applied_operations,
+        1
+    );
+    assert_eq!(
+        handoff_result.stats.reconfiguration_summary.pure_operations,
+        1
+    );
+    assert_eq!(
+        handoff_result
+            .stats
+            .reconfiguration_summary
+            .transition_budget_consumed,
+        0
+    );
+}
+
+#[test]
+fn transition_reconfiguration_budget_is_reported_separately_from_descent() {
+    let (global, local_types) = finite_protocol();
+    let scenario_toml = r#"
+name = "transition_reconfig"
+roles = ["A", "B"]
+steps = 4
+seed = 13
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "canonical_exact"
+envelope_profile = "exact"
+assumption_bundle = "observed_transport"
+
+[[reconfigurations]]
+trigger = { at_tick = 1 }
+effect = { kind = "transition_choreography", budget_cost = 3 }
+action = { type = "mode_transition", roles = ["A"], from_mode = "mesh", to_mode = "relay" }
+"#;
+    let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
+    let initial_states =
+        BTreeMap::from([("A".to_string(), Vec::new()), ("B".to_string(), Vec::new())]);
+
+    let result = run_with_scenario(
+        &local_types,
+        &global,
+        &initial_states,
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("run scenario");
+
+    assert_eq!(result.stats.theorem_progress.initial_depth_budget, 2);
+    assert_eq!(result.stats.theorem_progress.weighted_measure_consumed, 4);
+    assert_eq!(result.stats.reconfiguration_summary.applied_operations, 1);
+    assert_eq!(result.stats.reconfiguration_summary.pure_operations, 0);
+    assert_eq!(
+        result.stats.reconfiguration_summary.transition_operations,
+        1
+    );
+    assert_eq!(
+        result
+            .stats
+            .reconfiguration_summary
+            .transition_budget_consumed,
+        3
     );
 }
 
@@ -454,17 +631,17 @@ fn generated_effect_scenario_builder_records_effect_outcomes() {
 fn run_samples_initial_state_plus_one_record_per_round() {
     let (global, local_types) = simple_protocol();
     let mut initial_states = BTreeMap::new();
-    initial_states.insert(
-        "A".to_string(),
-        vec![FixedQ32::half(), FixedQ32::half()],
-    );
-    initial_states.insert(
-        "B".to_string(),
-        vec![FixedQ32::half(), FixedQ32::half()],
-    );
+    initial_states.insert("A".to_string(), vec![FixedQ32::half(), FixedQ32::half()]);
+    initial_states.insert("B".to_string(), vec![FixedQ32::half(), FixedQ32::half()]);
 
-    let trace = run(&local_types, &global, &initial_states, 4, &PassthroughHandler)
-        .expect("round-based run");
+    let trace = run(
+        &local_types,
+        &global,
+        &initial_states,
+        4,
+        &PassthroughHandler,
+    )
+    .expect("round-based run");
 
     let a_steps = trace
         .records_for_role("A")
@@ -529,7 +706,8 @@ loss_probability = "0.0"
     .expect("scenario run");
 
     let image = CodeImage::from_local_types(&local_types, &global);
-    let mut machine = SimulationMachine::Canonical(ProtocolMachine::new(ProtocolMachineConfig::default()));
+    let mut machine =
+        SimulationMachine::Canonical(ProtocolMachine::new(ProtocolMachineConfig::default()));
     let owned = machine
         .load_choreography_owned(&image, "sim/shared-engine-test")
         .expect("load choreography");
@@ -538,9 +716,12 @@ loss_probability = "0.0"
     let initial_states = derive_initial_states(&scenario).expect("derive initial states");
     write_initial_states(&mut machine, sid, &initial_states);
 
-    let middleware =
-        ScenarioMiddleware::from_scenario(&scenario, &PassthroughHandler, machine.clock().tick_duration)
-            .expect("build middleware");
+    let middleware = ScenarioMiddleware::from_scenario(
+        &scenario,
+        &PassthroughHandler,
+        machine.clock().tick_duration,
+    )
+    .expect("build middleware");
     let concurrency = usize::try_from(
         scenario
             .resolved_execution()
@@ -578,6 +759,9 @@ loss_probability = "0.0"
     assert_eq!(execution.rounds_executed, result.stats.rounds_executed);
     assert_eq!(machine.clock().tick, result.stats.final_tick);
     assert_eq!(machine.trace(), result.replay.obs_trace.as_slice());
-    assert_eq!(machine.effect_trace(), result.replay.effect_trace.as_slice());
+    assert_eq!(
+        machine.effect_trace(),
+        result.replay.effect_trace.as_slice()
+    );
     assert_eq!(monitor.violations().len(), result.violations.len());
 }

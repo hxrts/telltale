@@ -1,5 +1,6 @@
 //! Network simulation middleware.
 
+use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::Duration;
@@ -17,10 +18,7 @@ use crate::rng::SimRng;
 enum NetworkRoute {
     Drop,
     DeliverNow(Value),
-    Defer {
-        delivery_tick: u64,
-        value: Value,
-    },
+    Defer { delivery_tick: u64, value: Value },
 }
 
 /// Network simulation configuration.
@@ -32,8 +30,6 @@ pub struct NetworkConfig {
     pub latency_variance: FixedQ32,
     /// Probability of dropping each message.
     pub loss_probability: FixedQ32,
-    /// Network partition definitions.
-    pub partitions: Vec<Partition>,
     /// Per-link policy overrides for role-to-role traffic.
     pub links: Vec<LinkPolicy>,
 }
@@ -44,21 +40,9 @@ impl Default for NetworkConfig {
             base_latency: Duration::from_millis(0),
             latency_variance: FixedQ32::zero(),
             loss_probability: FixedQ32::zero(),
-            partitions: Vec::new(),
             links: Vec::new(),
         }
     }
-}
-
-/// Network partition definition.
-#[derive(Debug, Clone)]
-pub struct Partition {
-    /// Groups of roles that can communicate within but not across.
-    pub groups: Vec<Vec<String>>,
-    /// Tick when the partition becomes active.
-    pub start_tick: u64,
-    /// Tick when the partition heals.
-    pub end_tick: u64,
 }
 
 /// Per-link policy override for role-to-role traffic.
@@ -68,10 +52,6 @@ pub struct LinkPolicy {
     pub from: String,
     /// Destination role.
     pub to: String,
-    /// Tick when link policy becomes active. None means always active.
-    pub start_tick: Option<u64>,
-    /// Tick when link policy becomes inactive. None means no end.
-    pub end_tick: Option<u64>,
     /// Whether this link is enabled while active.
     pub enabled: bool,
     /// Optional latency override for this link.
@@ -91,13 +71,20 @@ struct InFlightMessage {
     value: Value,
 }
 
+#[derive(Debug, Clone, Default)]
+struct DynamicNetworkState {
+    link_overrides: BTreeMap<(String, String), LinkPolicy>,
+    federations: BTreeMap<String, Vec<Vec<String>>>,
+}
+
 /// Network simulation middleware. Wraps an inner EffectHandler and
-/// intercepts sends to model latency, loss, and partitions.
+/// intercepts sends to model latency, loss, federated connectivity, and link policy.
 pub struct NetworkModel<H: EffectHandler> {
     inner: H,
     config: NetworkConfig,
     rng: Mutex<SimRng>,
     in_flight: Mutex<Vec<InFlightMessage>>,
+    dynamic: Mutex<DynamicNetworkState>,
     current_tick: AtomicU64,
     tick_duration: Duration,
 }
@@ -115,6 +102,12 @@ impl<H: EffectHandler> NetworkModel<H> {
             .map_err(|_| "network rng lock poisoned".to_string())
     }
 
+    fn lock_dynamic(&self) -> Result<std::sync::MutexGuard<'_, DynamicNetworkState>, String> {
+        self.dynamic
+            .lock()
+            .map_err(|_| "network dynamic state lock poisoned".to_string())
+    }
+
     /// Creates a new network model wrapping an inner handler.
     #[must_use]
     pub fn new(inner: H, config: NetworkConfig, rng: SimRng, tick_duration: Duration) -> Self {
@@ -123,6 +116,7 @@ impl<H: EffectHandler> NetworkModel<H> {
             config,
             rng: Mutex::new(rng),
             in_flight: Mutex::new(Vec::new()),
+            dynamic: Mutex::new(DynamicNetworkState::default()),
             current_tick: AtomicU64::new(0),
             tick_duration,
         }
@@ -217,48 +211,66 @@ impl<H: EffectHandler> NetworkModel<H> {
         }
     }
 
-    fn is_partitioned(&self, from: &str, to: &str, tick: u64) -> bool {
-        for partition in &self.config.partitions {
-            if tick < partition.start_tick || tick > partition.end_tick {
-                continue;
-            }
+    /// Apply or replace one directed link policy.
+    pub fn set_link_policy(&self, link: LinkPolicy) -> Result<(), String> {
+        self.lock_dynamic()?
+            .link_overrides
+            .insert((link.from.clone(), link.to.clone()), link);
+        Ok(())
+    }
+
+    /// Activate or replace one federation partitioning policy.
+    pub fn set_federation_groups(
+        &self,
+        federation: String,
+        groups: Vec<Vec<String>>,
+    ) -> Result<(), String> {
+        self.lock_dynamic()?.federations.insert(federation, groups);
+        Ok(())
+    }
+
+    /// Remove one federation partitioning policy.
+    pub fn clear_federation(&self, federation: &str) -> Result<(), String> {
+        self.lock_dynamic()?.federations.remove(federation);
+        Ok(())
+    }
+
+    fn is_federated_disconnected(&self, from: &str, to: &str) -> Result<bool, String> {
+        let dynamic = self.lock_dynamic()?;
+        for groups in dynamic.federations.values() {
             let mut from_group = None;
             let mut to_group = None;
-            for (idx, group) in partition.groups.iter().enumerate() {
-                if group.iter().any(|r| r == from) {
+            for (idx, group) in groups.iter().enumerate() {
+                if group.iter().any(|role| role == from) {
                     from_group = Some(idx);
                 }
-                if group.iter().any(|r| r == to) {
+                if group.iter().any(|role| role == to) {
                     to_group = Some(idx);
                 }
             }
             if from_group != to_group {
-                return true;
+                return Ok(true);
             }
         }
-        false
+        Ok(false)
     }
 
-    fn link_active(link: &LinkPolicy, tick: u64) -> bool {
-        if let Some(start) = link.start_tick {
-            if tick < start {
-                return false;
-            }
+    fn link_policy(&self, from: &str, to: &str) -> Result<Option<LinkPolicy>, String> {
+        if let Some(link) = self
+            .lock_dynamic()?
+            .link_overrides
+            .get(&(from.to_string(), to.to_string()))
+            .cloned()
+        {
+            return Ok(Some(link));
         }
-        if let Some(end) = link.end_tick {
-            if tick > end {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn link_policy(&self, from: &str, to: &str, tick: u64) -> Option<&LinkPolicy> {
-        self.config
+        Ok(self
+            .config
             .links
             .iter()
             .rev()
-            .find(|link| link.from == from && link.to == to && Self::link_active(link, tick))
+            .find(|link| link.from == from && link.to == to)
+            .cloned())
     }
 
     fn route_payload(
@@ -269,7 +281,10 @@ impl<H: EffectHandler> NetworkModel<H> {
         to: &str,
         payload: Value,
     ) -> Result<NetworkRoute, EffectFailure> {
-        if self.is_partitioned(from, to, tick) {
+        if self
+            .is_federated_disconnected(from, to)
+            .map_err(EffectFailure::contract_violation)?
+        {
             return Ok(NetworkRoute::Drop);
         }
 
@@ -277,7 +292,10 @@ impl<H: EffectHandler> NetworkModel<H> {
         let mut base_latency = self.config.base_latency;
         let mut latency_variance = self.config.latency_variance;
 
-        if let Some(link) = self.link_policy(from, to, tick) {
+        if let Some(link) = self
+            .link_policy(from, to)
+            .map_err(EffectFailure::contract_violation)?
+        {
             if !link.enabled {
                 return Ok(NetworkRoute::Drop);
             }
@@ -293,9 +311,7 @@ impl<H: EffectHandler> NetworkModel<H> {
         }
 
         let delay_ticks = {
-            let mut rng = self
-                .lock_rng()
-                .map_err(EffectFailure::contract_violation)?;
+            let mut rng = self.lock_rng().map_err(EffectFailure::contract_violation)?;
             if rng.should_trigger(loss_probability) {
                 return Ok(NetworkRoute::Drop);
             }
@@ -504,8 +520,6 @@ mod tests {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: None,
-                end_tick: None,
                 enabled: false,
                 base_latency: None,
                 latency_variance: None,
@@ -530,14 +544,12 @@ mod tests {
     }
 
     #[test]
-    fn link_window_inactive_uses_global_policy() {
+    fn dynamic_link_override_is_footprint_local() {
         let config = NetworkConfig {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: Some(10),
-                end_tick: Some(20),
-                enabled: false,
+                enabled: true,
                 base_latency: None,
                 latency_variance: None,
                 loss_probability: None,
@@ -545,8 +557,18 @@ mod tests {
             ..NetworkConfig::default()
         };
         let model = model(config);
+        model
+            .set_link_policy(LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                enabled: false,
+                base_latency: None,
+                latency_variance: None,
+                loss_probability: None,
+            })
+            .expect("apply dynamic link override");
         model.set_tick(5);
-        let decision = model
+        let ab_decision = model
             .send_decision(SendDecisionInput {
                 sid: 0,
                 role: "A",
@@ -557,7 +579,20 @@ mod tests {
             })
             .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
             .expect("send decision");
-        assert!(matches!(decision, SendDecision::Deliver(Value::Nat(1))));
+        assert!(matches!(ab_decision, SendDecision::Drop));
+
+        let ac_decision = model
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "C",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(2)),
+            })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("send decision");
+        assert!(matches!(ac_decision, SendDecision::Deliver(Value::Nat(2))));
     }
 
     #[test]
@@ -566,8 +601,6 @@ mod tests {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: None,
-                end_tick: None,
                 enabled: true,
                 base_latency: Some(Duration::from_millis(10)),
                 latency_variance: Some(FixedQ32::zero()),
@@ -597,8 +630,6 @@ mod tests {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: None,
-                end_tick: None,
                 enabled: true,
                 base_latency: Some(Duration::from_micros(100)),
                 latency_variance: Some(FixedQ32::zero()),
@@ -628,8 +659,6 @@ mod tests {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: None,
-                end_tick: None,
                 enabled: true,
                 base_latency: None,
                 latency_variance: None,
@@ -671,8 +700,6 @@ mod tests {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: None,
-                end_tick: None,
                 enabled: false,
                 base_latency: None,
                 latency_variance: None,
@@ -691,7 +718,10 @@ mod tests {
             })
             .expect("external route should succeed");
 
-        assert!(!injected, "disabled link should drop externally routed payloads");
+        assert!(
+            !injected,
+            "disabled link should drop externally routed payloads"
+        );
     }
 
     #[test]
@@ -700,8 +730,6 @@ mod tests {
             links: vec![LinkPolicy {
                 from: "A".to_string(),
                 to: "B".to_string(),
-                start_tick: None,
-                end_tick: None,
                 enabled: true,
                 base_latency: Some(Duration::from_millis(10)),
                 latency_variance: Some(FixedQ32::zero()),
@@ -737,5 +765,45 @@ mod tests {
         assert_eq!(delivered[0].1, "A");
         assert_eq!(delivered[0].2, "B");
         assert_eq!(delivered[0].3, Value::Nat(9));
+    }
+
+    #[test]
+    fn active_federation_drops_cross_group_traffic() {
+        let model = model(NetworkConfig::default());
+        model
+            .set_federation_groups(
+                "mesh-cut".to_string(),
+                vec![vec!["A".to_string()], vec!["B".to_string()]],
+            )
+            .expect("set federation groups");
+        model.set_tick(1);
+        let decision = model
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("send decision");
+        assert!(matches!(decision, SendDecision::Drop));
+
+        model
+            .clear_federation("mesh-cut")
+            .expect("clear federation groups");
+        let healed = model
+            .send_decision(SendDecisionInput {
+                sid: 0,
+                role: "A",
+                partner: "B",
+                label: "msg",
+                state: &[],
+                payload: Some(Value::Nat(1)),
+            })
+            .expect_success(|| EffectFailure::contract_violation("unexpected blocked effect"))
+            .expect("send decision");
+        assert!(matches!(healed, SendDecision::Deliver(Value::Nat(1))));
     }
 }
