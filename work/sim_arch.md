@@ -227,7 +227,7 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for manifest reproducibility, witness retention, and deterministic sweep ordering.
 - [x] Update docs and examples to present batch/sweep outputs as experiment artifacts rather than ad hoc logs.
 - [x] Remove any older ad hoc sweep-output or batch-report format that the new manifest supersedes. Do not keep parallel legacy artifact layouts.
-- [ ] Make a git commit for Phase 17.
+- [x] Make a git commit for Phase 17.
 
 ## Phase 18: External Domain-Model Integration Boundary
 
