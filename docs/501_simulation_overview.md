@@ -1,50 +1,57 @@
 # Protocol-Machine Simulation
 
 This page is the top-level guide for `telltale-simulator`.
-Detailed behavior is split into focused pages to keep this entry concise.
+It describes the supported simulator surface at a high level.
+Detailed behavior lives in the focused pages linked below.
 
 ## Scope
 
 The simulator runs projected local types on `telltale-machine`.
-It adds deterministic middleware for scenarios, faults, network behavior, and properties.
+It adds deterministic middleware for faults, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
-For effect-heavy guest runtimes, it exposes generated effect-family scenario helpers written in terms of declared effect operations and their semantic outcomes.
+
+Materials are the simulator's abstraction for domain state evolution.
+A material defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`.
+This keeps protocol structure separate from model-specific dynamics.
+
+The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
+Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
+They are not yet wired into the main harness execution path.
 
 ## Quick Start
 
-Use `SimulationHarness` with a `HostAdapter` implementation.
-For generated effect interfaces, script semantic outcomes directly with
-`GeneratedEffectScenario` and keep the host adapter thin.
+Use `SimulationHarness` with a `HostAdapter` implementation and a `HarnessSpec`.
 
 ```rust
-let adapter = DirectAdapter::new(&handler);
-let generated = GeneratedEffectScenario::builder()
-    .record_return("Runtime", "acceptInvite", serde_json::json!({ "status": "ok" }))
-    .record_timeout("Runtime", "watchPresence")
-    .build();
+let adapter = MaterialAdapter::from_scenario(&spec.scenario);
 let harness = SimulationHarness::new(&adapter);
 let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This path runs protocol-machine execution, scenario middleware, generated
-effect-family scripting, and post-run contract checks.
-It is the recommended integration lane for host runtimes.
+This path runs protocol-machine execution, scenario middleware, replay capture, and post-run contract checks.
+It is the recommended integration lane for external projects.
 
-It is also the recommended lane for testing ownership handoff, stale-owner rejection, and owner-failure scenarios. The simulator can inject timing, crash, and replay conditions around the same protocol-machine ownership contract used in production runtimes.
+Use `DirectAdapter` when the host already owns the `EffectHandler`.
+Use `MaterialAdapter` when scenario material parameters should construct the handler and initial states.
 
-When a project uses exported effect interfaces from the tooling-only
-`effect-scaffold` binary, the simulator should be treated as a first-class
-handler domain. Generated scenario builders cover success, timeout,
-cancellation, stale late result, blocked, and degraded outcomes by default.
+## Generated Effect Helpers
+
+The simulator also exposes generated effect-family helper types such as `GeneratedEffectScenario`.
+These APIs are useful when a project wants to script semantic outcomes for exported effect operations.
+Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
+They currently sit beside the harness API rather than inside it.
+
+Use this lane when a downstream integration layer needs effect-centric fixtures.
+Do not document it as the default `SimulationHarness` workflow unless that wiring is added.
 
 ## Document Map
 
 Use these pages for detailed behavior.
 
-- [Protocol-Machine Simulation Runner](502_simulation_runner.md): trace shape, runner entry points, harness APIs, sampling model, and round order.
-- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md): scenario schema, TOML examples, fault and network middleware, properties, checkpointing, and replay.
-- [Protocol-Machine Simulation Materials](504_simulation_materials.md): material handlers, distributed simulation, post-run analysis, conformance lanes, and current limits.
+- [Protocol-Machine Simulation Runner](502_simulation_runner.md)
+- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
+- [Protocol-Machine Simulation Materials](504_simulation_materials.md)
 
 ## CLI
 
@@ -54,11 +61,9 @@ Use the simulator runner binary through `just` for CI-friendly JSON output.
 just sim-run artifacts/sim_integration.toml
 ```
 
-The process exits with code `2` when configured contract checks fail.
-
 ## Related Docs
 
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Rust-Lean Parity](703_rust_lean_parity.md)
 - [Lean-Rust Bridge](702_lean_rust_bridge.md)
+- [Rust-Lean Parity](703_rust_lean_parity.md)

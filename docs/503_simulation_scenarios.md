@@ -1,12 +1,13 @@
 # Protocol-Machine Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
-It covers scenario TOML shape, generated effect-family scripting, fault injection, network modeling, and property monitoring.
+It covers the TOML schema, fault injection, network modeling, properties, checkpointing, and current limits.
 
 ## Scenario Schema
 
-`Scenario` is parsed from TOML and drives scenario runs.
+`Scenario` is parsed from TOML and drives `run_with_scenario(...)`.
 Core defaults are `concurrency = 1`, `seed = 0`, and `output.format = "json"`.
+`material` is required.
 
 ```rust
 pub struct Scenario {
@@ -24,8 +25,9 @@ pub struct Scenario {
 }
 ```
 
-`material` is required.
-`network`, `events`, and `properties` are optional.
+`network`, `events`, `properties`, and `checkpoint_interval` are optional.
+`output` is parsed and validated as part of the schema.
+The current CLI output path is still controlled by runner flags rather than `scenario.output`.
 
 ## Scenario Example
 
@@ -62,41 +64,35 @@ invariants = ["no_faults", "simplex", "buffer_bound(0,16)"]
 Quoted decimal strings are the safest TOML form for `FixedQ32` values.
 The parser also accepts compatible numeric representations.
 
-Generated effect interfaces add a second scenario lane for effect-centric tests.
-A scenario can script declared effect operations directly instead of expressing only network or scheduler perturbations.
-
-```rust
-let generated = GeneratedEffectScenario::builder()
-    .record_return("Runtime", "acceptInvite", serde_json::json!({ "status": "ok" }))
-    .with_delay_ms(200)
-    .record_degraded("Runtime", "watchPresence", "owner_lag")
-    .record_stale_late_result("Runtime", "acceptInvite")
-    .build();
-```
-
-This is the preferred lane for testing timeout, cancellation, stale late results, blocked execution, and degraded outcomes on parity-critical flows.
-
 ## Fault Middleware
 
-`FaultInjector` wraps an inner external handler.
-It manages activation, expiry, random triggers, delay queues, corruption, and crash state.
+`FaultInjector` wraps the inner handler.
+It manages activation, expiry, random triggers, delayed delivery, corruption, and crash state.
 
 Supported actions are `MessageDrop`, `MessageDelay`, `MessageCorruption`, `NodeCrash`, and `NetworkPartition`.
 Supported triggers are `Immediate`, `AtTick`, `AfterStep`, `Random`, and `OnEvent`.
-Scenario trigger declarations must contain exactly one trigger condition.
+If a trigger declaration sets no trigger field, it defaults to `Immediate`.
+
+An event must not set more than one trigger field at once.
+The parser rejects multi-trigger declarations.
+`Trigger::AfterStep` is evaluated against logical round count rather than raw tick count.
 
 ## Network Middleware
 
-`NetworkModel` wraps `FaultInjector` in scenario runs.
+`NetworkModel` wraps `FaultInjector` when network simulation is enabled.
 It applies partition checks, link overrides, latency sampling, loss sampling, and deferred delivery.
 
-Per-link policies are matched by `(from_role, to_role)` plus optional active tick windows.
+Per-link policies match directed `(from, to)` pairs.
+A link policy is active only inside its optional tick window.
+When multiple link policies match, the last matching entry wins.
+
 Loss is evaluated before latency scheduling.
-Latency of zero produces immediate delivery.
+Dropped messages never enter the in-flight queue.
+Zero effective latency produces immediate delivery.
 
 ## Property Monitoring
 
-`PropertyMonitor` performs online checks by scanning newly appended events.
+`PropertyMonitor` performs online checks by scanning newly appended observable events and machine state.
 Built-in checks include `NoFaults`, `Simplex`, `SendRecvLiveness`, `TypeMonotonicity`, `BufferBound`, and `Liveness`.
 
 Invariant strings are parsed by `parse_invariant`.
@@ -106,10 +102,22 @@ Predicate strings are parsed by `parse_predicate`.
 ## Checkpointing and Replay
 
 `CheckpointStore` snapshots protocol-machine state as JSON bytes at configured intervals.
-When `checkpoint_interval` is set, `run_with_scenario` writes checkpoint files under `artifacts/<scenario.name>/`.
+When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
+Replay loads a checkpoint and re-executes the same middleware loop.
 
-Replay loads one checkpoint and one scenario.
-It then runs the same middleware and property loop for selected rounds.
+Checkpoint persistence is best-effort.
+Serialization or file-write failures do not fail the run.
+`CheckpointStore::last_persist_error()` exposes the last recorded persistence error.
+
+## Current Limits
+
+`scenario.output` is part of the parsed schema.
+The `run` binary still uses `--output` and `--pretty` for emission control.
+Do not treat `scenario.output` as the authoritative CLI contract yet.
+
+Generated effect-family helpers (e.g. `record_return()`, `with_delay_ms()`, `record_stale_late_result()`) are separate programmatic APIs.
+They are not a TOML scenario feature.
+They are also not yet wired into `SimulationHarness`.
 
 ## Related Docs
 

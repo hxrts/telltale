@@ -1,369 +1,292 @@
 # Theory
 
-This document provides a primer on the theoretical foundations of Telltale. It covers session types, multiparty session types, and the key properties that make them useful for distributed programming. It also covers delivery models, coherence, harmony, and delegation.
+This document explains the theory that Telltale builds on.
+It is organized by audience relevance.
+Developer-facing protocol concepts come first.
+Proof-oriented topics come last.
 
-## Why Session Types
+## Foundations
 
-Distributed systems are difficult to program correctly. Participants must coordinate their communication to avoid deadlocks, message mismatches, and protocol violations. Traditional type systems check data types but not communication patterns.
+Session types describe communication protocols as types.
+They let the type system check message order, branch structure, and termination behavior.
+Telltale uses them as the structure layer of its protocol model.
 
-Session types fill this gap. They describe communication protocols as types. The type system then checks that implementations follow the protocol. Errors that would otherwise appear at runtime become compile-time type errors.
+### Why Session Types
 
-## Binary Session Types
+Distributed programs fail when participants disagree about message order or branch choice.
+Ordinary data types do not describe those communication obligations.
+Session types add that missing protocol structure.
 
-Binary session types describe communication between exactly two parties. Each party has a session type that specifies what messages they send and receive in what order.
+With session types, communication mistakes become type errors rather than runtime surprises.
+This is the main reason they matter in practice.
+They let developers state protocol shape directly and check it mechanically.
 
-### Basic Syntax
+### Binary Session Types
 
-The fundamental operations are send and receive.
-
-| Syntax | Meaning |
-|--------|---------|
-| `!T.S` | Send a value of type T, then continue as S |
-| `?T.S` | Receive a value of type T, then continue as S |
-| `end`  | Session complete |
-
-A session type is a sequence of these operations. The type `!Int.?Bool.end` means send an integer, receive a boolean, then terminate.
-
-### Duality
-
-For two parties to communicate correctly, their session types must be dual. If one party sends, the other must receive. If one party terminates, the other must also terminate.
-
-| Type | Dual |
-|------|------|
-| `!T.S` | `?T.S̄` |
-| `?T.S` | `!T.S̄` |
-| `end` | `end` |
-
-The dual of `!Int.?Bool.end` is `?Int.!Bool.end`. When two parties with dual types communicate, every send has a matching receive.
-
-### Choice and Branching
-
-Protocols often involve decisions. One party chooses which branch to take and the other party follows.
+Binary session types describe one conversation between two parties.
+The core actions are send, receive, choice, and termination.
 
 | Syntax | Meaning |
-|--------|---------|
-| `⊕{l₁: S₁, l₂: S₂}` | Internal choice: select and send a label |
-| `&{l₁: S₁, l₂: S₂}` | External choice: receive a label and branch |
+|---|---|
+| `!T.S` | send a value of type `T`, then continue as `S` |
+| `?T.S` | receive a value of type `T`, then continue as `S` |
+| `⊕{...}` | choose one labeled branch |
+| `&{...}` | accept one labeled branch |
+| `end` | terminate the session |
 
-Internal choice (`⊕`) is the active side that decides. External choice (`&`) is the passive side that reacts. These are dual to each other.
+Binary types also rely on duality.
+If one side sends, the other side must receive.
+If one side chooses, the other side must branch on that choice.
 
-### Example: Request-Response
-
-A client sends a request and receives a response.
-
-```
+```text
 Client: !Request.?Response.end
 Server: ?Request.!Response.end
 ```
 
-These types are dual. The client sends then receives. The server receives then sends. Both terminate together.
+This pair is dual.
+The client sends then receives.
+The server receives then sends.
 
-## Multiparty Session Types
+### Multiparty Session Types
 
-Binary session types handle two parties. Multiparty session types (MPST) handle protocols with three or more participants. This extension requires new concepts.
+Multiparty session types extend the same idea to three or more roles.
+They separate the protocol into a global view and one local view per participant.
+This is the core abstraction behind Telltale choreographies.
 
-### The Challenge
+Global types describe the whole protocol from a neutral perspective.
+Local types describe only what one role must send and receive.
+Projection computes those local types from the global type.
 
-With two parties, duality ensures compatibility. With three or more parties, the situation is more complex. Messages between Alice and Bob affect what Carol expects. The type system must track these dependencies across all participants.
-
-### Global Types
-
-Global types describe the protocol from a neutral perspective. They specify all interactions between all participants without favoring any viewpoint.
-
-```
-G = Alice -> Bob: Request.
-    Bob -> Carol: Forward.
-    Carol -> Bob: Result.
-    Bob -> Alice: Response.
-    end
-```
-
-This global type specifies a four-message protocol. Alice sends to Bob, Bob forwards to Carol, Carol replies to Bob, and Bob responds to Alice.
-
-### Local Types
-
-Local types describe the protocol from one participant's viewpoint. Each participant sees only the messages they send or receive.
-
-From the global type above:
-
-```
-Alice: Bob!Request.Bob?Response.end
-Bob:   Alice?Request.Carol!Forward.Carol?Result.Alice!Response.end
-Carol: Bob?Forward.Bob!Result.end
+```text
+Global:
+  Alice -> Bob: Request.
+  Bob -> Carol: Forward.
+  Carol -> Bob: Result.
+  Bob -> Alice: Response.
+  end
 ```
 
-Alice sees two messages. Bob sees four. Carol sees two. Each local type captures exactly that participant's communication.
+This global type describes the whole conversation.
+Projection gives Alice a two-step local view, Bob a four-step local view, and Carol a two-step local view.
 
-### Projection
+### Projection and Merging
 
-Projection is the algorithm that transforms a global type into local types. For each role, projection extracts the relevant communication actions.
+Projection extracts one role-local type from the global type.
+When a message does not involve the target role, projection skips it.
+When a message does involve the target role, projection turns it into a local send or receive action.
 
-The projection of `Alice -> Bob: M.G` for role R is:
-- If R = Alice: `Bob!M.project(G, Alice)`
-- If R = Bob: `Alice?M.project(G, Bob)`
-- Otherwise: `project(G, R)`
+Branching requires one extra operation called merge.
+If a participant is not the branch chooser, its projected local view must combine the possible continuations.
+Merge succeeds only when those continuations remain compatible from that participant's viewpoint.
 
-Projection preserves protocol structure while extracting the local view.
+### Protocol Constraints
 
-### Merging
+Not every syntactically valid protocol is meaningful.
+Telltale relies on a set of constraints that a protocol must satisfy before projection and execution are well behaved.
+These are often called well-formedness conditions in the literature.
 
-When a global type has branches, projection must merge the local views. Consider:
+For global protocols, the main rules are:
 
-```
-G = Alice -> Bob: {
-      Left: Bob -> Carol: X.end,
-      Right: Bob -> Carol: Y.end
-    }
-```
+- recursion variables must be bound
+- communication branches must be non-empty
+- a role must not send to itself
+- recursion must pass through communication
 
-Carol's projection must handle both branches. The merge operation combines `Bob?X.end` and `Bob?Y.end` into `Bob?{X, Y}.end`.
+For local protocols, the main rules are:
 
-Merge succeeds when branches are compatible. It fails when branches conflict in ways that would leave a participant unable to distinguish which branch was taken.
+- the type must be closed
+- recursion must unfold to observable communication or termination
 
-## Well-Formedness
+These constraints are developer-facing.
+They are the rules a protocol must satisfy in order to project cleanly and support the later guarantees.
 
-Not every syntactically valid type is meaningful. Well-formedness conditions ensure types represent sensible protocols.
+### Recursion
 
-### Global Type Conditions
+Session types support recursive protocols through fixed points.
+This is how a protocol expresses repetition or long-running interaction.
 
-A global type is well-formed when:
-- All recursion variables are bound
-- All communication branches are non-empty
-- No participant sends to themselves
-- Recursion passes through at least one communication
-
-The productivity condition prevents types like `μX.X` that recurse without doing anything.
-
-### Local Type Conditions
-
-A local type is well-formed when:
-- It is closed (no free variables)
-- It is contractive (recursion unfolds to observable action)
-
-Contractiveness ensures that unfolding a recursive type eventually produces a send, receive, or termination.
-
-## Subtyping
-
-Subtyping determines when one session type can substitute for another. A subtype can do everything the supertype promises and possibly more.
-
-### Synchronous Subtyping
-
-Synchronous subtyping assumes messages are delivered instantly. The rules are:
-
-- A type that sends more labels is a subtype (internal choice covariance)
-- A type that receives fewer labels is a subtype (external choice contravariance)
-- Continuations must be subtypes recursively
-
-### Asynchronous Subtyping
-
-Asynchronous subtyping accounts for message buffering. Messages may arrive before they are expected. This relaxes some constraints but complicates the analysis.
-
-The key insight is that output actions can be reordered with respect to input actions under certain conditions. This enables optimizations that would be unsound in synchronous semantics.
-
-Telltale implements the asynchronous subtyping algorithm from Bravetti et al. (POPL 2021). This algorithm decomposes types into single-input-single-output segments for decidable checking.
-
-## Bisimulation
-
-Two session types are bisimilar when they exhibit the same observable behavior. Bisimulation is a coinductive relation that compares types by their transitions.
-
-Types T and S are bisimilar when:
-- Every transition of T can be matched by a transition of S to bisimilar states
-- Every transition of S can be matched by a transition of T to bisimilar states
-
-Bisimulation is useful for comparing recursive types where structural equality is too strict. Two types with different recursion structure may still be bisimilar if they unfold to the same infinite behavior.
-
-## Safety Properties
-
-Session type theory establishes several safety properties for well-typed programs.
-
-### Preservation
-
-Preservation (subject reduction) states that well-typed configurations remain well-typed after transitions. If a protocol state is valid and takes a step, the resulting state is also valid.
-
-This ensures that type safety is maintained throughout execution. A program that starts in a well-typed state cannot reach an ill-typed state.
-
-### Progress
-
-Progress states that well-typed configurations can always take a step or have terminated. No participant is stuck waiting for a message that will never arrive.
-
-Progress depends on assumptions. Telltale's progress theorems require explicit premises:
-- Well-typedness of the configuration
-- Reachability of communication (no infinite internal computation)
-- Fair scheduling (all participants eventually run)
-
-### Deadlock Freedom
-
-Deadlock freedom follows from preservation and progress together. A well-typed protocol cannot reach a state where all participants are blocked.
-
-This property is assumption-scoped. It holds under the premises required for progress. Circular dependencies between participants are ruled out by the global type structure.
-
-### Harmony
-
-Harmony states that projection commutes with protocol evolution. When the global protocol takes a step, projecting the result equals taking the corresponding local step on the projected type.
-
-```
-project(step(G)) = localStep(project(G))
-```
-
-This equation establishes that global and local views remain synchronized. The global choreography and the local implementations evolve in lockstep.
-
-Harmony is essential for compositional reasoning. It allows proving properties at the global level and transferring them to local implementations. Without harmony, the connection between choreography and endpoint code would be unclear.
-
-## Delegation
-
-Delegation allows dynamic changes to participant sets during protocol execution. A participant can transfer their session endpoint to another party. The receiving party takes over the communication obligations.
-
-### The Problem
-
-Static MPST assumes a fixed set of participants. The global type names all roles at the start. Real distributed systems often need dynamic topology.
-
-New participants can join over time. Existing participants can leave. Capabilities can transfer between parties.
-
-### Delegation Operations
-
-A delegation operation transfers an endpoint from one participant to another. The delegating party sends a channel endpoint. The receiving party gains the ability to communicate on that channel.
-
-```
-Alice -> Bob: delegate(channel_to_Carol)
-```
-
-After this operation, Bob can communicate with Carol on the delegated channel. Alice no longer participates in that sub-protocol.
-
-### Reconfiguration Harmony
-
-Delegation introduces a reconfiguration step that changes the participant structure. Telltale proves that harmony extends to these reconfiguration steps. Projection commutes with both static linking and dynamic delegation.
-
-The reconfiguration harmony theorem covers two cases. Static composition through linking combines independent sub-protocols. Dynamic delegation transfers endpoints during execution. Both preserve coherence when well-formedness conditions hold.
-
-### Delegation Safety
-
-For delegation to be safe, certain conditions must hold. The delegated endpoint must be in a state compatible with the receiver's expectations. The delegation must not create orphaned messages or dangling references.
-
-Telltale's `DelegationWF` predicate captures these conditions. The safe delegation theorem shows that coherence is preserved when this predicate holds.
-
-### Host-Runtime Ownership Contract
-
-Telltale's Rust runtime also enforces a host ownership contract around delegation, reconfiguration, and session-local host mutation. This contract uses concepts such as current owner capability, ownership generation, transfer receipts, rollback, and stale-owner rejection.
-
-This layer should be interpreted carefully:
-
-- it is the host/runtime realization of delegation boundaries
-- it is aligned with theorem-side concepts such as `DelegationWF`
-- it is not itself a new theorem statement
-
-In other words, the Lean theory proves protocol-side safety properties under declared premises. The Rust ownership contract is an implementation hardening layer that makes those protocol-side boundaries explicit at the host embedding boundary.
-
-## Coherence
-
-Coherence is the invariant that makes multiparty session types work. It ensures that the collective state of all participants remains consistent with the global protocol.
-
-In Telltale, coherence is formulated as a per-edge property. Each communication edge between two roles maintains a coherence invariant involving:
-- The message buffer contents
-- The local type states of both endpoints
-- The global type structure
-
-The `Consume` function is the recursive alignment check at the heart of coherence. It interprets buffered traces against receiver expectations. For a receiver expecting type T and a buffer containing messages [m1, m2, ...], `Consume` verifies that each message matches the expected type at that point.
-
-Two key lemmas support preservation proofs. `consume_append` shows that consumption over concatenated traces factors through sequential consumption. `consume_cons` shows that head consumption reduces to one-step alignment plus recursive continuation alignment. These lemmas isolate message-type alignment complexity into reusable components.
-
-## Delivery Models
-
-Asynchronous session types parameterize over message delivery semantics. Different delivery models affect what orderings are possible and what safety properties hold.
-
-### FIFO Delivery
-
-FIFO (first-in-first-out) delivery guarantees that messages between any two participants arrive in the order they were sent. If Alice sends m1 then m2 to Bob, Bob receives m1 before m2.
-
-This is the most common model in MPST literature. It matches the behavior of TCP connections and many message queue systems.
-
-### Causal Delivery
-
-Causal delivery preserves causality across all participants. If message m1 causally precedes message m2, then any participant that receives both will receive m1 first.
-
-Causal delivery is stronger than FIFO. It handles scenarios where Alice sends to Bob, Bob sends to Carol based on that message, and Carol must see consistent ordering even though she communicates with both.
-
-### Lossy Delivery
-
-Lossy delivery permits message loss. Messages may fail to arrive. The type system must account for this possibility in its safety guarantees.
-
-Telltale's theorems are parameterized by `DeliveryModel`. This gives one theorem shape across FIFO, causal, and lossy instances. The delivery model affects which buffer orderings are possible and which coherence conditions must hold.
-
-## Recursion
-
-Session types support recursive protocols through fixed-point constructs.
-
-### Named Recursion
-
-Named recursion binds a variable to a type body.
-
-```
+```text
 μX. Alice -> Bob: Ping. Bob -> Alice: Pong. X
 ```
 
-This protocol repeats forever. The variable X refers back to the enclosing μ.
+This protocol repeats the same request-response cycle forever.
+Recursion is valid only when unfolding eventually reaches observable communication.
+
+### Subtyping
+
+Subtyping determines when one protocol can replace another.
+This matters when a component offers a more specific behavior than the caller requires.
+
+In synchronous settings, subtyping follows the usual session-typing variance rules.
+In asynchronous settings, buffering allows some outputs to move earlier relative to inputs.
+Telltale implements asynchronous subtyping using the Bravetti et al. POPL 2021 algorithm.
+
+## Protocol Guarantees
+
+This section describes the guarantees developers usually care about once a protocol satisfies the foundational constraints.
+These guarantees are still premise-scoped.
+They depend on explicit assumptions about execution and delivery.
+
+### Coherence
+
+Coherence is the central MPST invariant.
+It states that the collective local state of the protocol still matches the global protocol state.
+Without coherence, projection would not give a trustworthy local view.
+
+In Telltale, coherence is tracked per communication edge.
+Each edge relates the sender state, the receiver state, the relevant buffer contents, and the remaining global structure.
+This is the invariant that lets local endpoint behavior stay aligned with the choreography.
+
+### Preservation
+
+Preservation states that a well-typed and coherent protocol state remains well-typed and coherent after a valid step.
+A correct protocol execution does not silently fall out of the typing discipline.
+This is the usual subject-reduction property.
+
+Preservation is mainly a meta-level guarantee.
+Developers benefit from it because protocol execution stays inside the checked state space once it starts there.
+
+### Progress
+
+Progress states that a well-typed protocol can continue unless it has already terminated.
+A participant does not get stuck waiting for behavior the protocol itself forbids.
+
+This guarantee is premise-scoped.
+Telltale states those premises explicitly.
+They include well-typedness, reachability of communication, and fair scheduling.
+
+### Deadlock Freedom
+
+Deadlock freedom is the developer-facing consequence of preservation plus progress under the declared premises.
+A well-typed protocol cannot reach a state where all participants are permanently blocked by protocol structure alone.
+
+This guarantee does not ignore the environment.
+If the delivery model or scheduler violates the stated premises, the theorem does not apply.
+That separation is part of Telltale's premise discipline.
+
+### Harmony
+
+Harmony is a compilation-correctness property rather than a direct developer-facing liveness property.
+It states that global protocol evolution and projected local evolution stay in correspondence.
+This is what makes endpoint projection trustworthy.
+
+```text
+project(step(G)) = localStep(project(G))
+```
+
+This equation says that stepping the choreography and then projecting gives the same result as projecting first and stepping locally.
+Developers benefit indirectly because generated endpoint behavior stays aligned with the choreography they wrote.
+
+## Operational Extensions
+
+This section covers theory that matters once the protocol interacts with realistic runtime concerns.
+These topics are still user-relevant, but they are more specialized than the core session-typing model.
+
+### Delegation and Reconfiguration
+
+Delegation transfers a session endpoint from one participant to another.
+This allows the active participant set to change during execution.
+It is the main extension beyond fixed-role MPST.
+
+Delegation is safe only when the transferred endpoint state matches what the receiver can legally assume.
+Telltale captures those conditions with `DelegationWF`.
+The important developer-facing point is that endpoint transfer is governed by explicit protocol-side conditions, not by ambient host authority.
+
+### Delivery Models
+
+Asynchronous session reasoning depends on the delivery model.
+Different delivery models allow different message orderings and therefore support different theorems.
+
+Telltale parameterizes theorems over `DeliveryModel`.
+Important examples are FIFO, causal, and lossy delivery.
+This keeps the theorem shape stable while making delivery assumptions explicit.
+
+### Host-Runtime Ownership Contract
+
+The Rust runtime adds an ownership contract around delegation, reconfiguration, and host-visible mutation.
+This layer uses concepts such as current owner capability, ownership generation, transfer receipts, rollback, and stale-owner rejection.
+It is an implementation hardening layer.
+
+This runtime contract is aligned with theory-side predicates such as `DelegationWF`.
+It should not be read as a separate theorem family.
+It is the host/runtime realization of the protocol boundaries that the theory already identifies.
+
+## Verification Topics
+
+This section is mainly for readers of the Lean formalization.
+These concepts matter for proofs and mechanization.
+They are not the first concepts a protocol author usually needs.
+
+### Bisimulation
+
+Bisimulation compares two types by observable behavior rather than by literal syntax.
+It is useful when recursive types differ syntactically but unfold to the same behavior.
+This is a proof and equivalence technique.
+
+In practice, bisimulation matters most when reasoning about proof identities, recursive encodings, and normalization arguments.
+It is less central for day-to-day protocol authoring.
 
 ### De Bruijn Indices
 
-The Lean formalization uses de Bruijn indices in foundational proofs. This avoids name capture during substitution.
+The Lean formalization uses de Bruijn indices in foundational proof layers.
+This avoids name-capture problems during substitution and recursion reasoning.
+Rust-facing protocol APIs keep named recursion variables for usability.
 
-The index `0` refers to the innermost binder. The index `1` refers to the next enclosing binder. Rust core protocol types currently keep named recursion variables (`String`) for ergonomic construction and serialization.
-
-## Telltale Implementation
-
-Telltale implements these concepts in Rust and backs them with a substantial
-Lean formalization. The Lean model and theorem libraries are mechanically
-verified. The shipped Rust implementation is connected to them through strict
-correspondence and operational assurance rather than a blanket end-to-end proof
-claim today.
-
-### Rust Types
-
-The `telltale-types` crate defines `GlobalType` and `LocalTypeR` for protocol structure. The `telltale-theory` crate implements projection, merge, duality, and subtyping algorithms.
+If you are reading the proof code, expect de Bruijn forms in the foundational libraries.
+If you are writing protocols, this detail is mostly invisible.
 
 ### Lean Formalization
 
-The Lean formalization in `lean/` proves preservation, progress, and coherence theorems. Current library metrics are tracked in [Lean Verification Code Map](../lean/CODE_MAP.md) and should be treated as the source of truth.
+The Lean formalization proves the core metatheory behind projection and protocol execution.
+Important theorem families include coherence, preservation, progress, and harmony.
+Current library structure and metrics are tracked in [Lean Verification Code Map](../lean/CODE_MAP.md).
 
-Key libraries include:
-- `SessionTypes` and `SessionCoTypes` for type definitions and bisimulation
-- `Choreography` for projection and harmony proofs
-- `Protocol` for coherence and preservation
-- `Runtime` for protocol-machine correctness
+At a high level, `SessionTypes` and `SessionCoTypes` cover syntax and equivalence.
+`Choreography` covers projection and harmony.
+`Protocol` covers coherence and typing.
+`Runtime` covers the protocol-machine model and runtime correctness surfaces.
 
-See [Lean Verification Code Map](../lean/CODE_MAP.md) for detailed documentation of the proof structure.
+## Theory in Telltale
+
+Telltale implements the theory across Rust and Lean.
+The Rust crates provide executable data types and algorithms.
+The Lean libraries provide mechanized proofs and proof-facing models.
+
+On the Rust side, `telltale-types` defines `GlobalType` and `LocalTypeR`.
+`telltale-theory` implements projection, merge, duality, and subtyping.
+The runtime and machine layers then realize those structures operationally.
+
+On the Lean side, the formalization provides the theorem libraries that justify those structures.
+See [Lean Verification](701_lean_verification.md) for the proof pipeline and source layout.
+See [Introduction](101_introduction.md) for the system-level overview.
 
 ## Conservation and Session Structure
 
-Session types realize one of six conserved properties in Telltale: structure conservation. The compositional structure of a protocol is defined entirely by its type. Local behavior must remain a valid projection of the global protocol. No runtime behavior can alter the protocol shape. Coherence, projection, and harmony are the theorems that back this conservation law.
+Session types are Telltale's concrete realization of structure conservation.
+The protocol type fixes the allowed interaction shape.
+Local behavior must remain a valid projection of that shape.
 
-The other five conserved properties extend the guarantees beyond what session types alone provide. Evidence conservation governs the integrity of witnesses and attestations. Authority conservation enforces single-owner exclusivity over resources. Identity conservation tracks stable object references across retries and handoffs. Commitment conservation ensures that all outstanding effects resolve to a terminal class. Premise conservation makes environmental assumptions explicit and triggers escalation on violation.
+The other conserved properties extend the guarantee surface beyond session structure alone.
+Evidence governs witnesses and attestations.
+Authority governs exclusive ownership.
+Identity governs stable references.
+Commitment governs outstanding effects.
+Premise governs environmental assumptions.
 
-In the current runtime/Lean architecture, those conserved properties are not
-left abstract. They are carried by a narrow capability taxonomy:
-
-- `admission` for theorem-pack and runtime-profile eligibility
-- `ownership` for current live mutation authority
-- `evidence` for authoritative reads, publication/materialization, and
-  canonical-handle/finalization objects
-- `transition` for receipts, semantic handoff, and reconfiguration/runtime
-  upgrade artifacts
-
-This is how the session-type and conservation theorems connect to the concrete
-protocol-machine model: structure remains the session-type core, while the other
-conserved properties are realized by explicit typed objects rather than ambient
-host state.
-
-These six properties are mutually constitutive. A violation in any one property can manifest as a failure in any other. The conservation framework is the organizing principle that connects session-type theory to the full runtime architecture. See [Conservation Framework](102_conservation_framework.md) for the conservation laws, reduction principle, and eliminated bug classes.
+In the runtime and Lean model, these properties are carried by explicit typed objects.
+They are not left as ambient host assumptions.
+See [Conservation Framework](102_conservation_framework.md) for the full conservation model.
 
 ## Further Reading
 
 For deeper study of session type theory:
 
-- [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf) provides an accessible overview.
-- [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf) covers asynchronous subtyping.
-- [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf) integrates session types with choreographic programming.
+- [A Very Gentle Introduction to Multiparty Session Types](http://mrg.doc.ic.ac.uk/publications/a-very-gentle-introduction-to-multiparty-session-types/main.pdf)
+- [Precise Subtyping for Asynchronous Multiparty Sessions](http://mrg.doc.ic.ac.uk/publications/precise-subtyping-for-asynchronous-multiparty-sessions/main.pdf)
+- [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf)
 
 Within this documentation:
-- [Introduction](101_introduction.md) introduces the concepts in context
-- [Choreographic DSL](202_choreographic_dsl.md) shows how to write protocols
-- [Lean Verification](701_lean_verification.md) details the proof infrastructure
+
+- [Introduction](101_introduction.md)
+- [Choreographic DSL](202_choreographic_dsl.md)
+- [Lean Verification](701_lean_verification.md)
