@@ -28,13 +28,14 @@ includes a Lean-native `MaterialModel`, `MaterialHandler`, built-in `MaterialPar
 This is still an executable parity layer rather than a mirror of Rust trait objects or serde-driven scenario parsing.
 
 The built-in scenario format remains intentionally narrower.
-`Scenario.material` still deserializes into the serde-tagged `MaterialParams` enum, which currently ships:
+When a scenario uses built-in materials, `Scenario.material` deserializes into the serde-tagged `MaterialParams` enum, which currently ships:
 
 - `mean_field`
 - `hamiltonian`
 - `continuum_field`
 
 `MaterialParams` implements `MaterialModel`, so the built-in scenario path and the general Rust extension path share the same simulator boundary.
+The base `Scenario` type does not require built-in material params when a host adapter owns handler creation and initial-state derivation.
 
 Simulator material handlers implement deterministic `EffectHandler::step` updates over fixed-point state.
 The runner stores material state in coroutine registers starting at register `2`.
@@ -92,8 +93,7 @@ They help keep Rust behavior synchronized with the Lean reference material where
 It does not write arbitrary scenario output files by itself.
 The `run` binary controls JSON emission through CLI flags.
 
-`active_per_role(...)` uses the maximum active-depth branch when estimating active-node count.
-`GeneratedEffectScenario` remains an adjacent helper API rather than a built-in `SimulationHarness` input.
+`GeneratedEffectScenario` remains an adjacent helper API under `telltale_simulator::generated` rather than a built-in `SimulationHarness` input.
 
 ## Related Docs
 

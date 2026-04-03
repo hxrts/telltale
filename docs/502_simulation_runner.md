@@ -62,44 +62,45 @@ pub trait HostAdapter {
 ```
 
 `DirectAdapter` wraps an existing `EffectHandler`.
-`MaterialAdapter` derives initial states from scenario material parameters and constructs the handler from `material`.
+`MaterialAdapter` derives initial states from built-in scenario material parameters and constructs the handler from `material`.
 The harness does not currently consume `GeneratedEffectScenario` directly.
 
 ## Initial State Derivation
 
-`derive_initial_states(&Scenario)` builds default per-role state vectors from `material`.
+`derive_initial_states(&Scenario)` builds default per-role state vectors from built-in `material` when present.
 `mean_field` broadcasts one concentration vector to every role.
 `hamiltonian` maps each role index to `[position, momentum]`.
 `continuum_field` assigns one scalar field value per role.
+
+The generic harness path does not require scenario materials.
+If a `HostAdapter` returns explicit initial states, the simulator never consults the built-in material catalog.
 
 The runner writes these state vectors into coroutine registers starting at register `2`.
 The sampled trace reads the same numeric suffix back out.
 
 ## Sampling and Step Mapping
 
-The simulator records samples on invocation boundaries.
-It does not record after every protocol-machine instruction.
+The simulator now uses explicit round-based sampling.
+It does not infer round boundaries from `ObsEvent::Invoked` counts.
 
-For each round, the runner counts newly appended `ObsEvent::Invoked` events.
-When invoke count reaches role count, the runner records one sample for each role.
-It also inserts a Mu-step sample at active-node boundaries derived from the local types.
-
-If `steps > 0`, the runner records an initial sample at step `0` before the main loop.
+If `steps > 0`, the runner records an initial sample at step `0` before the first protocol-machine round.
+Each subsequent completed round records one additional sample.
 If no samples were produced during execution, the runner emits one fallback sample at the last requested step index.
 
 ## Scenario Execution Order
 
-Scenario runs use a fixed per-round order for determinism.
+Scenario runs and replay now share the same execution core and use a fixed per-round order for determinism.
 
 1. Compute `next_tick` from the protocol-machine clock.
 2. Advance the fault schedule from newly visible observable events in `machine.trace()`.
-3. Deliver due delayed fault messages into protocol-machine buffers.
-4. Deliver network middleware queues when network simulation is enabled.
-5. Update paused roles from active crash faults.
-6. Execute one protocol-machine round with the selected handler domain.
-7. Update trace samples from new `Invoked` events.
-8. Run online property checks.
-9. Attempt checkpoint persistence when the interval policy triggers.
+3. Deliver due delayed fault messages.
+4. When network middleware is active, route those due fault-delayed messages back through the network policy stage before they enter protocol-machine buffers.
+5. Deliver due network middleware queues.
+6. Update paused roles from active crash faults.
+7. Execute one protocol-machine round with the selected handler domain.
+8. Record one round-based trace sample when sampling is enabled.
+9. Run online property checks.
+10. Attempt checkpoint persistence when the interval policy triggers.
 
 Checkpoint persistence is best-effort.
 Serialization and file-write failures do not fail the run.

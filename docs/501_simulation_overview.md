@@ -15,7 +15,7 @@ A material model defines how role-local numeric state changes when the protocol 
 This keeps protocol structure separate from model-specific dynamics.
 
 The simulator-facing abstraction is `MaterialModel` in `rust/simulator/src/material.rs`.
-The scenario file format still uses the built-in `MaterialParams` enum as a serde-tagged catalog for shipped material families.
+The scenario file format can optionally use the built-in `MaterialParams` enum as a serde-tagged catalog for shipped material families.
 `MaterialParams` implements `MaterialModel`, but custom Rust integrations may implement `MaterialModel` directly without modifying the scenario schema.
 
 The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
@@ -27,7 +27,7 @@ They are not yet wired into the main harness execution path.
 Use `SimulationHarness` with a `HostAdapter` implementation and a `HarnessSpec`.
 
 ```rust
-let adapter = MaterialAdapter::from_scenario(&spec.scenario);
+let adapter = MaterialAdapter::from_scenario(&spec.scenario)?;
 let harness = SimulationHarness::new(&adapter);
 let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
@@ -39,10 +39,11 @@ It is the recommended integration lane for external projects.
 Use `DirectAdapter` when the host already owns the `EffectHandler`.
 Use `MaterialAdapter::from_scenario(...)` when built-in scenario material parameters should construct the handler and initial states.
 Use `MaterialAdapter::new(...)` or `MaterialAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `MaterialModel`.
+If the host adapter supplies initial states directly, the base `Scenario` does not need built-in material params at all.
 
 ## Generated Effect Helpers
 
-The simulator also exposes generated effect-family helper types such as `GeneratedEffectScenario`.
+The simulator also exposes generated effect-family helper types under `telltale_simulator::generated`, such as `GeneratedEffectScenario`.
 These APIs are useful when a project wants to script semantic outcomes for exported effect operations.
 Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
 They currently sit beside the harness API rather than inside it.

@@ -6,8 +6,8 @@ It covers the TOML schema, fault injection, network modeling, properties, checkp
 ## Scenario Schema
 
 `Scenario` is parsed from TOML and drives `run_with_scenario(...)`.
-Core defaults are `concurrency = 1`, `seed = 0`, and `output.format = "json"`.
-`material` is required.
+Core defaults are `concurrency = 1` and `seed = 0`.
+`material` is optional and is only required by built-in material-driven surfaces such as `MaterialAdapter::from_scenario(...)`, `derive_initial_states(&Scenario)`, and the simulator CLI binaries.
 
 ```rust
 pub struct Scenario {
@@ -17,17 +17,14 @@ pub struct Scenario {
     pub concurrency: u64,
     pub seed: u64,
     pub network: Option<NetworkSpec>,
-    pub material: MaterialParams,
+    pub material: Option<MaterialParams>,
     pub events: Vec<EventSpec>,
     pub properties: Option<PropertiesSpec>,
     pub checkpoint_interval: Option<u64>,
-    pub output: OutputConfig,
 }
 ```
 
-`network`, `events`, `properties`, and `checkpoint_interval` are optional.
-`output` is parsed and validated as part of the schema.
-The current CLI output path is still controlled by runner flags rather than `scenario.output`.
+`network`, `material`, `events`, `properties`, and `checkpoint_interval` are optional.
 
 ## Scenario Example
 
@@ -95,7 +92,7 @@ Zero effective latency produces immediate delivery.
 `PropertyMonitor` performs online checks by scanning newly appended observable events and machine state.
 Built-in checks include `NoFaults`, `Simplex`, `SendRecvLiveness`, `TypeMonotonicity`, `BufferBound`, and `Liveness`.
 
-Invariant strings are parsed by `parse_invariant`.
+Invariant strings are parsed by `parse_property`.
 Predicate strings are parsed by `parse_predicate`.
 `SendRecvLiveness` uses session-local event counters rather than raw global ticks.
 
@@ -103,17 +100,13 @@ Predicate strings are parsed by `parse_predicate`.
 
 `CheckpointStore` snapshots protocol-machine state as JSON bytes at configured intervals.
 When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
-Replay loads a checkpoint and re-executes the same middleware loop.
+Replay loads a checkpoint and re-executes the same shared middleware loop used by fresh scenario runs.
 
 Checkpoint persistence is best-effort.
 Serialization or file-write failures do not fail the run.
 `CheckpointStore::last_persist_error()` exposes the last recorded persistence error.
 
 ## Current Limits
-
-`scenario.output` is part of the parsed schema.
-The `run` binary still uses `--output` and `--pretty` for emission control.
-Do not treat `scenario.output` as the authoritative CLI contract yet.
 
 Generated effect-family helpers (e.g. `record_return()`, `with_delay_ms()`, `record_stale_late_result()`) are separate programmatic APIs.
 They are not a TOML scenario feature.
