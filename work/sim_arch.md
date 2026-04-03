@@ -205,17 +205,17 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for scheduler-profile reporting and cross-scheduler classification stability.
 - [x] Update docs and examples to frame scheduler choice as both an execution policy and a theorem-profile choice.
 - [x] Remove stale scheduler reporting/config surfaces that become redundant once first-class scheduler profiles exist. Do not keep old and new policy vocabularies in parallel.
-- [ ] Make a git commit for Phase 15.
+- [x] Make a git commit for Phase 15.
 
 ## Phase 16: Approximation and Limit-Regime Ladders
 
-- [ ] Add an explicit approximation surface for comparing exact protocol-machine execution with batched stochastic, fluid, mean-field, or continuum-style regimes where Telltale has theorem support.
-- [ ] Make approximation runs declare their theorem-side scope and non-goals rather than presenting them as interchangeable with exact execution.
-- [ ] Add comparison reports that relate exact and approximate runs through shared observables, admissibility checks, and approximation metadata.
-- [ ] Keep approximation artifacts separate from authoritative replay artifacts while allowing them to cite the same scenario and profile manifest.
-- [ ] Add targeted tests for approximation-run determinism, manifest generation, and exact-vs-approximate comparison reporting.
-- [ ] Update docs to explain which approximation families are empirical only and which are tied to existing classical/mean-field theorem surfaces.
-- [ ] Remove or rename any legacy “simulation mode” surface that blurs exact execution and approximation once the explicit ladder exists. No backwards-compatibility aliases.
+- [x] Add an explicit approximation surface for comparing exact protocol-machine execution with batched stochastic, fluid, mean-field, or continuum-style regimes where Telltale has theorem support.
+- [x] Make approximation runs declare their theorem-side scope and non-goals rather than presenting them as interchangeable with exact execution.
+- [x] Add comparison reports that relate exact and approximate runs through shared observables, admissibility checks, and approximation metadata.
+- [x] Keep approximation artifacts separate from authoritative replay artifacts while allowing them to cite the same scenario and profile manifest.
+- [x] Add targeted tests for approximation-run determinism, manifest generation, and exact-vs-approximate comparison reporting.
+- [x] Update docs to explain which approximation families are empirical only and which are tied to existing classical/mean-field theorem surfaces.
+- [x] Remove or rename any legacy “simulation mode” surface that blurs exact execution and approximation once the explicit ladder exists. No backwards-compatibility aliases.
 - [ ] Make a git commit for Phase 16.
 
 ## Phase 17: Proof-Carrying Batch and Sweep Artifacts

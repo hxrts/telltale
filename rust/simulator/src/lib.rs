@@ -16,6 +16,7 @@
 // Internal simulator errors are self-documenting via Result types.
 #![allow(clippy::missing_errors_doc)]
 
+pub mod approximation;
 pub mod analysis;
 #[doc(hidden)]
 pub mod backend;
@@ -41,6 +42,11 @@ pub mod scenario;
 pub mod trace;
 mod value_conv;
 
+pub use approximation::{
+    compare_exact_and_approximate, run_approximation, ApproximationAdmissibility,
+    ApproximationArtifact, ApproximationComparison, ApproximationFamily, ApproximationManifest,
+    ApproximationObservables, ApproximationScope, ApproximationSpec,
+};
 pub use analysis::{
     compare_observability, normalized_observability, NormalizedObservability,
     ObservabilityComparison, ObservabilityRelation,

@@ -146,6 +146,29 @@ These decision procedures return structured `DecisionReport` values with either 
 They are distinct from empirical run analysis such as `theorem_progress`, `reconfiguration_summary`, or normalized observability comparison.
 The one intentional bridge is theorem eligibility: the same witness format is available both offline (`decide_theorem_eligibility(...)`) and from an executed run (`theorem_eligibility_from_result(...)`).
 
+## Approximation Artifacts
+
+Approximation runs are now explicit and separate from `ScenarioResult`.
+Use `run_approximation(...)` with an `ApproximationSpec` when the caller wants a non-authoritative artifact for `batched_stochastic`, `mean_field`, or `continuum_field` analysis.
+
+Approximation artifacts retain:
+
+- an `ApproximationManifest`
+- the sampled state `Trace`
+- `NormalizedObservability`
+- shared observables such as final per-role states and productive-step counts
+
+They intentionally do not pretend to be canonical replay artifacts.
+Instead the manifest declares:
+
+- the approximation family
+- the theorem-side scope
+- explicit non-goals
+- whether the approximation is theorem-backed, empirical-only, or unsupported for this scenario/profile pair
+
+Use `compare_exact_and_approximate(...)` to compare an authoritative `ScenarioResult` against one approximation artifact.
+That report compares normalized observability, productive-step counts, and final-state error without blurring the authoritative replay lane.
+
 ## Harness API
 
 `SimulationHarness` is the stable integration path for external projects.

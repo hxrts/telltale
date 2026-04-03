@@ -41,6 +41,10 @@ Generated effect-family helpers exist as adjacent APIs for integration layers an
 They are not yet wired into the main harness execution path.
 The simulator also now exposes a separate `decision` module for offline theorem-facing checks.
 That layer returns structured certificates and counterexamples for coherence, subtyping, capacity predicates, and theorem-profile eligibility instead of boolean-only pass/fail answers.
+An explicit `approximation` module now sits beside the authoritative runner as well.
+Approximation artifacts are separate from replay artifacts and must declare an approximation family, theorem-side scope, and explicit non-goals.
+Current families are `batched_stochastic`, `mean_field`, and `continuum_field`.
+`mean_field` and `continuum_field` can be theorem-backed when the scenario material and theorem profile line up; `batched_stochastic` may also be declared as empirical-only when no theorem-side claim is intended.
 
 ## Quick Start
 
