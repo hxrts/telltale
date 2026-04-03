@@ -52,6 +52,9 @@ pub use encoding::{
     CanonicalHeapEncoder, CanonicalHeapEncoding, HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
 };
 pub use heap_impl::Heap;
-pub use merkle::{Direction, HeapCommitment, MerkleProof, MerkleTree, ProofStep};
+pub use merkle::{
+    merkle_node_hash, nullifier_leaf_hash, resource_leaf_hash, Direction, HeapCommitment,
+    MerkleProof, MerkleTree, ProofStep,
+};
 pub use resource::{ChannelState, HeapError, Message, MessagePayload, Resource, ResourceId};
 pub use telltale_types::{DefaultContentHasher as DefaultHeapHasher, Hasher};

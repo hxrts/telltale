@@ -17,6 +17,7 @@
 //! The specific Rust types (`ResourceId`, `Resource`, `HeapError`) are Rust-only.
 
 use super::encoding::{
+    encode_resource_id_preimage,
     tag_channel_state, tag_message, tag_message_payload, tag_resource_channel,
     tag_resource_message, tag_resource_session, tag_resource_value, CanonicalHeapEncoder,
     CanonicalHeapEncoding,
@@ -28,9 +29,9 @@ use telltale_types::{DefaultContentHasher, Hasher};
 
 /// Unique identifier for heap-allocated resources.
 ///
-/// ResourceId is derived from the content hash of the resource,
-/// combined with an allocation counter to ensure uniqueness even
-/// for identical content.
+/// `ResourceId` is derived from a tagged hash preimage that contains the
+/// canonical resource encoding and the allocation counter.
+/// This keeps repeated allocations of identical semantic resources distinct.
 #[derive(Clone)]
 pub struct ResourceId<H: Hasher = DefaultContentHasher> {
     /// The hashed resource identity
@@ -50,14 +51,14 @@ impl<H: Hasher> ResourceId<H> {
         }
     }
 
-    /// Create a ResourceId from a resource and allocation counter.
+    /// Create a `ResourceId` from a resource and allocation counter.
+    ///
+    /// The hasher consumes a tagged preimage that contains the canonical
+    /// resource bytes and the little-endian counter.
     pub fn from_resource(resource: &Resource, counter: u64) -> Self {
         let content_bytes = resource.canonical_bytes();
-        let counter_bytes = counter.to_le_bytes();
-        let mut bytes = Vec::with_capacity(content_bytes.len() + counter_bytes.len());
-        bytes.extend_from_slice(&content_bytes);
-        bytes.extend_from_slice(&counter_bytes);
-        let hash = H::digest(&bytes);
+        let preimage = encode_resource_id_preimage(&content_bytes, counter);
+        let hash = H::digest(&preimage);
 
         Self {
             hash,
@@ -419,6 +420,10 @@ mod tests {
     use crate::heap::{HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION};
     use telltale_types::{Blake3Hasher, DefaultContentHasher, Hasher};
 
+    fn to_hex(bytes: &[u8]) -> String {
+        bytes.iter().map(|byte| format!("{:02x}", byte)).collect()
+    }
+
     #[test]
     fn test_resource_id_creation() {
         let r1 = Resource::channel("Alice", "Bob");
@@ -432,6 +437,21 @@ mod tests {
         assert_eq!(id1, id2);
         // Same resource, different counter → different ID
         assert_ne!(id1, id3);
+    }
+
+    #[test]
+    fn test_resource_id_fixed_vector() {
+        let resource = Resource::message("Alice", "Bob", "Hello", vec![1, 2, 3], 7);
+        let resource_id = ResourceId::<DefaultContentHasher>::from_resource(&resource, 1);
+
+        assert_eq!(
+            to_hex(resource.canonical_bytes().as_slice()),
+            "545448500100415454485001003005000000416c69636503000000426f62545448500100100500000048656c6c6f030000000102030700000000000000"
+        );
+        assert_eq!(
+            to_hex(resource_id.as_bytes()),
+            "5a22a0e61e5faa3ea4c2bee86a92761eea62364727a77a4ed7c3a24c456afd8e"
+        );
     }
 
     #[test]

@@ -17,6 +17,11 @@ const TAG_RESOURCE_CHANNEL: u8 = 0x40;
 const TAG_RESOURCE_MESSAGE: u8 = 0x41;
 const TAG_RESOURCE_SESSION: u8 = 0x42;
 const TAG_RESOURCE_VALUE: u8 = 0x43;
+const TAG_RESOURCE_ID_PREIMAGE: u8 = 0x50;
+const TAG_RESOURCE_LEAF_PREIMAGE: u8 = 0x51;
+const TAG_NULLIFIER_LEAF_PREIMAGE: u8 = 0x52;
+const TAG_MERKLE_NODE_PREIMAGE: u8 = 0x53;
+const TAG_HEAP_COMMITMENT_PREIMAGE: u8 = 0x54;
 
 /// Canonical heap encoding boundary.
 ///
@@ -114,4 +119,46 @@ pub(crate) const fn tag_resource_session() -> u8 {
 
 pub(crate) const fn tag_resource_value() -> u8 {
     TAG_RESOURCE_VALUE
+}
+
+pub(crate) fn encode_resource_id_preimage(resource_bytes: &[u8], counter: u64) -> Vec<u8> {
+    let mut encoder = CanonicalHeapEncoder::new(TAG_RESOURCE_ID_PREIMAGE);
+    encoder.bytes(resource_bytes);
+    encoder.u64(counter);
+    encoder.finish()
+}
+
+pub(crate) fn encode_resource_leaf_preimage(
+    resource_id_bytes: &[u8],
+    resource_bytes: &[u8],
+) -> Vec<u8> {
+    let mut encoder = CanonicalHeapEncoder::new(TAG_RESOURCE_LEAF_PREIMAGE);
+    encoder.bytes(resource_id_bytes);
+    encoder.bytes(resource_bytes);
+    encoder.finish()
+}
+
+pub(crate) fn encode_nullifier_leaf_preimage(resource_id_bytes: &[u8]) -> Vec<u8> {
+    let mut encoder = CanonicalHeapEncoder::new(TAG_NULLIFIER_LEAF_PREIMAGE);
+    encoder.bytes(resource_id_bytes);
+    encoder.finish()
+}
+
+pub(crate) fn encode_merkle_node_preimage(left: &[u8], right: &[u8]) -> Vec<u8> {
+    let mut encoder = CanonicalHeapEncoder::new(TAG_MERKLE_NODE_PREIMAGE);
+    encoder.bytes(left);
+    encoder.bytes(right);
+    encoder.finish()
+}
+
+pub(crate) fn encode_heap_commitment_preimage(
+    resource_root: &[u8],
+    nullifier_root: &[u8],
+    counter: u64,
+) -> Vec<u8> {
+    let mut encoder = CanonicalHeapEncoder::new(TAG_HEAP_COMMITMENT_PREIMAGE);
+    encoder.bytes(resource_root);
+    encoder.bytes(nullifier_root);
+    encoder.u64(counter);
+    encoder.finish()
 }

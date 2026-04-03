@@ -113,7 +113,8 @@ let commitment = HeapCommitment::from_heap(&heap);
 
 `prove(...)` generates an inclusion proof by leaf index in the current active-resource ordering.
 That ordering follows `BTreeMap` iteration over active `ResourceId` keys.
-`HeapCommitment::hash()` then hashes the two roots plus the counter with the selected heap hasher.
+`resource_leaf_hash(...)`, `nullifier_leaf_hash(...)`, and `merkle_node_hash(...)` expose the leaf and node hashing rules directly.
+`HeapCommitment::hash()` then hashes a tagged preimage that contains the two roots and the counter.
 
 ## Error Types
 
@@ -134,10 +135,13 @@ In the current implementation, `NotFound` and `AlreadyConsumed` are the main ope
 
 ## Serialization and Hashing Notes
 
-The heap uses a versioned canonical binary format.
+The heap uses a versioned canonical binary format for resources.
 Every canonical heap value starts with the `TTHP` magic prefix, a little-endian encoding version, and a one-byte type tag.
 Strings and byte slices use explicit little-endian `u32` length prefixes.
 Nested heap values are encoded as full canonical child values.
+
+The heap also uses tagged preimages for `ResourceId`, resource-leaf hashes, nullifier-leaf hashes, Merkle internal nodes, and `HeapCommitment::hash()`.
+Those tagged preimages are part of the public heap contract.
 
 `ChannelState` encoding includes sender, receiver, queue length, and every queued `MessagePayload` in order.
 `Message` encoding includes source, destination, label, full payload bytes, and sequence number.

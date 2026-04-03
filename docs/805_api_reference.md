@@ -64,7 +64,8 @@ Key exports:
 - Topology: `Topology`, `TopologyHandler`, `TransportType`
 - Heap: `Heap`, `DefaultHeapHasher`, `Hasher`, `Resource`, `ResourceId`,
   `CanonicalHeapEncoding`, `CanonicalHeapEncoder`, `HEAP_ENCODING_MAGIC`,
-  `HEAP_ENCODING_VERSION`, `MerkleTree`, `HeapCommitment`
+  `HEAP_ENCODING_VERSION`, `resource_leaf_hash`, `nullifier_leaf_hash`,
+  `merkle_node_hash`, `MerkleTree`, `HeapCommitment`
 - Extensions: `ExtensionRegistry`, `GrammarExtension`, `ProtocolExtension`
 
 See `rust/runtime/src/lib.rs` for the full export surface.

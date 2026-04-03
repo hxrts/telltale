@@ -30,7 +30,7 @@ The current canonical encoding covers `MessagePayload`, `ChannelState`, `Message
 ## Resource Identity
 
 `ResourceId` remains allocation-unique in the current design.
-The heap computes it as `hash(resource_canonical_bytes || allocation_counter_le)`.
+The heap computes it from a tagged preimage that contains the canonical resource bytes and the little-endian allocation counter.
 The digest uses the selected heap hasher, which defaults to `DefaultHeapHasher`.
 
 This design keeps repeated allocations of identical semantic resources distinct.
@@ -38,10 +38,15 @@ It also ties the ID contract directly to the canonical heap encoding boundary.
 
 ## Merkle Leaves and Commitments
 
-Active-resource leaves hash `resource_id_digest || resource_canonical_bytes`.
-Nullifier leaves currently use the `ResourceId` digest bytes directly.
-`HeapCommitment` combines the active-resource root, the nullifier root, and the allocation counter.
-`HeapCommitment::hash()` then hashes those three values with the selected heap hasher.
+Active-resource leaves hash a tagged preimage that contains the `ResourceId` digest and the canonical resource bytes.
+Nullifier leaves hash a distinct tagged preimage that contains the `ResourceId` digest bytes.
+Internal Merkle nodes hash a tagged preimage that contains the left child digest and the right child digest.
+`HeapCommitment` stores the active-resource root, the nullifier root, and the allocation counter.
+`HeapCommitment::hash()` hashes a tagged preimage that contains those three values.
+
+The allocation counter remains part of the authoritative commitment contract.
+This keeps the commitment aligned with allocation history rather than only current live content.
+The current heap model treats that history as semantically relevant.
 
 See [Resource Heap](802_resource_heap.md) for the public heap APIs.
 See [API Reference](805_api_reference.md) for the exported runtime heap types.
