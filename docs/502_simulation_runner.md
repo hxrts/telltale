@@ -192,6 +192,26 @@ The harness does not currently consume `GeneratedEffectScenario` directly.
 Batch results remain in the same order as the input slice.
 The default batch worker count is host parallelism outside CI and `1` in CI.
 `BatchRunResult.manifest` records one resolved theorem-profile entry per input spec, even when an individual run later fails.
+`SimulationHarness::run_sweep(...)` extends that batch lane into deterministic parameter sweeps.
+Current sweep axes include:
+
+- `seed`
+- `capacity_budget`
+- `scheduler_profile`
+- `reconfiguration_program`
+- `adversary_budget`
+
+Sweep expansion preserves deterministic input order.
+`SweepRunResult.manifest` records, per expanded run:
+
+- explicit parameter bindings
+- resolved theorem profiles
+- resolved scheduler profiles when execution succeeded
+- theorem-eligibility witnesses
+- capacity-predicate reports when a capacity budget axis is present
+- per-run execution errors without collapsing the manifest layout
+
+Use `compare_sweep_results(...)` to diff two experiment families by theorem eligibility, productive-step deltas, and assumption-diagnostic changes rather than comparing ad hoc logs.
 
 Distributed simulation uses a different execution vocabulary.
 `DistributedSimBuilder::execution_contract(...)` accepts a `NestedExecutionContract` for outer scheduler concurrency plus inner rounds-per-step.

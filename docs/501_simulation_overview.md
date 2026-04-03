@@ -69,6 +69,8 @@ If the host adapter supplies initial states directly, the base `Scenario` does n
 Batch execution parallelizes independent runs while preserving result order by input index.
 Unlike single-run `auto` execution, batch worker defaults are still throughput-oriented: host parallelism outside CI and `1` in CI.
 Batch results now also carry a theorem-profile manifest in input order so batch tooling can inspect resolved theorem classifications without unpacking each successful run first.
+For larger experiment families, `SimulationHarness::run_sweep(...)` expands one base `HarnessSpec` into a deterministic sweep over seeds, theorem scheduler profiles, reconfiguration programs, adversary budgets, and theorem-capacity budgets.
+Sweep results emit a richer manifest with parameter bindings, theorem eligibility witnesses, capacity-predicate reports, scheduler profiles, and preserved authoritative input ordering.
 
 Distributed simulation has a separate outer/inner execution surface.
 `DistributedSimBuilder` now accepts one explicit `NestedExecutionContract` describing outer scheduler concurrency and inner rounds-per-step.

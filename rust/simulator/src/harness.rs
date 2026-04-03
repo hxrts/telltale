@@ -13,6 +13,7 @@ use crate::contracts::{assert_contracts, ContractCheckConfig};
 use crate::material::MaterialModel;
 use crate::runner::{run_with_scenario, ScenarioResult};
 use crate::scenario::{ResolvedTheoremProfile, Scenario};
+use crate::sweep::{run_sweep, SweepConfig, SweepRunResult};
 use crate::EffectHandler;
 
 /// Host integration hook for simulator execution.
@@ -277,6 +278,7 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
     /// # Errors
     ///
     /// Returns a per-spec `Err` entry when one run fails.
+    #[must_use]
     pub fn run_batch(&self, specs: &[HarnessSpec]) -> BatchRunResult
     where
         A: Sync,
@@ -285,6 +287,7 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
     }
 
     /// Execute many specs with explicit batch configuration.
+    #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn run_batch_with(&self, specs: &[HarnessSpec], config: BatchConfig) -> BatchRunResult
     where
@@ -343,6 +346,22 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
                 })
                 .collect(),
         }
+    }
+
+    /// Expand one base spec into a deterministic parameter sweep and execute it.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when sweep expansion fails.
+    pub fn run_sweep(
+        &self,
+        base: &HarnessSpec,
+        config: SweepConfig,
+    ) -> Result<SweepRunResult, String>
+    where
+        A: Sync,
+    {
+        run_sweep(self, base, config)
     }
 }
 

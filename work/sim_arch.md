@@ -216,17 +216,17 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for approximation-run determinism, manifest generation, and exact-vs-approximate comparison reporting.
 - [x] Update docs to explain which approximation families are empirical only and which are tied to existing classical/mean-field theorem surfaces.
 - [x] Remove or rename any legacy “simulation mode” surface that blurs exact execution and approximation once the explicit ladder exists. No backwards-compatibility aliases.
-- [ ] Make a git commit for Phase 16.
+- [x] Make a git commit for Phase 16.
 
 ## Phase 17: Proof-Carrying Batch and Sweep Artifacts
 
-- [ ] Extend batch execution to support parameter sweeps over seeds, capacities, scheduler profiles, reconfiguration programs, and fault/adversary budgets.
-- [ ] Emit one reproducible manifest per sweep containing resolved execution settings, theorem profiles, assumption bundles, witnesses/certificates, and authoritative result ordering.
-- [ ] Preserve deterministic input-order results and deterministic artifact layout regardless of worker scheduling.
-- [ ] Add diff/report tooling for comparing experiment families by theorem-native outcomes as well as raw metrics.
-- [ ] Add targeted tests for manifest reproducibility, witness retention, and deterministic sweep ordering.
-- [ ] Update docs and examples to present batch/sweep outputs as experiment artifacts rather than ad hoc logs.
-- [ ] Remove any older ad hoc sweep-output or batch-report format that the new manifest supersedes. Do not keep parallel legacy artifact layouts.
+- [x] Extend batch execution to support parameter sweeps over seeds, capacities, scheduler profiles, reconfiguration programs, and fault/adversary budgets.
+- [x] Emit one reproducible manifest per sweep containing resolved execution settings, theorem profiles, assumption bundles, witnesses/certificates, and authoritative result ordering.
+- [x] Preserve deterministic input-order results and deterministic artifact layout regardless of worker scheduling.
+- [x] Add diff/report tooling for comparing experiment families by theorem-native outcomes as well as raw metrics.
+- [x] Add targeted tests for manifest reproducibility, witness retention, and deterministic sweep ordering.
+- [x] Update docs and examples to present batch/sweep outputs as experiment artifacts rather than ad hoc logs.
+- [x] Remove any older ad hoc sweep-output or batch-report format that the new manifest supersedes. Do not keep parallel legacy artifact layouts.
 - [ ] Make a git commit for Phase 17.
 
 ## Phase 18: External Domain-Model Integration Boundary

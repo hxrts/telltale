@@ -16,8 +16,8 @@
 // Internal simulator errors are self-documenting via Result types.
 #![allow(clippy::missing_errors_doc)]
 
-pub mod approximation;
 pub mod analysis;
+pub mod approximation;
 #[doc(hidden)]
 pub mod backend;
 pub mod checkpoint;
@@ -39,17 +39,18 @@ pub mod reconfiguration;
 pub mod rng;
 pub mod runner;
 pub mod scenario;
+pub mod sweep;
 pub mod trace;
 mod value_conv;
 
+pub use analysis::{
+    compare_observability, normalized_observability, NormalizedObservability,
+    ObservabilityComparison, ObservabilityRelation,
+};
 pub use approximation::{
     compare_exact_and_approximate, run_approximation, ApproximationAdmissibility,
     ApproximationArtifact, ApproximationComparison, ApproximationFamily, ApproximationManifest,
     ApproximationObservables, ApproximationScope, ApproximationSpec,
-};
-pub use analysis::{
-    compare_observability, normalized_observability, NormalizedObservability,
-    ObservabilityComparison, ObservabilityRelation,
 };
 pub use contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
@@ -89,5 +90,9 @@ pub use runner::{
     compare_scheduler_runs, CriticalCapacityPhase, CriticalCapacitySummary,
     ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus,
     SchedulerFairnessRequirement, SchedulerProfileSummary, TheoremProgressSummary,
+};
+pub use sweep::{
+    compare_sweep_results, run_sweep, SweepAxis, SweepBinding, SweepConfig, SweepDiffReport,
+    SweepManifest, SweepManifestEntry, SweepRunDiff, SweepRunResult,
 };
 pub use telltale_machine::model::effects::EffectHandler;
