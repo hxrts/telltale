@@ -62,3 +62,4 @@
 - [Verification Inventory](806_verification_inventory.md)
 - [Glossary and Notation Index](807_glossary_notation.md)
 - [Heap Encoding and Commitments](808_heap_encoding_commitments.md)
+- [Heap Determinism Contract](809_heap_determinism.md)

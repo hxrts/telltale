@@ -153,10 +153,13 @@ See [Heap Encoding and Commitments](808_heap_encoding_commitments.md) for the by
 
 ## Determinism Notes
 
-Heap operations are deterministic because they use ordered maps and sets and avoid hash-map iteration order.
-`state_hash()` provides a simple debug-oriented heap summary based on resource counters and nullifiers.
-It is not a cryptographic commitment and should not be treated as one.
+Heap operations are deterministic by contract.
+Active-resource ordering follows `ResourceId` ordering in the heap `BTreeMap`.
+Consumed-resource ordering follows the same `ResourceId` ordering in the nullifier `BTreeSet`.
+Merkle proof indices refer to that exact active-resource order.
 
-Use `HeapCommitment` when you need a cryptographic summary of heap state.
+Repeated executions of the same heap operation sequence must yield the same `ResourceId` values, proof paths, and `HeapCommitment` values.
+`HeapCommitment` is the authoritative cryptographic summary of heap state.
 Use [Content Addressing](801_content_addressing.md) for the type-level artifact identity system.
 Use [Choreography Effect Handlers](301_effect_handlers.md) for choreography runtime integration.
+See [Heap Determinism Contract](809_heap_determinism.md) for the explicit ordering and replay rules.

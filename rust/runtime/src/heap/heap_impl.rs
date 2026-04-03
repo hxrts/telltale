@@ -18,6 +18,7 @@
 //! The heap abstraction is currently Rust-only. Resource concepts
 //! correspond to `lean/Runtime/Resources/ResourceModel.lean`.
 
+use super::merkle::{HeapCommitment, MerkleProof, MerkleTree};
 use super::resource::{HeapError, Resource, ResourceId};
 use std::collections::{BTreeMap, BTreeSet};
 use telltale_types::{DefaultContentHasher, Hasher};
@@ -215,21 +216,6 @@ impl<H: Hasher> Heap<H> {
     pub fn alloc_session(&self, role: &str, type_hash: u64) -> (ResourceId<H>, Heap<H>) {
         self.alloc(Resource::session(role, type_hash))
     }
-
-    /// Compute a simple hash of the heap state (for debugging).
-    ///
-    /// A real implementation would compute a Merkle root.
-    pub fn state_hash(&self) -> u64 {
-        let resource_hash: u64 = self
-            .resources
-            .keys()
-            .fold(0u64, |acc, rid| acc ^ rid.counter());
-        let nullifier_hash: u64 = self
-            .nullifiers
-            .iter()
-            .fold(0u64, |acc, rid| acc ^ rid.counter());
-        resource_hash ^ nullifier_hash ^ self.counter
-    }
 }
 
 #[cfg(test)]
@@ -356,18 +342,74 @@ mod tests {
 
         // Same operations → same results
         assert_eq!(rid1, rid2);
-        assert_eq!(h1.state_hash(), h2.state_hash());
+        assert_eq!(
+            HeapCommitment::<DefaultContentHasher>::from_heap(&h1).hash(),
+            HeapCommitment::<DefaultContentHasher>::from_heap(&h2).hash()
+        );
     }
 
     #[test]
-    fn test_heap_state_hash() {
+    fn test_consume_many_is_order_independent() {
         let heap = Heap::<DefaultContentHasher>::new();
-        let hash1 = heap.state_hash();
+        let (rids, heap) = heap.alloc_many(vec![
+            Resource::channel("Alice", "Bob"),
+            Resource::channel("Bob", "Carol"),
+            Resource::session("Alice", 7),
+        ]);
 
-        let (_, heap) = heap.alloc(Resource::channel("Alice", "Bob"));
-        let hash2 = heap.state_hash();
+        let left = heap.consume_many(&[rids[0].clone(), rids[1].clone()]).unwrap();
+        let right = heap.consume_many(&[rids[1].clone(), rids[0].clone()]).unwrap();
 
-        assert_ne!(hash1, hash2);
+        assert_eq!(
+            HeapCommitment::<DefaultContentHasher>::from_heap(&left),
+            HeapCommitment::<DefaultContentHasher>::from_heap(&right)
+        );
+        let consumed_left: Vec<_> = left.consumed_ids().cloned().collect();
+        let consumed_right: Vec<_> = right.consumed_ids().cloned().collect();
+        assert_eq!(consumed_left, consumed_right);
+    }
+
+    #[test]
+    fn test_repeated_operation_sequences_yield_identical_proofs_and_commitments() {
+        fn build_fixture() -> (
+            Vec<ResourceId<DefaultContentHasher>>,
+            HeapCommitment<DefaultContentHasher>,
+            MerkleProof<DefaultContentHasher>,
+        ) {
+            let heap = Heap::<DefaultContentHasher>::new();
+            let (rid0, heap) = heap.alloc_channel("Alice", "Bob");
+            let (rid1, heap) = heap.alloc_message("Alice", "Bob", "Hello", vec![1, 2, 3], 7);
+            let (rid2, heap) = heap.alloc_session("Alice", 12345);
+            let heap = heap.consume(&rid0).unwrap();
+
+            let commitment = HeapCommitment::<DefaultContentHasher>::from_heap(&heap);
+            let proof = MerkleTree::<DefaultContentHasher>::from_heap(&heap)
+                .prove(0)
+                .expect("proof should exist");
+            (vec![rid0, rid1, rid2], commitment, proof)
+        }
+
+        let left = build_fixture();
+        let right = build_fixture();
+
+        assert_eq!(left.0, right.0);
+        assert_eq!(left.1, right.1);
+        assert_eq!(left.2, right.2);
+    }
+
+    #[test]
+    fn test_remove_changes_commitment_and_clears_nullifier_history() {
+        let heap = Heap::<DefaultContentHasher>::new();
+        let (rid, heap) = heap.alloc_channel("Alice", "Bob");
+        let consumed = heap.consume(&rid).unwrap();
+        let removed = consumed.remove(&rid).unwrap();
+
+        let consumed_commitment = HeapCommitment::<DefaultContentHasher>::from_heap(&consumed);
+        let removed_commitment = HeapCommitment::<DefaultContentHasher>::from_heap(&removed);
+
+        assert_ne!(consumed_commitment, removed_commitment);
+        assert_eq!(removed.nullified_count(), 0);
+        assert_eq!(removed.size(), 0);
     }
 
     #[test]
