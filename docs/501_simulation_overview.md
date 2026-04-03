@@ -37,6 +37,8 @@ It keeps canonical raw replay unchanged while exposing a normalized behavior cla
 
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
+The simulator also now exposes a separate `decision` module for offline theorem-facing checks.
+That layer returns structured certificates and counterexamples for coherence, subtyping, capacity predicates, and theorem-profile eligibility instead of boolean-only pass/fail answers.
 
 ## Quick Start
 

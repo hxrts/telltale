@@ -173,16 +173,16 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for normalization-aware equivalence and non-equivalence reporting.
 - [x] Update simulator docs to explain raw trace vs normalized envelope trace semantics.
 - [x] Remove any older comparison/reporting surface that duplicates the new normalized observability contract. Do not retain parallel legacy diff modes.
-- [ ] Make a git commit for Phase 12.
+- [x] Make a git commit for Phase 12.
 
 ## Phase 13: Decision Procedures and Counterexample Surfaces
 
-- [ ] Add simulator-facing decision/checker APIs for regular-fragment properties such as branching feasibility, async-subtyping-facing checks, capacity predicates, and crash/distributed assumption eligibility where the theorem program supports them.
-- [ ] When a theorem-side predicate fails, return a structured witness or counterexample object rather than only a boolean or log line.
-- [ ] Preserve separation between runtime execution and offline decision procedures, but allow both to emit a shared witness/certificate format.
-- [ ] Add targeted tests for witness emission, counterexample minimization, and decision/execution result alignment.
-- [ ] Update docs to explain which checks are theorem-decision procedures and which are empirical simulator analyses.
-- [ ] Remove boolean-only or string-only legacy checker outputs where the new witness/certificate surface replaces them. No duplicate old/new result APIs.
+- [x] Add simulator-facing decision/checker APIs for regular-fragment properties such as branching feasibility, async-subtyping-facing checks, capacity predicates, and crash/distributed assumption eligibility where the theorem program supports them.
+- [x] When a theorem-side predicate fails, return a structured witness or counterexample object rather than only a boolean or log line.
+- [x] Preserve separation between runtime execution and offline decision procedures, but allow both to emit a shared witness/certificate format.
+- [x] Add targeted tests for witness emission, counterexample minimization, and decision/execution result alignment.
+- [x] Update docs to explain which checks are theorem-decision procedures and which are empirical simulator analyses.
+- [x] Remove boolean-only or string-only legacy checker outputs where the new witness/certificate surface replaces them. No duplicate old/new result APIs.
 - [ ] Make a git commit for Phase 13.
 
 ## Phase 14: Budgeted Fault and Adversary Models

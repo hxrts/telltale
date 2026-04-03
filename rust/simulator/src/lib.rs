@@ -21,6 +21,7 @@ pub mod analysis;
 pub mod backend;
 pub mod checkpoint;
 pub mod contracts;
+pub mod decision;
 pub mod distributed;
 #[doc(hidden)]
 pub mod execution;
@@ -46,6 +47,14 @@ pub use analysis::{
 };
 pub use contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
+};
+pub use decision::{
+    decide_async_subtyping, decide_capacity_predicate, decide_global_coherence,
+    decide_global_well_formedness, decide_sync_subtyping, decide_theorem_eligibility,
+    theorem_eligibility_from_result, AsyncSubtypeWitness, CapacityCounterexample,
+    CoherenceFailure, DecisionCertificate, DecisionCounterexample, DecisionKind,
+    DecisionOutcome, DecisionReport, SyncSubtypeWitness, TheoremEligibilityCounterexample,
+    WellFormednessViolation,
 };
 pub use distributed::{DistributedSimBuilder, DistributedSimulation, NestedExecutionContract};
 pub use harness::{

@@ -113,6 +113,18 @@ Normalization is order-insensitive over session-normalized observable events and
 If two runs only differ by admissible exchange ordering or equivalent footprint-normalized cutover ordering, the report upgrades them to `equivalent_under_normalization`.
 If the normalized classes still differ, the comparison remains a safety-visible divergence.
 
+Offline theorem-facing checks live in the `decision` module rather than in the runner itself.
+Use that module for:
+
+- global well-formedness and coherence checks
+- async- and sync-subtyping checks
+- productive-step capacity predicates
+- theorem-profile eligibility before running the simulator
+
+These decision procedures return structured `DecisionReport` values with either a certificate or a counterexample object.
+They are distinct from empirical run analysis such as `theorem_progress`, `reconfiguration_summary`, or normalized observability comparison.
+The one intentional bridge is theorem eligibility: the same witness format is available both offline (`decide_theorem_eligibility(...)`) and from an executed run (`theorem_eligibility_from_result(...)`).
+
 ## Harness API
 
 `SimulationHarness` is the stable integration path for external projects.
