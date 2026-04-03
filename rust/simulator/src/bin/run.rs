@@ -41,6 +41,7 @@ fn main() {
         stats: StatsOutput {
             seed: result.stats.seed,
             execution_regime: result.stats.execution_regime,
+            theorem_profile: result.stats.theorem_profile,
             backend: result.stats.backend,
             scheduler_concurrency: result.stats.scheduler_concurrency,
             worker_threads: result.stats.worker_threads,
@@ -138,6 +139,7 @@ struct ViolationOutput {
 struct StatsOutput {
     seed: u64,
     execution_regime: telltale_simulator::scenario::ExecutionRegime,
+    theorem_profile: telltale_simulator::scenario::ResolvedTheoremProfile,
     backend: telltale_simulator::scenario::ResolvedExecutionBackend,
     scheduler_concurrency: u64,
     worker_threads: u64,

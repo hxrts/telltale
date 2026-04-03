@@ -44,6 +44,9 @@ pub struct Scenario {
     /// Checkpoint interval (ticks). None = disabled.
     #[serde(default)]
     pub checkpoint_interval: Option<u64>,
+    /// Optional theorem/profile declaration for theorem-indexed reporting.
+    #[serde(default)]
+    pub theorem: TheoremProfileSpec,
 }
 
 /// Execution configuration for one simulator run.
@@ -98,6 +101,20 @@ pub struct ResolvedExecution {
     pub worker_threads: u64,
 }
 
+/// Declared theorem/profile configuration for one simulator run.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct TheoremProfileSpec {
+    /// Scheduler-facing theorem profile.
+    #[serde(default)]
+    pub scheduler_profile: TheoremSchedulerProfile,
+    /// Envelope-facing theorem profile.
+    #[serde(default)]
+    pub envelope_profile: TheoremEnvelopeProfile,
+    /// Transport/fault assumption bundle.
+    #[serde(default)]
+    pub assumption_bundle: TheoremAssumptionBundle,
+}
+
 /// Proof-side execution regime classification for one resolved simulator run.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -108,6 +125,82 @@ pub enum ExecutionRegime {
     ThreadedExact,
     /// Threaded execution at scheduler concurrency `> 1`; authoritative only modulo the declared envelope contract.
     ThreadedEnvelopeBounded,
+}
+
+/// Declared scheduler theorem profile.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TheoremSchedulerProfile {
+    /// Derive a scheduler profile from the resolved execution regime.
+    #[default]
+    Auto,
+    /// Require canonical exact execution.
+    CanonicalExact,
+    /// Require threaded execution that remains exact at scheduler concurrency `1`.
+    ThreadedExact,
+    /// Classify the run under the threaded envelope regime.
+    ThreadedEnvelope,
+}
+
+/// Declared envelope theorem profile.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TheoremEnvelopeProfile {
+    /// Derive an envelope profile from the resolved execution regime.
+    #[default]
+    Auto,
+    /// Claim exact theorem-facing behavior.
+    Exact,
+    /// Claim protocol-machine envelope adherence.
+    ProtocolMachineEnvelopeAdherence,
+    /// Claim protocol-machine envelope admission.
+    ProtocolMachineEnvelopeAdmission,
+    /// Do not claim a theorem-facing envelope.
+    None,
+}
+
+/// Declared transport/fault assumption bundle.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TheoremAssumptionBundle {
+    /// Derive an assumption bundle from the scenario middleware surface.
+    #[default]
+    Auto,
+    /// No network middleware and no injected faults.
+    FaultFreeTransport,
+    /// Transport behavior is observed empirically rather than theorem-indexed.
+    ObservedTransport,
+    /// A partial-synchrony assumption bundle is declared.
+    PartialSynchrony,
+    /// A Byzantine/failure-envelope assumption bundle is declared.
+    ByzantineEnvelope,
+}
+
+/// Eligibility classification for theorem-backed outputs.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TheoremEligibility {
+    /// Exact theorem-backed reporting is admissible for this run/profile pair.
+    Exact,
+    /// Only envelope-bounded theorem-backed reporting is admissible.
+    EnvelopeBounded,
+    /// The declared profile does not admit theorem-backed outputs for this run.
+    Ineligible,
+}
+
+/// Resolved theorem/profile information for one run.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ResolvedTheoremProfile {
+    /// Resolved scheduler theorem profile.
+    pub scheduler_profile: TheoremSchedulerProfile,
+    /// Resolved envelope theorem profile.
+    pub envelope_profile: TheoremEnvelopeProfile,
+    /// Resolved transport/fault assumption bundle.
+    pub assumption_bundle: TheoremAssumptionBundle,
+    /// Eligibility of theorem-backed outputs under this profile.
+    pub eligibility: TheoremEligibility,
+    /// Optional explanation when theorem-backed output is ineligible.
+    pub eligibility_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -393,6 +486,155 @@ impl ResolvedExecution {
                 ExecutionRegime::ThreadedExact
             }
             ResolvedExecutionBackend::Threaded => ExecutionRegime::ThreadedEnvelopeBounded,
+        }
+    }
+}
+
+impl Scenario {
+    /// Resolve theorem/profile information against one resolved execution.
+    #[must_use]
+    pub fn resolve_theorem_profile_for(
+        &self,
+        execution: &ResolvedExecution,
+    ) -> ResolvedTheoremProfile {
+        let execution_regime = execution.regime();
+        let scheduler_profile = match self.theorem.scheduler_profile {
+            TheoremSchedulerProfile::Auto => match execution_regime {
+                ExecutionRegime::CanonicalExact => TheoremSchedulerProfile::CanonicalExact,
+                ExecutionRegime::ThreadedExact => TheoremSchedulerProfile::ThreadedExact,
+                ExecutionRegime::ThreadedEnvelopeBounded => {
+                    TheoremSchedulerProfile::ThreadedEnvelope
+                }
+            },
+            profile => profile,
+        };
+        let envelope_profile = match self.theorem.envelope_profile {
+            TheoremEnvelopeProfile::Auto => match execution_regime {
+                ExecutionRegime::CanonicalExact | ExecutionRegime::ThreadedExact => {
+                    TheoremEnvelopeProfile::Exact
+                }
+                ExecutionRegime::ThreadedEnvelopeBounded => {
+                    TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdherence
+                }
+            },
+            profile => profile,
+        };
+        let assumption_bundle = match self.theorem.assumption_bundle {
+            TheoremAssumptionBundle::Auto if self.network.is_none() && self.events.is_empty() => {
+                TheoremAssumptionBundle::FaultFreeTransport
+            }
+            TheoremAssumptionBundle::Auto => TheoremAssumptionBundle::ObservedTransport,
+            bundle => bundle,
+        };
+
+        let scheduler_error = match (scheduler_profile, execution_regime) {
+            (TheoremSchedulerProfile::CanonicalExact, ExecutionRegime::CanonicalExact)
+            | (TheoremSchedulerProfile::ThreadedExact, ExecutionRegime::ThreadedExact)
+            | (
+                TheoremSchedulerProfile::ThreadedEnvelope,
+                ExecutionRegime::ThreadedEnvelopeBounded,
+            ) => None,
+            (TheoremSchedulerProfile::CanonicalExact, actual) => Some(format!(
+                "scheduler profile canonical_exact requires canonical_exact execution, got {}",
+                actual.as_str()
+            )),
+            (TheoremSchedulerProfile::ThreadedExact, actual) => Some(format!(
+                "scheduler profile threaded_exact requires threaded_exact execution, got {}",
+                actual.as_str()
+            )),
+            (TheoremSchedulerProfile::ThreadedEnvelope, actual) => Some(format!(
+                "scheduler profile threaded_envelope requires threaded_envelope_bounded execution, got {}",
+                actual.as_str()
+            )),
+            (TheoremSchedulerProfile::Auto, _) => None,
+        };
+
+        let envelope_error = match (envelope_profile, execution_regime) {
+            (
+                TheoremEnvelopeProfile::Exact,
+                ExecutionRegime::CanonicalExact | ExecutionRegime::ThreadedExact,
+            )
+            | (
+                TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdherence
+                | TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdmission,
+                _,
+            )
+            | (TheoremEnvelopeProfile::None, _)
+            | (TheoremEnvelopeProfile::Auto, _) => None,
+            (TheoremEnvelopeProfile::Exact, actual) => Some(format!(
+                "envelope profile exact requires an exact execution regime, got {}",
+                actual.as_str()
+            )),
+        };
+
+        let assumption_error = match assumption_bundle {
+            TheoremAssumptionBundle::FaultFreeTransport
+                if self.network.is_some() || !self.events.is_empty() =>
+            {
+                Some(
+                    "assumption bundle fault_free_transport requires no network middleware and no injected faults"
+                        .to_string(),
+                )
+            }
+            _ => None,
+        };
+
+        let eligibility_reason = scheduler_error.or(envelope_error).or(assumption_error).or_else(
+            || {
+                if matches!(envelope_profile, TheoremEnvelopeProfile::None) {
+                    Some(
+                        "envelope profile none disables theorem-backed outputs for this run"
+                            .to_string(),
+                    )
+                } else {
+                    None
+                }
+            },
+        );
+
+        let eligibility = if eligibility_reason.is_some() {
+            TheoremEligibility::Ineligible
+        } else {
+            match envelope_profile {
+                TheoremEnvelopeProfile::Exact => TheoremEligibility::Exact,
+                TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdherence
+                | TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdmission => {
+                    TheoremEligibility::EnvelopeBounded
+                }
+                TheoremEnvelopeProfile::None | TheoremEnvelopeProfile::Auto => {
+                    TheoremEligibility::Ineligible
+                }
+            }
+        };
+
+        ResolvedTheoremProfile {
+            scheduler_profile,
+            envelope_profile,
+            assumption_bundle,
+            eligibility,
+            eligibility_reason,
+        }
+    }
+
+    /// Resolve theorem/profile information against the scenario's resolved execution.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution resolution fails.
+    pub fn resolved_theorem_profile(&self) -> Result<ResolvedTheoremProfile, String> {
+        let execution = self.resolved_execution()?;
+        Ok(self.resolve_theorem_profile_for(&execution))
+    }
+}
+
+impl ExecutionRegime {
+    /// Stable string form for diagnostics.
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CanonicalExact => "canonical_exact",
+            Self::ThreadedExact => "threaded_exact",
+            Self::ThreadedEnvelopeBounded => "threaded_envelope_bounded",
         }
     }
 }

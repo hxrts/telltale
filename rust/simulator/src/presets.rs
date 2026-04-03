@@ -7,7 +7,7 @@ use crate::material::MaterialParams;
 use crate::property::Property;
 use crate::scenario::{
     EventSpec, ExecutionSpec, FaultActionSpec, LivenessSpec, PropertiesSpec, Scenario,
-    TriggerSpec,
+    TheoremProfileSpec, TriggerSpec,
 };
 
 /// Build a deterministic baseline scenario with no network or fault events.
@@ -29,6 +29,7 @@ pub fn deterministic_baseline(
         events: Vec::new(),
         properties: None,
         checkpoint_interval: None,
+        theorem: TheoremProfileSpec::default(),
     }
 }
 

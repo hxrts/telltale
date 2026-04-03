@@ -134,13 +134,13 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 
 ## Phase 9: Theorem-Indexed Simulation Profiles
 
-- [ ] Add a first-class theorem/profile layer for simulator runs that records scheduler profile, envelope profile, transport/fault assumption bundle, and eligibility for theorem-backed outputs.
-- [ ] Separate raw execution settings from theorem assumptions so the simulator can say both "what ran" and "what proof-side contract, if any, applies".
-- [ ] Emit resolved theorem/profile information in run statistics, replay artifacts, and batch manifests.
-- [ ] Add targeted tests showing that the same execution can be classified differently under different declared theorem profiles without changing raw runtime behavior.
-- [ ] Update simulator docs to explain theorem-indexed profiles and assumption-bundle reporting.
-- [ ] Remove any older ad hoc profile/status reporting once theorem-indexed profiles exist. Do not keep duplicate reporting surfaces for the same concept.
-- [ ] Make a git commit for Phase 9.
+- [x] Add a first-class theorem/profile layer for simulator runs that records scheduler profile, envelope profile, transport/fault assumption bundle, and eligibility for theorem-backed outputs.
+- [x] Separate raw execution settings from theorem assumptions so the simulator can say both "what ran" and "what proof-side contract, if any, applies".
+- [x] Emit resolved theorem/profile information in run statistics, replay artifacts, and batch manifests.
+- [x] Add targeted tests showing that the same execution can be classified differently under different declared theorem profiles without changing raw runtime behavior.
+- [x] Update simulator docs to explain theorem-indexed profiles and assumption-bundle reporting.
+- [x] Remove any older ad hoc profile/status reporting once theorem-indexed profiles exist. Do not keep duplicate reporting surfaces for the same concept.
+- [x] Make a git commit for Phase 9.
 
 ## Phase 10: Capacity, Stability, and Phase Classification
 

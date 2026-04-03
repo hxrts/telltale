@@ -15,7 +15,10 @@ use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDispo
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::runner::{run, run_with_scenario};
-use telltale_simulator::scenario::{ExecutionRegime, ResolvedExecutionBackend, Scenario};
+use telltale_simulator::scenario::{
+    ExecutionRegime, ResolvedExecutionBackend, Scenario, TheoremAssumptionBundle,
+    TheoremEligibility, TheoremEnvelopeProfile, TheoremSchedulerProfile,
+};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -155,6 +158,23 @@ step_size = "0.01"
 
     assert_eq!(result.stats.seed, 123);
     assert_eq!(result.stats.execution_regime, ExecutionRegime::CanonicalExact);
+    assert_eq!(
+        result.stats.theorem_profile.scheduler_profile,
+        TheoremSchedulerProfile::CanonicalExact
+    );
+    assert_eq!(
+        result.stats.theorem_profile.envelope_profile,
+        TheoremEnvelopeProfile::Exact
+    );
+    assert_eq!(
+        result.stats.theorem_profile.assumption_bundle,
+        TheoremAssumptionBundle::FaultFreeTransport
+    );
+    assert_eq!(
+        result.stats.theorem_profile.eligibility,
+        TheoremEligibility::Exact
+    );
+    assert_eq!(result.replay.theorem_profile, result.stats.theorem_profile);
     assert_eq!(result.stats.backend, ResolvedExecutionBackend::Canonical);
     assert_eq!(result.stats.scheduler_concurrency, 1);
     assert_eq!(result.stats.worker_threads, 1);
@@ -184,6 +204,101 @@ step_size = "0.01"
                 }
             )),
         "scenario replay should include structured semantic effect observations"
+    );
+}
+
+#[test]
+fn theorem_profiles_can_reclassify_one_execution_without_changing_runtime_behavior() {
+    let (global, local_types) = simple_protocol();
+    let exact_toml = r#"
+name = "theorem_exact"
+roles = ["A", "B"]
+steps = 8
+seed = 77
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "canonical_exact"
+envelope_profile = "exact"
+assumption_bundle = "fault_free_transport"
+
+[material]
+layer = "mean_field"
+
+[material.params]
+beta = "1.0"
+species = ["up", "down"]
+initial_state = ["0.5", "0.5"]
+step_size = "0.01"
+"#;
+    let envelope_toml = r#"
+name = "theorem_envelope"
+roles = ["A", "B"]
+steps = 8
+seed = 77
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "canonical_exact"
+envelope_profile = "protocol_machine_envelope_adherence"
+assumption_bundle = "fault_free_transport"
+
+[material]
+layer = "mean_field"
+
+[material.params]
+beta = "1.0"
+species = ["up", "down"]
+initial_state = ["0.5", "0.5"]
+step_size = "0.01"
+"#;
+
+    let exact = Scenario::parse(exact_toml).expect("parse exact theorem scenario");
+    let envelope = Scenario::parse(envelope_toml).expect("parse envelope theorem scenario");
+
+    let exact_result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &exact,
+        &PassthroughHandler,
+    )
+    .expect("exact theorem run");
+    let envelope_result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &envelope,
+        &PassthroughHandler,
+    )
+    .expect("envelope theorem run");
+
+    assert_eq!(exact_result.trace.records, envelope_result.trace.records);
+    assert_eq!(exact_result.replay.obs_trace, envelope_result.replay.obs_trace);
+    assert_eq!(
+        exact_result.replay.effect_trace,
+        envelope_result.replay.effect_trace
+    );
+    assert_eq!(exact_result.stats.backend, envelope_result.stats.backend);
+    assert_eq!(
+        exact_result.stats.execution_regime,
+        envelope_result.stats.execution_regime
+    );
+    assert_eq!(
+        exact_result.stats.theorem_profile.eligibility,
+        TheoremEligibility::Exact
+    );
+    assert_eq!(
+        envelope_result.stats.theorem_profile.eligibility,
+        TheoremEligibility::EnvelopeBounded
     );
 }
 

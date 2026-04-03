@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use telltale_types::FixedQ32;
 
 /// A single step record for one role.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct StepRecord {
     /// Simulation step index.
     pub step: u64,
@@ -17,7 +17,7 @@ pub struct StepRecord {
 }
 
 /// Collected trace from a simulation run.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Trace {
     /// All recorded step records.
     pub records: Vec<StepRecord>,

@@ -65,6 +65,16 @@ That means `scheduler_concurrency = 1` and `worker_threads = 1` unless the scena
 `scheduler_concurrency` may change semantics.
 `worker_threads` must not change authoritative outputs for a fixed threaded scheduler configuration.
 
+`Scenario.theorem` is resolved separately from `Scenario.execution`.
+It carries:
+
+- `scheduler_profile`
+- `envelope_profile`
+- `assumption_bundle`
+
+The resolved theorem profile is emitted in both `ScenarioStats` and `ScenarioReplayArtifact`.
+Its `eligibility` reports whether the run admits exact theorem-backed reporting, only envelope-bounded reporting, or no theorem-backed reporting under the declared profile.
+
 ## Harness API
 
 `SimulationHarness` is the stable integration path for external projects.
@@ -87,6 +97,7 @@ The harness does not currently consume `GeneratedEffectScenario` directly.
 `SimulationHarness::run_batch(...)` and `run_batch_with(...)` run many `HarnessSpec` values concurrently.
 Batch results remain in the same order as the input slice.
 The default batch worker count is host parallelism outside CI and `1` in CI.
+`BatchRunResult.manifest` records one resolved theorem-profile entry per input spec, even when an individual run later fails.
 
 Distributed simulation uses a different execution vocabulary.
 `DistributedSimBuilder::execution_contract(...)` accepts a `NestedExecutionContract` for outer scheduler concurrency plus inner rounds-per-step.

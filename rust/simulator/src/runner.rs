@@ -21,7 +21,9 @@ use crate::checkpoint::CheckpointStore;
 use crate::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
-use crate::scenario::{ExecutionRegime, ResolvedExecutionBackend, Scenario};
+use crate::scenario::{
+    ExecutionRegime, ResolvedExecutionBackend, ResolvedTheoremProfile, Scenario,
+};
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
 
@@ -228,6 +230,8 @@ pub struct ScenarioResult {
 
 /// Replay-ready artifact data captured from a scenario run.
 pub struct ScenarioReplayArtifact {
+    /// Resolved theorem/profile information for this run.
+    pub theorem_profile: ResolvedTheoremProfile,
     /// Raw observable protocol-machine trace.
     pub obs_trace: Vec<ObsEvent>,
     /// Effect trace entries for deterministic replay.
@@ -248,6 +252,8 @@ pub struct ScenarioStats {
     pub seed: u64,
     /// Proof-side execution regime classification.
     pub execution_regime: ExecutionRegime,
+    /// Resolved theorem/profile information for this run.
+    pub theorem_profile: ResolvedTheoremProfile,
     /// Resolved execution backend.
     pub backend: ResolvedExecutionBackend,
     /// Resolved scheduler concurrency value.
@@ -281,6 +287,7 @@ pub fn run_with_scenario(
 ) -> Result<ScenarioResult, String> {
     let image = CodeImage::from_local_types(local_types, global_type);
     let resolved_execution = scenario.resolved_execution()?;
+    let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
     if matches!(resolved_execution.backend, ResolvedExecutionBackend::Threaded)
         && scenario.checkpoint_interval.is_some()
     {
@@ -395,6 +402,7 @@ pub fn run_with_scenario(
         trace,
         violations: monitor.violations().to_vec(),
         replay: ScenarioReplayArtifact {
+            theorem_profile: theorem_profile.clone(),
             obs_trace,
             effect_trace,
             effect_exchanges: machine.effect_exchanges().to_vec(),
@@ -405,6 +413,7 @@ pub fn run_with_scenario(
         stats: ScenarioStats {
             seed: scenario.seed,
             execution_regime: resolved_execution.regime(),
+            theorem_profile,
             backend: resolved_execution.backend,
             scheduler_concurrency: resolved_execution.scheduler_concurrency,
             worker_threads: resolved_execution.worker_threads,

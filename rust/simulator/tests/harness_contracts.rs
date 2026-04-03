@@ -141,6 +141,7 @@ fn scenario() -> Scenario {
         events: Vec::new(),
         properties: None,
         checkpoint_interval: None,
+        theorem: telltale_simulator::scenario::TheoremProfileSpec::default(),
     }
 }
 

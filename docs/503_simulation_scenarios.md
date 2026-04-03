@@ -10,6 +10,7 @@ It covers the TOML schema, fault injection, network modeling, properties, checkp
 `material` is optional and is only required by built-in material-driven surfaces such as `MaterialAdapter::from_scenario(...)`, `derive_initial_states(&Scenario)`, and the simulator CLI binaries.
 Execution defaults are resolved through `Scenario.execution`.
 `backend = "auto"` resolves to the authoritative canonical lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
+Theorem-facing interpretation is configured separately through `Scenario.theorem`.
 
 ```rust
 pub struct Scenario {
@@ -23,6 +24,7 @@ pub struct Scenario {
     pub events: Vec<EventSpec>,
     pub properties: Option<PropertiesSpec>,
     pub checkpoint_interval: Option<u64>,
+    pub theorem: TheoremProfileSpec,
 }
 ```
 
@@ -40,6 +42,18 @@ pub struct ExecutionSpec {
 `worker_threads` controls physical parallelism for the threaded backend only.
 Canonical execution requires both values to resolve to `1`.
 Threaded execution with `scheduler_concurrency = 1` remains exact with respect to the canonical lane, while `scheduler_concurrency > 1` is only authoritative modulo the declared concurrency envelope.
+
+```rust
+pub struct TheoremProfileSpec {
+    pub scheduler_profile: TheoremSchedulerProfile,
+    pub envelope_profile: TheoremEnvelopeProfile,
+    pub assumption_bundle: TheoremAssumptionBundle,
+}
+```
+
+The theorem block does not change runtime execution.
+It declares which theorem-side contract the caller wants the run to be interpreted under.
+The simulator resolves that declaration against the actual execution regime and reports eligibility in `ScenarioStats.theorem_profile` and `ScenarioReplayArtifact.theorem_profile`.
 
 ## Scenario Example
 

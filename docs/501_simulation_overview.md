@@ -24,6 +24,10 @@ This separates backend choice from scheduler concurrency and worker-thread count
 The default `auto` policy resolves to the authoritative canonical execution lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
 Throughput-oriented parallelism remains available through explicit threaded execution settings and through batch execution.
 
+The simulator also exposes a separate theorem/profile layer through `Scenario.theorem`.
+This layer records scheduler profile, envelope profile, and transport/fault assumption bundle independently of raw execution settings.
+That separation lets one execution be interpreted under different theorem-side contracts without changing the runtime behavior itself.
+
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
 
@@ -49,6 +53,7 @@ If the host adapter supplies initial states directly, the base `Scenario` does n
 `SimulationHarness` also supports deterministic batched execution through `run_batch(...)` and `run_batch_with(...)`.
 Batch execution parallelizes independent runs while preserving result order by input index.
 Unlike single-run `auto` execution, batch worker defaults are still throughput-oriented: host parallelism outside CI and `1` in CI.
+Batch results now also carry a theorem-profile manifest in input order so batch tooling can inspect resolved theorem classifications without unpacking each successful run first.
 
 Distributed simulation has a separate outer/inner execution surface.
 `DistributedSimBuilder` now accepts one explicit `NestedExecutionContract` describing outer scheduler concurrency and inner rounds-per-step.

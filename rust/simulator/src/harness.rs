@@ -12,7 +12,7 @@ use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 use crate::contracts::{assert_contracts, ContractCheckConfig};
 use crate::material::MaterialModel;
 use crate::runner::{run_with_scenario, ScenarioResult};
-use crate::scenario::Scenario;
+use crate::scenario::{ResolvedTheoremProfile, Scenario};
 use crate::EffectHandler;
 
 /// Host integration hook for simulator execution.
@@ -176,8 +176,30 @@ pub struct BatchConfig {
 pub struct BatchRunResult {
     /// Resolved worker count.
     pub parallelism: usize,
+    /// Resolved theorem/profile manifest for the batch inputs.
+    pub manifest: BatchRunManifest,
     /// Per-spec results in the same order as the input slice.
     pub results: Vec<Result<ScenarioResult, String>>,
+}
+
+/// Resolved theorem/profile manifest for one batch execution.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchRunManifest {
+    /// Resolved worker count.
+    pub parallelism: usize,
+    /// Per-spec theorem/profile resolution in input order.
+    pub runs: Vec<BatchRunManifestEntry>,
+}
+
+/// One batch manifest entry.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BatchRunManifestEntry {
+    /// Scenario name.
+    pub scenario_name: String,
+    /// Resolved theorem/profile data when execution resolution succeeded.
+    pub theorem_profile: Option<ResolvedTheoremProfile>,
+    /// Resolution error when execution settings could not be resolved.
+    pub theorem_profile_error: Option<String>,
 }
 
 impl HarnessConfig {
@@ -269,15 +291,18 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
         A: Sync,
     {
         let parallelism = resolve_batch_parallelism(config.parallelism);
+        let manifest = build_batch_manifest(specs, parallelism);
         if specs.is_empty() {
             return BatchRunResult {
                 parallelism,
+                manifest,
                 results: Vec::new(),
             };
         }
         if parallelism <= 1 || specs.len() == 1 {
             return BatchRunResult {
                 parallelism,
+                manifest,
                 results: specs.iter().map(|spec| self.run(spec)).collect(),
             };
         }
@@ -312,6 +337,7 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
 
         BatchRunResult {
             parallelism,
+            manifest,
             results: ordered
                 .into_iter()
                 .map(|entry| {
@@ -319,6 +345,27 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
                 })
                 .collect(),
         }
+    }
+}
+
+fn build_batch_manifest(specs: &[HarnessSpec], parallelism: usize) -> BatchRunManifest {
+    BatchRunManifest {
+        parallelism,
+        runs: specs
+            .iter()
+            .map(|spec| match spec.scenario.resolved_execution() {
+                Ok(execution) => BatchRunManifestEntry {
+                    scenario_name: spec.scenario.name.clone(),
+                    theorem_profile: Some(spec.scenario.resolve_theorem_profile_for(&execution)),
+                    theorem_profile_error: None,
+                },
+                Err(error) => BatchRunManifestEntry {
+                    scenario_name: spec.scenario.name.clone(),
+                    theorem_profile: None,
+                    theorem_profile_error: Some(error),
+                },
+            })
+            .collect(),
     }
 }
 
@@ -495,6 +542,7 @@ mod tests {
             events: Vec::new(),
             properties: None,
             checkpoint_interval: None,
+            theorem: crate::scenario::TheoremProfileSpec::default(),
         }
     }
 
@@ -618,10 +666,26 @@ mod tests {
         let batch = harness.run_batch_with(&[spec_a, spec_b], BatchConfig { parallelism: Some(2) });
 
         assert_eq!(batch.parallelism, 2);
+        assert_eq!(batch.manifest.parallelism, 2);
         assert_eq!(batch.results.len(), 2);
+        assert_eq!(batch.manifest.runs.len(), 2);
         let first = batch.results[0].as_ref().expect("first result");
         let second = batch.results[1].as_ref().expect("second result");
         assert_eq!(first.stats.seed, 7);
         assert_eq!(second.stats.seed, 99);
+        assert_eq!(
+            batch.manifest.runs[0]
+                .theorem_profile
+                .as_ref()
+                .expect("first theorem profile"),
+            &first.stats.theorem_profile
+        );
+        assert_eq!(
+            batch.manifest.runs[1]
+                .theorem_profile
+                .as_ref()
+                .expect("second theorem profile"),
+            &second.stats.theorem_profile
+        );
     }
 }

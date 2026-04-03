@@ -59,6 +59,13 @@ fn test_default_seed_when_missing() {
     assert_eq!(execution.scheduler_concurrency, 1);
     assert_eq!(execution.worker_threads, 1);
     assert_eq!(execution.regime(), ExecutionRegime::CanonicalExact);
+    let theorem = scenario
+        .resolved_theorem_profile()
+        .expect("resolve theorem profile");
+    assert_eq!(theorem.scheduler_profile, TheoremSchedulerProfile::CanonicalExact);
+    assert_eq!(theorem.envelope_profile, TheoremEnvelopeProfile::Exact);
+    assert_eq!(theorem.assumption_bundle, TheoremAssumptionBundle::FaultFreeTransport);
+    assert_eq!(theorem.eligibility, TheoremEligibility::Exact);
 }
 
 #[test]
@@ -243,6 +250,53 @@ fn test_threaded_execution_regime_is_exact_at_scheduler_concurrency_one() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.regime(), ExecutionRegime::ThreadedExact);
+}
+
+#[test]
+fn test_explicit_theorem_profile_can_make_the_same_execution_ineligible() {
+    let toml = r#"
+            name = "theorem_profile_conflict"
+            roles = ["A", "B"]
+            steps = 1
+
+            [execution]
+            backend = "canonical"
+            scheduler_concurrency = 1
+            worker_threads = 1
+
+            [theorem]
+            scheduler_profile = "threaded_envelope"
+            envelope_profile = "protocol_machine_envelope_adherence"
+            assumption_bundle = "fault_free_transport"
+
+            [material]
+            layer = "mean_field"
+
+            [material.params]
+            beta = "1.0"
+            species = ["up", "down"]
+            initial_state = ["0.5", "0.5"]
+            step_size = "0.01"
+        "#;
+
+    let scenario = Scenario::parse(toml).expect("parse scenario");
+    let theorem = scenario
+        .resolved_theorem_profile()
+        .expect("resolve theorem profile");
+
+    assert_eq!(theorem.scheduler_profile, TheoremSchedulerProfile::ThreadedEnvelope);
+    assert_eq!(
+        theorem.envelope_profile,
+        TheoremEnvelopeProfile::ProtocolMachineEnvelopeAdherence
+    );
+    assert_eq!(theorem.assumption_bundle, TheoremAssumptionBundle::FaultFreeTransport);
+    assert_eq!(theorem.eligibility, TheoremEligibility::Ineligible);
+    assert!(
+        theorem
+            .eligibility_reason
+            .expect("eligibility reason")
+            .contains("threaded_envelope")
+    );
 }
 
 #[test]
