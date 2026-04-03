@@ -39,7 +39,7 @@ All register operands are bounds-checked at runtime. Out-of-range reads or write
 
 | Instruction | Fields | Runtime effect |
 |---|---|---|
-| `Invoke` | `action`, `dst` | Executes an effect step through the bound handler for the session. `dst` is an optional compatibility field. |
+| `Invoke` | `action` | Executes an effect step through the bound handler for the session. |
 | `Acquire` | `layer`, `dst` | Attempts guard acquisition and writes evidence to `dst` when granted. |
 | `Release` | `layer`, `evidence` | Releases a guard layer using previously issued evidence. |
 
