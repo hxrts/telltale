@@ -20,6 +20,8 @@ pub mod analysis;
 pub mod checkpoint;
 pub mod contracts;
 pub mod distributed;
+#[doc(hidden)]
+pub mod execution;
 pub mod fault;
 /// Generated effect-family simulator helpers and scenario surfaces.
 pub mod generated;

@@ -17,11 +17,9 @@ use telltale_machine::{
 use telltale_types::{GlobalType, LocalTypeR};
 
 use crate::checkpoint::CheckpointStore;
-use crate::fault::FaultInjector;
+use crate::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use crate::harness::derive_initial_states;
-use crate::network::NetworkModel;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
-use crate::rng::SimRng;
 use crate::scenario::Scenario;
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
@@ -434,7 +432,6 @@ pub fn run_with_scenario(
     let mut invoke_count: usize = 0;
     let mut active_count: usize = 0;
     let mut step_idx: usize = 0;
-    let mut rounds_executed: u64 = 0;
     let mut checkpoint_writes: usize = 0;
 
     if scenario.steps > 0 {
@@ -442,7 +439,6 @@ pub fn run_with_scenario(
         step_idx = 1;
     }
 
-    let mut rng = SimRng::new(scenario.seed);
     let mut monitor = scenario
         .property_monitor()
         .map_err(|e| format!("properties: {e}"))?
@@ -453,115 +449,55 @@ pub fn run_with_scenario(
         CheckpointStore::with_dir(interval, dir)
     });
 
-    let schedule = scenario
-        .fault_schedule()
-        .map_err(|e| format!("fault schedule: {e}"))?;
-    let fault = FaultInjector::new(handler, schedule, rng.fork());
+    let middleware = ScenarioMiddleware::from_scenario(
+        scenario,
+        handler,
+        machine.clock().tick_duration,
+    )
+    .map_err(|e| format!("middleware setup: {e}"))?;
 
-    let mut fault_only = None;
-    let mut network = None;
-    if let Some(cfg) = scenario.network_config() {
-        network = Some(NetworkModel::new(
-            fault,
-            cfg,
-            rng.fork(),
-            machine.clock().tick_duration,
-        ));
-    } else {
-        fault_only = Some(fault);
-    }
-
-    for _ in 0..max_vm_rounds {
-        if step_idx >= steps_limit {
-            break;
-        }
-
-        let next_tick = machine.clock().tick + 1;
-        let next_logical_step = rounds_executed.saturating_add(1);
-
-        if let Some(net) = &network {
-            net.inner()
-                .tick(next_tick, next_logical_step, machine.trace())
-                .map_err(|e| format!("fault middleware tick: {e}"))?;
-            net.inner()
-                .deliver(next_tick, |sid, from, to, val| {
-                    machine
-                        .inject_message(sid, from, to, val)
-                        .map_err(|e| e.to_string())
-                })
-                .map_err(|e| format!("fault middleware deliver: {e}"))?;
-            net.set_tick(next_tick);
-            net.deliver(next_tick, |sid, from, to, val| {
-                machine
-                    .inject_message(sid, from, to, val)
-                    .map_err(|e| e.to_string())
-            })
-            .map_err(|e| format!("network middleware deliver: {e}"))?;
-            let paused_roles = net
-                .inner()
-                .crashed_roles()
-                .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
-            machine.set_paused_roles(&paused_roles);
-            match machine.step_round(net, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
-                Err(e) => return Err(format!("protocol machine error: {e}")),
+    let execution = execute_scenario_rounds(
+        &mut machine,
+        scenario,
+        &middleware,
+        concurrency,
+        max_vm_rounds,
+        |machine, _completed_rounds| {
+            if step_idx >= steps_limit {
+                return Ok(());
             }
-            rounds_executed = rounds_executed.saturating_add(1);
-        } else {
-            let Some(fault) = fault_only.as_ref() else {
-                return Err("internal simulator error: fault middleware missing".to_string());
+
+            let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
+            invoke_count += new_invokes;
+            advance_sampling(
+                &mut invoke_count,
+                &mut active_count,
+                &mut step_idx,
+                num_roles,
+                apr,
+                steps_limit,
+                |sample_step| record_all_roles(machine, &coro_info, sample_step, &mut trace),
+            );
+
+            let ctx = PropertyContext {
+                tick: machine.clock().tick,
+                trace: machine.trace(),
+                sessions: machine.sessions(),
+                coroutines: machine.coroutines(),
             };
-            fault
-                .tick(next_tick, next_logical_step, machine.trace())
-                .map_err(|e| format!("fault middleware tick: {e}"))?;
-            fault
-                .deliver(next_tick, |sid, from, to, val| {
-                    machine
-                        .inject_message(sid, from, to, val)
-                        .map_err(|e| e.to_string())
-                })
-                .map_err(|e| format!("fault middleware deliver: {e}"))?;
-            let paused_roles = fault
-                .crashed_roles()
-                .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
-            machine.set_paused_roles(&paused_roles);
-            match machine.step_round(fault, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
-                Err(e) => return Err(format!("protocol machine error: {e}")),
-            }
-            rounds_executed = rounds_executed.saturating_add(1);
-        }
-
-        let new_invokes = count_new_invokes(machine.trace(), &mut prev_trace_len);
-        invoke_count += new_invokes;
-        advance_sampling(
-            &mut invoke_count,
-            &mut active_count,
-            &mut step_idx,
-            num_roles,
-            apr,
-            steps_limit,
-            |sample_step| record_all_roles(&machine, &coro_info, sample_step, &mut trace),
-        );
-
-        let ctx = PropertyContext {
-            tick: machine.clock().tick,
-            trace: machine.trace(),
-            sessions: machine.sessions(),
-            coroutines: machine.coroutines(),
-        };
-        monitor.check(&ctx);
-        if let Some(store) = &mut checkpoints {
-            if let Some(interval) = scenario.checkpoint_interval {
-                if interval != 0 && machine.clock().tick % interval == 0 {
-                    checkpoint_writes = checkpoint_writes.saturating_add(1);
+            monitor.check(&ctx);
+            if let Some(store) = &mut checkpoints {
+                if let Some(interval) = scenario.checkpoint_interval {
+                    if interval != 0 && machine.clock().tick % interval == 0 {
+                        checkpoint_writes = checkpoint_writes.saturating_add(1);
+                    }
                 }
+                store.maybe_checkpoint(machine.clock().tick, machine);
             }
-            store.maybe_checkpoint(machine.clock().tick, &machine);
-        }
-    }
+            Ok(())
+        },
+    )?;
+    let rounds_executed = execution.rounds_executed;
 
     if trace.records.is_empty() {
         let fallback_step = steps_limit.saturating_sub(1);

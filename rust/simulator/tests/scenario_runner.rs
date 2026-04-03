@@ -3,15 +3,19 @@
 use std::collections::BTreeMap;
 
 use serde_json::json;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
-use telltale_machine::SemanticAuditRecord;
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, SemanticAuditRecord};
+use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
+use telltale_simulator::harness::derive_initial_states;
+use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::runner::run_with_scenario;
 use telltale_simulator::scenario::Scenario;
-use telltale_types::{GlobalType, Label, LocalTypeR};
+use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
 struct PassthroughHandler;
@@ -89,6 +93,31 @@ fn simple_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
     );
 
     (global, local_types)
+}
+
+fn write_initial_states(
+    machine: &mut ProtocolMachine,
+    sid: usize,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+) {
+    let coro_info = machine
+        .session_coroutines(sid)
+        .iter()
+        .map(|coro| (coro.id, coro.role.clone()))
+        .collect::<Vec<_>>();
+    for (coro_id, role) in coro_info {
+        let Some(values) = initial_states.get(&role) else {
+            continue;
+        };
+        if let Some(coro_mut) = machine.coroutine_mut(coro_id) {
+            for (idx, value) in values.iter().enumerate() {
+                let reg_idx = idx + 2;
+                if reg_idx < coro_mut.regs.len() {
+                    coro_mut.regs[reg_idx] = Value::Str(format!("q32:{}", value.to_bits()));
+                }
+            }
+        }
+    }
 }
 
 #[test]
@@ -172,4 +201,99 @@ fn generated_effect_scenario_builder_records_effect_outcomes() {
         scenario.steps[2].disposition,
         ScenarioEffectDisposition::StaleLateResult
     );
+}
+
+#[test]
+fn shared_execution_engine_matches_scenario_runner_semantics() {
+    let (global, local_types) = simple_protocol();
+    let scenario_toml = r#"
+name = "shared_engine_equivalence"
+roles = ["A", "B"]
+steps = 8
+concurrency = 2
+seed = 9
+
+[material]
+layer = "mean_field"
+
+[material.params]
+beta = "1.0"
+species = ["up", "down"]
+initial_state = ["0.5", "0.5"]
+step_size = "0.01"
+
+[[events]]
+[events.trigger]
+at_tick = 2
+
+[events.action]
+type = "message_delay"
+ticks = 2
+
+[network]
+base_latency_ms = 1
+latency_variance = "0.0"
+loss_probability = "0.0"
+"#;
+
+    let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
+    let result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("scenario run");
+
+    let image = CodeImage::from_local_types(&local_types, &global);
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owned = machine
+        .load_choreography_owned(&image, "sim/shared-engine-test")
+        .expect("load choreography");
+    let sid = owned.session_id();
+
+    let initial_states = derive_initial_states(&scenario).expect("derive initial states");
+    write_initial_states(&mut machine, sid, &initial_states);
+
+    let middleware = ScenarioMiddleware::from_scenario(
+        &scenario,
+        &PassthroughHandler,
+        machine.clock().tick_duration,
+    )
+    .expect("build middleware");
+    let concurrency = usize::try_from(scenario.concurrency).expect("concurrency fits usize");
+    let max_rounds = scenario
+        .steps
+        .saturating_mul(u64::try_from(local_types.len()).expect("role count fits u64"))
+        .saturating_mul(10);
+    let mut monitor = scenario
+        .property_monitor()
+        .expect("build property monitor")
+        .unwrap_or_else(|| PropertyMonitor::new(Vec::new()));
+
+    let execution = execute_scenario_rounds(
+        &mut machine,
+        &scenario,
+        &middleware,
+        concurrency,
+        max_rounds,
+        |machine, _completed_rounds| {
+            let ctx = PropertyContext {
+                tick: machine.clock().tick,
+                trace: machine.trace(),
+                sessions: machine.sessions(),
+                coroutines: machine.coroutines(),
+            };
+            monitor.check(&ctx);
+            Ok(())
+        },
+    )
+    .expect("shared engine run");
+
+    assert_eq!(execution.rounds_executed, result.stats.rounds_executed);
+    assert_eq!(machine.clock().tick, result.stats.final_tick);
+    assert_eq!(machine.trace(), result.replay.obs_trace.as_slice());
+    assert_eq!(machine.effect_trace(), result.replay.effect_trace.as_slice());
+    assert_eq!(monitor.violations().len(), result.violations.len());
 }

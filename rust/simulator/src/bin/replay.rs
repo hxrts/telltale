@@ -2,12 +2,10 @@
 
 use std::path::PathBuf;
 
-use telltale_machine::{ProtocolMachine, StepResult};
-use telltale_simulator::fault::FaultInjector;
+use telltale_machine::ProtocolMachine;
+use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use telltale_simulator::handler_from_material;
-use telltale_simulator::network::NetworkModel;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
-use telltale_simulator::rng::SimRng;
 use telltale_simulator::scenario::Scenario;
 
 struct ReplayArgs {
@@ -34,95 +32,35 @@ fn main() {
     let concurrency = usize::try_from(scenario.concurrency)
         .unwrap_or_else(|_| fatal("scenario.concurrency exceeds usize"));
 
-    let mut rng = SimRng::new(scenario.seed);
     let mut monitor = scenario
         .property_monitor()
         .unwrap_or_else(|e| fatal(&format!("properties: {e}")))
         .unwrap_or_else(|| PropertyMonitor::new(Vec::new()));
-    let schedule = scenario
-        .fault_schedule()
-        .unwrap_or_else(|e| fatal(&format!("fault schedule: {e}")));
-    let fault = FaultInjector::new(handler.as_ref(), schedule, rng.fork());
+    let middleware = ScenarioMiddleware::from_scenario(
+        &scenario,
+        handler.as_ref(),
+        machine.clock().tick_duration,
+    )
+    .unwrap_or_else(|e| fatal(&format!("middleware setup: {e}")));
 
-    let mut fault_only = None;
-    let mut network = None;
-    if let Some(cfg) = scenario.network_config() {
-        network = Some(NetworkModel::new(
-            fault,
-            cfg,
-            rng.fork(),
-            machine.clock().tick_duration,
-        ));
-    } else {
-        fault_only = Some(fault);
-    }
-
-    let mut rounds_executed = 0_u64;
-    for _ in 0..max_rounds {
-        let next_tick = machine.clock().tick + 1;
-        let next_logical_step = rounds_executed.saturating_add(1);
-        if let Some(net) = &network {
-            net.inner()
-                .tick(next_tick, next_logical_step, machine.trace())
-                .unwrap_or_else(|e| fatal(&format!("fault middleware tick: {e}")));
-            net.inner()
-                .deliver(next_tick, |sid, from, to, val| {
-                    machine
-                        .inject_message(sid, from, to, val)
-                        .map_err(|e| e.to_string())
-                })
-                .unwrap_or_else(|e| fatal(&format!("fault middleware deliver: {e}")));
-            net.set_tick(next_tick);
-            net.deliver(next_tick, |sid, from, to, val| {
-                machine
-                    .inject_message(sid, from, to, val)
-                    .map_err(|e| e.to_string())
-            })
-            .unwrap_or_else(|e| fatal(&format!("network middleware deliver: {e}")));
-            let paused_roles = net
-                .inner()
-                .crashed_roles()
-                .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
-            machine.set_paused_roles(&paused_roles);
-            match machine.step_round(net, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
-                Err(e) => fatal(&format!("machine error: {e}")),
-            }
-        } else {
-            let fault = fault_only
-                .as_ref()
-                .unwrap_or_else(|| fatal("internal replay error: missing fault middleware"));
-            fault
-                .tick(next_tick, next_logical_step, machine.trace())
-                .unwrap_or_else(|e| fatal(&format!("fault middleware tick: {e}")));
-            fault
-                .deliver(next_tick, |sid, from, to, val| {
-                    machine
-                        .inject_message(sid, from, to, val)
-                        .map_err(|e| e.to_string())
-                })
-                .unwrap_or_else(|e| fatal(&format!("fault middleware deliver: {e}")));
-            let paused_roles = fault
-                .crashed_roles()
-                .unwrap_or_else(|e| fatal(&format!("fault middleware crashed_roles: {e}")));
-            machine.set_paused_roles(&paused_roles);
-            match machine.step_round(fault, concurrency) {
-                Ok(StepResult::AllDone | StepResult::Stuck) => break,
-                Ok(StepResult::Continue) => {}
-                Err(e) => fatal(&format!("machine error: {e}")),
-            }
-        }
-        rounds_executed = rounds_executed.saturating_add(1);
-
-        let ctx = PropertyContext {
-            tick: machine.clock().tick,
-            trace: machine.trace(),
-            sessions: machine.sessions(),
-            coroutines: machine.coroutines(),
-        };
-        monitor.check(&ctx);
-    }
+    let _execution = execute_scenario_rounds(
+        &mut machine,
+        &scenario,
+        &middleware,
+        concurrency,
+        max_rounds,
+        |machine, _completed_rounds| {
+            let ctx = PropertyContext {
+                tick: machine.clock().tick,
+                trace: machine.trace(),
+                sessions: machine.sessions(),
+                coroutines: machine.coroutines(),
+            };
+            monitor.check(&ctx);
+            Ok(())
+        },
+    )
+    .unwrap_or_else(|e| fatal(&e));
 
     if monitor.violations().is_empty() {
         println!("replay completed (tick {})", machine.clock().tick);

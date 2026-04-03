@@ -14,6 +14,15 @@ use telltale_machine::model::state::SessionId;
 
 use crate::rng::SimRng;
 
+enum NetworkRoute {
+    Drop,
+    DeliverNow(Value),
+    Defer {
+        delivery_tick: u64,
+        value: Value,
+    },
+}
+
 /// Network simulation configuration.
 #[derive(Debug, Clone)]
 pub struct NetworkConfig {
@@ -251,6 +260,114 @@ impl<H: EffectHandler> NetworkModel<H> {
             .rev()
             .find(|link| link.from == from && link.to == to && Self::link_active(link, tick))
     }
+
+    fn route_payload(
+        &self,
+        tick: u64,
+        _sid: SessionId,
+        from: &str,
+        to: &str,
+        payload: Value,
+    ) -> Result<NetworkRoute, EffectFailure> {
+        if self.is_partitioned(from, to, tick) {
+            return Ok(NetworkRoute::Drop);
+        }
+
+        let mut loss_probability = self.config.loss_probability;
+        let mut base_latency = self.config.base_latency;
+        let mut latency_variance = self.config.latency_variance;
+
+        if let Some(link) = self.link_policy(from, to, tick) {
+            if !link.enabled {
+                return Ok(NetworkRoute::Drop);
+            }
+            if let Some(override_loss) = link.loss_probability {
+                loss_probability = override_loss;
+            }
+            if let Some(override_latency) = link.base_latency {
+                base_latency = override_latency;
+            }
+            if let Some(override_variance) = link.latency_variance {
+                latency_variance = override_variance;
+            }
+        }
+
+        let delay_ticks = {
+            let mut rng = self
+                .lock_rng()
+                .map_err(EffectFailure::contract_violation)?;
+            if rng.should_trigger(loss_probability) {
+                return Ok(NetworkRoute::Drop);
+            }
+            let latency = rng.sample_duration(base_latency, latency_variance);
+            self.latency_ticks(latency)
+        };
+
+        if delay_ticks == 0 {
+            Ok(NetworkRoute::DeliverNow(payload))
+        } else {
+            Ok(NetworkRoute::Defer {
+                delivery_tick: tick.saturating_add(delay_ticks),
+                value: payload,
+            })
+        }
+    }
+
+    fn enqueue_deferred(
+        &self,
+        delivery_tick: u64,
+        sid: SessionId,
+        from: &str,
+        to: &str,
+        value: Value,
+    ) -> Result<(), String> {
+        let mut in_flight = self.lock_in_flight()?;
+        in_flight.push(InFlightMessage {
+            delivery_tick,
+            sid,
+            from: from.to_string(),
+            to: to.to_string(),
+            value,
+        });
+        Ok(())
+    }
+
+    /// Route an already-validated payload through network policy.
+    ///
+    /// This is used by outer middleware layers such as the fault injector when a
+    /// message becomes ready for transport after fault-local delay.
+    pub fn route_external<F>(
+        &self,
+        tick: u64,
+        sid: SessionId,
+        from: &str,
+        to: &str,
+        value: Value,
+        mut inject: F,
+    ) -> Result<(), String>
+    where
+        F: FnMut(SessionId, &str, &str, Value) -> Result<EnqueueResult, String>,
+    {
+        match self
+            .route_payload(tick, sid, from, to, value)
+            .map_err(|failure| failure.to_string())?
+        {
+            NetworkRoute::Drop => Ok(()),
+            NetworkRoute::DeliverNow(value) => match inject(sid, from, to, value.clone()) {
+                Ok(EnqueueResult::Ok | EnqueueResult::Dropped) => Ok(()),
+                Ok(EnqueueResult::WouldBlock | EnqueueResult::Full) => {
+                    self.enqueue_deferred(tick.saturating_add(1), sid, from, to, value)
+                }
+                Err(err) => Err(format!(
+                    "network external route inject failed for edge {from}->{to} (sid={sid}): {err}"
+                )),
+            },
+            NetworkRoute::Defer {
+                delivery_tick,
+                value,
+            } => self.enqueue_deferred(delivery_tick, sid, from, to, value),
+        }
+    }
 }
 
 impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
@@ -279,59 +396,20 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
         };
 
         let tick = self.current_tick.load(Ordering::Relaxed);
-        if self.is_partitioned(role, partner, tick) {
-            return EffectResult::success(SendDecision::Drop);
+        match self.route_payload(tick, sid, role, partner, payload) {
+            Ok(NetworkRoute::Drop) => EffectResult::success(SendDecision::Drop),
+            Ok(NetworkRoute::DeliverNow(payload)) => {
+                EffectResult::success(SendDecision::Deliver(payload))
+            }
+            Ok(NetworkRoute::Defer {
+                delivery_tick,
+                value,
+            }) => match self.enqueue_deferred(delivery_tick, sid, role, partner, value) {
+                Ok(()) => EffectResult::success(SendDecision::Defer),
+                Err(err) => EffectResult::failure(EffectFailure::contract_violation(err)),
+            },
+            Err(failure) => EffectResult::failure(failure),
         }
-
-        let mut loss_probability = self.config.loss_probability;
-        let mut base_latency = self.config.base_latency;
-        let mut latency_variance = self.config.latency_variance;
-
-        if let Some(link) = self.link_policy(role, partner, tick) {
-            if !link.enabled {
-                return EffectResult::success(SendDecision::Drop);
-            }
-            if let Some(override_loss) = link.loss_probability {
-                loss_probability = override_loss;
-            }
-            if let Some(override_latency) = link.base_latency {
-                base_latency = override_latency;
-            }
-            if let Some(override_variance) = link.latency_variance {
-                latency_variance = override_variance;
-            }
-        }
-
-        let delay_ticks = {
-            let mut rng = match self.lock_rng() {
-                Ok(rng) => rng,
-                Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
-            };
-            if rng.should_trigger(loss_probability) {
-                return EffectResult::success(SendDecision::Drop);
-            }
-            let latency = rng.sample_duration(base_latency, latency_variance);
-            self.latency_ticks(latency)
-        };
-
-        if delay_ticks == 0 {
-            return EffectResult::success(SendDecision::Deliver(payload));
-        }
-
-        let delivery_tick = tick.saturating_add(delay_ticks);
-        let mut in_flight = match self.lock_in_flight() {
-            Ok(in_flight) => in_flight,
-            Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
-        };
-        in_flight.push(InFlightMessage {
-            delivery_tick,
-            sid,
-            from: role.to_string(),
-            to: partner.to_string(),
-            value: payload,
-        });
-
-        EffectResult::success(SendDecision::Defer)
     }
 
     fn handle_recv(
@@ -585,5 +663,79 @@ mod tests {
     fn exact_zero_latency_stays_zero_ticks() {
         let model = model(NetworkConfig::default());
         assert_eq!(model.latency_ticks(Duration::ZERO), 0);
+    }
+
+    #[test]
+    fn external_route_respects_disabled_link_policy() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: None,
+                end_tick: None,
+                enabled: false,
+                base_latency: None,
+                latency_variance: None,
+                loss_probability: None,
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(3);
+
+        let mut injected = false;
+        model
+            .route_external(3, 0, "A", "B", Value::Nat(7), |_sid, _from, _to, _value| {
+                injected = true;
+                Ok(EnqueueResult::Ok)
+            })
+            .expect("external route should succeed");
+
+        assert!(!injected, "disabled link should drop externally routed payloads");
+    }
+
+    #[test]
+    fn external_route_with_latency_enters_network_in_flight_queue() {
+        let config = NetworkConfig {
+            links: vec![LinkPolicy {
+                from: "A".to_string(),
+                to: "B".to_string(),
+                start_tick: None,
+                end_tick: None,
+                enabled: true,
+                base_latency: Some(Duration::from_millis(10)),
+                latency_variance: Some(FixedQ32::zero()),
+                loss_probability: Some(FixedQ32::zero()),
+            }],
+            ..NetworkConfig::default()
+        };
+        let model = model(config);
+        model.set_tick(1);
+
+        model
+            .route_external(1, 0, "A", "B", Value::Nat(9), |_sid, _from, _to, _value| {
+                Ok(EnqueueResult::Ok)
+            })
+            .expect("external route should enqueue");
+
+        let mut delivered = Vec::new();
+        model
+            .deliver(5, |sid, from, to, value| {
+                delivered.push((sid, from.to_string(), to.to_string(), value));
+                Ok(EnqueueResult::Ok)
+            })
+            .expect("deliver before deadline");
+        assert!(delivered.is_empty(), "message should still be delayed");
+
+        model
+            .deliver(11, |sid, from, to, value| {
+                delivered.push((sid, from.to_string(), to.to_string(), value));
+                Ok(EnqueueResult::Ok)
+            })
+            .expect("deliver after deadline");
+        assert_eq!(delivered.len(), 1);
+        assert_eq!(delivered[0].1, "A");
+        assert_eq!(delivered[0].2, "B");
+        assert_eq!(delivered[0].3, Value::Nat(9));
     }
 }
