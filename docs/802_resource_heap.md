@@ -133,7 +133,7 @@ pub enum HeapError<H: Hasher = DefaultContentHasher> {
 In the current implementation, `NotFound` and `AlreadyConsumed` are the main operational cases returned by heap methods.
 `AlreadyExists` and `TypeMismatch` are part of the public error vocabulary but are not heavily exercised by the basic heap operations shown above.
 
-## Serialization and Hashing Notes
+## Encoding and Hashing Guarantees
 
 The heap uses a versioned canonical binary format for resources.
 Every canonical heap value starts with the `TTHP` magic prefix, a little-endian encoding version, and a one-byte type tag.
@@ -151,7 +151,7 @@ The heap canonical format is still runtime-local.
 It is not the same artifact encoding used by `telltale-types::Contentable`.
 See [Heap Encoding and Commitments](808_heap_encoding_commitments.md) for the byte-level contract.
 
-## Determinism Notes
+## Determinism Contract
 
 Heap operations are deterministic by contract.
 Active-resource ordering follows `ResourceId` ordering in the heap `BTreeMap`.

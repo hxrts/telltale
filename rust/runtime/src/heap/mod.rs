@@ -4,10 +4,12 @@
 //!
 //! ## Overview
 //!
-//! This module provides content-addressed resources and a deterministic heap
+//! This module provides canonically encoded resources and a deterministic heap
 //! for managing protocol state. Key features:
 //!
 //! - **Hash-Policy Reuse**: Resource IDs use the shared `Hasher` abstraction
+//! - **Canonical Encoding**: Resource identity and leaf hashing use versioned
+//!   heap-local encodings and tagged preimages
 //! - **Nullifier Tracking**: Consumed resources are tracked to prevent double-spending
 //! - **Deterministic Operations**: Same operations produce identical results
 //! - **Functional and Mutable APIs**: Both persistent and in-place update paths exist

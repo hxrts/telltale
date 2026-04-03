@@ -73,7 +73,8 @@ pub use topology::{
 };
 pub use util::{spawn, spawn_local};
 
-// Re-export heap types for resource management
+// Re-export heap types for resource management, canonical encoding, and
+// vector-stable hashing helpers.
 pub use heap::{
     CanonicalHeapEncoder, CanonicalHeapEncoding, ChannelState, DefaultHeapHasher, Direction,
     Hasher, Heap, HeapCommitment, HeapError, MerkleProof, MerkleTree, Message as HeapMessage,

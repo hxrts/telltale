@@ -119,6 +119,7 @@ It provides the async `ChoreoHandler` path, effect interpretation, topology and 
 
 This crate also re-exports parts of the shared frontend for convenience, but it does not replace `telltale-language` as the canonical frontend layer.
 Its `util/` module now contains platform-facing helpers such as spawn, clock, RNG, and synchronization support.
+Its `heap/` module now includes a dedicated `encoding.rs` layer for canonical heap bytes and tagged hashing preimages, plus published conformance vectors in `rust/runtime/tests/data/heap_vectors_v1.json`.
 
 ### telltale-bridge
 
