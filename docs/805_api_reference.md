@@ -62,7 +62,8 @@ Key exports:
 - Effect system: `Program`, `ProgramBuilder`, `interpret`
 - Handlers: `ChoreoHandler`, `InMemoryHandler`, `TelltaleHandler`
 - Topology: `Topology`, `TopologyHandler`, `TransportType`
-- Heap: `Heap`, `Resource`, `MerkleTree`, `HeapCommitment`
+- Heap: `Heap`, `DefaultHeapHasher`, `Hasher`, `Resource`, `ResourceId`,
+  `MerkleTree`, `HeapCommitment`
 - Extensions: `ExtensionRegistry`, `GrammarExtension`, `ProtocolExtension`
 
 See `rust/runtime/src/lib.rs` for the full export surface.

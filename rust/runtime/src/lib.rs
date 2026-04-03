@@ -75,8 +75,9 @@ pub use util::{spawn, spawn_local};
 
 // Re-export heap types for resource management
 pub use heap::{
-    ChannelState, Direction, Heap, HeapCommitment, HeapError, MerkleProof, MerkleTree,
-    Message as HeapMessage, MessagePayload, ProofStep, Resource, ResourceId,
+    ChannelState, DefaultHeapHasher, Direction, Hasher, Heap, HeapCommitment, HeapError,
+    MerkleProof, MerkleTree, Message as HeapMessage, MessagePayload, ProofStep, Resource,
+    ResourceId,
 };
 
 // Re-export testing types for protocol testing

@@ -15,7 +15,8 @@
 
 use super::heap_impl::Heap;
 use super::resource::{Resource, ResourceId};
-use sha2::{Digest, Sha256};
+use std::marker::PhantomData;
+use telltale_types::{DefaultContentHasher, Hasher};
 
 /// Direction in a Merkle proof path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,81 +29,86 @@ pub enum Direction {
 
 /// A single step in a Merkle proof.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProofStep {
+pub struct ProofStep<H: Hasher = DefaultContentHasher> {
     /// Direction: is this node a left or right sibling?
     pub direction: Direction,
     /// The sibling hash at this level
-    pub sibling_hash: [u8; 32],
+    pub sibling_hash: H::Digest,
 }
 
 /// A Merkle inclusion proof.
 ///
 /// The proof consists of sibling hashes from leaf to root.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MerkleProof {
+pub struct MerkleProof<H: Hasher = DefaultContentHasher> {
     /// The leaf hash being proven
-    pub leaf_hash: [u8; 32],
+    pub leaf_hash: H::Digest,
     /// Proof path from leaf to root
-    pub path: Vec<ProofStep>,
+    pub path: Vec<ProofStep<H>>,
     /// The expected root hash
-    pub root: [u8; 32],
+    pub root: H::Digest,
 }
 
-impl MerkleProof {
+impl<H: Hasher> MerkleProof<H> {
     /// Verify this proof.
     pub fn verify(&self) -> bool {
         let computed_root =
             self.path
                 .iter()
-                .fold(self.leaf_hash, |current, step| match step.direction {
-                    Direction::Left => hash_pair(&step.sibling_hash, &current),
-                    Direction::Right => hash_pair(&current, &step.sibling_hash),
+                .fold(self.leaf_hash.clone(), |current, step| {
+                    match step.direction {
+                        Direction::Left => hash_pair::<H>(&step.sibling_hash, &current),
+                        Direction::Right => hash_pair::<H>(&current, &step.sibling_hash),
+                    }
                 });
         computed_root == self.root
     }
 }
 
 /// Hash two child hashes to get parent hash.
-fn hash_pair(left: &[u8; 32], right: &[u8; 32]) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(left);
-    hasher.update(right);
-    hasher.finalize().into()
+fn hash_pair<H: Hasher>(left: &H::Digest, right: &H::Digest) -> H::Digest {
+    let mut bytes = Vec::with_capacity(left.as_ref().len() + right.as_ref().len());
+    bytes.extend_from_slice(left.as_ref());
+    bytes.extend_from_slice(right.as_ref());
+    H::digest(&bytes)
 }
 
-/// Compute hash of a (ResourceId, Resource) leaf.
-fn hash_leaf(rid: &ResourceId, resource: &Resource) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(rid.hash());
-    hasher.update(resource.to_bytes());
-    hasher.finalize().into()
+/// Compute hash of a `(ResourceId, Resource)` leaf.
+fn hash_leaf<H: Hasher>(rid: &ResourceId<H>, resource: &Resource) -> H::Digest {
+    let resource_bytes = resource.to_bytes();
+    let mut bytes = Vec::with_capacity(rid.as_bytes().len() + resource_bytes.len());
+    bytes.extend_from_slice(rid.as_bytes());
+    bytes.extend_from_slice(&resource_bytes);
+    H::digest(&bytes)
 }
 
 /// Empty tree root (hash of empty).
-fn empty_root() -> [u8; 32] {
-    Sha256::digest([]).into()
+fn empty_root<H: Hasher>() -> H::Digest {
+    H::digest(&[])
 }
 
 /// Merkle tree structure for efficient proof generation.
 #[derive(Debug, Clone)]
-pub struct MerkleTree {
+pub struct MerkleTree<H: Hasher = DefaultContentHasher> {
     /// Root hash
-    pub root: [u8; 32],
+    pub root: H::Digest,
     /// Leaf hashes in order
-    leaves: Vec<[u8; 32]>,
+    leaves: Vec<H::Digest>,
     /// Internal nodes (for proof generation)
     /// Stored level by level, bottom up
-    levels: Vec<Vec<[u8; 32]>>,
+    levels: Vec<Vec<H::Digest>>,
+    _hasher: PhantomData<H>,
 }
 
-impl MerkleTree {
+impl<H: Hasher> MerkleTree<H> {
     /// Build a Merkle tree from a list of leaf hashes.
-    pub fn from_leaves(leaves: Vec<[u8; 32]>) -> Self {
+    pub fn from_leaves(leaves: Vec<H::Digest>) -> Self {
         if leaves.is_empty() {
             return Self {
-                root: empty_root(),
+                root: empty_root::<H>(),
                 leaves: Vec::new(),
                 levels: Vec::new(),
+                _hasher: PhantomData,
             };
         }
 
@@ -110,36 +116,34 @@ impl MerkleTree {
         let mut current_level = leaves.clone();
 
         while current_level.len() > 1 {
-            // Pad to even if needed
             if current_level.len() % 2 == 1 {
-                // Safety: current_level is non-empty (len > 1 checked above)
-                current_level.push(*current_level.last().expect("non-empty after len check"));
+                current_level.push(current_level.last().expect("non-empty level").clone());
             }
 
-            // Compute next level
-            let next_level: Vec<[u8; 32]> = current_level
+            let next_level: Vec<H::Digest> = current_level
                 .chunks(2)
-                .map(|pair| hash_pair(&pair[0], &pair[1]))
+                .map(|pair| hash_pair::<H>(&pair[0], &pair[1]))
                 .collect();
 
             levels.push(next_level.clone());
             current_level = next_level;
         }
 
-        let root = current_level[0];
+        let root = current_level[0].clone();
 
         Self {
             root,
             leaves,
             levels,
+            _hasher: PhantomData,
         }
     }
 
     /// Build a Merkle tree from a heap.
-    pub fn from_heap(heap: &Heap) -> Self {
-        let leaves: Vec<[u8; 32]> = heap
+    pub fn from_heap(heap: &Heap<H>) -> Self {
+        let leaves: Vec<H::Digest> = heap
             .active_resources()
-            .map(|(rid, resource)| hash_leaf(rid, resource))
+            .map(|(rid, resource)| hash_leaf::<H>(rid, resource))
             .collect();
         Self::from_leaves(leaves)
     }
@@ -150,12 +154,12 @@ impl MerkleTree {
     }
 
     /// Generate an inclusion proof for a leaf at the given index.
-    pub fn prove(&self, index: usize) -> Option<MerkleProof> {
+    pub fn prove(&self, index: usize) -> Option<MerkleProof<H>> {
         if index >= self.leaves.len() {
             return None;
         }
 
-        let leaf_hash = self.leaves[index];
+        let leaf_hash = self.leaves[index].clone();
         let mut path = Vec::new();
         let mut current_index = index;
 
@@ -166,11 +170,10 @@ impl MerkleTree {
                 current_index - 1
             };
 
-            // Handle odd-length levels (last element duplicated)
             let sibling_hash = if sibling_index < level.len() {
-                level[sibling_index]
+                level[sibling_index].clone()
             } else {
-                level[current_index]
+                level[current_index].clone()
             };
 
             let direction = if current_index % 2 == 0 {
@@ -190,33 +193,34 @@ impl MerkleTree {
         Some(MerkleProof {
             leaf_hash,
             path,
-            root: self.root,
+            root: self.root.clone(),
         })
     }
 }
 
 /// Commitment to heap state (roots + counter).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct HeapCommitment {
+pub struct HeapCommitment<H: Hasher = DefaultContentHasher> {
     /// Merkle root of resources
-    pub resource_root: [u8; 32],
+    pub resource_root: H::Digest,
     /// Merkle root of nullifiers
-    pub nullifier_root: [u8; 32],
+    pub nullifier_root: H::Digest,
     /// Allocation counter
     pub counter: u64,
 }
 
-impl HeapCommitment {
+impl<H: Hasher> HeapCommitment<H> {
     /// Compute commitment from a heap.
-    pub fn from_heap(heap: &Heap) -> Self {
-        let resource_leaves: Vec<[u8; 32]> = heap
+    pub fn from_heap(heap: &Heap<H>) -> Self {
+        let resource_leaves: Vec<H::Digest> = heap
             .active_resources()
-            .map(|(rid, resource)| hash_leaf(rid, resource))
+            .map(|(rid, resource)| hash_leaf::<H>(rid, resource))
             .collect();
-        let resource_tree = MerkleTree::from_leaves(resource_leaves);
+        let resource_tree = MerkleTree::<H>::from_leaves(resource_leaves);
 
-        let nullifier_leaves: Vec<[u8; 32]> = heap.consumed_ids().map(|rid| rid.hash()).collect();
-        let nullifier_tree = MerkleTree::from_leaves(nullifier_leaves);
+        let nullifier_leaves: Vec<H::Digest> =
+            heap.consumed_ids().map(|rid| rid.hash().clone()).collect();
+        let nullifier_tree = MerkleTree::<H>::from_leaves(nullifier_leaves);
 
         Self {
             resource_root: resource_tree.root,
@@ -226,53 +230,58 @@ impl HeapCommitment {
     }
 
     /// Hash this commitment to a single value.
-    pub fn hash(&self) -> [u8; 32] {
-        let mut hasher = Sha256::new();
-        hasher.update(self.resource_root);
-        hasher.update(self.nullifier_root);
-        hasher.update(self.counter.to_le_bytes());
-        hasher.finalize().into()
+    pub fn hash(&self) -> H::Digest {
+        let mut bytes = Vec::with_capacity(
+            self.resource_root.as_ref().len() + self.nullifier_root.as_ref().len() + 8,
+        );
+        bytes.extend_from_slice(self.resource_root.as_ref());
+        bytes.extend_from_slice(self.nullifier_root.as_ref());
+        bytes.extend_from_slice(&self.counter.to_le_bytes());
+        H::digest(&bytes)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use telltale_types::DefaultContentHasher;
 
     #[test]
     fn test_empty_tree() {
-        let tree = MerkleTree::from_leaves(vec![]);
-        assert_eq!(tree.root, empty_root());
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(vec![]);
+        assert_eq!(tree.root, empty_root::<DefaultContentHasher>());
         assert_eq!(tree.size(), 0);
     }
 
     #[test]
     fn test_single_leaf() {
-        let leaf = Sha256::digest(b"hello").into();
-        let tree = MerkleTree::from_leaves(vec![leaf]);
+        let leaf = DefaultContentHasher::digest(b"hello");
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(vec![leaf]);
         assert_eq!(tree.root, leaf);
         assert_eq!(tree.size(), 1);
     }
 
     #[test]
     fn test_two_leaves() {
-        let leaf1: [u8; 32] = Sha256::digest(b"hello").into();
-        let leaf2: [u8; 32] = Sha256::digest(b"world").into();
-        let tree = MerkleTree::from_leaves(vec![leaf1, leaf2]);
+        let leaf1 = DefaultContentHasher::digest(b"hello");
+        let leaf2 = DefaultContentHasher::digest(b"world");
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(vec![leaf1, leaf2]);
 
-        let expected_root = hash_pair(&leaf1, &leaf2);
+        let expected_root = hash_pair::<DefaultContentHasher>(&leaf1, &leaf2);
         assert_eq!(tree.root, expected_root);
         assert_eq!(tree.size(), 2);
     }
 
     #[test]
     fn test_four_leaves() {
-        let leaves: Vec<[u8; 32]> = (0_u8..4).map(|i| Sha256::digest([i]).into()).collect();
-        let tree = MerkleTree::from_leaves(leaves.clone());
+        let leaves: Vec<_> = (0_u8..4)
+            .map(|i| DefaultContentHasher::digest(&[i]))
+            .collect();
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(leaves.clone());
 
-        let h01 = hash_pair(&leaves[0], &leaves[1]);
-        let h23 = hash_pair(&leaves[2], &leaves[3]);
-        let expected_root = hash_pair(&h01, &h23);
+        let h01 = hash_pair::<DefaultContentHasher>(&leaves[0], &leaves[1]);
+        let h23 = hash_pair::<DefaultContentHasher>(&leaves[2], &leaves[3]);
+        let expected_root = hash_pair::<DefaultContentHasher>(&h01, &h23);
 
         assert_eq!(tree.root, expected_root);
         assert_eq!(tree.size(), 4);
@@ -280,8 +289,10 @@ mod tests {
 
     #[test]
     fn test_proof_generation_and_verification() {
-        let leaves: Vec<[u8; 32]> = (0_u8..4).map(|i| Sha256::digest([i]).into()).collect();
-        let tree = MerkleTree::from_leaves(leaves);
+        let leaves: Vec<_> = (0_u8..4)
+            .map(|i| DefaultContentHasher::digest(&[i]))
+            .collect();
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(leaves);
 
         for i in 0..4 {
             let proof = tree.prove(i).expect("should generate proof");
@@ -291,8 +302,10 @@ mod tests {
 
     #[test]
     fn test_proof_for_out_of_bounds() {
-        let leaves: Vec<[u8; 32]> = (0_u8..4).map(|i| Sha256::digest([i]).into()).collect();
-        let tree = MerkleTree::from_leaves(leaves);
+        let leaves: Vec<_> = (0_u8..4)
+            .map(|i| DefaultContentHasher::digest(&[i]))
+            .collect();
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(leaves);
 
         assert!(tree.prove(4).is_none());
         assert!(tree.prove(100).is_none());
@@ -300,10 +313,11 @@ mod tests {
 
     #[test]
     fn test_odd_number_of_leaves() {
-        let leaves: Vec<[u8; 32]> = (0_u8..3).map(|i| Sha256::digest([i]).into()).collect();
-        let tree = MerkleTree::from_leaves(leaves);
+        let leaves: Vec<_> = (0_u8..3)
+            .map(|i| DefaultContentHasher::digest(&[i]))
+            .collect();
+        let tree = MerkleTree::<DefaultContentHasher>::from_leaves(leaves);
 
-        // Should still work with 3 leaves
         for i in 0..3 {
             let proof = tree.prove(i).expect("should generate proof");
             assert!(proof.verify(), "proof for leaf {} should verify", i);
@@ -312,37 +326,35 @@ mod tests {
 
     #[test]
     fn test_heap_merkle_root() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let (_, heap) = heap.alloc_channel("Alice", "Bob");
         let (_, heap) = heap.alloc_message("Alice", "Bob", "Hello", vec![], 0);
 
-        let root = MerkleTree::from_heap(&heap).root;
-        assert_ne!(root, empty_root());
+        let root = MerkleTree::<DefaultContentHasher>::from_heap(&heap).root;
+        assert_ne!(root, empty_root::<DefaultContentHasher>());
     }
 
     #[test]
     fn test_heap_commitment() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let (rid, heap) = heap.alloc_channel("Alice", "Bob");
         let heap = heap.consume(&rid).unwrap();
 
-        let commitment = HeapCommitment::from_heap(&heap);
+        let commitment = HeapCommitment::<DefaultContentHasher>::from_heap(&heap);
 
-        // Resource root should be empty (resource consumed)
-        // Nullifier root should not be empty (has consumed ID)
         assert_eq!(commitment.counter, 1);
     }
 
     #[test]
     fn test_commitment_determinism() {
-        let heap1 = Heap::new();
+        let heap1 = Heap::<DefaultContentHasher>::new();
         let (_, heap1) = heap1.alloc_channel("Alice", "Bob");
 
-        let heap2 = Heap::new();
+        let heap2 = Heap::<DefaultContentHasher>::new();
         let (_, heap2) = heap2.alloc_channel("Alice", "Bob");
 
-        let c1 = HeapCommitment::from_heap(&heap1);
-        let c2 = HeapCommitment::from_heap(&heap2);
+        let c1 = HeapCommitment::<DefaultContentHasher>::from_heap(&heap1);
+        let c2 = HeapCommitment::<DefaultContentHasher>::from_heap(&heap2);
 
         assert_eq!(c1, c2);
         assert_eq!(c1.hash(), c2.hash());

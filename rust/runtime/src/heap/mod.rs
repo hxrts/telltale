@@ -7,10 +7,10 @@
 //! This module provides content-addressed resources and a deterministic heap
 //! for managing protocol state. Key features:
 //!
-//! - **Content Addressing**: Resources are identified by their content hash
+//! - **Hash-Policy Reuse**: Resource IDs use the shared `Hasher` abstraction
 //! - **Nullifier Tracking**: Consumed resources are tracked to prevent double-spending
 //! - **Deterministic Operations**: Same operations produce identical results
-//! - **Immutable API**: All operations return new heaps (functional style)
+//! - **Functional and Mutable APIs**: Both persistent and in-place update paths exist
 //!
 //! ## Lean Correspondence
 //!
@@ -20,10 +20,10 @@
 //! ## Example
 //!
 //! ```rust
-//! use telltale_runtime::heap::{Heap, Resource};
+//! use telltale_runtime::heap::{DefaultHeapHasher, Heap, Resource};
 //!
 //! // Create a new heap
-//! let heap = Heap::new();
+//! let heap = Heap::<DefaultHeapHasher>::new();
 //!
 //! // Allocate a channel resource
 //! let (channel_id, heap) = heap.alloc_channel("Alice", "Bob");
@@ -50,3 +50,4 @@ mod resource;
 pub use heap_impl::Heap;
 pub use merkle::{Direction, HeapCommitment, MerkleProof, MerkleTree, ProofStep};
 pub use resource::{ChannelState, HeapError, Message, MessagePayload, Resource, ResourceId};
+pub use telltale_types::{DefaultContentHasher as DefaultHeapHasher, Hasher};

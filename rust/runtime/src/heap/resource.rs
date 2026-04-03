@@ -16,44 +16,54 @@
 //! Resource concepts correspond to `lean/Runtime/Resources/ResourceModel.lean`.
 //! The specific Rust types (`ResourceId`, `Resource`, `HeapError`) are Rust-only.
 
-use sha2::{Digest, Sha256};
 use std::fmt;
+use std::hash::{Hash, Hasher as StdHasher};
+use std::marker::PhantomData;
+use telltale_types::{DefaultContentHasher, Hasher};
 
 /// Unique identifier for heap-allocated resources.
 ///
 /// ResourceId is derived from the content hash of the resource,
 /// combined with an allocation counter to ensure uniqueness even
 /// for identical content.
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ResourceId {
-    /// The content hash (SHA-256)
-    hash: [u8; 32],
+#[derive(Clone)]
+pub struct ResourceId<H: Hasher = DefaultContentHasher> {
+    /// The hashed resource identity
+    hash: H::Digest,
     /// Allocation counter (for uniqueness of identical content)
     counter: u64,
+    _hasher: PhantomData<H>,
 }
 
-impl ResourceId {
+impl<H: Hasher> ResourceId<H> {
     /// Create a new ResourceId from hash and counter.
-    pub fn new(hash: [u8; 32], counter: u64) -> Self {
-        Self { hash, counter }
+    pub fn new(hash: H::Digest, counter: u64) -> Self {
+        Self {
+            hash,
+            counter,
+            _hasher: PhantomData,
+        }
     }
 
     /// Create a ResourceId from a resource and allocation counter.
     pub fn from_resource(resource: &Resource, counter: u64) -> Self {
         let content_bytes = resource.to_bytes();
         let counter_bytes = counter.to_le_bytes();
+        let mut bytes = Vec::with_capacity(content_bytes.len() + counter_bytes.len());
+        bytes.extend_from_slice(&content_bytes);
+        bytes.extend_from_slice(&counter_bytes);
+        let hash = H::digest(&bytes);
 
-        let mut hasher = Sha256::new();
-        hasher.update(content_bytes);
-        hasher.update(counter_bytes);
-        let hash: [u8; 32] = hasher.finalize().into();
-
-        Self { hash, counter }
+        Self {
+            hash,
+            counter,
+            _hasher: PhantomData,
+        }
     }
 
     /// Display as a short hex string.
     pub fn to_short_hex(&self) -> String {
-        let hex: String = self.hash[..4]
+        let hex: String = self.hash.as_ref()[..4]
             .iter()
             .map(|b| format!("{:02x}", b))
             .collect();
@@ -62,8 +72,14 @@ impl ResourceId {
 
     /// Get the raw hash bytes.
     #[must_use]
-    pub fn hash(&self) -> [u8; 32] {
-        self.hash
+    pub fn hash(&self) -> &H::Digest {
+        &self.hash
+    }
+
+    /// Get the raw hash bytes as a slice.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.hash.as_ref()
     }
 
     /// Get the allocation counter.
@@ -73,27 +89,47 @@ impl ResourceId {
     }
 }
 
-impl fmt::Debug for ResourceId {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ResourceId({})", self.to_short_hex())
+impl<H: Hasher> PartialEq for ResourceId<H> {
+    fn eq(&self, other: &Self) -> bool {
+        self.hash.as_ref() == other.hash.as_ref() && self.counter == other.counter
     }
 }
 
-impl fmt::Display for ResourceId {
+impl<H: Hasher> Eq for ResourceId<H> {}
+
+impl<H: Hasher> Hash for ResourceId<H> {
+    fn hash<S: StdHasher>(&self, state: &mut S) {
+        self.hash.as_ref().hash(state);
+        self.counter.hash(state);
+    }
+}
+
+impl<H: Hasher> fmt::Debug for ResourceId<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ResourceId<{}>({})",
+            H::algorithm_name(),
+            self.to_short_hex()
+        )
+    }
+}
+
+impl<H: Hasher> fmt::Display for ResourceId<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_short_hex())
     }
 }
 
-impl PartialOrd for ResourceId {
+impl<H: Hasher> PartialOrd for ResourceId<H> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for ResourceId {
+impl<H: Hasher> Ord for ResourceId<H> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.hash.cmp(&other.hash) {
+        match self.hash.as_ref().cmp(other.hash.as_ref()) {
             std::cmp::Ordering::Equal => self.counter.cmp(&other.counter),
             ord => ord,
         }
@@ -297,21 +333,37 @@ impl fmt::Display for Resource {
 }
 
 /// Errors that can occur during heap operations.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum HeapError {
+#[derive(Clone, PartialEq, Eq)]
+pub enum HeapError<H: Hasher = DefaultContentHasher> {
     /// Resource not found in heap
-    NotFound(ResourceId),
+    NotFound(ResourceId<H>),
     /// Resource already consumed (nullified)
-    AlreadyConsumed(ResourceId),
+    AlreadyConsumed(ResourceId<H>),
     /// Resource already exists with this ID
-    AlreadyExists(ResourceId),
+    AlreadyExists(ResourceId<H>),
     /// Invalid resource type for operation
     TypeMismatch { expected: String, got: String },
     /// Generic error with message
     Other(String),
 }
 
-impl fmt::Display for HeapError {
+impl<H: Hasher> fmt::Debug for HeapError<H> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            HeapError::NotFound(rid) => f.debug_tuple("NotFound").field(rid).finish(),
+            HeapError::AlreadyConsumed(rid) => f.debug_tuple("AlreadyConsumed").field(rid).finish(),
+            HeapError::AlreadyExists(rid) => f.debug_tuple("AlreadyExists").field(rid).finish(),
+            HeapError::TypeMismatch { expected, got } => f
+                .debug_struct("TypeMismatch")
+                .field("expected", expected)
+                .field("got", got)
+                .finish(),
+            HeapError::Other(msg) => f.debug_tuple("Other").field(msg).finish(),
+        }
+    }
+}
+
+impl<H: Hasher> fmt::Display for HeapError<H> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             HeapError::NotFound(rid) => write!(f, "Resource not found: {}", rid),
@@ -325,20 +377,21 @@ impl fmt::Display for HeapError {
     }
 }
 
-impl std::error::Error for HeapError {}
+impl<H: Hasher> std::error::Error for HeapError<H> {}
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use telltale_types::{Blake3Hasher, DefaultContentHasher, Hasher};
 
     #[test]
     fn test_resource_id_creation() {
         let r1 = Resource::channel("Alice", "Bob");
         let r2 = Resource::channel("Alice", "Bob");
 
-        let id1 = ResourceId::from_resource(&r1, 0);
-        let id2 = ResourceId::from_resource(&r2, 0);
-        let id3 = ResourceId::from_resource(&r1, 1);
+        let id1 = ResourceId::<DefaultContentHasher>::from_resource(&r1, 0);
+        let id2 = ResourceId::<DefaultContentHasher>::from_resource(&r2, 0);
+        let id3 = ResourceId::<DefaultContentHasher>::from_resource(&r1, 1);
 
         // Same resource, same counter → same ID
         assert_eq!(id1, id2);
@@ -348,11 +401,10 @@ mod tests {
 
     #[test]
     fn test_resource_id_ordering() {
-        let r = Resource::channel("Alice", "Bob");
-        let id1 = ResourceId::from_resource(&r, 0);
-        let id2 = ResourceId::from_resource(&r, 1);
+        let id1 = ResourceId::<DefaultContentHasher>::new([0u8; 32], 0);
+        let id2 = ResourceId::<DefaultContentHasher>::new([0u8; 32], 1);
 
-        // Same hash, different counter
+        // When the digest matches, ordering falls back to the counter.
         assert!(id1 < id2);
     }
 
@@ -387,8 +439,15 @@ mod tests {
 
     #[test]
     fn test_heap_error_display() {
-        let rid = ResourceId::new([0u8; 32], 42);
+        let rid = ResourceId::<DefaultContentHasher>::new([0u8; 32], 42);
         let err = HeapError::NotFound(rid);
         assert!(err.to_string().contains("not found"));
+    }
+
+    #[test]
+    fn test_default_heap_hasher_is_blake3() {
+        let expected = Blake3Hasher::digest(b"heap");
+        let actual = DefaultContentHasher::digest(b"heap");
+        assert_eq!(expected, actual);
     }
 }

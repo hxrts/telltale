@@ -8,7 +8,7 @@
 //! The heap uses BTreeMap/BTreeSet for O(log n) operations with deterministic iteration order.
 //!
 //! Key properties:
-//! - **Immutable API**: All operations return new heaps (functional style)
+//! - **Functional and Mutable APIs**: Both persistent and in-place update paths exist
 //! - **Deterministic**: Same operations produce identical results
 //! - **Content-addressed**: Resources identified by content hash
 //! - **Nullifier tracking**: Consumed resources are tracked to prevent double-spending
@@ -20,28 +20,31 @@
 
 use super::resource::{HeapError, Resource, ResourceId};
 use std::collections::{BTreeMap, BTreeSet};
+use telltale_types::{DefaultContentHasher, Hasher};
 
 /// Deterministic heap for protocol resources.
 ///
 /// Uses BTreeMap for O(log n) operations with deterministic iteration order.
 /// The nullifiers set tracks consumed resources to prevent double-spending.
 #[derive(Debug, Clone, Default)]
-pub struct Heap {
+pub struct Heap<H: Hasher = DefaultContentHasher> {
     /// Map from ResourceId to Resource
-    resources: BTreeMap<ResourceId, Resource>,
+    resources: BTreeMap<ResourceId<H>, Resource>,
     /// Set of consumed (nullified) resource IDs
-    nullifiers: BTreeSet<ResourceId>,
+    nullifiers: BTreeSet<ResourceId<H>>,
     /// Counter for generating unique ResourceIds
     counter: u64,
 }
 
-impl Heap {
+impl<H: Hasher> Heap<H> {
     /// Create an empty heap.
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Get the number of active (non-nullified) resources.
+    /// Get the number of retained resource entries.
+    ///
+    /// Consumed resources are still retained until removed explicitly.
     pub fn size(&self) -> usize {
         self.resources.len()
     }
@@ -52,17 +55,17 @@ impl Heap {
     }
 
     /// Check if a resource exists in the heap (not necessarily active).
-    pub fn contains(&self, rid: &ResourceId) -> bool {
+    pub fn contains(&self, rid: &ResourceId<H>) -> bool {
         self.resources.contains_key(rid)
     }
 
     /// Check if a resource has been consumed (nullified).
-    pub fn is_consumed(&self, rid: &ResourceId) -> bool {
+    pub fn is_consumed(&self, rid: &ResourceId<H>) -> bool {
         self.nullifiers.contains(rid)
     }
 
     /// Check if a resource is active (exists and not consumed).
-    pub fn is_active(&self, rid: &ResourceId) -> bool {
+    pub fn is_active(&self, rid: &ResourceId<H>) -> bool {
         self.contains(rid) && !self.is_consumed(rid)
     }
 
@@ -75,8 +78,8 @@ impl Heap {
     ///
     /// Returns the new ResourceId and updated heap.
     /// The ResourceId is derived from the resource content and allocation counter.
-    pub fn alloc(&self, resource: Resource) -> (ResourceId, Heap) {
-        let rid = ResourceId::from_resource(&resource, self.counter);
+    pub fn alloc(&self, resource: Resource) -> (ResourceId<H>, Heap<H>) {
+        let rid = ResourceId::<H>::from_resource(&resource, self.counter);
         let mut new_heap = self.clone();
         new_heap.resources.insert(rid.clone(), resource);
         new_heap.counter += 1;
@@ -84,8 +87,8 @@ impl Heap {
     }
 
     /// Allocate a resource mutably (for efficiency when building heaps).
-    pub fn alloc_mut(&mut self, resource: Resource) -> ResourceId {
-        let rid = ResourceId::from_resource(&resource, self.counter);
+    pub fn alloc_mut(&mut self, resource: Resource) -> ResourceId<H> {
+        let rid = ResourceId::<H>::from_resource(&resource, self.counter);
         self.resources.insert(rid.clone(), resource);
         self.counter += 1;
         rid
@@ -94,7 +97,7 @@ impl Heap {
     /// Read a resource from the heap.
     ///
     /// Returns an error if the resource doesn't exist or has been consumed.
-    pub fn read(&self, rid: &ResourceId) -> Result<&Resource, HeapError> {
+    pub fn read(&self, rid: &ResourceId<H>) -> Result<&Resource, HeapError<H>> {
         if self.is_consumed(rid) {
             return Err(HeapError::AlreadyConsumed(rid.clone()));
         }
@@ -107,7 +110,7 @@ impl Heap {
     ///
     /// Returns an error if the resource doesn't exist or has already been consumed.
     /// The resource remains in the heap but is marked as consumed.
-    pub fn consume(&self, rid: &ResourceId) -> Result<Heap, HeapError> {
+    pub fn consume(&self, rid: &ResourceId<H>) -> Result<Heap<H>, HeapError<H>> {
         if self.is_consumed(rid) {
             return Err(HeapError::AlreadyConsumed(rid.clone()));
         }
@@ -120,7 +123,7 @@ impl Heap {
     }
 
     /// Consume a resource mutably.
-    pub fn consume_mut(&mut self, rid: &ResourceId) -> Result<(), HeapError> {
+    pub fn consume_mut(&mut self, rid: &ResourceId<H>) -> Result<(), HeapError<H>> {
         if self.is_consumed(rid) {
             return Err(HeapError::AlreadyConsumed(rid.clone()));
         }
@@ -135,7 +138,7 @@ impl Heap {
     ///
     /// Unlike `consume`, this removes the resource from both maps.
     /// Returns an error if the resource doesn't exist.
-    pub fn remove(&self, rid: &ResourceId) -> Result<Heap, HeapError> {
+    pub fn remove(&self, rid: &ResourceId<H>) -> Result<Heap<H>, HeapError<H>> {
         if !self.contains(rid) {
             return Err(HeapError::NotFound(rid.clone()));
         }
@@ -146,14 +149,14 @@ impl Heap {
     }
 
     /// Get all active (non-consumed) resources.
-    pub fn active_resources(&self) -> impl Iterator<Item = (&ResourceId, &Resource)> {
+    pub fn active_resources(&self) -> impl Iterator<Item = (&ResourceId<H>, &Resource)> {
         self.resources
             .iter()
             .filter(|(rid, _)| !self.nullifiers.contains(*rid))
     }
 
     /// Get all consumed resource IDs.
-    pub fn consumed_ids(&self) -> impl Iterator<Item = &ResourceId> {
+    pub fn consumed_ids(&self) -> impl Iterator<Item = &ResourceId<H>> {
         self.nullifiers.iter()
     }
 
@@ -161,7 +164,7 @@ impl Heap {
     pub fn alloc_many(
         &self,
         resources: impl IntoIterator<Item = Resource>,
-    ) -> (Vec<ResourceId>, Heap) {
+    ) -> (Vec<ResourceId<H>>, Heap<H>) {
         let mut new_heap = self.clone();
         let rids: Vec<_> = resources
             .into_iter()
@@ -173,7 +176,7 @@ impl Heap {
     /// Try to consume multiple resources atomically.
     ///
     /// If any consumption fails, returns the error without modifying the heap.
-    pub fn consume_many(&self, rids: &[ResourceId]) -> Result<Heap, HeapError> {
+    pub fn consume_many(&self, rids: &[ResourceId<H>]) -> Result<Heap<H>, HeapError<H>> {
         // First validate all can be consumed
         for rid in rids {
             if self.is_consumed(rid) {
@@ -192,7 +195,7 @@ impl Heap {
     }
 
     /// Create a channel resource and allocate it.
-    pub fn alloc_channel(&self, sender: &str, receiver: &str) -> (ResourceId, Heap) {
+    pub fn alloc_channel(&self, sender: &str, receiver: &str) -> (ResourceId<H>, Heap<H>) {
         self.alloc(Resource::channel(sender, receiver))
     }
 
@@ -204,12 +207,12 @@ impl Heap {
         label: &str,
         payload: Vec<u8>,
         seq_no: u64,
-    ) -> (ResourceId, Heap) {
+    ) -> (ResourceId<H>, Heap<H>) {
         self.alloc(Resource::message(source, dest, label, payload, seq_no))
     }
 
     /// Create a session state resource and allocate it.
-    pub fn alloc_session(&self, role: &str, type_hash: u64) -> (ResourceId, Heap) {
+    pub fn alloc_session(&self, role: &str, type_hash: u64) -> (ResourceId<H>, Heap<H>) {
         self.alloc(Resource::session(role, type_hash))
     }
 
@@ -232,10 +235,11 @@ impl Heap {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use telltale_types::DefaultContentHasher;
 
     #[test]
     fn test_heap_alloc() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         assert_eq!(heap.size(), 0);
         assert_eq!(heap.alloc_counter(), 0);
 
@@ -250,7 +254,7 @@ mod tests {
 
     #[test]
     fn test_heap_read() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let resource = Resource::channel("Alice", "Bob");
         let (rid, heap) = heap.alloc(resource);
 
@@ -258,13 +262,13 @@ mod tests {
         assert_eq!(read_resource.kind(), "channel");
 
         // Reading nonexistent resource fails
-        let fake_rid = ResourceId::new([0u8; 32], 999);
+        let fake_rid = ResourceId::<DefaultContentHasher>::new([0u8; 32], 999);
         assert!(heap.read(&fake_rid).is_err());
     }
 
     #[test]
     fn test_heap_consume() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let resource = Resource::channel("Alice", "Bob");
         let (rid, heap) = heap.alloc(resource);
 
@@ -285,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_heap_remove() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let resource = Resource::channel("Alice", "Bob");
         let (rid, heap) = heap.alloc(resource);
 
@@ -296,7 +300,7 @@ mod tests {
 
     #[test]
     fn test_heap_alloc_many() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let resources = vec![
             Resource::channel("Alice", "Bob"),
             Resource::channel("Bob", "Carol"),
@@ -312,7 +316,7 @@ mod tests {
 
     #[test]
     fn test_heap_consume_many() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let (rids, heap) = heap.alloc_many(vec![
             Resource::channel("Alice", "Bob"),
             Resource::channel("Bob", "Carol"),
@@ -326,7 +330,7 @@ mod tests {
 
     #[test]
     fn test_heap_active_resources() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let (rids, heap) = heap.alloc_many(vec![
             Resource::channel("Alice", "Bob"),
             Resource::channel("Bob", "Carol"),
@@ -341,8 +345,8 @@ mod tests {
 
     #[test]
     fn test_heap_determinism() {
-        let h1 = Heap::new();
-        let h2 = Heap::new();
+        let h1 = Heap::<DefaultContentHasher>::new();
+        let h2 = Heap::<DefaultContentHasher>::new();
 
         let r1 = Resource::channel("Alice", "Bob");
         let r2 = Resource::channel("Alice", "Bob");
@@ -357,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_heap_state_hash() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
         let hash1 = heap.state_hash();
 
         let (_, heap) = heap.alloc(Resource::channel("Alice", "Bob"));
@@ -368,7 +372,7 @@ mod tests {
 
     #[test]
     fn test_helper_methods() {
-        let heap = Heap::new();
+        let heap = Heap::<DefaultContentHasher>::new();
 
         let (rid1, heap) = heap.alloc_channel("Alice", "Bob");
         assert!(matches!(heap.read(&rid1), Ok(Resource::Channel(_))));
