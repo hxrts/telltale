@@ -11,12 +11,14 @@
 //!
 //! ## Lean Correspondence
 //!
-//! Merkle tree operations are currently Rust-only.
+//! Proof-path direction and ordering semantics are mirrored by
+//! `lean/Runtime/Resources/HeapModel.lean`.
+//! Digest computation remains Rust-side and is checked through published vectors.
 
 use super::heap_impl::Heap;
 use super::encoding::{
-    encode_heap_commitment_preimage, encode_merkle_node_preimage, encode_nullifier_leaf_preimage,
-    encode_resource_leaf_preimage,
+    heap_commitment_preimage, merkle_node_preimage, nullifier_leaf_preimage,
+    resource_leaf_preimage,
 };
 use super::resource::{Resource, ResourceId};
 use std::marker::PhantomData;
@@ -78,7 +80,7 @@ impl<H: Hasher> MerkleProof<H> {
 /// The hasher consumes a tagged preimage that contains the left child and
 /// right child digests in order.
 pub fn merkle_node_hash<H: Hasher>(left: &H::Digest, right: &H::Digest) -> H::Digest {
-    let preimage = encode_merkle_node_preimage(left.as_ref(), right.as_ref());
+    let preimage = merkle_node_preimage(left.as_ref(), right.as_ref());
     H::digest(&preimage)
 }
 
@@ -88,7 +90,7 @@ pub fn merkle_node_hash<H: Hasher>(left: &H::Digest, right: &H::Digest) -> H::Di
 /// digest and the canonical resource bytes.
 pub fn resource_leaf_hash<H: Hasher>(rid: &ResourceId<H>, resource: &Resource) -> H::Digest {
     let resource_bytes = resource.canonical_bytes();
-    let preimage = encode_resource_leaf_preimage(rid.as_bytes(), &resource_bytes);
+    let preimage = resource_leaf_preimage(rid.as_bytes(), &resource_bytes);
     H::digest(&preimage)
 }
 
@@ -97,7 +99,7 @@ pub fn resource_leaf_hash<H: Hasher>(rid: &ResourceId<H>, resource: &Resource) -
 /// The hasher consumes a tagged preimage that contains the `ResourceId`
 /// digest bytes.
 pub fn nullifier_leaf_hash<H: Hasher>(rid: &ResourceId<H>) -> H::Digest {
-    let preimage = encode_nullifier_leaf_preimage(rid.as_bytes());
+    let preimage = nullifier_leaf_preimage(rid.as_bytes());
     H::digest(&preimage)
 }
 
@@ -253,7 +255,7 @@ impl<H: Hasher> HeapCommitment<H> {
     /// The hasher consumes a tagged preimage that contains the resource root,
     /// the nullifier root, and the allocation counter.
     pub fn hash(&self) -> H::Digest {
-        let preimage = encode_heap_commitment_preimage(
+        let preimage = heap_commitment_preimage(
             self.resource_root.as_ref(),
             self.nullifier_root.as_ref(),
             self.counter,

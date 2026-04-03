@@ -13,11 +13,13 @@
 //!
 //! ## Lean Correspondence
 //!
-//! Resource concepts correspond to `lean/Runtime/Resources/ResourceModel.lean`.
-//! The specific Rust types (`ResourceId`, `Resource`, `HeapError`) are Rust-only.
+//! Resource concepts correspond to `lean/Runtime/Resources/HeapModel.lean`.
+//! The Lean parity lane mirrors canonical bytes and tagged preimages for the
+//! resource family. The concrete Rust digest type and heap error surface remain
+//! operational Rust artifacts.
 
 use super::encoding::{
-    encode_resource_id_preimage,
+    resource_id_preimage,
     tag_channel_state, tag_message, tag_message_payload, tag_resource_channel,
     tag_resource_message, tag_resource_session, tag_resource_value, CanonicalHeapEncoder,
     CanonicalHeapEncoding,
@@ -57,7 +59,7 @@ impl<H: Hasher> ResourceId<H> {
     /// resource bytes and the little-endian counter.
     pub fn from_resource(resource: &Resource, counter: u64) -> Self {
         let content_bytes = resource.canonical_bytes();
-        let preimage = encode_resource_id_preimage(&content_bytes, counter);
+        let preimage = resource_id_preimage(&content_bytes, counter);
         let hash = H::digest(&preimage);
 
         Self {

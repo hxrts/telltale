@@ -16,8 +16,10 @@
 //!
 //! ## Lean Correspondence
 //!
-//! Resource concepts correspond to `lean/Runtime/Resources/ResourceModel.lean`.
-//! The heap abstraction is currently Rust-only.
+//! Resource concepts correspond to `lean/Runtime/Resources/HeapModel.lean`.
+//! The Lean parity lane mirrors canonical encoding, tagged preimages,
+//! ordering rules, and proof-path structure. Digest computation remains a
+//! published-vector conformance target rather than a Lean-native hash model.
 //!
 //! ## Example
 //!
@@ -51,7 +53,9 @@ mod merkle;
 mod resource;
 
 pub use encoding::{
-    CanonicalHeapEncoder, CanonicalHeapEncoding, HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
+    heap_commitment_preimage, merkle_node_preimage, nullifier_leaf_preimage,
+    resource_id_preimage, resource_leaf_preimage, CanonicalHeapEncoder, CanonicalHeapEncoding,
+    HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
 };
 pub use heap_impl::Heap;
 pub use merkle::{

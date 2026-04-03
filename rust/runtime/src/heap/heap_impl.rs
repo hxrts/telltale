@@ -15,8 +15,9 @@
 //!
 //! ## Lean Correspondence
 //!
-//! The heap abstraction is currently Rust-only. Resource concepts
-//! correspond to `lean/Runtime/Resources/ResourceModel.lean`.
+//! Resource concepts correspond to `lean/Runtime/Resources/HeapModel.lean`.
+//! The Lean parity lane mirrors deterministic heap replay and ordering
+//! behavior, while the Rust runtime remains the digest-producing implementation.
 
 use super::resource::{HeapError, Resource, ResourceId};
 use std::collections::{BTreeMap, BTreeSet};

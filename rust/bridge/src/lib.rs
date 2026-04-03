@@ -69,6 +69,7 @@ pub mod semantic_objects;
 cfg_if! {
     if #[cfg(feature = "runner")] {
         pub mod bridge_normalization;
+        pub mod heap_parity_runner;
         pub(crate) mod projection_payload;
         pub mod equivalence;
         pub mod protocol_machine_runner;
@@ -120,6 +121,12 @@ cfg_if! {
         pub use equivalence::{
             CoherenceBundle, EquivalenceChecker, EquivalenceConfig, EquivalenceError,
             EquivalenceResult, GoldenBundle,
+        };
+        pub use heap_parity_runner::{
+            HeapParityCommitment, HeapParityHeapFixtureOutput, HeapParityOutput,
+            HeapParityProof, HeapParityProofStep, HeapParityReplayOutput,
+            HeapParityResourceFixtureOutput, HeapParityResourceId,
+            HeapParityRunner, HeapParityRunnerError, HeapParityStateSummary,
         };
         pub use runner::{
             ChoreographyJson, LeanRunner, LeanRunnerError, LeanValidationResult,

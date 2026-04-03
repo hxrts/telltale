@@ -1,11 +1,39 @@
-//! Material parameter definitions for physical simulation layers.
+//! Material-model interfaces and built-in simulation-layer parameters.
 //!
-//! Each material layer (mean-field, Hamiltonian, continuum field) has its own
-//! parameter struct. The top-level [`MaterialParams`] enum dispatches to the
-//! appropriate variant based on the `"layer"` field in JSON.
+//! [`MaterialModel`] is the simulator-facing abstraction for any material,
+//! mean-field, Hamiltonian, or continuum-field model. [`MaterialParams`] is the
+//! built-in serde-tagged catalog used by scenario configs.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
+
+use crate::material_handlers::{ContinuumFieldHandler, HamiltonianHandler, IsingHandler};
+use telltale_machine::model::effects::EffectHandler;
+
+/// Simulator-facing abstraction for a material or field model.
+///
+/// This trait is intentionally broader than the built-in [`MaterialParams`]
+/// enum so callers can plug in custom simulation families without extending the
+/// scenario config format or changing simulator dispatch code.
+pub trait MaterialModel: Send + Sync {
+    /// Stable identifier for diagnostics and registry-style dispatch.
+    fn layer_name(&self) -> &'static str;
+
+    /// Construct the effect handler for this material model.
+    fn build_handler(&self) -> Box<dyn EffectHandler>;
+
+    /// Derive initial per-role register state for a given role ordering.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the model parameters are incompatible with the
+    /// supplied role list.
+    fn derive_initial_states(
+        &self,
+        roles: &[String],
+    ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String>;
+}
 
 /// Material parameters for all supported simulation layers.
 ///
@@ -86,6 +114,123 @@ pub struct ContinuumFieldParams {
     pub step_size: FixedQ32,
 }
 
+impl MaterialModel for MeanFieldParams {
+    fn layer_name(&self) -> &'static str {
+        "mean_field"
+    }
+
+    fn build_handler(&self) -> Box<dyn EffectHandler> {
+        Box::new(IsingHandler::new(self.clone()))
+    }
+
+    fn derive_initial_states(
+        &self,
+        roles: &[String],
+    ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
+        if self.initial_state.is_empty() {
+            return Err("mean_field material requires at least one state component".into());
+        }
+
+        Ok(roles
+            .iter()
+            .cloned()
+            .map(|role| (role, self.initial_state.clone()))
+            .collect())
+    }
+}
+
+impl MaterialModel for HamiltonianParams {
+    fn layer_name(&self) -> &'static str {
+        "hamiltonian"
+    }
+
+    fn build_handler(&self) -> Box<dyn EffectHandler> {
+        Box::new(HamiltonianHandler::new(self.clone()))
+    }
+
+    fn derive_initial_states(
+        &self,
+        roles: &[String],
+    ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
+        let n = roles.len();
+        if self.initial_positions.len() < n || self.initial_momenta.len() < n {
+            return Err(format!(
+                "hamiltonian material requires at least {n} positions and momenta"
+            ));
+        }
+
+        Ok(roles
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(idx, role)| {
+                (
+                    role,
+                    vec![self.initial_positions[idx], self.initial_momenta[idx]],
+                )
+            })
+            .collect())
+    }
+}
+
+impl MaterialModel for ContinuumFieldParams {
+    fn layer_name(&self) -> &'static str {
+        "continuum_field"
+    }
+
+    fn build_handler(&self) -> Box<dyn EffectHandler> {
+        Box::new(ContinuumFieldHandler::new(self.clone()))
+    }
+
+    fn derive_initial_states(
+        &self,
+        roles: &[String],
+    ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
+        let n = roles.len();
+        if self.initial_fields.len() < n {
+            return Err(format!(
+                "continuum_field material requires at least {n} initial field values"
+            ));
+        }
+
+        Ok(roles
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(idx, role)| (role, vec![self.initial_fields[idx]]))
+            .collect())
+    }
+}
+
+impl MaterialModel for MaterialParams {
+    fn layer_name(&self) -> &'static str {
+        match self {
+            Self::MeanField(params) => params.layer_name(),
+            Self::Hamiltonian(params) => params.layer_name(),
+            Self::ContinuumField(params) => params.layer_name(),
+        }
+    }
+
+    fn build_handler(&self) -> Box<dyn EffectHandler> {
+        match self {
+            Self::MeanField(params) => params.build_handler(),
+            Self::Hamiltonian(params) => params.build_handler(),
+            Self::ContinuumField(params) => params.build_handler(),
+        }
+    }
+
+    fn derive_initial_states(
+        &self,
+        roles: &[String],
+    ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
+        match self {
+            Self::MeanField(params) => params.derive_initial_states(roles),
+            Self::Hamiltonian(params) => params.derive_initial_states(roles),
+            Self::ContinuumField(params) => params.derive_initial_states(roles),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,5 +288,25 @@ mod tests {
             }
             _ => panic!("expected MeanField"),
         }
+    }
+
+    #[test]
+    fn material_model_dispatch_derives_states_for_builtin_catalog() {
+        let params = MaterialParams::Hamiltonian(HamiltonianParams {
+            spring_constant: FixedQ32::one(),
+            mass: FixedQ32::one(),
+            dimensions: 1,
+            initial_positions: vec![FixedQ32::one(), FixedQ32::neg_one()],
+            initial_momenta: vec![FixedQ32::zero(), FixedQ32::zero()],
+            step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
+        });
+
+        let states = params
+            .derive_initial_states(&["A".into(), "B".into()])
+            .expect("derive states");
+
+        assert_eq!(params.layer_name(), "hamiltonian");
+        assert_eq!(states["A"], vec![FixedQ32::one(), FixedQ32::zero()]);
+        assert_eq!(states["B"], vec![FixedQ32::neg_one(), FixedQ32::zero()]);
     }
 }

@@ -2,6 +2,7 @@ import Runtime.Simulation.Core
 import Runtime.Simulation.Ising
 import Runtime.Simulation.Hamiltonian
 import Runtime.Simulation.Continuum
+import Runtime.Simulation.Material
 
 /-! # Runtime.Simulation
 

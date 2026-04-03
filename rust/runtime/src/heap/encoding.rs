@@ -121,14 +121,16 @@ pub(crate) const fn tag_resource_value() -> u8 {
     TAG_RESOURCE_VALUE
 }
 
-pub(crate) fn encode_resource_id_preimage(resource_bytes: &[u8], counter: u64) -> Vec<u8> {
+/// Build the tagged preimage for `ResourceId` derivation.
+pub fn resource_id_preimage(resource_bytes: &[u8], counter: u64) -> Vec<u8> {
     let mut encoder = CanonicalHeapEncoder::new(TAG_RESOURCE_ID_PREIMAGE);
     encoder.bytes(resource_bytes);
     encoder.u64(counter);
     encoder.finish()
 }
 
-pub(crate) fn encode_resource_leaf_preimage(
+/// Build the tagged preimage for an active-resource Merkle leaf.
+pub fn resource_leaf_preimage(
     resource_id_bytes: &[u8],
     resource_bytes: &[u8],
 ) -> Vec<u8> {
@@ -138,20 +140,23 @@ pub(crate) fn encode_resource_leaf_preimage(
     encoder.finish()
 }
 
-pub(crate) fn encode_nullifier_leaf_preimage(resource_id_bytes: &[u8]) -> Vec<u8> {
+/// Build the tagged preimage for a nullifier Merkle leaf.
+pub fn nullifier_leaf_preimage(resource_id_bytes: &[u8]) -> Vec<u8> {
     let mut encoder = CanonicalHeapEncoder::new(TAG_NULLIFIER_LEAF_PREIMAGE);
     encoder.bytes(resource_id_bytes);
     encoder.finish()
 }
 
-pub(crate) fn encode_merkle_node_preimage(left: &[u8], right: &[u8]) -> Vec<u8> {
+/// Build the tagged preimage for a Merkle parent node.
+pub fn merkle_node_preimage(left: &[u8], right: &[u8]) -> Vec<u8> {
     let mut encoder = CanonicalHeapEncoder::new(TAG_MERKLE_NODE_PREIMAGE);
     encoder.bytes(left);
     encoder.bytes(right);
     encoder.finish()
 }
 
-pub(crate) fn encode_heap_commitment_preimage(
+/// Build the tagged preimage for `HeapCommitment::hash()`.
+pub fn heap_commitment_preimage(
     resource_root: &[u8],
     nullifier_root: &[u8],
     counter: u64,

@@ -6,6 +6,7 @@ import Runtime.ProgramLogic.LanguageInstance
 import Runtime.Resources.SessionRA
 import Runtime.Resources.BufferRA
 import Runtime.Resources.Arena
+import Runtime.Resources.HeapModel
 import Runtime.Invariants
 import Runtime.Transport
 import Runtime.Simulation
@@ -32,6 +33,7 @@ import Runtime.Proofs.Lowering.API
 import Runtime.Proofs.ProtocolMachine.Effects
 import Runtime.Proofs.ProtocolMachine.ConcreteRefinement
 import Runtime.Proofs.ProtocolMachine.Speculation
+import Runtime.Proofs.Heap
 import Runtime.Proofs.InvariantSpace
 import Runtime.Proofs.Adapters.Progress
 import Runtime.Proofs.Adapters.Classical

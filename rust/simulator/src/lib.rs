@@ -43,12 +43,13 @@ pub use generated::{
     ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep,
 };
 pub use harness::{
-    derive_initial_states, DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, MaterialAdapter,
-    SimulationHarness,
+    derive_initial_states, derive_initial_states_for_model, DirectAdapter, HarnessConfig,
+    HarnessSpec, HostAdapter, MaterialAdapter, SimulationHarness,
 };
-pub use material::MaterialParams;
+pub use material::{MaterialModel, MaterialParams};
 pub use material_handlers::{
-    handler_from_material, ContinuumFieldHandler, HamiltonianHandler, IsingHandler,
+    handler_from_material, handler_from_model, ContinuumFieldHandler, HamiltonianHandler,
+    IsingHandler,
 };
 pub use network::{NetworkConfig, NetworkModel};
 pub use property::{Property, PropertyMonitor};

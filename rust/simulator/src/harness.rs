@@ -9,7 +9,7 @@ use std::path::Path;
 use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 
 use crate::contracts::{assert_contracts, ContractCheckConfig};
-use crate::material::MaterialParams;
+use crate::material::MaterialModel;
 use crate::runner::{run_with_scenario, ScenarioResult};
 use crate::scenario::Scenario;
 use crate::EffectHandler;
@@ -64,16 +64,31 @@ impl HostAdapter for DirectAdapter<'_> {
 
 /// Adapter that uses material-derived handlers from scenario params.
 pub struct MaterialAdapter {
+    model: Box<dyn MaterialModel>,
     handler: Box<dyn EffectHandler>,
 }
 
 impl MaterialAdapter {
+    /// Build a material adapter from any material-model implementation.
+    #[must_use]
+    pub fn new<M>(model: M) -> Self
+    where
+        M: MaterialModel + 'static,
+    {
+        Self::from_boxed_model(Box::new(model))
+    }
+
+    /// Build a material adapter from a boxed material-model implementation.
+    #[must_use]
+    pub fn from_boxed_model(model: Box<dyn MaterialModel>) -> Self {
+        let handler = crate::handler_from_model(model.as_ref());
+        Self { model, handler }
+    }
+
     /// Build a material adapter from a scenario.
     #[must_use]
     pub fn from_scenario(scenario: &Scenario) -> Self {
-        Self {
-            handler: crate::handler_from_material(&scenario.material),
-        }
+        Self::new(scenario.material.clone())
     }
 }
 
@@ -86,7 +101,7 @@ impl HostAdapter for MaterialAdapter {
         &self,
         scenario: &Scenario,
     ) -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String> {
-        derive_initial_states(scenario).map(Some)
+        derive_initial_states_for_model(self.model.as_ref(), &scenario.roles).map(Some)
     }
 }
 
@@ -230,55 +245,104 @@ fn resolve_initial_states<A: HostAdapter + ?Sized>(
 /// # Errors
 ///
 /// Returns an error when material parameters do not match scenario roles.
+pub fn derive_initial_states_for_model(
+    material: &dyn MaterialModel,
+    roles: &[String],
+) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
+    material.derive_initial_states(roles)
+}
+
+/// Derive per-role initial states from built-in scenario material parameters.
+///
+/// # Errors
+///
+/// Returns an error when material parameters do not match scenario roles.
 pub fn derive_initial_states(
     scenario: &Scenario,
 ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
-    let mut states = BTreeMap::new();
-
-    match &scenario.material {
-        MaterialParams::MeanField(params) => {
-            if params.initial_state.is_empty() {
-                return Err("mean_field material requires at least one state component".into());
-            }
-            for role in &scenario.roles {
-                states.insert(role.clone(), params.initial_state.clone());
-            }
-        }
-        MaterialParams::Hamiltonian(params) => {
-            let n = scenario.roles.len();
-            if params.initial_positions.len() < n || params.initial_momenta.len() < n {
-                return Err(format!(
-                    "hamiltonian material requires at least {n} positions and momenta"
-                ));
-            }
-            for (idx, role) in scenario.roles.iter().enumerate() {
-                states.insert(
-                    role.clone(),
-                    vec![params.initial_positions[idx], params.initial_momenta[idx]],
-                );
-            }
-        }
-        MaterialParams::ContinuumField(params) => {
-            let n = scenario.roles.len();
-            if params.initial_fields.len() < n {
-                return Err(format!(
-                    "continuum_field material requires at least {n} initial field values"
-                ));
-            }
-            for (idx, role) in scenario.roles.iter().enumerate() {
-                states.insert(role.clone(), vec![params.initial_fields[idx]]);
-            }
-        }
-    }
-
-    Ok(states)
+    derive_initial_states_for_model(&scenario.material, &scenario.roles)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::contracts::ContractCheckConfig;
-    use crate::material::{HamiltonianParams, MeanFieldParams};
+    use crate::material::{HamiltonianParams, MaterialParams, MeanFieldParams};
+    use telltale_machine::coroutine::Value;
+    use telltale_machine::model::effects::{EffectResult, SendDecision, SendDecisionInput};
+
+    struct DummyHandler;
+
+    impl EffectHandler for DummyHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Unit)
+        }
+
+        fn send_decision(&self, _input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::success(SendDecision::Deliver(Value::Unit))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> EffectResult<()> {
+            EffectResult::success(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> EffectResult<String> {
+            EffectResult::success(labels.first().cloned().unwrap_or_default())
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
+        }
+    }
+
+    struct DummyMaterialModel;
+
+    impl MaterialModel for DummyMaterialModel {
+        fn layer_name(&self) -> &'static str {
+            "dummy"
+        }
+
+        fn build_handler(&self) -> Box<dyn EffectHandler> {
+            Box::new(DummyHandler)
+        }
+
+        fn derive_initial_states(
+            &self,
+            roles: &[String],
+        ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
+            Ok(roles
+                .iter()
+                .cloned()
+                .enumerate()
+                .map(|(idx, role)| {
+                    let idx = i64::try_from(idx).expect("index fits in i64");
+                    (
+                        role,
+                        vec![FixedQ32::from_ratio(idx + 1, 1).expect("representable")],
+                    )
+                })
+                .collect())
+        }
+    }
 
     fn mean_field_scenario() -> Scenario {
         Scenario {
@@ -325,6 +389,20 @@ mod tests {
         let states = derive_initial_states(&scenario).expect("derive states");
         assert_eq!(states["A"], vec![FixedQ32::one(), FixedQ32::zero()]);
         assert_eq!(states["B"], vec![FixedQ32::neg_one(), FixedQ32::zero()]);
+    }
+
+    #[test]
+    fn material_adapter_supports_custom_material_models() {
+        let scenario = mean_field_scenario();
+        let adapter = MaterialAdapter::new(DummyMaterialModel);
+        let states = adapter
+            .initial_states(&scenario)
+            .expect("derive states")
+            .expect("adapter provides states");
+
+        assert_eq!(states["A"], vec![FixedQ32::one()]);
+        assert_eq!(states["B"], vec![FixedQ32::from_ratio(2, 1).expect("2")]);
+        adapter.effect_handler();
     }
 
     #[test]

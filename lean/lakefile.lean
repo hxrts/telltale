@@ -103,6 +103,11 @@ lean_exe protocol_machine_runner where
   root := `Runtime.Tests.ProtocolMachineRunner
   moreLinkArgs := macosLinkArgs
 
+/-- Heap parity runner: mirrors heap encoding, ordering, and proof structure. -/
+lean_exe heap_parity_runner where
+  root := `Runtime.Tests.HeapParityRunner
+  moreLinkArgs := macosLinkArgs
+
 /-- Projection validator (compares projected local types). -/
 @[default_target]
 lean_exe telltale_validator where
