@@ -223,6 +223,7 @@ check-telltale-style:
     trap restore EXIT
     ./scripts/check/dependency-layers.sh
     ./scripts/check/docs-links.sh
+    ./scripts/check/docs-index.sh
     ./scripts/check/text-symbols.sh
 
 # Enforce public tooling/example cutover to generated effect interfaces and owned opens.
@@ -349,6 +350,10 @@ check-semantic-name-parity:
 # Check for semantic drift in backticked identifiers, paths, crates, features, and versions.
 check-docs-semantic-drift:
     ./scripts/check/docs-semantic-drift.sh
+
+# Validate the Document Index in docs/101_introduction.md is complete and titles match.
+check-docs-index:
+    ./scripts/check/docs-index.sh
 
 # Validate that all remote GitHub Action references in workflows resolve.
 check-workflow-actions:
