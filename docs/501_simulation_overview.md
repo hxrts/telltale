@@ -32,6 +32,8 @@ That separation lets one execution be interpreted under different theorem-side c
 When theorem-indexed reporting is enabled, `ScenarioStats` also includes a theorem-native progress summary.
 That summary reports weighted progress potential, productive communication count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification separately from raw transport counters.
 Reconfiguration accounting is reported separately again through `ScenarioStats.reconfiguration_summary` so pure reconfiguration and budget-consuming transition choreography do not get mixed into the descent/progress quantities.
+`ScenarioResult.analysis.normalized_observability` provides the companion envelope-aware analysis view.
+It keeps canonical raw replay unchanged while exposing a normalized behavior class for order-insensitive and footprint-aware comparison.
 
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
@@ -73,6 +75,8 @@ They currently sit beside the harness API rather than inside it.
 
 Scenario replay artifacts now also retain a canonical `reconfiguration_trace`.
 That trace is shared across fresh runs, replay, and post-run analysis tooling so link cutovers, federation updates, handoffs, delegation, and mode transitions all use one simulator-facing representation.
+Normalized comparison lives beside replay rather than inside it.
+The helper `compare_observability(...)` reports `exact_raw_match`, `equivalent_under_normalization`, or `safety_visible_divergence`.
 
 Use this lane when a downstream integration layer needs effect-centric fixtures.
 Do not document it as the default `SimulationHarness` workflow unless that wiring is added.

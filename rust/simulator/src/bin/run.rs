@@ -60,6 +60,9 @@ fn main() {
             output_condition_checks: u64::try_from(result.replay.output_condition_trace.len())
                 .unwrap_or(u64::MAX),
         },
+        analysis: AnalysisOutput {
+            normalized_observability: result.analysis.normalized_observability,
+        },
         contracts,
     };
 
@@ -127,6 +130,7 @@ struct RunOutput {
     violations: Vec<ViolationOutput>,
     stats: StatsOutput,
     replay: ReplayOutput,
+    analysis: AnalysisOutput,
     contracts: telltale_simulator::contracts::ContractCheckReport,
 }
 
@@ -159,6 +163,11 @@ struct ReplayOutput {
     obs_events: u64,
     effect_events: u64,
     output_condition_checks: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct AnalysisOutput {
+    normalized_observability: telltale_simulator::analysis::NormalizedObservability,
 }
 
 fn usage(msg: &str) -> ! {

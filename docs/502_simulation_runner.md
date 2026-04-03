@@ -35,6 +35,10 @@ The runner skips the first two reserved registers and samples material state sta
 `ScenarioReplayArtifact` contains observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, and a canonical simulator reconfiguration trace.
 These artifacts support deterministic replay and post-run validation.
 
+`ScenarioResult.analysis.normalized_observability` is the companion analysis view.
+It is derived from replay-visible raw traces, but it is not itself the authoritative replay surface.
+That separation keeps debugging and replay pinned to the canonical raw event stream.
+
 ## Runner Entry Points
 
 The runner exposes three main entry points.
@@ -97,6 +101,17 @@ It reports:
 - `transition_budget_consumed`
 
 This keeps semantic topology/authority cutover accounting distinct from theorem-native descent and productive-step reporting.
+
+The analysis layer also exposes `compare_observability(...)`.
+That comparison reports one of three relations:
+
+- `exact_raw_match`
+- `equivalent_under_normalization`
+- `safety_visible_divergence`
+
+Normalization is order-insensitive over session-normalized observable events and canonical reconfiguration footprints.
+If two runs only differ by admissible exchange ordering or equivalent footprint-normalized cutover ordering, the report upgrades them to `equivalent_under_normalization`.
+If the normalized classes still differ, the comparison remains a safety-visible divergence.
 
 ## Harness API
 
@@ -183,6 +198,8 @@ The canonical backend remains the authoritative replay and debugging lane.
 
 Record ordering is stable within each sampling pass.
 Replay artifacts preserve the observable, semantic, and reconfiguration data needed for deterministic post-run inspection.
+Normalized observability classes are for comparison and analysis only.
+They do not replace canonical replay traces.
 
 ## Related Docs
 

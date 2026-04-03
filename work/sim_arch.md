@@ -162,17 +162,17 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 - [x] Add targeted tests for delegation safety, footprint-local updates, handoff replay, and reconfiguration/run equivalence.
 - [x] Update docs to explain when a scenario should use transport faults versus semantic reconfiguration operations.
 - [x] Remove legacy topology-change encodings that become redundant once first-class reconfiguration operations exist. Do not keep old ad hoc encodings as compatibility paths.
-- [ ] Make a git commit for Phase 11.
+- [x] Make a git commit for Phase 11.
 
 ## Phase 12: Envelope-Aware Observability and Normalization
 
-- [ ] Add a normalized observability layer that groups traces modulo exchange normalization and spatial refinement rather than only exposing raw event order.
-- [ ] Extend simulator outputs so users can inspect both raw traces and envelope-normalized behavior classes.
-- [ ] Report whether two runs differ only by admissible exchange/spatial normalization or by safety-visible semantic divergence.
-- [ ] Keep replay/debugging anchored to canonical authoritative traces while allowing normalized comparison views for analysis.
-- [ ] Add targeted tests for normalization-aware equivalence and non-equivalence reporting.
-- [ ] Update simulator docs to explain raw trace vs normalized envelope trace semantics.
-- [ ] Remove any older comparison/reporting surface that duplicates the new normalized observability contract. Do not retain parallel legacy diff modes.
+- [x] Add a normalized observability layer that groups traces modulo exchange normalization and spatial refinement rather than only exposing raw event order.
+- [x] Extend simulator outputs so users can inspect both raw traces and envelope-normalized behavior classes.
+- [x] Report whether two runs differ only by admissible exchange/spatial normalization or by safety-visible semantic divergence.
+- [x] Keep replay/debugging anchored to canonical authoritative traces while allowing normalized comparison views for analysis.
+- [x] Add targeted tests for normalization-aware equivalence and non-equivalence reporting.
+- [x] Update simulator docs to explain raw trace vs normalized envelope trace semantics.
+- [x] Remove any older comparison/reporting surface that duplicates the new normalized observability contract. Do not retain parallel legacy diff modes.
 - [ ] Make a git commit for Phase 12.
 
 ## Phase 13: Decision Procedures and Counterexample Surfaces

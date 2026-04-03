@@ -6,6 +6,7 @@
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
+use crate::analysis::NormalizedObservability;
 use crate::backend::SimulationMachine;
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
 use telltale_machine::model::output_condition::OutputConditionCheck;
@@ -292,8 +293,16 @@ pub struct ScenarioResult {
     pub violations: Vec<PropertyViolation>,
     /// Replay-ready protocol-machine artifact data captured for this run.
     pub replay: ScenarioReplayArtifact,
+    /// Envelope-normalized analysis artifacts derived from replay-visible data.
+    pub analysis: ScenarioAnalysisArtifact,
     /// Structured run statistics for observability.
     pub stats: ScenarioStats,
+}
+
+/// Analysis artifacts derived from a scenario run without weakening canonical replay.
+pub struct ScenarioAnalysisArtifact {
+    /// Envelope-normalized observability class derived from raw replay traces.
+    pub normalized_observability: NormalizedObservability,
 }
 
 /// Replay-ready artifact data captured from a scenario run.
@@ -606,6 +615,8 @@ pub fn run_with_scenario(
     let semantic_objects = machine.semantic_objects();
     let reconfiguration_trace = middleware.reconfiguration_trace()?;
     let reconfiguration_summary = middleware.reconfiguration_summary()?;
+    let normalized_observability =
+        crate::analysis::normalized_observability(&obs_trace, &reconfiguration_trace);
     let final_session_snapshots = machine.session_snapshots();
     let productive_step_count = productive_event_count(&obs_trace);
     let theorem_progress = theorem_progress_summary(
@@ -633,6 +644,9 @@ pub fn run_with_scenario(
             semantic_audit_log,
             semantic_objects,
             reconfiguration_trace,
+        },
+        analysis: ScenarioAnalysisArtifact {
+            normalized_observability,
         },
         stats: ScenarioStats {
             seed: scenario.seed,

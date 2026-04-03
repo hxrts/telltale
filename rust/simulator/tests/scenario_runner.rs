@@ -210,6 +210,20 @@ step_size = "0.01"
     assert!(result.replay.reconfiguration_trace.is_empty());
     assert_eq!(result.stats.reconfiguration_summary.applied_operations, 0);
     assert_eq!(
+        result
+            .analysis
+            .normalized_observability
+            .raw_reconfiguration_count,
+        0
+    );
+    assert_eq!(
+        result
+            .analysis
+            .normalized_observability
+            .raw_observable_event_count,
+        u64::try_from(result.replay.obs_trace.len()).unwrap_or(u64::MAX)
+    );
+    assert_eq!(
         result.stats.theorem_progress.critical_capacity.phase,
         CriticalCapacityPhase::Unsupported
     );

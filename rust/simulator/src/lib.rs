@@ -40,6 +40,10 @@ pub mod scenario;
 pub mod trace;
 mod value_conv;
 
+pub use analysis::{
+    compare_observability, normalized_observability, NormalizedObservability,
+    ObservabilityComparison, ObservabilityRelation,
+};
 pub use contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
 };
@@ -63,7 +67,7 @@ pub use reconfiguration::{
 };
 pub use rng::SimRng;
 pub use runner::{
-    CriticalCapacityPhase, CriticalCapacitySummary, SchedulerLiftMode, SchedulerLiftSummary,
-    TheoremProgressSummary,
+    CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact, SchedulerLiftMode,
+    SchedulerLiftSummary, TheoremProgressSummary,
 };
 pub use telltale_machine::model::effects::EffectHandler;
