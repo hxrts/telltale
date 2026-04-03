@@ -417,7 +417,10 @@ fn test_reject_unknown_link_role() {
 
 #[test]
 fn core_scenario_schema_remains_domain_neutral() {
-    let source = include_str!("../scenario.rs");
+    let source = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/scenario.rs"),
+    )
+    .expect("read scenario source");
     for banned in [
         "bluetooth",
         "ble",

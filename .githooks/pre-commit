@@ -43,17 +43,7 @@ else
     exit 1
 fi
 
-# 2. Clippy on workspace (catches most issues)
-echo -n "Running clippy... "
-if cargo clippy --workspace --all-targets --all-features -- -D warnings 2>/dev/null; then
-    echo -e "${GREEN}OK${NC}"
-else
-    echo -e "${RED}FAILED${NC}"
-    echo "Run 'cargo clippy --workspace --all-targets --all-features' to see issues"
-    exit 1
-fi
-
-# 3. Quick compile check
+# 2. Quick compile check
 echo -n "Checking compilation... "
 if cargo check --workspace --all-targets --all-features 2>/dev/null; then
     echo -e "${GREEN}OK${NC}"

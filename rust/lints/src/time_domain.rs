@@ -20,6 +20,7 @@ pub(crate) fn scan(file: &Path, syntax: &syn::File) -> Vec<String> {
     // to drive the Lean binary subprocess.
     const ALLOWED_SUFFIXES: &[&str] = &[
         "rust/bridge/src/runner.rs",
+        "rust/bridge/src/heap_parity_runner.rs",
         "rust/bridge/src/protocol_machine_runner.rs",
     ];
 

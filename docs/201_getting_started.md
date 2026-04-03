@@ -55,7 +55,7 @@ It provides async `ChoreoHandler` integration, topology support, testing helpers
 The workspace uses feature flags to control optional algorithms and target support.
 The root crate keeps its default surface small.
 
-### Root Crate
+#### `telltale`
 
 | Feature | Default | Description |
 |---|---|---|
@@ -66,7 +66,7 @@ The root crate keeps its default surface small.
 | `theory-bounded` | no | enable bounded recursion helpers |
 | `full` | no | enable all optional root features |
 
-### Theory Crate
+#### `telltale-theory`
 
 | Feature | Default | Description |
 |---|---|---|
@@ -81,7 +81,7 @@ The root crate keeps its default surface small.
 | `coherence` | yes | coherence predicates |
 | `full` | no | enable all optional theory features |
 
-### Runtime Crate
+#### `telltale-runtime`
 
 | Feature | Default | Description |
 |---|---|---|
@@ -90,7 +90,7 @@ The root crate keeps its default surface small.
 | `native-cli` | no | build `choreo-fmt` and `effect-scaffold` |
 | `native-examples` | no | build runtime examples that require native tooling |
 
-### Lean Bridge Crate
+#### `telltale-bridge`
 
 | Feature | Default | Description |
 |---|---|---|

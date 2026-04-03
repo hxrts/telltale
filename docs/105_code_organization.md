@@ -99,9 +99,10 @@ Macro correctness is guarded by operational tests rather than a mechanized proof
 It compiles `LocalTypeR` into bytecode and executes it with bounded buffers, scheduler policies, observability, and protocol-machine semantic objects.
 It is the canonical semantic core used by the simulator and by direct host embeddings.
 
-The main public front doors are `telltale_machine::model` and `telltale_machine::runtime`.
-`model` exposes execution, effect, scheduler, state, semantic-object, and transition vocabulary.
-`runtime` exposes loading, admission, and runner surfaces such as `CodeImage`, `ProtocolMachine`, `GuestRuntime`, and `OwnedSession`.
+The main public front doors are `telltale_machine::model`, `telltale_machine::runtime`, and `telltale_machine::semantics`.
+`telltale_machine::model` exposes execution, effect, scheduler, state, semantic-object, and transition vocabulary.
+`telltale_machine::runtime` exposes loading, admission, and runner surfaces such as `CodeImage`, `ProtocolMachine`, `GuestRuntime`, and `OwnedSession`.
+`telltale_machine::semantics` exposes the higher-level semantic interpretation and analysis surface layered over the protocol machine core.
 
 ### telltale-simulator
 
