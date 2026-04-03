@@ -14,7 +14,7 @@
 //!
 //! This corresponds to the memoization infrastructure in the Lean formalization.
 
-use crate::content_id::{ContentId, Hasher, Sha256Hasher};
+use crate::content_id::{ContentId, DefaultContentHasher, Hasher};
 use crate::contentable::{Contentable, ContentableError};
 use std::collections::HashMap;
 use std::hash::Hash as StdHash;
@@ -54,7 +54,7 @@ impl CacheMetrics {
 ///
 /// - `K`: The content key type (must implement `Contentable`)
 /// - `V`: The cached value type
-/// - `H`: The hash algorithm (default: `Sha256Hasher`)
+/// - `H`: The hash algorithm (default: `DefaultContentHasher`)
 ///
 /// # Examples
 ///
@@ -74,7 +74,7 @@ impl CacheMetrics {
 /// assert_eq!(store.get(&global).unwrap(), Some(&local));
 /// ```
 #[derive(Debug)]
-pub struct ContentStore<K: Contentable, V, H: Hasher + Eq + StdHash = Sha256Hasher> {
+pub struct ContentStore<K: Contentable, V, H: Hasher + Eq + StdHash = DefaultContentHasher> {
     store: HashMap<ContentId<H>, V>,
     collision_witnesses: Option<HashMap<ContentId<H>, Vec<u8>>>,
     hits: AtomicU64,
@@ -313,7 +313,7 @@ impl<K: Contentable, V: Clone, H: Hasher + Eq + StdHash> Clone for ContentStore<
 /// - `K`: The content key type (must implement `Contentable`)
 /// - `E`: The extra key type (e.g., role name)
 /// - `V`: The cached value type
-/// - `H`: The hash algorithm (default: `Sha256Hasher`)
+/// - `H`: The hash algorithm (default: `DefaultContentHasher`)
 ///
 /// # Examples
 ///
@@ -340,7 +340,7 @@ pub struct KeyedContentStore<
     K: Contentable,
     E: StdHash + Eq,
     V,
-    H: Hasher + Eq + StdHash = Sha256Hasher,
+    H: Hasher + Eq + StdHash = DefaultContentHasher,
 > {
     store: HashMap<ContentId<H>, HashMap<E, V>>,
     collision_witnesses: Option<HashMap<ContentId<H>, Vec<u8>>>,

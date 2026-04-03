@@ -14,12 +14,14 @@ pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
     fn algorithm_name() -> &'static str;
 }
 
-pub struct ContentId<H: Hasher = Sha256Hasher> {
+pub type DefaultContentHasher = Blake3Hasher;
+
+pub struct ContentId<H: Hasher = DefaultContentHasher> {
     hash: H::Digest,
 }
 ```
 
-SHA-256 is the default hasher. A custom `Hasher` implementation can trade off speed or proof system constraints.
+`DefaultContentHasher` is the central policy alias for content addressing and currently resolves to `Blake3Hasher`. SHA-256 remains available as an explicit alternative behind the `sha256` crate feature when compatibility matters. A custom `Hasher` implementation can still trade off speed or proof system constraints.
 
 ## Contentable
 
@@ -44,9 +46,9 @@ use telltale_types::{GlobalType, Label};
 use telltale_types::contentable::Contentable;
 
 let open = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("free_t"));
-assert!(open.content_id_sha256().is_err());
+assert!(open.content_id_default().is_err());
 
-let template_id = open.template_id_sha256()?;
+let template_id = open.template_id_default()?;
 let template_bytes = open.to_template_bytes()?;
 ```
 
@@ -62,7 +64,7 @@ use telltale_types::contentable::Contentable;
 
 let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 let json_bytes = g.to_bytes()?;
-let cid = g.content_id_sha256()?;
+let cid = g.content_id_default()?;
 ```
 
 JSON and DAG-CBOR produce different content IDs for the same value. One format should be used consistently within a system. Switching formats is a cache-boundary event that requires regenerating persisted IDs.
@@ -96,7 +98,7 @@ use telltale_theory::project;
 
 let global = GlobalType::send("Alice", "Bob", Label::new("ping"), GlobalType::End);
 let mut cache: HashMap<(ContentId<_>, String), LocalTypeR> = HashMap::new();
-let cid = global.content_id_sha256()?;
+let cid = global.content_id_default()?;
 let key = (cid, "Alice".to_string());
 
 if let Some(cached) = cache.get(&key) {

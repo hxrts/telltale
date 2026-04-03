@@ -37,7 +37,11 @@ pub mod units;
 mod val_type;
 
 pub use action::{Action, LocalAction};
-pub use content_id::{ContentId, ContentIdSha256, Hasher, Sha256Hasher};
+pub use content_id::{
+    Blake3Hasher, ContentId, ContentIdBlake3, DefaultContentHasher, DefaultContentId, Hasher,
+};
+#[cfg(feature = "sha256")]
+pub use content_id::{ContentIdSha256, Sha256Hasher};
 pub use content_store::{CacheMetrics, ContentStore, KeyedContentStore};
 pub use contentable::{Contentable, ContentableError};
 pub use fixed_q32::{FixedQ32, FixedQ32Error, PPM_SCALE};

@@ -43,8 +43,9 @@
 //! ```
 
 use crate::limits::{CacheEntries, DEFAULT_PROJECTOR_CACHE_ENTRIES};
+use std::hash::Hash as StdHash;
 use std::sync::Arc;
-use telltale_types::content_id::Sha256Hasher;
+use telltale_types::content_id::{DefaultContentHasher, Hasher};
 use telltale_types::content_store::{CacheMetrics, KeyedContentStore};
 use telltale_types::contentable::Contentable;
 use telltale_types::merge::{merge_all, MergeError};
@@ -255,18 +256,18 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
 /// println!("Cache: {} hits, {} misses", metrics.hits, metrics.misses);
 /// ```
 #[derive(Debug, Clone)]
-pub struct MemoizedProjector {
-    cache: KeyedContentStore<GlobalType, String, Result<Arc<LocalTypeR>, ProjectionError>>,
+pub struct MemoizedProjector<H: Hasher + Eq + StdHash = DefaultContentHasher> {
+    cache: KeyedContentStore<GlobalType, String, Result<Arc<LocalTypeR>, ProjectionError>, H>,
     max_entries: CacheEntries,
 }
 
-impl Default for MemoizedProjector {
+impl<H: Hasher + Eq + StdHash> Default for MemoizedProjector<H> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl MemoizedProjector {
+impl<H: Hasher + Eq + StdHash> MemoizedProjector<H> {
     /// Create a new memoized projector with empty cache.
     #[must_use]
     pub fn new() -> Self {
@@ -321,7 +322,7 @@ impl MemoizedProjector {
     ) -> Result<Arc<LocalTypeR>, ProjectionError> {
         let role_key = role.to_string();
         let cid = global
-            .content_id::<Sha256Hasher>()
+            .content_id::<H>()
             .map_err(|e| ProjectionError::ContentAddressing(e.to_string()))?;
 
         // Check if already cached
@@ -361,6 +362,12 @@ impl MemoizedProjector {
     #[must_use]
     pub fn metrics(&self) -> CacheMetrics {
         self.cache.metrics()
+    }
+
+    /// Return the content-addressing algorithm used by this projector's cache.
+    #[must_use]
+    pub fn hasher_algorithm(&self) -> &'static str {
+        H::algorithm_name()
     }
 
     /// Clear the cache.

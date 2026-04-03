@@ -12,6 +12,7 @@
 //!
 //! This module corresponds to `lean/SessionTypes/ContentIdentityPolicy.lean`.
 
+#[cfg(feature = "sha256")]
 use sha2::Digest;
 use std::fmt;
 use std::hash::Hash;
@@ -25,11 +26,11 @@ use std::marker::PhantomData;
 /// # Example
 ///
 /// ```
-/// use telltale_types::content_id::{Hasher, Sha256Hasher};
+/// use telltale_types::content_id::{Blake3Hasher, Hasher};
 ///
 /// let data = b"hello world";
-/// let hash = Sha256Hasher::digest(data);
-/// assert_eq!(hash.len(), Sha256Hasher::HASH_SIZE);
+/// let hash = Blake3Hasher::digest(data);
+/// assert_eq!(hash.len(), Blake3Hasher::HASH_SIZE);
 /// ```
 pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
     /// Fixed-size digest type produced by this hasher.
@@ -48,18 +49,45 @@ pub trait Hasher: Clone + Default + PartialEq + Send + Sync + 'static {
     fn algorithm_name() -> &'static str;
 }
 
-/// SHA-256 hasher implementation (default).
+/// BLAKE3 hasher implementation (default).
 ///
-/// SHA-256 is chosen as the default because:
-/// - Widely supported and well-understood
-/// - 256-bit output provides strong collision resistance
-/// - Compatible with most ZK systems
-/// - Native hardware acceleration on modern CPUs
+/// BLAKE3 is chosen as the default because:
+/// - Fast on modern CPUs
+/// - Deterministic 256-bit output
+/// - Strong implementation ergonomics for high-throughput content addressing
+/// - Good fit for memoization-heavy protocol tooling
+#[derive(Clone, Default, Debug, PartialEq, Eq, Hash)]
+pub struct Blake3Hasher;
+
+impl Hasher for Blake3Hasher {
+    type Digest = [u8; 32];
+
+    const HASH_SIZE: usize = 32;
+
+    fn digest(data: &[u8]) -> Self::Digest {
+        *blake3::hash(data).as_bytes()
+    }
+
+    fn algorithm_name() -> &'static str {
+        "blake3"
+    }
+}
+
+/// Central default hasher policy for content addressing.
 ///
-/// Uses `sha2` crate.
+/// Higher layers should prefer this alias over naming a concrete hash
+/// implementation directly so the workspace can change defaults in one place.
+pub type DefaultContentHasher = Blake3Hasher;
+
+/// SHA-256 hasher implementation.
+///
+/// SHA-256 remains available as an explicit alternative when compatibility
+/// with external systems or proof assumptions requires it.
+#[cfg(feature = "sha256")]
 #[derive(Clone, Default, Debug, PartialEq, Eq, Hash)]
 pub struct Sha256Hasher;
 
+#[cfg(feature = "sha256")]
 impl Hasher for Sha256Hasher {
     type Digest = [u8; 32];
 
@@ -82,18 +110,18 @@ impl Hasher for Sha256Hasher {
 ///
 /// # Type Parameter
 ///
-/// - `H`: The hash algorithm to use (default: `Sha256Hasher`)
+/// - `H`: The hash algorithm to use (default: `DefaultContentHasher`)
 ///
 /// # Examples
 ///
 /// ```
-/// use telltale_types::content_id::{ContentId, Sha256Hasher};
+/// use telltale_types::content_id::{ContentId, DefaultContentHasher};
 ///
-/// let cid: ContentId<Sha256Hasher> = ContentId::from_bytes(b"test data");
+/// let cid: ContentId<DefaultContentHasher> = ContentId::from_bytes(b"test data");
 /// assert_eq!(cid.as_bytes().len(), 32);
 /// ```
 #[derive(Clone, PartialEq, Eq, Hash)]
-pub struct ContentId<H: Hasher = Sha256Hasher> {
+pub struct ContentId<H: Hasher = DefaultContentHasher> {
     hash: H::Digest,
     _hasher: PhantomData<H>,
 }
@@ -198,13 +226,41 @@ impl<H: Hasher> fmt::Display for ContentId<H> {
     }
 }
 
+/// Convenience type alias for default-hasher content IDs.
+pub type DefaultContentId = ContentId<DefaultContentHasher>;
+
+/// Convenience type alias for BLAKE3 content IDs.
+pub type ContentIdBlake3 = ContentId<Blake3Hasher>;
+
 /// Convenience type alias for SHA-256 content IDs.
+#[cfg(feature = "sha256")]
 pub type ContentIdSha256 = ContentId<Sha256Hasher>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_blake3_empty() {
+        let hash = Blake3Hasher::digest(b"");
+        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(
+            hex,
+            "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
+        );
+    }
+
+    #[test]
+    fn test_blake3_hello() {
+        let hash = Blake3Hasher::digest(b"hello");
+        let hex: String = hash.iter().map(|b| format!("{b:02x}")).collect();
+        assert_eq!(
+            hex,
+            "ea8f163db38682925e4491c5e58d4bb3506ef8c14eb78a86e908c5624a67200f"
+        );
+    }
+
+    #[cfg(feature = "sha256")]
     #[test]
     fn test_sha256_empty() {
         // SHA-256 of empty string
@@ -216,6 +272,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "sha256")]
     #[test]
     fn test_sha256_hello() {
         // SHA-256 of "hello"
@@ -229,37 +286,37 @@ mod tests {
 
     #[test]
     fn test_content_id_from_bytes() {
-        let cid = ContentIdSha256::from_bytes(b"test");
+        let cid = ContentIdBlake3::from_bytes(b"test");
         assert_eq!(cid.as_bytes().len(), 32);
     }
 
     #[test]
     fn test_content_id_deterministic() {
-        let cid1 = ContentIdSha256::from_bytes(b"same data");
-        let cid2 = ContentIdSha256::from_bytes(b"same data");
+        let cid1 = ContentIdBlake3::from_bytes(b"same data");
+        let cid2 = ContentIdBlake3::from_bytes(b"same data");
         assert_eq!(cid1, cid2);
     }
 
     #[test]
     fn test_content_id_different() {
-        let cid1 = ContentIdSha256::from_bytes(b"data1");
-        let cid2 = ContentIdSha256::from_bytes(b"data2");
+        let cid1 = ContentIdBlake3::from_bytes(b"data1");
+        let cid2 = ContentIdBlake3::from_bytes(b"data2");
         assert_ne!(cid1, cid2);
     }
 
     #[test]
     fn test_content_id_hex() {
-        let cid = ContentIdSha256::from_bytes(b"");
+        let cid = ContentIdBlake3::from_bytes(b"");
         assert_eq!(
             cid.to_hex(),
-            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
         );
     }
 
     #[test]
     fn test_content_id_debug() {
-        let cid = ContentIdSha256::from_bytes(b"test");
+        let cid = ContentIdBlake3::from_bytes(b"test");
         let debug = format!("{cid:?}");
-        assert!(debug.contains("ContentId<sha256>"));
+        assert!(debug.contains("ContentId<blake3>"));
     }
 }

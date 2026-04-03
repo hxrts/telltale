@@ -1,7 +1,6 @@
 use super::{can_step, step, GlobalAction};
 use crate::limits::{TraversalFuel, DEFAULT_TRAVERSAL_FUEL};
 use std::collections::BTreeSet;
-use telltale_types::content_id::Sha256Hasher;
 use telltale_types::contentable::Contentable;
 use telltale_types::GlobalType;
 
@@ -152,7 +151,7 @@ fn good_g_fuel(g: &GlobalType, fuel: usize, visited: &mut BTreeSet<String>) -> b
 }
 
 fn global_fingerprint(g: &GlobalType) -> String {
-    g.content_id::<Sha256Hasher>()
+    g.content_id_default()
         .map(|cid| cid.to_hex())
         .unwrap_or_else(|_| format!("{g:?}"))
 }

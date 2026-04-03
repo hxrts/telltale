@@ -107,7 +107,7 @@ The crate provides content addressing infrastructure. The `ContentId` type wraps
 
 #### Feature Flags
 
-The `dag-cbor` feature enables DAG-CBOR serialization for IPLD or IPFS compatibility. It adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_sha256()` methods to `Contentable` types.
+The `dag-cbor` feature enables DAG-CBOR serialization for IPLD or IPFS compatibility. It adds `to_cbor_bytes()`, `from_cbor_bytes()`, and `content_id_cbor_default()` methods to `Contentable` types. If the `sha256` feature is also enabled, `content_id_cbor_sha256()` is available as an explicit alternative.
 
 ```rust
 use telltale_types::{GlobalType, LocalTypeR, Label, PayloadSort};

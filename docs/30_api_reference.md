@@ -33,7 +33,9 @@ Type definitions shared across the stack.
 Key exports:
 
 - `GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`
-- `ContentId`, `Sha256Hasher`, `ContentStore`, `KeyedContentStore`
+- `ContentId`, `Blake3Hasher`, `ContentStore`, `KeyedContentStore`
+- `DefaultContentHasher` and `DefaultContentId` for central content-hash policy
+- `Sha256Hasher` and `ContentIdSha256` when the `sha256` feature is enabled
 - Merge helpers (`merge`, `merge_all`, `can_merge`) and canonical-serialization utilities
 
 See `rust/types/src/lib.rs` for re-exports.

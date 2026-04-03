@@ -24,7 +24,9 @@
 //! This module corresponds to `lean/SessionTypes/ContentIdentityPolicy.lean`.
 //! The `toCbor`/`fromCbor` methods in Lean map to `to_cbor_bytes`/`from_cbor_bytes` here.
 
-use crate::content_id::{ContentId, Hasher, Sha256Hasher};
+#[cfg(feature = "sha256")]
+use crate::content_id::Sha256Hasher;
+use crate::content_id::{Blake3Hasher, ContentId, DefaultContentHasher, Hasher};
 use crate::de_bruijn::{GlobalTypeDB, LocalTypeRDB};
 use crate::{GlobalType, Label, LocalTypeR, PayloadSort};
 use serde::{de::DeserializeOwned, Serialize};
@@ -111,11 +113,30 @@ pub trait Contentable: Sized {
         Ok(ContentId::from_bytes(&bytes))
     }
 
-    /// Compute content ID using default SHA-256 hasher (from JSON bytes).
+    /// Compute content ID using the central default content hasher (from JSON bytes).
     ///
     /// # Errors
     ///
     /// Returns [`ContentableError`] if serialization fails.
+    fn content_id_default(&self) -> Result<ContentId<DefaultContentHasher>, ContentableError> {
+        self.content_id()
+    }
+
+    /// Compute content ID using explicit BLAKE3 (from JSON bytes).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
+    fn content_id_blake3(&self) -> Result<ContentId<Blake3Hasher>, ContentableError> {
+        self.content_id()
+    }
+
+    /// Compute content ID using SHA-256 (from JSON bytes).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
+    #[cfg(feature = "sha256")]
     fn content_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id()
     }
@@ -130,11 +151,30 @@ pub trait Contentable: Sized {
         Ok(ContentId::from_bytes(&bytes))
     }
 
-    /// Compute a template ID using default SHA-256 hasher.
+    /// Compute a template ID using the central default content hasher.
     ///
     /// # Errors
     ///
     /// Returns [`ContentableError`] if serialization fails.
+    fn template_id_default(&self) -> Result<ContentId<DefaultContentHasher>, ContentableError> {
+        self.template_id()
+    }
+
+    /// Compute a template ID using explicit BLAKE3.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
+    fn template_id_blake3(&self) -> Result<ContentId<Blake3Hasher>, ContentableError> {
+        self.template_id()
+    }
+
+    /// Compute a template ID using SHA-256.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
+    #[cfg(feature = "sha256")]
     fn template_id_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.template_id()
     }
@@ -153,12 +193,33 @@ pub trait Contentable: Sized {
         Ok(ContentId::from_bytes(&bytes))
     }
 
-    /// Compute content ID from DAG-CBOR using SHA-256 (requires `dag-cbor` feature).
+    /// Compute content ID from DAG-CBOR using the central default content hasher
+    /// (requires `dag-cbor` feature).
     ///
     /// # Errors
     ///
     /// Returns [`ContentableError`] if serialization fails.
     #[cfg(feature = "dag-cbor")]
+    fn content_id_cbor_default(&self) -> Result<ContentId<DefaultContentHasher>, ContentableError> {
+        self.content_id_cbor()
+    }
+
+    /// Compute content ID from DAG-CBOR using explicit BLAKE3 (requires `dag-cbor` feature).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
+    #[cfg(feature = "dag-cbor")]
+    fn content_id_cbor_blake3(&self) -> Result<ContentId<Blake3Hasher>, ContentableError> {
+        self.content_id_cbor()
+    }
+
+    /// Compute content ID from DAG-CBOR using SHA-256 (requires `dag-cbor` feature).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ContentableError`] if serialization fails.
+    #[cfg(all(feature = "dag-cbor", feature = "sha256"))]
     fn content_id_cbor_sha256(&self) -> Result<ContentId<Sha256Hasher>, ContentableError> {
         self.content_id_cbor()
     }
@@ -455,6 +516,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_default_content_id_helper() {
+        let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
+        let cid = g.content_id_default().unwrap();
+        assert_eq!(cid.algorithm(), "blake3");
+    }
+
+    #[test]
     fn test_payload_sort_roundtrip() {
         let sort = PayloadSort::prod(PayloadSort::Nat, PayloadSort::Bool);
         let bytes = sort.to_bytes().unwrap();
@@ -488,8 +556,8 @@ mod tests {
 
         // And the same content ID
         assert_eq!(
-            g1.content_id_sha256().unwrap(),
-            g2.content_id_sha256().unwrap()
+            g1.content_id_default().unwrap(),
+            g2.content_id_default().unwrap()
         );
     }
 
@@ -508,8 +576,8 @@ mod tests {
 
         assert_eq!(t1.to_bytes().unwrap(), t2.to_bytes().unwrap());
         assert_eq!(
-            t1.content_id_sha256().unwrap(),
-            t2.content_id_sha256().unwrap()
+            t1.content_id_default().unwrap(),
+            t2.content_id_default().unwrap()
         );
     }
 
@@ -593,8 +661,8 @@ mod tests {
 
         assert_ne!(g1.to_bytes().unwrap(), g2.to_bytes().unwrap());
         assert_ne!(
-            g1.content_id_sha256().unwrap(),
-            g2.content_id_sha256().unwrap()
+            g1.content_id_default().unwrap(),
+            g2.content_id_default().unwrap()
         );
     }
 
@@ -618,8 +686,8 @@ mod tests {
         );
 
         assert_eq!(
-            g1.content_id_sha256().unwrap(),
-            g2.content_id_sha256().unwrap()
+            g1.content_id_default().unwrap(),
+            g2.content_id_default().unwrap()
         );
     }
 
@@ -644,8 +712,8 @@ mod tests {
 
         // These are NOT α-equivalent
         assert_ne!(
-            g1.content_id_sha256().unwrap(),
-            g2.content_id_sha256().unwrap()
+            g1.content_id_default().unwrap(),
+            g2.content_id_default().unwrap()
         );
     }
 
@@ -667,10 +735,10 @@ mod tests {
     fn test_global_type_open_term_has_template_id() {
         let open = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("free_t"));
         let tid = open
-            .template_id_sha256()
+            .template_id_default()
             .expect("open terms should support template IDs");
         let tid2 = open
-            .template_id_sha256()
+            .template_id_default()
             .expect("template IDs should be deterministic");
         assert_eq!(tid, tid2);
     }
@@ -679,10 +747,10 @@ mod tests {
     fn test_local_type_open_term_has_template_id() {
         let open = LocalTypeR::send("B", Label::new("msg"), LocalTypeR::var("free_t"));
         let tid = open
-            .template_id_sha256()
+            .template_id_default()
             .expect("open terms should support template IDs");
         let tid2 = open
-            .template_id_sha256()
+            .template_id_default()
             .expect("template IDs should be deterministic");
         assert_eq!(tid, tid2);
     }
@@ -692,8 +760,8 @@ mod tests {
         let g1 = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("x"));
         let g2 = GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("y"));
         assert_ne!(
-            g1.template_id_sha256().unwrap(),
-            g2.template_id_sha256().unwrap()
+            g1.template_id_default().unwrap(),
+            g2.template_id_default().unwrap()
         );
     }
 
@@ -768,8 +836,8 @@ mod tests {
 
             assert_eq!(g1.to_cbor_bytes().unwrap(), g2.to_cbor_bytes().unwrap());
             assert_eq!(
-                g1.content_id_cbor_sha256().unwrap(),
-                g2.content_id_cbor_sha256().unwrap()
+                g1.content_id_cbor_default().unwrap(),
+                g2.content_id_cbor_default().unwrap()
             );
         }
 
@@ -978,8 +1046,8 @@ mod proptests {
         /// Property: Same type produces same content ID
         #[test]
         fn prop_content_id_deterministic(g in arb_closed_global_type(3)) {
-            let cid1 = g.content_id_sha256().unwrap();
-            let cid2 = g.content_id_sha256().unwrap();
+            let cid1 = g.content_id_default().unwrap();
+            let cid2 = g.content_id_default().unwrap();
             prop_assert_eq!(cid1, cid2);
         }
 
@@ -1000,8 +1068,8 @@ mod proptests {
 
             // α-equivalent closed types should have same content ID
             prop_assert_eq!(
-                g.content_id_sha256().unwrap(),
-                renamed.content_id_sha256().unwrap(),
+                g.content_id_default().unwrap(),
+                renamed.content_id_default().unwrap(),
                 "α-equivalent closed types should have same content ID"
             );
         }
@@ -1013,8 +1081,8 @@ mod proptests {
             if let Ok(recovered) = GlobalType::from_bytes(&bytes) {
                 // Roundtrip should preserve content ID (α-equivalence)
                 prop_assert_eq!(
-                    g.content_id_sha256().unwrap(),
-                    recovered.content_id_sha256().unwrap(),
+                    g.content_id_default().unwrap(),
+                    recovered.content_id_default().unwrap(),
                     "roundtrip should preserve content ID for closed types"
                 );
             }
@@ -1046,8 +1114,8 @@ mod proptests {
 
             // Same content ID regardless of branch order
             prop_assert_eq!(
-                g1.content_id_sha256().unwrap(),
-                g2.content_id_sha256().unwrap(),
+                g1.content_id_default().unwrap(),
+                g2.content_id_default().unwrap(),
                 "branch order should not affect content ID"
             );
         }
@@ -1062,8 +1130,8 @@ mod proptests {
             let t2 = LocalTypeR::mu("y", LocalTypeR::send(&partner, label, LocalTypeR::var("y")));
 
             prop_assert_eq!(
-                t1.content_id_sha256().unwrap(),
-                t2.content_id_sha256().unwrap(),
+                t1.content_id_default().unwrap(),
+                t2.content_id_default().unwrap(),
                 "α-equivalent local types should have same content ID"
             );
         }

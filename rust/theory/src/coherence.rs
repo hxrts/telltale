@@ -17,7 +17,6 @@ use crate::projection::MemoizedProjector;
 use crate::semantics;
 use crate::well_formedness::unique_labels;
 use std::collections::BTreeSet;
-use telltale_types::content_id::Sha256Hasher;
 use telltale_types::contentable::Contentable;
 use telltale_types::merge::merge_all;
 use telltale_types::GlobalType;
@@ -237,7 +236,7 @@ fn can_project_role(
 }
 
 fn global_fingerprint(g: &GlobalType) -> String {
-    g.content_id::<Sha256Hasher>()
+    g.content_id_default()
         .map(|cid| cid.to_hex())
         .unwrap_or_else(|_| format!("{g:?}"))
 }

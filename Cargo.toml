@@ -253,6 +253,7 @@ regex = "1.10"
 lazy_static = "1.4"
 toml = "0.8"
 sha2 = "0.10"
+blake3 = "1.5"
 parking_lot = "0.12"
 fixed = { version = "~1.30", default-features = false, features = ["std"] }
 
