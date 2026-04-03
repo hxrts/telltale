@@ -11,9 +11,11 @@ use telltale_simulator::contracts::{
     ExpectedPublication,
 };
 use telltale_simulator::generated::ScenarioEffectResult;
-use telltale_simulator::harness::{DirectAdapter, HarnessConfig, HarnessSpec, SimulationHarness};
+use telltale_simulator::harness::{
+    DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, SimulationHarness,
+};
 use telltale_simulator::material::{MaterialParams, MeanFieldParams};
-use telltale_simulator::scenario::{OutputConfig, Scenario};
+use telltale_simulator::scenario::Scenario;
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -65,6 +67,32 @@ impl EffectHandler for PassthroughHandler {
     }
 }
 
+struct StateProvidingAdapter {
+    handler: PassthroughHandler,
+}
+
+impl HostAdapter for StateProvidingAdapter {
+    fn effect_handler(&self) -> &dyn EffectHandler {
+        &self.handler
+    }
+
+    fn initial_states(
+        &self,
+        _scenario: &Scenario,
+    ) -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String> {
+        let mut states = BTreeMap::new();
+        states.insert(
+            "A".to_string(),
+            vec![FixedQ32::half(), FixedQ32::half()],
+        );
+        states.insert(
+            "B".to_string(),
+            vec![FixedQ32::half(), FixedQ32::half()],
+        );
+        Ok(Some(states))
+    }
+}
+
 fn simple_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
     let global = GlobalType::mu(
         "loop",
@@ -104,16 +132,15 @@ fn scenario() -> Scenario {
         concurrency: 1,
         seed: 5,
         network: None,
-        material: MaterialParams::MeanField(MeanFieldParams {
+        material: Some(MaterialParams::MeanField(MeanFieldParams {
             beta: FixedQ32::one(),
             species: vec!["up".into(), "down".into()],
             initial_state: vec![FixedQ32::half(), FixedQ32::half()],
             step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
-        }),
+        })),
         events: Vec::new(),
         properties: None,
         checkpoint_interval: None,
-        output: OutputConfig::default(),
     }
 }
 
@@ -260,6 +287,23 @@ fn run_config_enforces_contract_checks() {
         Err(err) => err,
     };
     assert!(err.contains("missing sampled trace records"));
+}
+
+#[test]
+fn generic_harness_run_succeeds_without_built_in_material() {
+    let (global_type, local_types) = simple_protocol();
+    let mut scenario = scenario();
+    scenario.material = None;
+    let spec = HarnessSpec::new(local_types, global_type, scenario);
+
+    let adapter = StateProvidingAdapter {
+        handler: PassthroughHandler,
+    };
+    let harness = SimulationHarness::new(&adapter);
+    let result = harness.run(&spec).expect("generic harness run");
+
+    assert!(result.trace.records.iter().any(|record| record.role == "A"));
+    assert!(result.trace.records.iter().any(|record| record.role == "B"));
 }
 
 #[test]

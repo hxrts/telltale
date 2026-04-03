@@ -1,7 +1,7 @@
 //! TOML scenario format for simulation runs.
 //!
 //! A scenario specifies the roles, material layer, parameters, step count,
-//! and output configuration for a simulation.
+//! and middleware configuration for a simulation.
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -35,8 +35,9 @@ pub struct Scenario {
     /// Optional network configuration.
     #[serde(default)]
     pub network: Option<NetworkSpec>,
-    /// Material parameters.
-    pub material: MaterialParams,
+    /// Optional built-in material parameters for material-driven adapters.
+    #[serde(default)]
+    pub material: Option<MaterialParams>,
     /// Fault injection events.
     #[serde(default)]
     pub events: Vec<EventSpec>,
@@ -46,39 +47,6 @@ pub struct Scenario {
     /// Checkpoint interval (ticks). None = disabled.
     #[serde(default)]
     pub checkpoint_interval: Option<u64>,
-    /// Output configuration.
-    #[serde(default)]
-    pub output: OutputConfig,
-}
-
-/// Output configuration for trace writing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OutputConfig {
-    /// Output file path (defaults to stdout if not set).
-    pub file: Option<String>,
-    /// Output format.
-    #[serde(default)]
-    pub format: OutputFormat,
-}
-
-impl Default for OutputConfig {
-    fn default() -> Self {
-        Self {
-            file: None,
-            format: OutputFormat::Json,
-        }
-    }
-}
-
-/// Trace output format.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum OutputFormat {
-    /// JSON array of step records.
-    #[default]
-    Json,
-    /// JSON lines (one record per line).
-    Jsonl,
 }
 
 /// Network configuration in TOML-friendly units.

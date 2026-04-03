@@ -19,7 +19,8 @@ fn main() {
     let config_path = args.config_path;
     let config = HarnessConfig::from_file(&config_path).unwrap_or_else(|e| fatal(&e));
 
-    let adapter = MaterialAdapter::from_scenario(&config.spec.scenario);
+    let adapter =
+        MaterialAdapter::from_scenario(&config.spec.scenario).unwrap_or_else(|e| fatal(&e));
     let harness = SimulationHarness::new(&adapter);
 
     let result = harness.run(&config.spec).unwrap_or_else(|e| fatal(&e));

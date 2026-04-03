@@ -27,7 +27,11 @@ fn main() {
     let mut machine: ProtocolMachine =
         serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
 
-    let handler = handler_from_material(&scenario.material);
+    let material = scenario
+        .material
+        .as_ref()
+        .unwrap_or_else(|| fatal("scenario is missing built-in material parameters"));
+    let handler = handler_from_material(material);
     let max_rounds = replay_args.rounds.unwrap_or(scenario.steps);
     let concurrency = usize::try_from(scenario.concurrency)
         .unwrap_or_else(|_| fatal("scenario.concurrency exceeds usize"));

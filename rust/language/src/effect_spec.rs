@@ -289,7 +289,7 @@ fn render_generated_simulator(families: &[GeneratedEffectFamily]) -> String {
          // This file provides first-class simulator helpers for generated effect families.\n\n\
          use std::collections::BTreeMap;\n\n\
          use serde_json::Value;\n\
-         use telltale_simulator::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, ScenarioEffectResult};\n\n",
+         use telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, ScenarioEffectResult};\n\n",
     );
 
     for family in families {

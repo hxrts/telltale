@@ -6,8 +6,7 @@ use crate::fault::Fault;
 use crate::material::MaterialParams;
 use crate::property::Property;
 use crate::scenario::{
-    EventSpec, FaultActionSpec, LivenessSpec, OutputConfig, OutputFormat, PropertiesSpec, Scenario,
-    TriggerSpec,
+    EventSpec, FaultActionSpec, LivenessSpec, PropertiesSpec, Scenario, TriggerSpec,
 };
 
 /// Build a deterministic baseline scenario with no network or fault events.
@@ -25,14 +24,10 @@ pub fn deterministic_baseline(
         concurrency: 1,
         seed: 0,
         network: None,
-        material,
+        material: Some(material),
         events: Vec::new(),
         properties: None,
         checkpoint_interval: None,
-        output: OutputConfig {
-            file: None,
-            format: OutputFormat::Json,
-        },
     }
 }
 

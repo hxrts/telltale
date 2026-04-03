@@ -17,9 +17,6 @@ fn test_parse_mean_field_scenario() {
             species = ["up", "down"]
             initial_state = ["0.6", "0.4"]
             step_size = "0.01"
-
-            [output]
-            format = "jsonl"
         "#;
 
     let scenario = Scenario::parse(toml).expect("parse scenario");
@@ -27,7 +24,7 @@ fn test_parse_mean_field_scenario() {
     assert_eq!(scenario.roles, vec!["A", "B"]);
     assert_eq!(scenario.steps, 1000);
     assert_eq!(scenario.seed, 42);
-    match &scenario.material {
+    match scenario.material.as_ref().expect("material should parse") {
         MaterialParams::MeanField(mf) => {
             let expected = FixedQ32::from_ratio(3, 2).expect("1.5");
             let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
@@ -57,6 +54,19 @@ fn test_default_seed_when_missing() {
 
     let scenario = Scenario::parse(toml).expect("parse scenario");
     assert_eq!(scenario.seed, 0);
+}
+
+#[test]
+fn test_parse_generic_scenario_without_material() {
+    let toml = r#"
+            name = "generic"
+            roles = ["A", "B"]
+            steps = 4
+            seed = 1
+        "#;
+
+    let scenario = Scenario::parse(toml).expect("parse generic scenario");
+    assert!(scenario.material.is_none());
 }
 
 #[test]

@@ -86,9 +86,16 @@ impl MaterialAdapter {
     }
 
     /// Build a material adapter from a scenario.
-    #[must_use]
-    pub fn from_scenario(scenario: &Scenario) -> Self {
-        Self::new(scenario.material.clone())
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the scenario does not declare built-in material params.
+    pub fn from_scenario(scenario: &Scenario) -> Result<Self, String> {
+        let material = scenario
+            .material
+            .clone()
+            .ok_or_else(|| "scenario is missing built-in material parameters".to_string())?;
+        Ok(Self::new(material))
     }
 }
 
@@ -260,7 +267,11 @@ pub fn derive_initial_states_for_model(
 pub fn derive_initial_states(
     scenario: &Scenario,
 ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
-    derive_initial_states_for_model(&scenario.material, &scenario.roles)
+    let material = scenario
+        .material
+        .as_ref()
+        .ok_or_else(|| "scenario is missing built-in material parameters".to_string())?;
+    derive_initial_states_for_model(material, &scenario.roles)
 }
 
 #[cfg(test)]
@@ -352,16 +363,15 @@ mod tests {
             concurrency: 1,
             seed: 7,
             network: None,
-            material: MaterialParams::MeanField(MeanFieldParams {
+            material: Some(MaterialParams::MeanField(MeanFieldParams {
                 beta: FixedQ32::one(),
                 species: vec!["up".into(), "down".into()],
                 initial_state: vec![FixedQ32::half(), FixedQ32::half()],
                 step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
-            }),
+            })),
             events: Vec::new(),
             properties: None,
             checkpoint_interval: None,
-            output: crate::scenario::OutputConfig::default(),
         }
     }
 
@@ -377,14 +387,14 @@ mod tests {
     #[test]
     fn derive_initial_states_for_hamiltonian_maps_role_index() {
         let mut scenario = mean_field_scenario();
-        scenario.material = MaterialParams::Hamiltonian(HamiltonianParams {
+        scenario.material = Some(MaterialParams::Hamiltonian(HamiltonianParams {
             spring_constant: FixedQ32::one(),
             mass: FixedQ32::one(),
             dimensions: 1,
             initial_positions: vec![FixedQ32::one(), FixedQ32::neg_one()],
             initial_momenta: vec![FixedQ32::zero(), FixedQ32::zero()],
             step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
-        });
+        }));
 
         let states = derive_initial_states(&scenario).expect("derive states");
         assert_eq!(states["A"], vec![FixedQ32::one(), FixedQ32::zero()]);
@@ -403,6 +413,25 @@ mod tests {
         assert_eq!(states["A"], vec![FixedQ32::one()]);
         assert_eq!(states["B"], vec![FixedQ32::from_ratio(2, 1).expect("2")]);
         adapter.effect_handler();
+    }
+
+    #[test]
+    fn material_adapter_from_scenario_requires_material() {
+        let mut scenario = mean_field_scenario();
+        scenario.material = None;
+        let err = match MaterialAdapter::from_scenario(&scenario) {
+            Ok(_) => panic!("material should be required"),
+            Err(err) => err,
+        };
+        assert!(err.contains("missing built-in material"));
+    }
+
+    #[test]
+    fn derive_initial_states_requires_material_when_not_provided_by_adapter() {
+        let mut scenario = mean_field_scenario();
+        scenario.material = None;
+        let err = derive_initial_states(&scenario).expect_err("material should be required");
+        assert!(err.contains("missing built-in material"));
     }
 
     #[test]
