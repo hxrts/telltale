@@ -125,11 +125,35 @@ That lane keeps canonical vs invalidated finalization paths and
 committed-cutover vs rolled-back runtime-upgrade artifacts executable and
 claim-visible.
 
+## Scope Decision Criteria
+
+A concern is eligible to move into the protocol-machine/effect/DSL boundary
+when all of the following hold:
+
+1. It changes protocol-critical behavior rather than only presentation or app-internal behavior.
+2. It can be represented as typed outcomes, evidence, receipts, or obligations rather than opaque host internals.
+3. It is observable at the replay/audit/effect-trace boundary.
+4. The protocol machine can enforce or validate it at a meaningful boundary.
+5. Lean/Rust correspondence can model it without inventing a separate host-language semantics.
+
+A concern should stay host-only when any of the following hold:
+
+1. It is mainly UI/view/reduction logic.
+2. It depends on implementation-specific nondeterministic runtime internals rather than typed protocol observations.
+3. It cannot be expressed as typed evidence/outcomes without dragging in a general-purpose application semantics.
+4. It is not part of the safety-visible or replay-visible protocol interface.
+
+### Classification
+
+| Boundary | Examples |
+|---|---|
+| Move into protocol machine/effect layer | typed effect outcomes, authority/evidence/receipt objects, explicit timeout/cancellation/failure semantics, structured authority traces |
+| Move into DSL | `case/of` pattern matching, unions and `type alias`, `let`-bound evidence values, `check` syntax, `effect`/`uses` declarations |
+| Keep host-only | UI/view/reduction architecture, frontend state taxonomies, storage/retry/transport internals, rendering-oriented observed state |
+
 ## Related Docs
 
 - [Capability and Admission](602_capability_admission.md)
-- [Protocol-Critical Authority Scope](603_protocol_authority_scope.md)
 - [Authority Language Surface](604_authority_language_surface.md)
-- [Protocol-Critical Authority and Evidence](605_protocol_authority_evidence.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Verification Inventory](806_verification_inventory.md)

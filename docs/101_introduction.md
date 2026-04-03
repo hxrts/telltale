@@ -84,12 +84,10 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [API Reference](805_api_reference.md) | Reference | Informative |
 | [Glossary and Notation Index](807_glossary_notation.md) | Reference | Informative |
 | [Verification Inventory](806_verification_inventory.md) | Reference | Informative |
-| [Protocol-Critical Authority Scope](603_protocol_authority_scope.md) | Reference | Normative |
+| [Capability Model](601_capability_model.md) | Reference | Normative |
 | [Authority Language Surface](604_authority_language_surface.md) | Reference | Normative |
-| [Protocol-Critical Authority and Evidence](605_protocol_authority_evidence.md) | Reference | Normative |
 | [Semantic Runtime Name Parity](704_semantic_runtime_name_parity.md) | Reference | Normative |
 | [Conservation Framework](102_conservation_framework.md) | Concept | Normative |
-| [Capability Model](601_capability_model.md) | Reference | Normative |
 
 ## Paths by Role
 

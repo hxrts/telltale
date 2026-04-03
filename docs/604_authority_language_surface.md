@@ -393,35 +393,51 @@ Current design rule:
 - missing or ambiguous authoritative input must become typed failure, never silent fallback success
 - canonical replay artifacts must preserve these decisions as structured semantic audit records rather than opaque host-only log text
 
-## Future Extension Path
+## Source-Derived Capability Boundary Rows
 
-The initial design is nominal on purpose.
+The rows below are source-derived and checked against
+`telltale_machine::protocol_critical_capability_boundary()` by
+`rust/bridge/tests/docs_contract_tests.rs`.
 
-Not part of the current language surface:
+| Surface | Class | Lifecycle | Rust boundary | Lean boundary | Rationale |
+|---|---|---|---|---|---|
+| `runtime_admission` | `admission` | `issued`, `rejected` | `rust/machine/src/runtime_contracts.rs` | `lean/Runtime/Proofs/TheoremPack/AdmissionBoundary.lean` | Admits or rejects runtime/profile execution before protocol-critical execution begins. |
+| `theorem_pack_capabilities` | `admission` | `issued`, `rejected` | `rust/machine/src/composition.rs` | `lean/Runtime/Proofs/TheoremPack/API.lean` | Carries proof-backed eligibility that higher-level runtime admission consumes. |
+| `ownership_capability` | `ownership` | `issued`, `invalidated`, `expired`, `rejected` | `rust/machine/src/session/overview.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Proves which actor may currently mutate session-local protocol-critical state. |
+| `readiness_witness` | `evidence` | `issued`, `consumed`, `rejected`, `invalidated`, `expired` | `rust/machine/src/session/overview.rs` | `lean/Runtime/Proofs/AuthorityMetatheory.lean` | Justifies a protocol-critical readiness decision under one live owner generation. |
+| `authoritative_read` | `evidence` | `issued`, `consumed`, `rejected` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Evidence.lean` | Carries evidence-bearing protocol input that may author canonical truth. |
+| `materialization_proof` | `evidence` | `issued`, `consumed`, `rejected` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Evidence.lean` | Witnesses proof-bearing success on the sanctioned materialization path. |
+| `canonical_handle` | `evidence` | `issued`, `consumed`, `rejected`, `invalidated` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Evidence.lean` | Provides the strong reference required on parity-critical follow-on paths. |
+| `ownership_receipt` | `transition` | `issued`, `committed`, `rolled_back`, `rejected`, `invalidated`, `expired` | `rust/machine/src/session/overview.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Stages and commits explicit ownership transfer rather than ambient authority mutation. |
+| `semantic_handoff` | `transition` | `committed`, `rolled_back`, `rejected`, `invalidated` | `rust/machine/src/semantic_objects.rs` | `lean/Runtime/Proofs/Conservation/Authority.lean` | Represents explicit protocol-visible authority transfer and old-owner revocation. |
+| `reconfiguration_transition` | `transition` | `issued`, `committed`, `rolled_back`, `rejected` | `rust/machine/src/composition.rs` | `lean/Runtime/Proofs/ReconfigurationObserver.lean` | Captures protocol-critical cutover and membership/runtime transition artifacts. |
 
-- effect polymorphism
-- parameterized effect rows
-- generalized handler polymorphism
+## Runtime Meaning
 
-Reserved extension points:
+Language-level authority checks lower into the existing runtime authority surfaces:
 
-- stable effect/interface names
-- explicit operation signatures
-- explicit `uses` lists
-- AST nodes that separate effect references from generic expression calls
+- `check Effect.op(...)` lowers to the typed protocol-machine effect boundary
+- successful protocol-critical checks produce explicit evidence/witness objects
+- invalid or missing evidence fails closed
+- timeout and cancellation become explicit observable/runtime-audit outcomes
+- transfer/delegation emits explicit receipts and audit records
+- stale capability, receipt, and witness reuse are rejected and retained in the lifecycle audit
 
-## Why Nominal First
+This keeps the language aligned with `EffectHandler` typed outcomes,
+`OwnedSession` ownership capability checks, the witness family
+(`ReadinessWitness`, `CancellationWitness`, `TimeoutWitness`), and
+`semantic_audit_log` replay-visible event ordering.
 
-The first effect-interface feature is deliberately nominal.
+## Fail-Closed Rules
 
-Reasons:
+Protocol-critical authority must not degrade into ambient host heuristics.
 
-- the protocol machine and Lean already have a typed effect-obligation boundary centered on
-  `invoke`
-- nominal interfaces are enough to make host dependencies explicit and typed
-- observational audit/parity semantics are easier to stabilize with named
-  interfaces and operations
-- generalized effect polymorphism should wait until the nominal lowering,
-  replay/audit model, and Rust/Lean correspondence are stable
+- no implicit wildcard/default masking for `Result` and `Maybe`
+- no ad hoc "missing data means false" authority checks
+- no silent reuse of stale capabilities or receipts
+- no hidden host-only branch decisions outside typed effect queries
 
-This keeps the current system small while leaving a clean path toward later parameterized or polymorphic effects.
+This design does not create a second host/runtime bridge. The authoritative
+path is: declare a nominal `effect`, name it in `uses`, invoke it with
+`check Effect.op(...)`, lower it into the existing typed protocol-machine
+`invoke` boundary, and preserve its outcome in effect/audit/replay surfaces.

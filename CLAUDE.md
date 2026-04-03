@@ -243,9 +243,8 @@ The `docs/` directory contains mdbook documentation:
 - `docs/401_protocol_machine_architecture.md`: Protocol machine architecture
 - `docs/703_rust_lean_parity.md`: Lean/Rust parity policy and deviation registry
 - `docs/701_lean_verification.md`: Formal verification pipeline
-- `docs/603_protocol_authority_scope.md`: Protocol authority boundary classification
-- `docs/604_authority_language_surface.md`: Authority and failure DSL constructs
-- `docs/605_protocol_authority_evidence.md`: Evidence and typed outcome semantics
+- `docs/601_capability_model.md`: Capability model, scope criteria, and finalization
+- `docs/604_authority_language_surface.md`: Authority language surface and evidence semantics
 - `docs/102_conservation_framework.md`: Conservation framework and design philosophy
 
 The Lean codebase has its own documentation at `lean/CODE_MAP.md`.

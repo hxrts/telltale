@@ -134,4 +134,4 @@ Instead of "the system hung," a developer sees: which operation, which owner, wh
 - [Theory](103_theory.md)
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Protocol-Critical Authority and Evidence](605_protocol_authority_evidence.md)
+- [Authority Language Surface](604_authority_language_surface.md)
