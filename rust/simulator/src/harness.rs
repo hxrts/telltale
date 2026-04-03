@@ -6,6 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 
 use crate::contracts::{assert_contracts, ContractCheckConfig};
@@ -161,6 +162,24 @@ pub struct HarnessConfig {
     pub contracts: ContractCheckConfig,
 }
 
+/// Batch execution configuration for harness runs.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct BatchConfig {
+    /// Optional worker count override.
+    ///
+    /// When absent, the harness resolves a CI-aware default.
+    #[serde(default)]
+    pub parallelism: Option<usize>,
+}
+
+/// Deterministic batch execution result.
+pub struct BatchRunResult {
+    /// Resolved worker count.
+    pub parallelism: usize,
+    /// Per-spec results in the same order as the input slice.
+    pub results: Vec<Result<ScenarioResult, String>>,
+}
+
 impl HarnessConfig {
     /// Load harness config from JSON or TOML.
     ///
@@ -230,6 +249,77 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
         assert_contracts(&result, &config.contracts)?;
         Ok(result)
     }
+
+    /// Execute many specs with deterministic input-order results.
+    ///
+    /// # Errors
+    ///
+    /// Returns a per-spec `Err` entry when one run fails.
+    pub fn run_batch(&self, specs: &[HarnessSpec]) -> BatchRunResult
+    where
+        A: Sync,
+    {
+        self.run_batch_with(specs, BatchConfig::default())
+    }
+
+    /// Execute many specs with explicit batch configuration.
+    #[allow(clippy::missing_panics_doc)]
+    pub fn run_batch_with(&self, specs: &[HarnessSpec], config: BatchConfig) -> BatchRunResult
+    where
+        A: Sync,
+    {
+        let parallelism = resolve_batch_parallelism(config.parallelism);
+        if specs.is_empty() {
+            return BatchRunResult {
+                parallelism,
+                results: Vec::new(),
+            };
+        }
+        if parallelism <= 1 || specs.len() == 1 {
+            return BatchRunResult {
+                parallelism,
+                results: specs.iter().map(|spec| self.run(spec)).collect(),
+            };
+        }
+
+        let next = AtomicUsize::new(0);
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        std::thread::scope(|scope| {
+            for _ in 0..parallelism {
+                let tx = tx.clone();
+                let next = &next;
+                scope.spawn(move || {
+                    loop {
+                        let idx = next.fetch_add(1, Ordering::Relaxed);
+                        let Some(spec) = specs.get(idx) else {
+                            break;
+                        };
+                        let result = self.run(spec);
+                        if tx.send((idx, result)).is_err() {
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+        drop(tx);
+
+        let mut ordered = (0..specs.len()).map(|_| None).collect::<Vec<_>>();
+        for (idx, result) in rx {
+            ordered[idx] = Some(result);
+        }
+
+        BatchRunResult {
+            parallelism,
+            results: ordered
+                .into_iter()
+                .map(|entry| {
+                    entry.unwrap_or_else(|| Err("batch worker terminated without a result".into()))
+                })
+                .collect(),
+        }
+    }
 }
 
 fn resolve_initial_states<A: HostAdapter + ?Sized>(
@@ -257,6 +347,39 @@ pub fn derive_initial_states_for_model(
     roles: &[String],
 ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
     material.derive_initial_states(roles)
+}
+
+fn resolve_batch_parallelism(requested: Option<usize>) -> usize {
+    resolve_batch_parallelism_for(
+        requested,
+        running_in_ci(),
+        std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1)
+            .max(1),
+    )
+}
+
+fn resolve_batch_parallelism_for(
+    requested: Option<usize>,
+    ci: bool,
+    available_parallelism: usize,
+) -> usize {
+    match requested {
+        Some(n) => n.max(1),
+        None if ci => 1,
+        None => available_parallelism.max(1),
+    }
+}
+
+fn running_in_ci() -> bool {
+    std::env::var("CI")
+        .ok()
+        .map(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            !(normalized.is_empty() || normalized == "0" || normalized == "false")
+        })
+        .unwrap_or(false)
 }
 
 /// Derive per-role initial states from built-in scenario material parameters.
@@ -360,7 +483,7 @@ mod tests {
             name: "mean_field_harness".to_string(),
             roles: vec!["A".to_string(), "B".to_string()],
             steps: 8,
-            concurrency: 1,
+            execution: crate::scenario::ExecutionSpec::default(),
             seed: 7,
             network: None,
             material: Some(MaterialParams::MeanField(MeanFieldParams {
@@ -468,5 +591,37 @@ mod tests {
             loaded.contracts.replay_coherence,
             config.contracts.replay_coherence
         );
+    }
+
+    #[test]
+    fn batch_parallelism_serializes_in_ci() {
+        assert_eq!(resolve_batch_parallelism_for(Some(4), true, 8), 4);
+        assert_eq!(resolve_batch_parallelism_for(None, true, 8), 1);
+        assert_eq!(resolve_batch_parallelism_for(None, false, 8), 8);
+    }
+
+    #[test]
+    fn run_batch_preserves_input_order() {
+        let scenario_a = mean_field_scenario();
+        let mut scenario_b = mean_field_scenario();
+        scenario_b.seed = 99;
+
+        let local_types = BTreeMap::from([
+            ("A".to_string(), LocalTypeR::End),
+            ("B".to_string(), LocalTypeR::End),
+        ]);
+        let spec_a = HarnessSpec::new(local_types.clone(), GlobalType::End, scenario_a);
+        let spec_b = HarnessSpec::new(local_types, GlobalType::End, scenario_b);
+
+        let adapter = MaterialAdapter::from_scenario(&spec_a.scenario).expect("material adapter");
+        let harness = SimulationHarness::new(&adapter);
+        let batch = harness.run_batch_with(&[spec_a, spec_b], BatchConfig { parallelism: Some(2) });
+
+        assert_eq!(batch.parallelism, 2);
+        assert_eq!(batch.results.len(), 2);
+        let first = batch.results[0].as_ref().expect("first result");
+        let second = batch.results[1].as_ref().expect("second result");
+        assert_eq!(first.stats.seed, 7);
+        assert_eq!(second.stats.seed, 99);
     }
 }

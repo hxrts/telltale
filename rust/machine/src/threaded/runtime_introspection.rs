@@ -1,4 +1,116 @@
 impl ThreadedProtocolMachine {
+    /// Snapshot all session states.
+    #[must_use]
+    pub fn session_snapshots(
+        &self,
+    ) -> std::collections::BTreeMap<crate::session::SessionId, crate::session::SessionState> {
+        self.sessions
+            .sessions
+            .read()
+            .expect("threaded ProtocolMachine lock poisoned")
+            .iter()
+            .map(|(sid, session)| {
+                (
+                    *sid,
+                    session
+                        .lock()
+                        .expect("threaded ProtocolMachine lock poisoned")
+                        .clone(),
+                )
+            })
+            .collect()
+    }
+
+    /// Snapshot all coroutines.
+    #[must_use]
+    pub fn coroutines(&self) -> Vec<crate::coroutine::Coroutine> {
+        self.coroutines
+            .iter()
+            .map(|coro| {
+                coro.lock()
+                    .expect("threaded ProtocolMachine lock poisoned")
+                    .clone()
+            })
+            .collect()
+    }
+
+    /// Snapshot all coroutines for one session.
+    #[must_use]
+    pub fn session_coroutines(
+        &self,
+        sid: crate::session::SessionId,
+    ) -> Vec<crate::coroutine::Coroutine> {
+        self.coroutines
+            .iter()
+            .filter_map(|coro| {
+                let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
+                (guard.session_id == sid).then(|| guard.clone())
+            })
+            .collect()
+    }
+
+    /// Overwrite a prefix of one coroutine register file.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the coroutine or register range is invalid.
+    pub fn overwrite_coroutine_registers(
+        &mut self,
+        coro_id: usize,
+        start: usize,
+        values: &[crate::coroutine::Value],
+    ) -> Result<(), String> {
+        let Some(coro) = self.coroutines.get(coro_id) else {
+            return Err(format!("missing coroutine {coro_id}"));
+        };
+        let mut guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
+        if start > guard.regs.len() || start.saturating_add(values.len()) > guard.regs.len() {
+            return Err(format!(
+                "register update out of bounds for coroutine {coro_id}: start={start}, len={}",
+                values.len()
+            ));
+        }
+        for (offset, value) in values.iter().cloned().enumerate() {
+            guard.regs[start + offset] = value;
+        }
+        Ok(())
+    }
+
+    /// Inject a message into a session buffer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session is not found or the buffer enqueue fails.
+    pub fn inject_message(
+        &mut self,
+        sid: crate::session::SessionId,
+        from: &str,
+        to: &str,
+        value: crate::coroutine::Value,
+    ) -> Result<crate::buffer::EnqueueResult, crate::ProtocolMachineError> {
+        let session = self
+            .sessions
+            .get(sid)
+            .ok_or(crate::ProtocolMachineError::SessionNotFound(sid))?;
+        let mut guard = session
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
+        guard
+            .send(from, to, value)
+            .map_err(|_| crate::ProtocolMachineError::SessionNotFound(sid))
+    }
+
+    /// Replace the paused role set used by scheduler selection.
+    pub fn set_paused_roles(&mut self, roles: &std::collections::BTreeSet<String>) {
+        self.paused_roles = roles.clone();
+    }
+
+    /// Access paused roles.
+    #[must_use]
+    pub fn paused_roles(&self) -> &std::collections::BTreeSet<String> {
+        &self.paused_roles
+    }
+
     /// Export the concrete runtime slice used for exact refinement checks.
     ///
     /// # Panics

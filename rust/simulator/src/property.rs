@@ -5,7 +5,7 @@ use telltale_types::FixedQ32;
 
 use telltale_machine::coroutine::{CoroStatus, Coroutine};
 use telltale_machine::instr::Endpoint;
-use telltale_machine::model::state::{SessionId, SessionStore};
+use telltale_machine::model::state::{SessionId, SessionState};
 use telltale_machine::trace::obs_session;
 use telltale_machine::ObsEvent;
 use telltale_types::LocalTypeR;
@@ -23,9 +23,9 @@ pub struct PropertyContext<'a> {
     pub tick: u64,
     /// Observable event trace from the ProtocolMachine.
     pub trace: &'a [ObsEvent],
-    /// Session store for buffer and type state inspection.
-    pub sessions: &'a SessionStore,
-    /// Coroutine list for register inspection.
+    /// Session snapshots for buffer and type state inspection.
+    pub sessions: &'a BTreeMap<SessionId, SessionState>,
+    /// Coroutine snapshots for register inspection.
     pub coroutines: &'a [Coroutine],
 }
 
@@ -434,7 +434,7 @@ impl PropertyMonitor {
                     if *violated {
                         continue;
                     }
-                    if let Some(session) = ctx.sessions.get(*sid) {
+                    if let Some(session) = ctx.sessions.get(sid) {
                         let too_large = session.buffers.values().any(|buf| buf.len() > *max);
                         if too_large {
                             *violated = true;
@@ -522,7 +522,7 @@ impl PropertyMonitor {
                     if *violated {
                         continue;
                     }
-                    if let Some(session) = ctx.sessions.get(*sid) {
+                    if let Some(session) = ctx.sessions.get(sid) {
                         for (ep, entry) in &session.local_types {
                             if contains_recursion(&entry.original) {
                                 continue;

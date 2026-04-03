@@ -122,6 +122,7 @@ pub struct ThreadedProtocolMachine {
     next_effect_id: u64,
     output_condition_checks: Vec<OutputConditionCheck>,
     crashed_sites: BTreeSet<String>,
+    paused_roles: BTreeSet<String>,
     partitioned_edges: BTreeSet<(String, String)>,
     corrupted_edges: BTreeMap<(String, String), CorruptionType>,
     timed_out_sites: BTreeMap<String, u64>,

@@ -6,7 +6,8 @@ use crate::fault::Fault;
 use crate::material::MaterialParams;
 use crate::property::Property;
 use crate::scenario::{
-    EventSpec, FaultActionSpec, LivenessSpec, PropertiesSpec, Scenario, TriggerSpec,
+    EventSpec, ExecutionSpec, FaultActionSpec, LivenessSpec, PropertiesSpec, Scenario,
+    TriggerSpec,
 };
 
 /// Build a deterministic baseline scenario with no network or fault events.
@@ -21,7 +22,7 @@ pub fn deterministic_baseline(
         name: name.into(),
         roles,
         steps,
-        concurrency: 1,
+        execution: ExecutionSpec::default(),
         seed: 0,
         network: None,
         material: Some(material),
@@ -148,7 +149,8 @@ mod tests {
         let scenario =
             deterministic_baseline("baseline", vec!["A".into(), "B".into()], 16, material());
         assert_eq!(scenario.seed, 0);
-        assert_eq!(scenario.concurrency, 1);
+        let execution = scenario.resolved_execution().expect("resolve execution");
+        assert!(execution.scheduler_concurrency >= 1);
         assert!(scenario.events.is_empty());
         assert!(scenario.properties.is_none());
     }

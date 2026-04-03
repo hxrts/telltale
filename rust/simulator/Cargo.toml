@@ -15,8 +15,9 @@ categories = ["simulation"]
 bench = false
 
 [features]
-default = []
+default = ["multi-thread"]
 wasm = ["getrandom/js", "telltale-machine/wasm"]
+multi-thread = ["telltale-machine/multi-thread"]
 
 [dependencies]
 telltale-types = { path = "../types", version = "10.0.0" }

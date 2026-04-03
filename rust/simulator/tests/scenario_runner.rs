@@ -9,12 +9,13 @@ use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, SemanticAuditRecord};
+use telltale_simulator::backend::SimulationMachine;
 use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::runner::{run, run_with_scenario};
-use telltale_simulator::scenario::Scenario;
+use telltale_simulator::scenario::{ResolvedExecutionBackend, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -95,11 +96,7 @@ fn simple_protocol() -> (GlobalType, BTreeMap<String, LocalTypeR>) {
     (global, local_types)
 }
 
-fn write_initial_states(
-    machine: &mut ProtocolMachine,
-    sid: usize,
-    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
-) {
+fn write_initial_states(machine: &mut SimulationMachine, sid: usize, initial_states: &BTreeMap<String, Vec<FixedQ32>>) {
     let coro_info = machine
         .session_coroutines(sid)
         .iter()
@@ -109,13 +106,14 @@ fn write_initial_states(
         let Some(values) = initial_states.get(&role) else {
             continue;
         };
-        if let Some(coro_mut) = machine.coroutine_mut(coro_id) {
-            for (idx, value) in values.iter().enumerate() {
-                let reg_idx = idx + 2;
-                if reg_idx < coro_mut.regs.len() {
-                    coro_mut.regs[reg_idx] = Value::Str(format!("q32:{}", value.to_bits()));
-                }
-            }
+        let encoded = values
+            .iter()
+            .map(|value| Value::Str(format!("q32:{}", value.to_bits())))
+            .collect::<Vec<_>>();
+        if !encoded.is_empty() {
+            machine
+                .overwrite_coroutine_registers(coro_id, 2, &encoded)
+                .expect("write coroutine registers");
         }
     }
 }
@@ -127,9 +125,13 @@ fn scenario_result_includes_replay_and_stats() {
 name = "scenario_replay"
 roles = ["A", "B"]
 steps = 8
-concurrency = 2
 seed = 123
 checkpoint_interval = 2
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
 
 [material]
 layer = "mean_field"
@@ -152,7 +154,9 @@ step_size = "0.01"
     .expect("scenario run");
 
     assert_eq!(result.stats.seed, 123);
-    assert_eq!(result.stats.concurrency, 2);
+    assert_eq!(result.stats.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(result.stats.scheduler_concurrency, 1);
+    assert_eq!(result.stats.worker_threads, 1);
     assert!(result.stats.rounds_executed > 0);
     assert_eq!(result.stats.total_obs_events, result.replay.obs_trace.len());
     assert_eq!(
@@ -241,8 +245,12 @@ fn shared_execution_engine_matches_scenario_runner_semantics() {
 name = "shared_engine_equivalence"
 roles = ["A", "B"]
 steps = 8
-concurrency = 2
 seed = 9
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
 
 [material]
 layer = "mean_field"
@@ -278,7 +286,7 @@ loss_probability = "0.0"
     .expect("scenario run");
 
     let image = CodeImage::from_local_types(&local_types, &global);
-    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut machine = SimulationMachine::Canonical(ProtocolMachine::new(ProtocolMachineConfig::default()));
     let owned = machine
         .load_choreography_owned(&image, "sim/shared-engine-test")
         .expect("load choreography");
@@ -287,13 +295,16 @@ loss_probability = "0.0"
     let initial_states = derive_initial_states(&scenario).expect("derive initial states");
     write_initial_states(&mut machine, sid, &initial_states);
 
-    let middleware = ScenarioMiddleware::from_scenario(
-        &scenario,
-        &PassthroughHandler,
-        machine.clock().tick_duration,
+    let middleware =
+        ScenarioMiddleware::from_scenario(&scenario, &PassthroughHandler, machine.clock().tick_duration)
+            .expect("build middleware");
+    let concurrency = usize::try_from(
+        scenario
+            .resolved_execution()
+            .expect("resolve execution")
+            .scheduler_concurrency,
     )
-    .expect("build middleware");
-    let concurrency = usize::try_from(scenario.concurrency).expect("concurrency fits usize");
+    .expect("concurrency fits usize");
     let max_rounds = scenario.steps.saturating_sub(1);
     let mut monitor = scenario
         .property_monitor()
@@ -307,11 +318,13 @@ loss_probability = "0.0"
         concurrency,
         max_rounds,
         |machine, _completed_rounds| {
+            let session_snapshots = machine.session_snapshots();
+            let coroutine_snapshots = machine.coroutines();
             let ctx = PropertyContext {
                 tick: machine.clock().tick,
                 trace: machine.trace(),
-                sessions: machine.sessions(),
-                coroutines: machine.coroutines(),
+                sessions: &session_snapshots,
+                coroutines: &coroutine_snapshots,
             };
             monitor.check(&ctx);
             Ok(())

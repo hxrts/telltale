@@ -3,8 +3,9 @@
 use std::time::Duration;
 
 use telltale_machine::model::effects::EffectHandler;
-use telltale_machine::{ProtocolMachine, StepResult};
+use telltale_machine::StepResult;
 
+use crate::backend::SimulationMachine;
 use crate::fault::FaultInjector;
 use crate::network::NetworkModel;
 use crate::rng::SimRng;
@@ -35,7 +36,7 @@ impl<'a> ScenarioMiddleware<'a> {
 
     fn prepare_round(
         &self,
-        machine: &mut ProtocolMachine,
+        machine: &mut SimulationMachine,
         next_tick: u64,
         next_logical_step: u64,
     ) -> Result<(), String> {
@@ -90,7 +91,7 @@ impl<'a> ScenarioMiddleware<'a> {
 
     fn step_round(
         &self,
-        machine: &mut ProtocolMachine,
+        machine: &mut SimulationMachine,
         concurrency: usize,
     ) -> Result<StepResult, String> {
         match self {
@@ -107,12 +108,12 @@ pub struct ExecutionSummary {
 
 /// Execute scenario rounds with one shared middleware ordering.
 pub fn execute_scenario_rounds(
-    machine: &mut ProtocolMachine,
+    machine: &mut SimulationMachine,
     _scenario: &Scenario,
     middleware: &ScenarioMiddleware<'_>,
     concurrency: usize,
     max_rounds: u64,
-    mut after_round: impl FnMut(&ProtocolMachine, u64) -> Result<(), String>,
+    mut after_round: impl FnMut(&SimulationMachine, u64) -> Result<(), String>,
 ) -> Result<ExecutionSummary, String> {
     let mut rounds_executed = 0_u64;
 

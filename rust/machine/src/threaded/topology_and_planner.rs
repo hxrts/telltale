@@ -428,6 +428,7 @@ impl ThreadedProtocolMachine {
         planner: &mut WavePlannerState,
         coros: &[Arc<Mutex<Coroutine>>],
         crashed_sites: &BTreeSet<SiteId>,
+        paused_roles: &BTreeSet<SiteId>,
         timed_out_sites: &BTreeMap<SiteId, u64>,
         id: usize,
     ) -> bool {
@@ -438,6 +439,7 @@ impl ThreadedProtocolMachine {
         let sid = coro_guard.session_id;
         let lane = id % planner.lane_count;
         if crashed_sites.contains(&coro_guard.role)
+            || paused_roles.contains(&coro_guard.role)
             || timed_out_sites.contains_key(&coro_guard.role)
         {
             return false;
@@ -536,6 +538,7 @@ impl ThreadedProtocolMachine {
                             &mut planner,
                             coros,
                             &self.crashed_sites,
+                            &self.paused_roles,
                             &self.timed_out_sites,
                             id,
                         )

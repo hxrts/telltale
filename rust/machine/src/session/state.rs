@@ -2,7 +2,7 @@
 ///
 /// Stores per-endpoint local types (the type truth), message buffers,
 /// and lifecycle status. Matches Lean `SessionState`.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct SessionState {
     /// Session identifier.
     pub sid: SessionId,

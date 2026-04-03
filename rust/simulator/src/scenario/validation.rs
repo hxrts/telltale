@@ -29,9 +29,7 @@ fn validate_roles(scenario: &Scenario) -> Result<BTreeSet<String>, String> {
 }
 
 fn validate_limits(scenario: &Scenario) -> Result<(), String> {
-    if scenario.concurrency == 0 {
-        return Err("scenario.concurrency must be >= 1".to_string());
-    }
+    scenario.resolved_execution()?;
     if matches!(scenario.checkpoint_interval, Some(0)) {
         return Err("scenario.checkpoint_interval must be > 0 when set".to_string());
     }

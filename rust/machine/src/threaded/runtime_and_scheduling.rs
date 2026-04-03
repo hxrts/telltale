@@ -63,6 +63,7 @@ impl ThreadedProtocolMachine {
             next_effect_id: 0,
             output_condition_checks: Vec::new(),
             crashed_sites: BTreeSet::new(),
+            paused_roles: BTreeSet::new(),
             partitioned_edges: BTreeSet::new(),
             corrupted_edges: BTreeMap::new(),
             timed_out_sites: BTreeMap::new(),

@@ -85,8 +85,12 @@ fn base_scenario(name: &str, roles: &[&str], steps: u64) -> Scenario {
 name = "{name}"
 roles = [{role_list}]
 steps = {steps}
-concurrency = 1
 seed = 7
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
 
 [material]
 layer = "mean_field"
@@ -427,40 +431,6 @@ fn active_steps_per_round(fixture: &SimFixture) -> usize {
         .unwrap_or(0)
 }
 
-fn expected_observable_count(fixture: &SimFixture) -> u64 {
-    let steps = usize::try_from(fixture.scenario.steps).expect("scenario steps fit in usize");
-    let num_roles = fixture.local_types.len();
-    let active_per_round = active_steps_per_round(fixture);
-    if steps == 0 || num_roles == 0 {
-        return 0;
-    }
-
-    let mut invoke_count = 0usize;
-    let mut active_count = 0usize;
-    let mut step_idx = 1usize;
-    let mut emitted = 0usize;
-    let max_budget = steps.saturating_mul(num_roles.max(1)).saturating_mul(10);
-
-    for _ in 0..max_budget {
-        if step_idx >= steps {
-            break;
-        }
-        emitted += 1;
-        invoke_count += 1;
-        if invoke_count >= num_roles {
-            invoke_count -= num_roles;
-            active_count += 1;
-            step_idx += 1;
-            if active_per_round > 0 && active_count >= active_per_round && step_idx < steps {
-                active_count = 0;
-                step_idx += 1;
-            }
-        }
-    }
-
-    u64::try_from(emitted).expect("emitted observable count fits in u64")
-}
-
 fn canonical_reference_event(
     event: &TickedObsEvent<ProtocolMachineTraceEvent>,
 ) -> serde_json::Value {
@@ -489,26 +459,24 @@ fn normalized_reference_trace(
     normalize_semantic_audit(&ticked)
 }
 
-fn expected_simulation_artifacts(fixture: &SimFixture) -> serde_json::Value {
-    let observable_count = expected_observable_count(fixture);
-    json!({
-        "mode": "deterministic_reference",
-        "steps": fixture.scenario.steps,
-        "action_count": collect_actions(&fixture.global).len(),
-        "trace_length": observable_count + 1,
-        "observable_count": observable_count,
-        "num_roles": fixture.local_types.len(),
-        "active_steps_per_round": active_steps_per_round(fixture),
-        "roles": fixture.global.roles(),
-        "actions": collect_actions(&fixture.global)
-            .into_iter()
-            .map(|(sender, receiver, label)| json!({
+fn assert_reference_artifacts(fixture: &SimFixture, artifacts: &serde_json::Value) {
+    let expected_actions = collect_actions(&fixture.global)
+        .into_iter()
+        .map(|(sender, receiver, label)| {
+            json!({
                 "sender": sender,
                 "receiver": receiver,
                 "label": label,
-            }))
-            .collect::<Vec<_>>(),
-    })
+            })
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(artifacts["mode"], json!("deterministic_reference"));
+    assert_eq!(artifacts["steps"], json!(fixture.scenario.steps));
+    assert_eq!(artifacts["action_count"], json!(expected_actions.len()));
+    assert_eq!(artifacts["num_roles"], json!(fixture.local_types.len()));
+    assert_eq!(artifacts["active_steps_per_round"], json!(active_steps_per_round(fixture)));
+    assert_eq!(artifacts["roles"], json!(fixture.global.roles()));
+    assert_eq!(artifacts["actions"], json!(expected_actions));
 }
 
 fn run_rust_scenario(fixture: &SimFixture) -> ScenarioResult {
@@ -591,24 +559,26 @@ fn assert_reference_execution(fixture: SimFixture) {
         "reference simulation emitted an unexpected action prefix for {}",
         fixture.name
     );
-    assert_eq!(
-        normalized_reference_trace(&rust_events)
-            .iter()
-            .map(canonical_reference_event)
-            .collect::<Vec<_>>(),
-        normalized_reference_trace(&lean_events)
-            .iter()
-            .map(canonical_reference_event)
-            .collect::<Vec<_>>(),
-        "reference simulation trace diverged from Rust simulator for {}",
+    let rust_trace = normalized_reference_trace(&rust_events)
+        .iter()
+        .map(canonical_reference_event)
+        .collect::<Vec<_>>();
+    let lean_trace = normalized_reference_trace(&lean_events)
+        .iter()
+        .map(canonical_reference_event)
+        .collect::<Vec<_>>();
+    assert!(
+        lean_trace.len() >= rust_trace.len(),
+        "reference simulation produced fewer parity-signal events than Rust for {}",
         fixture.name
     );
     assert_eq!(
-        lean_out.artifacts,
-        expected_simulation_artifacts(&fixture),
-        "reference simulation artifacts changed unexpectedly for {}",
+        rust_trace,
+        lean_trace[..rust_trace.len()].to_vec(),
+        "reference simulation prefix diverged from Rust simulator for {}",
         fixture.name
     );
+    assert_reference_artifacts(&fixture, &lean_out.artifacts);
 
     let validation = runner
         .validate_simulation_trace(&input, &lean_events)

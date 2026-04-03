@@ -3,6 +3,7 @@
 use std::path::PathBuf;
 
 use telltale_machine::ProtocolMachine;
+use telltale_simulator::backend::SimulationMachine;
 use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use telltale_simulator::handler_from_material;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
@@ -24,8 +25,9 @@ fn main() {
 
     let checkpoint =
         std::fs::read(&replay_args.checkpoint_path).unwrap_or_else(|e| fatal(&e.to_string()));
-    let mut machine: ProtocolMachine =
+    let machine: ProtocolMachine =
         serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
+    let mut machine = SimulationMachine::Canonical(machine);
 
     let material = scenario
         .material
@@ -33,8 +35,13 @@ fn main() {
         .unwrap_or_else(|| fatal("scenario is missing built-in material parameters"));
     let handler = handler_from_material(material);
     let max_rounds = replay_args.rounds.unwrap_or(scenario.steps);
-    let concurrency = usize::try_from(scenario.concurrency)
-        .unwrap_or_else(|_| fatal("scenario.concurrency exceeds usize"));
+    let concurrency = usize::try_from(
+        scenario
+            .resolved_execution()
+            .unwrap_or_else(|e| fatal(&e))
+            .scheduler_concurrency,
+    )
+    .unwrap_or_else(|_| fatal("scenario.execution.scheduler_concurrency exceeds usize"));
 
     let mut monitor = scenario
         .property_monitor()
@@ -54,11 +61,13 @@ fn main() {
         concurrency,
         max_rounds,
         |machine, _completed_rounds| {
+            let session_snapshots = machine.session_snapshots();
+            let coroutine_snapshots = machine.coroutines();
             let ctx = PropertyContext {
                 tick: machine.clock().tick,
                 trace: machine.trace(),
-                sessions: machine.sessions(),
-                coroutines: machine.coroutines(),
+                sessions: &session_snapshots,
+                coroutines: &coroutine_snapshots,
             };
             monitor.check(&ctx);
             Ok(())

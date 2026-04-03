@@ -175,7 +175,7 @@ pub mod model {
             AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
             HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
             OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
-            SessionHostMutation, SessionId, SessionStatus, SessionStore, SessionStoreMemoryUsage,
+            SessionHostMutation, SessionId, SessionState, SessionStatus, SessionStore, SessionStoreMemoryUsage,
             SessionStoreRetainedBytes, TimeoutWitness,
         };
         pub use crate::session::{unfold_if_var, unfold_mu};

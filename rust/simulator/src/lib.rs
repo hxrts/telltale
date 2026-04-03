@@ -17,6 +17,8 @@
 #![allow(clippy::missing_errors_doc)]
 
 pub mod analysis;
+#[doc(hidden)]
+pub mod backend;
 pub mod checkpoint;
 pub mod contracts;
 pub mod distributed;
@@ -41,8 +43,8 @@ pub use contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ContractCheckReport,
 };
 pub use harness::{
-    derive_initial_states, derive_initial_states_for_model, DirectAdapter, HarnessConfig,
-    HarnessSpec, HostAdapter, MaterialAdapter, SimulationHarness,
+    derive_initial_states, derive_initial_states_for_model, BatchConfig, BatchRunResult,
+    DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, MaterialAdapter, SimulationHarness,
 };
 pub use material::{MaterialModel, MaterialParams};
 pub use material_handlers::{

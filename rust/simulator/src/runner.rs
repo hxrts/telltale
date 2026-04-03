@@ -6,13 +6,14 @@
 use std::collections::BTreeMap;
 use telltale_types::FixedQ32;
 
+use crate::backend::SimulationMachine;
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
 use telltale_machine::model::output_condition::OutputConditionCheck;
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::ObsEvent;
 use telltale_machine::{
-    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects, SemanticAuditRecord,
-    StepResult,
+    ProtocolMachine, ProtocolMachineConfig, ProtocolMachineSemanticObjects,
+    SemanticAuditRecord, StepResult,
 };
 use telltale_types::{GlobalType, LocalTypeR};
 
@@ -20,7 +21,7 @@ use crate::checkpoint::CheckpointStore;
 use crate::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
-use crate::scenario::Scenario;
+use crate::scenario::{ResolvedExecutionBackend, Scenario};
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
 
@@ -31,14 +32,18 @@ type CoroInfo = Vec<(usize, String)>;
 
 /// Record state for all roles in a coroutine set.
 fn record_all_roles(
-    machine: &ProtocolMachine,
+    machine: &SimulationMachine,
     coro_info: &CoroInfo,
     step: usize,
     trace: &mut Trace,
 ) {
     let step_u64 = u64::try_from(step).unwrap_or(u64::MAX);
     for (coro_id, role) in coro_info {
-        if let Some(coro) = machine.coroutine(*coro_id) {
+        if let Some(coro) = machine
+            .coroutines()
+            .into_iter()
+            .find(|coro| coro.id == *coro_id)
+        {
             trace.record(StepRecord {
                 step: step_u64,
                 role: role.clone(),
@@ -50,7 +55,7 @@ fn record_all_roles(
 
 /// Initialize coroutine registers from FixedQ32 state vectors.
 fn init_coro_regs(
-    machine: &mut ProtocolMachine,
+    machine: &mut SimulationMachine,
     coro_info: &CoroInfo,
     initial_states: &BTreeMap<String, Vec<FixedQ32>>,
 ) -> Result<(), String> {
@@ -58,14 +63,8 @@ fn init_coro_regs(
         let init = initial_states
             .get(role)
             .ok_or_else(|| format!("missing initial state for role '{role}'"))?;
-        if let Some(coro) = machine.coroutine_mut(*coro_id) {
-            let vals = f64s_to_values(init);
-            for (i, v) in vals.into_iter().enumerate() {
-                if i + 2 < coro.regs.len() {
-                    coro.regs[i + 2] = v;
-                }
-            }
-        }
+        let vals = f64s_to_values(init);
+        machine.overwrite_coroutine_registers(*coro_id, 2, &vals)?;
     }
     Ok(())
 }
@@ -94,7 +93,8 @@ pub fn run_concurrent(
     steps: usize,
     handler: &dyn EffectHandler,
 ) -> Result<Vec<Trace>, String> {
-    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut machine =
+        SimulationMachine::Canonical(ProtocolMachine::new(ProtocolMachineConfig::default()));
 
     let mut session_infos: Vec<(usize, CoroInfo)> = Vec::new();
 
@@ -170,7 +170,8 @@ pub fn run(
 ) -> Result<Trace, String> {
     let image = CodeImage::from_local_types(local_types, global_type);
 
-    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut machine =
+        SimulationMachine::Canonical(ProtocolMachine::new(ProtocolMachineConfig::default()));
     let sid = machine
         .load_choreography_owned(&image, "sim/run")
         .map_err(|e| format!("load error: {e}"))?;
@@ -245,8 +246,14 @@ pub struct ScenarioReplayArtifact {
 pub struct ScenarioStats {
     /// Scenario seed used for middleware RNG.
     pub seed: u64,
-    /// Scenario scheduler concurrency value.
-    pub concurrency: u64,
+    /// Resolved execution backend.
+    pub backend: ResolvedExecutionBackend,
+    /// Resolved scheduler concurrency value.
+    pub scheduler_concurrency: u64,
+    /// Resolved worker-thread count.
+    pub worker_threads: u64,
+    /// True when auto execution was serialized because the process is running in CI.
+    pub ci_serialized_default: bool,
     /// Number of protocol-machine rounds executed by the scenario loop.
     pub rounds_executed: u64,
     /// Final protocol-machine clock tick.
@@ -273,7 +280,15 @@ pub fn run_with_scenario(
     handler: &dyn EffectHandler,
 ) -> Result<ScenarioResult, String> {
     let image = CodeImage::from_local_types(local_types, global_type);
-    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let resolved_execution = scenario.resolved_execution()?;
+    if matches!(resolved_execution.backend, ResolvedExecutionBackend::Threaded)
+        && scenario.checkpoint_interval.is_some()
+    {
+        return Err(
+            "scenario checkpoints currently require the canonical simulator backend".to_string(),
+        );
+    }
+    let mut machine = SimulationMachine::new(ProtocolMachineConfig::default(), &resolved_execution);
     let sid = machine
         .load_choreography_owned(&image, "sim/scenario")
         .map_err(|e| format!("load error: {e}"))?;
@@ -292,10 +307,10 @@ pub fn run_with_scenario(
     let max_rounds = scenario.steps.saturating_sub(1);
     let steps_limit = usize::try_from(scenario.steps)
         .map_err(|_| format!("scenario.steps {} exceeds usize", scenario.steps))?;
-    let concurrency = usize::try_from(scenario.concurrency).map_err(|_| {
+    let concurrency = usize::try_from(resolved_execution.scheduler_concurrency).map_err(|_| {
         format!(
-            "scenario.concurrency {} exceeds usize",
-            scenario.concurrency
+            "scenario.execution.scheduler_concurrency {} exceeds usize",
+            resolved_execution.scheduler_concurrency
         )
     })?;
     let mut step_idx: usize = 0;
@@ -337,11 +352,13 @@ pub fn run_with_scenario(
             record_all_roles(machine, &coro_info, step_idx, &mut trace);
             step_idx += 1;
 
+            let session_snapshots = machine.session_snapshots();
+            let coroutine_snapshots = machine.coroutines();
             let ctx = PropertyContext {
                 tick: machine.clock().tick,
                 trace: machine.trace(),
-                sessions: machine.sessions(),
-                coroutines: machine.coroutines(),
+                sessions: &session_snapshots,
+                coroutines: &coroutine_snapshots,
             };
             monitor.check(&ctx);
             if let Some(store) = &mut checkpoints {
@@ -350,7 +367,9 @@ pub fn run_with_scenario(
                         checkpoint_writes = checkpoint_writes.saturating_add(1);
                     }
                 }
-                store.maybe_checkpoint(machine.clock().tick, machine);
+                if let SimulationMachine::Canonical(inner) = machine {
+                    store.maybe_checkpoint(inner.clock().tick, inner);
+                }
             }
             Ok(())
         },
@@ -385,7 +404,10 @@ pub fn run_with_scenario(
         },
         stats: ScenarioStats {
             seed: scenario.seed,
-            concurrency: scenario.concurrency,
+            backend: resolved_execution.backend,
+            scheduler_concurrency: resolved_execution.scheduler_concurrency,
+            worker_threads: resolved_execution.worker_threads,
+            ci_serialized_default: resolved_execution.ci_serialized_default,
             rounds_executed,
             final_tick: machine.clock().tick,
             total_obs_events: machine.trace().len(),

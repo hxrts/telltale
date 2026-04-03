@@ -54,6 +54,10 @@ fn test_default_seed_when_missing() {
 
     let scenario = Scenario::parse(toml).expect("parse scenario");
     assert_eq!(scenario.seed, 0);
+    let execution = scenario.resolved_execution().expect("resolve execution");
+    assert_eq!(execution.backend, ResolvedExecutionBackend::Threaded);
+    assert!(execution.scheduler_concurrency >= 1);
+    assert!(execution.worker_threads >= 1);
 }
 
 #[test]
@@ -159,7 +163,9 @@ fn test_reject_zero_concurrency() {
             name = "bad_concurrency"
             roles = ["A", "B"]
             steps = 1
-            concurrency = 0
+
+            [execution]
+            scheduler_concurrency = 0
 
             [material]
             layer = "mean_field"
@@ -171,8 +177,44 @@ fn test_reject_zero_concurrency() {
             step_size = "0.01"
         "#;
 
-    let error = Scenario::parse(toml).expect_err("zero concurrency must fail");
+    let error = Scenario::parse(toml).expect_err("zero scheduler concurrency must fail");
     assert!(error.contains("concurrency"));
+}
+
+#[test]
+fn test_auto_execution_serializes_in_ci_environment() {
+    let spec = ExecutionSpec::default();
+    let resolved = spec
+        .resolve_for(ExecutionEnvironment {
+            ci: true,
+            available_parallelism: 8,
+            threaded_available: true,
+        })
+        .expect("resolve execution");
+    assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
+    assert_eq!(resolved.scheduler_concurrency, 1);
+    assert_eq!(resolved.worker_threads, 1);
+    assert!(resolved.ci_serialized_default);
+}
+
+#[test]
+fn test_explicit_threaded_execution_keeps_parallel_defaults() {
+    let spec = ExecutionSpec {
+        backend: ExecutionBackend::Threaded,
+        scheduler_concurrency: None,
+        worker_threads: None,
+    };
+    let resolved = spec
+        .resolve_for(ExecutionEnvironment {
+            ci: false,
+            available_parallelism: 6,
+            threaded_available: true,
+        })
+        .expect("resolve execution");
+    assert_eq!(resolved.backend, ResolvedExecutionBackend::Threaded);
+    assert_eq!(resolved.scheduler_concurrency, 6);
+    assert_eq!(resolved.worker_threads, 6);
+    assert!(!resolved.ci_serialized_default);
 }
 
 #[test]

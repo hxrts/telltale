@@ -15,7 +15,7 @@ use telltale_simulator::harness::{
     DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, SimulationHarness,
 };
 use telltale_simulator::material::{MaterialParams, MeanFieldParams};
-use telltale_simulator::scenario::Scenario;
+use telltale_simulator::scenario::{ExecutionSpec, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
 #[derive(Debug, Clone, Copy)]
@@ -129,7 +129,7 @@ fn scenario() -> Scenario {
         name: "harness_contracts".to_string(),
         roles: vec!["A".to_string(), "B".to_string()],
         steps: 10,
-        concurrency: 1,
+        execution: ExecutionSpec::default(),
         seed: 5,
         network: None,
         material: Some(MaterialParams::MeanField(MeanFieldParams {
