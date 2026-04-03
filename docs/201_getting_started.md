@@ -2,139 +2,131 @@
 
 ## Installation
 
-Add Telltale to your project dependencies.
+Choose dependencies based on the integration path you need.
+For most application code using the compile-time DSL, start with the facade crate.
 
 ```toml
 [dependencies]
 telltale = "10.0.0"
-telltale-runtime = "10.0.0"
 ```
 
-This adds the facade crate and the choreographic programming layer. Pinning versions keeps builds reproducible.
+This gives you the root session-type surface and the `tell!` macro.
+Add other crates only when you need a lower-level integration path.
 
-### Which Crate Should You Use
+## Which Crate Should You Use
+
+Use this table to pick the right entry point.
 
 | If you need | Use |
-|-------------|-----|
-| Core session types plus facade APIs | `telltale` |
-| Choreography DSL, parser, and effect handlers | `telltale-runtime` |
-| Projection, merge, and subtyping algorithms | `telltale-theory` |
-| Protocol-machine execution with schedulers | `telltale-machine` |
-| Deterministic simulation and scenario middleware | `telltale-simulator` |
+|---|---|
+| facade APIs plus the `tell!` macro | `telltale` |
+| runtime parsing, validated ASTs, projection, and integration artifacts | `telltale-language` |
+| async choreography handlers and topology/runtime support | `telltale-runtime` |
+| pure theory algorithms | `telltale-theory` |
+| protocol-machine execution in a host runtime | `telltale-machine` |
+| deterministic simulation and host-handler testing | `telltale-simulator` |
 | Lean JSON import, export, and validation tools | `telltale-bridge` |
-| Production transport adapters | `telltale-transport` |
+| production choreography transports | `telltale-transport` |
 
-This table is a quick entry point for crate selection. Use it before reading the full crate descriptions.
+The important split is between the shared frontend and the execution layers.
+`telltale-language` is the shared frontend.
+`telltale-runtime` and `telltale-machine` are different execution paths.
 
-### Understanding the Crates
+## Understanding the Crates
 
-Telltale is organized as a Cargo workspace with several crates. The layout tracks the Lean formalization for shared protocol concepts.
+`telltale-types` contains the core protocol data model.
+It defines `GlobalType`, `LocalTypeR`, `Label`, `PayloadSort`, and content-addressing support.
+Lean still includes a `delegate` constructor that is not exposed in the Rust core `GlobalType`.
 
-The `telltale-types` crate contains core type definitions such as `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort`. Lean includes a `delegate` constructor that is not yet exposed in Rust.
+`telltale-language` is the shared choreography frontend.
+It owns the AST, parser, validation, projection to frontend `LocalType`, ordered annotation extraction, and integration helpers such as `compile_choreography(...)`.
+Use this crate when you need to parse or inspect DSL at runtime without going through macros.
 
-The `telltale-theory` crate contains pure algorithms for projection, merge, subtyping, and well-formedness checks. The `telltale-runtime` crate is the choreographic programming layer that provides the DSL parser, effect handlers, and code generation.
+`telltale-runtime` is the choreography-layer runtime.
+It provides async `ChoreoHandler` integration, topology support, testing helpers, and tooling such as `choreo-fmt` and `effect-scaffold`.
+`telltale-machine` provides the protocol machine and guest-runtime execution surfaces.
 
-The `telltale-machine` crate provides the protocol machine and guest-runtime execution surfaces. The `telltale-simulator` crate wraps the protocol machine with deterministic middleware for testing. The `telltale-bridge` crate enables cross-validation with Lean through JSON import and export functions. The `telltale-transport` crate provides production-oriented transport adapters that integrate with choreography handlers.
+`telltale-simulator` wraps the protocol machine with deterministic middleware for testing.
+`telltale-bridge` supports Rust↔Lean conversion and validation.
+`telltale-transport` provides first-party transport implementations for choreography-layer systems.
 
-The `telltale` crate is the main facade that re-exports types from other crates with feature flags. Most users need both `telltale` and `telltale-runtime` for session types and the high-level DSL.
+## Feature Flags
 
-### Feature Flags
+The workspace uses feature flags to control optional algorithms and target support.
+The root crate keeps its default surface small.
 
-The workspace provides granular feature flags to control dependencies and functionality.
-
-#### Root Crate (`telltale`)
+### Root Crate
 
 | Feature | Default | Description |
-|---------|---------|-------------|
-| `test-utils` | no | Testing utilities (random generation) |
+|---|---|---|
+| `test-utils` | no | testing utilities |
 | `wasm` | no | WebAssembly support |
-| `theory` | no | Session type algorithms via `telltale-theory` |
-| `theory-async-subtyping` | no | POPL 2021 asynchronous subtyping algorithm |
-| `theory-bounded` | no | Bounded recursion strategies |
-| `full` | no | Enable all optional features |
+| `theory` | no | enable `telltale-theory` re-exports |
+| `theory-async-subtyping` | no | enable asynchronous subtyping helpers |
+| `theory-bounded` | no | enable bounded recursion helpers |
+| `full` | no | enable all optional root features |
 
-#### Theory Crate (`telltale-theory`)
-
-| Feature | Default | Description |
-|---------|---------|-------------|
-| `projection` | yes | Global to local type projection |
-| `duality` | yes | Dual type computation |
-| `merge` | yes | Local type merging |
-| `well-formedness` | yes | Type validation |
-| `bounded` | yes | Bounded recursion strategies |
-| `async-subtyping` | yes | POPL 2021 asynchronous subtyping |
-| `sync-subtyping` | yes | Synchronous subtyping |
-| `semantics` | yes | Async step semantics from ECOOP 2025 |
-| `coherence` | yes | Coherence predicates |
-| `full` | no | Enable all optional features |
-
-#### Choreography Crate (`telltale-runtime`)
+### Theory Crate
 
 | Feature | Default | Description |
-|---------|---------|-------------|
-| `test-utils` | no | Testing utilities (random, fault injection) |
+|---|---|---|
+| `projection` | yes | global-to-local projection |
+| `duality` | yes | dual type computation |
+| `merge` | yes | local merge operations |
+| `well-formedness` | yes | theory validation predicates |
+| `bounded` | yes | bounded recursion strategies |
+| `async-subtyping` | yes | asynchronous subtyping |
+| `sync-subtyping` | yes | synchronous subtyping |
+| `semantics` | yes | async step semantics |
+| `coherence` | yes | coherence predicates |
+| `full` | no | enable all optional theory features |
+
+### Runtime Crate
+
+| Feature | Default | Description |
+|---|---|---|
+| `test-utils` | no | runtime testing utilities |
 | `wasm` | no | WebAssembly support |
-| `native-cli` | no | Build native CLI binaries such as `choreo-fmt` |
-| `native-examples` | no | Build native examples that depend on local runtime tooling |
+| `native-cli` | no | build `choreo-fmt` and `effect-scaffold` |
+| `native-examples` | no | build runtime examples that require native tooling |
 
-#### Lean Bridge Crate (`telltale-bridge`)
+### Lean Bridge Crate
 
 | Feature | Default | Description |
-|---------|---------|-------------|
-| `runner` | yes | `LeanRunner` for invoking Lean binary |
-| `cli` | no | Command-line interface binary |
-| `exporter` | no | Choreography exporter binary |
-| `golden` | no | Golden file management CLI |
+|---|---|---|
+| `runner` | yes | enable Lean runner support |
+| `cli` | no | build the main bridge CLI |
+| `exporter` | no | build the choreography exporter binary |
+| `golden` | no | build the golden-file CLI |
 
-#### Example: Minimal Dependencies
+### Minimal Root Dependency
 
 ```toml
-# Just the core runtime, no algorithms
 telltale = { version = "10.0.0", default-features = false }
 ```
 
-This keeps the dependency surface small while enabling the core runtime.
+This keeps the dependency surface small while preserving the core facade crate.
 
-#### Example: Full Feature Set
-
-```toml
-# Everything enabled
-telltale = { version = "10.0.0", features = ["full"] }
-```
-
-This enables all optional features for the facade crate.
-
-For WASM support, enable the `wasm` feature on the choreography crate.
+### Root Crate With Theory Support
 
 ```toml
-telltale-runtime = { version = "10.0.0", features = ["wasm"] }
+telltale = { version = "10.0.0", features = ["theory"] }
 ```
 
-This enables compilation to WebAssembly targets.
+This adds the theory re-exports to the facade crate.
 
-## Creating a Choreography
+### Runtime CLI Tooling
 
-This example shows a simple ping-pong protocol between two roles.
-
-Define the protocol using the `tell!` macro.
-
-```rust
-use telltale::tell;
-
-tell! {
-  protocol PingPong =
-    roles Alice, Bob
-    Alice -> Bob : Ping
-    Bob -> Alice : Pong
-}
+```toml
+telltale-runtime = { version = "10.0.0", features = ["native-cli"] }
 ```
 
-The macro generates the protocol module and, when the protocol is projectable,
-the session surfaces. Use `PingPong::proof_status` to inspect whether a protocol
-is session-projectable or only protocol-machine executable. For advanced
-scenarios requiring runtime parsing, see [Choreographic DSL](202_choreographic_dsl.md).
+Enable this when you want binaries such as `choreo-fmt` or `effect-scaffold`.
+It is not required for normal library usage.
 
-Run the protocol using the effect system.
+## First Protocol With `tell!`
+
+For compile-time protocol definitions, `tell!` is the main public entry point.
 
 ```rust
 use telltale::tell;
@@ -149,51 +141,61 @@ tell! {
 assert!(PingPong::proof_status::SESSION_PROJECTABLE);
 ```
 
-Start from `tell!` and the generated protocol/effect surfaces. The older
-effect-program builder APIs still exist inside `telltale-runtime`, but
-they are no longer the recommended public entrypoint.
+This defines a simple two-role protocol.
+The macro generates the protocol module and, when the protocol is projectable, the session surfaces for that protocol.
+
+## Runtime Parsing Without Macros
+
+Use the shared frontend when protocol text is loaded at runtime or when another tool needs validated artifacts.
+
+```rust
+use telltale_language::compile_choreography;
+
+let compiled = compile_choreography(
+    "protocol PingPong =\n  roles Alice, Bob\n  Alice -> Bob : Ping\n  Bob -> Alice : Pong\n",
+)?;
+
+let local_types = compiled.try_local_type_r_map()?;
+let global_type = compiled.try_global_type()?;
+```
+
+This path parses, validates, and projects the choreography once.
+It is the right entry point for downstream integrations that need AST access, ordered annotations, or theory-facing artifacts.
 
 ## Core Concepts
 
 ### Choreographies
 
-A choreography specifies a distributed protocol from a global viewpoint. Projection transforms the global view into local behavior for each role.
+A choreography describes the protocol from a global viewpoint.
+Projection turns that global description into per-role local behavior.
+This is the main abstraction behind the Telltale DSL.
 
 ### Roles
 
-Roles are participants in the protocol. Each role sends and receives messages according to their projected session type.
+Roles are the participants in the protocol.
+Each role sends and receives messages according to its projected local type.
+Generated session surfaces enforce those obligations at the type level when projection succeeds.
 
 ### Messages
 
-Messages are data exchanged between roles. They must implement `Serialize` and `Deserialize` from the `serde` library.
+Messages are the data exchanged between roles.
+At the choreography layer, message payloads typically use `serde` serialization.
+At the protocol-machine layer, host integration works through typed effect requests and outcomes instead.
 
-### Effect Handlers
+### Handler Boundaries
 
-Handlers interpret choreographic effects into actual communication. Different handlers provide different transports.
+Telltale exposes two main handler surfaces.
+Use `ChoreoHandler` for generated choreography code in `telltale-runtime`.
+Use `EffectHandler` for protocol-machine host integration in `telltale-machine`.
 
-The `InMemoryHandler` provides local testing. The `TelltaleHandler` provides session-based communication. WebSocket handlers provide network communication.
+If you implement protocol-machine `EffectHandler`, validate it through `SimulationHarness` in `telltale-simulator`.
+That is the supported deterministic test path for host integrations.
 
-The `TelltaleHandler` supports two patterns. You can register built-in `TelltaleSession` pairs.
+## Related Docs
 
-```rust
-let (client_session, server_session) = TelltaleSession::pair();
-client_endpoint.register_session(Role::Server, client_session);
-server_endpoint.register_session(Role::Client, server_session);
-```
-
-Both endpoints now communicate through the session pair.
-
-Alternatively, you can wrap your own sink and stream transports.
-
-```rust
-use telltale_runtime::effects::TelltaleSession;
-
-let ws_session = TelltaleSession::from_sink_stream(websocket_writer, websocket_reader);
-client_endpoint.register_session(Role::Server, ws_session);
-```
-
-Both options integrate with the same handler.
-
-### Projection
-
-The system projects global choreographies into local session types. Each role gets a type-safe API for their part of the protocol. This ensures communication follows the choreography specification.
+- [Architecture](104_architecture.md)
+- [Code Organization](105_code_organization.md)
+- [Choreographic DSL](202_choreographic_dsl.md)
+- [Choreography Effect Handlers](301_effect_handlers.md)
+- [Effect Handlers and Session Types](303_effect_session_bridge.md)
+- [Protocol-Machine Simulation](501_simulation_overview.md)
