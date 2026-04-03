@@ -9,10 +9,10 @@ fn test_parse_mean_field_scenario() {
             steps = 1000
             seed = 42
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.5"
             species = ["up", "down"]
             initial_state = ["0.6", "0.4"]
@@ -24,8 +24,8 @@ fn test_parse_mean_field_scenario() {
     assert_eq!(scenario.roles, vec!["A", "B"]);
     assert_eq!(scenario.steps, 1000);
     assert_eq!(scenario.seed, 42);
-    match scenario.material.as_ref().expect("material should parse") {
-        MaterialParams::MeanField(mf) => {
+    match scenario.field.as_ref().expect("field should parse") {
+        FieldSpec::MeanField(mf) => {
             let expected = FixedQ32::from_ratio(3, 2).expect("1.5");
             let eps = FixedQ32::from_ratio(1, 1_000_000).expect("epsilon");
             assert!((mf.beta - expected).abs() < eps);
@@ -42,10 +42,10 @@ fn test_default_seed_when_missing() {
             roles = ["A", "B"]
             steps = 1
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.0"
             species = ["up", "down"]
             initial_state = ["0.5", "0.5"]
@@ -79,7 +79,7 @@ fn test_default_seed_when_missing() {
 }
 
 #[test]
-fn test_parse_generic_scenario_without_material() {
+fn test_parse_generic_scenario_without_field() {
     let toml = r#"
             name = "generic"
             roles = ["A", "B"]
@@ -88,7 +88,7 @@ fn test_parse_generic_scenario_without_material() {
         "#;
 
     let scenario = Scenario::parse(toml).expect("parse generic scenario");
-    assert!(scenario.material.is_none());
+    assert!(scenario.field.is_none());
 }
 
 #[test]
@@ -98,10 +98,10 @@ fn test_parse_network_link_topology() {
             roles = ["A", "B", "C"]
             steps = 10
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.0"
             species = ["up", "down"]
             initial_state = ["0.5", "0.5"]
@@ -184,10 +184,10 @@ fn test_reject_duplicate_roles() {
             roles = ["A", "A"]
             steps = 1
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.0"
             species = ["up", "down"]
             initial_state = ["0.5", "0.5"]
@@ -208,10 +208,10 @@ fn test_reject_zero_concurrency() {
             [execution]
             scheduler_concurrency = 0
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.0"
             species = ["up", "down"]
             initial_state = ["0.5", "0.5"]
@@ -336,10 +336,10 @@ fn test_explicit_theorem_profile_can_make_the_same_execution_ineligible() {
             envelope_profile = "protocol_machine_envelope_adherence"
             assumption_bundle = "fault_free_transport"
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.0"
             species = ["up", "down"]
             initial_state = ["0.5", "0.5"]
@@ -393,10 +393,10 @@ fn test_reject_unknown_link_role() {
             roles = ["A", "B"]
             steps = 1
 
-            [material]
+            [field]
             layer = "mean_field"
 
-            [material.params]
+            [field.params]
             beta = "1.0"
             species = ["up", "down"]
             initial_state = ["0.5", "0.5"]
@@ -413,4 +413,25 @@ fn test_reject_unknown_link_role() {
 
     let error = Scenario::parse(toml).expect_err("unknown link role must fail");
     assert!(error.contains("unknown to-role"));
+}
+
+#[test]
+fn core_scenario_schema_remains_domain_neutral() {
+    let source = include_str!("../scenario.rs");
+    for banned in [
+        "bluetooth",
+        "ble",
+        "wifi",
+        "lte",
+        "quic",
+        "zigbee",
+        "satellite",
+    ] {
+        assert!(
+            !source.contains(&format!("pub {banned}:"))
+                && !source.contains(&format!("pub {banned}_"))
+                && !source.contains(&format!("#[serde(rename = \"{banned}\"")),
+            "core scenario schema should not expose domain-branded field `{banned}`",
+        );
+    }
 }

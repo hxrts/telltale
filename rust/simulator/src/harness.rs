@@ -10,8 +10,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 
 use crate::contracts::{assert_contracts, ContractCheckConfig};
-use crate::material::MaterialModel;
-use crate::runner::{run_with_scenario, ScenarioResult};
+use crate::environment::EnvironmentModels;
+use crate::field::FieldModel;
+use crate::runner::{run_with_scenario_and_environment, ScenarioResult};
 use crate::scenario::{ResolvedTheoremProfile, Scenario};
 use crate::sweep::{run_sweep, SweepConfig, SweepRunResult};
 use crate::EffectHandler;
@@ -28,6 +29,14 @@ pub trait HostAdapter {
         &self,
         _scenario: &Scenario,
     ) -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String> {
+        Ok(None)
+    }
+
+    /// Optionally provide environment-model hooks for the shared execution core.
+    fn environment_models(
+        &self,
+        _scenario: &Scenario,
+    ) -> Result<Option<EnvironmentModels<'_>>, String> {
         Ok(None)
     }
 
@@ -64,44 +73,44 @@ impl HostAdapter for DirectAdapter<'_> {
     }
 }
 
-/// Adapter that uses material-derived handlers from scenario params.
-pub struct MaterialAdapter {
-    model: Box<dyn MaterialModel>,
+/// Adapter that uses field-derived handlers from scenario params.
+pub struct FieldAdapter {
+    model: Box<dyn FieldModel>,
     handler: Box<dyn EffectHandler>,
 }
 
-impl MaterialAdapter {
-    /// Build a material adapter from any material-model implementation.
+impl FieldAdapter {
+    /// Build a field adapter from any field-model implementation.
     #[must_use]
     pub fn new<M>(model: M) -> Self
     where
-        M: MaterialModel + 'static,
+        M: FieldModel + 'static,
     {
         Self::from_boxed_model(Box::new(model))
     }
 
-    /// Build a material adapter from a boxed material-model implementation.
+    /// Build a field adapter from a boxed field-model implementation.
     #[must_use]
-    pub fn from_boxed_model(model: Box<dyn MaterialModel>) -> Self {
-        let handler = crate::handler_from_model(model.as_ref());
+    pub fn from_boxed_model(model: Box<dyn FieldModel>) -> Self {
+        let handler = crate::handler_from_field_model(model.as_ref());
         Self { model, handler }
     }
 
-    /// Build a material adapter from a scenario.
+    /// Build a field adapter from a scenario.
     ///
     /// # Errors
     ///
-    /// Returns an error when the scenario does not declare built-in material params.
+    /// Returns an error when the scenario does not declare built-in field params.
     pub fn from_scenario(scenario: &Scenario) -> Result<Self, String> {
-        let material = scenario
-            .material
+        let field = scenario
+            .field
             .clone()
-            .ok_or_else(|| "scenario is missing built-in material parameters".to_string())?;
-        Ok(Self::new(material))
+            .ok_or_else(|| "scenario is missing built-in field parameters".to_string())?;
+        Ok(Self::new(field))
     }
 }
 
-impl HostAdapter for MaterialAdapter {
+impl HostAdapter for FieldAdapter {
     fn effect_handler(&self) -> &dyn EffectHandler {
         self.handler.as_ref()
     }
@@ -110,7 +119,7 @@ impl HostAdapter for MaterialAdapter {
         &self,
         scenario: &Scenario,
     ) -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String> {
-        derive_initial_states_for_model(self.model.as_ref(), &scenario.roles).map(Some)
+        derive_initial_states_for_field_model(self.model.as_ref(), &scenario.roles).map(Some)
     }
 }
 
@@ -250,12 +259,13 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
     pub fn run(&self, spec: &HarnessSpec) -> Result<ScenarioResult, String> {
         let initial_states = resolve_initial_states(spec, self.adapter)?;
 
-        let result = run_with_scenario(
+        let result = run_with_scenario_and_environment(
             &spec.local_types,
             &spec.global_type,
             &initial_states,
             &spec.scenario,
             self.adapter.effect_handler(),
+            self.adapter.environment_models(&spec.scenario)?,
         )?;
 
         self.adapter.validate_result(&spec.scenario, &result)?;
@@ -401,16 +411,16 @@ fn resolve_initial_states<A: HostAdapter + ?Sized>(
     derive_initial_states(&spec.scenario)
 }
 
-/// Derive per-role initial states from material parameters.
+/// Derive per-role initial states from field parameters.
 ///
 /// # Errors
 ///
-/// Returns an error when material parameters do not match scenario roles.
-pub fn derive_initial_states_for_model(
-    material: &dyn MaterialModel,
+/// Returns an error when field parameters do not match scenario roles.
+pub fn derive_initial_states_for_field_model(
+    field: &dyn FieldModel,
     roles: &[String],
 ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
-    material.derive_initial_states(roles)
+    field.derive_initial_states(roles)
 }
 
 fn resolve_batch_parallelism(requested: Option<usize>) -> usize {
@@ -446,26 +456,26 @@ fn running_in_ci() -> bool {
         .unwrap_or(false)
 }
 
-/// Derive per-role initial states from built-in scenario material parameters.
+/// Derive per-role initial states from built-in scenario field parameters.
 ///
 /// # Errors
 ///
-/// Returns an error when material parameters do not match scenario roles.
+/// Returns an error when field parameters do not match scenario roles.
 pub fn derive_initial_states(
     scenario: &Scenario,
 ) -> Result<BTreeMap<String, Vec<FixedQ32>>, String> {
-    let material = scenario
-        .material
+    let field = scenario
+        .field
         .as_ref()
-        .ok_or_else(|| "scenario is missing built-in material parameters".to_string())?;
-    derive_initial_states_for_model(material, &scenario.roles)
+        .ok_or_else(|| "scenario is missing built-in field parameters".to_string())?;
+    derive_initial_states_for_field_model(field, &scenario.roles)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::contracts::ContractCheckConfig;
-    use crate::material::{HamiltonianParams, MaterialParams, MeanFieldParams};
+    use crate::field::{FieldSpec, HamiltonianFieldSpec, MeanFieldSpec};
     use telltale_machine::coroutine::Value;
     use telltale_machine::model::effects::{EffectResult, SendDecision, SendDecisionInput};
 
@@ -512,10 +522,10 @@ mod tests {
         }
     }
 
-    struct DummyMaterialModel;
+    struct DummyFieldModel;
 
-    impl MaterialModel for DummyMaterialModel {
-        fn layer_name(&self) -> &'static str {
+    impl FieldModel for DummyFieldModel {
+        fn field_name(&self) -> &'static str {
             "dummy"
         }
 
@@ -550,7 +560,7 @@ mod tests {
             execution: crate::scenario::ExecutionSpec::default(),
             seed: 7,
             network: None,
-            material: Some(MaterialParams::MeanField(MeanFieldParams {
+            field: Some(FieldSpec::MeanField(MeanFieldSpec {
                 beta: FixedQ32::one(),
                 species: vec!["up".into(), "down".into()],
                 initial_state: vec![FixedQ32::half(), FixedQ32::half()],
@@ -561,6 +571,7 @@ mod tests {
             properties: None,
             checkpoint_interval: None,
             theorem: crate::scenario::TheoremProfileSpec::default(),
+            extensions: BTreeMap::new(),
         }
     }
 
@@ -576,7 +587,7 @@ mod tests {
     #[test]
     fn derive_initial_states_for_hamiltonian_maps_role_index() {
         let mut scenario = mean_field_scenario();
-        scenario.material = Some(MaterialParams::Hamiltonian(HamiltonianParams {
+        scenario.field = Some(FieldSpec::Hamiltonian(HamiltonianFieldSpec {
             spring_constant: FixedQ32::one(),
             mass: FixedQ32::one(),
             dimensions: 1,
@@ -591,9 +602,9 @@ mod tests {
     }
 
     #[test]
-    fn material_adapter_supports_custom_material_models() {
+    fn field_adapter_supports_custom_field_models() {
         let scenario = mean_field_scenario();
-        let adapter = MaterialAdapter::new(DummyMaterialModel);
+        let adapter = FieldAdapter::new(DummyFieldModel);
         let states = adapter
             .initial_states(&scenario)
             .expect("derive states")
@@ -605,22 +616,22 @@ mod tests {
     }
 
     #[test]
-    fn material_adapter_from_scenario_requires_material() {
+    fn field_adapter_from_scenario_requires_field() {
         let mut scenario = mean_field_scenario();
-        scenario.material = None;
-        let err = match MaterialAdapter::from_scenario(&scenario) {
-            Ok(_) => panic!("material should be required"),
+        scenario.field = None;
+        let err = match FieldAdapter::from_scenario(&scenario) {
+            Ok(_) => panic!("field should be required"),
             Err(err) => err,
         };
-        assert!(err.contains("missing built-in material"));
+        assert!(err.contains("missing built-in field"));
     }
 
     #[test]
-    fn derive_initial_states_requires_material_when_not_provided_by_adapter() {
+    fn derive_initial_states_requires_field_when_not_provided_by_adapter() {
         let mut scenario = mean_field_scenario();
-        scenario.material = None;
-        let err = derive_initial_states(&scenario).expect_err("material should be required");
-        assert!(err.contains("missing built-in material"));
+        scenario.field = None;
+        let err = derive_initial_states(&scenario).expect_err("field should be required");
+        assert!(err.contains("missing built-in field"));
     }
 
     #[test]
@@ -679,7 +690,7 @@ mod tests {
         let spec_a = HarnessSpec::new(local_types.clone(), GlobalType::End, scenario_a);
         let spec_b = HarnessSpec::new(local_types, GlobalType::End, scenario_b);
 
-        let adapter = MaterialAdapter::from_scenario(&spec_a.scenario).expect("material adapter");
+        let adapter = FieldAdapter::from_scenario(&spec_a.scenario).expect("field adapter");
         let harness = SimulationHarness::new(&adapter);
         let batch = harness.run_batch_with(
             &[spec_a, spec_b],

@@ -6,6 +6,7 @@ top of the choreography parser.
 It is the current reference page for language-level authority checks, typed
 failure branching, and nominal effect interfaces.
 It is intentionally narrower than a full generalized effect language.
+General host application authorization is out of scope.
 
 ## Current Surface
 
@@ -204,14 +205,14 @@ forms for protocol-critical authoritative and observational reads.
 
 ## DSL Capability Mapping
 
-| DSL form | Capability class | Canonical lifecycle states |
+| DSL form | Capability class | Lifecycle emphasis |
 |---|---|---|
-| `authoritative let x = check ...` | `evidence` | `issued`, `consumed`, `rejected` |
-| `observe let x = observe ...` | `evidence` | observational-only input, never canonical directly |
-| `let receipt = transfer ...` | `transition` | `issued`, `committed`, `rolled_back`, `rejected`, `invalidated`, `expired` |
-| `publish witness as Publication` | `evidence` | authoritative publication path |
-| `materialize proof from Publication` | `evidence` | `materialized`, `rejected` |
-| `handoff op to Role with receipt` | `transition` | `committed`, `rolled_back`, `invalidated` |
+| `authoritative let x = check ...` | `evidence` | issued -> consumed/rejected |
+| `observe let x = observe ...` | `evidence` | observed-only input, never canonical directly |
+| `let receipt = transfer ...` | `transition` | issued -> committed/rolled_back/rejected/invalidated |
+| `publish witness as Publication` | `evidence` | authoritative -> published |
+| `materialize proof from Publication` | `evidence` | materialized/rejected |
+| `handoff op to Role with receipt` | `transition` | committed/rolled_back/invalidated |
 | `case/of` over evidence | control-flow over evidence | must preserve linear assets and remain exhaustive |
 | `timeout ... on timeout ... on cancel ...` | evidence/transition-adjacent control-flow | explicit timeout/cancellation outcomes with replay-visible lifecycle |
 
@@ -393,7 +394,7 @@ Current design rule:
 - missing or ambiguous authoritative input must become typed failure, never silent fallback success
 - canonical replay artifacts must preserve these decisions as structured semantic audit records rather than opaque host-only log text
 
-## Source-Derived Capability Boundary Rows
+## Source-Derived Boundary Rows
 
 The rows below are source-derived and checked against
 `telltale_machine::protocol_critical_capability_boundary()` by

@@ -1,9 +1,10 @@
 //! TOML scenario format for simulation runs.
 //!
-//! A scenario specifies the roles, field/material layer, parameters, step count,
+//! A scenario specifies the roles, field/environment layer, parameters, step count,
 //! and middleware configuration for a simulation.
 
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 use telltale_types::FixedQ32;
@@ -12,7 +13,7 @@ use crate::fault::{
     AdversaryAction, AdversaryBudget, AdversaryBudgetMode, AdversaryProgram,
     AssumptionFailureClass, ScheduledAdversary, Trigger,
 };
-use crate::material::MaterialParams;
+use crate::field::FieldSpec;
 use crate::network::{LinkPolicy, NetworkConfig};
 use crate::property::{parse_predicate, parse_property, Property, PropertyMonitor};
 use crate::reconfiguration::{
@@ -38,9 +39,9 @@ pub struct Scenario {
     /// Optional network configuration.
     #[serde(default)]
     pub network: Option<NetworkSpec>,
-    /// Optional built-in material parameters for material-driven adapters.
+    /// Optional built-in field parameters for field-driven adapters.
     #[serde(default)]
-    pub material: Option<MaterialParams>,
+    pub field: Option<FieldSpec>,
     /// First-class simulator reconfiguration operations.
     #[serde(default)]
     pub reconfigurations: Vec<ReconfigurationSpec>,
@@ -56,6 +57,9 @@ pub struct Scenario {
     /// Optional theorem/profile declaration for theorem-indexed reporting.
     #[serde(default)]
     pub theorem: TheoremProfileSpec,
+    /// Domain-owned extension config keyed by external namespace.
+    #[serde(default)]
+    pub extensions: BTreeMap<String, toml::Value>,
 }
 
 /// Execution configuration for one simulator run.

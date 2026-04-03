@@ -24,14 +24,15 @@ pub mod checkpoint;
 pub mod contracts;
 pub mod decision;
 pub mod distributed;
+pub mod environment;
 #[doc(hidden)]
 pub mod execution;
 pub mod fault;
+pub mod field;
+pub mod field_handlers;
 /// Generated effect-family simulator helpers and scenario surfaces.
 pub mod generated;
 pub mod harness;
-pub mod material;
-pub mod material_handlers;
 pub mod network;
 pub mod presets;
 pub mod property;
@@ -63,20 +64,26 @@ pub use decision::{
     SyncSubtypeWitness, TheoremEligibilityCounterexample, WellFormednessViolation,
 };
 pub use distributed::{DistributedSimBuilder, DistributedSimulation, NestedExecutionContract};
+pub use environment::{
+    EnvironmentArtifact, EnvironmentController, EnvironmentModels, EnvironmentSnapshot,
+    EnvironmentTrace, LinkAdmissionDecision, LinkAdmissionModel, MediumModel, MediumOutcomeKind,
+    MediumResolution, MobilityModel, NodeCapabilityModel, NodeCapabilityState, NodePose,
+    PotentialLink, TopologyModel, TransmissionIntent,
+};
 pub use fault::{
     AdversaryAction, AdversaryBudget, AdversaryBudgetMode, AdversaryBudgetRecord,
     AdversaryBudgetRecordKind, AdversaryInjector, AdversaryProgram, AdversarySummary,
     AssumptionDiagnostic, AssumptionFailureClass, ScheduledAdversary, Trigger,
 };
-pub use harness::{
-    derive_initial_states, derive_initial_states_for_model, BatchConfig, BatchRunManifest,
-    BatchRunManifestEntry, BatchRunResult, DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter,
-    MaterialAdapter, SimulationHarness,
-};
-pub use material::{MaterialModel, MaterialParams};
-pub use material_handlers::{
-    handler_from_material, handler_from_model, ContinuumFieldHandler, HamiltonianHandler,
+pub use field::{ContinuumFieldSpec, FieldModel, FieldSpec, HamiltonianFieldSpec, MeanFieldSpec};
+pub use field_handlers::{
+    handler_from_field, handler_from_field_model, ContinuumFieldHandler, HamiltonianHandler,
     IsingHandler,
+};
+pub use harness::{
+    derive_initial_states, derive_initial_states_for_field_model, BatchConfig, BatchRunManifest,
+    BatchRunManifestEntry, BatchRunResult, DirectAdapter, FieldAdapter, HarnessConfig, HarnessSpec,
+    HostAdapter, SimulationHarness,
 };
 pub use network::{NetworkConfig, NetworkModel};
 pub use property::{Property, PropertyMonitor};

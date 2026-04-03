@@ -102,10 +102,10 @@ backend = "{backend}"
 scheduler_concurrency = {scheduler_concurrency}
 worker_threads = {worker_threads}
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
@@ -121,19 +121,31 @@ fn threaded_backend_matches_canonical_at_scheduler_concurrency_one() {
     let canonical = scenario("canonical", 1, 1);
     let threaded = scenario("threaded", 1, 2);
 
-    let canonical_result =
-        run_with_scenario(&local_types, &global, &BTreeMap::new(), &canonical, &PassthroughHandler)
-            .expect("canonical run");
-    let threaded_result =
-        run_with_scenario(&local_types, &global, &BTreeMap::new(), &threaded, &PassthroughHandler)
-            .expect("threaded run");
+    let canonical_result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &canonical,
+        &PassthroughHandler,
+    )
+    .expect("canonical run");
+    let threaded_result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &threaded,
+        &PassthroughHandler,
+    )
+    .expect("threaded run");
 
     assert_eq!(
-        canonical_result.replay.obs_trace,
-        threaded_result.replay.obs_trace,
+        canonical_result.replay.obs_trace, threaded_result.replay.obs_trace,
         "threaded backend must preserve canonical observable traces at scheduler_concurrency = 1"
     );
-    assert_eq!(canonical_result.replay.effect_trace, threaded_result.replay.effect_trace);
+    assert_eq!(
+        canonical_result.replay.effect_trace,
+        threaded_result.replay.effect_trace
+    );
     assert_eq!(
         canonical_result.replay.output_condition_trace,
         threaded_result.replay.output_condition_trace
@@ -149,9 +161,14 @@ fn threaded_backend_reports_resolved_execution_settings() {
     let (global, local_types) = simple_protocol();
     let threaded = scenario("threaded", 2, 2);
 
-    let result =
-        run_with_scenario(&local_types, &global, &BTreeMap::new(), &threaded, &PassthroughHandler)
-            .expect("threaded run");
+    let result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &threaded,
+        &PassthroughHandler,
+    )
+    .expect("threaded run");
 
     assert_eq!(result.stats.backend, ResolvedExecutionBackend::Threaded);
     assert_eq!(
@@ -168,12 +185,22 @@ fn threaded_backend_is_worker_count_invariant_for_fixed_scheduler_concurrency() 
     let workers2 = scenario("threaded", 2, 2);
     let workers4 = scenario("threaded", 2, 4);
 
-    let result2 =
-        run_with_scenario(&local_types, &global, &BTreeMap::new(), &workers2, &PassthroughHandler)
-            .expect("threaded run with two workers");
-    let result4 =
-        run_with_scenario(&local_types, &global, &BTreeMap::new(), &workers4, &PassthroughHandler)
-            .expect("threaded run with four workers");
+    let result2 = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &workers2,
+        &PassthroughHandler,
+    )
+    .expect("threaded run with two workers");
+    let result4 = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &workers4,
+        &PassthroughHandler,
+    )
+    .expect("threaded run with four workers");
 
     assert_eq!(result2.replay.obs_trace, result4.replay.obs_trace);
     assert_eq!(result2.replay.effect_trace, result4.replay.effect_trace);
@@ -181,5 +208,8 @@ fn threaded_backend_is_worker_count_invariant_for_fixed_scheduler_concurrency() 
         result2.replay.output_condition_trace,
         result4.replay.output_condition_trace
     );
-    assert_eq!(result2.replay.semantic_objects, result4.replay.semantic_objects);
+    assert_eq!(
+        result2.replay.semantic_objects,
+        result4.replay.semantic_objects
+    );
 }

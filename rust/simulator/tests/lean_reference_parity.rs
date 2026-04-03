@@ -92,10 +92,10 @@ backend = "canonical"
 scheduler_concurrency = 1
 worker_threads = 1
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
@@ -474,7 +474,10 @@ fn assert_reference_artifacts(fixture: &SimFixture, artifacts: &serde_json::Valu
     assert_eq!(artifacts["steps"], json!(fixture.scenario.steps));
     assert_eq!(artifacts["action_count"], json!(expected_actions.len()));
     assert_eq!(artifacts["num_roles"], json!(fixture.local_types.len()));
-    assert_eq!(artifacts["active_steps_per_round"], json!(active_steps_per_round(fixture)));
+    assert_eq!(
+        artifacts["active_steps_per_round"],
+        json!(active_steps_per_round(fixture))
+    );
     assert_eq!(artifacts["roles"], json!(fixture.global.roles()));
     assert_eq!(artifacts["actions"], json!(expected_actions));
 }

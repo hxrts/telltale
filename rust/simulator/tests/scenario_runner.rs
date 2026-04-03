@@ -167,10 +167,10 @@ backend = "canonical"
 scheduler_concurrency = 1
 worker_threads = 1
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
@@ -289,10 +289,10 @@ scheduler_profile = "threaded_envelope"
 envelope_profile = "protocol_machine_envelope_adherence"
 assumption_bundle = "partial_synchrony"
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
@@ -522,10 +522,10 @@ scheduler_profile = "canonical_exact"
 envelope_profile = "exact"
 assumption_bundle = "fault_free_transport"
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
@@ -547,10 +547,10 @@ scheduler_profile = "canonical_exact"
 envelope_profile = "protocol_machine_envelope_adherence"
 assumption_bundle = "fault_free_transport"
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
@@ -829,10 +829,10 @@ backend = "canonical"
 scheduler_concurrency = 1
 worker_threads = 1
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]

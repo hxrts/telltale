@@ -1,6 +1,6 @@
 //! Regression test suite (B4).
 //!
-//! Runs both materials (mean-field Ising and Hamiltonian 2-body) through
+//! Runs both built-in field models (mean-field Ising and Hamiltonian 2-body) through
 //! both Lean and Rust projection paths, verifying identical traces.
 
 use std::collections::{BTreeMap, HashMap};
@@ -10,7 +10,7 @@ use telltale_bridge::export::global_to_json;
 use telltale_bridge::import::json_to_local;
 use telltale_bridge::runner::LeanRunner;
 use telltale_simulator::analysis;
-use telltale_simulator::material::{HamiltonianParams, MeanFieldParams};
+use telltale_simulator::field::{HamiltonianFieldSpec, MeanFieldSpec};
 use telltale_simulator::runner;
 use telltale_simulator::trace::Trace;
 use telltale_simulator::EffectHandler;
@@ -124,8 +124,8 @@ fn ising_global_type() -> GlobalType {
     )
 }
 
-fn ising_params() -> MeanFieldParams {
-    MeanFieldParams {
+fn ising_params() -> MeanFieldSpec {
+    MeanFieldSpec {
         beta: FixedQ32::half(),
         species: vec!["up".into(), "down".into()],
         initial_state: vec![
@@ -201,8 +201,8 @@ fn hamiltonian_global_type() -> GlobalType {
     )
 }
 
-fn hamiltonian_params() -> HamiltonianParams {
-    HamiltonianParams {
+fn hamiltonian_params() -> HamiltonianFieldSpec {
+    HamiltonianFieldSpec {
         spring_constant: FixedQ32::one(),
         mass: FixedQ32::one(),
         dimensions: 1,

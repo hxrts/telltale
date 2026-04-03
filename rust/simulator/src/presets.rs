@@ -2,7 +2,7 @@
 
 use telltale_types::FixedQ32;
 
-use crate::material::MaterialParams;
+use crate::field::FieldSpec;
 use crate::property::Property;
 use crate::scenario::{
     AdversaryActionSpec, AdversaryBudgetModeSpec, AdversaryBudgetSpec, AdversarySpec,
@@ -15,7 +15,7 @@ pub fn deterministic_baseline(
     name: impl Into<String>,
     roles: Vec<String>,
     steps: u64,
-    material: MaterialParams,
+    field: FieldSpec,
 ) -> Scenario {
     Scenario {
         name: name.into(),
@@ -24,12 +24,13 @@ pub fn deterministic_baseline(
         execution: ExecutionSpec::default(),
         seed: 0,
         network: None,
-        material: Some(material),
+        field: Some(field),
         reconfigurations: Vec::new(),
         adversaries: Vec::new(),
         properties: None,
         checkpoint_interval: None,
         theorem: TheoremProfileSpec::default(),
+        extensions: Default::default(),
     }
 }
 
@@ -116,10 +117,10 @@ pub fn property_to_invariant(property: &Property) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::material::MeanFieldParams;
+    use crate::field::MeanFieldSpec;
 
-    fn material() -> MaterialParams {
-        MaterialParams::MeanField(MeanFieldParams {
+    fn field() -> FieldSpec {
+        FieldSpec::MeanField(MeanFieldSpec {
             beta: FixedQ32::one(),
             species: vec!["up".into(), "down".into()],
             initial_state: vec![FixedQ32::half(), FixedQ32::half()],
@@ -130,7 +131,7 @@ mod tests {
     #[test]
     fn baseline_has_expected_defaults() {
         let scenario =
-            deterministic_baseline("baseline", vec!["A".into(), "B".into()], 16, material());
+            deterministic_baseline("baseline", vec!["A".into(), "B".into()], 16, field());
         assert_eq!(scenario.seed, 0);
         let execution = scenario.resolved_execution().expect("resolve execution");
         assert!(execution.scheduler_concurrency >= 1);
@@ -151,7 +152,7 @@ mod tests {
     #[test]
     fn withholding_adversary_is_added() {
         let scenario =
-            deterministic_baseline("baseline", vec!["A".into(), "B".into()], 16, material());
+            deterministic_baseline("baseline", vec!["A".into(), "B".into()], 16, field());
         let updated =
             with_withholding_adversary(scenario, 5, FixedQ32::from_ratio(1, 4).expect("0.25"));
         assert_eq!(updated.adversaries.len(), 1);

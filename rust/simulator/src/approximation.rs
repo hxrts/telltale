@@ -8,7 +8,7 @@ use telltale_machine::model::effects::EffectHandler;
 use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 
 use crate::analysis::NormalizedObservability;
-use crate::material::MaterialParams;
+use crate::field::FieldSpec;
 use crate::runner::{run_with_scenario, ScenarioResult, SchedulerProfileSummary};
 use crate::scenario::{ResolvedTheoremProfile, Scenario, TheoremEligibility};
 use crate::trace::Trace;
@@ -165,10 +165,10 @@ fn approximation_admissibility(
         );
     }
 
-    let family_supported = match (approximation.family, scenario.material.as_ref()) {
+    let family_supported = match (approximation.family, scenario.field.as_ref()) {
         (ApproximationFamily::BatchedStochastic, _) => true,
-        (ApproximationFamily::MeanField, Some(MaterialParams::MeanField(_))) => true,
-        (ApproximationFamily::ContinuumField, Some(MaterialParams::ContinuumField(_))) => true,
+        (ApproximationFamily::MeanField, Some(FieldSpec::MeanField(_))) => true,
+        (ApproximationFamily::ContinuumField, Some(FieldSpec::ContinuumField(_))) => true,
         (ApproximationFamily::MeanField, _) => false,
         (ApproximationFamily::ContinuumField, _) => false,
     };
@@ -176,7 +176,9 @@ fn approximation_admissibility(
     if !family_supported {
         return (
             ApproximationAdmissibility::Unsupported,
-            Some("scenario material does not match the selected approximation family".to_string()),
+            Some(
+                "scenario field layer does not match the selected approximation family".to_string(),
+            ),
         );
     }
 
@@ -316,10 +318,10 @@ name = "approximation_fixture"
 roles = ["A", "B"]
 steps = 4
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]

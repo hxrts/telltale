@@ -7,7 +7,7 @@ use telltale_bridge::export::global_to_json;
 use telltale_bridge::import::json_to_local;
 use telltale_bridge::runner::LeanRunner;
 use telltale_simulator::analysis;
-use telltale_simulator::material::{HamiltonianParams, MeanFieldParams};
+use telltale_simulator::field::{HamiltonianFieldSpec, MeanFieldSpec};
 use telltale_simulator::runner;
 use telltale_simulator::{HamiltonianHandler, IsingHandler};
 use telltale_types::{GlobalType, Label, PayloadSort};
@@ -53,7 +53,7 @@ fn test_mean_field_ising_end_to_end() {
     let b_local = json_to_local(&projections["B"]).expect("parse B local type");
 
     // 3. Set up simulator.
-    let params = MeanFieldParams {
+    let params = MeanFieldSpec {
         beta: FixedQ32::half(), // subcritical: converges to [0.5, 0.5]
         species: vec!["up".into(), "down".into()],
         initial_state: vec![
@@ -130,7 +130,7 @@ fn test_hamiltonian_2body_end_to_end() {
     let b_local = json_to_local(&projections["B"]).expect("parse B local type");
 
     // 3. Set up simulator.
-    let params = HamiltonianParams {
+    let params = HamiltonianFieldSpec {
         spring_constant: FixedQ32::one(),
         mass: FixedQ32::one(),
         dimensions: 1,

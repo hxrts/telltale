@@ -8,10 +8,14 @@ use telltale_types::FixedQ32;
 
 use crate::analysis::{compare_observability, NormalizedObservability, ObservabilityRelation};
 use crate::backend::SimulationMachine;
+use crate::environment::{
+    EnvironmentController, EnvironmentModels, EnvironmentTrace, TransmissionIntent,
+};
 use crate::fault::{
     AdversaryBudgetRecord, AdversarySummary, AssumptionDiagnostic, AssumptionFailureClass,
     ScheduledAdversary,
 };
+use crate::field::FieldModel;
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
 use telltale_machine::model::output_condition::OutputConditionCheck;
 use telltale_machine::model::scheduler_types::{PriorityPolicy, SchedPolicy};
@@ -62,6 +66,51 @@ fn record_all_roles(
             });
         }
     }
+}
+
+fn current_role_state(
+    machine: &SimulationMachine,
+    coro_info: &CoroInfo,
+) -> BTreeMap<String, Vec<FixedQ32>> {
+    let mut states = BTreeMap::new();
+    for (coro_id, role) in coro_info {
+        if let Some(coro) = machine
+            .coroutines()
+            .into_iter()
+            .find(|coro| coro.id == *coro_id)
+        {
+            states.insert(role.clone(), registers_to_f64s(&coro.regs));
+        }
+    }
+    states
+}
+
+fn transmissions_at_tick(
+    obs_trace: &[ObsEvent],
+    tick: u64,
+    logical_step: u64,
+) -> Vec<TransmissionIntent> {
+    obs_trace
+        .iter()
+        .filter_map(|event| match event {
+            ObsEvent::Sent {
+                tick: event_tick,
+                session,
+                from,
+                to,
+                label,
+                ..
+            } if *event_tick == tick => Some(TransmissionIntent {
+                tick: *event_tick,
+                logical_step,
+                session: *session,
+                from: from.clone(),
+                to: to.clone(),
+                label: label.clone(),
+            }),
+            _ => None,
+        })
+        .collect()
 }
 
 /// Initialize coroutine registers from FixedQ32 state vectors.
@@ -335,6 +384,8 @@ pub struct ScenarioReplayArtifact {
     pub semantic_objects: ProtocolMachineSemanticObjects,
     /// Canonical simulator reconfiguration trace captured from the shared execution core.
     pub reconfiguration_trace: Vec<ReconfigurationRecord>,
+    /// Canonical environment trace captured from shared environment hooks.
+    pub environment_trace: EnvironmentTrace,
 }
 
 /// Structured statistics emitted by scenario execution.
@@ -351,6 +402,8 @@ pub struct ScenarioStats {
     pub scheduler_profile: SchedulerProfileSummary,
     /// Reconfiguration accounting summary kept separate from theorem progress descent.
     pub reconfiguration_summary: ReconfigurationSummary,
+    /// Environment trace emitted by shared environment hooks.
+    pub environment_trace: EnvironmentTrace,
     /// Adversary-budget summary for the run.
     pub adversary_summary: AdversarySummary,
     /// Assumption-bundle diagnostics derived from adversary budgets and theorem regime checks.
@@ -669,6 +722,30 @@ pub fn run_with_scenario(
     scenario: &Scenario,
     handler: &dyn EffectHandler,
 ) -> Result<ScenarioResult, String> {
+    run_with_scenario_and_environment(
+        local_types,
+        global_type,
+        initial_states,
+        scenario,
+        handler,
+        None,
+    )
+}
+
+/// Run a choreography with scenario-defined middleware and optional environment hooks.
+///
+/// # Errors
+///
+/// Returns an error string if protocol-machine execution fails.
+#[allow(clippy::too_many_lines)]
+pub fn run_with_scenario_and_environment(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    global_type: &GlobalType,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+    scenario: &Scenario,
+    handler: &dyn EffectHandler,
+    environment_models: Option<EnvironmentModels<'_>>,
+) -> Result<ScenarioResult, String> {
     let image = CodeImage::from_local_types(local_types, global_type);
     let resolved_execution = scenario.resolved_execution()?;
     let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
@@ -700,6 +777,7 @@ pub fn run_with_scenario(
     };
     init_coro_regs(&mut machine, &coro_info, &resolved_initial_states)?;
     let initial_session_snapshots = machine.session_snapshots();
+    let initial_role_state = current_role_state(&machine, &coro_info);
 
     let mut trace = Trace::new();
     let max_rounds = scenario.steps.saturating_sub(1);
@@ -732,6 +810,14 @@ pub fn run_with_scenario(
     let middleware =
         ScenarioMiddleware::from_scenario(scenario, handler, machine.clock().tick_duration)
             .map_err(|e| format!("middleware setup: {e}"))?;
+    let mut environment = EnvironmentController::new(
+        &scenario.roles,
+        scenario
+            .field
+            .as_ref()
+            .map(|field| field.field_name().to_string()),
+        environment_models,
+    );
 
     let execution = execute_scenario_rounds(
         &mut machine,
@@ -739,13 +825,22 @@ pub fn run_with_scenario(
         &middleware,
         concurrency,
         max_rounds,
-        |machine, _completed_rounds| {
+        |machine, completed_rounds| {
             if step_idx >= steps_limit {
                 return Ok(());
             }
 
             record_all_roles(machine, &coro_info, step_idx, &mut trace);
             step_idx += 1;
+
+            if environment.is_active() {
+                let current_tick = machine.clock().tick;
+                let current_role_state = current_role_state(machine, &coro_info);
+                environment.begin_round(current_tick, completed_rounds, current_role_state)?;
+                let transmissions =
+                    transmissions_at_tick(machine.trace(), current_tick, completed_rounds);
+                environment.finish_round(&transmissions)?;
+            }
 
             let session_snapshots = machine.session_snapshots();
             let coroutine_snapshots = machine.coroutines();
@@ -790,6 +885,10 @@ pub fn run_with_scenario(
     );
     let reconfiguration_trace = middleware.reconfiguration_trace()?;
     let reconfiguration_summary = middleware.reconfiguration_summary()?;
+    if environment.is_active() && environment.trace().records.is_empty() && scenario.steps > 0 {
+        environment.begin_round(0, 0, initial_role_state)?;
+    }
+    let environment_trace = environment.trace().clone();
     let normalized_observability =
         crate::analysis::normalized_observability(&obs_trace, &reconfiguration_trace);
     let final_session_snapshots = machine.session_snapshots();
@@ -826,6 +925,7 @@ pub fn run_with_scenario(
             semantic_audit_log,
             semantic_objects,
             reconfiguration_trace,
+            environment_trace: environment_trace.clone(),
         },
         analysis: ScenarioAnalysisArtifact {
             normalized_observability,
@@ -837,6 +937,7 @@ pub fn run_with_scenario(
             theorem_progress,
             scheduler_profile,
             reconfiguration_summary,
+            environment_trace,
             adversary_summary,
             assumption_diagnostics,
             backend: resolved_execution.backend,

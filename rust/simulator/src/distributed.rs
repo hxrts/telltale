@@ -107,9 +107,8 @@ impl DistributedSimBuilder {
             .load_choreography(&inter_site)
             .map_err(|e| format!("outer load error: {e}"))?;
 
-        let mut nested =
-            NestedProtocolMachineHandler::new()
-                .with_rounds_per_step(self.execution_contract.inner_rounds_per_step);
+        let mut nested = NestedProtocolMachineHandler::new()
+            .with_rounds_per_step(self.execution_contract.inner_rounds_per_step);
 
         for (site, protocols) in self.sites {
             let mut inner_vm = ProtocolMachine::new(config.clone());

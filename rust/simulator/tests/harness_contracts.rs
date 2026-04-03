@@ -10,11 +10,11 @@ use telltale_simulator::contracts::{
     assert_contracts, evaluate_contracts, ContractCheckConfig, ExpectedProgressState,
     ExpectedPublication,
 };
+use telltale_simulator::field::{FieldSpec, MeanFieldSpec};
 use telltale_simulator::generated::ScenarioEffectResult;
 use telltale_simulator::harness::{
     DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter, SimulationHarness,
 };
-use telltale_simulator::material::{MaterialParams, MeanFieldParams};
 use telltale_simulator::scenario::{ExecutionSpec, Scenario};
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
@@ -126,7 +126,7 @@ fn scenario() -> Scenario {
         execution: ExecutionSpec::default(),
         seed: 5,
         network: None,
-        material: Some(MaterialParams::MeanField(MeanFieldParams {
+        field: Some(FieldSpec::MeanField(MeanFieldSpec {
             beta: FixedQ32::one(),
             species: vec!["up".into(), "down".into()],
             initial_state: vec![FixedQ32::half(), FixedQ32::half()],
@@ -137,6 +137,7 @@ fn scenario() -> Scenario {
         properties: None,
         checkpoint_interval: None,
         theorem: telltale_simulator::scenario::TheoremProfileSpec::default(),
+        extensions: BTreeMap::new(),
     }
 }
 
@@ -286,10 +287,10 @@ fn run_config_enforces_contract_checks() {
 }
 
 #[test]
-fn generic_harness_run_succeeds_without_built_in_material() {
+fn generic_harness_run_succeeds_without_built_in_field() {
     let (global_type, local_types) = simple_protocol();
     let mut scenario = scenario();
-    scenario.material = None;
+    scenario.field = None;
     let spec = HarnessSpec::new(local_types, global_type, scenario);
 
     let adapter = StateProvidingAdapter {

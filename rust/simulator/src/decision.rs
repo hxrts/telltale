@@ -69,9 +69,7 @@ pub enum DecisionCertificate {
         requested_productive_steps: u64,
     },
     /// Theorem profile is admissible.
-    TheoremEligibility {
-        eligibility: TheoremEligibility,
-    },
+    TheoremEligibility { eligibility: TheoremEligibility },
 }
 
 /// Structured negative witness/counterexample for a decision procedure.
@@ -127,7 +125,10 @@ pub enum AsyncSubtypeWitness {
     NotSisoDecomposable,
     InputTreeMismatch,
     OutputTreeMismatch,
-    PhaseMismatch { sub_segments: u64, super_segments: u64 },
+    PhaseMismatch {
+        sub_segments: u64,
+        super_segments: u64,
+    },
     UnfoldLimitExceeded,
 }
 
@@ -135,11 +136,23 @@ pub enum AsyncSubtypeWitness {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SyncSubtypeWitness {
-    PartnerMismatch { expected: String, found: String },
-    DirectionMismatch { expected: String, found: String },
-    MissingLabel { label: String },
-    ExtraLabel { label: String },
-    ContinuationMismatch { label: String },
+    PartnerMismatch {
+        expected: String,
+        found: String,
+    },
+    DirectionMismatch {
+        expected: String,
+        found: String,
+    },
+    MissingLabel {
+        label: String,
+    },
+    ExtraLabel {
+        label: String,
+    },
+    ContinuationMismatch {
+        label: String,
+    },
     LabelSortMismatch {
         label: String,
         expected: String,
@@ -150,7 +163,10 @@ pub enum SyncSubtypeWitness {
         expected: String,
         found: String,
     },
-    VariableMismatch { expected: String, found: String },
+    VariableMismatch {
+        expected: String,
+        found: String,
+    },
     IncompatibleTypes {
         sub_type: String,
         super_type: String,
@@ -272,10 +288,9 @@ pub fn decide_async_subtyping(sub: &LocalTypeR, sup: &LocalTypeR) -> DecisionRep
 #[must_use]
 pub fn decide_sync_subtyping(sub: &LocalTypeR, sup: &LocalTypeR) -> DecisionReport {
     match sync_subtype(sub, sup) {
-        Ok(()) => DecisionReport::certified(
-            DecisionKind::SyncSubtype,
-            DecisionCertificate::SyncSubtype,
-        ),
+        Ok(()) => {
+            DecisionReport::certified(DecisionKind::SyncSubtype, DecisionCertificate::SyncSubtype)
+        }
         Err(error) => DecisionReport::counterexample(
             DecisionKind::SyncSubtype,
             DecisionCounterexample::SyncSubtype {
@@ -392,7 +407,9 @@ fn flatten_validation_error(error: &ValidationError) -> Vec<WellFormednessViolat
                 label: label.clone(),
             }]
         }
-        ValidationError::Multiple(errors) => errors.iter().flat_map(flatten_validation_error).collect(),
+        ValidationError::Multiple(errors) => {
+            errors.iter().flat_map(flatten_validation_error).collect()
+        }
     }
 }
 

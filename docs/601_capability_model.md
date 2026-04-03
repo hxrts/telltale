@@ -18,7 +18,8 @@ In scope:
 
 Out of scope:
 
-- general host application authorization
+General host application authorization is out of scope.
+
 - arbitrary user/resource policy languages
 - product-specific auth delegation systems unrelated to protocol semantics
 - host-only policy decisions that cannot be modeled as typed Rust/Lean objects

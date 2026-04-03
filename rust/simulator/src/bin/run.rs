@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::path::PathBuf;
 
 use telltale_simulator::contracts::evaluate_contracts;
-use telltale_simulator::harness::{HarnessConfig, MaterialAdapter, SimulationHarness};
+use telltale_simulator::harness::{FieldAdapter, HarnessConfig, SimulationHarness};
 
 struct RunArgs {
     config_path: PathBuf,
@@ -19,8 +19,7 @@ fn main() {
     let config_path = args.config_path;
     let config = HarnessConfig::from_file(&config_path).unwrap_or_else(|e| fatal(&e));
 
-    let adapter =
-        MaterialAdapter::from_scenario(&config.spec.scenario).unwrap_or_else(|e| fatal(&e));
+    let adapter = FieldAdapter::from_scenario(&config.spec.scenario).unwrap_or_else(|e| fatal(&e));
     let harness = SimulationHarness::new(&adapter);
 
     let result = harness.run(&config.spec).unwrap_or_else(|e| fatal(&e));
@@ -45,6 +44,7 @@ fn main() {
             theorem_progress: result.stats.theorem_progress,
             scheduler_profile: result.stats.scheduler_profile,
             reconfiguration_summary: result.stats.reconfiguration_summary,
+            environment_trace: result.stats.environment_trace,
             adversary_summary: result.stats.adversary_summary,
             assumption_diagnostics: result.stats.assumption_diagnostics,
             backend: result.stats.backend,
@@ -61,6 +61,7 @@ fn main() {
             adversary_schedule: result.replay.adversary_schedule,
             adversary_budget_history: result.replay.adversary_budget_history,
             assumption_diagnostics: result.replay.assumption_diagnostics,
+            environment_trace: result.replay.environment_trace,
             obs_events: u64::try_from(result.replay.obs_trace.len()).unwrap_or(u64::MAX),
             effect_events: u64::try_from(result.replay.effect_trace.len()).unwrap_or(u64::MAX),
             output_condition_checks: u64::try_from(result.replay.output_condition_trace.len())
@@ -155,6 +156,7 @@ struct StatsOutput {
     theorem_progress: telltale_simulator::runner::TheoremProgressSummary,
     scheduler_profile: telltale_simulator::runner::SchedulerProfileSummary,
     reconfiguration_summary: telltale_simulator::reconfiguration::ReconfigurationSummary,
+    environment_trace: telltale_simulator::environment::EnvironmentTrace,
     adversary_summary: telltale_simulator::fault::AdversarySummary,
     assumption_diagnostics: Vec<telltale_simulator::fault::AssumptionDiagnostic>,
     backend: telltale_simulator::scenario::ResolvedExecutionBackend,
@@ -172,6 +174,7 @@ struct ReplayOutput {
     adversary_schedule: Vec<telltale_simulator::fault::ScheduledAdversary>,
     adversary_budget_history: Vec<telltale_simulator::fault::AdversaryBudgetRecord>,
     assumption_diagnostics: Vec<telltale_simulator::fault::AssumptionDiagnostic>,
+    environment_trace: telltale_simulator::environment::EnvironmentTrace,
     obs_events: u64,
     effect_events: u64,
     output_condition_checks: u64,

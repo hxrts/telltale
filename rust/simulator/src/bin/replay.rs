@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use telltale_machine::ProtocolMachine;
 use telltale_simulator::backend::SimulationMachine;
 use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
-use telltale_simulator::handler_from_material;
+use telltale_simulator::handler_from_field;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
 use telltale_simulator::scenario::Scenario;
 
@@ -29,11 +29,11 @@ fn main() {
         serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
     let mut machine = SimulationMachine::Canonical(machine);
 
-    let material = scenario
-        .material
+    let field = scenario
+        .field
         .as_ref()
-        .unwrap_or_else(|| fatal("scenario is missing built-in material parameters"));
-    let handler = handler_from_material(material);
+        .unwrap_or_else(|| fatal("scenario is missing built-in field parameters"));
+    let handler = handler_from_field(field);
     let max_rounds = replay_args.rounds.unwrap_or(scenario.steps);
     let concurrency = usize::try_from(
         scenario

@@ -384,10 +384,10 @@ name = "sweep_fixture"
 roles = ["A", "B"]
 steps = 4
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.0"
 species = ["up", "down"]
 initial_state = ["0.5", "0.5"]

@@ -1,47 +1,28 @@
 //! Hamiltonian 2-body effect handler.
-//!
-//! Implements leapfrog (Störmer-Verlet) integration for a 2-body system
-//! with harmonic coupling potential V = k/2 * (q_A - q_B)^2.
-//!
-//! State vector per role: [position, momentum].
-//! The protocol exchanges positions and forces between roles in a 4-step
-//! cycle: A→B:pos, B→A:pos, A→B:force, B→A:force. Integration happens
-//! once per full cycle (every 4 scheduler ticks).
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
 use telltale_types::FixedQ32;
 
-use crate::material::HamiltonianParams;
+use crate::field::HamiltonianFieldSpec;
 use crate::value_conv::{fixed_to_value, registers_to_f64s, value_to_f64, write_f64s};
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
 
-/// Effect handler for Hamiltonian 2-body dynamics.
-///
-/// Uses leapfrog integration: half-kick, drift, half-kick.
-/// The protocol cycle is:
-///   tick 0: exchange positions
-///   tick 1: exchange positions (reverse)
-///   tick 2: exchange forces
-///   tick 3: exchange forces (reverse)
-/// Integration happens at tick 3 (after all forces received).
+/// Hamiltonian field effect handler using symplectic integration.
 pub struct HamiltonianHandler {
-    params: HamiltonianParams,
-    /// Per-role: received peer position.
+    params: HamiltonianFieldSpec,
     peer_positions: Mutex<BTreeMap<String, FixedQ32>>,
-    /// Per-role: received peer force.
     peer_forces: Mutex<BTreeMap<String, FixedQ32>>,
-    /// Tick counter per role to track protocol phase.
     tick_count: Mutex<BTreeMap<String, usize>>,
 }
 
 impl HamiltonianHandler {
-    /// Create a new Hamiltonian handler from material parameters.
+    /// Create a new handler from a Hamiltonian field spec.
     #[must_use]
-    pub fn new(params: HamiltonianParams) -> Self {
+    pub fn new(params: HamiltonianFieldSpec) -> Self {
         Self {
             params,
             peer_positions: Mutex::new(BTreeMap::new()),
@@ -74,10 +55,6 @@ impl HamiltonianHandler {
             .map_err(|_| "hamiltonian handler tick-counter lock poisoned".to_string())
     }
 
-    /// Compute force on a role given its position and its peer's position.
-    ///
-    /// For harmonic potential V = k/2 * (q_A - q_B)^2:
-    ///   F = -dV/dq = -k * (q_self - q_peer)
     fn force(&self, my_position: FixedQ32, peer_position: FixedQ32) -> FixedQ32 {
         -self.params.spring_constant * (my_position - peer_position)
     }
@@ -122,7 +99,6 @@ impl EffectHandler for HamiltonianHandler {
     }
 
     fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
-        // Always compute payload via handle_send, ignoring any passed-in payload
         self.handle_send(input.role, input.partner, input.label, input.state)
             .map_success(SendDecision::Deliver)
     }
@@ -200,7 +176,6 @@ impl EffectHandler for HamiltonianHandler {
             phase
         };
 
-        // Only integrate on tick 3 (after force exchange complete).
         if phase != 3 {
             return EffectResult::success(());
         }
@@ -217,16 +192,10 @@ impl EffectHandler for HamiltonianHandler {
         };
 
         let force = self.force(vals[0], peer_pos);
-
         let two = FixedQ32::from_ratio(2, 1).expect("2 must be representable");
-        // Leapfrog integration:
-        // 1. Half-kick: p += F * dt/2
         vals[1] += force * dt / two;
-        // 2. Drift: q += p/m * dt
         vals[0] = vals[0] + vals[1] / mass * dt;
-        // 3. Half-kick with new force: p += F(new_q) * dt/2
-        let peer_pos_for_new = peer_pos; // peer position hasn't changed this tick
-        let new_force = self.force(vals[0], peer_pos_for_new);
+        let new_force = self.force(vals[0], peer_pos);
         vals[1] += new_force * dt / two;
 
         write_f64s(state, &vals);
@@ -237,7 +206,7 @@ impl EffectHandler for HamiltonianHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::material::HamiltonianParams;
+    use crate::field::HamiltonianFieldSpec;
     use crate::value_conv::{registers_to_f64s, write_f64s};
     use telltale_machine::model::effects::{EffectFailure, EffectResult};
 
@@ -247,8 +216,8 @@ mod tests {
             .expect("effect should succeed")
     }
 
-    fn test_params() -> HamiltonianParams {
-        HamiltonianParams {
+    fn test_params() -> HamiltonianFieldSpec {
+        HamiltonianFieldSpec {
             spring_constant: FixedQ32::one(),
             mass: FixedQ32::one(),
             dimensions: 1,
@@ -261,7 +230,6 @@ mod tests {
     #[test]
     fn test_force_harmonic() {
         let handler = HamiltonianHandler::new(test_params());
-        // F = -k * (q_A - q_B) = -1.0 * (1.0 - (-1.0)) = -2.0
         let one = FixedQ32::one();
         let f = handler.force(one, -one);
         let expected = -FixedQ32::from_ratio(2, 1).expect("2");
@@ -274,7 +242,6 @@ mod tests {
         let params = test_params();
         let handler = HamiltonianHandler::new(params.clone());
 
-        // Set up peer position for role A
         handler
             .peer_positions
             .lock()
@@ -298,7 +265,6 @@ mod tests {
         let initial_vals = registers_to_f64s(&state_a);
         let initial_energy = ke(&initial_vals) + pe(&initial_vals);
 
-        // Simulate 100 integration steps (each needs 4 ticks)
         for _ in 0..400 {
             expect_success(handler.step("A", &mut state_a));
         }
