@@ -17,6 +17,7 @@ use crate::reconfiguration::{
 use crate::rng::SimRng;
 use crate::scenario::Scenario;
 
+#[allow(clippy::large_enum_variant)]
 enum ScenarioTransport<'a> {
     Adversary(AdversaryInjector<&'a dyn EffectHandler>),
     Network(NetworkModel<AdversaryInjector<&'a dyn EffectHandler>>),

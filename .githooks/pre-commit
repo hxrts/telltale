@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-# Rust Style Guide Pre-commit Hook
-# Runs quick checks before allowing commit
+# Pre-commit Hook
 #
 # To install:
 #   git config core.hooksPath .githooks
@@ -15,6 +14,24 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 echo "Running pre-commit checks..."
+
+# 0. Prevent committing gitignored files
+echo -n "Checking for gitignored files... "
+ignored_staged=$(git diff --cached --name-only --diff-filter=d | while read -r file; do
+  if git check-ignore --no-index -q "$file" 2>/dev/null; then
+    echo "$file"
+  fi
+done)
+
+if [[ -n "${ignored_staged}" ]]; then
+    echo -e "${RED}FAILED${NC}"
+    echo "error: gitignored files must not be included in source control:" >&2
+    echo "${ignored_staged}" | sed 's/^/  /' >&2
+    echo "" >&2
+    echo "Remove them with: git reset HEAD <file>" >&2
+    exit 1
+fi
+echo -e "${GREEN}OK${NC}"
 
 # 1. Format check (fast)
 echo -n "Checking formatting... "

@@ -114,6 +114,7 @@ pub fn run_approximation(
     })
 }
 
+#[must_use]
 pub fn compare_exact_and_approximate(
     exact: &ScenarioResult,
     approximation: &ApproximationArtifact,
@@ -131,9 +132,17 @@ pub fn compare_exact_and_approximate(
     ApproximationComparison {
         exact_scenario_name: "exact_protocol_machine".to_string(),
         approximation_manifest: approximation.manifest.clone(),
-        normalized_equivalence: exact.analysis.normalized_observability.normalized_event_class
-            == approximation.normalized_observability.normalized_event_class
-            && exact.analysis.normalized_observability.normalized_reconfiguration_class
+        normalized_equivalence: exact
+            .analysis
+            .normalized_observability
+            .normalized_event_class
+            == approximation
+                .normalized_observability
+                .normalized_event_class
+            && exact
+                .analysis
+                .normalized_observability
+                .normalized_reconfiguration_class
                 == approximation
                     .normalized_observability
                     .normalized_reconfiguration_class,
@@ -193,7 +202,10 @@ fn scope_matches_family(family: ApproximationFamily, scope: ApproximationScope) 
                 ApproximationFamily::BatchedStochastic,
                 ApproximationScope::StochasticEnvelope
             )
-            | (ApproximationFamily::MeanField, ApproximationScope::MeanFieldLimit)
+            | (
+                ApproximationFamily::MeanField,
+                ApproximationScope::MeanFieldLimit
+            )
             | (
                 ApproximationFamily::ContinuumField,
                 ApproximationScope::ContinuumLimit
@@ -348,7 +360,10 @@ step_size = "0.01"
 
         assert_eq!(first.manifest, second.manifest);
         assert_eq!(first.trace.records, second.trace.records);
-        assert_eq!(first.manifest.admissibility, ApproximationAdmissibility::TheoremBacked);
+        assert_eq!(
+            first.manifest.admissibility,
+            ApproximationAdmissibility::TheoremBacked
+        );
     }
 
     #[test]

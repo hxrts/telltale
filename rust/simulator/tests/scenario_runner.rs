@@ -152,6 +152,7 @@ fn write_initial_states(
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
 fn scenario_result_includes_replay_and_stats() {
     let (global, local_types) = simple_protocol();
     let scenario_toml = r#"

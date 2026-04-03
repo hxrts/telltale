@@ -16,6 +16,7 @@ use telltale_machine::{
 
 use crate::scenario::{ResolvedExecution, ResolvedExecutionBackend};
 
+#[allow(clippy::large_enum_variant)]
 pub enum SimulationMachine {
     Canonical(ProtocolMachine),
     #[cfg(feature = "multi-thread")]
@@ -23,6 +24,7 @@ pub enum SimulationMachine {
 }
 
 impl SimulationMachine {
+    #[must_use]
     pub fn new(config: ProtocolMachineConfig, execution: &ResolvedExecution) -> Self {
         let mut config = config;
         // The simulator must opt into the proof-aligned threaded semantics explicitly
@@ -31,12 +33,14 @@ impl SimulationMachine {
         match execution.backend {
             ResolvedExecutionBackend::Canonical => Self::Canonical(ProtocolMachine::new(config)),
             #[cfg(feature = "multi-thread")]
-            ResolvedExecutionBackend::Threaded => Self::Threaded(
-                telltale_machine::ThreadedProtocolMachine::with_workers(
+            ResolvedExecutionBackend::Threaded => {
+                Self::Threaded(telltale_machine::ThreadedProtocolMachine::with_workers(
                     config,
-                    usize::try_from(execution.worker_threads).unwrap_or(usize::MAX).max(1),
-                ),
-            ),
+                    usize::try_from(execution.worker_threads)
+                        .unwrap_or(usize::MAX)
+                        .max(1),
+                ))
+            }
             #[cfg(not(feature = "multi-thread"))]
             ResolvedExecutionBackend::Threaded => {
                 unreachable!("threaded execution requires simulator feature `multi-thread`")
@@ -111,7 +115,9 @@ impl SimulationMachine {
                 Ok(())
             }
             #[cfg(feature = "multi-thread")]
-            Self::Threaded(machine) => machine.overwrite_coroutine_registers(coro_id, start, values),
+            Self::Threaded(machine) => {
+                machine.overwrite_coroutine_registers(coro_id, start, values)
+            }
         }
     }
 

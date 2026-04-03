@@ -68,9 +68,9 @@ impl CompiledChoreography {
     /// Look up one projected local type by role name.
     #[must_use]
     pub fn local_type(&self, role_name: &str) -> Option<&LocalType> {
-        self.local_types.iter().find_map(|(role, local_type)| {
-            (role.name().to_string() == role_name).then_some(local_type)
-        })
+        self.local_types
+            .iter()
+            .find_map(|(role, local_type)| (*role.name() == *role_name).then_some(local_type))
     }
 
     /// Convert the authoritative choreography to a theory-level global type.
@@ -202,7 +202,7 @@ fn collect_protocol_annotation_records_inner(
                 "send",
                 AnnotationScope::Statement,
                 Some(from),
-                &[to.clone()],
+                std::slice::from_ref(to),
                 protocol.get_annotations().dsl_entries(),
             );
             if let Some(from_annotations) = protocol.get_from_annotations() {
@@ -212,7 +212,7 @@ fn collect_protocol_annotation_records_inner(
                     "send",
                     AnnotationScope::Sender,
                     Some(from),
-                    &[to.clone()],
+                    std::slice::from_ref(to),
                     from_annotations.dsl_entries(),
                 );
             }
@@ -223,7 +223,7 @@ fn collect_protocol_annotation_records_inner(
                     "send",
                     AnnotationScope::Receiver,
                     Some(to),
-                    &[from.clone()],
+                    std::slice::from_ref(from),
                     to_annotations.dsl_entries(),
                 );
             }

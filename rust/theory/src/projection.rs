@@ -26,7 +26,7 @@
 //! use telltale_theory::projection::MemoizedProjector;
 //! use telltale_types::{GlobalType, Label};
 //!
-//! let mut projector = MemoizedProjector::new();
+//! let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 //! let global = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 //!
 //! // First call computes and caches
@@ -239,7 +239,7 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
 /// use telltale_theory::projection::MemoizedProjector;
 /// use telltale_types::{GlobalType, Label};
 ///
-/// let mut projector = MemoizedProjector::new();
+/// let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 ///
 /// let global = GlobalType::mu("t",
 ///     GlobalType::send("A", "B", Label::new("msg"), GlobalType::var("t"))
@@ -598,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_memoized_projector_basic() {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
@@ -617,7 +617,7 @@ mod tests {
 
     #[test]
     fn test_memoized_projector_alpha_equivalence() {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 
         // Two α-equivalent types
         let g1 = GlobalType::mu(
@@ -644,7 +644,7 @@ mod tests {
 
     #[test]
     fn test_memoized_projector_different_roles() {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
@@ -670,7 +670,7 @@ mod tests {
 
     #[test]
     fn test_memoized_projector_project_all() {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
 
@@ -687,7 +687,7 @@ mod tests {
 
     #[test]
     fn test_memoized_projector_clear() {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 
         let g = GlobalType::End;
         projector.project(&g, "A").unwrap();
@@ -699,7 +699,7 @@ mod tests {
 
     #[test]
     fn test_memoized_projector_error_cached() {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
 
         // Empty branches cause projection error
         let g = GlobalType::Comm {

@@ -422,6 +422,7 @@ pub enum SchedulerBoundMode {
 /// Fairness premise required by the scheduler policy.
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
+#[allow(clippy::enum_variant_names)]
 pub enum SchedulerFairnessRequirement {
     /// Fairness depends on roles yielding cooperatively.
     ExplicitYieldFairness,
@@ -561,6 +562,7 @@ fn machine_scheduler_policy(policy: ResolvedSchedulerPolicy) -> SchedPolicy {
 }
 
 /// Compare two scenario runs through their scheduler-profile summaries and normalized observability.
+#[must_use]
 pub fn compare_scheduler_runs(
     baseline: &ScenarioResult,
     candidate: &ScenarioResult,
@@ -679,8 +681,10 @@ pub fn run_with_scenario(
             "scenario checkpoints currently require the canonical simulator backend".to_string(),
         );
     }
-    let mut machine_config = ProtocolMachineConfig::default();
-    machine_config.sched_policy = machine_scheduler_policy(resolved_execution.scheduler_policy);
+    let machine_config = ProtocolMachineConfig {
+        sched_policy: machine_scheduler_policy(resolved_execution.scheduler_policy),
+        ..ProtocolMachineConfig::default()
+    };
     let mut machine = SimulationMachine::new(machine_config, &resolved_execution);
     let sid = machine
         .load_choreography_owned(&image, "sim/scenario")

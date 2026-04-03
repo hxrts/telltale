@@ -356,7 +356,7 @@ impl<'a, A: HostAdapter + ?Sized> SimulationHarness<'a, A> {
     pub fn run_sweep(
         &self,
         base: &HarnessSpec,
-        config: SweepConfig,
+        config: &SweepConfig,
     ) -> Result<SweepRunResult, String>
     where
         A: Sync,

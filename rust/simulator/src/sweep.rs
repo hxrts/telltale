@@ -11,29 +11,31 @@ use crate::harness::{BatchConfig, HarnessSpec, HostAdapter, SimulationHarness};
 use crate::runner::{ScenarioResult, SchedulerProfileSummary};
 use crate::scenario::{ReconfigurationSpec, ResolvedTheoremProfile, TheoremSchedulerProfile};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SweepConfig {
     pub batch: BatchConfig,
     pub axes: Vec<SweepAxis>,
 }
 
-impl Default for SweepConfig {
-    fn default() -> Self {
-        Self {
-            batch: BatchConfig::default(),
-            axes: Vec::new(),
-        }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "axis", rename_all = "snake_case")]
 pub enum SweepAxis {
-    Seed { values: Vec<u64> },
-    CapacityBudget { values: Vec<u64> },
-    SchedulerProfile { values: Vec<TheoremSchedulerProfile> },
-    ReconfigurationProgram { values: Vec<Vec<ReconfigurationSpec>> },
-    AdversaryBudget { adversary_id: String, totals: Vec<u64> },
+    Seed {
+        values: Vec<u64>,
+    },
+    CapacityBudget {
+        values: Vec<u64>,
+    },
+    SchedulerProfile {
+        values: Vec<TheoremSchedulerProfile>,
+    },
+    ReconfigurationProgram {
+        values: Vec<Vec<ReconfigurationSpec>>,
+    },
+    AdversaryBudget {
+        adversary_id: String,
+        totals: Vec<u64>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -86,6 +88,7 @@ struct SweepItem {
     capacity_budget: Option<u64>,
 }
 
+#[must_use]
 pub fn compare_sweep_results(left: &SweepRunResult, right: &SweepRunResult) -> SweepDiffReport {
     let max_len = left.manifest.runs.len().max(right.manifest.runs.len());
     let mut differing_runs = Vec::new();
@@ -122,7 +125,9 @@ pub fn compare_sweep_results(left: &SweepRunResult, right: &SweepRunResult) -> S
         };
 
         let assumption_diagnostics_changed = match (left_result, right_result) {
-            (Some(lhs), Some(rhs)) => lhs.stats.assumption_diagnostics != rhs.stats.assumption_diagnostics,
+            (Some(lhs), Some(rhs)) => {
+                lhs.stats.assumption_diagnostics != rhs.stats.assumption_diagnostics
+            }
             _ => left_result.is_some() != right_result.is_some(),
         };
 
@@ -146,7 +151,7 @@ pub fn compare_sweep_results(left: &SweepRunResult, right: &SweepRunResult) -> S
 pub fn run_sweep<'a, A>(
     harness: &SimulationHarness<'a, A>,
     base: &HarnessSpec,
-    config: SweepConfig,
+    config: &SweepConfig,
 ) -> Result<SweepRunResult, String>
 where
     A: HostAdapter + Sync + ?Sized,
@@ -169,16 +174,22 @@ where
                     Ok(result) => theorem_eligibility_from_result(result),
                     Err(_) => decide_theorem_eligibility(&item.spec.scenario),
                 };
-                let capacity_report = item.capacity_budget.map(|budget| {
-                    decide_capacity_predicate(&item.spec.local_types, budget)
-                });
+                let capacity_report = item
+                    .capacity_budget
+                    .map(|budget| decide_capacity_predicate(&item.spec.local_types, budget));
 
                 SweepManifestEntry {
                     input_index: idx,
                     scenario_name: item.spec.scenario.name.clone(),
                     bindings: item.bindings.clone(),
-                    theorem_profile: result.as_ref().ok().map(|run| run.stats.theorem_profile.clone()),
-                    scheduler_profile: result.as_ref().ok().map(|run| run.stats.scheduler_profile.clone()),
+                    theorem_profile: result
+                        .as_ref()
+                        .ok()
+                        .map(|run| run.stats.theorem_profile.clone()),
+                    scheduler_profile: result
+                        .as_ref()
+                        .ok()
+                        .map(|run| run.stats.scheduler_profile.clone()),
                     theorem_eligibility,
                     capacity_report,
                     result_error: result.as_ref().err().cloned(),
@@ -417,8 +428,8 @@ budget = { total = 1, mode = "activation" }
             ],
         };
 
-        let first = run_sweep(&harness, &spec, config.clone()).expect("first sweep");
-        let second = run_sweep(&harness, &spec, config).expect("second sweep");
+        let first = run_sweep(&harness, &spec, &config).expect("first sweep");
+        let second = run_sweep(&harness, &spec, &config).expect("second sweep");
 
         assert_eq!(first.manifest, second.manifest);
         assert_eq!(first.manifest.runs.len(), 4);
@@ -435,7 +446,7 @@ budget = { total = 1, mode = "activation" }
         let result = run_sweep(
             &harness,
             &spec,
-            SweepConfig {
+            &SweepConfig {
                 batch: BatchConfig {
                     parallelism: Some(1),
                 },
@@ -456,14 +467,10 @@ budget = { total = 1, mode = "activation" }
             .runs
             .iter()
             .all(|entry| entry.capacity_report.is_some()));
-        assert!(result
-            .manifest
-            .runs
-            .iter()
-            .all(|entry| matches!(
-                entry.theorem_eligibility.outcome,
-                crate::decision::DecisionOutcome::Certified(_)
-                    | crate::decision::DecisionOutcome::Counterexample(_)
-            )));
+        assert!(result.manifest.runs.iter().all(|entry| matches!(
+            entry.theorem_eligibility.outcome,
+            crate::decision::DecisionOutcome::Certified(_)
+                | crate::decision::DecisionOutcome::Counterexample(_)
+        )));
     }
 }

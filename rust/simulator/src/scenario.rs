@@ -533,14 +533,12 @@ impl ExecutionSpec {
         };
 
         let parallel_default = env.available_parallelism.max(1);
-        let scheduler_concurrency =
-            self.scheduler_concurrency
-                .unwrap_or_else(|| match self.backend {
-                    ExecutionBackend::Auto => 1,
-                    ExecutionBackend::Canonical => 1,
-                    ExecutionBackend::Threaded => parallel_default,
-                });
-        let worker_threads = self.worker_threads.unwrap_or_else(|| match self.backend {
+        let scheduler_concurrency = self.scheduler_concurrency.unwrap_or(match self.backend {
+            ExecutionBackend::Auto => 1,
+            ExecutionBackend::Canonical => 1,
+            ExecutionBackend::Threaded => parallel_default,
+        });
+        let worker_threads = self.worker_threads.unwrap_or(match self.backend {
             ExecutionBackend::Auto => 1,
             ExecutionBackend::Canonical => 1,
             ExecutionBackend::Threaded => parallel_default,

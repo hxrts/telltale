@@ -56,7 +56,10 @@ fn test_default_seed_when_missing() {
     assert_eq!(scenario.seed, 0);
     let execution = scenario.resolved_execution().expect("resolve execution");
     assert_eq!(execution.backend, ResolvedExecutionBackend::Canonical);
-    assert_eq!(execution.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
+    assert_eq!(
+        execution.scheduler_policy,
+        ResolvedSchedulerPolicy::Cooperative
+    );
     assert_eq!(execution.scheduler_concurrency, 1);
     assert_eq!(execution.worker_threads, 1);
     assert_eq!(execution.regime(), ExecutionRegime::CanonicalExact);
@@ -229,7 +232,10 @@ fn test_auto_execution_serializes_in_ci_environment() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
-    assert_eq!(resolved.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
+    assert_eq!(
+        resolved.scheduler_policy,
+        ResolvedSchedulerPolicy::Cooperative
+    );
     assert_eq!(resolved.scheduler_concurrency, 1);
     assert_eq!(resolved.worker_threads, 1);
 }
@@ -244,7 +250,10 @@ fn test_auto_execution_defaults_to_authoritative_serialized_outside_ci() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Canonical);
-    assert_eq!(resolved.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
+    assert_eq!(
+        resolved.scheduler_policy,
+        ResolvedSchedulerPolicy::Cooperative
+    );
     assert_eq!(resolved.scheduler_concurrency, 1);
     assert_eq!(resolved.worker_threads, 1);
 }
@@ -264,7 +273,10 @@ fn test_explicit_threaded_execution_keeps_parallel_defaults() {
         })
         .expect("resolve execution");
     assert_eq!(resolved.backend, ResolvedExecutionBackend::Threaded);
-    assert_eq!(resolved.scheduler_policy, ResolvedSchedulerPolicy::Cooperative);
+    assert_eq!(
+        resolved.scheduler_policy,
+        ResolvedSchedulerPolicy::Cooperative
+    );
     assert_eq!(resolved.scheduler_concurrency, 6);
     assert_eq!(resolved.worker_threads, 6);
     assert_eq!(resolved.regime(), ExecutionRegime::ThreadedEnvelopeBounded);

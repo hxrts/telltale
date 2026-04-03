@@ -1,5 +1,9 @@
 impl ThreadedProtocolMachine {
     /// Snapshot all session states.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     #[must_use]
     pub fn session_snapshots(
         &self,
@@ -22,6 +26,10 @@ impl ThreadedProtocolMachine {
     }
 
     /// Snapshot all coroutines.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     #[must_use]
     pub fn coroutines(&self) -> Vec<crate::coroutine::Coroutine> {
         self.coroutines
@@ -35,6 +43,10 @@ impl ThreadedProtocolMachine {
     }
 
     /// Snapshot all coroutines for one session.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     #[must_use]
     pub fn session_coroutines(
         &self,
@@ -50,6 +62,10 @@ impl ThreadedProtocolMachine {
     }
 
     /// Overwrite a prefix of one coroutine register file.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     /// # Errors
     ///
@@ -77,6 +93,10 @@ impl ThreadedProtocolMachine {
     }
 
     /// Inject a message into a session buffer.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     /// # Errors
     ///

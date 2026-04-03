@@ -287,27 +287,6 @@ pub struct PropertyViolation {
     pub details: String,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_property_handles_parameterized_invariants() {
-        match parse_property("buffer_bound(3,7)").expect("parse property") {
-            Property::BufferBound { sid, max } => {
-                assert_eq!(sid, 3);
-                assert_eq!(max, 7);
-            }
-            other => panic!("expected buffer bound, got {other:?}"),
-        }
-
-        match parse_property("type_monotonicity(5)").expect("parse property") {
-            Property::TypeMonotonicity { sid } => assert_eq!(sid, 5),
-            other => panic!("expected type monotonicity, got {other:?}"),
-        }
-    }
-}
-
 struct LivenessTracking {
     precondition_tick: Option<u64>,
     steps_since_precondition: usize,
@@ -683,6 +662,27 @@ fn type_depth(lt: &LocalTypeR) -> usize {
                 .max()
                 .unwrap_or(0);
             1 + max_branch
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_property_handles_parameterized_invariants() {
+        match parse_property("buffer_bound(3,7)").expect("parse property") {
+            Property::BufferBound { sid, max } => {
+                assert_eq!(sid, 3);
+                assert_eq!(max, 7);
+            }
+            other => panic!("expected buffer bound, got {other:?}"),
+        }
+
+        match parse_property("type_monotonicity(5)").expect("parse property") {
+            Property::TypeMonotonicity { sid } => assert_eq!(sid, 5),
+            other => panic!("expected type monotonicity, got {other:?}"),
         }
     }
 }

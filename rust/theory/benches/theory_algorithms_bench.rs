@@ -36,7 +36,7 @@ fn bench_projection(c: &mut Criterion) {
     });
 
     c.bench_function("projection_memoized_hits_depth_128", |b| {
-        let mut projector = MemoizedProjector::new();
+        let mut projector = MemoizedProjector::<telltale_types::DefaultContentHasher>::new();
         projector
             .project_shared(&global, "A")
             .expect("warm cache projection");

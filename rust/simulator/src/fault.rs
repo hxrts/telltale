@@ -263,7 +263,7 @@ impl<H: EffectHandler> AdversaryInjector<H> {
 
         state
             .active_crashes
-            .retain(|crash| crash.expires_at.is_none_or(|exp| tick < exp));
+            .retain(|crash| crash.expires_at.map_or(true, |exp| tick < exp));
         state
             .active_transport
             .retain(|adversary| adversary.budget_state.remaining(&adversary.budget) > 0);
@@ -763,13 +763,13 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
             if kind != "sent" {
                 return false;
             }
-            role.is_none_or(|r| r == from || r == to)
+            role.map_or(true, |r| r == from || r == to)
         }
         ObsEvent::Received { from, to, .. } => {
             if kind != "received" {
                 return false;
             }
-            role.is_none_or(|r| r == from || r == to)
+            role.map_or(true, |r| r == from || r == to)
         }
         ObsEvent::Opened { .. } => kind == "opened" && role.is_none(),
         ObsEvent::Closed { .. } => kind == "closed" && role.is_none(),
@@ -777,7 +777,7 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
             if kind != "invoked" {
                 return false;
             }
-            role.is_none_or(|rr| rr == r)
+            role.map_or(true, |rr| rr == r)
         }
         ObsEvent::Halted { .. } => kind == "halted" && role.is_none(),
         ObsEvent::Faulted { .. } => kind == "faulted" && role.is_none(),
