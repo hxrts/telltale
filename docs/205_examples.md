@@ -257,4 +257,4 @@ cd examples/wasm
 ./harness.sh run
 ```
 
-See the comments in each example file for setup requirements. For WASM-specific guidance, see [WASM Guide](29_wasm_guide.md).
+See the comments in each example file for setup requirements. For WASM-specific guidance, see [WASM Guide](804_wasm_guide.md).

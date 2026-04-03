@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Validate docs/19_rust_lean_parity.md has required sections, then
+# Validate docs/703_rust_lean_parity.md has required sections, then
 # delegate to cross-runtime-parity.sh --types for structural checks.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "${ROOT_DIR}"
 
-PARITY_DOC="docs/19_rust_lean_parity.md"
+PARITY_DOC="docs/703_rust_lean_parity.md"
 
 # ── Structural Checks ────────────────────────────────────────────────
 

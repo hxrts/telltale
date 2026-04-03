@@ -126,7 +126,7 @@ Record ordering is stable within each sampling pass for role snapshots.
 
 ## Related Docs
 
-- [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md)
-- [Protocol-Machine Simulation Scenarios](17_protocol_machine_simulation_scenarios.md)
-- [Protocol-Machine Simulation Materials](18_protocol_machine_simulation_materials.md)
-- [Rust-Lean Parity](19_rust_lean_parity.md)
+- [Protocol-Machine Simulation](501_simulation_overview.md)
+- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
+- [Protocol-Machine Simulation Materials](504_simulation_materials.md)
+- [Rust-Lean Parity](703_rust_lean_parity.md)

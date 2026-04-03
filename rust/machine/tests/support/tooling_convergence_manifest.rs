@@ -16,59 +16,59 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
         pattern: "./scripts/check/tooling-convergence.sh",
     },
     PatternExpectation {
-        path: "../../../docs/02_getting_started.md",
+        path: "../../../docs/201_getting_started.md",
         pattern: "use telltale::tell;",
     },
     PatternExpectation {
-        path: "../../../docs/02_getting_started.md",
+        path: "../../../docs/201_getting_started.md",
         pattern: "PingPong::proof_status",
     },
     PatternExpectation {
-        path: "../../../docs/03_architecture.md",
+        path: "../../../docs/104_architecture.md",
         pattern: "protocol-machine and generated effect boundary",
     },
     PatternExpectation {
-        path: "../../../docs/04_code_organization.md",
+        path: "../../../docs/105_code_organization.md",
         pattern: "generated surfaces & tooling",
     },
     PatternExpectation {
-        path: "../../../docs/06_choreographic_dsl.md",
+        path: "../../../docs/202_choreographic_dsl.md",
         pattern: "Protocol::proof_status",
     },
     PatternExpectation {
-        path: "../../../docs/08_extensions.md",
+        path: "../../../docs/204_extensions.md",
         pattern: "not the primary public",
     },
     PatternExpectation {
-        path: "../../../docs/09_effect_handlers.md",
+        path: "../../../docs/301_effect_handlers.md",
         pattern: "Protocol::effects::*",
     },
     PatternExpectation {
-        path: "../../../docs/11_effect_session_bridge.md",
+        path: "../../../docs/303_effect_session_bridge.md",
         pattern: "interfaces emitted directly by `tell!`",
     },
     PatternExpectation {
-        path: "../../../docs/15_protocol_machine_simulation_overview.md",
+        path: "../../../docs/501_simulation_overview.md",
         pattern: "GeneratedEffectScenario::builder()",
     },
     PatternExpectation {
-        path: "../../../docs/16_protocol_machine_simulation_runner.md",
+        path: "../../../docs/502_simulation_runner.md",
         pattern: "ProtocolMachineSemanticObjects",
     },
     PatternExpectation {
-        path: "../../../docs/17_protocol_machine_simulation_scenarios.md",
+        path: "../../../docs/503_simulation_scenarios.md",
         pattern: "record_stale_late_result",
     },
     PatternExpectation {
-        path: "../../../docs/22_topology.md",
+        path: "../../../docs/803_topology.md",
         pattern: "`tell!` emits a topology helper module",
     },
     PatternExpectation {
-        path: "../../../docs/28_examples.md",
+        path: "../../../docs/205_examples.md",
         pattern: "Protocol::proof_status",
     },
     PatternExpectation {
-        path: "../../../docs/29_wasm_guide.md",
+        path: "../../../docs/804_wasm_guide.md",
         pattern: "Protocol definitions written with `tell!`",
     },
     PatternExpectation {
@@ -115,47 +115,47 @@ pub(crate) const FORBIDDEN_PATTERNS: &[PatternExpectation] = &[
         pattern: "load_choreography(",
     },
     PatternExpectation {
-        path: "../../../docs/02_getting_started.md",
+        path: "../../../docs/201_getting_started.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/03_architecture.md",
+        path: "../../../docs/104_architecture.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/08_extensions.md",
+        path: "../../../docs/204_extensions.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/09_effect_handlers.md",
+        path: "../../../docs/301_effect_handlers.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/28_examples.md",
+        path: "../../../docs/205_examples.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/29_wasm_guide.md",
+        path: "../../../docs/804_wasm_guide.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/02_getting_started.md",
+        path: "../../../docs/201_getting_started.md",
         pattern: "choreography!(",
     },
     PatternExpectation {
-        path: "../../../docs/06_choreographic_dsl.md",
+        path: "../../../docs/202_choreographic_dsl.md",
         pattern: "choreography!(",
     },
     PatternExpectation {
-        path: "../../../docs/22_topology.md",
+        path: "../../../docs/803_topology.md",
         pattern: "`choreography!`",
     },
     PatternExpectation {
-        path: "../../../docs/28_examples.md",
+        path: "../../../docs/205_examples.md",
         pattern: "`choreography!`",
     },
     PatternExpectation {
-        path: "../../../docs/29_wasm_guide.md",
+        path: "../../../docs/804_wasm_guide.md",
         pattern: "`choreography!`",
     },
 ];

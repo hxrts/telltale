@@ -132,7 +132,7 @@ Module access (not re-exported at crate root):
 - Semantics: `telltale_machine::semantics::exec::{ExecResult, ExecStatus, StepPack}`
 
 See `rust/machine/src/lib.rs` for the full API.
-See [Effect Handlers and Session Types](11_effect_session_bridge.md) for integration-boundary guidance.
+See [Effect Handlers and Session Types](303_effect_session_bridge.md) for integration-boundary guidance.
 
 ### `telltale-simulator`
 
@@ -165,7 +165,7 @@ Key exports:
 - `ProtocolMachineSemanticObjects` and semantic-object schema helpers
   These come from the same canonical semantic-object family as `telltale_machine::model::semantic_objects`, not a bridge-local duplicate.
 
-See [Lean-Rust Bridge](24_lean_rust_bridge.md) for details.
+See [Lean-Rust Bridge](702_lean_rust_bridge.md) for details.
 
 ### `telltale-transport`
 

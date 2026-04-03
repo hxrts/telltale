@@ -127,9 +127,9 @@ claim-visible.
 
 ## Related Docs
 
-- [Capability and Admission](25_capability_admission.md)
-- [Protocol-Critical Authority Scope](33_protocol_authority_scope.md)
-- [Authority Language Surface](34_authority_language_surface.md)
-- [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md)
-- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
-- [Verification Inventory](32_testing_verification_inventory.md)
+- [Capability and Admission](602_capability_admission.md)
+- [Protocol-Critical Authority Scope](603_protocol_authority_scope.md)
+- [Authority Language Surface](604_authority_language_surface.md)
+- [Protocol-Critical Authority and Evidence](605_protocol_authority_evidence.md)
+- [Protocol Machine Architecture](401_protocol_machine_architecture.md)
+- [Verification Inventory](806_verification_inventory.md)

@@ -129,8 +129,14 @@ resolve_path() {
   normalised="${normalised%/}"
 
   if [[ "$normalised" != docs && "$normalised" != docs/* ]]; then
-    echo "outside_docs:"
-    return
+    # Relative paths resolved from non-docs directories (e.g. rust/machine/tests/)
+    # may normalise to prefix/docs/file.md — extract the docs/ suffix.
+    if [[ "$normalised" == */docs/* ]]; then
+      normalised="docs/${normalised#*/docs/}"
+    else
+      echo "outside_docs:"
+      return
+    fi
   fi
 
   echo "ok:$normalised"
@@ -260,9 +266,9 @@ extract_markdown_links_with_text() {
 # Extract "LINE_NO:TARGET" for bare docs/ path references.
 extract_bare_docs_refs() {
   if rg --pcre2-version >/dev/null 2>&1; then
-    rg -n -o --pcre2 '(?<![A-Za-z0-9_./-])((?:\./\.?/)*docs/[A-Za-z0-9._/-]+)' -r '$1' "$1" 2>/dev/null || true
+    rg -n -o --pcre2 '(?<![A-Za-z0-9_./-])((?:\.\.?/)*docs/[A-Za-z0-9._/-]+)' -r '$1' "$1" 2>/dev/null || true
   else
-    rg -n -o '(?:^|[^A-Za-z0-9_./-])((?:\./\.?/)*docs/[A-Za-z0-9._/-]+)' -r '$1' "$1" 2>/dev/null || true
+    rg -n -o '(?:^|[^A-Za-z0-9_./-])((?:\.\.?/)*docs/[A-Za-z0-9._/-]+)' -r '$1' "$1" 2>/dev/null || true
   fi
 }
 

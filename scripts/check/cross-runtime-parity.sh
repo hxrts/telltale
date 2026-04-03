@@ -357,7 +357,7 @@ check_types() {
     for m in "${mismatches[@]}"; do
       echo "  - ${m}"
     done
-    echo "ERROR: found Lean/Rust parity mismatches - add deviation entry to docs/19_rust_lean_parity.md Deviation Registry"
+    echo "ERROR: found Lean/Rust parity mismatches - add deviation entry to docs/703_rust_lean_parity.md Deviation Registry"
     exit 1
   fi
 

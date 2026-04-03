@@ -25,7 +25,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This pattern makes extension runtime checks reusable across projects. See [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md) for harness config files and preset constructors.
+This pattern makes extension runtime checks reusable across projects. See [Protocol-Machine Simulation](501_simulation_overview.md) for harness config files and preset constructors.
 
 ## Runtime Effect Extensions
 
@@ -364,6 +364,6 @@ The `extensions::timeout` module contains a sample grammar extension, parser, an
 
 ## Related Docs
 
-- [Choreography Effect Handlers](09_effect_handlers.md)
-- [Choreographic DSL](06_choreographic_dsl.md)
-- [Using Telltale Handlers](10_telltale_handler.md)
+- [Choreography Effect Handlers](301_effect_handlers.md)
+- [Choreographic DSL](202_choreographic_dsl.md)
+- [Using Telltale Handlers](302_telltale_handler.md)

@@ -29,7 +29,7 @@ For protocol-machine policy/data encodings, the project follows:
 - spec-first for shape
 - runtime-first for justified execution details
 
-Lean/Rust mismatches must be documented as justified breaks in `docs/19_rust_lean_parity.md` (Deviation Registry section) before merge.
+Lean/Rust mismatches must be documented as justified breaks in `docs/703_rust_lean_parity.md` (Deviation Registry section) before merge.
 
 ### Flow Policy Serialization Boundary
 
@@ -214,12 +214,12 @@ Projection transforms global choreographies to local session types (`rust/langua
 
 Content addressing assigns cryptographic identities to protocol artifacts (`rust/types/src/content_id.rs`).
 
-Conservation framework: the six conserved properties (evidence, authority, identity, commitment, structure, premise) organize all protocol-critical behavior. See `docs/37_conservation_framework.md`.
+Conservation framework: the six conserved properties (evidence, authority, identity, commitment, structure, premise) organize all protocol-critical behavior. See `docs/102_conservation_framework.md`.
 
 Capability model: protocol-critical capability semantics use the four-class
 taxonomy above. Finalization is explicit via `ProtocolMachineFinalization`,
 `FinalizationPath`, `FinalizationReadClass`, and `FinalizationStage`. See
-`docs/38_capability_model.md`.
+`docs/601_capability_model.md`.
 
 ## Development Environment
 
@@ -237,16 +237,16 @@ This enters a development shell with:
 
 The `docs/` directory contains mdbook documentation:
 
-- `docs/04_code_organization.md`: Crate and module structure
-- `docs/06_choreographic_dsl.md`: DSL syntax reference
-- `docs/09_effect_handlers.md`: Effect system guide
-- `docs/12_protocol_machine_architecture.md`: Protocol machine architecture
-- `docs/19_rust_lean_parity.md`: Lean/Rust parity policy and deviation registry
-- `docs/23_lean_verification.md`: Formal verification pipeline
-- `docs/33_protocol_authority_scope.md`: Protocol authority boundary classification
-- `docs/34_authority_language_surface.md`: Authority and failure DSL constructs
-- `docs/35_protocol_authority_evidence.md`: Evidence and typed outcome semantics
-- `docs/37_conservation_framework.md`: Conservation framework and design philosophy
+- `docs/105_code_organization.md`: Crate and module structure
+- `docs/202_choreographic_dsl.md`: DSL syntax reference
+- `docs/301_effect_handlers.md`: Effect system guide
+- `docs/401_protocol_machine_architecture.md`: Protocol machine architecture
+- `docs/703_rust_lean_parity.md`: Lean/Rust parity policy and deviation registry
+- `docs/701_lean_verification.md`: Formal verification pipeline
+- `docs/603_protocol_authority_scope.md`: Protocol authority boundary classification
+- `docs/604_authority_language_surface.md`: Authority and failure DSL constructs
+- `docs/605_protocol_authority_evidence.md`: Evidence and typed outcome semantics
+- `docs/102_conservation_framework.md`: Conservation framework and design philosophy
 
 The Lean codebase has its own documentation at `lean/CODE_MAP.md`.
 

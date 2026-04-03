@@ -4,7 +4,7 @@ This document defines the protocol-machine architecture, scheduling semantics, a
 
 ## Architecture Overview
 
-The protocol machine is the sole authority over semantic progression. It realizes structure conservation and authority conservation from the [Conservation Framework](37_conservation_framework.md). All protocol-visible truth is committed through the protocol machine. Handlers may stage and return effect outcomes, but they do not mutate semantic state directly.
+The protocol machine is the sole authority over semantic progression. It realizes structure conservation and authority conservation from the [Conservation Framework](102_conservation_framework.md). All protocol-visible truth is committed through the protocol machine. Handlers may stage and return effect outcomes, but they do not mutate semantic state directly.
 
 The canonical semantic authority is `ProtocolMachineKernel`. The cooperative `ProtocolMachine` and threaded `ThreadedProtocolMachine` (backed by `NativeThreadedDriver`) are the guest-runtime execution surfaces that call kernel-owned step entrypoints. Both implement the `KernelMachine` trait, which provides `kernel_step_round` for executing scheduler rounds.
 
@@ -334,10 +334,10 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 
 ## Related Docs
 
-- [Protocol-Machine Bytecode Instructions](13_bytecode_instructions.md)
-- [Session Lifecycle](14_session_lifecycle.md)
-- [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md)
-- [Rust-Lean Parity](19_rust_lean_parity.md)
-- [Effect Handlers and Session Types](11_effect_session_bridge.md)
-- [Lean Verification](23_lean_verification.md)
-- [Capability and Admission](25_capability_admission.md)
+- [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
+- [Session Lifecycle](403_session_lifecycle.md)
+- [Protocol-Machine Simulation](501_simulation_overview.md)
+- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Effect Handlers and Session Types](303_effect_session_bridge.md)
+- [Lean Verification](701_lean_verification.md)
+- [Capability and Admission](602_capability_admission.md)

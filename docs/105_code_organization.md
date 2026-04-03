@@ -2,7 +2,7 @@
 
 This document describes the implementation organization of the codebase. It covers workspace layout, crate dependency structure, crate-level responsibilities, and Rust-Lean constructor correspondence.
 
-For conceptual pipeline and runtime architecture, see [Architecture](03_architecture.md).
+For conceptual pipeline and runtime architecture, see [Architecture](104_architecture.md).
 
 ## Workspace Layout
 
@@ -133,7 +133,7 @@ The `projection` module handles `GlobalType` to `LocalTypeR` projection with mer
 
 The `subtyping/sync` module provides synchronous subtyping. The `subtyping/async` module provides asynchronous subtyping via SISO decomposition. The `well_formedness` module contains validation predicates. The `duality` module computes dual types and the `bounded` module implements bounded recursion strategies.
 
-Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](20_content_addressing.md) for details.
+Projection memoization uses the content store in `telltale-types` to cache by content ID. See [Content Addressing](801_content_addressing.md) for details.
 
 ```rust
 use telltale_theory::{project, merge, sync_subtype, async_subtype};
@@ -150,7 +150,7 @@ The `project` function computes the local type for a given role. The `sync_subty
 
 ### telltale-bridge
 
-This crate is located in `rust/bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](24_lean_rust_bridge.md) for detailed documentation.
+This crate is located in `rust/bridge/`. It provides bidirectional conversion between Rust types and Lean-compatible JSON. See [Lean-Rust Bridge](702_lean_rust_bridge.md) for detailed documentation.
 
 The `export` module converts Rust types to JSON for Lean. The `import` module converts Lean JSON back to Rust types. The `validate` module provides cross-validation between Rust and Lean.
 
@@ -259,11 +259,11 @@ Named agreement profiles, explicit operation/progress metadata, and typed metada
 
 #### Validation and Submodules
 
-Validation includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for protocol machine-core statements. See [Choreographic DSL](06_choreographic_dsl.md) for syntax details.
+Validation includes bundle and capability checks. It rejects duplicate bundle declarations, missing required bundles, and missing capability coverage for protocol machine-core statements. See [Choreographic DSL](202_choreographic_dsl.md) for syntax details.
 
 The `effects/` directory contains the effect system and handlers. The `extensions/` directory contains the DSL extension system. The `runtime/` directory contains platform abstraction.
 
-The `topology/` directory provides deployment configuration. See [Topology](22_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](21_resource_heap.md) for nullifier-based consumption tracking.
+The `topology/` directory provides deployment configuration. See [Topology](803_topology.md) for the separation between protocol logic and deployment. The `heap/` directory provides explicit resource management. See [Resource Heap](802_resource_heap.md) for nullifier-based consumption tracking.
 
 ### telltale-macros
 
@@ -296,7 +296,7 @@ The crate implements TCP-based transports with async networking via tokio. Futur
 
 This crate is defined at the repository root and uses `rust/src/` as its library source path. It re-exports core APIs from `telltale-types`, `telltale-macros`, and optional `telltale-theory` features.
 
-The crate supports several feature flags. The `theory` feature enables `telltale-theory` algorithms. The `full` feature enables all optional root features. See [Getting Started](02_getting_started.md) for the complete feature flag reference.
+The crate supports several feature flags. The `theory` feature enables `telltale-theory` algorithms. The `full` feature enables all optional root features. See [Getting Started](201_getting_started.md) for the complete feature flag reference.
 
 ```rust
 use telltale::prelude::*;

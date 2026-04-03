@@ -7,7 +7,7 @@ It is centered on typed `EffectRequest` and `EffectOutcome` values.
 ## Scope
 
 Use this document when integrating Telltale into another execution environment.
-Use [Choreography Effect Handlers](09_effect_handlers.md) when implementing async handlers for generated choreography code.
+Use [Choreography Effect Handlers](301_effect_handlers.md) when implementing async handlers for generated choreography code.
 
 This bridge is for protocol-critical capability and evidence flow. It is not a
 general host authorization framework. Arbitrary application auth, policy, and
@@ -287,7 +287,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md) for harness config fields and preset helpers.
+This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Protocol-Machine Simulation](501_simulation_overview.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 
@@ -342,7 +342,7 @@ request/outcome model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`.
 
 ## Related Docs
 
-- [Choreography Effect Handlers](09_effect_handlers.md)
-- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
-- [Lean Verification](23_lean_verification.md)
-- [Lean-Rust Bridge](24_lean_rust_bridge.md)
+- [Choreography Effect Handlers](301_effect_handlers.md)
+- [Protocol Machine Architecture](401_protocol_machine_architecture.md)
+- [Lean Verification](701_lean_verification.md)
+- [Lean-Rust Bridge](702_lean_rust_bridge.md)

@@ -10,56 +10,56 @@ use tooling_convergence_manifest::{FORBIDDEN_PATTERNS, REQUIRED_PATTERNS};
 const TOOLING_SOURCES: &[(&str, &str)] = &[
     ("../../../justfile", include_str!("../../../justfile")),
     (
-        "../../../docs/02_getting_started.md",
-        include_str!("../../../docs/02_getting_started.md"),
+        "../../../docs/201_getting_started.md",
+        include_str!("../../../docs/201_getting_started.md"),
     ),
     (
-        "../../../docs/03_architecture.md",
-        include_str!("../../../docs/03_architecture.md"),
+        "../../../docs/104_architecture.md",
+        include_str!("../../../docs/104_architecture.md"),
     ),
     (
-        "../../../docs/04_code_organization.md",
-        include_str!("../../../docs/04_code_organization.md"),
+        "../../../docs/105_code_organization.md",
+        include_str!("../../../docs/105_code_organization.md"),
     ),
     (
-        "../../../docs/06_choreographic_dsl.md",
-        include_str!("../../../docs/06_choreographic_dsl.md"),
+        "../../../docs/202_choreographic_dsl.md",
+        include_str!("../../../docs/202_choreographic_dsl.md"),
     ),
     (
-        "../../../docs/08_extensions.md",
-        include_str!("../../../docs/08_extensions.md"),
+        "../../../docs/204_extensions.md",
+        include_str!("../../../docs/204_extensions.md"),
     ),
     (
-        "../../../docs/09_effect_handlers.md",
-        include_str!("../../../docs/09_effect_handlers.md"),
+        "../../../docs/301_effect_handlers.md",
+        include_str!("../../../docs/301_effect_handlers.md"),
     ),
     (
-        "../../../docs/11_effect_session_bridge.md",
-        include_str!("../../../docs/11_effect_session_bridge.md"),
+        "../../../docs/303_effect_session_bridge.md",
+        include_str!("../../../docs/303_effect_session_bridge.md"),
     ),
     (
-        "../../../docs/15_protocol_machine_simulation_overview.md",
-        include_str!("../../../docs/15_protocol_machine_simulation_overview.md"),
+        "../../../docs/501_simulation_overview.md",
+        include_str!("../../../docs/501_simulation_overview.md"),
     ),
     (
-        "../../../docs/16_protocol_machine_simulation_runner.md",
-        include_str!("../../../docs/16_protocol_machine_simulation_runner.md"),
+        "../../../docs/502_simulation_runner.md",
+        include_str!("../../../docs/502_simulation_runner.md"),
     ),
     (
-        "../../../docs/17_protocol_machine_simulation_scenarios.md",
-        include_str!("../../../docs/17_protocol_machine_simulation_scenarios.md"),
+        "../../../docs/503_simulation_scenarios.md",
+        include_str!("../../../docs/503_simulation_scenarios.md"),
     ),
     (
-        "../../../docs/22_topology.md",
-        include_str!("../../../docs/22_topology.md"),
+        "../../../docs/803_topology.md",
+        include_str!("../../../docs/803_topology.md"),
     ),
     (
-        "../../../docs/28_examples.md",
-        include_str!("../../../docs/28_examples.md"),
+        "../../../docs/205_examples.md",
+        include_str!("../../../docs/205_examples.md"),
     ),
     (
-        "../../../docs/29_wasm_guide.md",
-        include_str!("../../../docs/29_wasm_guide.md"),
+        "../../../docs/804_wasm_guide.md",
+        include_str!("../../../docs/804_wasm_guide.md"),
     ),
     (
         "../../runtime/examples/authority_surface.rs",

@@ -90,48 +90,48 @@ assert_gate_fails() {
 # - release package registry drift should be rejected by release-recovery.sh
 # - package resource escapes should be rejected by package-resource-audit.sh
 
-doc_backup="$(backup_file docs/32_testing_verification_inventory.md)"
+doc_backup="$(backup_file docs/806_verification_inventory.md)"
 replace_once \
-  docs/32_testing_verification_inventory.md \
+  docs/806_verification_inventory.md \
   "semantic-audit tick normalization" \
   "semantic-audit tick mutation"
 assert_gate_fails \
   "bridge normalization ledger mutation" \
   "missing bridge normalization ledger row for 'semantic-audit tick normalization'" \
   ./scripts/check/bridge-normalization-ledger.sh
-restore_now docs/32_testing_verification_inventory.md "${doc_backup}"
+restore_now docs/806_verification_inventory.md "${doc_backup}"
 
-admission_doc_backup="$(backup_file docs/25_capability_admission.md)"
+admission_doc_backup="$(backup_file docs/602_capability_admission.md)"
 replace_once \
-  docs/25_capability_admission.md \
+  docs/602_capability_admission.md \
   '| `protocol_envelope_bridge` |' \
   '| `phase16_mutation_boundary` |'
 assert_gate_fails \
   "capability admission docs row mutation" \
   "missing expected docs row:" \
   ./scripts/check/docs-as-contract.sh
-restore_now docs/25_capability_admission.md "${admission_doc_backup}"
+restore_now docs/602_capability_admission.md "${admission_doc_backup}"
 
-authority_doc_backup="$(backup_file docs/34_authority_language_surface.md)"
+authority_doc_backup="$(backup_file docs/604_authority_language_surface.md)"
 replace_once \
-  docs/34_authority_language_surface.md \
+  docs/604_authority_language_surface.md \
   '| `par` with observational binding |' \
   '| `phase16_parallel_mutation` |'
 assert_gate_fails \
   "authority language docs row mutation" \
   "missing expected docs row:" \
   ./scripts/check/docs-as-contract.sh
-restore_now docs/34_authority_language_surface.md "${authority_doc_backup}"
+restore_now docs/604_authority_language_surface.md "${authority_doc_backup}"
 
 replace_once \
-  docs/32_testing_verification_inventory.md \
+  docs/806_verification_inventory.md \
   "| Handler contract boundary assurance suites | 2 |" \
   "| Handler contract boundary assurance suites | 999 |"
 assert_gate_fails \
   "verification inventory metric mutation" \
   'metric `Handler contract boundary assurance suites` documents 999 but actual is 2' \
   ./scripts/check/verification-inventory.sh
-restore_now docs/32_testing_verification_inventory.md "${doc_backup}"
+restore_now docs/806_verification_inventory.md "${doc_backup}"
 
 cat > rust/runtime/src/__phase10_package_resource_probe.rs <<'EOF'
 const _: &str = include_str!("../Cargo.toml");

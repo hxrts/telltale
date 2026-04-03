@@ -4,9 +4,9 @@
 
 This page documents the choreography-layer handler surface in `telltale-runtime`.
 This surface is `ChoreoHandler`.
-For protocol-machine host integration, see [Effect Handlers and Session Types](11_effect_session_bridge.md).
+For protocol-machine host integration, see [Effect Handlers and Session Types](303_effect_session_bridge.md).
 
-Effect interfaces are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. See [Conservation Framework](37_conservation_framework.md) for the full design philosophy.
+Effect interfaces are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. See [Conservation Framework](102_conservation_framework.md) for the full design philosophy.
 
 `ChoreoHandler` decouples protocol logic from transport implementation at the choreography layer. Handlers interpret choreographic effects into concrete communication operations. Protocol code remains unchanged across handlers. The effect runtime normalizes `Parallel` effects to deterministic declaration order.
 
@@ -124,7 +124,7 @@ The TelltaleHandler is located in `rust/runtime/src/effects/handlers/telltale.rs
 
 This handler enforces session types at runtime. It provides strong guarantees about protocol compliance.
 
-See [Using Telltale Handlers](10_telltale_handler.md) for complete documentation.
+See [Using Telltale Handlers](302_telltale_handler.md) for complete documentation.
 
 ### RecordingHandler
 
@@ -290,7 +290,7 @@ Use middleware to add logging, metrics, retries, or fault injection. Middleware 
 
 InMemoryHandler and TelltaleHandler both work in WASM environments. They use futures channels for communication.
 
-For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](29_wasm_guide.md) for details.
+For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](804_wasm_guide.md) for details.
 
 ## Parameterized Roles
 

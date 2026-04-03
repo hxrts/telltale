@@ -2,7 +2,7 @@
 
 ## Overview
 
-Telltale compiles global protocol specifications into local session types for each participant. The system is organized as a conservation system over protocol semantics. All protocol-critical behavior reduces to six conserved properties: evidence, authority, identity, commitment, structure, and premise. See [Conservation Framework](37_conservation_framework.md) for the full design philosophy.
+Telltale compiles global protocol specifications into local session types for each participant. The system is organized as a conservation system over protocol semantics. All protocol-critical behavior reduces to six conserved properties: evidence, authority, identity, commitment, structure, and premise. See [Conservation Framework](102_conservation_framework.md) for the full design philosophy.
 
 The architecture has three compile-time stages and two runtime paths:
 
@@ -228,7 +228,7 @@ pub trait ChoreoHandler: Send {
 
 Handlers implement this trait to provide different execution strategies. This async handler is distinct from the synchronous `telltale_machine::model::effects::EffectHandler` used by the protocol machine.
 
-Use [Effect Handlers and Session Types](11_effect_session_bridge.md) for protocol-machine integration guidance.
+Use [Effect Handlers and Session Types](303_effect_session_bridge.md) for protocol-machine integration guidance.
 
 ### Protocol-Machine Execution Layer
 
@@ -238,7 +238,7 @@ The protocol machine maintains session state with bounded message buffers. Each 
 
 At the embedding boundary, the protocol machine distinguishes current host ownership from protocol typing and capability admission. Production host integrations use `load_choreography_owned(...)` and `OwnedSession` for explicit session-local authority after open. Guest runtimes embed the protocol machine inside a host runtime with explicit external handlers.
 
-Delegation and reconfiguration paths emit explicit receipts and audit records. See [Protocol Machine Architecture](12_protocol_machine_architecture.md) for details on the underlying bytecode protocol-machine architecture.
+Delegation and reconfiguration paths emit explicit receipts and audit records. See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for details on the underlying bytecode protocol-machine architecture.
 
 ## Data Flow
 
@@ -312,7 +312,7 @@ internal implementation technique, not the canonical public architecture story.
 
 ### Why Conservation
 
-Telltale treats protocol semantics as conserved quantities rather than emergent properties. Every runtime phenomenon reduces to the conservation framework. Async execution reduces to commitment lifecycle. Race conditions reduce to authority violations. Retry logic reduces to identity and commitment. See the full reduction table in [Conservation Framework](37_conservation_framework.md).
+Telltale treats protocol semantics as conserved quantities rather than emergent properties. Every runtime phenomenon reduces to the conservation framework. Async execution reduces to commitment lifecycle. Race conditions reduce to authority violations. Retry logic reduces to identity and commitment. See the full reduction table in [Conservation Framework](102_conservation_framework.md).
 
 This design eliminates classes of bugs by construction. Hidden concurrency, authority ambiguity, silent failure, late result races, and unbounded waiting all map to violations of specific conserved properties. The erasure principle removes everything that is not part of the conserved system from the programming model.
 
@@ -322,7 +322,7 @@ Choreographies specify the global protocol once and projection generates local c
 
 ### Why Effect Handlers
 
-Effect handlers are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. Internal handlers realize scheduling, dispatch, and replay. External handlers realize storage, network, and domain-specific integrations. See [Choreography Effect Handlers](09_effect_handlers.md) for the async surface and [Effect Handlers and Session Types](11_effect_session_bridge.md) for the protocol-machine boundary.
+Effect handlers are the typed operational vocabulary between the protocol machine and the world. They realize commitment conservation: every effect is a tracked commitment that must resolve to a terminal class. Internal handlers realize scheduling, dispatch, and replay. External handlers realize storage, network, and domain-specific integrations. See [Choreography Effect Handlers](301_effect_handlers.md) for the async surface and [Effect Handlers and Session Types](303_effect_session_bridge.md) for the protocol-machine boundary.
 
 ### Why Capability Semantics Are First Class
 
@@ -349,7 +349,7 @@ The runtime module provides platform-specific async primitives. Native targets u
 
 ### Custom Handlers
 
-Implement `ChoreoHandler` for choreography-layer transports. Implement `EffectHandler` for protocol-machine host integration. See [Choreography Effect Handlers](09_effect_handlers.md) and [Effect Handlers and Session Types](11_effect_session_bridge.md) for details.
+Implement `ChoreoHandler` for choreography-layer transports. Implement `EffectHandler` for protocol-machine host integration. See [Choreography Effect Handlers](301_effect_handlers.md) and [Effect Handlers and Session Types](303_effect_session_bridge.md) for details.
 
 ### Middleware
 
@@ -359,4 +359,4 @@ Wrap handlers with middleware for cross-cutting concerns. Logging, metrics, and 
 
 This page focuses on conceptual architecture: compilation stages, runtime execution paths, and why those boundaries exist.
 
-For concrete workspace layout, crate dependency edges, per-crate responsibilities, and Lean constructor correspondence, see [Code Organization](04_code_organization.md).
+For concrete workspace layout, crate dependency edges, per-crate responsibilities, and Lean constructor correspondence, see [Code Organization](105_code_organization.md).

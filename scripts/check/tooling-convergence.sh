@@ -147,12 +147,12 @@ check_no_match 'EffectHandler stubs plus simulator harness test templates' Justf
 # ── Legacy Public Teaching Surfaces ──────────────────────────────────
 
 check_no_match 'Program::new\(' \
-  docs/02_getting_started.md \
-  docs/03_architecture.md \
-  docs/08_extensions.md \
-  docs/09_effect_handlers.md \
-  docs/28_examples.md \
-  docs/29_wasm_guide.md
+  docs/201_getting_started.md \
+  docs/104_architecture.md \
+  docs/204_extensions.md \
+  docs/301_effect_handlers.md \
+  docs/205_examples.md \
+  docs/804_wasm_guide.md
 
 check_no_match 'compose race\b' docs examples
 check_no_match 'compose fallback\b' docs examples

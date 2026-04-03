@@ -42,9 +42,9 @@ cancellation, stale late result, blocked, and degraded outcomes by default.
 
 Use these pages for detailed behavior.
 
-- [Protocol-Machine Simulation Runner](16_protocol_machine_simulation_runner.md): trace shape, runner entry points, harness APIs, sampling model, and round order.
-- [Protocol-Machine Simulation Scenarios](17_protocol_machine_simulation_scenarios.md): scenario schema, TOML examples, fault and network middleware, properties, checkpointing, and replay.
-- [Protocol-Machine Simulation Materials](18_protocol_machine_simulation_materials.md): material handlers, distributed simulation, post-run analysis, conformance lanes, and current limits.
+- [Protocol-Machine Simulation Runner](502_simulation_runner.md): trace shape, runner entry points, harness APIs, sampling model, and round order.
+- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md): scenario schema, TOML examples, fault and network middleware, properties, checkpointing, and replay.
+- [Protocol-Machine Simulation Materials](504_simulation_materials.md): material handlers, distributed simulation, post-run analysis, conformance lanes, and current limits.
 
 ## CLI
 
@@ -58,7 +58,7 @@ The process exits with code `2` when configured contract checks fail.
 
 ## Related Docs
 
-- [Effect Handlers and Session Types](11_effect_session_bridge.md)
-- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
-- [Rust-Lean Parity](19_rust_lean_parity.md)
-- [Lean-Rust Bridge](24_lean_rust_bridge.md)
+- [Effect Handlers and Session Types](303_effect_session_bridge.md)
+- [Protocol Machine Architecture](401_protocol_machine_architecture.md)
+- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Lean-Rust Bridge](702_lean_rust_bridge.md)

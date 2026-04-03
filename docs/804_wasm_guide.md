@@ -167,4 +167,4 @@ just wasm-test-all
 
 For ad hoc crate-level runs, use `wasm-pack test --node`. This compiles the crate for `wasm32` and executes tests in a Node environment.
 
-See [Choreography Effect Handlers](09_effect_handlers.md) for handler details. See [Using Telltale Handlers](10_telltale_handler.md) for the channel based API.
+See [Choreography Effect Handlers](301_effect_handlers.md) for handler details. See [Using Telltale Handlers](302_telltale_handler.md) for the channel based API.

@@ -353,7 +353,7 @@ protocol-machine model: structure remains the session-type core, while the other
 conserved properties are realized by explicit typed objects rather than ambient
 host state.
 
-These six properties are mutually constitutive. A violation in any one property can manifest as a failure in any other. The conservation framework is the organizing principle that connects session-type theory to the full runtime architecture. See [Conservation Framework](37_conservation_framework.md) for the conservation laws, reduction principle, and eliminated bug classes.
+These six properties are mutually constitutive. A violation in any one property can manifest as a failure in any other. The conservation framework is the organizing principle that connects session-type theory to the full runtime architecture. See [Conservation Framework](102_conservation_framework.md) for the conservation laws, reduction principle, and eliminated bug classes.
 
 ## Further Reading
 
@@ -364,6 +364,6 @@ For deeper study of session type theory:
 - [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf) integrates session types with choreographic programming.
 
 Within this documentation:
-- [Introduction](01_introduction.md) introduces the concepts in context
-- [Choreographic DSL](06_choreographic_dsl.md) shows how to write protocols
-- [Lean Verification](23_lean_verification.md) details the proof infrastructure
+- [Introduction](1101_introduction.md) introduces the concepts in context
+- [Choreographic DSL](202_choreographic_dsl.md) shows how to write protocols
+- [Lean Verification](701_lean_verification.md) details the proof infrastructure

@@ -113,6 +113,6 @@ It then runs the same middleware and property loop for selected rounds.
 
 ## Related Docs
 
-- [Protocol-Machine Simulation](15_protocol_machine_simulation_overview.md)
-- [Protocol-Machine Simulation Runner](16_protocol_machine_simulation_runner.md)
-- [Protocol-Machine Simulation Materials](18_protocol_machine_simulation_materials.md)
+- [Protocol-Machine Simulation](501_simulation_overview.md)
+- [Protocol-Machine Simulation Runner](502_simulation_runner.md)
+- [Protocol-Machine Simulation Materials](504_simulation_materials.md)

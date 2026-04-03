@@ -36,7 +36,7 @@ Conservation law: every commitment must resolve to exactly one of success, failu
 
 Structure is the essential shape of the protocol. Multiparty session types are the concrete form of structure. Structure defines the topology of interaction, the composition of roles, and the coherence between local and global behavior.
 
-Conservation law: the compositional structure of the protocol is defined entirely by its type. Local behavior must remain a valid projection of the global protocol. No runtime behavior can alter the protocol shape. See [Theory](05_theory.md) for the session type foundations.
+Conservation law: the compositional structure of the protocol is defined entirely by its type. Local behavior must remain a valid projection of the global protocol. No runtime behavior can alter the protocol shape. See [Theory](103_theory.md) for the session type foundations.
 
 ### Premise
 
@@ -103,7 +103,7 @@ The conservation framework is realized through a closed set of semantic objects.
 | `CanonicalHandle` | Non-forgeable reference obtained from authoritative materialization | `evidence` |
 | `ProgressContract` | Explicit liveness and budget contract governing waits and escalation | premise/commitment support |
 
-These objects are first-class in the Lean formalization, represented canonically in Rust, and referenced in the protocol machine semantic audit surface. See [Protocol Machine Architecture](12_protocol_machine_architecture.md) for the runtime accessors and [Lean Verification](23_lean_verification.md) for the proof surfaces.
+These objects are first-class in the Lean formalization, represented canonically in Rust, and referenced in the protocol machine semantic audit surface. See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for the runtime accessors and [Lean Verification](701_lean_verification.md) for the proof surfaces.
 
 ## Implementation Techniques
 
@@ -130,8 +130,8 @@ Instead of "the system hung," a developer sees: which operation, which owner, wh
 
 ## Related Docs
 
-- [Architecture](03_architecture.md)
-- [Theory](05_theory.md)
-- [Effect Handlers and Session Types](11_effect_session_bridge.md)
-- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
-- [Protocol-Critical Authority and Evidence](35_protocol_authority_evidence.md)
+- [Architecture](104_architecture.md)
+- [Theory](103_theory.md)
+- [Effect Handlers and Session Types](303_effect_session_bridge.md)
+- [Protocol Machine Architecture](401_protocol_machine_architecture.md)
+- [Protocol-Critical Authority and Evidence](605_protocol_authority_evidence.md)

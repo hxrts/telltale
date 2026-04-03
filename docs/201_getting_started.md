@@ -132,7 +132,7 @@ tell! {
 The macro generates the protocol module and, when the protocol is projectable,
 the session surfaces. Use `PingPong::proof_status` to inspect whether a protocol
 is session-projectable or only protocol-machine executable. For advanced
-scenarios requiring runtime parsing, see [Choreographic DSL](06_choreographic_dsl.md).
+scenarios requiring runtime parsing, see [Choreographic DSL](202_choreographic_dsl.md).
 
 Run the protocol using the effect system.
 

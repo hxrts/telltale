@@ -135,8 +135,8 @@ removed_names=(
 
 for name in "${removed_names[@]}"; do
   if rg -q "\\b${name}\\b" "${RUST_MACHINE_LIB}" "${ROOT_DIR}/rust/machine/src/nested.rs" \
-    "${ROOT_DIR}/rust/machine/src/wasm.rs" "${ROOT_DIR}/docs/04_code_organization.md" \
-    "${ROOT_DIR}/docs/30_api_reference.md"; then
+    "${ROOT_DIR}/rust/machine/src/wasm.rs" "${ROOT_DIR}/docs/105_code_organization.md" \
+    "${ROOT_DIR}/docs/805_api_reference.md"; then
     echo "[semantic-name-parity] removed runtime name '${name}' is still present" >&2
     exit 1
   fi
@@ -167,12 +167,12 @@ for duplicate in "pub struct OperationInstance" "pub struct OutstandingEffect" "
 done
 
 if ! rg -q '`Region` is now part of the canonical protocol-machine semantic-object family' \
-  "${ROOT_DIR}/docs/19_rust_lean_parity.md"; then
-  echo "[semantic-name-parity] docs/19_rust_lean_parity.md is missing the Region semantic-core note" >&2
+  "${ROOT_DIR}/docs/703_rust_lean_parity.md"; then
+  echo "[semantic-name-parity] docs/703_rust_lean_parity.md is missing the Region semantic-core note" >&2
   exit 1
 fi
 
-for doc_path in "${ROOT_DIR}/docs/04_code_organization.md" "${ROOT_DIR}/docs/30_api_reference.md"; do
+for doc_path in "${ROOT_DIR}/docs/105_code_organization.md" "${ROOT_DIR}/docs/805_api_reference.md"; do
   if ! rg -q 'telltale_machine::model' "${doc_path}" || \
      ! rg -q 'telltale_machine::runtime' "${doc_path}" || \
      ! rg -q 'telltale_machine::semantics' "${doc_path}"; then

@@ -115,8 +115,8 @@ Lean and Rust alignment is checked by automation lanes.
 
 ## Related Docs
 
-- [Protocol Machine Architecture](12_protocol_machine_architecture.md)
-- [Rust-Lean Parity](19_rust_lean_parity.md)
-- [Lean-Rust Bridge](24_lean_rust_bridge.md)
-- [Capability and Admission](25_capability_admission.md)
-- [Distributed and Classical Families](27_distributed_classical_families.md)
+- [Protocol Machine Architecture](401_protocol_machine_architecture.md)
+- [Rust-Lean Parity](703_rust_lean_parity.md)
+- [Lean-Rust Bridge](702_lean_rust_bridge.md)
+- [Capability and Admission](602_capability_admission.md)
+- [Distributed and Classical Families](706_distributed_classical_families.md)

@@ -239,4 +239,4 @@ execution, snapshot/restore, and bridge-mediated recovery runs.
 
 The Lean formalization for topology is in `lean/Protocol/Spatial.lean`. Projection correctness does not depend on topology data, so location checks are enforced during deployment instead of compilation.
 
-See [Choreographic DSL](06_choreographic_dsl.md) for role declarations and [Choreography Effect Handlers](09_effect_handlers.md) for choreography handler usage patterns.
+See [Choreographic DSL](202_choreographic_dsl.md) for role declarations and [Choreography Effect Handlers](301_effect_handlers.md) for choreography handler usage patterns.

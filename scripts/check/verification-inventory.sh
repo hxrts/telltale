@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Verify that docs/32_testing_verification_inventory.md metrics match actual values
+# Verify that docs/806_verification_inventory.md metrics match actual values
 # derived from CODE_MAP.md, justfile recipe counts, and macro UI fixture counts.
 set -euo pipefail
 
@@ -208,9 +208,9 @@ gate_ownership_recipes=(
 metric_value() {
   local name="$1"
   local row
-  row=$(grep -E "^\|[[:space:]]*${name}[[:space:]]*\|" docs/32_testing_verification_inventory.md) || true
+  row=$(grep -E "^\|[[:space:]]*${name}[[:space:]]*\|" docs/806_verification_inventory.md) || true
   if [[ -z "$row" ]]; then
-    echo "missing metric row in docs/32_testing_verification_inventory.md: ${name}" >&2
+    echo "missing metric row in docs/806_verification_inventory.md: ${name}" >&2
     exit 1
   fi
   # Extract the numeric value column (second pipe-delimited field), strip commas
@@ -258,7 +258,7 @@ check_metric() {
   local documented
   documented=$(metric_value "$name")
   if [[ "$documented" -ne "$actual" ]]; then
-    errors+=("docs/32_testing_verification_inventory.md: metric \`${name}\` documents ${documented} but actual is ${actual}")
+    errors+=("docs/806_verification_inventory.md: metric \`${name}\` documents ${documented} but actual is ${actual}")
   fi
 }
 
@@ -402,20 +402,20 @@ check_metric "Deterministic scale and budget assurance suites" "$actual_determin
 check_metric "Explicit unsupported or fail-closed property notes" "$actual_explicit_unsupported_fail_closed_notes"
 
 for phrase in "${forbidden_inventory_gap_phrases[@]}"; do
-  if rg -Fq "$phrase" docs/32_testing_verification_inventory.md; then
-    errors+=("docs/32_testing_verification_inventory.md: stale gap phrase remains in inventory: ${phrase}")
+  if rg -Fq "$phrase" docs/806_verification_inventory.md; then
+    errors+=("docs/806_verification_inventory.md: stale gap phrase remains in inventory: ${phrase}")
   fi
 done
 
-if ! rg -q "^## Gate Ownership" docs/32_testing_verification_inventory.md; then
-  errors+=("docs/32_testing_verification_inventory.md: missing 'Gate Ownership' section")
+if ! rg -q "^## Gate Ownership" docs/806_verification_inventory.md; then
+  errors+=("docs/806_verification_inventory.md: missing 'Gate Ownership' section")
 fi
 
 for recipe in "${gate_ownership_recipes[@]}"; do
   recipe_code_span="$(printf '`just %s`' "${recipe}")"
   recipe_command_count "${recipe}" >/dev/null
-  if ! rg -Fq "${recipe_code_span}" docs/32_testing_verification_inventory.md; then
-    errors+=("docs/32_testing_verification_inventory.md: missing gate ownership entry for ${recipe}")
+  if ! rg -Fq "${recipe_code_span}" docs/806_verification_inventory.md; then
+    errors+=("docs/806_verification_inventory.md: missing gate ownership entry for ${recipe}")
   fi
 done
 

@@ -362,7 +362,7 @@ done
 # ── Feature Table Accuracy ────────────────────────────────────────────
 # Compare documented features against actual Cargo features.
 
-GETTING_STARTED="docs/02_getting_started.md"
+GETTING_STARTED="docs/201_getting_started.md"
 if [[ -f "$GETTING_STARTED" ]]; then
     TARGET_CRATES="telltale
 telltale-theory
@@ -513,7 +513,7 @@ telltale-bridge"
         # Missing in docs (in actual but not in docs)
         while IFS= read -r feat; do
             if ! in_set "$feat" "$doc_file_feat"; then
-                echo "docs/02_getting_started.md: feature \`$feat\` exists in \`$crate_name\` but is not documented in feature table" >> "$ERRORS_FILE"
+                echo "docs/201_getting_started.md: feature \`$feat\` exists in \`$crate_name\` but is not documented in feature table" >> "$ERRORS_FILE"
             fi
         done < "$actual_file"
 
@@ -521,7 +521,7 @@ telltale-bridge"
         if [[ -s "$doc_file_feat" ]]; then
             while IFS= read -r feat; do
                 if ! in_set "$feat" "$actual_file"; then
-                    echo "docs/02_getting_started.md: feature \`$feat\` is documented for \`$crate_name\` but does not exist in Cargo.toml" >> "$ERRORS_FILE"
+                    echo "docs/201_getting_started.md: feature \`$feat\` is documented for \`$crate_name\` but does not exist in Cargo.toml" >> "$ERRORS_FILE"
                 fi
             done < "$doc_file_feat"
         fi

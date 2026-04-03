@@ -15,20 +15,20 @@ const DRIVER_SOURCES: &[(&str, &str)] = &[
 
 const DOC_SOURCES: &[(&str, &str)] = &[
     (
-        "../../../docs/04_code_organization.md",
-        include_str!("../../../docs/04_code_organization.md"),
+        "../../../docs/105_code_organization.md",
+        include_str!("../../../docs/105_code_organization.md"),
     ),
     (
-        "../../../docs/11_effect_session_bridge.md",
-        include_str!("../../../docs/11_effect_session_bridge.md"),
+        "../../../docs/303_effect_session_bridge.md",
+        include_str!("../../../docs/303_effect_session_bridge.md"),
     ),
     (
-        "../../../docs/14_session_lifecycle.md",
-        include_str!("../../../docs/14_session_lifecycle.md"),
+        "../../../docs/403_session_lifecycle.md",
+        include_str!("../../../docs/403_session_lifecycle.md"),
     ),
     (
-        "../../../docs/30_api_reference.md",
-        include_str!("../../../docs/30_api_reference.md"),
+        "../../../docs/805_api_reference.md",
+        include_str!("../../../docs/805_api_reference.md"),
     ),
     (
         "../../runtime/src/bin/effect_scaffold.rs",
