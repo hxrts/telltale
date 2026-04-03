@@ -153,22 +153,22 @@ Basic theorem-facing predicates live in `Runtime/ProtocolMachine/Model/SemanticO
 The re-export facade is `Runtime/ProtocolMachine/Model/SemanticObjects.lean`.
 
 Deferred-effect admissibility, retry shape, and late-result rejection live in `Runtime/ProtocolMachine/Model/SemanticObjects/OutstandingEffects.lean`.
-Associated theorem-facing lemmas are in `Runtime/ProtocolMachine/Model/SemanticObjects/OutstandingEffectsLemmas.lean`.
+Associated theorem-facing lemmas are in `Runtime/Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean`.
 
 Semantic handoff realization lives in `Runtime/ProtocolMachine/Model/SemanticObjects/SemanticHandoffTransition.lean`.
-Theorem-facing owner/publication/delegation bridge lemmas are in `Runtime/ProtocolMachine/Model/SemanticObjects/SemanticHandoffLemmas.lean`.
+Theorem-facing owner/publication/delegation bridge lemmas are in `Runtime/Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean`.
 
 Authoritative-read commitment contexts and canonical publication-path uniqueness live in `Runtime/ProtocolMachine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`.
-Observer-projection, blindness, and noninterference lemmas are in `Runtime/ProtocolMachine/Model/SemanticObjects/AuthoritativeReadsPublicationLemmas.lean`.
+Observer-projection, blindness, and noninterference lemmas are in `Runtime/Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean`.
 
 Proof-backed success contexts and materialization-proof adequacy live in `Runtime/ProtocolMachine/Model/SemanticObjects/MaterializationSuccess.lean`.
-Lemmas ruling out proof-less success and observational materialization promotion are in `Runtime/ProtocolMachine/Model/SemanticObjects/MaterializationSuccessLemmas.lean`.
+Lemmas ruling out proof-less success and observational materialization promotion are in `Runtime/Proofs/ProtocolMachine/SemanticObjects/MaterializationSuccess.lean`.
 
 Progress-contract semantics live in `Runtime/ProtocolMachine/Model/SemanticObjects/ProgressContracts.lean`.
-Owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound compatibility lemmas are in `Runtime/ProtocolMachine/Model/SemanticObjects/ProgressContractsLemmas.lean`.
+Owner-liveness, escalation, and Lyapunov/weighted-measure/scheduling-bound compatibility lemmas are in `Runtime/Proofs/ProtocolMachine/SemanticObjects/ProgressContracts.lean`.
 
 Transformation-local obligation bundles live in `Runtime/ProtocolMachine/Model/SemanticObjects/TransformationLocalObligations.lean`.
-Coverage/admissibility lemmas and lightweight linking/reconfiguration bridge structures are in `Runtime/ProtocolMachine/Model/SemanticObjects/TransformationLocalObligationsLemmas.lean`.
+Coverage/admissibility lemmas and lightweight linking/reconfiguration bridge structures are in `Runtime/Proofs/ProtocolMachine/SemanticObjects/TransformationLocalObligations.lean`.
 
 Theorem-pack attachment for these semantic-object proof families lives in `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
 The same attachment points are exposed through `Runtime/Proofs/TheoremPack/Inventory.lean`, `Runtime/Proofs/TheoremPack/API.lean`, and `Runtime/Proofs/Contracts/RuntimeContracts.lean`.
@@ -203,8 +203,8 @@ entrypoints remain.
 | protocol-machine config | `Runtime/ProtocolMachine/Model/Config.lean` | `telltale_machine::ProtocolMachineConfig` | `telltale_bridge::ProtocolMachineRunInput` | Aligned |
 | protocol-machine state | `Runtime/ProtocolMachine/Model/State.lean` | `telltale_machine::ProtocolMachineState` | `telltale_bridge::ProtocolMachineRunOutput` | Aligned |
 | protocol-machine executor | `Runtime/ProtocolMachine/API.lean`, `Runtime/ProtocolMachine/Runtime/Runner.lean` | `telltale_machine::ProtocolMachine` | `telltale_bridge::ProtocolMachineRunner` | Aligned |
-| protocol-machine step result | `Runtime/ProtocolMachine/Model/ExecResult.lean` | `telltale_machine::StepResult` | `telltale_bridge::ProtocolMachineStepState` | Aligned |
-| protocol-machine run status | `Runtime/ProtocolMachine/Model/ExecResult.lean` | `telltale_machine::RunStatus` | `telltale_bridge::ProtocolMachineRunOutput.status` | Aligned |
+| protocol-machine step result | `Runtime/ProtocolMachine/Model/State.lean` | `telltale_machine::StepResult` | `telltale_bridge::ProtocolMachineStepState` | Aligned |
+| protocol-machine run status | `Runtime/ProtocolMachine/Model/State.lean` | `telltale_machine::RunStatus` | `telltale_bridge::ProtocolMachineRunOutput.status` | Aligned |
 | protocol-machine error surface | `Runtime/ProtocolMachine/Model/State.lean`, `Runtime/ProtocolMachine/Runtime/Json.lean` | `telltale_machine::ProtocolMachineError` | `telltale_bridge::LeanStructuredError` | Aligned |
 | protocol-machine memory accounting | `Runtime/ProtocolMachine/Model/State.lean` | `telltale_machine::ProtocolMachineMemoryUsage`, `telltale_machine::ProtocolMachineRetainedBytes` | n/a | Aligned |
 | guest runtime driver | `Runtime/ProtocolMachine/API.lean` | `telltale_machine::GuestRuntime`, `telltale_machine::ThreadedGuestRuntime` | n/a | Aligned |

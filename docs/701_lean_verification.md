@@ -27,8 +27,8 @@ The Lean tree is organized as a layered stack.
 | Runtime | protocol-machine model, semantics, runtime adapters, theorem-pack APIs |
 | Distributed | FLP, CAP, quorum, synchrony, Nakamoto, reconfiguration, safety families |
 | Classical | transported queueing and stochastic theorem families |
-| ClassicalAnalysis | real-analysis-backed concrete models used by classical transport |
-| IrisExtraction | runtime proof extraction and ghost logic bridge |
+| ClassicalAnalysisInstance | real-analysis-backed concrete models used by classical transport |
+| IrisExtractionInstance | runtime proof extraction and ghost logic bridge |
 
 ## Protocol-Machine Model and Runtime Surfaces
 
@@ -49,16 +49,16 @@ The semantic objects layer lives under `Runtime/ProtocolMachine/Model/SemanticOb
 
 | Surface | Location |
 |---|---|
-| Identity, ownership, observed-read discipline | `Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean`, `Invariants.lean` |
-| Deferred-effect admissibility and stale late-result rejection | `Runtime/ProtocolMachine/Model/SemanticObjects/OutstandingEffects.lean`, `OutstandingEffectsLemmas.lean` |
-| Semantic handoff activation and delegation bridge | `Runtime/ProtocolMachine/Model/SemanticObjects/SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` |
-| Authoritative-read commitment and publication projection | `Runtime/ProtocolMachine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` |
-| Materialization-proof adequacy and canonical-handle adequacy | `Runtime/ProtocolMachine/Model/SemanticObjects/MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` |
+| Identity, ownership, observed-read discipline | `Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean`, `Discipline.lean` |
+| Deferred-effect admissibility and stale late-result rejection | `Runtime/ProtocolMachine/Model/SemanticObjects/OutstandingEffects.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean` |
+| Semantic handoff activation and delegation bridge | `Runtime/ProtocolMachine/Model/SemanticObjects/SemanticHandoffTransition.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean` |
+| Authoritative-read commitment and publication projection | `Runtime/ProtocolMachine/Model/SemanticObjects/AuthoritativeReadsPublication.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean` |
+| Materialization-proof adequacy and canonical-handle adequacy | `Runtime/ProtocolMachine/Model/SemanticObjects/MaterializationSuccess.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/MaterializationSuccess.lean` |
 | First-class capability/finalization and runtime-upgrade facade | `lean/Runtime/Proofs/CapabilityModel.lean`, `lean/Runtime/Tests/ProtocolMachineRunner.lean` |
-| Progress-contract semantics and escalation lemmas | `Runtime/ProtocolMachine/Model/SemanticObjects/ProgressContracts.lean`, `ProgressContractsLemmas.lean` |
-| Transformation-local obligation bundles | `Runtime/ProtocolMachine/Model/SemanticObjects/TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` |
-| Replay-failure exactness | `Runtime/ProtocolMachine/Model/SemanticObjects/ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` |
-| Cross-target progress and dependent work | `Runtime/ProtocolMachine/Model/SemanticObjects/CrossTargetProgressDependentWork.lean`, `CrossTargetProgressDependentWorkLemmas.lean` |
+| Progress-contract semantics and escalation lemmas | `Runtime/ProtocolMachine/Model/SemanticObjects/ProgressContracts.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/ProgressContracts.lean` |
+| Transformation-local obligation bundles | `Runtime/ProtocolMachine/Model/SemanticObjects/TransformationLocalObligations.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/TransformationLocalObligations.lean` |
+| Replay-failure exactness | `Runtime/ProtocolMachine/Model/SemanticObjects/ReplayFailureExactness.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/ReplayFailureExactness.lean` |
+| Cross-target progress and dependent work | `Runtime/ProtocolMachine/Model/SemanticObjects/CrossTargetProgressDependentWork.lean`, `Runtime/Proofs/ProtocolMachine/SemanticObjects/CrossTargetProgressDependentWork.lean` |
 
 Semantic-object theorem families attach to theorem-pack proof spaces through `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
 

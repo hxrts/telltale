@@ -15,16 +15,17 @@ On the Lean side, semantic-object modules live under `Runtime/ProtocolMachine/Mo
 
 | Module | Content |
 |---|---|
-| `Core.lean`, `Invariants.lean` | Identity, ownership, observed-read discipline predicates |
-| `OutstandingEffects.lean`, `OutstandingEffectsLemmas.lean` | Deferred-effect admissibility and stale late-result rejection |
-| `SemanticHandoffTransition.lean`, `SemanticHandoffLemmas.lean` | Semantic handoff activation, delegation bridge |
-| `AuthoritativeReadsPublication.lean`, `AuthoritativeReadsPublicationLemmas.lean` | Authoritative-read commitment, publication projection |
-| `MaterializationSuccess.lean`, `MaterializationSuccessLemmas.lean` | Materialization-proof adequacy, canonical-handle adequacy |
-| `ProgressContracts.lean`, `ProgressContractsLemmas.lean` | Progress-contract semantics and escalation lemmas |
-| `TransformationLocalObligations.lean`, `TransformationLocalObligationsLemmas.lean` | Transformation-local obligation bundles |
-| `ReplayFailureExactness.lean`, `ReplayFailureExactnessLemmas.lean` | Replay-failure exactness |
-| `CrossTargetProgressDependentWork.lean`, `CrossTargetProgressDependentWorkLemmas.lean` | Cross-target progress and dependent work |
+| `Core.lean`, `Discipline.lean` | Identity, ownership, observed-read discipline predicates |
+| `OutstandingEffects.lean` | Deferred-effect admissibility and stale late-result rejection |
+| `SemanticHandoffTransition.lean` | Semantic handoff activation, delegation bridge |
+| `AuthoritativeReadsPublication.lean` | Authoritative-read commitment, publication projection |
+| `MaterializationSuccess.lean` | Materialization-proof adequacy, canonical-handle adequacy |
+| `ProgressContracts.lean` | Progress-contract semantics and escalation lemmas |
+| `TransformationLocalObligations.lean` | Transformation-local obligation bundles |
+| `ReplayFailureExactness.lean` | Replay-failure exactness |
+| `CrossTargetProgressDependentWork.lean` | Cross-target progress and dependent work |
 
+Proof-facing lemmas for each semantic object family live under `Runtime/Proofs/ProtocolMachine/SemanticObjects/`.
 Semantic-object theorem families attach to theorem-pack proof spaces through `Runtime/Proofs/InvariantSpace.lean` via `SemanticObjectWitnessBundle`.
 Canonical inventory and contract surfaces for those attachment points live in `Runtime/Proofs/TheoremPack/API.lean`, `Runtime/Proofs/TheoremPack/Inventory.lean`, and `Runtime/Proofs/Contracts/RuntimeContracts.lean`.
 
@@ -319,11 +320,15 @@ It resolves relative `--golden-dir` paths from the crate manifest directory.
 Bridge tests in `rust/bridge/tests` cover conversion, projection parity, schema compatibility, invariant verification, and protocol-machine correspondence.
 Most Lean-dependent tests skip when Lean binaries are missing.
 
+- `capability_model_correspondence.rs`
 - `coherence_tests.rs`
+- `compiler_pipeline_conformance.rs`
+- `docs_contract_tests.rs`
 - `generated_effect_schema.rs`
 - `golden_equivalence_tests.rs`
 - `invariant_verification.rs`
 - `lean_integration_tests.rs`
+- `lean_trace_validation.rs`
 - `live_equivalence_tests.rs`
 - `merge_semantics_tests.rs`
 - `projection_equivalence.rs`
@@ -333,13 +338,17 @@ Most Lean-dependent tests skip when Lean binaries are missing.
 - `proptest_bundle.rs`
 - `proptest_json_roundtrip.rs`
 - `proptest_projection.rs`
-- `schema_version_tests.rs`
-- `semantic_object_roundtrip.rs`
-- `semantics_verification.rs`
+- `protocol_bundle_admission_contracts.rs`
 - `protocol_machine_composition_stress.rs`
 - `protocol_machine_correspondence_tests.rs`
 - `protocol_machine_cross_target_tests.rs`
 - `protocol_machine_differential_steps.rs`
+- `reconfiguration_recovery_harness.rs`
+- `regular_practical_fragment_checks.rs`
+- `scale_budget_contracts.rs`
+- `schema_version_tests.rs`
+- `semantic_object_roundtrip.rs`
+- `semantics_verification.rs`
 
 These lanes are aligned with repository parity and release-gate lanes.
 Examples include `just check-parity --types`, `just check-parity --suite`, and `just check-capability-gates`.
