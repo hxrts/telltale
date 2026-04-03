@@ -8,7 +8,10 @@ use std::path::Path;
 use std::time::Duration;
 use telltale_types::FixedQ32;
 
-use crate::fault::{Fault, FaultSchedule, ScheduledFault, Trigger};
+use crate::fault::{
+    AdversaryAction, AdversaryBudget, AdversaryBudgetMode, AdversaryProgram,
+    AssumptionFailureClass, ScheduledAdversary, Trigger,
+};
 use crate::material::MaterialParams;
 use crate::network::{LinkPolicy, NetworkConfig};
 use crate::property::{parse_predicate, parse_property, Property, PropertyMonitor};
@@ -41,9 +44,9 @@ pub struct Scenario {
     /// First-class simulator reconfiguration operations.
     #[serde(default)]
     pub reconfigurations: Vec<ReconfigurationSpec>,
-    /// Fault injection events.
+    /// Budgeted adversary declarations.
     #[serde(default)]
-    pub events: Vec<EventSpec>,
+    pub adversaries: Vec<AdversarySpec>,
     /// Property monitoring configuration.
     #[serde(default)]
     pub properties: Option<PropertiesSpec>,
@@ -172,7 +175,7 @@ pub enum TheoremAssumptionBundle {
     /// Derive an assumption bundle from the scenario middleware surface.
     #[default]
     Auto,
-    /// No network middleware and no injected faults.
+    /// No network middleware and no declared adversaries.
     FaultFreeTransport,
     /// Transport behavior is observed empirically rather than theorem-indexed.
     ObservedTransport,
@@ -289,16 +292,21 @@ pub struct ReconfigurationSpec {
     pub effect: ReconfigurationEffect,
 }
 
-/// Fault injection event specification.
+/// Budgeted adversary declaration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventSpec {
-    /// When to activate the fault.
+pub struct AdversarySpec {
+    /// Optional stable identifier for replay/artifact surfaces.
+    #[serde(default)]
+    pub id: Option<String>,
+    /// When to activate the adversary.
     pub trigger: TriggerSpec,
-    /// What fault to inject.
-    pub action: FaultActionSpec,
+    /// What adversarial behavior to activate.
+    pub action: AdversaryActionSpec,
+    /// Budget/accounting declaration for the adversary.
+    pub budget: AdversaryBudgetSpec,
 }
 
-/// Trigger specification for events.
+/// Trigger specification for adversaries and reconfigurations.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TriggerSpec {
     /// Activate immediately when scheduled.
@@ -313,7 +321,7 @@ pub struct TriggerSpec {
     /// Activate randomly with the given probability each tick.
     #[serde(default)]
     pub random: Option<FixedQ32>,
-    /// Activate when a specific event occurs.
+    /// Activate when a specific observable event occurs.
     #[serde(default)]
     pub on_event: Option<OnEventSpec>,
 }
@@ -328,31 +336,77 @@ pub struct OnEventSpec {
     pub role: Option<String>,
 }
 
-/// Fault action specification.
+/// Budget declaration for one adversary.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum FaultActionSpec {
-    /// Drop messages with given probability.
-    MessageDrop {
-        /// Probability of dropping each message (0.0 to 1.0).
+pub struct AdversaryBudgetSpec {
+    /// Total budgeted disturbances or activations.
+    pub total: u64,
+    /// Assumption-bundle clause to diagnose if this budget is exhausted.
+    #[serde(default)]
+    pub assumption_failure: Option<AssumptionFailureClass>,
+    /// Budget consumption model.
+    #[serde(flatten)]
+    pub mode: AdversaryBudgetModeSpec,
+}
+
+/// Budget consumption model for one adversary.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum AdversaryBudgetModeSpec {
+    /// Deterministic one-shot activation budgeting.
+    Activation,
+    /// Independent per-message Bernoulli disturbance.
+    Independent {
+        /// Probability of disturbing one eligible message.
         probability: FixedQ32,
     },
-    /// Delay messages by N ticks.
-    MessageDelay {
+    /// Per-window quota budgeting for correlated disturbance windows.
+    Windowed {
+        /// Window width in ticks.
+        window_ticks: u64,
+        /// Maximum disturbed messages in one window.
+        max_per_window: u64,
+    },
+    /// Correlated burst budgeting started by Bernoulli activation.
+    Correlated {
+        /// Probability of starting a burst at one eligible message.
+        probability: FixedQ32,
+        /// Burst duration in ticks once activated.
+        burst_ticks: u64,
+    },
+}
+
+/// Adversary action specification.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum AdversaryActionSpec {
+    /// Withhold/destroy selected messages.
+    Withholding,
+    /// Delay selected messages by N ticks.
+    TimingDisturbance {
         /// Number of ticks to delay message delivery.
         ticks: u64,
     },
-    /// Corrupt message payload with given probability.
-    MessageCorruption {
-        /// Probability of corrupting each message (0.0 to 1.0).
-        probability: FixedQ32,
-    },
+    /// Corrupt selected message payloads.
+    Corruption,
     /// Crash a role (stop executing its coroutines).
-    NodeCrash {
+    Crash {
         /// The role to crash.
         role: String,
         /// Duration in ticks before recovery. None means permanent.
         duration: Option<u64>,
+    },
+    /// Apply a byzantine-style interference profile to selected messages.
+    ByzantineInterference {
+        /// Probability of withholding a selected message.
+        #[serde(default)]
+        withholding_probability: FixedQ32,
+        /// Probability of corrupting a selected message if not withheld.
+        #[serde(default)]
+        corruption_probability: FixedQ32,
+        /// Optional delay if the selected message is neither withheld nor corrupted.
+        #[serde(default)]
+        delay_ticks: Option<u64>,
     },
 }
 
@@ -503,7 +557,7 @@ impl Scenario {
         let assumption_bundle = match self.theorem.assumption_bundle {
             TheoremAssumptionBundle::Auto
                 if self.network.is_none()
-                    && self.events.is_empty()
+                    && self.adversaries.is_empty()
                     && self.reconfigurations.is_empty() =>
             {
                 TheoremAssumptionBundle::FaultFreeTransport
@@ -555,11 +609,11 @@ impl Scenario {
         let assumption_error = match assumption_bundle {
             TheoremAssumptionBundle::FaultFreeTransport
                 if self.network.is_some()
-                    || !self.events.is_empty()
+                    || !self.adversaries.is_empty()
                     || !self.reconfigurations.is_empty() =>
             {
                 Some(
-                    "assumption bundle fault_free_transport requires no network middleware, no injected faults, and no simulator reconfiguration program"
+                    "assumption bundle fault_free_transport requires no network middleware, no declared adversaries, and no simulator reconfiguration program"
                         .to_string(),
                 )
             }
@@ -701,22 +755,24 @@ impl Scenario {
         self.execution.resolve_for(current_execution_environment())
     }
 
-    /// Convert event specs to a fault schedule.
-    pub fn fault_schedule(&self) -> Result<FaultSchedule, String> {
-        let mut faults = Vec::new();
-        for event in &self.events {
-            let trigger = event.trigger.to_trigger()?;
-            let fault = event.action.to_fault()?;
-            faults.push(ScheduledFault {
-                fault,
+    /// Convert adversary specs to a resolved adversary program.
+    pub fn adversary_program(&self) -> Result<AdversaryProgram, String> {
+        let mut adversaries = Vec::new();
+        for (idx, adversary) in self.adversaries.iter().enumerate() {
+            let trigger = adversary.trigger.to_trigger()?;
+            let action = adversary.action.to_action()?;
+            let budget = adversary.budget.to_budget(&action)?;
+            adversaries.push(ScheduledAdversary {
+                adversary_id: adversary
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| format!("adversary:{idx}")),
+                action,
                 trigger,
-                duration: None,
+                budget,
             });
         }
-        Ok(FaultSchedule {
-            faults,
-            max_concurrent: usize::MAX,
-        })
+        Ok(AdversaryProgram { adversaries })
     }
 
     /// Convert reconfiguration specs to one scheduled reconfiguration program.
@@ -804,31 +860,85 @@ impl TriggerSpec {
     }
 }
 
-impl FaultActionSpec {
-    fn to_fault(&self) -> Result<Fault, String> {
+impl AdversaryBudgetSpec {
+    fn to_budget(&self, action: &AdversaryAction) -> Result<AdversaryBudget, String> {
+        let assumption_failure = self
+            .assumption_failure
+            .unwrap_or_else(|| action.default_assumption_failure());
+        Ok(AdversaryBudget {
+            total: self.total,
+            assumption_failure,
+            mode: match self.mode {
+                AdversaryBudgetModeSpec::Activation => AdversaryBudgetMode::Activation,
+                AdversaryBudgetModeSpec::Independent { probability } => {
+                    validate_probability("adversary.budget.probability", probability)?;
+                    AdversaryBudgetMode::Independent { probability }
+                }
+                AdversaryBudgetModeSpec::Windowed {
+                    window_ticks,
+                    max_per_window,
+                } => AdversaryBudgetMode::Windowed {
+                    window_ticks,
+                    max_per_window,
+                },
+                AdversaryBudgetModeSpec::Correlated {
+                    probability,
+                    burst_ticks,
+                } => {
+                    validate_probability("adversary.budget.probability", probability)?;
+                    AdversaryBudgetMode::Correlated {
+                        probability,
+                        burst_ticks,
+                    }
+                }
+            },
+        })
+    }
+}
+
+impl AdversaryActionSpec {
+    fn to_action(&self) -> Result<AdversaryAction, String> {
         match self {
-            FaultActionSpec::MessageDrop { probability } => {
-                validate_probability("event.message_drop.probability", *probability)?;
-                Ok(Fault::MessageDrop {
-                    probability: *probability,
+            AdversaryActionSpec::Withholding => Ok(AdversaryAction::Withholding),
+            AdversaryActionSpec::TimingDisturbance { ticks } => {
+                Ok(AdversaryAction::TimingDisturbance {
+                    ticks: checked_u64_to_usize("adversary.timing_disturbance.ticks", *ticks)?,
                 })
             }
-            FaultActionSpec::MessageDelay { ticks } => Ok(Fault::MessageDelay {
-                ticks: checked_u64_to_usize("event.message_delay.ticks", *ticks)?,
-            }),
-            FaultActionSpec::MessageCorruption { probability } => {
-                validate_probability("event.message_corruption.probability", *probability)?;
-                Ok(Fault::MessageCorruption {
-                    probability: *probability,
-                })
-            }
-            FaultActionSpec::NodeCrash { role, duration } => Ok(Fault::NodeCrash {
+            AdversaryActionSpec::Corruption => Ok(AdversaryAction::Corruption),
+            AdversaryActionSpec::Crash { role, duration } => Ok(AdversaryAction::Crash {
                 role: role.clone(),
                 duration: match duration {
-                    Some(value) => Some(checked_u64_to_usize("event.node_crash.duration", *value)?),
+                    Some(value) => Some(checked_u64_to_usize("adversary.crash.duration", *value)?),
                     None => None,
                 },
             }),
+            AdversaryActionSpec::ByzantineInterference {
+                withholding_probability,
+                corruption_probability,
+                delay_ticks,
+            } => {
+                validate_probability(
+                    "adversary.byzantine_interference.withholding_probability",
+                    *withholding_probability,
+                )?;
+                validate_probability(
+                    "adversary.byzantine_interference.corruption_probability",
+                    *corruption_probability,
+                )?;
+                Ok(AdversaryAction::ByzantineInterference {
+                    withholding_probability: *withholding_probability,
+                    corruption_probability: *corruption_probability,
+                    delay_ticks: delay_ticks
+                        .map(|value| {
+                            checked_u64_to_usize(
+                                "adversary.byzantine_interference.delay_ticks",
+                                value,
+                            )
+                        })
+                        .transpose()?,
+                })
+            }
         }
     }
 }

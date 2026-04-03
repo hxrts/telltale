@@ -32,7 +32,7 @@ pub struct ScenarioResult {
 `state` contains the numeric portion of the coroutine register file.
 The runner skips the first two reserved registers and samples material state starting at register `2`.
 
-`ScenarioReplayArtifact` contains observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, and a canonical simulator reconfiguration trace.
+`ScenarioReplayArtifact` contains the resolved adversary schedule, adversary budget-consumption history, assumption diagnostics, observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, and a canonical simulator reconfiguration trace.
 These artifacts support deterministic replay and post-run validation.
 
 `ScenarioResult.analysis.normalized_observability` is the companion analysis view.
@@ -47,7 +47,7 @@ The runner exposes three main entry points.
 - `run_multi_session_canonical(...)` executes multiple choreographies on one canonical protocol machine and returns one trace per input choreography.
 - `run_with_scenario(...)` executes one choreography with scenario middleware and returns `ScenarioResult`.
 
-Use `run_with_scenario(...)` when faults, network behavior, properties, checkpoints, or replay artifacts are required.
+Use `run_with_scenario(...)` when budgeted adversaries, network behavior, properties, checkpoints, or replay artifacts are required.
 Use the smaller entry points when only sampled state traces are needed.
 
 `run_with_scenario(...)` resolves execution through `Scenario.execution`.
@@ -101,6 +101,16 @@ It reports:
 - `transition_budget_consumed`
 
 This keeps semantic topology/authority cutover accounting distinct from theorem-native descent and productive-step reporting.
+
+`ScenarioStats.adversary_summary` and `ScenarioStats.assumption_diagnostics` are separate again.
+They report:
+
+- how many adversaries were declared and activated
+- how much declared disturbance budget was consumed
+- which adversary budgets exhausted
+- which theorem-side assumption clauses failed, if any
+
+The raw replay artifact retains the full adversary program plus one budget-history record per activation, consumption, and exhaustion event.
 
 The analysis layer also exposes `compare_observability(...)`.
 That comparison reports one of three relations:
@@ -181,11 +191,11 @@ Scenario runs and replay now share the same execution core and use a fixed per-r
 
 1. Compute `next_tick` from the protocol-machine clock.
 2. Activate due simulator reconfiguration operations from newly visible observable events in `machine.trace()`.
-3. Advance the fault schedule from newly visible observable events in `machine.trace()`.
-4. Deliver due delayed fault messages.
-5. When network middleware is active, route those due fault-delayed messages back through the network policy stage before they enter protocol-machine buffers.
+3. Advance the adversary program from newly visible observable events in `machine.trace()`.
+4. Deliver due delayed adversary messages.
+5. When network middleware is active, route those due adversary-delayed messages back through the network policy stage before they enter protocol-machine buffers.
 6. Deliver due network middleware queues.
-7. Update paused roles from active crash faults.
+7. Update paused roles from active crash adversaries.
 8. Execute one protocol-machine round with the selected handler domain.
 9. Record one round-based trace sample when sampling is enabled.
 10. Run online property checks.

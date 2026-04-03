@@ -6,7 +6,7 @@ pub(super) fn validate_semantics(scenario: &Scenario) -> Result<(), String> {
     validate_limits(scenario)?;
     validate_network(scenario, &role_set)?;
     validate_reconfigurations(scenario, &role_set)?;
-    validate_events(scenario, &role_set)?;
+    validate_adversaries(scenario, &role_set)?;
     if scenario.property_monitor()?.is_some() {
         // Property monitor configuration is validated by construction here.
     }
@@ -218,14 +218,92 @@ fn validate_reconfigurations(
     Ok(())
 }
 
-fn validate_events(scenario: &Scenario, role_set: &BTreeSet<String>) -> Result<(), String> {
-    for (idx, event) in scenario.events.iter().enumerate() {
-        let _trigger = event.trigger.to_trigger()?;
-        if let super::FaultActionSpec::NodeCrash { role, .. } = &event.action {
-            if !role_set.contains(role) {
-                return Err(format!(
-                    "events[{idx}] node_crash references unknown role '{role}'"
-                ));
+fn validate_adversaries(scenario: &Scenario, role_set: &BTreeSet<String>) -> Result<(), String> {
+    let mut seen_ids = BTreeSet::new();
+    for (idx, adversary) in scenario.adversaries.iter().enumerate() {
+        let _trigger = adversary.trigger.to_trigger()?;
+        if adversary.budget.total == 0 {
+            return Err(format!("adversaries[{idx}] budget.total must be > 0"));
+        }
+        if let Some(id) = &adversary.id {
+            if id.trim().is_empty() {
+                return Err(format!("adversaries[{idx}] id must not be empty"));
+            }
+            if !seen_ids.insert(id.clone()) {
+                return Err(format!("duplicate adversary id '{id}'"));
+            }
+        }
+        match &adversary.budget.mode {
+            super::AdversaryBudgetModeSpec::Activation => {}
+            super::AdversaryBudgetModeSpec::Independent { probability } => {
+                validate_probability("adversaries.budget.probability", *probability)?;
+            }
+            super::AdversaryBudgetModeSpec::Windowed {
+                window_ticks,
+                max_per_window,
+            } => {
+                if *window_ticks == 0 {
+                    return Err(format!("adversaries[{idx}] window_ticks must be > 0"));
+                }
+                if *max_per_window == 0 {
+                    return Err(format!("adversaries[{idx}] max_per_window must be > 0"));
+                }
+            }
+            super::AdversaryBudgetModeSpec::Correlated {
+                probability,
+                burst_ticks,
+            } => {
+                validate_probability("adversaries.budget.probability", *probability)?;
+                if *burst_ticks == 0 {
+                    return Err(format!("adversaries[{idx}] burst_ticks must be > 0"));
+                }
+            }
+        }
+        match &adversary.action {
+            super::AdversaryActionSpec::Withholding
+            | super::AdversaryActionSpec::TimingDisturbance { .. }
+            | super::AdversaryActionSpec::Corruption => {}
+            super::AdversaryActionSpec::Crash { role, .. } => {
+                if !role_set.contains(role) {
+                    return Err(format!(
+                        "adversaries[{idx}] crash references unknown role '{role}'"
+                    ));
+                }
+                if !matches!(
+                    adversary.budget.mode,
+                    super::AdversaryBudgetModeSpec::Activation
+                ) {
+                    return Err(format!(
+                        "adversaries[{idx}] crash must use budget.mode = \"activation\""
+                    ));
+                }
+                if adversary.budget.total != 1 {
+                    return Err(format!(
+                        "adversaries[{idx}] crash budgets must declare total = 1"
+                    ));
+                }
+            }
+            super::AdversaryActionSpec::ByzantineInterference {
+                withholding_probability,
+                corruption_probability,
+                delay_ticks,
+            } => {
+                validate_probability(
+                    "adversaries.byzantine_interference.withholding_probability",
+                    *withholding_probability,
+                )?;
+                validate_probability(
+                    "adversaries.byzantine_interference.corruption_probability",
+                    *corruption_probability,
+                )?;
+                if *withholding_probability == telltale_types::FixedQ32::zero()
+                    && *corruption_probability == telltale_types::FixedQ32::zero()
+                    && delay_ticks.is_none()
+                {
+                    return Err(format!(
+                        "adversaries[{idx}] byzantine_interference must declare at least one effect"
+                    ));
+                }
             }
         }
     }

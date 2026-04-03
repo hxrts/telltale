@@ -8,6 +8,10 @@ use telltale_types::FixedQ32;
 
 use crate::analysis::NormalizedObservability;
 use crate::backend::SimulationMachine;
+use crate::fault::{
+    AdversaryBudgetRecord, AdversarySummary, AssumptionDiagnostic, AssumptionFailureClass,
+    ScheduledAdversary,
+};
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
 use telltale_machine::model::output_condition::OutputConditionCheck;
 use telltale_machine::runtime::loader::CodeImage;
@@ -309,6 +313,12 @@ pub struct ScenarioAnalysisArtifact {
 pub struct ScenarioReplayArtifact {
     /// Resolved theorem/profile information for this run.
     pub theorem_profile: ResolvedTheoremProfile,
+    /// Resolved adversary program used by the transport/crash middleware.
+    pub adversary_schedule: Vec<ScheduledAdversary>,
+    /// Budget-consumption history recorded by the adversary middleware.
+    pub adversary_budget_history: Vec<AdversaryBudgetRecord>,
+    /// Assumption-bundle diagnostics derived from adversary budgets and theorem regime checks.
+    pub assumption_diagnostics: Vec<AssumptionDiagnostic>,
     /// Raw observable protocol-machine trace.
     pub obs_trace: Vec<ObsEvent>,
     /// Effect trace entries for deterministic replay.
@@ -337,6 +347,10 @@ pub struct ScenarioStats {
     pub theorem_progress: TheoremProgressSummary,
     /// Reconfiguration accounting summary kept separate from theorem progress descent.
     pub reconfiguration_summary: ReconfigurationSummary,
+    /// Adversary-budget summary for the run.
+    pub adversary_summary: AdversarySummary,
+    /// Assumption-bundle diagnostics derived from adversary budgets and theorem regime checks.
+    pub assumption_diagnostics: Vec<AssumptionDiagnostic>,
     /// Resolved execution backend.
     pub backend: ResolvedExecutionBackend,
     /// Resolved scheduler concurrency value.
@@ -492,7 +506,26 @@ fn theorem_progress_summary(
     }
 }
 
-/// Run a choreography with scenario-defined middleware (faults/network/properties).
+fn assumption_diagnostics_with_regime(
+    theorem_profile: &ResolvedTheoremProfile,
+    mut diagnostics: Vec<AssumptionDiagnostic>,
+) -> Vec<AssumptionDiagnostic> {
+    if let Some(reason) = theorem_profile
+        .eligibility_reason
+        .as_ref()
+        .filter(|_| theorem_profile.eligibility == crate::scenario::TheoremEligibility::Ineligible)
+    {
+        diagnostics.push(AssumptionDiagnostic {
+            tick: 0,
+            class: AssumptionFailureClass::UnsupportedRegime,
+            adversary_id: None,
+            detail: reason.clone(),
+        });
+    }
+    diagnostics
+}
+
+/// Run a choreography with scenario-defined middleware (adversaries/network/properties).
 ///
 /// # Errors
 ///
@@ -613,6 +646,13 @@ pub fn run_with_scenario(
     let output_condition_trace = machine.output_condition_checks().to_vec();
     let semantic_audit_log = machine.semantic_audit_log();
     let semantic_objects = machine.semantic_objects();
+    let adversary_schedule = middleware.adversary_schedule();
+    let adversary_budget_history = middleware.adversary_budget_history()?;
+    let adversary_summary = middleware.adversary_summary()?;
+    let assumption_diagnostics = assumption_diagnostics_with_regime(
+        &theorem_profile,
+        middleware.adversary_assumption_diagnostics()?,
+    );
     let reconfiguration_trace = middleware.reconfiguration_trace()?;
     let reconfiguration_summary = middleware.reconfiguration_summary()?;
     let normalized_observability =
@@ -637,6 +677,9 @@ pub fn run_with_scenario(
         violations: monitor.violations().to_vec(),
         replay: ScenarioReplayArtifact {
             theorem_profile: theorem_profile.clone(),
+            adversary_schedule,
+            adversary_budget_history,
+            assumption_diagnostics: assumption_diagnostics.clone(),
             obs_trace,
             effect_trace,
             effect_exchanges: machine.effect_exchanges().to_vec(),
@@ -654,6 +697,8 @@ pub fn run_with_scenario(
             theorem_profile,
             theorem_progress,
             reconfiguration_summary,
+            adversary_summary,
+            assumption_diagnostics,
             backend: resolved_execution.backend,
             scheduler_concurrency: resolved_execution.scheduler_concurrency,
             worker_threads: resolved_execution.worker_threads,

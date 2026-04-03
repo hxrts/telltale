@@ -1,9 +1,10 @@
-//! Fault injection middleware for simulation.
+//! Budgeted adversary middleware for simulator transport and crash disturbances.
+#![allow(missing_docs)]
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashSet};
 use std::sync::Mutex;
-use telltale_types::FixedQ32;
 
+use serde::{Deserialize, Serialize};
 use telltale_machine::buffer::EnqueueResult;
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
@@ -11,100 +12,169 @@ use telltale_machine::model::effects::{
 };
 use telltale_machine::model::state::SessionId;
 use telltale_machine::ObsEvent;
+use telltale_types::FixedQ32;
 
 use crate::rng::SimRng;
 use crate::value_conv::{
     fixed_to_value, fixed_vec_to_value, try_decode_fixed, try_decode_fixed_vec,
 };
 
-/// Fault types that can be injected during simulation.
-#[derive(Debug, Clone)]
-pub enum Fault {
-    /// Drop messages with given probability.
-    MessageDrop {
-        /// Probability of dropping each message (0.0 to 1.0).
-        probability: FixedQ32,
-    },
-    /// Delay messages by N ticks.
-    MessageDelay {
-        /// Number of ticks to delay message delivery.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AssumptionFailureClass {
+    QuorumIntersectionFailure,
+    AuthenticationEvidenceFailure,
+    #[default]
+    FairnessFailure,
+    BudgetExhaustion,
+    UnsupportedRegime,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum AdversaryAction {
+    Withholding,
+    TimingDisturbance {
         ticks: usize,
     },
-    /// Corrupt message payload with given probability.
-    MessageCorruption {
-        /// Probability of corrupting each message (0.0 to 1.0).
-        probability: FixedQ32,
-    },
-    /// Crash a role (stop executing its coroutines) for optional duration.
-    NodeCrash {
-        /// The role to crash.
+    Corruption,
+    Crash {
         role: String,
-        /// Duration in ticks before recovery. None means permanent.
         duration: Option<usize>,
     },
-}
-
-/// When to activate a fault.
-#[derive(Debug, Clone)]
-pub enum Trigger {
-    /// Activate immediately when the fault is scheduled.
-    Immediate,
-    /// Activate at a specific simulation tick.
-    AtTick(u64),
-    /// Activate after a specific number of steps.
-    AfterStep(u64),
-    /// Activate randomly with the given probability each tick.
-    Random(FixedQ32),
-    /// Activate when a specific event occurs.
-    OnEvent {
-        /// The event kind to match (e.g., "sent", "received").
-        kind: String,
-        /// Optional role filter for the event.
-        role: Option<String>,
+    ByzantineInterference {
+        withholding_probability: FixedQ32,
+        corruption_probability: FixedQ32,
+        delay_ticks: Option<usize>,
     },
 }
 
-/// A fault with its activation trigger and optional duration.
-#[derive(Debug, Clone)]
-pub struct ScheduledFault {
-    /// The fault to inject.
-    pub fault: Fault,
-    /// When to activate the fault.
-    pub trigger: Trigger,
-    /// Optional duration in ticks. Overrides fault-specific duration.
-    pub duration: Option<usize>,
-}
-
-/// A collection of scheduled faults with concurrency limits.
-#[derive(Debug, Clone)]
-pub struct FaultSchedule {
-    /// The list of faults to schedule.
-    pub faults: Vec<ScheduledFault>,
-    /// Maximum number of faults active simultaneously.
-    pub max_concurrent: usize,
-}
-
-impl Default for FaultSchedule {
-    fn default() -> Self {
-        Self {
-            faults: Vec::new(),
-            max_concurrent: usize::MAX,
+impl AdversaryAction {
+    #[must_use]
+    pub fn default_assumption_failure(&self) -> AssumptionFailureClass {
+        match self {
+            Self::Withholding | Self::TimingDisturbance { .. } | Self::Crash { .. } => {
+                AssumptionFailureClass::FairnessFailure
+            }
+            Self::Corruption | Self::ByzantineInterference { .. } => {
+                AssumptionFailureClass::AuthenticationEvidenceFailure
+            }
         }
     }
 }
 
-#[derive(Debug, Clone)]
-struct ActiveFault {
-    fault: Fault,
-    expires_at: Option<u64>,
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "mode", rename_all = "snake_case")]
+pub enum AdversaryBudgetMode {
+    Activation,
+    Independent {
+        probability: FixedQ32,
+    },
+    Windowed {
+        window_ticks: u64,
+        max_per_window: u64,
+    },
+    Correlated {
+        probability: FixedQ32,
+        burst_ticks: u64,
+    },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AdversaryBudget {
+    pub total: u64,
+    pub assumption_failure: AssumptionFailureClass,
+    pub mode: AdversaryBudgetMode,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum Trigger {
+    Immediate,
+    AtTick(u64),
+    AfterStep(u64),
+    Random(FixedQ32),
+    OnEvent { kind: String, role: Option<String> },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ScheduledAdversary {
+    pub adversary_id: String,
+    pub action: AdversaryAction,
+    pub trigger: Trigger,
+    pub budget: AdversaryBudget,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct AdversaryProgram {
+    pub adversaries: Vec<ScheduledAdversary>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum AdversaryBudgetRecordKind {
+    Activated,
+    Consumed,
+    Exhausted,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AdversaryBudgetRecord {
+    pub tick: u64,
+    pub adversary_id: String,
+    pub kind: AdversaryBudgetRecordKind,
+    pub total_consumed: u64,
+    pub total_remaining: u64,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct AssumptionDiagnostic {
+    pub tick: u64,
+    pub class: AssumptionFailureClass,
+    pub adversary_id: Option<String>,
+    pub detail: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+pub struct AdversarySummary {
+    pub declared_adversaries: usize,
+    pub activated_adversaries: usize,
+    pub budget_consumed: u64,
+    pub exhausted_adversaries: Vec<String>,
+    pub assumption_failures: Vec<AssumptionFailureClass>,
 }
 
 #[derive(Debug, Clone)]
-struct ScheduledFaultState {
-    fault: Fault,
-    trigger: Trigger,
-    duration: Option<usize>,
+struct ScheduledAdversaryState {
+    adversary: ScheduledAdversary,
     activated: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+struct BudgetState {
+    total_consumed: u64,
+    current_window: Option<u64>,
+    consumed_in_window: u64,
+    burst_expires_at: Option<u64>,
+}
+
+impl BudgetState {
+    fn remaining(&self, budget: &AdversaryBudget) -> u64 {
+        budget.total.saturating_sub(self.total_consumed)
+    }
+}
+
+#[derive(Debug, Clone)]
+struct ActiveTransportAdversary {
+    adversary_id: String,
+    action: AdversaryAction,
+    budget: AdversaryBudget,
+    budget_state: BudgetState,
+}
+
+#[derive(Debug, Clone)]
+struct ActiveCrash {
+    role: String,
+    expires_at: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
@@ -116,143 +186,148 @@ struct InFlightMessage {
     value: Value,
 }
 
-struct FaultState {
-    scheduled: Vec<ScheduledFaultState>,
-    active: Vec<ActiveFault>,
+struct AdversaryState {
+    scheduled: Vec<ScheduledAdversaryState>,
+    active_transport: Vec<ActiveTransportAdversary>,
+    active_crashes: Vec<ActiveCrash>,
     rng: SimRng,
     in_flight: Vec<InFlightMessage>,
     current_tick: u64,
     last_trace_len: usize,
     crashed_roles: BTreeSet<String>,
+    budget_history: Vec<AdversaryBudgetRecord>,
+    assumption_diagnostics: Vec<AssumptionDiagnostic>,
 }
 
-impl FaultState {
+impl AdversaryState {
     fn refresh_crashed_roles(&mut self) {
-        let mut crashed = BTreeSet::new();
-        for fault in &self.active {
-            if let Fault::NodeCrash { role, .. } = &fault.fault {
-                crashed.insert(role.clone());
-            }
-        }
-        self.crashed_roles = crashed;
+        self.crashed_roles = self
+            .active_crashes
+            .iter()
+            .map(|crash| crash.role.clone())
+            .collect();
     }
 
     fn is_crashed(&self, role: &str) -> bool {
         self.crashed_roles.contains(role)
     }
-
-    fn message_drop_probability(&self) -> FixedQ32 {
-        let one = FixedQ32::one();
-        let zero = FixedQ32::zero();
-        let mut p_not = one;
-        for fault in &self.active {
-            if let Fault::MessageDrop { probability } = &fault.fault {
-                p_not *= one - (*probability).clamp(zero, one);
-            }
-        }
-        one - p_not
-    }
-
-    fn message_delay_ticks(&self) -> Option<usize> {
-        let mut delay: Option<usize> = None;
-        for fault in &self.active {
-            if let Fault::MessageDelay { ticks } = &fault.fault {
-                delay = Some(delay.map_or(*ticks, |d| d.max(*ticks)));
-            }
-        }
-        delay
-    }
-
-    fn message_corruption_probability(&self) -> FixedQ32 {
-        let one = FixedQ32::one();
-        let zero = FixedQ32::zero();
-        let mut p_not = one;
-        for fault in &self.active {
-            if let Fault::MessageCorruption { probability } = &fault.fault {
-                p_not *= one - (*probability).clamp(zero, one);
-            }
-        }
-        one - p_not
-    }
 }
 
-/// Runtime fault state. Manages active faults, expiration, RNG.
-pub struct FaultInjector<H: EffectHandler> {
+pub struct AdversaryInjector<H: EffectHandler> {
     inner: H,
-    state: Mutex<FaultState>,
-    max_concurrent: usize,
+    program: Vec<ScheduledAdversary>,
+    state: Mutex<AdversaryState>,
 }
 
-impl<H: EffectHandler> FaultInjector<H> {
-    fn lock_state(&self) -> Result<std::sync::MutexGuard<'_, FaultState>, String> {
+impl<H: EffectHandler> AdversaryInjector<H> {
+    fn lock_state(&self) -> Result<std::sync::MutexGuard<'_, AdversaryState>, String> {
         self.state
             .lock()
-            .map_err(|_| "fault state lock poisoned".to_string())
+            .map_err(|_| "adversary state lock poisoned".to_string())
     }
 
-    /// Creates a new fault injector wrapping an inner handler.
     #[must_use]
-    pub fn new(inner: H, schedule: FaultSchedule, rng: SimRng) -> Self {
-        let scheduled = schedule
-            .faults
-            .into_iter()
-            .map(|f| ScheduledFaultState {
-                fault: f.fault,
-                trigger: f.trigger,
-                duration: f.duration,
+    pub fn new(inner: H, program: AdversaryProgram, rng: SimRng) -> Self {
+        let scheduled = program
+            .adversaries
+            .iter()
+            .cloned()
+            .map(|adversary| ScheduledAdversaryState {
+                adversary,
                 activated: false,
             })
             .collect();
         Self {
             inner,
-            state: Mutex::new(FaultState {
+            program: program.adversaries,
+            state: Mutex::new(AdversaryState {
                 scheduled,
-                active: Vec::new(),
+                active_transport: Vec::new(),
+                active_crashes: Vec::new(),
                 rng,
                 in_flight: Vec::new(),
                 current_tick: 0,
                 last_trace_len: 0,
                 crashed_roles: BTreeSet::new(),
+                budget_history: Vec::new(),
+                assumption_diagnostics: Vec::new(),
             }),
-            max_concurrent: schedule.max_concurrent.max(1),
         }
     }
 
-    /// Advance fault schedule, activating and expiring faults.
-    /// Uses the ProtocolMachine's global tick (not session-local normalization).
     pub fn tick(&self, tick: u64, logical_step: u64, trace: &[ObsEvent]) -> Result<(), String> {
         let mut state = self.lock_state()?;
         state.current_tick = tick;
 
         let new_events = trace.get(state.last_trace_len..).unwrap_or(&[]);
 
-        // Expire active faults.
-        state.active.retain(|fault| match fault.expires_at {
-            Some(exp) => tick < exp,
-            None => true,
-        });
+        state
+            .active_crashes
+            .retain(|crash| crash.expires_at.is_none_or(|exp| tick < exp));
+        state
+            .active_transport
+            .retain(|adversary| adversary.budget_state.remaining(&adversary.budget) > 0);
 
-        // Activate scheduled faults.
-        let FaultState {
+        let AdversaryState {
             scheduled,
-            active,
+            active_transport,
+            active_crashes,
             rng,
+            budget_history,
+            assumption_diagnostics,
             ..
         } = &mut *state;
+
         for scheduled in scheduled.iter_mut() {
             if scheduled.activated {
                 continue;
             }
-            if active.len() >= self.max_concurrent {
-                break;
+            if !trigger_fires(
+                &scheduled.adversary.trigger,
+                tick,
+                logical_step,
+                new_events,
+                rng,
+            ) {
+                continue;
             }
-            if trigger_fires(&scheduled.trigger, tick, logical_step, new_events, rng) {
-                let expires_at = fault_expiry(tick, &scheduled.fault, scheduled.duration);
-                active.push(ActiveFault {
-                    fault: scheduled.fault.clone(),
-                    expires_at,
-                });
-                scheduled.activated = true;
+            scheduled.activated = true;
+            budget_history.push(AdversaryBudgetRecord {
+                tick,
+                adversary_id: scheduled.adversary.adversary_id.clone(),
+                kind: AdversaryBudgetRecordKind::Activated,
+                total_consumed: 0,
+                total_remaining: scheduled.adversary.budget.total,
+                detail: "activated".to_string(),
+            });
+
+            match &scheduled.adversary.action {
+                AdversaryAction::Crash { role, duration } => {
+                    let mut budget_state = BudgetState::default();
+                    if consume_budget(
+                        &scheduled.adversary.adversary_id,
+                        &scheduled.adversary.budget,
+                        &mut budget_state,
+                        tick,
+                        "crash activation",
+                        budget_history,
+                        assumption_diagnostics,
+                    ) {
+                        let expires_at = duration.map(|value| {
+                            tick.saturating_add(u64::try_from(value).unwrap_or(u64::MAX))
+                        });
+                        active_crashes.push(ActiveCrash {
+                            role: role.clone(),
+                            expires_at,
+                        });
+                    }
+                }
+                _ => active_transport.push(ActiveTransportAdversary {
+                    adversary_id: scheduled.adversary.adversary_id.clone(),
+                    action: scheduled.adversary.action.clone(),
+                    budget: scheduled.adversary.budget.clone(),
+                    budget_state: BudgetState::default(),
+                }),
             }
         }
 
@@ -261,7 +336,6 @@ impl<H: EffectHandler> FaultInjector<H> {
         Ok(())
     }
 
-    /// Deliver any delayed messages whose time has arrived.
     pub fn deliver<F>(&self, tick: u64, mut inject: F) -> Result<(), String>
     where
         F: FnMut(SessionId, &str, &str, Value) -> Result<EnqueueResult, String>,
@@ -282,11 +356,11 @@ impl<H: EffectHandler> FaultInjector<H> {
         let mut retry = Vec::new();
         for msg in deliver_now {
             let InFlightMessage {
-                delivery_tick: _,
                 sid,
                 from,
                 to,
                 value,
+                ..
             } = msg;
             match inject(sid, &from, &to, value.clone()) {
                 Ok(EnqueueResult::Ok | EnqueueResult::Dropped) => {}
@@ -301,7 +375,7 @@ impl<H: EffectHandler> FaultInjector<H> {
                 }
                 Err(err) => {
                     return Err(format!(
-                        "fault delivery inject failed for edge {from}->{to} (sid={sid}): {err}"
+                        "adversary delivery inject failed for edge {from}->{to} (sid={sid}): {err}"
                     ));
                 }
             }
@@ -310,13 +384,60 @@ impl<H: EffectHandler> FaultInjector<H> {
         Ok(())
     }
 
-    /// Current crashed roles (for pausing ProtocolMachine execution).
     pub fn crashed_roles(&self) -> Result<BTreeSet<String>, String> {
         Ok(self.lock_state()?.crashed_roles.clone())
     }
+
+    pub fn program(&self) -> Vec<ScheduledAdversary> {
+        self.program.clone()
+    }
+
+    pub fn budget_history(&self) -> Result<Vec<AdversaryBudgetRecord>, String> {
+        Ok(self.lock_state()?.budget_history.clone())
+    }
+
+    pub fn assumption_diagnostics(&self) -> Result<Vec<AssumptionDiagnostic>, String> {
+        Ok(self.lock_state()?.assumption_diagnostics.clone())
+    }
+
+    pub fn summary(&self) -> Result<AdversarySummary, String> {
+        let state = self.lock_state()?;
+        let mut activated = HashSet::new();
+        let mut exhausted = Vec::new();
+        let mut consumed = 0_u64;
+        for record in &state.budget_history {
+            match record.kind {
+                AdversaryBudgetRecordKind::Activated => {
+                    activated.insert(record.adversary_id.clone());
+                }
+                AdversaryBudgetRecordKind::Consumed => {
+                    consumed = consumed.saturating_add(1);
+                }
+                AdversaryBudgetRecordKind::Exhausted => exhausted.push(record.adversary_id.clone()),
+            }
+        }
+        exhausted.sort();
+        exhausted.dedup();
+
+        let mut assumption_failures = state
+            .assumption_diagnostics
+            .iter()
+            .map(|diagnostic| diagnostic.class)
+            .collect::<Vec<_>>();
+        assumption_failures.sort();
+        assumption_failures.dedup();
+
+        Ok(AdversarySummary {
+            declared_adversaries: self.program.len(),
+            activated_adversaries: activated.len(),
+            budget_consumed: consumed,
+            exhausted_adversaries: exhausted,
+            assumption_failures,
+        })
+    }
 }
 
-impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
+impl<H: EffectHandler> EffectHandler for AdversaryInjector<H> {
     fn handle_send(
         &self,
         role: &str,
@@ -333,11 +454,7 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
             EffectResult::Blocked => return EffectResult::Blocked,
             EffectResult::Failure(failure) => return EffectResult::Failure(failure),
         };
-        let sid = input.sid;
-        let role = input.role;
-        let partner = input.partner;
-
-        let SendDecision::Deliver(payload) = base else {
+        let SendDecision::Deliver(mut payload) = base else {
             return EffectResult::success(base);
         };
 
@@ -345,36 +462,60 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
             Ok(state) => state,
             Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
         };
-        if state.is_crashed(role) {
+        if state.is_crashed(input.role) {
             return EffectResult::failure(EffectFailure::topology_disruption("node crashed"));
         }
-        let drop_p = state.message_drop_probability();
-        let zero = FixedQ32::zero();
-        if drop_p > zero && state.rng.should_trigger(drop_p) {
+
+        let tick = state.current_tick;
+        let AdversaryState {
+            active_transport,
+            rng,
+            budget_history,
+            assumption_diagnostics,
+            in_flight,
+            ..
+        } = &mut *state;
+
+        let mut should_drop = false;
+        let mut max_delay: Option<usize> = None;
+
+        for adversary in active_transport.iter_mut() {
+            if !should_apply_transport_adversary(adversary, tick, rng) {
+                continue;
+            }
+            if !consume_budget(
+                &adversary.adversary_id,
+                &adversary.budget,
+                &mut adversary.budget_state,
+                tick,
+                "transport disturbance",
+                budget_history,
+                assumption_diagnostics,
+            ) {
+                continue;
+            }
+            let outcome = apply_transport_action(&adversary.action, payload, rng);
+            payload = outcome.payload;
+            should_drop |= outcome.drop;
+            if let Some(delay) = outcome.delay_ticks {
+                max_delay = Some(max_delay.map_or(delay, |current| current.max(delay)));
+            }
+            if should_drop {
+                break;
+            }
+        }
+
+        if should_drop {
             return EffectResult::success(SendDecision::Drop);
         }
 
-        let mut payload = payload;
-        let corrupt_p = state.message_corruption_probability();
-        if corrupt_p > zero && state.rng.should_trigger(corrupt_p) {
-            payload = corrupt_value(payload);
-        }
-
-        if let Some(delay) = state.message_delay_ticks() {
-            let delay_ticks = match u64::try_from(delay) {
-                Ok(delay_ticks) => delay_ticks,
-                Err(_) => {
-                    return EffectResult::failure(EffectFailure::contract_violation(format!(
-                        "message delay {delay} cannot be represented as u64"
-                    )));
-                }
-            };
-            let delivery_tick = state.current_tick.saturating_add(delay_ticks);
-            state.in_flight.push(InFlightMessage {
+        if let Some(delay) = max_delay {
+            let delivery_tick = tick.saturating_add(u64::try_from(delay).unwrap_or(u64::MAX));
+            in_flight.push(InFlightMessage {
                 delivery_tick,
-                sid,
-                from: role.to_string(),
-                to: partner.to_string(),
+                sid: input.sid,
+                from: input.role.to_string(),
+                to: input.partner.to_string(),
                 value: payload,
             });
             return EffectResult::success(SendDecision::Defer);
@@ -429,6 +570,172 @@ impl<H: EffectHandler> EffectHandler for FaultInjector<H> {
     }
 }
 
+#[derive(Debug)]
+struct TransportOutcome {
+    drop: bool,
+    payload: Value,
+    delay_ticks: Option<usize>,
+}
+
+fn apply_transport_action(
+    action: &AdversaryAction,
+    payload: Value,
+    rng: &mut SimRng,
+) -> TransportOutcome {
+    match action {
+        AdversaryAction::Withholding => TransportOutcome {
+            drop: true,
+            payload,
+            delay_ticks: None,
+        },
+        AdversaryAction::TimingDisturbance { ticks } => TransportOutcome {
+            drop: false,
+            payload,
+            delay_ticks: Some(*ticks),
+        },
+        AdversaryAction::Corruption => TransportOutcome {
+            drop: false,
+            payload: corrupt_value(payload),
+            delay_ticks: None,
+        },
+        AdversaryAction::Crash { .. } => TransportOutcome {
+            drop: false,
+            payload,
+            delay_ticks: None,
+        },
+        AdversaryAction::ByzantineInterference {
+            withholding_probability,
+            corruption_probability,
+            delay_ticks,
+        } => {
+            if *withholding_probability > FixedQ32::zero()
+                && rng.should_trigger(*withholding_probability)
+            {
+                return TransportOutcome {
+                    drop: true,
+                    payload,
+                    delay_ticks: None,
+                };
+            }
+            if *corruption_probability > FixedQ32::zero()
+                && rng.should_trigger(*corruption_probability)
+            {
+                return TransportOutcome {
+                    drop: false,
+                    payload: corrupt_value(payload),
+                    delay_ticks: None,
+                };
+            }
+            TransportOutcome {
+                drop: false,
+                payload,
+                delay_ticks: *delay_ticks,
+            }
+        }
+    }
+}
+
+fn should_apply_transport_adversary(
+    adversary: &mut ActiveTransportAdversary,
+    tick: u64,
+    rng: &mut SimRng,
+) -> bool {
+    if adversary.budget_state.remaining(&adversary.budget) == 0 {
+        return false;
+    }
+    match adversary.budget.mode {
+        AdversaryBudgetMode::Activation => true,
+        AdversaryBudgetMode::Independent { probability } => rng.should_trigger(probability),
+        AdversaryBudgetMode::Windowed {
+            window_ticks,
+            max_per_window,
+        } => {
+            let width = window_ticks.max(1);
+            let window = tick / width;
+            if adversary.budget_state.current_window != Some(window) {
+                adversary.budget_state.current_window = Some(window);
+                adversary.budget_state.consumed_in_window = 0;
+            }
+            adversary.budget_state.consumed_in_window < max_per_window
+        }
+        AdversaryBudgetMode::Correlated {
+            probability,
+            burst_ticks,
+        } => {
+            if let Some(expiry) = adversary.budget_state.burst_expires_at {
+                if tick < expiry {
+                    return true;
+                }
+            }
+            if rng.should_trigger(probability) {
+                adversary.budget_state.burst_expires_at =
+                    Some(tick.saturating_add(burst_ticks.max(1)));
+                return true;
+            }
+            false
+        }
+    }
+}
+
+fn consume_budget(
+    adversary_id: &str,
+    budget: &AdversaryBudget,
+    budget_state: &mut BudgetState,
+    tick: u64,
+    detail: &str,
+    budget_history: &mut Vec<AdversaryBudgetRecord>,
+    assumption_diagnostics: &mut Vec<AssumptionDiagnostic>,
+) -> bool {
+    if budget_state.remaining(budget) == 0 {
+        return false;
+    }
+    if let AdversaryBudgetMode::Windowed { max_per_window, .. } = budget.mode {
+        if budget_state.consumed_in_window >= max_per_window {
+            return false;
+        }
+        budget_state.consumed_in_window = budget_state.consumed_in_window.saturating_add(1);
+    }
+
+    budget_state.total_consumed = budget_state.total_consumed.saturating_add(1);
+    let remaining = budget_state.remaining(budget);
+    budget_history.push(AdversaryBudgetRecord {
+        tick,
+        adversary_id: adversary_id.to_string(),
+        kind: AdversaryBudgetRecordKind::Consumed,
+        total_consumed: budget_state.total_consumed,
+        total_remaining: remaining,
+        detail: detail.to_string(),
+    });
+    if remaining == 0 {
+        budget_history.push(AdversaryBudgetRecord {
+            tick,
+            adversary_id: adversary_id.to_string(),
+            kind: AdversaryBudgetRecordKind::Exhausted,
+            total_consumed: budget_state.total_consumed,
+            total_remaining: 0,
+            detail: "budget exhausted".to_string(),
+        });
+        assumption_diagnostics.push(AssumptionDiagnostic {
+            tick,
+            class: AssumptionFailureClass::BudgetExhaustion,
+            adversary_id: Some(adversary_id.to_string()),
+            detail: format!("budget exhausted for adversary '{adversary_id}'"),
+        });
+        if budget.assumption_failure != AssumptionFailureClass::BudgetExhaustion {
+            assumption_diagnostics.push(AssumptionDiagnostic {
+                tick,
+                class: budget.assumption_failure,
+                adversary_id: Some(adversary_id.to_string()),
+                detail: format!(
+                    "budget exhaustion violates declared assumption clause {:?}",
+                    budget.assumption_failure
+                ),
+            });
+        }
+    }
+    true
+}
+
 fn trigger_fires(
     trigger: &Trigger,
     tick: u64,
@@ -456,13 +763,13 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
             if kind != "sent" {
                 return false;
             }
-            role.map_or(true, |r| r == from || r == to)
+            role.is_none_or(|r| r == from || r == to)
         }
         ObsEvent::Received { from, to, .. } => {
             if kind != "received" {
                 return false;
             }
-            role.map_or(true, |r| r == from || r == to)
+            role.is_none_or(|r| r == from || r == to)
         }
         ObsEvent::Opened { .. } => kind == "opened" && role.is_none(),
         ObsEvent::Closed { .. } => kind == "closed" && role.is_none(),
@@ -470,23 +777,12 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
             if kind != "invoked" {
                 return false;
             }
-            role.map_or(true, |rr| rr == r)
+            role.is_none_or(|rr| rr == r)
         }
         ObsEvent::Halted { .. } => kind == "halted" && role.is_none(),
         ObsEvent::Faulted { .. } => kind == "faulted" && role.is_none(),
         _ => false,
     }
-}
-
-fn fault_expiry(tick: u64, fault: &Fault, scheduled: Option<usize>) -> Option<u64> {
-    let duration = match fault {
-        Fault::NodeCrash { duration, .. } => duration.or(scheduled),
-        _ => scheduled,
-    };
-    duration.map(|d| {
-        let delta = u64::try_from(d).unwrap_or(u64::MAX);
-        tick.saturating_add(delta)
-    })
 }
 
 // RECURSION_SAFE: recurses only through finite product value nesting.
@@ -518,13 +814,52 @@ mod tests {
 
     #[test]
     fn after_step_trigger_uses_logical_step_not_tick() {
-        let mut rng = SimRng::new(0);
         let trigger = Trigger::AfterStep(3);
-        let events: Vec<ObsEvent> = Vec::new();
+        assert!(!trigger_fires(&trigger, 10, 2, &[], &mut SimRng::new(1),));
+        assert!(trigger_fires(&trigger, 1, 3, &[], &mut SimRng::new(1),));
+    }
 
-        // Global tick exceeds threshold but logical step does not.
-        assert!(!trigger_fires(&trigger, 10, 2, &events, &mut rng));
-        // Fires when logical step reaches threshold.
-        assert!(trigger_fires(&trigger, 2, 3, &events, &mut rng));
+    #[test]
+    fn windowed_budget_exhaustion_emits_assumption_diagnostic() {
+        let budget = AdversaryBudget {
+            total: 2,
+            assumption_failure: AssumptionFailureClass::FairnessFailure,
+            mode: AdversaryBudgetMode::Windowed {
+                window_ticks: 4,
+                max_per_window: 2,
+            },
+        };
+        let mut state = BudgetState::default();
+        let mut history = Vec::new();
+        let mut diagnostics = Vec::new();
+
+        assert!(consume_budget(
+            "adv",
+            &budget,
+            &mut state,
+            1,
+            "first",
+            &mut history,
+            &mut diagnostics,
+        ));
+        assert!(consume_budget(
+            "adv",
+            &budget,
+            &mut state,
+            1,
+            "second",
+            &mut history,
+            &mut diagnostics,
+        ));
+        assert_eq!(
+            diagnostics
+                .iter()
+                .filter(|entry| entry.class == AssumptionFailureClass::BudgetExhaustion)
+                .count(),
+            1
+        );
+        assert!(diagnostics
+            .iter()
+            .any(|entry| entry.class == AssumptionFailureClass::FairnessFailure));
     }
 }

@@ -133,7 +133,7 @@ fn scenario() -> Scenario {
             step_size: FixedQ32::from_ratio(1, 100).expect("0.01"),
         })),
         reconfigurations: Vec::new(),
-        events: Vec::new(),
+        adversaries: Vec::new(),
         properties: None,
         checkpoint_interval: None,
         theorem: telltale_simulator::scenario::TheoremProfileSpec::default(),

@@ -10,7 +10,10 @@ use telltale_machine::model::effects::{
 };
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, StepResult};
-use telltale_simulator::fault::{Fault, FaultInjector, FaultSchedule, ScheduledFault, Trigger};
+use telltale_simulator::fault::{
+    AdversaryAction, AdversaryBudget, AdversaryBudgetMode, AdversaryInjector, AdversaryProgram,
+    AssumptionFailureClass, ScheduledAdversary, Trigger,
+};
 use telltale_simulator::rng::SimRng;
 use telltale_types::{GlobalType, LocalTypeR};
 
@@ -93,23 +96,23 @@ fn transfer_image() -> CodeImage {
     }
 }
 
-fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolMachine {
+fn run_faulted_transfer(program: AdversaryProgram, max_rounds: usize) -> ProtocolMachine {
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     machine
         .load_choreography(&transfer_image())
         .expect("load transfer fixture");
-    let fault = FaultInjector::new(NoopHandler, schedule, SimRng::new(7));
+    let adversary = AdversaryInjector::new(NoopHandler, program, SimRng::new(7));
 
     for logical_step in 1..=max_rounds {
         let next_tick = machine.clock().tick + 1;
-        fault
+        adversary
             .tick(
                 next_tick,
                 u64::try_from(logical_step).expect("logical step fits in u64"),
                 machine.trace(),
             )
-            .expect("advance fault schedule");
-        fault
+            .expect("advance adversary schedule");
+        adversary
             .deliver(next_tick, |sid, from, to, value| {
                 machine
                     .inject_message(sid, from, to, value)
@@ -123,12 +126,12 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolM
             })
             .expect("deliver delayed messages");
         machine.set_paused_roles(
-            &fault
+            &adversary
                 .crashed_roles()
                 .expect("read currently crashed simulator roles"),
         );
         match machine
-            .step_round(&fault, 1)
+            .step_round(&adversary, 1)
             .expect("step transfer fixture")
         {
             StepResult::Continue => {}
@@ -141,18 +144,22 @@ fn run_faulted_transfer(schedule: FaultSchedule, max_rounds: usize) -> ProtocolM
 
 #[test]
 fn ownership_owner_failure_before_handoff_emits_no_transfer_event() {
-    let schedule = FaultSchedule {
-        faults: vec![ScheduledFault {
-            fault: Fault::NodeCrash {
+    let program = AdversaryProgram {
+        adversaries: vec![ScheduledAdversary {
+            adversary_id: "owner_crash".to_string(),
+            action: AdversaryAction::Crash {
                 role: "A".to_string(),
                 duration: None,
             },
             trigger: Trigger::AtTick(1),
-            duration: None,
+            budget: AdversaryBudget {
+                total: 1,
+                assumption_failure: AssumptionFailureClass::FairnessFailure,
+                mode: AdversaryBudgetMode::Activation,
+            },
         }],
-        max_concurrent: 1,
     };
-    let machine = run_faulted_transfer(schedule, 8);
+    let machine = run_faulted_transfer(program, 8);
 
     assert!(
         machine
@@ -169,18 +176,22 @@ fn ownership_owner_failure_before_handoff_emits_no_transfer_event() {
 
 #[test]
 fn ownership_handoff_race_with_target_crash_keeps_transfer_observable() {
-    let schedule = FaultSchedule {
-        faults: vec![ScheduledFault {
-            fault: Fault::NodeCrash {
+    let program = AdversaryProgram {
+        adversaries: vec![ScheduledAdversary {
+            adversary_id: "target_crash".to_string(),
+            action: AdversaryAction::Crash {
                 role: "B".to_string(),
                 duration: None,
             },
             trigger: Trigger::AtTick(1),
-            duration: None,
+            budget: AdversaryBudget {
+                total: 1,
+                assumption_failure: AssumptionFailureClass::FairnessFailure,
+                mode: AdversaryBudgetMode::Activation,
+            },
         }],
-        max_concurrent: 1,
     };
-    let machine = run_faulted_transfer(schedule, 8);
+    let machine = run_faulted_transfer(program, 8);
 
     assert_eq!(
         machine

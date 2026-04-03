@@ -187,13 +187,13 @@ Do not keep backwards-compatibility aliases, wrappers, dual schemas, or legacy c
 
 ## Phase 14: Budgeted Fault and Adversary Models
 
-- [ ] Refactor fault injection to support explicit budget declarations for crash, Byzantine-style interference, corruption, withholding, and timing disturbance models.
-- [ ] Keep low-level packet events, but classify failures at the assumption-bundle level: quorum/intersection failure, authentication/evidence failure, fairness failure, budget exhaustion, or unsupported regime.
-- [ ] Add support for correlated and windowed fault budgets in addition to per-message independent probabilities.
-- [ ] Ensure replay artifacts record the resolved budget schedule and budget-consumption history.
-- [ ] Add targeted tests for budget accounting, failure classification, and assumption-bundle diagnostics.
-- [ ] Update docs to describe budgeted adversary surfaces and their theorem-side meaning.
-- [ ] Remove any superseded low-level-only fault reporting paths once budget/accounting-aware surfaces exist, except where raw packet events remain intentionally foundational.
+- [x] Refactor fault injection to support explicit budget declarations for crash, Byzantine-style interference, corruption, withholding, and timing disturbance models.
+- [x] Keep low-level packet events, but classify failures at the assumption-bundle level: quorum/intersection failure, authentication/evidence failure, fairness failure, budget exhaustion, or unsupported regime.
+- [x] Add support for correlated and windowed fault budgets in addition to per-message independent probabilities.
+- [x] Ensure replay artifacts record the resolved budget schedule and budget-consumption history.
+- [x] Add targeted tests for budget accounting, failure classification, and assumption-bundle diagnostics.
+- [x] Update docs to describe budgeted adversary surfaces and their theorem-side meaning.
+- [x] Remove any superseded low-level-only fault reporting paths once budget/accounting-aware surfaces exist, except where raw packet events remain intentionally foundational.
 - [ ] Make a git commit for Phase 14.
 
 ## Phase 15: Scheduler Semantics as a First-Class Surface

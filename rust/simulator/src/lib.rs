@@ -51,12 +51,16 @@ pub use contracts::{
 pub use decision::{
     decide_async_subtyping, decide_capacity_predicate, decide_global_coherence,
     decide_global_well_formedness, decide_sync_subtyping, decide_theorem_eligibility,
-    theorem_eligibility_from_result, AsyncSubtypeWitness, CapacityCounterexample,
-    CoherenceFailure, DecisionCertificate, DecisionCounterexample, DecisionKind,
-    DecisionOutcome, DecisionReport, SyncSubtypeWitness, TheoremEligibilityCounterexample,
-    WellFormednessViolation,
+    theorem_eligibility_from_result, AsyncSubtypeWitness, CapacityCounterexample, CoherenceFailure,
+    DecisionCertificate, DecisionCounterexample, DecisionKind, DecisionOutcome, DecisionReport,
+    SyncSubtypeWitness, TheoremEligibilityCounterexample, WellFormednessViolation,
 };
 pub use distributed::{DistributedSimBuilder, DistributedSimulation, NestedExecutionContract};
+pub use fault::{
+    AdversaryAction, AdversaryBudget, AdversaryBudgetMode, AdversaryBudgetRecord,
+    AdversaryBudgetRecordKind, AdversaryInjector, AdversaryProgram, AdversarySummary,
+    AssumptionDiagnostic, AssumptionFailureClass, ScheduledAdversary, Trigger,
+};
 pub use harness::{
     derive_initial_states, derive_initial_states_for_model, BatchConfig, BatchRunManifest,
     BatchRunManifestEntry, BatchRunResult, DirectAdapter, HarnessConfig, HarnessSpec, HostAdapter,

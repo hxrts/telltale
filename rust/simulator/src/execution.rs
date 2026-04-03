@@ -6,7 +6,10 @@ use telltale_machine::model::effects::EffectHandler;
 use telltale_machine::StepResult;
 
 use crate::backend::SimulationMachine;
-use crate::fault::FaultInjector;
+use crate::fault::{
+    AdversaryBudgetRecord, AdversaryInjector, AdversarySummary, AssumptionDiagnostic,
+    ScheduledAdversary,
+};
 use crate::network::NetworkModel;
 use crate::reconfiguration::{
     ReconfigurationController, ReconfigurationRecord, ReconfigurationSummary,
@@ -15,8 +18,8 @@ use crate::rng::SimRng;
 use crate::scenario::Scenario;
 
 enum ScenarioTransport<'a> {
-    Fault(FaultInjector<&'a dyn EffectHandler>),
-    Network(NetworkModel<FaultInjector<&'a dyn EffectHandler>>),
+    Adversary(AdversaryInjector<&'a dyn EffectHandler>),
+    Network(NetworkModel<AdversaryInjector<&'a dyn EffectHandler>>),
 }
 
 /// Shared middleware stack for one scenario execution.
@@ -33,16 +36,16 @@ impl<'a> ScenarioMiddleware<'a> {
         tick_duration: Duration,
     ) -> Result<Self, String> {
         let mut rng = SimRng::new(scenario.seed);
-        let schedule = scenario.fault_schedule()?;
-        let fault = FaultInjector::new(handler, schedule, rng.fork());
+        let program = scenario.adversary_program()?;
+        let adversary = AdversaryInjector::new(handler, program, rng.fork());
         let reconfiguration =
             ReconfigurationController::new(scenario.reconfiguration_schedule()?, rng.fork());
 
         let transport = if scenario.requires_network_model() {
             let cfg = scenario.network_config().unwrap_or_default();
-            ScenarioTransport::Network(NetworkModel::new(fault, cfg, rng.fork(), tick_duration))
+            ScenarioTransport::Network(NetworkModel::new(adversary, cfg, rng.fork(), tick_duration))
         } else {
-            ScenarioTransport::Fault(fault)
+            ScenarioTransport::Adversary(adversary)
         };
 
         Ok(Self {
@@ -67,7 +70,7 @@ impl<'a> ScenarioMiddleware<'a> {
                 )?;
                 net.inner()
                     .tick(next_tick, next_logical_step, machine.trace())
-                    .map_err(|e| format!("fault middleware tick: {e}"))?;
+                    .map_err(|e| format!("adversary middleware tick: {e}"))?;
                 net.inner()
                     .deliver(next_tick, |sid, from, to, val| {
                         net.route_external(next_tick, sid, from, to, val, |sid, from, to, val| {
@@ -77,7 +80,7 @@ impl<'a> ScenarioMiddleware<'a> {
                         })?;
                         Ok(telltale_machine::buffer::EnqueueResult::Ok)
                     })
-                    .map_err(|e| format!("fault middleware deliver: {e}"))?;
+                    .map_err(|e| format!("adversary middleware deliver: {e}"))?;
                 net.set_tick(next_tick);
                 net.deliver(next_tick, |sid, from, to, val| {
                     machine
@@ -88,30 +91,30 @@ impl<'a> ScenarioMiddleware<'a> {
                 let paused_roles = net
                     .inner()
                     .crashed_roles()
-                    .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
+                    .map_err(|e| format!("adversary middleware crashed_roles: {e}"))?;
                 machine.set_paused_roles(&paused_roles);
                 Ok(())
             }
-            ScenarioTransport::Fault(fault) => {
+            ScenarioTransport::Adversary(adversary) => {
                 self.reconfiguration.tick(
                     next_tick,
                     next_logical_step,
                     machine.trace(),
-                    Option::<&NetworkModel<FaultInjector<&'a dyn EffectHandler>>>::None,
+                    Option::<&NetworkModel<AdversaryInjector<&'a dyn EffectHandler>>>::None,
                 )?;
-                fault
+                adversary
                     .tick(next_tick, next_logical_step, machine.trace())
-                    .map_err(|e| format!("fault middleware tick: {e}"))?;
-                fault
+                    .map_err(|e| format!("adversary middleware tick: {e}"))?;
+                adversary
                     .deliver(next_tick, |sid, from, to, val| {
                         machine
                             .inject_message(sid, from, to, val)
                             .map_err(|e| e.to_string())
                     })
-                    .map_err(|e| format!("fault middleware deliver: {e}"))?;
-                let paused_roles = fault
+                    .map_err(|e| format!("adversary middleware deliver: {e}"))?;
+                let paused_roles = adversary
                     .crashed_roles()
-                    .map_err(|e| format!("fault middleware crashed_roles: {e}"))?;
+                    .map_err(|e| format!("adversary middleware crashed_roles: {e}"))?;
                 machine.set_paused_roles(&paused_roles);
                 Ok(())
             }
@@ -125,9 +128,41 @@ impl<'a> ScenarioMiddleware<'a> {
     ) -> Result<StepResult, String> {
         match &self.transport {
             ScenarioTransport::Network(net) => machine.step_round(net, concurrency),
-            ScenarioTransport::Fault(fault) => machine.step_round(fault, concurrency),
+            ScenarioTransport::Adversary(adversary) => machine.step_round(adversary, concurrency),
         }
         .map_err(|e| format!("protocol machine error: {e}"))
+    }
+
+    /// Resolved adversary schedule for the run.
+    pub fn adversary_schedule(&self) -> Vec<ScheduledAdversary> {
+        match &self.transport {
+            ScenarioTransport::Network(net) => net.inner().program(),
+            ScenarioTransport::Adversary(adversary) => adversary.program(),
+        }
+    }
+
+    /// Budget-consumption history recorded by the adversary middleware.
+    pub fn adversary_budget_history(&self) -> Result<Vec<AdversaryBudgetRecord>, String> {
+        match &self.transport {
+            ScenarioTransport::Network(net) => net.inner().budget_history(),
+            ScenarioTransport::Adversary(adversary) => adversary.budget_history(),
+        }
+    }
+
+    /// Assumption-bundle diagnostics recorded by the adversary middleware.
+    pub fn adversary_assumption_diagnostics(&self) -> Result<Vec<AssumptionDiagnostic>, String> {
+        match &self.transport {
+            ScenarioTransport::Network(net) => net.inner().assumption_diagnostics(),
+            ScenarioTransport::Adversary(adversary) => adversary.assumption_diagnostics(),
+        }
+    }
+
+    /// Adversary summary for the run.
+    pub fn adversary_summary(&self) -> Result<AdversarySummary, String> {
+        match &self.transport {
+            ScenarioTransport::Network(net) => net.inner().summary(),
+            ScenarioTransport::Adversary(adversary) => adversary.summary(),
+        }
     }
 
     /// Canonical applied reconfiguration trace.

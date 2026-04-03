@@ -11,6 +11,7 @@ use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, SemanticAuditRecord};
 use telltale_simulator::backend::SimulationMachine;
 use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
+use telltale_simulator::fault::AssumptionFailureClass;
 use telltale_simulator::generated::{GeneratedEffectScenario, ScenarioEffectDisposition};
 use telltale_simulator::harness::derive_initial_states;
 use telltale_simulator::property::{PropertyContext, PropertyMonitor};
@@ -207,7 +208,12 @@ step_size = "0.01"
         TheoremEligibility::Exact
     );
     assert_eq!(result.replay.theorem_profile, result.stats.theorem_profile);
+    assert!(result.replay.adversary_schedule.is_empty());
+    assert!(result.replay.adversary_budget_history.is_empty());
+    assert!(result.replay.assumption_diagnostics.is_empty());
     assert!(result.replay.reconfiguration_trace.is_empty());
+    assert_eq!(result.stats.adversary_summary.declared_adversaries, 0);
+    assert!(result.stats.assumption_diagnostics.is_empty());
     assert_eq!(result.stats.reconfiguration_summary.applied_operations, 0);
     assert_eq!(
         result
@@ -261,6 +267,81 @@ step_size = "0.01"
             )),
         "scenario replay should include structured semantic effect observations"
     );
+}
+
+#[test]
+fn budgeted_adversary_history_and_assumption_diagnostics_are_reported() {
+    let (global, local_types) = simple_protocol();
+    let scenario_toml = r#"
+name = "budgeted_adversary_diagnostics"
+roles = ["A", "B"]
+steps = 6
+seed = 7
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+scheduler_profile = "threaded_envelope"
+envelope_profile = "protocol_machine_envelope_adherence"
+assumption_bundle = "partial_synchrony"
+
+[material]
+layer = "mean_field"
+
+[material.params]
+beta = "1.0"
+species = ["up", "down"]
+initial_state = ["0.5", "0.5"]
+step_size = "0.01"
+
+[[adversaries]]
+id = "loss_once"
+trigger = { immediate = true }
+action = { type = "withholding" }
+budget = { total = 1, mode = "activation", assumption_failure = "fairness_failure" }
+"#;
+
+    let scenario = Scenario::parse(scenario_toml).expect("parse scenario");
+    let result = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("scenario run");
+
+    assert_eq!(result.replay.adversary_schedule.len(), 1);
+    assert!(result.replay.adversary_budget_history.iter().any(
+        |record| record.kind == telltale_simulator::fault::AdversaryBudgetRecordKind::Activated
+    ));
+    assert!(result.replay.adversary_budget_history.iter().any(
+        |record| record.kind == telltale_simulator::fault::AdversaryBudgetRecordKind::Consumed
+    ));
+    assert!(result.replay.adversary_budget_history.iter().any(
+        |record| record.kind == telltale_simulator::fault::AdversaryBudgetRecordKind::Exhausted
+    ));
+    assert_eq!(result.stats.adversary_summary.declared_adversaries, 1);
+    assert_eq!(result.stats.adversary_summary.activated_adversaries, 1);
+    assert_eq!(result.stats.adversary_summary.budget_consumed, 1);
+    assert!(result
+        .stats
+        .assumption_diagnostics
+        .iter()
+        .any(|entry| entry.class == AssumptionFailureClass::BudgetExhaustion));
+    assert!(result
+        .stats
+        .assumption_diagnostics
+        .iter()
+        .any(|entry| entry.class == AssumptionFailureClass::FairnessFailure));
+    assert!(result
+        .stats
+        .assumption_diagnostics
+        .iter()
+        .any(|entry| entry.class == AssumptionFailureClass::UnsupportedRegime));
 }
 
 #[test]
@@ -695,13 +776,10 @@ species = ["up", "down"]
 initial_state = ["0.5", "0.5"]
 step_size = "0.01"
 
-[[events]]
-[events.trigger]
-at_tick = 2
-
-[events.action]
-type = "message_delay"
-ticks = 2
+[[adversaries]]
+trigger = { at_tick = 2 }
+action = { type = "timing_disturbance", ticks = 2 }
+budget = { total = 32, mode = "activation" }
 
 [network]
 base_latency_ms = 1

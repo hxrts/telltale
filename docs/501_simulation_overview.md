@@ -7,7 +7,7 @@ Detailed behavior lives in the focused pages linked below.
 ## Scope
 
 The simulator runs projected local types on `telltale-machine`.
-It adds deterministic middleware for faults, network behavior, property monitoring, checkpointing, and replay artifacts.
+It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
 Simulator-visible topology and authority change now use a separate first-class reconfiguration program rather than fault-event encodings.
 
@@ -26,12 +26,14 @@ The default `auto` policy resolves to the authoritative canonical execution lane
 Throughput-oriented parallelism remains available through explicit threaded execution settings and through batch execution.
 
 The simulator also exposes a separate theorem/profile layer through `Scenario.theorem`.
-This layer records scheduler profile, envelope profile, and transport/fault assumption bundle independently of raw execution settings.
+This layer records scheduler profile, envelope profile, and transport/adversary assumption bundle independently of raw execution settings.
 That separation lets one execution be interpreted under different theorem-side contracts without changing the runtime behavior itself.
 
 When theorem-indexed reporting is enabled, `ScenarioStats` also includes a theorem-native progress summary.
 That summary reports weighted progress potential, productive communication count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification separately from raw transport counters.
 Reconfiguration accounting is reported separately again through `ScenarioStats.reconfiguration_summary` so pure reconfiguration and budget-consuming transition choreography do not get mixed into the descent/progress quantities.
+Budgeted disturbance accounting is reported through `ScenarioStats.adversary_summary` and `ScenarioStats.assumption_diagnostics`.
+Replay artifacts also retain the resolved adversary program and budget-consumption history so theorem-side assumption failures are inspectable after the fact.
 `ScenarioResult.analysis.normalized_observability` provides the companion envelope-aware analysis view.
 It keeps canonical raw replay unchanged while exposing a normalized behavior class for order-insensitive and footprint-aware comparison.
 

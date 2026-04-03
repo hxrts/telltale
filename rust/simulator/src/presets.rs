@@ -2,15 +2,14 @@
 
 use telltale_types::FixedQ32;
 
-use crate::fault::Fault;
 use crate::material::MaterialParams;
 use crate::property::Property;
 use crate::scenario::{
-    EventSpec, ExecutionSpec, FaultActionSpec, LivenessSpec, PropertiesSpec, Scenario,
-    TheoremProfileSpec, TriggerSpec,
+    AdversaryActionSpec, AdversaryBudgetModeSpec, AdversaryBudgetSpec, AdversarySpec,
+    ExecutionSpec, LivenessSpec, PropertiesSpec, Scenario, TheoremProfileSpec, TriggerSpec,
 };
 
-/// Build a deterministic baseline scenario with no network or fault events.
+/// Build a deterministic baseline scenario with no network or adversary declarations.
 #[must_use]
 pub fn deterministic_baseline(
     name: impl Into<String>,
@@ -27,7 +26,7 @@ pub fn deterministic_baseline(
         network: None,
         material: Some(material),
         reconfigurations: Vec::new(),
-        events: Vec::new(),
+        adversaries: Vec::new(),
         properties: None,
         checkpoint_interval: None,
         theorem: TheoremProfileSpec::default(),
@@ -73,14 +72,15 @@ pub fn with_standard_properties(
     scenario
 }
 
-/// Add a message-drop fault window starting at a specific tick.
+/// Add a withholding adversary starting at a specific tick.
 #[must_use]
-pub fn with_message_drop_fault(
+pub fn with_withholding_adversary(
     mut scenario: Scenario,
     at_tick: u64,
     probability: FixedQ32,
 ) -> Scenario {
-    scenario.events.push(EventSpec {
+    scenario.adversaries.push(AdversarySpec {
+        id: None,
         trigger: TriggerSpec {
             immediate: false,
             at_tick: Some(at_tick),
@@ -88,7 +88,12 @@ pub fn with_message_drop_fault(
             random: None,
             on_event: None,
         },
-        action: FaultActionSpec::MessageDrop { probability },
+        action: AdversaryActionSpec::Withholding,
+        budget: AdversaryBudgetSpec {
+            total: u64::MAX,
+            assumption_failure: None,
+            mode: AdversaryBudgetModeSpec::Independent { probability },
+        },
     });
     scenario
 }
@@ -105,26 +110,6 @@ pub fn property_to_invariant(property: &Property) -> String {
         Property::TypeMonotonicity { sid } => format!("type_monotonicity({sid})"),
         Property::BufferBound { sid, max } => format!("buffer_bound({sid},{max})"),
         Property::Liveness { name, .. } => name.clone(),
-    }
-}
-
-/// Convert a `Fault` value to a scenario fault action when possible.
-#[must_use]
-pub fn fault_to_action(fault: &Fault) -> Option<FaultActionSpec> {
-    match fault {
-        Fault::MessageDrop { probability } => Some(FaultActionSpec::MessageDrop {
-            probability: *probability,
-        }),
-        Fault::MessageDelay { ticks } => Some(FaultActionSpec::MessageDelay {
-            ticks: u64::try_from(*ticks).ok()?,
-        }),
-        Fault::MessageCorruption { probability } => Some(FaultActionSpec::MessageCorruption {
-            probability: *probability,
-        }),
-        Fault::NodeCrash { role, duration } => Some(FaultActionSpec::NodeCrash {
-            role: role.clone(),
-            duration: duration.map(u64::try_from).transpose().ok()?,
-        }),
     }
 }
 
@@ -149,7 +134,7 @@ mod tests {
         assert_eq!(scenario.seed, 0);
         let execution = scenario.resolved_execution().expect("resolve execution");
         assert!(execution.scheduler_concurrency >= 1);
-        assert!(scenario.events.is_empty());
+        assert!(scenario.adversaries.is_empty());
         assert!(scenario.properties.is_none());
     }
 
@@ -164,17 +149,21 @@ mod tests {
     }
 
     #[test]
-    fn message_drop_fault_is_added() {
+    fn withholding_adversary_is_added() {
         let scenario =
             deterministic_baseline("baseline", vec!["A".into(), "B".into()], 16, material());
         let updated =
-            with_message_drop_fault(scenario, 5, FixedQ32::from_ratio(1, 4).expect("0.25"));
-        assert_eq!(updated.events.len(), 1);
-        match updated.events[0].action {
-            FaultActionSpec::MessageDrop { probability } => {
+            with_withholding_adversary(scenario, 5, FixedQ32::from_ratio(1, 4).expect("0.25"));
+        assert_eq!(updated.adversaries.len(), 1);
+        assert!(matches!(
+            updated.adversaries[0].action,
+            AdversaryActionSpec::Withholding
+        ));
+        match updated.adversaries[0].budget.mode {
+            AdversaryBudgetModeSpec::Independent { probability } => {
                 assert_eq!(probability, FixedQ32::from_ratio(1, 4).expect("0.25"));
             }
-            _ => panic!("expected message drop action"),
+            _ => panic!("expected independent withholding budget"),
         }
     }
 }

@@ -1,7 +1,7 @@
 # Protocol-Machine Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
-It covers the TOML schema, fault injection, first-class reconfiguration, network modeling, properties, checkpointing, and current limits.
+It covers the TOML schema, budgeted adversary declarations, first-class reconfiguration, network modeling, properties, checkpointing, and current limits.
 
 ## Scenario Schema
 
@@ -22,14 +22,14 @@ pub struct Scenario {
     pub network: Option<NetworkSpec>,
     pub material: Option<MaterialParams>,
     pub reconfigurations: Vec<ReconfigurationSpec>,
-    pub events: Vec<EventSpec>,
+    pub adversaries: Vec<AdversarySpec>,
     pub properties: Option<PropertiesSpec>,
     pub checkpoint_interval: Option<u64>,
     pub theorem: TheoremProfileSpec,
 }
 ```
 
-`network`, `material`, `reconfigurations`, `events`, `properties`, and `checkpoint_interval` are optional.
+`network`, `material`, `reconfigurations`, `adversaries`, `properties`, and `checkpoint_interval` are optional.
 
 ```rust
 pub struct ExecutionSpec {
@@ -63,7 +63,7 @@ Recursive scenarios still receive the weighted summary, but critical-capacity cl
 ## Scenario Example
 
 ```toml
-name = "mean_field_fault_window"
+name = "mean_field_adversary_window"
 roles = ["A", "B"]
 steps = 200
 seed = 42
@@ -92,9 +92,11 @@ loss_probability = "0.02"
 trigger = { at_tick = 50 }
 action = { type = "link", from = "A", to = "B", enabled = false }
 
-[[events]]
+[[adversaries]]
+id = "loss_window"
 trigger = { at_tick = 75 }
-action = { type = "message_drop", probability = "0.25" }
+action = { type = "withholding" }
+budget = { total = 16, mode = "windowed", window_ticks = 8, max_per_window = 2 }
 
 [properties]
 invariants = ["no_faults", "simplex", "buffer_bound(0,16)"]
@@ -103,26 +105,48 @@ invariants = ["no_faults", "simplex", "buffer_bound(0,16)"]
 Quoted decimal strings are the safest TOML form for `FixedQ32` values.
 The parser also accepts compatible numeric representations.
 
-## Fault Middleware
+## Adversary Middleware
 
-`FaultInjector` wraps the inner handler.
-It manages activation, expiry, random triggers, delayed delivery, corruption, and crash state.
+`AdversaryInjector` wraps the inner handler.
+It manages trigger activation, budget accounting, delayed delivery, corruption, withholding, correlated bursts, and crash state.
 
-Supported actions are `MessageDrop`, `MessageDelay`, `MessageCorruption`, and `NodeCrash`.
+Supported actions are `withholding`, `timing_disturbance`, `corruption`, `crash`, and `byzantine_interference`.
 Supported triggers are `Immediate`, `AtTick`, `AfterStep`, `Random`, and `OnEvent`.
 If a trigger declaration sets no trigger field, it defaults to `Immediate`.
 
-An event must not set more than one trigger field at once.
+An adversary must not set more than one trigger field at once.
 The parser rejects multi-trigger declarations.
 `Trigger::AfterStep` is evaluated against logical round count rather than raw tick count.
 
-Use fault events for transport disruption and runtime failure only.
-Do not encode topology change, handoff, federation cutover, or mode change as fault events.
+Every adversary must also declare a budget:
+
+```rust
+pub struct AdversarySpec {
+    pub id: Option<String>,
+    pub trigger: TriggerSpec,
+    pub action: AdversaryActionSpec,
+    pub budget: AdversaryBudgetSpec,
+}
+```
+
+`budget.total` is the total disturbance or activation budget.
+`budget.mode` can be:
+
+- `activation` for one-shot activation budgeting such as crashes
+- `independent` for per-message Bernoulli disturbance
+- `windowed` for per-window correlated quotas
+- `correlated` for burst-style correlated disturbance windows
+
+`budget.assumption_failure` optionally states which theorem-side clause should fail if the budget exhausts.
+If omitted, the simulator derives a default based on the adversary action family.
+
+Use adversaries for transport disruption and runtime failure only.
+Do not encode topology change, handoff, federation cutover, or mode change as adversaries.
 
 ## Reconfiguration Program
 
 `Scenario.reconfigurations` is the first-class surface for simulator-visible topology and authority change.
-Each entry has the same trigger vocabulary as `events`, but it activates a semantic reconfiguration operation instead of a transport fault.
+Each entry has the same trigger vocabulary as `adversaries`, but it activates a semantic reconfiguration operation instead of a transport disturbance.
 
 ```rust
 pub struct ReconfigurationSpec {
@@ -148,7 +172,7 @@ Unknown roles, duplicated federation members, same-source/same-target delegation
 
 ## Network Middleware
 
-`NetworkModel` wraps `FaultInjector` when network simulation is enabled.
+`NetworkModel` wraps `AdversaryInjector` when network simulation is enabled.
 It applies federation connectivity checks, link overrides, latency sampling, loss sampling, and deferred delivery.
 
 Per-link policies match directed `(from, to)` pairs.
@@ -162,6 +186,7 @@ Zero effective latency produces immediate delivery.
 
 Use `network` for baseline transport parameters.
 Use `reconfigurations` for topology/federation/link cutovers.
+Use `adversaries` for budgeted disturbances and theorem-facing assumption diagnostics.
 
 ## Property Monitoring
 
@@ -177,6 +202,13 @@ Predicate strings are parsed by `parse_predicate`.
 `CheckpointStore` snapshots protocol-machine state as JSON bytes at configured intervals.
 When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
 Replay loads a checkpoint and re-executes the same shared middleware loop used by fresh scenario runs.
+
+Scenario replay artifacts also retain:
+
+- the resolved adversary schedule
+- adversary budget-consumption history
+- assumption-bundle diagnostics
+- the canonical reconfiguration trace
 
 Checkpoint snapshots currently require the canonical backend.
 Threaded scenario runs still emit replay artifacts such as observable events, effect traces, and semantic objects, but checkpoint serialization remains canonical-only.
