@@ -358,8 +358,12 @@ mod tests {
             Resource::session("Alice", 7),
         ]);
 
-        let left = heap.consume_many(&[rids[0].clone(), rids[1].clone()]).unwrap();
-        let right = heap.consume_many(&[rids[1].clone(), rids[0].clone()]).unwrap();
+        let left = heap
+            .consume_many(&[rids[0].clone(), rids[1].clone()])
+            .unwrap();
+        let right = heap
+            .consume_many(&[rids[1].clone(), rids[0].clone()])
+            .unwrap();
 
         assert_eq!(
             HeapCommitment::<DefaultContentHasher>::from_heap(&left),

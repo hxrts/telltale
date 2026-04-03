@@ -47,15 +47,15 @@
 //! assert!(heap.is_consumed(&msg_id));
 //! ```
 
-mod heap_impl;
 mod encoding;
+mod heap_impl;
 mod merkle;
 mod resource;
 
 pub use encoding::{
-    heap_commitment_preimage, merkle_node_preimage, nullifier_leaf_preimage,
-    resource_id_preimage, resource_leaf_preimage, CanonicalHeapEncoder, CanonicalHeapEncoding,
-    HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
+    heap_commitment_preimage, merkle_node_preimage, nullifier_leaf_preimage, resource_id_preimage,
+    resource_leaf_preimage, CanonicalHeapEncoder, CanonicalHeapEncoding, HEAP_ENCODING_MAGIC,
+    HEAP_ENCODING_VERSION,
 };
 pub use heap_impl::Heap;
 pub use merkle::{

@@ -19,10 +19,9 @@
 //! operational Rust artifacts.
 
 use super::encoding::{
-    resource_id_preimage,
-    tag_channel_state, tag_message, tag_message_payload, tag_resource_channel,
-    tag_resource_message, tag_resource_session, tag_resource_value, CanonicalHeapEncoder,
-    CanonicalHeapEncoding,
+    resource_id_preimage, tag_channel_state, tag_message, tag_message_payload,
+    tag_resource_channel, tag_resource_message, tag_resource_session, tag_resource_value,
+    CanonicalHeapEncoder, CanonicalHeapEncoding,
 };
 use std::fmt;
 use std::hash::{Hash, Hasher as StdHasher};

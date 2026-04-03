@@ -130,10 +130,7 @@ pub fn resource_id_preimage(resource_bytes: &[u8], counter: u64) -> Vec<u8> {
 }
 
 /// Build the tagged preimage for an active-resource Merkle leaf.
-pub fn resource_leaf_preimage(
-    resource_id_bytes: &[u8],
-    resource_bytes: &[u8],
-) -> Vec<u8> {
+pub fn resource_leaf_preimage(resource_id_bytes: &[u8], resource_bytes: &[u8]) -> Vec<u8> {
     let mut encoder = CanonicalHeapEncoder::new(TAG_RESOURCE_LEAF_PREIMAGE);
     encoder.bytes(resource_id_bytes);
     encoder.bytes(resource_bytes);

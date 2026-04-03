@@ -76,10 +76,10 @@ pub use util::{spawn, spawn_local};
 // Re-export heap types for resource management, canonical encoding, and
 // vector-stable hashing helpers.
 pub use heap::{
-    CanonicalHeapEncoder, CanonicalHeapEncoding, ChannelState, DefaultHeapHasher, Direction,
-    Hasher, Heap, HeapCommitment, HeapError, MerkleProof, MerkleTree, Message as HeapMessage,
-    MessagePayload, ProofStep, Resource, ResourceId, HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
-    merkle_node_hash, nullifier_leaf_hash, resource_leaf_hash,
+    merkle_node_hash, nullifier_leaf_hash, resource_leaf_hash, CanonicalHeapEncoder,
+    CanonicalHeapEncoding, ChannelState, DefaultHeapHasher, Direction, Hasher, Heap,
+    HeapCommitment, HeapError, MerkleProof, MerkleTree, Message as HeapMessage, MessagePayload,
+    ProofStep, Resource, ResourceId, HEAP_ENCODING_MAGIC, HEAP_ENCODING_VERSION,
 };
 
 // Re-export testing types for protocol testing

@@ -107,8 +107,7 @@ fn skip_without_heap_lean_runner() -> bool {
 }
 
 fn fixture_path() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../runtime/tests/data/heap_lean_parity_v1.json")
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../runtime/tests/data/heap_lean_parity_v1.json")
 }
 
 fn load_fixture() -> HeapParityFixture {
@@ -160,7 +159,8 @@ fn lean_heap_parity_matches_runtime_contract() {
         &message,
         fixture.resource_fixture.allocation_counter,
     );
-    let message_id_preimage = resource_id_preimage(&message_bytes, fixture.resource_fixture.allocation_counter);
+    let message_id_preimage =
+        resource_id_preimage(&message_bytes, fixture.resource_fixture.allocation_counter);
     let message_leaf = resource_leaf_hash::<DefaultHeapHasher>(&message_id, &message);
     let message_leaf_preimage = resource_leaf_preimage(message_id.as_bytes(), &message_bytes);
 
@@ -173,7 +173,8 @@ fn lean_heap_parity_matches_runtime_contract() {
         &session,
         fixture.session_fixture.allocation_counter,
     );
-    let session_id_preimage = resource_id_preimage(&session_bytes, fixture.session_fixture.allocation_counter);
+    let session_id_preimage =
+        resource_id_preimage(&session_bytes, fixture.session_fixture.allocation_counter);
     let session_leaf = resource_leaf_hash::<DefaultHeapHasher>(&session_id, &session);
     let session_leaf_preimage = resource_leaf_preimage(session_id.as_bytes(), &session_bytes);
 
@@ -186,31 +187,65 @@ fn lean_heap_parity_matches_runtime_contract() {
         &channel,
         fixture.channel_fixture.allocation_counter,
     );
-    let channel_id_preimage = resource_id_preimage(&channel_bytes, fixture.channel_fixture.allocation_counter);
+    let channel_id_preimage =
+        resource_id_preimage(&channel_bytes, fixture.channel_fixture.allocation_counter);
     let channel_nullifier_leaf = nullifier_leaf_hash::<DefaultHeapHasher>(&channel_id);
     let channel_nullifier_preimage = nullifier_leaf_preimage(channel_id.as_bytes());
 
-    assert_eq!(to_hex(&message_bytes), fixture.resource_fixture.canonical_bytes_hex);
-    assert_eq!(to_hex(message_id.as_bytes()), fixture.resource_fixture.resource_id_digest_hex);
-    assert_eq!(to_hex(&message_id_preimage), fixture.resource_fixture.resource_id_preimage_hex);
-    assert_eq!(to_hex(message_leaf.as_ref()), fixture.resource_fixture.resource_leaf_hex);
+    assert_eq!(
+        to_hex(&message_bytes),
+        fixture.resource_fixture.canonical_bytes_hex
+    );
+    assert_eq!(
+        to_hex(message_id.as_bytes()),
+        fixture.resource_fixture.resource_id_digest_hex
+    );
+    assert_eq!(
+        to_hex(&message_id_preimage),
+        fixture.resource_fixture.resource_id_preimage_hex
+    );
+    assert_eq!(
+        to_hex(message_leaf.as_ref()),
+        fixture.resource_fixture.resource_leaf_hex
+    );
     assert_eq!(
         to_hex(&message_leaf_preimage),
         fixture.resource_fixture.resource_leaf_preimage_hex
     );
 
-    assert_eq!(to_hex(&session_bytes), fixture.session_fixture.canonical_bytes_hex);
-    assert_eq!(to_hex(session_id.as_bytes()), fixture.session_fixture.resource_id_digest_hex);
-    assert_eq!(to_hex(&session_id_preimage), fixture.session_fixture.resource_id_preimage_hex);
-    assert_eq!(to_hex(session_leaf.as_ref()), fixture.session_fixture.resource_leaf_hex);
+    assert_eq!(
+        to_hex(&session_bytes),
+        fixture.session_fixture.canonical_bytes_hex
+    );
+    assert_eq!(
+        to_hex(session_id.as_bytes()),
+        fixture.session_fixture.resource_id_digest_hex
+    );
+    assert_eq!(
+        to_hex(&session_id_preimage),
+        fixture.session_fixture.resource_id_preimage_hex
+    );
+    assert_eq!(
+        to_hex(session_leaf.as_ref()),
+        fixture.session_fixture.resource_leaf_hex
+    );
     assert_eq!(
         to_hex(&session_leaf_preimage),
         fixture.session_fixture.resource_leaf_preimage_hex
     );
 
-    assert_eq!(to_hex(&channel_bytes), fixture.channel_fixture.canonical_bytes_hex);
-    assert_eq!(to_hex(channel_id.as_bytes()), fixture.channel_fixture.resource_id_digest_hex);
-    assert_eq!(to_hex(&channel_id_preimage), fixture.channel_fixture.resource_id_preimage_hex);
+    assert_eq!(
+        to_hex(&channel_bytes),
+        fixture.channel_fixture.canonical_bytes_hex
+    );
+    assert_eq!(
+        to_hex(channel_id.as_bytes()),
+        fixture.channel_fixture.resource_id_digest_hex
+    );
+    assert_eq!(
+        to_hex(&channel_id_preimage),
+        fixture.channel_fixture.resource_id_preimage_hex
+    );
     assert_eq!(
         to_hex(channel_nullifier_leaf.as_ref()),
         fixture.channel_fixture.nullifier_leaf_hex
@@ -256,8 +291,14 @@ fn lean_heap_parity_matches_runtime_contract() {
 
     assert_eq!(active_ids, fixture.heap_fixture.active_resource_ids_hex);
     assert_eq!(consumed_ids, fixture.heap_fixture.consumed_resource_ids_hex);
-    assert_eq!(to_hex(proof.leaf_hash.as_ref()), fixture.heap_fixture.proof_leaf_hex);
-    assert_eq!(to_hex(proof.root.as_ref()), fixture.heap_fixture.proof_root_hex);
+    assert_eq!(
+        to_hex(proof.leaf_hash.as_ref()),
+        fixture.heap_fixture.proof_leaf_hex
+    );
+    assert_eq!(
+        to_hex(proof.root.as_ref()),
+        fixture.heap_fixture.proof_root_hex
+    );
     assert_eq!(
         to_hex(commitment.resource_root.as_ref()),
         fixture.heap_fixture.resource_root_hex
@@ -322,14 +363,26 @@ fn lean_heap_parity_matches_runtime_contract() {
         lean.heap_fixture.consumed_resource_ids_hex,
         fixture.heap_fixture.consumed_resource_ids_hex
     );
-    assert_eq!(lean.heap_fixture.proof_index as usize, fixture.heap_fixture.proof_index);
+    assert_eq!(
+        lean.heap_fixture.proof_index as usize,
+        fixture.heap_fixture.proof_index
+    );
     let lean_resource_proof = lean
         .heap_fixture
         .resource_proof
         .expect("Lean should return a resource proof");
-    assert_eq!(lean_resource_proof.leaf_hash_hex, fixture.heap_fixture.proof_leaf_hex);
-    assert_eq!(lean_resource_proof.root_hex, fixture.heap_fixture.proof_root_hex);
-    assert_eq!(lean_resource_proof.path.len(), fixture.heap_fixture.proof_path.len());
+    assert_eq!(
+        lean_resource_proof.leaf_hash_hex,
+        fixture.heap_fixture.proof_leaf_hex
+    );
+    assert_eq!(
+        lean_resource_proof.root_hex,
+        fixture.heap_fixture.proof_root_hex
+    );
+    assert_eq!(
+        lean_resource_proof.path.len(),
+        fixture.heap_fixture.proof_path.len()
+    );
     assert_eq!(lean_resource_proof.path[0].direction, "Right");
     assert_eq!(
         lean_resource_proof.path[0].sibling_hash_hex,

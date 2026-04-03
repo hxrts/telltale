@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use std::fs;
 use telltale_runtime::heap::{
-    nullifier_leaf_hash, resource_leaf_hash, DefaultHeapHasher, Direction, Heap,
-    HeapCommitment, MerkleTree, Resource, ResourceId,
+    nullifier_leaf_hash, resource_leaf_hash, DefaultHeapHasher, Direction, Heap, HeapCommitment,
+    MerkleTree, Resource, ResourceId,
 };
 
 #[derive(Debug, Deserialize)]
@@ -128,7 +128,10 @@ fn public_heap_vectors_match_reference_values() {
         to_hex(proof.leaf_hash.as_ref()),
         vectors.heap_fixture.proof_leaf_hex
     );
-    assert_eq!(to_hex(proof.root.as_ref()), vectors.heap_fixture.proof_root_hex);
+    assert_eq!(
+        to_hex(proof.root.as_ref()),
+        vectors.heap_fixture.proof_root_hex
+    );
     assert_eq!(proof.path.len(), vectors.heap_fixture.proof_path.len());
     assert_eq!(
         to_hex(resource_id.as_bytes()),

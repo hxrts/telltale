@@ -21,10 +21,7 @@ pub enum HeapParityRunnerError {
     ParseError(String),
     /// The Lean process timed out.
     #[error("Lean heap parity runner '{operation}' timed out after {timeout_ms}ms")]
-    TimedOut {
-        operation: String,
-        timeout_ms: u64,
-    },
+    TimedOut { operation: String, timeout_ms: u64 },
     /// IO error while invoking the process.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -132,7 +129,11 @@ impl HeapParityRunner {
         let start = Instant::now();
         loop {
             match child.try_wait()? {
-                Some(_) => return child.wait_with_output().map_err(HeapParityRunnerError::from),
+                Some(_) => {
+                    return child
+                        .wait_with_output()
+                        .map_err(HeapParityRunnerError::from)
+                }
                 None => {
                     if start.elapsed() >= timeout {
                         if let Err(err) = child.kill() {

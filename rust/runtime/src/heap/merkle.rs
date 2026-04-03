@@ -15,11 +15,10 @@
 //! `lean/Runtime/Resources/HeapModel.lean`.
 //! Digest computation remains Rust-side and is checked through published vectors.
 
-use super::heap_impl::Heap;
 use super::encoding::{
-    heap_commitment_preimage, merkle_node_preimage, nullifier_leaf_preimage,
-    resource_leaf_preimage,
+    heap_commitment_preimage, merkle_node_preimage, nullifier_leaf_preimage, resource_leaf_preimage,
 };
+use super::heap_impl::Heap;
 use super::resource::{Resource, ResourceId};
 use std::marker::PhantomData;
 use telltale_types::{DefaultContentHasher, Hasher};
@@ -63,12 +62,8 @@ impl<H: Hasher> MerkleProof<H> {
                 .iter()
                 .fold(self.leaf_hash.clone(), |current, step| {
                     match step.direction {
-                        Direction::Left => {
-                            merkle_node_hash::<H>(&step.sibling_hash, &current)
-                        }
-                        Direction::Right => {
-                            merkle_node_hash::<H>(&current, &step.sibling_hash)
-                        }
+                        Direction::Left => merkle_node_hash::<H>(&step.sibling_hash, &current),
+                        Direction::Right => merkle_node_hash::<H>(&current, &step.sibling_hash),
                     }
                 });
         computed_root == self.root
@@ -400,11 +395,10 @@ mod tests {
             "c8ff09f3959b1a2d654b86e29d8f12df277db70f05256f0e433bf26a6c98acb1"
         );
 
-        let sibling: [u8; 32] = from_hex(
-            "981652f6785b2e7147a3ba489d050f3924700e808b9a7b229470754507c5a13c",
-        )
-        .try_into()
-        .expect("32-byte test vector");
+        let sibling: [u8; 32] =
+            from_hex("981652f6785b2e7147a3ba489d050f3924700e808b9a7b229470754507c5a13c")
+                .try_into()
+                .expect("32-byte test vector");
         let root = merkle_node_hash::<DefaultContentHasher>(&resource_leaf, &sibling);
         assert_eq!(
             to_hex(root.as_ref()),
