@@ -70,81 +70,33 @@ That means `scheduler_concurrency = 1` and `worker_threads = 1` unless the scena
 `scheduler_concurrency` may change semantics.
 `worker_threads` must not change authoritative outputs for a fixed threaded scheduler configuration.
 
+### Theorem Profile
+
 `Scenario.theorem` is resolved separately from `Scenario.execution`.
-It carries:
-
-- `scheduler_profile`
-- `envelope_profile`
-- `assumption_bundle`
-
+It carries `scheduler_profile`, `envelope_profile`, and `assumption_bundle`.
 The resolved theorem profile is emitted in both `ScenarioStats` and `ScenarioReplayArtifact`.
-Its `eligibility` reports whether the run admits exact theorem-backed reporting, only envelope-bounded reporting, or no theorem-backed reporting under the declared profile.
+Its `eligibility` reports whether the run admits exact, envelope-bounded, or no theorem-backed reporting.
 
-`ScenarioStats.theorem_progress` adds the theorem-native quantitative summary:
+### Stats and Summaries
 
-- `initial_weighted_measure`
-- `initial_depth_budget`
-- `productive_step_count`
-- `remaining_weighted_measure`
-- `weighted_measure_consumed`
-- `critical_capacity`
+`ScenarioStats.theorem_progress` reports theorem-native quantities: `initial_weighted_measure`, `initial_depth_budget`, `productive_step_count`, `remaining_weighted_measure`, `weighted_measure_consumed`, and `critical_capacity`.
+These are intentionally distinct from raw counters such as queue length or observable-event count.
 
-These values are intentionally distinct from raw counters such as queue length, message count, or observable-event count.
-They summarize the run in the vocabulary of the weighted-measure and scheduling-bound proofs instead.
+`ScenarioStats.scheduler_profile` records `implementation_policy`, `theorem_profile`, `productive_exactness`, `total_step_mode`, `total_step_upper_bound`, `fairness_requirement`, and `envelope_status`.
+`ScenarioStats.reconfiguration_summary` reports `applied_operations`, `pure_operations`, `transition_operations`, and `transition_budget_consumed`.
+`ScenarioStats.adversary_summary` and `ScenarioStats.assumption_diagnostics` report adversary activation, budget consumption, and theorem-side assumption failures.
 
-`ScenarioStats.scheduler_profile` is the scheduler-facing companion report.
-It records:
+### Observability Comparison
 
-- `implementation_policy`
-- `theorem_profile`
-- `productive_exactness`
-- `total_step_mode`
-- `total_step_upper_bound`
-- `fairness_requirement`
-- `envelope_status`
-
-`ScenarioStats.reconfiguration_summary` is separate again.
-It reports:
-
-- `applied_operations`
-- `pure_operations`
-- `transition_operations`
-- `transition_budget_consumed`
-
-This keeps semantic topology/authority cutover accounting distinct from theorem-native descent and productive-step reporting.
-
-`ScenarioStats.adversary_summary` and `ScenarioStats.assumption_diagnostics` are separate again.
-They report:
-
-- how many adversaries were declared and activated
-- how much declared disturbance budget was consumed
-- which adversary budgets exhausted
-- which theorem-side assumption clauses failed, if any
-
-The raw replay artifact retains the full adversary program plus one budget-history record per activation, consumption, and exhaustion event.
-
-The analysis layer also exposes `compare_observability(...)`.
-That comparison reports one of three relations:
-
-- `exact_raw_match`
-- `equivalent_under_normalization`
-- `safety_visible_divergence`
-
+`compare_observability(...)` reports one of three relations: `exact_raw_match`, `equivalent_under_normalization`, or `safety_visible_divergence`.
 Normalization is order-insensitive over session-normalized observable events and canonical reconfiguration footprints.
-If two runs only differ by admissible exchange ordering or equivalent footprint-normalized cutover ordering, the report upgrades them to `equivalent_under_normalization`.
-If the normalized classes still differ, the comparison remains a safety-visible divergence.
 
-Offline theorem-facing checks live in the `decision` module rather than in the runner itself.
-Use that module for:
+### Decision Module
 
-- global well-formedness and coherence checks
-- async- and sync-subtyping checks
-- productive-step capacity predicates
-- theorem-profile eligibility before running the simulator
-
-These decision procedures return structured `DecisionReport` values with either a certificate or a counterexample object.
-They are distinct from empirical run analysis such as `theorem_progress`, `reconfiguration_summary`, or normalized observability comparison.
-The one intentional bridge is theorem eligibility: the same witness format is available both offline (`decide_theorem_eligibility(...)`) and from an executed run (`theorem_eligibility_from_result(...)`).
+Offline theorem-facing checks live in the `decision` module.
+It provides global well-formedness checks, subtyping checks, capacity predicates, and theorem-profile eligibility.
+These return structured `DecisionReport` values with either a certificate or a counterexample object.
+The same theorem-eligibility witness format is available both offline and from an executed run.
 
 ## Approximation Artifacts
 
@@ -190,34 +142,19 @@ pub trait HostAdapter {
 `FieldAdapter` derives initial states from built-in scenario field parameters and constructs the handler from `field`.
 The harness does not currently consume `GeneratedEffectScenario` directly.
 
-`SimulationHarness::run_batch(...)` and `run_batch_with(...)` run many `HarnessSpec` values concurrently.
-Batch results remain in the same order as the input slice.
-The default batch worker count is host parallelism outside CI and `1` in CI.
-`BatchRunResult.manifest` records one resolved theorem-profile entry per input spec, even when an individual run later fails.
-`SimulationHarness::run_sweep(...)` extends that batch lane into deterministic parameter sweeps.
-Current sweep axes include:
+### Batch and Sweep
 
-- `seed`
-- `capacity_budget`
-- `scheduler_profile`
-- `reconfiguration_program`
-- `adversary_budget`
+`run_batch(...)` and `run_batch_with(...)` run many `HarnessSpec` values concurrently while preserving result order.
+`BatchRunResult.manifest` records one resolved theorem-profile entry per input spec.
 
-Sweep expansion preserves deterministic input order.
-`SweepRunResult.manifest` records, per expanded run:
+`run_sweep(...)` extends batch execution into deterministic parameter sweeps over `seed`, `capacity_budget`, `scheduler_profile`, `reconfiguration_program`, and `adversary_budget`.
+`SweepRunResult.manifest` records parameter bindings, theorem profiles, eligibility witnesses, and capacity-predicate reports per expanded run.
+Use `compare_sweep_results(...)` to diff experiment families by theorem eligibility and productive-step deltas.
 
-- explicit parameter bindings
-- resolved theorem profiles
-- resolved scheduler profiles when execution succeeded
-- theorem-eligibility witnesses
-- capacity-predicate reports when a capacity budget axis is present
-- per-run execution errors without collapsing the manifest layout
+### Distributed Simulation
 
-Use `compare_sweep_results(...)` to diff two experiment families by theorem eligibility, productive-step deltas, and assumption-diagnostic changes rather than comparing ad hoc logs.
-
-Distributed simulation uses a different execution vocabulary.
 `DistributedSimBuilder::execution_contract(...)` accepts a `NestedExecutionContract` for outer scheduler concurrency plus inner rounds-per-step.
-That outer/inner VM contract is part of simulation semantics, not just a worker-pool tuning knob.
+That outer/inner VM contract is part of simulation semantics, not a worker-pool tuning knob.
 
 ## Initial State Derivation
 

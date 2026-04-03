@@ -122,7 +122,9 @@ An adversary must not set more than one trigger field at once.
 The parser rejects multi-trigger declarations.
 `Trigger::AfterStep` is evaluated against logical round count rather than raw tick count.
 
-Every adversary must also declare a budget:
+### Adversary Budgets
+
+Every adversary must declare a budget.
 
 ```rust
 pub struct AdversarySpec {
@@ -134,15 +136,8 @@ pub struct AdversarySpec {
 ```
 
 `budget.total` is the total disturbance or activation budget.
-`budget.mode` can be:
-
-- `activation` for one-shot activation budgeting such as crashes
-- `independent` for per-message Bernoulli disturbance
-- `windowed` for per-window correlated quotas
-- `correlated` for burst-style correlated disturbance windows
-
+`budget.mode` can be `activation` (one-shot), `independent` (per-message Bernoulli), `windowed` (per-window correlated quotas), or `correlated` (burst-style windows).
 `budget.assumption_failure` optionally states which theorem-side clause should fail if the budget exhausts.
-If omitted, the simulator derives a default based on the adversary action family.
 
 Use adversaries for transport disruption and runtime failure only.
 Do not encode topology change, handoff, federation cutover, or mode change as adversaries.
@@ -215,18 +210,11 @@ Predicate strings are parsed by `parse_predicate`.
 When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
 Replay loads a checkpoint and re-executes the same shared middleware loop used by fresh scenario runs.
 
-Scenario replay artifacts also retain:
-
-- the resolved adversary schedule
-- adversary budget-consumption history
-- assumption-bundle diagnostics
-- the canonical reconfiguration trace
+Scenario replay artifacts also retain the resolved adversary schedule, budget-consumption history, assumption diagnostics, and the canonical reconfiguration trace.
 
 Checkpoint snapshots currently require the canonical backend.
-Threaded scenario runs still emit replay artifacts such as observable events, effect traces, and semantic objects, but checkpoint serialization remains canonical-only.
-
-Checkpoint persistence is best-effort.
-Serialization or file-write failures do not fail the run.
+Threaded scenario runs still emit replay artifacts but checkpoint serialization remains canonical-only.
+Checkpoint persistence is best-effort: serialization or file-write failures do not fail the run.
 `CheckpointStore::last_persist_error()` exposes the last recorded persistence error.
 
 ## Current Limits

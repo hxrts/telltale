@@ -15,21 +15,16 @@ A `FieldModel` supplies:
 - a `Box<dyn EffectHandler>` via `build_handler()`
 - default per-role initial states via `derive_initial_states(roles)`
 
-The built-in scenario schema can use the narrower serde-tagged `FieldSpec` catalog through `Scenario.field`.
-Current built-in families are:
+The built-in scenario schema uses the serde-tagged `FieldSpec` catalog through `Scenario.field`.
+Current built-in families are `mean_field`, `hamiltonian`, and `continuum_field`.
 
-- `mean_field`
-- `hamiltonian`
-- `continuum_field`
+### Adapter Integration
 
 Use `FieldAdapter::from_scenario(...)` when built-in scenario field parameters should drive handler construction and default state derivation.
 Use `FieldAdapter::new(...)` or `FieldAdapter::from_boxed_model(...)` when a host integration wants the harness to own a custom `FieldModel`.
-The harness helpers are:
+The harness provides `derive_initial_states(&Scenario)` for the built-in schema and `derive_initial_states_for_field_model(&dyn FieldModel, roles)` for arbitrary implementations.
 
-- `derive_initial_states(&Scenario)` for the built-in scenario schema
-- `derive_initial_states_for_field_model(&dyn FieldModel, roles)` for arbitrary field-model implementations
-
-Simulator field handlers still implement deterministic `EffectHandler::step` updates over fixed-point state.
+Simulator field handlers implement deterministic `EffectHandler::step` updates over fixed-point state.
 The runner stores field state in coroutine registers starting at register `2`.
 
 ## Environment Boundary
@@ -44,23 +39,14 @@ The shared execution core now accepts:
 - `LinkAdmissionModel`
 
 These hooks all receive the same `EnvironmentSnapshot` each round.
-That snapshot exposes current tick, logical step, participating roles, current built-in field layer, field-backed node state, node poses, node capabilities, and potential links.
-The shared execution core emits one canonical `EnvironmentTrace` of `EnvironmentArtifact` records for:
+That snapshot exposes current tick, logical step, participating roles, field-backed node state, node poses, node capabilities, and potential links.
+The shared execution core emits one canonical `EnvironmentTrace` of `EnvironmentArtifact` records for mobility updates, capability snapshots, reachability decisions, admission outcomes, and medium outcomes.
 
-- mobility updates
-- capability snapshots
-- reachability decisions
-- admission rejections or approvals
-- medium outcomes such as delay, corruption, collision, contention, or drop
-
-This is the supported extension seam for downstream domain models such as radio, geometry, or device-capability simulation.
-Vertical-specific logic belongs in downstream crates/projects, not in the core simulator schema.
+### Extension Configuration
 
 `Scenario.extensions` is the generic config hook for domain-owned environment configuration.
-It is a namespaced map of arbitrary TOML values so external projects can carry their own environment config without adding Bluetooth-, QUIC-, or other vertical-specific fields to core `Scenario`.
-
-The current crate boundary decision is to keep generic geometry/radio helpers out of `telltale-simulator` itself.
-If shared helpers become worthwhile later, they should live in a separate optional crate with domain-neutral names and interfaces.
+It is a namespaced map of arbitrary TOML values so external projects can carry their own config without adding vertical-specific fields to core `Scenario`.
+Vertical-specific logic belongs in downstream crates, not in the core simulator schema.
 
 ## Lean Mirror
 

@@ -9,45 +9,41 @@ Detailed behavior lives in the focused pages linked below.
 The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
-Simulator-visible topology and authority change now use a separate first-class reconfiguration program rather than fault-event encodings.
+
+### Field and Environment Models
 
 Fields are the simulator's abstraction for deterministic environment-dynamics evolution.
 A field model defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`, how an effect handler is constructed, and how default per-role initial states are derived.
 This keeps protocol structure separate from model-specific dynamics.
 
 The simulator-facing abstraction is `FieldModel` in `rust/simulator/src/field.rs`.
-The scenario file format can optionally use the built-in `FieldSpec` enum as a serde-tagged catalog for shipped field families.
-`FieldSpec` implements `FieldModel`, but custom Rust integrations may implement `FieldModel` directly without modifying the scenario schema.
+`FieldSpec` is the built-in serde-tagged catalog for shipped field families.
+Custom Rust integrations may implement `FieldModel` directly without modifying the scenario schema.
 
-Topology, medium behavior, mobility, capability limits, and link admission now live beside that field layer as separate environment hooks.
-The shared execution core consumes `EnvironmentSnapshot`, emits `EnvironmentTrace`, and accepts external `TopologyModel`, `MediumModel`, `MobilityModel`, `NodeCapabilityModel`, and `LinkAdmissionModel` implementations without baking domain-specific naming into core `Scenario`.
+Topology, medium behavior, mobility, capability limits, and link admission live beside the field layer as separate environment hooks.
+The shared execution core consumes `EnvironmentSnapshot`, emits `EnvironmentTrace`, and accepts external model implementations without baking domain-specific naming into core `Scenario`.
 
-The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `FieldAdapter`.
-Execution policy is now explicit through `Scenario.execution`.
-This separates backend choice from scheduler policy, scheduler concurrency, and worker-thread count.
+### Execution and Theorem Profiles
+
+The primary integration path is `SimulationHarness` with either `DirectAdapter` or `FieldAdapter`.
+Execution policy is explicit through `Scenario.execution`, which separates backend choice from scheduler policy, scheduler concurrency, and worker-thread count.
 The default `auto` policy resolves to the authoritative canonical execution lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
-Throughput-oriented parallelism remains available through explicit threaded execution settings and through batch execution.
 
 The simulator also exposes a separate theorem/profile layer through `Scenario.theorem`.
 This layer records scheduler profile, envelope profile, and transport/adversary assumption bundle independently of raw execution settings.
 That separation lets one execution be interpreted under different theorem-side contracts without changing the runtime behavior itself.
 
-When theorem-indexed reporting is enabled, `ScenarioStats` also includes a theorem-native progress summary.
-That summary reports weighted progress potential, productive communication count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification separately from raw transport counters.
-Reconfiguration accounting is reported separately again through `ScenarioStats.reconfiguration_summary` so pure reconfiguration and budget-consuming transition choreography do not get mixed into the descent/progress quantities.
-Budgeted disturbance accounting is reported through `ScenarioStats.adversary_summary` and `ScenarioStats.assumption_diagnostics`.
-Replay artifacts also retain the resolved adversary program and budget-consumption history so theorem-side assumption failures are inspectable after the fact.
-`ScenarioResult.analysis.normalized_observability` provides the companion envelope-aware analysis view.
-It keeps canonical raw replay unchanged while exposing a normalized behavior class for order-insensitive and footprint-aware comparison.
+### Reporting and Analysis
 
-Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
-They are not yet wired into the main harness execution path.
-The simulator also now exposes a separate `decision` module for offline theorem-facing checks.
-That layer returns structured certificates and counterexamples for coherence, subtyping, capacity predicates, and theorem-profile eligibility instead of boolean-only pass/fail answers.
-An explicit `approximation` module now sits beside the authoritative runner as well.
-Approximation artifacts are separate from replay artifacts and must declare an approximation family, theorem-side scope, and explicit non-goals.
-Current families are `batched_stochastic`, `mean_field`, and `continuum_field`.
-`mean_field` and `continuum_field` can be theorem-backed when the scenario field layer and theorem profile line up; `batched_stochastic` may also be declared as empirical-only when no theorem-side claim is intended.
+`ScenarioStats` includes theorem-native progress, reconfiguration accounting, and adversary budget summaries as separate fields.
+Replay artifacts retain the resolved adversary program and budget-consumption history so theorem-side assumption failures are inspectable after the fact.
+`ScenarioResult.analysis.normalized_observability` provides the companion envelope-aware analysis view for order-insensitive and footprint-aware comparison.
+
+### Decision and Approximation Modules
+
+The `decision` module provides offline theorem-facing checks that return structured certificates and counterexamples for coherence, subtyping, capacity predicates, and theorem-profile eligibility.
+The `approximation` module provides non-authoritative analysis runs for `batched_stochastic`, `mean_field`, and `continuum_field` families.
+Approximation artifacts declare an approximation family, theorem-side scope, and explicit non-goals.
 
 ## Quick Start
 
@@ -68,31 +64,28 @@ Use `FieldAdapter::from_scenario(...)` when built-in scenario field parameters s
 Use `FieldAdapter::new(...)` or `FieldAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `FieldModel`.
 If the host adapter supplies initial states directly, the base `Scenario` does not need built-in field params at all.
 
-`SimulationHarness` also supports deterministic batched execution through `run_batch(...)` and `run_batch_with(...)`.
-Batch execution parallelizes independent runs while preserving result order by input index.
-Unlike single-run `auto` execution, batch worker defaults are still throughput-oriented: host parallelism outside CI and `1` in CI.
-Batch results now also carry a theorem-profile manifest in input order so batch tooling can inspect resolved theorem classifications without unpacking each successful run first.
-For larger experiment families, `SimulationHarness::run_sweep(...)` expands one base `HarnessSpec` into a deterministic sweep over seeds, theorem scheduler profiles, reconfiguration programs, adversary budgets, and theorem-capacity budgets.
-Sweep results emit a richer manifest with parameter bindings, theorem eligibility witnesses, capacity-predicate reports, scheduler profiles, and preserved authoritative input ordering.
+### Batch and Sweep Execution
 
-Distributed simulation has a separate outer/inner execution surface.
-`DistributedSimBuilder` now accepts one explicit `NestedExecutionContract` describing outer scheduler concurrency and inner rounds-per-step.
+`SimulationHarness` supports batched execution through `run_batch(...)` and `run_batch_with(...)`.
+Batch execution parallelizes independent runs while preserving result order by input index.
+Batch results carry a theorem-profile manifest so batch tooling can inspect resolved theorem classifications without unpacking each run.
+
+`SimulationHarness::run_sweep(...)` expands one base `HarnessSpec` into a deterministic sweep over seeds, scheduler profiles, reconfiguration programs, adversary budgets, and capacity budgets.
+Sweep results emit a manifest with parameter bindings, theorem eligibility witnesses, and capacity-predicate reports.
+
+### Distributed Simulation
+
+`DistributedSimBuilder` accepts one explicit `NestedExecutionContract` describing outer scheduler concurrency and inner rounds-per-step.
 That nested-VM contract is distinct from worker-thread count and other performance-only parallelism controls.
 
 ## Generated Effect Helpers
 
 The simulator also exposes generated effect-family helper types under `telltale_simulator::generated`, such as `GeneratedEffectScenario`.
-These APIs are useful when a project wants to script semantic outcomes for exported effect operations.
 Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
-They currently sit beside the harness API rather than inside it.
+These APIs currently sit beside the harness API rather than inside it.
 
-Scenario replay artifacts now also retain a canonical `reconfiguration_trace`.
-That trace is shared across fresh runs, replay, and post-run analysis tooling so link cutovers, federation updates, handoffs, delegation, and mode transitions all use one simulator-facing representation.
-Normalized comparison lives beside replay rather than inside it.
+Scenario replay artifacts retain a canonical `reconfiguration_trace` shared across fresh runs, replay, and post-run analysis.
 The helper `compare_observability(...)` reports `exact_raw_match`, `equivalent_under_normalization`, or `safety_visible_divergence`.
-
-Use this lane when a downstream integration layer needs effect-centric fixtures.
-Do not document it as the default `SimulationHarness` workflow unless that wiring is added.
 
 ## Document Map
 
@@ -109,6 +102,8 @@ Use the simulator runner binary through `just` for CI-friendly JSON output.
 ```text
 just sim-run artifacts/sim_integration.toml
 ```
+
+This command runs one scenario through the simulator entrypoint and emits the same authoritative artifacts the harness APIs produce.
 
 ## Related Docs
 
