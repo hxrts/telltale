@@ -30,7 +30,7 @@ Choose the handler surface by integration level.
 
 Projects that implement `EffectHandler` should validate behavior in `telltale-simulator`.
 Use `SimulationHarness` with `DirectAdapter` for host handlers.
-Use `MaterialAdapter` when the scenario should select the handler from material parameters.
+Use `FieldAdapter` when the scenario should select the handler from built-in field parameters.
 
 ```rust
 let adapter = DirectAdapter::new(&handler);

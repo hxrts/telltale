@@ -2,10 +2,10 @@ name = "mean_field_ising"
 roles = ["A", "B"]
 steps = 1000
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = 0.5
 species = ["up", "down"]
 initial_state = [0.6, 0.4]

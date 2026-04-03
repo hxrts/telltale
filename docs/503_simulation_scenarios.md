@@ -7,7 +7,7 @@ It covers the TOML schema, budgeted adversary declarations, first-class reconfig
 
 `Scenario` is parsed from TOML and drives `run_with_scenario(...)`.
 `seed` defaults to `0`.
-`material` is optional and is only required by built-in material-driven surfaces such as `MaterialAdapter::from_scenario(...)`, `derive_initial_states(&Scenario)`, and the simulator CLI binaries.
+`field` is optional and is only required by built-in field-driven surfaces such as `FieldAdapter::from_scenario(...)`, `derive_initial_states(&Scenario)`, and the simulator CLI binaries.
 Execution defaults are resolved through `Scenario.execution`.
 `backend = "auto"` resolves to the authoritative canonical lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
 Theorem-facing interpretation is configured separately through `Scenario.theorem`.
@@ -20,16 +20,17 @@ pub struct Scenario {
     pub execution: ExecutionSpec,
     pub seed: u64,
     pub network: Option<NetworkSpec>,
-    pub material: Option<MaterialParams>,
+    pub field: Option<FieldSpec>,
     pub reconfigurations: Vec<ReconfigurationSpec>,
     pub adversaries: Vec<AdversarySpec>,
     pub properties: Option<PropertiesSpec>,
     pub checkpoint_interval: Option<u64>,
     pub theorem: TheoremProfileSpec,
+    pub extensions: BTreeMap<String, toml::Value>,
 }
 ```
 
-`network`, `material`, `reconfigurations`, `adversaries`, `properties`, and `checkpoint_interval` are optional.
+`network`, `field`, `reconfigurations`, `adversaries`, `properties`, `checkpoint_interval`, and `extensions` are optional.
 
 ```rust
 pub struct ExecutionSpec {
@@ -77,10 +78,10 @@ scheduler_policy = "round_robin"
 scheduler_concurrency = 2
 worker_threads = 4
 
-[material]
+[field]
 layer = "mean_field"
 
-[material.params]
+[field.params]
 beta = "1.5"
 species = ["up", "down"]
 initial_state = ["0.6", "0.4"]
@@ -145,6 +146,14 @@ If omitted, the simulator derives a default based on the adversary action family
 
 Use adversaries for transport disruption and runtime failure only.
 Do not encode topology change, handoff, federation cutover, or mode change as adversaries.
+
+## Environment Extensions
+
+`Scenario.extensions` is a domain-neutral namespace map for downstream environment config.
+Core `telltale-simulator` does not interpret those values directly.
+Instead a `HostAdapter` may inspect one namespace, build external environment models, and return them through `HostAdapter::environment_models(...)`.
+
+This is the supported path for downstream projects that need geometry, radio, mobility, or device-capability config without adding vertical-specific fields to core `Scenario`.
 
 ## Reconfiguration Program
 
@@ -230,4 +239,4 @@ They are also not yet wired into `SimulationHarness`.
 
 - [Protocol-Machine Simulation](501_simulation_overview.md)
 - [Protocol-Machine Simulation Runner](502_simulation_runner.md)
-- [Protocol-Machine Simulation Materials](504_simulation_materials.md)
+- [Protocol-Machine Simulation Fields](504_simulation_fields.md)

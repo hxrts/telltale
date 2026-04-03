@@ -2,10 +2,10 @@ name = "continuum_field_2site"
 roles = ["A", "B"]
 steps = 1000
 
-[material]
+[field]
 layer = "continuum_field"
 
-[material.params]
+[field.params]
 coupling = 1.0
 components = 1
 initial_fields = [1.0, 0.0]

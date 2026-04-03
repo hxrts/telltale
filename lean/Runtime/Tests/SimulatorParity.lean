@@ -29,9 +29,9 @@ private def lookupState (states : InitialStates) (role : String) : IO (List Scal
 private def eps : Scalar :=
   (1 : Scalar) / 1_000_000
 
-/-- Executable parity fixtures mirroring Rust material-handler parity tests. -/
+/-- Executable parity fixtures mirroring Rust field-handler parity tests. -/
 def main : IO Unit := do
-  let meanFieldCatalog : MaterialParams :=
+  let meanFieldCatalog : FieldParams :=
     .meanField
       { beta := (3 : Scalar) / 2
       , species := ["up", "down"]
@@ -39,11 +39,11 @@ def main : IO Unit := do
       , stepSize := (1 : Scalar) / 100
       }
   let isingEqOut ← unwrapResult <|
-    (handlerFromMaterial meanFieldCatalog).step {} [1 / 2, 1 / 2]
+    (handlerFromField meanFieldCatalog).step {} [1 / 2, 1 / 2]
   expect (listApproxEq eps isingEqOut [1 / 2, 1 / 2])
     "ising equilibrium fixture mismatch"
 
-  let isingZeroBeta : MaterialParams :=
+  let isingZeroBeta : FieldParams :=
     .meanField
       { beta := 0
       , species := ["up", "down"]
@@ -51,11 +51,11 @@ def main : IO Unit := do
       , stepSize := (1 : Scalar) / 10
       }
   let isingZeroOut ← unwrapResult <|
-    (handlerFromMaterial isingZeroBeta).step {} [3 / 5, 2 / 5]
+    (handlerFromField isingZeroBeta).step {} [3 / 5, 2 / 5]
   expect (listApproxEq eps isingZeroOut [29 / 50, 21 / 50])
     "ising zero-beta drift fixture mismatch"
 
-  let hamCatalog : MaterialParams :=
+  let hamCatalog : FieldParams :=
     .hamiltonian
       { springConstant := 1
       , mass := 1
@@ -64,7 +64,7 @@ def main : IO Unit := do
       , initialMomenta := [0, 0]
       , stepSize := (1 : Scalar) / 100
       }
-  let hamHandler := handlerFromMaterial hamCatalog
+  let hamHandler := handlerFromField hamCatalog
   let hamPhase0 ← unwrapResult <|
     hamHandler.step { phase := 0, peerState := [-1] } [1, 0]
   expect (decide (hamPhase0 = [1, 0]))
@@ -75,14 +75,14 @@ def main : IO Unit := do
   expect (listApproxEq eps hamPhase3 [9999 / 10000, (-39999 : Scalar) / 2_000_000])
     "hamiltonian leapfrog fixture mismatch"
 
-  let continuumCatalog : MaterialParams :=
+  let continuumCatalog : FieldParams :=
     .continuumField
       { coupling := 1
       , components := 1
       , initialFields := [1, 0]
       , stepSize := (1 : Scalar) / 10
       }
-  let continuumHandler := handlerFromMaterial continuumCatalog
+  let continuumHandler := handlerFromField continuumCatalog
   let contPhase0 ← unwrapResult <|
     continuumHandler.step { phase := 0, peerState := [0] } [1]
   expect (decide (contPhase0 = [1]))
@@ -101,7 +101,7 @@ def main : IO Unit := do
     "continuum layer name mismatch"
 
   let derivedStates ← unwrapStates <|
-    deriveInitialStatesFromMaterial hamCatalog ["A", "B"]
+    deriveInitialStatesFromField hamCatalog ["A", "B"]
   let stateA ← lookupState derivedStates "A"
   let stateB ← lookupState derivedStates "B"
   expect (decide (stateA = [1, 0]))

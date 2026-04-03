@@ -147,10 +147,10 @@ Simulation utilities built on the protocol machine.
 Key exports:
 
 - Harness surface in `rust/simulator/src/harness.rs`:
-  `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, `SimulationHarness`,
+  `HostAdapter`, `DirectAdapter`, `FieldAdapter`, `HarnessSpec`, `HarnessConfig`, `SimulationHarness`,
   `BatchConfig`, `BatchRunResult`
-  `MaterialAdapter::from_scenario(...)` requires built-in scenario material params.
-  Generic harness runs may omit `Scenario.material` when the adapter supplies its own initial states.
+  `FieldAdapter::from_scenario(...)` requires built-in scenario field params.
+  Generic harness runs may omit `Scenario.field` when the adapter supplies its own initial states or environment models.
   `SimulationHarness::run_batch(...)` and `run_batch_with(...)` preserve input-order results while parallelizing independent runs.
 
 Module access (not re-exported at crate root):
@@ -161,9 +161,9 @@ Module access (not re-exported at crate root):
 - Contract checks in `rust/simulator/src/contracts.rs`:
   `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
 - Preset helpers in `rust/simulator/src/presets.rs`
-- Material handlers and factory:
-  `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, `handler_from_material`
-  in `rust/simulator/src/material_handlers/`
+- Field handlers and factory:
+  `IsingHandler`, `HamiltonianHandler`, `ContinuumFieldHandler`, `handler_from_field`
+  in `rust/simulator/src/field_handlers/`
 
 ### `telltale-bridge`
 

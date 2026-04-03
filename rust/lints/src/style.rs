@@ -53,8 +53,8 @@ fn scan_blocking_lock_boundaries(file: &Path, source: &str) -> Vec<String> {
         "rust/machine/src/effect/runtime_types.rs",
         "rust/simulator/src/network.rs",
         "rust/simulator/src/fault.rs",
-        "rust/simulator/src/material_handlers/continuum.rs",
-        "rust/simulator/src/material_handlers/hamiltonian.rs",
+        "rust/simulator/src/field_handlers/continuum.rs",
+        "rust/simulator/src/field_handlers/hamiltonian.rs",
     ];
     const BLOCKED_PATTERNS: &[&str] = &[
         "std::sync::Mutex",

@@ -418,15 +418,15 @@ On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints` provi
 | Certified-wave fallback | `executeCertifiedRound` | `threaded.rs` wave certificate check with one-step fallback | Aligned |
 | `n > 1` envelope-bounded parity | `ThreadedRoundRefinementPremises` (premise-scoped) | `parity_fixtures_v2.rs::envelope_bounded_parity_holds_for_n_gt_1` | Aligned under envelope contract |
 
-## Simulator Material Mirror
+## Simulator Field Mirror
 
-Lean includes executable mirror dynamics for simulator material handlers under `lean/Runtime/Simulation/`. Rust material handlers live under `rust/simulator/src/material_handlers/`.
-The mirror now includes a Lean-native material-model boundary in `lean/Runtime/Simulation/Material.lean`, including built-in catalog dispatch and default initial-state derivation for shipped material families.
+Lean includes executable mirror dynamics for simulator field handlers under `lean/Runtime/Simulation/`. Rust field handlers live under `rust/simulator/src/field_handlers/`.
+The mirror now includes a Lean-native field-model boundary in `lean/Runtime/Simulation/Field.lean`, including built-in catalog dispatch and default initial-state derivation for shipped field families.
 It remains an executable parity layer, not a mirror of Rust trait objects or serde-based scenario parsing.
 
 Parity fixtures are enforced by:
 
-- `rust/simulator/tests/material_handler_parity.rs`
+- `rust/simulator/tests/field_handler_parity.rs`
 - `lean/Runtime/Tests/SimulatorParity.lean` (built as `simulator_parity_tests`)
 
 ## Lean Module Boundaries

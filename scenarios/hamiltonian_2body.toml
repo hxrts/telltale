@@ -2,10 +2,10 @@ name = "hamiltonian_2body"
 roles = ["A", "B"]
 steps = 1000
 
-[material]
+[field]
 layer = "hamiltonian"
 
-[material.params]
+[field.params]
 spring_constant = 1.0
 mass = 1.0
 dimensions = 1

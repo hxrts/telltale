@@ -11,15 +11,18 @@ It adds deterministic middleware for budgeted adversaries, network behavior, pro
 It also provides a harness API for external integration testing.
 Simulator-visible topology and authority change now use a separate first-class reconfiguration program rather than fault-event encodings.
 
-Materials are the simulator's abstraction for domain state evolution.
-A material model defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`, how an effect handler is constructed, and how default per-role initial states are derived.
+Fields are the simulator's abstraction for deterministic environment-dynamics evolution.
+A field model defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`, how an effect handler is constructed, and how default per-role initial states are derived.
 This keeps protocol structure separate from model-specific dynamics.
 
-The simulator-facing abstraction is `MaterialModel` in `rust/simulator/src/material.rs`.
-The scenario file format can optionally use the built-in `MaterialParams` enum as a serde-tagged catalog for shipped material families.
-`MaterialParams` implements `MaterialModel`, but custom Rust integrations may implement `MaterialModel` directly without modifying the scenario schema.
+The simulator-facing abstraction is `FieldModel` in `rust/simulator/src/field.rs`.
+The scenario file format can optionally use the built-in `FieldSpec` enum as a serde-tagged catalog for shipped field families.
+`FieldSpec` implements `FieldModel`, but custom Rust integrations may implement `FieldModel` directly without modifying the scenario schema.
 
-The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
+Topology, medium behavior, mobility, capability limits, and link admission now live beside that field layer as separate environment hooks.
+The shared execution core consumes `EnvironmentSnapshot`, emits `EnvironmentTrace`, and accepts external `TopologyModel`, `MediumModel`, `MobilityModel`, `NodeCapabilityModel`, and `LinkAdmissionModel` implementations without baking domain-specific naming into core `Scenario`.
+
+The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `FieldAdapter`.
 Execution policy is now explicit through `Scenario.execution`.
 This separates backend choice from scheduler policy, scheduler concurrency, and worker-thread count.
 The default `auto` policy resolves to the authoritative canonical execution lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
@@ -44,14 +47,14 @@ That layer returns structured certificates and counterexamples for coherence, su
 An explicit `approximation` module now sits beside the authoritative runner as well.
 Approximation artifacts are separate from replay artifacts and must declare an approximation family, theorem-side scope, and explicit non-goals.
 Current families are `batched_stochastic`, `mean_field`, and `continuum_field`.
-`mean_field` and `continuum_field` can be theorem-backed when the scenario material and theorem profile line up; `batched_stochastic` may also be declared as empirical-only when no theorem-side claim is intended.
+`mean_field` and `continuum_field` can be theorem-backed when the scenario field layer and theorem profile line up; `batched_stochastic` may also be declared as empirical-only when no theorem-side claim is intended.
 
 ## Quick Start
 
 Use `SimulationHarness` with a `HostAdapter` implementation and a `HarnessSpec`.
 
 ```rust
-let adapter = MaterialAdapter::from_scenario(&spec.scenario)?;
+let adapter = FieldAdapter::from_scenario(&spec.scenario)?;
 let harness = SimulationHarness::new(&adapter);
 let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
@@ -61,9 +64,9 @@ This path runs protocol-machine execution, scenario middleware, replay capture, 
 It is the recommended integration lane for external projects.
 
 Use `DirectAdapter` when the host already owns the `EffectHandler`.
-Use `MaterialAdapter::from_scenario(...)` when built-in scenario material parameters should construct the handler and initial states.
-Use `MaterialAdapter::new(...)` or `MaterialAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `MaterialModel`.
-If the host adapter supplies initial states directly, the base `Scenario` does not need built-in material params at all.
+Use `FieldAdapter::from_scenario(...)` when built-in scenario field parameters should construct the handler and initial states.
+Use `FieldAdapter::new(...)` or `FieldAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `FieldModel`.
+If the host adapter supplies initial states directly, the base `Scenario` does not need built-in field params at all.
 
 `SimulationHarness` also supports deterministic batched execution through `run_batch(...)` and `run_batch_with(...)`.
 Batch execution parallelizes independent runs while preserving result order by input index.
@@ -97,7 +100,7 @@ Use these pages for detailed behavior.
 
 - [Protocol-Machine Simulation Runner](502_simulation_runner.md)
 - [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
-- [Protocol-Machine Simulation Materials](504_simulation_materials.md)
+- [Protocol-Machine Simulation Fields](504_simulation_fields.md)
 
 ## CLI
 

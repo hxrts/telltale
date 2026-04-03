@@ -402,7 +402,7 @@ check_suite() {
   run_check "simulator lean-reference parity suite" \
     "cargo test -p telltale-simulator --test lean_reference_parity"
   run_check "simulator material parity fixtures (Rust handlers)" \
-    "cargo test -p telltale-simulator --test material_handler_parity"
+    "cargo test -p telltale-simulator --test field_handler_parity"
   run_check "simulator material parity fixtures (Lean mirror)" \
     "lake --dir lean build simulator_parity_tests && ./lean/.lake/build/bin/simulator_parity_tests"
   run_check "heap parity fixtures (Lean mirror)" \

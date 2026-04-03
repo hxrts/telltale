@@ -30,9 +30,9 @@ pub struct ScenarioResult {
 
 `step` is a simulator sampling index.
 `state` contains the numeric portion of the coroutine register file.
-The runner skips the first two reserved registers and samples material state starting at register `2`.
+The runner skips the first two reserved registers and samples field-backed state starting at register `2`.
 
-`ScenarioReplayArtifact` contains the resolved adversary schedule, adversary budget-consumption history, assumption diagnostics, observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, and a canonical simulator reconfiguration trace.
+`ScenarioReplayArtifact` contains the resolved adversary schedule, adversary budget-consumption history, assumption diagnostics, observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, a canonical simulator reconfiguration trace, and a canonical `EnvironmentTrace`.
 These artifacts support deterministic replay and post-run validation.
 
 `ScenarioResult.analysis.normalized_observability` is the companion analysis view.
@@ -179,13 +179,15 @@ pub trait HostAdapter {
     fn effect_handler(&self) -> &dyn EffectHandler;
     fn initial_states(&self, scenario: &Scenario)
         -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String>;
+    fn environment_models(&self, scenario: &Scenario)
+        -> Result<Option<EnvironmentModels<'_>>, String>;
     fn validate_result(&self, scenario: &Scenario, result: &ScenarioResult)
         -> Result<(), String>;
 }
 ```
 
 `DirectAdapter` wraps an existing `EffectHandler`.
-`MaterialAdapter` derives initial states from built-in scenario material parameters and constructs the handler from `material`.
+`FieldAdapter` derives initial states from built-in scenario field parameters and constructs the handler from `field`.
 The harness does not currently consume `GeneratedEffectScenario` directly.
 
 `SimulationHarness::run_batch(...)` and `run_batch_with(...)` run many `HarnessSpec` values concurrently.
@@ -219,13 +221,13 @@ That outer/inner VM contract is part of simulation semantics, not just a worker-
 
 ## Initial State Derivation
 
-`derive_initial_states(&Scenario)` builds default per-role state vectors from built-in `material` when present.
+`derive_initial_states(&Scenario)` builds default per-role state vectors from built-in `field` when present.
 `mean_field` broadcasts one concentration vector to every role.
 `hamiltonian` maps each role index to `[position, momentum]`.
 `continuum_field` assigns one scalar field value per role.
 
-The generic harness path does not require scenario materials.
-If a `HostAdapter` returns explicit initial states, the simulator never consults the built-in material catalog.
+The generic harness path does not require scenario field data.
+If a `HostAdapter` returns explicit initial states, the simulator never consults the built-in field catalog.
 
 The runner writes these state vectors into coroutine registers starting at register `2`.
 The sampled trace reads the same numeric suffix back out.
@@ -281,5 +283,5 @@ They do not replace canonical replay traces.
 
 - [Protocol-Machine Simulation](501_simulation_overview.md)
 - [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
-- [Protocol-Machine Simulation Materials](504_simulation_materials.md)
+- [Protocol-Machine Simulation Fields](504_simulation_fields.md)
 - [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
