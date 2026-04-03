@@ -19,6 +19,11 @@ The scenario file format can optionally use the built-in `MaterialParams` enum a
 `MaterialParams` implements `MaterialModel`, but custom Rust integrations may implement `MaterialModel` directly without modifying the scenario schema.
 
 The primary integration path today is `SimulationHarness` with either `DirectAdapter` or `MaterialAdapter`.
+Execution policy is now explicit through `Scenario.execution`.
+This separates backend choice from scheduler concurrency and worker-thread count.
+The default `auto` policy uses threaded execution outside CI when the simulator is built with the threaded machine feature.
+In CI, the same `auto` policy resolves to serialized canonical execution.
+
 Generated effect-family helpers exist as adjacent APIs for integration layers and test fixtures.
 They are not yet wired into the main harness execution path.
 
@@ -40,6 +45,10 @@ Use `DirectAdapter` when the host already owns the `EffectHandler`.
 Use `MaterialAdapter::from_scenario(...)` when built-in scenario material parameters should construct the handler and initial states.
 Use `MaterialAdapter::new(...)` or `MaterialAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `MaterialModel`.
 If the host adapter supplies initial states directly, the base `Scenario` does not need built-in material params at all.
+
+`SimulationHarness` also supports deterministic batched execution through `run_batch(...)` and `run_batch_with(...)`.
+Batch execution parallelizes independent runs while preserving result order by input index.
+Like single-run `auto` execution, the default batch worker count is host parallelism outside CI and `1` in CI.
 
 ## Generated Effect Helpers
 

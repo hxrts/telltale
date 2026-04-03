@@ -6,15 +6,17 @@ It covers the TOML schema, fault injection, network modeling, properties, checkp
 ## Scenario Schema
 
 `Scenario` is parsed from TOML and drives `run_with_scenario(...)`.
-Core defaults are `concurrency = 1` and `seed = 0`.
+`seed` defaults to `0`.
 `material` is optional and is only required by built-in material-driven surfaces such as `MaterialAdapter::from_scenario(...)`, `derive_initial_states(&Scenario)`, and the simulator CLI binaries.
+Execution defaults are resolved through `Scenario.execution`.
+`backend = "auto"` uses threaded execution outside CI when the simulator is built with the threaded machine feature, and canonical serialized execution in CI.
 
 ```rust
 pub struct Scenario {
     pub name: String,
     pub roles: Vec<String>,
     pub steps: u64,
-    pub concurrency: u64,
+    pub execution: ExecutionSpec,
     pub seed: u64,
     pub network: Option<NetworkSpec>,
     pub material: Option<MaterialParams>,
@@ -26,15 +28,31 @@ pub struct Scenario {
 
 `network`, `material`, `events`, `properties`, and `checkpoint_interval` are optional.
 
+```rust
+pub struct ExecutionSpec {
+    pub backend: ExecutionBackend,
+    pub scheduler_concurrency: Option<u64>,
+    pub worker_threads: Option<u64>,
+}
+```
+
+`scheduler_concurrency` controls how much scheduler work one simulator round may admit.
+`worker_threads` controls physical parallelism for the threaded backend only.
+Canonical execution requires both values to resolve to `1`.
+
 ## Scenario Example
 
 ```toml
 name = "mean_field_fault_window"
 roles = ["A", "B"]
 steps = 200
-concurrency = 2
 seed = 42
 checkpoint_interval = 25
+
+[execution]
+backend = "threaded"
+scheduler_concurrency = 2
+worker_threads = 4
 
 [material]
 layer = "mean_field"
@@ -101,6 +119,9 @@ Predicate strings are parsed by `parse_predicate`.
 `CheckpointStore` snapshots protocol-machine state as JSON bytes at configured intervals.
 When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
 Replay loads a checkpoint and re-executes the same shared middleware loop used by fresh scenario runs.
+
+Checkpoint snapshots currently require the canonical backend.
+Threaded scenario runs still emit replay artifacts such as observable events, effect traces, and semantic objects, but checkpoint serialization remains canonical-only.
 
 Checkpoint persistence is best-effort.
 Serialization or file-write failures do not fail the run.

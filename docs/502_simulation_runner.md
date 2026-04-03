@@ -46,6 +46,17 @@ The runner exposes three main entry points.
 Use `run_with_scenario(...)` when faults, network behavior, properties, checkpoints, or replay artifacts are required.
 Use the smaller entry points when only sampled state traces are needed.
 
+`run_with_scenario(...)` resolves execution through `Scenario.execution`.
+That resolution decides:
+
+- which machine backend to use
+- how many scheduler lanes one round may use
+- how many worker threads the threaded backend may use
+
+`Scenario.execution.backend = "auto"` is environment-aware.
+Outside CI, it prefers the threaded backend when the simulator is built with the `multi-thread` feature.
+In CI, the same `auto` policy resolves to canonical serialized execution.
+
 ## Harness API
 
 `SimulationHarness` is the stable integration path for external projects.
@@ -64,6 +75,10 @@ pub trait HostAdapter {
 `DirectAdapter` wraps an existing `EffectHandler`.
 `MaterialAdapter` derives initial states from built-in scenario material parameters and constructs the handler from `material`.
 The harness does not currently consume `GeneratedEffectScenario` directly.
+
+`SimulationHarness::run_batch(...)` and `run_batch_with(...)` run many `HarnessSpec` values concurrently.
+Batch results remain in the same order as the input slice.
+The default batch worker count is host parallelism outside CI and `1` in CI.
 
 ## Initial State Derivation
 
@@ -106,11 +121,18 @@ Checkpoint persistence is best-effort.
 Serialization and file-write failures do not fail the run.
 `CheckpointStore` records the last persistence error internally.
 
+Checkpoint snapshots currently require the canonical backend.
+Threaded scenario runs still emit observable/effect replay artifacts, but checkpoint serialization remains a canonical-only lane.
+
 ## Determinism and Reproducibility
 
 Simulator randomness is scoped to `SimRng`.
 `SimRng` is seeded from `scenario.seed` and currently uses `ChaCha8`.
 The protocol machine remains deterministic given the same handler outcomes and scheduler inputs.
+
+`scheduler_concurrency` may change simulation behavior because it changes how much work one round can admit.
+`worker_threads` must not change authoritative outputs for a fixed threaded execution setting.
+The canonical backend remains the authoritative replay and debugging lane.
 
 Record ordering is stable within each sampling pass.
 Replay artifacts preserve the observable and semantic data needed for deterministic post-run inspection.

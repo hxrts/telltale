@@ -147,14 +147,16 @@ Simulation utilities built on the protocol machine.
 Key exports:
 
 - Harness surface in `rust/simulator/src/harness.rs`:
-  `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, `SimulationHarness`
+  `HostAdapter`, `DirectAdapter`, `MaterialAdapter`, `HarnessSpec`, `HarnessConfig`, `SimulationHarness`,
+  `BatchConfig`, `BatchRunResult`
   `MaterialAdapter::from_scenario(...)` requires built-in scenario material params.
   Generic harness runs may omit `Scenario.material` when the adapter supplies its own initial states.
+  `SimulationHarness::run_batch(...)` and `run_batch_with(...)` preserve input-order results while parallelizing independent runs.
 
 Module access (not re-exported at crate root):
 - `telltale_simulator::trace::Trace`, `StepRecord`
 - `telltale_simulator::runner::run`, `run_concurrent`, `run_with_scenario`, `ChoreographySpec`
-- `telltale_simulator::scenario::Scenario`
+- `telltale_simulator::scenario::{Scenario, ExecutionSpec, ExecutionBackend, ResolvedExecution, ResolvedExecutionBackend}`
 - `telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport, ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep}`
 - Contract checks in `rust/simulator/src/contracts.rs`:
   `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
