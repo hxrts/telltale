@@ -162,7 +162,7 @@ Some important tooling surfaces are shipped as binaries inside workspace crates.
 - `lean-bridge`, `lean-bridge-exporter`, and `golden` in `telltale-bridge` support validation and bridge workflows.
 - `run` and `replay` in `telltale-simulator` support scenario execution and replay.
 
-These binaries are operational tooling surfaces.
+These binaries are generated surfaces & tooling.
 They are not the primary conceptual entry points for the architecture itself.
 
 ## Lean Correspondence
