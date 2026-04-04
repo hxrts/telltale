@@ -277,7 +277,7 @@ fn parse_call(expr: &str) -> Option<(&str, Vec<&str>)> {
 }
 
 /// Property violation record.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct PropertyViolation {
     /// Name of the violated property.
     pub property_name: String,

@@ -341,6 +341,7 @@ pub fn run(
 }
 
 /// Result of a scenario-backed run.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct ScenarioResult {
     /// Execution trace with step records.
     pub trace: Trace,
@@ -355,12 +356,14 @@ pub struct ScenarioResult {
 }
 
 /// Analysis artifacts derived from a scenario run without weakening canonical replay.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct ScenarioAnalysisArtifact {
     /// Envelope-normalized observability class derived from raw replay traces.
     pub normalized_observability: NormalizedObservability,
 }
 
 /// Replay-ready artifact data captured from a scenario run.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
 pub struct ScenarioReplayArtifact {
     /// Resolved theorem/profile information for this run.
     pub theorem_profile: ResolvedTheoremProfile,
@@ -389,6 +392,7 @@ pub struct ScenarioReplayArtifact {
 }
 
 /// Structured statistics emitted by scenario execution.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct ScenarioStats {
     /// Scenario seed used for middleware RNG.
     pub seed: u64,
@@ -641,12 +645,21 @@ pub fn compare_scheduler_runs(
     }
 }
 
+fn snapshot_contains_recursion(
+    snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
+) -> bool {
+    snapshots
+        .values()
+        .flat_map(|session| session.local_types.values())
+        .any(|entry| contains_recursion(&entry.current))
+}
+
 fn critical_capacity_summary(
-    local_types: &BTreeMap<String, LocalTypeR>,
+    initial_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
     productive_step_count: u64,
     initial_depth_budget: u64,
 ) -> CriticalCapacitySummary {
-    if local_types.values().any(contains_recursion) {
+    if snapshot_contains_recursion(initial_snapshots) {
         return CriticalCapacitySummary {
             threshold: None,
             phase: CriticalCapacityPhase::Unsupported,
@@ -666,7 +679,6 @@ fn critical_capacity_summary(
 }
 
 fn theorem_progress_summary(
-    local_types: &BTreeMap<String, LocalTypeR>,
     initial_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
     final_snapshots: &BTreeMap<telltale_machine::model::state::SessionId, SessionState>,
     productive_step_count: u64,
@@ -683,7 +695,7 @@ fn theorem_progress_summary(
         weighted_measure_consumed: initial_weighted_measure
             .saturating_sub(remaining_weighted_measure),
         critical_capacity: critical_capacity_summary(
-            local_types,
+            initial_snapshots,
             productive_step_count,
             initial_depth_budget,
         ),
@@ -732,57 +744,22 @@ pub fn run_with_scenario(
     )
 }
 
-/// Run a choreography with scenario-defined middleware and optional environment hooks.
-///
-/// # Errors
-///
-/// Returns an error string if protocol-machine execution fails.
-#[allow(clippy::too_many_lines)]
-pub fn run_with_scenario_and_environment(
-    local_types: &BTreeMap<String, LocalTypeR>,
-    global_type: &GlobalType,
-    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+fn execute_loaded_scenario_machine(
     scenario: &Scenario,
     handler: &dyn EffectHandler,
     environment_models: Option<EnvironmentModels<'_>>,
+    mut machine: SimulationMachine,
+    coro_info: CoroInfo,
+    resolved_execution: crate::scenario::ResolvedExecution,
+    theorem_profile: ResolvedTheoremProfile,
+    rounds_to_run: u64,
 ) -> Result<ScenarioResult, String> {
-    let image = CodeImage::from_local_types(local_types, global_type);
-    let resolved_execution = scenario.resolved_execution()?;
-    let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
-    if matches!(
-        resolved_execution.backend,
-        ResolvedExecutionBackend::Threaded
-    ) && scenario.checkpoint_interval.is_some()
-    {
-        return Err(
-            "scenario checkpoints currently require the canonical simulator backend".to_string(),
-        );
-    }
-    let machine_config = ProtocolMachineConfig {
-        sched_policy: machine_scheduler_policy(resolved_execution.scheduler_policy),
-        ..ProtocolMachineConfig::default()
-    };
-    let mut machine = SimulationMachine::new(machine_config, &resolved_execution);
-    let sid = machine
-        .load_choreography_owned(&image, "sim/scenario")
-        .map_err(|e| format!("load error: {e}"))?;
-    let sid = sid.session_id();
-
-    let coros = machine.session_coroutines(sid);
-    let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
-    let resolved_initial_states = if initial_states.is_empty() {
-        derive_initial_states(scenario)?
-    } else {
-        initial_states.clone()
-    };
-    init_coro_regs(&mut machine, &coro_info, &resolved_initial_states)?;
     let initial_session_snapshots = machine.session_snapshots();
     let initial_role_state = current_role_state(&machine, &coro_info);
 
     let mut trace = Trace::new();
-    let max_rounds = scenario.steps.saturating_sub(1);
-    let steps_limit = usize::try_from(scenario.steps)
-        .map_err(|_| format!("scenario.steps {} exceeds usize", scenario.steps))?;
+    let steps_limit = usize::try_from(rounds_to_run.saturating_add(1))
+        .map_err(|_| format!("replay step limit {} exceeds usize", rounds_to_run))?;
     let concurrency = usize::try_from(resolved_execution.scheduler_concurrency).map_err(|_| {
         format!(
             "scenario.execution.scheduler_concurrency {} exceeds usize",
@@ -792,7 +769,7 @@ pub fn run_with_scenario_and_environment(
     let mut step_idx: usize = 0;
     let mut checkpoint_writes: usize = 0;
 
-    if scenario.steps > 0 {
+    if steps_limit > 0 {
         record_all_roles(&machine, &coro_info, 0, &mut trace);
         step_idx = 1;
     }
@@ -824,7 +801,7 @@ pub fn run_with_scenario_and_environment(
         scenario,
         &middleware,
         concurrency,
-        max_rounds,
+        rounds_to_run,
         |machine, completed_rounds| {
             if step_idx >= steps_limit {
                 return Ok(());
@@ -885,8 +862,8 @@ pub fn run_with_scenario_and_environment(
     );
     let reconfiguration_trace = middleware.reconfiguration_trace()?;
     let reconfiguration_summary = middleware.reconfiguration_summary()?;
-    if environment.is_active() && environment.trace().records.is_empty() && scenario.steps > 0 {
-        environment.begin_round(0, 0, initial_role_state)?;
+    if environment.is_active() && environment.trace().records.is_empty() && steps_limit > 0 {
+        environment.begin_round(machine.clock().tick, 0, initial_role_state)?;
     }
     let environment_trace = environment.trace().clone();
     let normalized_observability =
@@ -894,7 +871,6 @@ pub fn run_with_scenario_and_environment(
     let final_session_snapshots = machine.session_snapshots();
     let productive_step_count = productive_event_count(&obs_trace);
     let theorem_progress = theorem_progress_summary(
-        local_types,
         &initial_session_snapshots,
         &final_session_snapshots,
         productive_step_count,
@@ -950,4 +926,111 @@ pub fn run_with_scenario_and_environment(
             checkpoint_writes,
         },
     })
+}
+
+/// Resolve how many rounds remain after restoring a canonical checkpoint.
+#[must_use]
+pub fn remaining_rounds_from_checkpoint(scenario: &Scenario, machine: &ProtocolMachine) -> u64 {
+    scenario
+        .steps
+        .saturating_sub(1)
+        .saturating_sub(machine.clock().tick)
+}
+
+/// Resume a canonical simulator run from a previously serialized checkpoint.
+///
+/// The checkpoint must come from the canonical backend. When `rounds` is `None`,
+/// the runner executes only the remaining rounds implied by `scenario.steps`.
+///
+/// # Errors
+///
+/// Returns an error if the scenario is not canonical, the checkpoint cannot be
+/// resumed under the declared execution contract, or middleware/setup fails.
+pub fn resume_with_scenario_from_checkpoint(
+    scenario: &Scenario,
+    machine: ProtocolMachine,
+    handler: &dyn EffectHandler,
+    environment_models: Option<EnvironmentModels<'_>>,
+    rounds: Option<u64>,
+) -> Result<ScenarioResult, String> {
+    let resolved_execution = scenario.resolved_execution()?;
+    if resolved_execution.backend != ResolvedExecutionBackend::Canonical {
+        return Err(
+            "checkpoint replay currently requires the canonical simulator backend".to_string(),
+        );
+    }
+    let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
+    let rounds_to_run =
+        rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &machine));
+    let coro_info: CoroInfo = machine
+        .coroutines()
+        .into_iter()
+        .map(|coro| (coro.id, coro.role.clone()))
+        .collect();
+    execute_loaded_scenario_machine(
+        scenario,
+        handler,
+        environment_models,
+        SimulationMachine::Canonical(machine),
+        coro_info,
+        resolved_execution,
+        theorem_profile,
+        rounds_to_run,
+    )
+}
+
+/// Run a choreography with scenario-defined middleware and optional environment hooks.
+///
+/// # Errors
+///
+/// Returns an error string if protocol-machine execution fails.
+#[allow(clippy::too_many_lines)]
+pub fn run_with_scenario_and_environment(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    global_type: &GlobalType,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+    scenario: &Scenario,
+    handler: &dyn EffectHandler,
+    environment_models: Option<EnvironmentModels<'_>>,
+) -> Result<ScenarioResult, String> {
+    let image = CodeImage::from_local_types(local_types, global_type);
+    let resolved_execution = scenario.resolved_execution()?;
+    let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
+    if matches!(
+        resolved_execution.backend,
+        ResolvedExecutionBackend::Threaded
+    ) && scenario.checkpoint_interval.is_some()
+    {
+        return Err(
+            "scenario checkpoints currently require the canonical simulator backend".to_string(),
+        );
+    }
+    let machine_config = ProtocolMachineConfig {
+        sched_policy: machine_scheduler_policy(resolved_execution.scheduler_policy),
+        ..ProtocolMachineConfig::default()
+    };
+    let mut machine = SimulationMachine::new(machine_config, &resolved_execution);
+    let sid = machine
+        .load_choreography_owned(&image, "sim/scenario")
+        .map_err(|e| format!("load error: {e}"))?;
+    let sid = sid.session_id();
+
+    let coros = machine.session_coroutines(sid);
+    let coro_info: CoroInfo = coros.iter().map(|c| (c.id, c.role.clone())).collect();
+    let resolved_initial_states = if initial_states.is_empty() {
+        derive_initial_states(scenario)?
+    } else {
+        initial_states.clone()
+    };
+    init_coro_regs(&mut machine, &coro_info, &resolved_initial_states)?;
+    execute_loaded_scenario_machine(
+        scenario,
+        handler,
+        environment_models,
+        machine,
+        coro_info,
+        resolved_execution,
+        theorem_profile,
+        scenario.steps.saturating_sub(1),
+    )
 }

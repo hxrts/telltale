@@ -1837,6 +1837,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-viewer"
+version = "11.0.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "telltale-machine",
+ "telltale-simulator",
+ "tempfile",
+ "toml 0.8.23",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

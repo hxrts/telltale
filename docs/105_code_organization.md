@@ -21,6 +21,7 @@ telltale/
 │   ├── runtime/            telltale-runtime
 │   ├── machine/            telltale-machine
 │   ├── simulator/          telltale-simulator
+│   ├── viewer/             telltale-viewer
 │   ├── bridge/             telltale-bridge
 │   ├── transport/          telltale-transport
 │   └── lints/              telltale-lints
@@ -46,6 +47,7 @@ The main direct dependency directions are:
 - `telltale-language` is used by `telltale-macros`, `telltale-runtime`, and the root `telltale` crate.
 - `telltale-macros` is used by `telltale-runtime` and the root `telltale` crate.
 - `telltale-machine` is used by `telltale-simulator`, `telltale-bridge`, and the root `telltale` crate.
+- `telltale-simulator` is used by `telltale-viewer` as the authoritative source of simulation artifacts.
 - The root `telltale` crate is used by `telltale-runtime` as a facade dependency.
 - `telltale-runtime` is used by `telltale-bridge` through optional features and by `telltale-transport`.
 
@@ -112,6 +114,15 @@ It provides runner entry points, `SimulationHarness`, scenario parsing, field/en
 This crate depends directly on `telltale-machine` and `telltale-types`.
 It is the preferred test path for third-party implementations of protocol-machine `EffectHandler`.
 Its generated-effect helpers exist as adjacent APIs, but the main integration path is still `SimulationHarness`.
+
+### telltale-viewer
+
+`telltale-viewer` is the pure artifact/model layer for the simulator webapp work.
+It owns viewer artifact envelopes, schema/version handling, branch patch types, search/query models, and the first application-service boundary for run inspection.
+
+This crate is intentionally renderer-free.
+Browser APIs and Dioxus component concerns belong in the future `telltale-web` and `telltale-ui` layers, not here.
+The goal is to keep artifact loading, branch mutation requests, and historical inspection state deterministic and reusable across shells.
 
 ### telltale-runtime
 

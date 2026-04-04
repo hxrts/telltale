@@ -84,6 +84,7 @@ These APIs currently sit beside the harness API rather than inside it.
 - [Simulation Runner](502_simulation_runner.md): execution mechanics, stats, harness API, batch/sweep, distributed simulation
 - [Simulation Scenarios](503_simulation_scenarios.md): TOML schema, adversaries, reconfiguration, network, properties, checkpointing
 - [Simulation Fields](504_simulation_fields.md): field model trait, built-in families, environment extension hooks
+- [Simulation Viewer Model](505_simulation_viewer_model.md): pure artifact envelopes, query/command boundary, branch patch model
 
 ## CLI
 

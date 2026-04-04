@@ -1,0 +1,28 @@
+[package]
+name = "telltale-viewer"
+version = "11.0.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Pure artifact, query, and command models for the Telltale simulator webapp"
+readme = "../../README.md"
+repository = "https://github.com/hxrts/telltale"
+license = "MIT OR Apache-2.0"
+keywords = ["simulation", "viewer", "dioxus", "artifacts"]
+categories = ["simulation"]
+
+[lib]
+bench = false
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+toml = { workspace = true }
+telltale-simulator = { path = "../simulator", version = "11.0.0" }
+telltale-machine = { path = "../machine", version = "11.0.0" }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
