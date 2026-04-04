@@ -109,6 +109,7 @@
           inherit nativeBuildInputs buildInputs;
 
           shellHook = ''
+            [[ -r "$HOME/.local/state/secrets/cargo-registry-token" ]] && export CARGO_REGISTRY_TOKEN="$(cat "$HOME/.local/state/secrets/cargo-registry-token")"
             echo "Telltale development environment"
             echo "Rust: $(rustc --version)"
             echo "Lean: $(elan show 2>/dev/null | head -1 || echo 'run: elan default leanprover/lean4:v4.25.0')"
