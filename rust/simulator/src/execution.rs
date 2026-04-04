@@ -24,7 +24,7 @@ enum ScenarioTransport<'a> {
     Network(NetworkModel<AdversaryInjector<&'a dyn EffectHandler>>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 enum ScenarioTransportCheckpoint {
     Adversary(AdversaryCheckpointState),
     Network {
@@ -33,7 +33,7 @@ enum ScenarioTransportCheckpoint {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub(crate) struct ScenarioMiddlewareCheckpoint {
     transport: ScenarioTransportCheckpoint,
     reconfiguration: ReconfigurationCheckpointState,
@@ -261,7 +261,7 @@ pub fn execute_scenario_rounds(
     max_rounds: u64,
     mut after_round: impl FnMut(&SimulationMachine, u64) -> Result<(), String>,
 ) -> Result<ExecutionSummary, String> {
-    let mut rounds_executed = 0_u64;
+    let mut rounds_executed = machine.clock().tick;
 
     for _ in 0..max_rounds {
         let next_tick = machine.clock().tick + 1;

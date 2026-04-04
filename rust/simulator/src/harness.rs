@@ -193,7 +193,7 @@ pub struct BatchRunResult {
 }
 
 /// Resolved theorem/profile manifest for one batch execution.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BatchRunManifest {
     /// Resolved worker count.
     pub parallelism: usize,
@@ -202,7 +202,7 @@ pub struct BatchRunManifest {
 }
 
 /// One batch manifest entry.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BatchRunManifestEntry {
     /// Scenario name.
     pub scenario_name: String,

@@ -4,6 +4,7 @@
 
 use rand::{RngCore, SeedableRng};
 use rand_chacha::ChaCha8Rng;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::time::Duration;
 use telltale_types::FixedQ32;
 
@@ -11,6 +12,13 @@ use telltale_types::FixedQ32;
 #[derive(Debug, Clone)]
 pub struct SimRng {
     inner: ChaCha8Rng,
+    seed: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+struct SimRngSnapshot {
+    seed: u64,
+    word_pos: u128,
 }
 
 impl SimRng {
@@ -19,6 +27,7 @@ impl SimRng {
     pub fn new(seed: u64) -> Self {
         Self {
             inner: ChaCha8Rng::seed_from_u64(seed),
+            seed,
         }
     }
 
@@ -30,6 +39,22 @@ impl SimRng {
     pub fn fork(&mut self) -> Self {
         let seed = self.inner.next_u64();
         Self::new(seed)
+    }
+
+    fn snapshot(&self) -> SimRngSnapshot {
+        SimRngSnapshot {
+            seed: self.seed,
+            word_pos: self.inner.get_word_pos(),
+        }
+    }
+
+    fn from_snapshot(snapshot: SimRngSnapshot) -> Self {
+        let mut inner = ChaCha8Rng::seed_from_u64(snapshot.seed);
+        inner.set_word_pos(snapshot.word_pos);
+        Self {
+            inner,
+            seed: snapshot.seed,
+        }
     }
 
     /// Sample a uniform FixedQ32 in [0, 1).
@@ -72,6 +97,32 @@ impl SimRng {
         }
     }
 }
+
+impl Serialize for SimRng {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.snapshot().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for SimRng {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        SimRngSnapshot::deserialize(deserializer).map(Self::from_snapshot)
+    }
+}
+
+impl PartialEq for SimRng {
+    fn eq(&self, other: &Self) -> bool {
+        self.snapshot() == other.snapshot()
+    }
+}
+
+impl Eq for SimRng {}
 
 #[cfg(test)]
 mod tests {

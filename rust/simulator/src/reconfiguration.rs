@@ -272,7 +272,7 @@ pub struct ReconfigurationSummary {
     pub transition_budget_consumed: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ScheduledReconfigurationState {
     operation_id: String,
     trigger: Trigger,
@@ -281,7 +281,7 @@ struct ScheduledReconfigurationState {
     activated: bool,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ReconfigurationState {
     scheduled: Vec<ScheduledReconfigurationState>,
     applied: Vec<ReconfigurationRecord>,
@@ -294,7 +294,7 @@ pub struct ReconfigurationController {
     state: Mutex<ReconfigurationState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct ReconfigurationCheckpointState {
     state: ReconfigurationState,
 }

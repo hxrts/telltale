@@ -143,13 +143,13 @@ pub struct AdversarySummary {
     pub assumption_failures: Vec<AssumptionFailureClass>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ScheduledAdversaryState {
     adversary: ScheduledAdversary,
     activated: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct BudgetState {
     total_consumed: u64,
     current_window: Option<u64>,
@@ -163,7 +163,7 @@ impl BudgetState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ActiveTransportAdversary {
     adversary_id: String,
     action: AdversaryAction,
@@ -171,13 +171,13 @@ struct ActiveTransportAdversary {
     budget_state: BudgetState,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ActiveCrash {
     role: String,
     expires_at: Option<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct InFlightMessage {
     delivery_tick: u64,
     sid: SessionId,
@@ -186,7 +186,7 @@ struct InFlightMessage {
     value: Value,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AdversaryState {
     scheduled: Vec<ScheduledAdversaryState>,
     active_transport: Vec<ActiveTransportAdversary>,
@@ -220,7 +220,7 @@ pub struct AdversaryInjector<H: EffectHandler> {
     state: Mutex<AdversaryState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AdversaryCheckpointState {
     state: AdversaryState,
 }

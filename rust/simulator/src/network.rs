@@ -1,5 +1,6 @@
 //! Network simulation middleware.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -46,7 +47,7 @@ impl Default for NetworkConfig {
 }
 
 /// Per-link policy override for role-to-role traffic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LinkPolicy {
     /// Source role.
     pub from: String,
@@ -62,7 +63,7 @@ pub struct LinkPolicy {
     pub loss_probability: Option<FixedQ32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct InFlightMessage {
     delivery_tick: u64,
     sid: SessionId,
@@ -71,7 +72,7 @@ struct InFlightMessage {
     value: Value,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct DynamicNetworkState {
     link_overrides: BTreeMap<(String, String), LinkPolicy>,
     federations: BTreeMap<String, Vec<Vec<String>>>,
@@ -89,7 +90,7 @@ pub struct NetworkModel<H: EffectHandler> {
     tick_duration: Duration,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NetworkCheckpointState {
     rng: SimRng,
     in_flight: Vec<InFlightMessage>,
