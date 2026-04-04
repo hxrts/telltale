@@ -1,6 +1,6 @@
 [package]
 name = "telltale-web"
-version = "11.0.0"
+version = "11.1.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -16,7 +16,7 @@ web = ["dioxus/web"]
 
 [dependencies]
 dioxus = { workspace = true, features = ["launch"] }
-telltale-ui = { path = "../ui", version = "11.0.0" }
+telltale-ui = { path = "../ui", version = "11.1.0" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = { workspace = true }

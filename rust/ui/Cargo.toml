@@ -1,6 +1,6 @@
 [package]
 name = "telltale-ui"
-version = "11.0.0"
+version = "11.1.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -14,10 +14,10 @@ publish = false
 dioxus = { workspace = true }
 futures = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-telltale-macros = { path = "../macros", version = "11.0.0" }
-telltale-machine = { path = "../machine", version = "11.0.0" }
-telltale-simulator = { path = "../simulator", version = "11.0.0" }
-telltale-viewer = { path = "../viewer", version = "11.0.0" }
+telltale-macros = { path = "../macros", version = "11.1.0" }
+telltale-machine = { path = "../machine", version = "11.1.0" }
+telltale-simulator = { path = "../simulator", version = "11.1.0" }
+telltale-viewer = { path = "../viewer", version = "11.1.0" }
 
 [dev-dependencies]
 dioxus-ssr = { workspace = true }
