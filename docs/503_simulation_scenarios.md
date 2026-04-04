@@ -60,8 +60,7 @@ It declares which theorem-side contract the caller wants the run to be interpret
 The simulator resolves that declaration against the actual execution regime and reports eligibility in `ScenarioStats.theorem_profile` and `ScenarioReplayArtifact.theorem_profile`.
 
 For recursion-free scenarios, the simulator also derives theorem-native progress quantities in `ScenarioStats.theorem_progress`.
-These include weighted measure `W = 2 * depth + buffer`, productive-step count, remaining weighted budget, scheduler-lift availability, and critical-capacity phase classification.
-Recursive scenarios still receive the weighted summary, but critical-capacity classification is currently reported as unsupported.
+See [Simulation Runner](502_simulation_runner.md) for definitions of the weighted measure, depth, buffer, and critical-capacity phase.
 
 ## Scenario Example
 
@@ -195,12 +194,18 @@ The three middleware surfaces serve distinct purposes: `network` defines baselin
 
 ## Property Monitoring
 
-`PropertyMonitor` performs online checks by scanning newly appended observable events and machine state.
-Built-in checks include `NoFaults`, `Simplex`, `SendRecvLiveness`, `TypeMonotonicity`, `BufferBound`, and `Liveness`.
+`PropertyMonitor` performs online checks by scanning newly appended observable events and machine state each round.
+Built-in checks are:
+
+- `NoFaults`: verifies that no coroutine has entered a faulted state during execution.
+- `Simplex`: verifies that all coroutine state vectors remain on the probability simplex (all components non-negative, sum to 1 within tolerance).
+- `SendRecvLiveness(sid, bound)`: verifies that every send in session `sid` is matched by a receive within `bound` session-local ticks. Uses per-session event counters rather than raw global ticks.
+- `TypeMonotonicity(sid)`: verifies that session-type depth never increases for non-recursive local types in session `sid`. Recursive types are skipped.
+- `BufferBound(sid, max)`: verifies that no buffer in session `sid` exceeds `max` pending messages.
+- `Liveness(name, precondition, goal, bound)`: a custom liveness check. Once the precondition predicate becomes true, the goal predicate must become true within `bound` steps. Predicates can be `no_faults`, `simplex`, tick comparisons, or `distance_to_equilibrium` comparisons.
 
 Invariant strings are parsed by `parse_property`.
 Predicate strings are parsed by `parse_predicate`.
-`SendRecvLiveness` uses session-local event counters rather than raw global ticks.
 
 ## Checkpointing and Replay
 

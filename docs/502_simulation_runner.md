@@ -1,7 +1,7 @@
 # Simulation Runner
 
 This page documents runner behavior in `telltale-simulator`.
-It covers traces, runner entry points, harness behavior, and scenario round order.
+It covers traces, runner entry points, stats, harness API, and scenario round order.
 
 ## Core Data Types
 
@@ -32,12 +32,8 @@ pub struct ScenarioResult {
 `state` contains the numeric portion of the coroutine register file.
 The runner skips the first two reserved registers and samples field-backed state starting at register `2`.
 
-`ScenarioReplayArtifact` contains the resolved adversary schedule, adversary budget-consumption history, assumption diagnostics, observable events, effect traces, output-condition checks, semantic audit records, `ProtocolMachineSemanticObjects`, a canonical simulator reconfiguration trace, and a canonical `EnvironmentTrace`.
+`ScenarioReplayArtifact` contains the resolved adversary schedule, observable events, effect traces, semantic audit records, `ProtocolMachineSemanticObjects`, the canonical reconfiguration trace, and the canonical `EnvironmentTrace`.
 These artifacts support deterministic replay and post-run validation.
-
-`ScenarioResult.analysis.normalized_observability` is the companion analysis view.
-It is derived from replay-visible raw traces, but it is not itself the authoritative replay surface.
-That separation keeps debugging and replay pinned to the canonical raw event stream.
 
 ## Runner Entry Points
 
@@ -47,33 +43,31 @@ The runner exposes three main entry points.
 - `run_multi_session_canonical(...)` executes multiple choreographies on one canonical protocol machine and returns one trace per input choreography.
 - `run_with_scenario(...)` executes one choreography with scenario middleware and returns `ScenarioResult`.
 
-Use `run_with_scenario(...)` when budgeted adversaries, network behavior, properties, checkpoints, or replay artifacts are required.
+Use `run_with_scenario(...)` when adversaries, network behavior, properties, checkpoints, or replay artifacts are required.
 Use the smaller entry points when only sampled state traces are needed.
 
-`run_with_scenario(...)` resolves execution through `Scenario.execution`.
-That resolution selects the machine backend, scheduler policy, scheduler lane count, and worker thread count.
-`Scenario.execution.backend = "auto"` resolves to the authoritative canonical backend with `scheduler_concurrency = 1` and `worker_threads = 1` unless the scenario explicitly requests a different backend.
-
 `ScenarioStats.execution_regime` records the proof-side concurrency class for the resolved run.
-`canonical_exact` means single-step cooperative execution. `threaded_exact` means threaded execution at concurrency 1, which is theorem-equal to canonical. `threaded_envelope_bounded` means threaded execution at concurrency greater than 1, which is only authoritative modulo the declared envelope.
+`canonical_exact` means single-step cooperative execution.
+`threaded_exact` means threaded execution at concurrency 1, which is theorem-equal to canonical.
+`threaded_envelope_bounded` means threaded execution at concurrency greater than 1, which is only authoritative modulo the declared envelope.
 
-Changing `scheduler_concurrency` may change semantics.
-Changing `worker_threads` must not change authoritative outputs for a fixed threaded scheduler configuration.
+## Stats and Summaries
 
-### Theorem Profile
+### Theorem Progress
 
-`Scenario.theorem` is resolved separately from `Scenario.execution`.
-It carries `scheduler_profile`, `envelope_profile`, and `assumption_bundle`.
-The resolved theorem profile is emitted in both `ScenarioStats` and `ScenarioReplayArtifact`.
-Its `eligibility` reports whether the run admits exact, envelope-bounded, or no theorem-backed reporting.
+`ScenarioStats.theorem_progress` reports theorem-native quantities that summarize the run in terms of the weighted-measure and scheduling-bound proofs.
+Depth is the sum of remaining session-type steps to `end` across all active sessions.
+Buffer is the total pending message count across all session buffers.
+The weighted measure is `W = 2 * depth + buffer`, a composite termination metric that strictly decreases on productive steps.
 
-### Stats and Summaries
+The reported fields are `initial_weighted_measure`, `initial_depth_budget`, `productive_step_count`, `remaining_weighted_measure`, `weighted_measure_consumed`, and `critical_capacity`.
+Critical-capacity phase classifies whether productive steps stayed below, at, or above the initial depth budget.
+This classification is unsupported for recursive protocols.
 
-`ScenarioStats.theorem_progress` reports theorem-native quantities: `initial_weighted_measure`, `initial_depth_budget`, `productive_step_count`, `remaining_weighted_measure`, `weighted_measure_consumed`, and `critical_capacity`.
-These are intentionally distinct from raw counters such as queue length or observable-event count.
+### Other Summaries
 
-`ScenarioStats.scheduler_profile` records `implementation_policy`, `theorem_profile`, `productive_exactness`, `total_step_mode`, `total_step_upper_bound`, `fairness_requirement`, and `envelope_status`.
-`ScenarioStats.reconfiguration_summary` reports `applied_operations`, `pure_operations`, `transition_operations`, and `transition_budget_consumed`.
+`ScenarioStats.scheduler_profile` records the scheduler-facing report including implementation policy, productive exactness, total-step mode, and envelope status.
+`ScenarioStats.reconfiguration_summary` reports applied, pure, and transition operations with transition budget consumed.
 `ScenarioStats.adversary_summary` and `ScenarioStats.assumption_diagnostics` report adversary activation, budget consumption, and theorem-side assumption failures.
 
 ### Observability Comparison
@@ -81,47 +75,15 @@ These are intentionally distinct from raw counters such as queue length or obser
 `compare_observability(...)` reports one of three relations: `exact_raw_match`, `equivalent_under_normalization`, or `safety_visible_divergence`.
 Normalization is order-insensitive over session-normalized observable events and canonical reconfiguration footprints.
 
-### Decision Module
-
-Offline theorem-facing checks live in the `decision` module.
-It provides global well-formedness checks, subtyping checks, capacity predicates, and theorem-profile eligibility.
-These return structured `DecisionReport` values with either a certificate or a counterexample object.
-The same theorem-eligibility witness format is available both offline and from an executed run.
-
-## Approximation Artifacts
-
-Approximation runs are now explicit and separate from `ScenarioResult`.
-Use `run_approximation(...)` with an `ApproximationSpec` when the caller wants a non-authoritative artifact for `batched_stochastic`, `mean_field`, or `continuum_field` analysis.
-
-Approximation artifacts retain an `ApproximationManifest`, the sampled state `Trace`, `NormalizedObservability`, and shared observables such as final per-role states and productive-step counts.
-They intentionally do not pretend to be canonical replay artifacts.
-
-The manifest declares the approximation family, theorem-side scope, explicit non-goals, and whether the approximation is theorem-backed, empirical-only, or unsupported for the given scenario and profile pair.
-This distinction prevents accidental use of approximate results where authoritative replay is required.
-
-Use `compare_exact_and_approximate(...)` to compare an authoritative `ScenarioResult` against one approximation artifact.
-That report compares normalized observability, productive-step counts, and final-state error without blurring the authoritative replay lane.
-
 ## Harness API
 
 `SimulationHarness` is the stable integration path for external projects.
 It runs `HarnessSpec` or `HarnessConfig` through a `HostAdapter`.
-
-```rust
-pub trait HostAdapter {
-    fn effect_handler(&self) -> &dyn EffectHandler;
-    fn initial_states(&self, scenario: &Scenario)
-        -> Result<Option<BTreeMap<String, Vec<FixedQ32>>>, String>;
-    fn environment_models(&self, scenario: &Scenario)
-        -> Result<Option<EnvironmentModels<'_>>, String>;
-    fn validate_result(&self, scenario: &Scenario, result: &ScenarioResult)
-        -> Result<(), String>;
-}
-```
+`HostAdapter` provides an `EffectHandler`, optional initial states, optional environment models, and a result validation callback.
 
 `DirectAdapter` wraps an existing `EffectHandler`.
-`FieldAdapter` derives initial states from built-in scenario field parameters and constructs the handler from `field`.
-The harness does not currently consume `GeneratedEffectScenario` directly.
+`FieldAdapter` derives initial states and constructs the handler from scenario field parameters.
+See [Simulation Fields](504_simulation_fields.md) for field adapter variants and custom `FieldModel` integration.
 
 ### Batch and Sweep
 
@@ -137,37 +99,22 @@ Use `compare_sweep_results(...)` to diff experiment families by theorem eligibil
 `DistributedSimBuilder::execution_contract(...)` accepts a `NestedExecutionContract` for outer scheduler concurrency plus inner rounds-per-step.
 That outer/inner VM contract is part of simulation semantics, not a worker-pool tuning knob.
 
-## Initial State Derivation
-
-`derive_initial_states(&Scenario)` builds default per-role state vectors from built-in `field` when present.
-`mean_field` broadcasts one concentration vector to every role.
-`hamiltonian` maps each role index to `[position, momentum]`.
-`continuum_field` assigns one scalar field value per role.
-
-The generic harness path does not require scenario field data.
-If a `HostAdapter` returns explicit initial states, the simulator never consults the built-in field catalog.
-
-The runner writes these state vectors into coroutine registers starting at register `2`.
-The sampled trace reads the same numeric suffix back out.
-
 ## Sampling and Step Mapping
 
-The simulator now uses explicit round-based sampling.
-It does not infer round boundaries from `ObsEvent::Invoked` counts.
-
+The simulator uses explicit round-based sampling.
 If `steps > 0`, the runner records an initial sample at step `0` before the first protocol-machine round.
 Each subsequent completed round records one additional sample.
 If no samples were produced during execution, the runner emits one fallback sample at the last requested step index.
 
 ## Scenario Execution Order
 
-Scenario runs and replay now share the same execution core and use a fixed per-round order for determinism.
+Scenario runs and replay share the same execution core and use a fixed per-round order for determinism.
 
 1. Compute `next_tick` from the protocol-machine clock.
-2. Activate due simulator reconfiguration operations from newly visible observable events in `machine.trace()`.
-3. Advance the adversary program from newly visible observable events in `machine.trace()`.
+2. Activate due simulator reconfiguration operations from newly visible observable events.
+3. Advance the adversary program from newly visible observable events.
 4. Deliver due delayed adversary messages.
-5. When network middleware is active, route those due adversary-delayed messages back through the network policy stage before they enter protocol-machine buffers.
+5. When network middleware is active, route adversary-delayed messages through the network policy stage before they enter protocol-machine buffers.
 6. Deliver due network middleware queues.
 7. Update paused roles from active crash adversaries.
 8. Execute one protocol-machine round with the selected handler domain.
@@ -177,25 +124,15 @@ Scenario runs and replay now share the same execution core and use a fixed per-r
 
 Checkpoint persistence is best-effort.
 Serialization and file-write failures do not fail the run.
-`CheckpointStore` records the last persistence error internally.
-
-Checkpoint snapshots currently require the canonical backend.
-Threaded scenario runs still emit observable/effect replay artifacts, but checkpoint serialization remains a canonical-only lane.
 
 ## Determinism and Reproducibility
 
-Simulator randomness is scoped to `SimRng`.
-`SimRng` is seeded from `scenario.seed` and currently uses `ChaCha8`.
+Simulator randomness is scoped to `SimRng`, seeded from `scenario.seed` and currently backed by `ChaCha8`.
 The protocol machine remains deterministic given the same handler outcomes and scheduler inputs.
-
-`scheduler_concurrency` may change simulation behavior because it changes how much work one round can admit.
-`worker_threads` must not change authoritative outputs for a fixed threaded execution setting.
 The canonical backend remains the authoritative replay and debugging lane.
 
 Record ordering is stable within each sampling pass.
 Replay artifacts preserve the observable, semantic, and reconfiguration data needed for deterministic post-run inspection.
-Normalized observability classes are for comparison and analysis only.
-They do not replace canonical replay traces.
 
 ## Related Docs
 

@@ -10,28 +10,38 @@ The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
 
+## Key Concepts
+
+The simulator wraps the protocol machine defined in `telltale-machine`.
+The protocol machine owns scheduling and session-type enforcement.
+The simulator adds middleware layers (adversaries, network, properties, checkpoints) and environment dynamics (fields) around that core.
+See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for the underlying execution model.
+
+`ObsEvent` is the protocol machine's trace of communication actions such as sends, receives, choices, and offers.
+Scenario execution order, property monitoring, and replay artifacts all operate over this event stream.
+
+`FixedQ32` is the fixed-point numeric type (Q32.32) used for all simulator state values including field state, network parameters, and property thresholds.
+Quoted decimal strings like `"1.5"` are the safest TOML representation.
+
+`ProtocolMachineSemanticObjects` is the typed introspection snapshot the protocol machine exports after execution.
+It contains operation instances, outstanding effects, semantic handoffs, authoritative reads, materialization proofs, canonical handles, publication events, and progress contracts.
+Replay artifacts and post-run analysis consume this bundle directly.
+
 ### Field and Environment Models
 
 Fields are the simulator's abstraction for deterministic environment-dynamics evolution.
 A field model defines how role-local numeric state changes when the protocol machine invokes `EffectHandler::step`, how an effect handler is constructed, and how default per-role initial states are derived.
-This keeps protocol structure separate from model-specific dynamics.
-
-The simulator-facing abstraction is `FieldModel` in `rust/simulator/src/field.rs`.
-`FieldSpec` is the built-in serde-tagged catalog for shipped field families.
-Custom Rust integrations may implement `FieldModel` directly without modifying the scenario schema.
+See [Simulation Fields](504_simulation_fields.md) for the `FieldModel` trait, built-in field families, and environment extension hooks.
 
 Topology, medium behavior, mobility, capability limits, and link admission live beside the field layer as separate environment hooks.
-The shared execution core consumes `EnvironmentSnapshot`, emits `EnvironmentTrace`, and accepts external model implementations without baking domain-specific naming into core `Scenario`.
+The shared execution core consumes `EnvironmentSnapshot` and emits `EnvironmentTrace` without baking domain-specific naming into core `Scenario`.
 
 ### Execution and Theorem Profiles
 
-The primary integration path is `SimulationHarness` with either `DirectAdapter` or `FieldAdapter`.
 Execution policy is explicit through `Scenario.execution`, which separates backend choice from scheduler policy, scheduler concurrency, and worker-thread count.
-The default `auto` policy resolves to the authoritative canonical execution lane with `scheduler_concurrency = 1` and `worker_threads = 1`.
-
 The simulator also exposes a separate theorem/profile layer through `Scenario.theorem`.
-This layer records scheduler profile, envelope profile, and transport/adversary assumption bundle independently of raw execution settings.
 That separation lets one execution be interpreted under different theorem-side contracts without changing the runtime behavior itself.
+See [Simulation Scenarios](503_simulation_scenarios.md) for the full schema and backend resolution rules.
 
 ### Reporting and Analysis
 
@@ -61,39 +71,19 @@ It is the recommended integration lane for external projects.
 
 `DirectAdapter` is for hosts that already own the `EffectHandler`.
 `FieldAdapter::from_scenario(...)` constructs the handler and initial states from built-in scenario field parameters.
-`FieldAdapter::new(...)` and `FieldAdapter::from_boxed_model(...)` accept a custom `FieldModel` from the host integration.
-If the host adapter supplies initial states directly, the `Scenario` does not need built-in field params at all.
-
-### Batch and Sweep Execution
-
-`SimulationHarness` supports batched execution through `run_batch(...)` and `run_batch_with(...)`.
-Batch execution parallelizes independent runs while preserving result order by input index.
-Batch results carry a theorem-profile manifest so batch tooling can inspect resolved theorem classifications without unpacking each run.
-
-`SimulationHarness::run_sweep(...)` expands one base `HarnessSpec` into a deterministic sweep over seeds, scheduler profiles, reconfiguration programs, adversary budgets, and capacity budgets.
-Sweep results emit a manifest with parameter bindings, theorem eligibility witnesses, and capacity-predicate reports.
-
-### Distributed Simulation
-
-`DistributedSimBuilder` accepts one explicit `NestedExecutionContract` describing outer scheduler concurrency and inner rounds-per-step.
-That nested-VM contract is distinct from worker-thread count and other performance-only parallelism controls.
+See [Simulation Fields](504_simulation_fields.md) for custom `FieldModel` integration via `FieldAdapter::new(...)` and `FieldAdapter::from_boxed_model(...)`.
 
 ## Generated Effect Helpers
 
-The simulator also exposes generated effect-family helper types under `telltale_simulator::generated`, such as `GeneratedEffectScenario`.
+The simulator exposes generated effect-family helper types under `telltale_simulator::generated`, such as `GeneratedEffectScenario`.
 Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
 These APIs currently sit beside the harness API rather than inside it.
 
-Scenario replay artifacts retain a canonical `reconfiguration_trace` shared across fresh runs, replay, and post-run analysis.
-The helper `compare_observability(...)` reports `exact_raw_match`, `equivalent_under_normalization`, or `safety_visible_divergence`.
-
 ## Document Map
 
-Use these pages for detailed behavior.
-
-- [Simulation Runner](502_simulation_runner.md)
-- [Simulation Scenarios](503_simulation_scenarios.md)
-- [Simulation Fields](504_simulation_fields.md)
+- [Simulation Runner](502_simulation_runner.md): execution mechanics, stats, harness API, batch/sweep, distributed simulation
+- [Simulation Scenarios](503_simulation_scenarios.md): TOML schema, adversaries, reconfiguration, network, properties, checkpointing
+- [Simulation Fields](504_simulation_fields.md): field model trait, built-in families, environment extension hooks
 
 ## CLI
 

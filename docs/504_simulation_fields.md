@@ -23,6 +23,15 @@ The harness provides `derive_initial_states(&Scenario)` for the built-in schema 
 Simulator field handlers implement deterministic `EffectHandler::step` updates over fixed-point state.
 The runner stores field state in coroutine registers starting at register `2`.
 
+### Initial State Derivation
+
+`derive_initial_states(&Scenario)` builds default per-role state vectors from the built-in `field` when present.
+`mean_field` broadcasts one concentration vector to every role.
+`hamiltonian` maps each role index to `[position, momentum]`.
+`continuum_field` assigns one scalar field value per role.
+
+If a `HostAdapter` returns explicit initial states, the simulator never consults the built-in field catalog.
+
 ## Environment Boundary
 
 External projects should extend the simulator through the domain-neutral environment hooks in `rust/simulator/src/environment.rs`.
