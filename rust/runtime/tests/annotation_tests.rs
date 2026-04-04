@@ -1,7 +1,6 @@
+//! Tests for the annotation framework compilation pipeline.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Tests for the enhanced annotation framework
 //
 // This test suite verifies that annotations work correctly throughout
 // the choreography compilation pipeline.

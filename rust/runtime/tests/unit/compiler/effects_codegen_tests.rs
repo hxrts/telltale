@@ -1,3 +1,4 @@
+// Unit tests for effects code generation.
 use super::*;
 use crate::ast::{Annotations, MessageType, Protocol, Role};
 

@@ -1,3 +1,5 @@
+//! Parsers for recursive and continue control-flow statements.
+
 use super::super::error::{ErrorSpan, ParseError};
 use super::super::statement::parse_block;
 use super::super::types::Statement;

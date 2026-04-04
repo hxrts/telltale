@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+//! Reconfiguration and recovery harness tests.
 
 use std::collections::BTreeMap;
 

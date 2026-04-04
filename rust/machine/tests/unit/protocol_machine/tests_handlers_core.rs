@@ -1,3 +1,5 @@
+    // Core effect handler dispatch and persistence tests.
+
     use super::*;
     use crate::instr::Instr;
     use crate::loader::CodeImage;

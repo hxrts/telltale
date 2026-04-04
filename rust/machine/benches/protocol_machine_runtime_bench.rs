@@ -1,3 +1,4 @@
+//! Criterion benchmark harness for protocol machine runtime.
 #![allow(missing_docs)]
 
 #[path = "protocol_machine_bench_common.rs"]

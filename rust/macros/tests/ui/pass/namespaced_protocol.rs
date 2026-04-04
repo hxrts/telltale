@@ -1,3 +1,4 @@
+//! Pass: namespaced protocol under a module declaration.
 use telltale_macros::tell;
 
 tell! {

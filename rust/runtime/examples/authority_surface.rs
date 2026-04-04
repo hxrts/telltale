@@ -1,3 +1,4 @@
+//! Authority surface example with effect family generation.
 use telltale_language::generated_effect_families;
 use telltale_runtime::compiler::parser::parse_choreography_str;
 

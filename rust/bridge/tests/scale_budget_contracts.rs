@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used, missing_docs)]
+//! Scale and memory budget contract enforcement tests.
 
 use std::collections::BTreeMap;
 

@@ -1,3 +1,4 @@
+//! Transport contract profile validation tests.
 #![allow(clippy::unwrap_used)]
 
 use telltale_runtime::{

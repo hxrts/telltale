@@ -1,3 +1,4 @@
+//! Pass: authority control-flow with effect checks.
 use telltale::tell;
 
 tell! {

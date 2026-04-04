@@ -1,7 +1,6 @@
+//! Performance benchmarks for TelltaleHandler.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Performance benchmarks for TelltaleHandler
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use serde::{Deserialize, Serialize};

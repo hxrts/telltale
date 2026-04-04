@@ -8,6 +8,7 @@ use std::time::Duration;
 use telltale_types::FixedQ32;
 
 /// Deterministic RNG for simulation middleware.
+#[derive(Debug, Clone)]
 pub struct SimRng {
     inner: ChaCha8Rng,
 }

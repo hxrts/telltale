@@ -281,6 +281,7 @@ struct ScheduledReconfigurationState {
     activated: bool,
 }
 
+#[derive(Debug, Clone)]
 struct ReconfigurationState {
     scheduled: Vec<ScheduledReconfigurationState>,
     applied: Vec<ReconfigurationRecord>,
@@ -291,6 +292,11 @@ struct ReconfigurationState {
 /// Stateful reconfiguration controller shared by one simulator run.
 pub struct ReconfigurationController {
     state: Mutex<ReconfigurationState>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ReconfigurationCheckpointState {
+    state: ReconfigurationState,
 }
 
 impl ReconfigurationController {
@@ -407,6 +413,20 @@ impl ReconfigurationController {
             }
         }
         Ok(summary)
+    }
+
+    pub(crate) fn checkpoint_state(&self) -> Result<ReconfigurationCheckpointState, String> {
+        Ok(ReconfigurationCheckpointState {
+            state: self.lock_state()?.clone(),
+        })
+    }
+
+    pub(crate) fn restore_state(
+        &self,
+        checkpoint: &ReconfigurationCheckpointState,
+    ) -> Result<(), String> {
+        *self.lock_state()? = checkpoint.state.clone();
+        Ok(())
     }
 }
 

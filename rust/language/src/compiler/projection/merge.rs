@@ -1,3 +1,5 @@
+//! Merging of labeled local types during projection.
+
 use super::*;
 use proc_macro2::Ident;
 

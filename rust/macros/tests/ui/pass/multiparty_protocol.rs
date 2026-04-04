@@ -1,3 +1,4 @@
+//! Pass: three-party multiparty protocol.
 use telltale_macros::tell;
 
 tell! {

@@ -1,3 +1,4 @@
+//! Communication replay-consumption model and nullifier tracking.
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};

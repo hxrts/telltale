@@ -1,4 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
+//! Capability model correspondence tests against the Lean runner.
 
 use serde_json::json;
 use telltale_bridge::protocol_machine_runner::ProtocolMachineRunner;

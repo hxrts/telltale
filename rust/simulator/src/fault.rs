@@ -186,6 +186,7 @@ struct InFlightMessage {
     value: Value,
 }
 
+#[derive(Debug, Clone)]
 struct AdversaryState {
     scheduled: Vec<ScheduledAdversaryState>,
     active_transport: Vec<ActiveTransportAdversary>,
@@ -217,6 +218,11 @@ pub struct AdversaryInjector<H: EffectHandler> {
     inner: H,
     program: Vec<ScheduledAdversary>,
     state: Mutex<AdversaryState>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct AdversaryCheckpointState {
+    state: AdversaryState,
 }
 
 impl<H: EffectHandler> AdversaryInjector<H> {
@@ -434,6 +440,20 @@ impl<H: EffectHandler> AdversaryInjector<H> {
             exhausted_adversaries: exhausted,
             assumption_failures,
         })
+    }
+
+    pub(crate) fn checkpoint_state(&self) -> Result<AdversaryCheckpointState, String> {
+        Ok(AdversaryCheckpointState {
+            state: self.lock_state()?.clone(),
+        })
+    }
+
+    pub(crate) fn restore_state(
+        &self,
+        checkpoint: &AdversaryCheckpointState,
+    ) -> Result<(), String> {
+        *self.lock_state()? = checkpoint.state.clone();
+        Ok(())
     }
 }
 

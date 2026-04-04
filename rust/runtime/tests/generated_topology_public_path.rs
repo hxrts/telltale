@@ -1,3 +1,4 @@
+//! Tests for generated topology code and public API paths.
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]

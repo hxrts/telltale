@@ -1,3 +1,4 @@
+// Immutable program storage with deterministic interning.
 fn default_instruction_cost() -> usize {
     1
 }

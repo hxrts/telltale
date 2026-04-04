@@ -326,3 +326,33 @@ fn external_environment_models_emit_domain_neutral_environment_trace() {
         if *outcome == MediumOutcomeKind::DeliverNow
     )));
 }
+
+#[test]
+fn composed_environment_models_are_deterministic_for_same_seed_and_snapshot() {
+    let (global_type, local_types) = finite_protocol();
+    let spec = HarnessSpec::new(local_types, global_type, scenario_without_builtin_field());
+    let adapter = FakeEnvironmentAdapter {
+        handler: PassthroughHandler,
+        topology: FakeTopologyModel,
+        medium: FakeMediumModel,
+        mobility: FakeMobilityModel,
+        node_capabilities: FakeNodeCapabilityModel,
+        admission: FakeAdmissionModel,
+    };
+    let harness = SimulationHarness::new(&adapter);
+
+    let first = harness.run(&spec).expect("first environment-enabled run");
+    let second = harness.run(&spec).expect("second environment-enabled run");
+
+    assert_eq!(
+        first.replay.environment_trace,
+        second.replay.environment_trace
+    );
+    assert_eq!(first.replay.obs_trace, second.replay.obs_trace);
+    assert_eq!(first.replay.effect_trace, second.replay.effect_trace);
+    assert_eq!(
+        first.replay.semantic_objects,
+        second.replay.semantic_objects
+    );
+    assert_eq!(first.analysis, second.analysis);
+}

@@ -1,3 +1,5 @@
+    // Flow-policy predicate application and fault tests.
+
     #[test]
     fn test_check_applies_predicate_flow_policy() {
         let local_types = simple_send_recv_types();

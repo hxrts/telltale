@@ -1,4 +1,5 @@
 #![allow(dead_code, unused_imports)]
+//! Shared test choreography fixtures organized by complexity tier.
 
 use std::collections::BTreeMap;
 

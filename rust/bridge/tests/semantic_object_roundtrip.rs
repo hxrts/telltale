@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+//! Semantic object extraction and roundtrip tests.
 
 use telltale_bridge::ProtocolMachineSemanticObjects;
 use telltale_machine::coroutine::Value;

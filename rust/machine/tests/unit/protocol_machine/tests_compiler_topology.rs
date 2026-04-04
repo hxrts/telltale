@@ -1,3 +1,5 @@
+    // Compiler topology tests for branch and choice codegen.
+
     #[test]
     fn test_compiler_multi_branch() {
         use crate::compiler::compile;

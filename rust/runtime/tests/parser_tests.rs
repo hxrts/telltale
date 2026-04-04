@@ -1,7 +1,6 @@
+//! Comprehensive tests for the choreographic DSL parser.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Comprehensive tests for the choreographic DSL parser
 
 use telltale_runtime::ast::Protocol;
 use telltale_runtime::compiler::parser::{parse_choreography_str, ParseError};

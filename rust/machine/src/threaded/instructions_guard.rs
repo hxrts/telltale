@@ -1,3 +1,4 @@
+// Guard acquire and release instructions for threaded mode.
 fn guard_active(config: &ProtocolMachineConfig, layer: &str) -> Result<(), Fault> {
     if config.guard_layers.is_empty() {
         return Ok(());

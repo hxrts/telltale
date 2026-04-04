@@ -1,3 +1,4 @@
+// Choice, speculation, and transfer instructions for threaded mode.
 fn step_join(coro: &mut Coroutine, sid: SessionId, tick: u64) -> Result<StepPack, Fault> {
     if coro.spec_state.is_none() {
         return Err(speculation_fault_join_requires_active());

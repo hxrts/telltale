@@ -1,3 +1,4 @@
+//! Pass: Role and Message derive macros with route channels.
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use telltale::{
     channel::Bidirectional,

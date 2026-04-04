@@ -1,3 +1,4 @@
+//! CLI integration tests for the choreography formatter.
 use std::io::Write;
 use std::process::{Command, Stdio};
 

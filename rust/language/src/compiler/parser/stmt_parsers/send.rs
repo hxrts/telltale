@@ -1,3 +1,5 @@
+//! Parser for message-send statements (A -> B : Message).
+
 use std::collections::HashSet;
 
 use super::super::role::parse_role_ref;

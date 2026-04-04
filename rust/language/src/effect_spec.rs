@@ -1,3 +1,5 @@
+//! Effect handler scaffolding and simulation metadata generation.
+
 use crate::ast::{Choreography, EffectAuthorityClass};
 use serde::{Deserialize, Serialize};
 use std::fs;

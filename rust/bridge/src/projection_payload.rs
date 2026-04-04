@@ -1,3 +1,5 @@
+//! Parsing helpers for projection JSON payloads.
+
 use serde_json::Value;
 use std::collections::HashMap;
 

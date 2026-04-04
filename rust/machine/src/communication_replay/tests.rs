@@ -1,3 +1,4 @@
+// Tests for communication replay modes and nullifier enforcement.
 #[cfg(test)]
 mod tests {
     use super::*;

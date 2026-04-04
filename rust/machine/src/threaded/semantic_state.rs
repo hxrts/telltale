@@ -1,3 +1,4 @@
+// Effect-request validation and ownership for threaded mode.
 impl ThreadedProtocolMachine {
     fn coro_owner_id(coro_id: usize) -> String {
         format!("coro:{coro_id}")

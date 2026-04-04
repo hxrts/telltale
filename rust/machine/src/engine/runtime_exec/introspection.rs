@@ -1,3 +1,4 @@
+// Refinement-slice export and runtime introspection queries.
 impl ProtocolMachine {
     /// Export the concrete runtime slice used for exact Rust/Lean refinement checks.
     ///

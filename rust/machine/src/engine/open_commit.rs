@@ -1,3 +1,4 @@
+// Session open and commit lifecycle for the protocol machine.
 impl ProtocolMachine {
     fn intern_edge(&mut self, edge: &Edge) -> EdgeId {
         let sender = self.role_symbols.intern(&edge.sender);

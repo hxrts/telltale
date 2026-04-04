@@ -1,3 +1,5 @@
+//! Semantic validation for simulator scenario configurations.
+
 use super::{validate_non_negative, validate_probability, Scenario};
 use std::collections::BTreeSet;
 

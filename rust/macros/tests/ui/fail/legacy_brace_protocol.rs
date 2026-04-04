@@ -1,3 +1,4 @@
+//! Compile-fail: legacy brace-delimited protocol syntax.
 use telltale_macros::tell;
 
 tell! {

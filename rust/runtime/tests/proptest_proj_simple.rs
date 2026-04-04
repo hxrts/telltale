@@ -1,8 +1,7 @@
+//! Simple property-based tests for choreography projection.
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Simple property-based tests for choreography projection
 //
 // Simplified version to verify proptest works
 

@@ -7,12 +7,13 @@ use telltale_machine::StepResult;
 
 use crate::backend::SimulationMachine;
 use crate::fault::{
-    AdversaryBudgetRecord, AdversaryInjector, AdversarySummary, AssumptionDiagnostic,
-    ScheduledAdversary,
+    AdversaryBudgetRecord, AdversaryCheckpointState, AdversaryInjector, AdversarySummary,
+    AssumptionDiagnostic, ScheduledAdversary,
 };
-use crate::network::NetworkModel;
+use crate::network::{NetworkCheckpointState, NetworkModel};
 use crate::reconfiguration::{
-    ReconfigurationController, ReconfigurationRecord, ReconfigurationSummary,
+    ReconfigurationCheckpointState, ReconfigurationController, ReconfigurationRecord,
+    ReconfigurationSummary,
 };
 use crate::rng::SimRng;
 use crate::scenario::Scenario;
@@ -21,6 +22,21 @@ use crate::scenario::Scenario;
 enum ScenarioTransport<'a> {
     Adversary(AdversaryInjector<&'a dyn EffectHandler>),
     Network(NetworkModel<AdversaryInjector<&'a dyn EffectHandler>>),
+}
+
+#[derive(Debug, Clone)]
+enum ScenarioTransportCheckpoint {
+    Adversary(AdversaryCheckpointState),
+    Network {
+        network: NetworkCheckpointState,
+        adversary: AdversaryCheckpointState,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ScenarioMiddlewareCheckpoint {
+    transport: ScenarioTransportCheckpoint,
+    reconfiguration: ReconfigurationCheckpointState,
 }
 
 /// Shared middleware stack for one scenario execution.
@@ -53,6 +69,17 @@ impl<'a> ScenarioMiddleware<'a> {
             transport,
             reconfiguration,
         })
+    }
+
+    pub(crate) fn from_checkpoint(
+        scenario: &Scenario,
+        handler: &'a dyn EffectHandler,
+        tick_duration: Duration,
+        checkpoint: &ScenarioMiddlewareCheckpoint,
+    ) -> Result<Self, String> {
+        let middleware = Self::from_scenario(scenario, handler, tick_duration)?;
+        middleware.restore_checkpoint_state(checkpoint)?;
+        Ok(middleware)
     }
 
     fn prepare_round(
@@ -174,6 +201,50 @@ impl<'a> ScenarioMiddleware<'a> {
     /// Reconfiguration accounting summary for the run.
     pub fn reconfiguration_summary(&self) -> Result<ReconfigurationSummary, String> {
         self.reconfiguration.summary()
+    }
+
+    pub(crate) fn checkpoint_state(&self) -> Result<ScenarioMiddlewareCheckpoint, String> {
+        let transport = match &self.transport {
+            ScenarioTransport::Adversary(adversary) => {
+                ScenarioTransportCheckpoint::Adversary(adversary.checkpoint_state()?)
+            }
+            ScenarioTransport::Network(net) => ScenarioTransportCheckpoint::Network {
+                network: net.checkpoint_state()?,
+                adversary: net.inner().checkpoint_state()?,
+            },
+        };
+        Ok(ScenarioMiddlewareCheckpoint {
+            transport,
+            reconfiguration: self.reconfiguration.checkpoint_state()?,
+        })
+    }
+
+    fn restore_checkpoint_state(
+        &self,
+        checkpoint: &ScenarioMiddlewareCheckpoint,
+    ) -> Result<(), String> {
+        match (&self.transport, &checkpoint.transport) {
+            (ScenarioTransport::Adversary(adversary), ScenarioTransportCheckpoint::Adversary(state)) => {
+                adversary.restore_state(state)?
+            }
+            (
+                ScenarioTransport::Network(net),
+                ScenarioTransportCheckpoint::Network { network, adversary },
+            ) => {
+                net.restore_state(network)?;
+                net.inner().restore_state(adversary)?;
+            }
+            (ScenarioTransport::Adversary(_), ScenarioTransportCheckpoint::Network { .. })
+            | (ScenarioTransport::Network(_), ScenarioTransportCheckpoint::Adversary(_)) => {
+                return Err(
+                    "checkpoint transport shape does not match the scenario middleware configuration"
+                        .to_string(),
+                )
+            }
+        }
+        self.reconfiguration
+            .restore_state(&checkpoint.reconfiguration)?;
+        Ok(())
     }
 }
 

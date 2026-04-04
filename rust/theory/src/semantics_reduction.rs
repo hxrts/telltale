@@ -1,3 +1,5 @@
+//! Reduction relations and multi-step reachability for global types.
+
 use super::{can_step, step, GlobalAction};
 use crate::limits::{TraversalFuel, DEFAULT_TRAVERSAL_FUEL};
 use std::collections::BTreeSet;

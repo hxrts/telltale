@@ -1,3 +1,5 @@
+//! Error and result types for topology validation.
+
 use std::fmt;
 
 use super::{RoleName, TopologyConstraint, TopologyParseError};

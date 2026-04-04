@@ -3,10 +3,8 @@
 use std::path::PathBuf;
 
 use telltale_machine::ProtocolMachine;
-use telltale_simulator::backend::SimulationMachine;
-use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
 use telltale_simulator::handler_from_field;
-use telltale_simulator::property::{PropertyContext, PropertyMonitor};
+use telltale_simulator::resume_with_scenario_from_checkpoint;
 use telltale_simulator::scenario::Scenario;
 
 struct ReplayArgs {
@@ -15,7 +13,6 @@ struct ReplayArgs {
     rounds: Option<u64>,
 }
 
-#[allow(clippy::too_many_lines)]
 fn main() {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     let replay_args = parse_args(&raw_args).unwrap_or_else(|e| usage(&format!("{e}\n")));
@@ -26,63 +23,30 @@ fn main() {
     let checkpoint =
         std::fs::read(&replay_args.checkpoint_path).unwrap_or_else(|e| fatal(&e.to_string()));
     let machine: ProtocolMachine =
-        serde_json::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
-    let mut machine = SimulationMachine::Canonical(machine);
+        serde_cbor::from_slice(&checkpoint).unwrap_or_else(|e| fatal(&e.to_string()));
 
     let field = scenario
         .field
         .as_ref()
         .unwrap_or_else(|| fatal("scenario is missing built-in field parameters"));
     let handler = handler_from_field(field);
-    let max_rounds = replay_args.rounds.unwrap_or(scenario.steps);
-    let concurrency = usize::try_from(
-        scenario
-            .resolved_execution()
-            .unwrap_or_else(|e| fatal(&e))
-            .scheduler_concurrency,
-    )
-    .unwrap_or_else(|_| fatal("scenario.execution.scheduler_concurrency exceeds usize"));
-
-    let mut monitor = scenario
-        .property_monitor()
-        .unwrap_or_else(|e| fatal(&format!("properties: {e}")))
-        .unwrap_or_else(|| PropertyMonitor::new(Vec::new()));
-    let middleware = ScenarioMiddleware::from_scenario(
+    let result = resume_with_scenario_from_checkpoint(
         &scenario,
+        machine,
         handler.as_ref(),
-        machine.clock().tick_duration,
-    )
-    .unwrap_or_else(|e| fatal(&format!("middleware setup: {e}")));
-
-    let _execution = execute_scenario_rounds(
-        &mut machine,
-        &scenario,
-        &middleware,
-        concurrency,
-        max_rounds,
-        |machine, _completed_rounds| {
-            let session_snapshots = machine.session_snapshots();
-            let coroutine_snapshots = machine.coroutines();
-            let ctx = PropertyContext {
-                tick: machine.clock().tick,
-                trace: machine.trace(),
-                sessions: &session_snapshots,
-                coroutines: &coroutine_snapshots,
-            };
-            monitor.check(&ctx);
-            Ok(())
-        },
+        None,
+        replay_args.rounds,
     )
     .unwrap_or_else(|e| fatal(&e));
 
-    if monitor.violations().is_empty() {
-        println!("replay completed (tick {})", machine.clock().tick);
+    if result.violations.is_empty() {
+        println!("replay completed (tick {})", result.stats.final_tick);
     } else {
         println!(
             "replay completed with {} violations",
-            monitor.violations().len()
+            result.violations.len()
         );
-        for v in monitor.violations() {
+        for v in &result.violations {
             println!("{} @ tick {}: {}", v.property_name, v.tick, v.details);
         }
         std::process::exit(2);

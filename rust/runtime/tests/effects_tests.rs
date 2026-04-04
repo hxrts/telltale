@@ -1,7 +1,6 @@
+//! Basic compilation smoke tests for the effect system.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Basic test to verify effect system compiles
 
 #[test]
 fn test_effect_traits_compile() {

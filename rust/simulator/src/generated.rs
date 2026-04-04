@@ -1,3 +1,5 @@
+//! Types for scripted generated-effect steps in simulator scenarios.
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use telltale_machine::{ProtocolMachineSemanticObjects, SemanticAuditRecord};

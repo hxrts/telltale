@@ -1,3 +1,5 @@
+//! Parsers for loop statements and loop condition clauses.
+
 use std::collections::HashMap;
 
 use crate::ast::Condition;

@@ -1,3 +1,5 @@
+//! Tier 1: minimal two-party protocol fixtures.
+
 use std::collections::BTreeMap;
 
 use telltale_bridge::InvariantClaims;

@@ -1,3 +1,5 @@
+//! Dynamic session wrapper and metadata for Telltale endpoints.
+
 use super::{ChoreoResult, ChoreographyError};
 use futures::{channel::mpsc, future::BoxFuture, SinkExt, StreamExt};
 use std::fmt::Debug;

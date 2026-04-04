@@ -1,3 +1,4 @@
+// Send and receive instruction execution with type-plan resolution.
 struct RecvTypePlan {
     ep: Endpoint,
     sid: SessionId,

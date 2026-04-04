@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+//! Proptest-based protocol bundle construction and validation.
 
 use std::collections::BTreeMap;
 

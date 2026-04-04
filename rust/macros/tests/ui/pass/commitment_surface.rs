@@ -1,3 +1,4 @@
+//! Pass: commitment surface with profiles and operations.
 use telltale::tell;
 
 tell! {

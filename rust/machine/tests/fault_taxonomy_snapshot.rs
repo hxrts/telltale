@@ -1,4 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
+//! Snapshot tests for fault taxonomy code stability.
 #![allow(missing_docs)]
 
 use telltale_machine::coroutine::Fault;

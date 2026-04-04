@@ -1,3 +1,4 @@
+//! Compile-fail tests for authority validation fixtures.
 use std::fs;
 use std::path::{Path, PathBuf};
 

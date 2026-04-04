@@ -1,3 +1,4 @@
+// Threaded execution driver with lock contention tracking.
 fn role_fingerprint(role: &str) -> u64 {
     const FNV_OFFSET: u64 = 0xcbf29ce484222325;
     const FNV_PRIME: u64 = 0x100000001b3;

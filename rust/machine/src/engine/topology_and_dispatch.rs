@@ -1,3 +1,4 @@
+// Topology event ingress, timeout management, and dispatch.
 impl ProtocolMachine {
     fn next_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
         let witness = TimeoutWitness {

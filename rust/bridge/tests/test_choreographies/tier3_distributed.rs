@@ -1,3 +1,5 @@
+//! Tier 3: distributed multi-party protocol fixtures.
+
 use std::collections::BTreeMap;
 
 use telltale_bridge::{

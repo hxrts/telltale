@@ -1,3 +1,5 @@
+//! Tier 5: negative test fixtures (invalid invariant claims).
+
 use telltale_bridge::{
     AvailabilityLevel, CAPConfig, DistributedClaims, FLPConfig, InvariantClaims, LivenessConfig,
     PartitionModel, ProtocolEnvelopeBridgeConfig, ProtocolMachineEnvelopeAdherenceConfig,

@@ -1,3 +1,5 @@
+//! JSON parsing and validation for protocol-machine runner output.
+
 use super::*;
 #[cfg(test)]
 use crate::bridge_normalization::{SchemaVersionBackfillPath, SCHEMA_VERSION_BACKFILL_PATHS};

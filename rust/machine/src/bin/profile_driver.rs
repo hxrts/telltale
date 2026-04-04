@@ -1,3 +1,4 @@
+//! Standalone profiling driver for protocol machine benchmarks.
 #![allow(missing_docs)]
 
 use std::collections::BTreeMap;

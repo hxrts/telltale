@@ -1,3 +1,4 @@
+// Unit tests for global-type operational semantics.
 use super::*;
 
 #[test]

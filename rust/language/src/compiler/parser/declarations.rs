@@ -1,3 +1,5 @@
+//! Parsers for top-level DSL declarations and metadata blocks.
+
 use super::*;
 use crate::ast::{
     AgreementProfileDeclaration, ChildEffectAggregation, ChildEffectAggregationPolicy,

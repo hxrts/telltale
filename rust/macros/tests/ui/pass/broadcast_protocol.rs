@@ -1,3 +1,4 @@
+//! Pass: broadcast protocol with leader-to-all send.
 use telltale_macros::tell;
 
 tell! {

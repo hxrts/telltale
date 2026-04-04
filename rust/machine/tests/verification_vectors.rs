@@ -1,4 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
+//! Verification model test vectors (hashing, signing, auth trees).
 #![allow(missing_docs)]
 
 use telltale_machine::coroutine::Value;

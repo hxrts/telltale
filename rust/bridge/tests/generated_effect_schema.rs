@@ -1,3 +1,5 @@
+//! Tests for generated effect family schema roundtrips.
+
 use telltale_language::compiler::parser::parse_choreography_str;
 use telltale_language::{
     generated_effect_families, GeneratedEffectBehavior, GeneratedEffectFamily,

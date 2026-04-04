@@ -1,3 +1,5 @@
+//! Linear asset tracking and ownership validation for protocols.
+
 use super::*;
 
 fn linear_usage_error(input: &str, message: impl Into<String>) -> ParseError {

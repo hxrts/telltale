@@ -1,3 +1,4 @@
+//! Compile-fail: ambiguous Message derive without payload markers.
 use telltale_macros::Message;
 
 #[derive(Message)]

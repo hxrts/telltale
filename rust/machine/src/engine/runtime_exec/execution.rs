@@ -1,3 +1,4 @@
+// Core scheduler round execution and coroutine stepping.
 impl ProtocolMachine {
     /// Execute one scheduler round: advance at most one ready coroutine.
     ///

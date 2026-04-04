@@ -1,3 +1,4 @@
+// KernelMachine trait implementation for ProtocolMachine.
 impl KernelMachine for ProtocolMachine {
     fn kernel_step_round(
         &mut self,

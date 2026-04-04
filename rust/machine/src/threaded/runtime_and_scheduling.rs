@@ -1,3 +1,4 @@
+// Thread-pool construction and scheduling for threaded mode.
 impl ThreadedProtocolMachine {
     /// Create with thread pool sized to available OS parallelism.
     #[must_use]

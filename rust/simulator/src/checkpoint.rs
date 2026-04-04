@@ -45,7 +45,7 @@ impl CheckpointStore {
             return;
         }
         self.last_persist_error = None;
-        let data = match serde_json::to_vec(machine) {
+        let data = match serde_cbor::to_vec(machine) {
             Ok(data) => data,
             Err(err) => {
                 self.last_persist_error =
@@ -62,7 +62,7 @@ impl CheckpointStore {
                 ));
                 return;
             }
-            let path = dir.join(format!("checkpoint_{tick}.json"));
+            let path = dir.join(format!("checkpoint_{tick}.cbor"));
             if let Some(bytes) = self.checkpoints.get(&tick) {
                 if let Err(err) = std::fs::write(&path, bytes) {
                     self.last_persist_error =
@@ -77,7 +77,13 @@ impl CheckpointStore {
     pub fn restore(&self, tick: u64) -> Option<ProtocolMachine> {
         self.checkpoints
             .get(&tick)
-            .and_then(|data| serde_json::from_slice(data).ok())
+            .and_then(|data| serde_cbor::from_slice(data).ok())
+    }
+
+    /// Access the serialized checkpoint map captured during this run.
+    #[must_use]
+    pub fn checkpoints(&self) -> &BTreeMap<u64, SerializedState> {
+        &self.checkpoints
     }
 
     /// Find the nearest checkpoint at or before the given tick.

@@ -1,7 +1,6 @@
+//! Three-party negotiation protocol using TelltaleHandler.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Three-party negotiation protocol example using TelltaleHandler
 //
 // This example demonstrates a negotiation protocol between a buyer, seller, and broker.
 // The broker facilitates the negotiation by coordinating offers and acceptances.

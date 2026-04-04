@@ -1,3 +1,4 @@
+//! Baseline performance capture for threaded vs cooperative execution.
 #![allow(missing_docs, clippy::as_conversions)]
 
 use cfg_if::cfg_if;

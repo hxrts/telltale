@@ -1,3 +1,4 @@
+//! Compile-fail: Role derive missing #[message] attribute.
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use telltale::{
     channel::Bidirectional,

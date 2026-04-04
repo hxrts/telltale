@@ -1,3 +1,5 @@
+//! Golden-file equivalence checks for projection role staleness.
+
 use super::*;
 use std::collections::BTreeSet;
 use std::path::Path;

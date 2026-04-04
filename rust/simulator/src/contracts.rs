@@ -131,7 +131,7 @@ impl Default for ContractCheckConfig {
 }
 
 /// Contract-check result for one simulator run.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ContractCheckReport {
     /// True when all enabled checks passed.
     pub passed: bool,

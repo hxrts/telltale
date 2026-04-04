@@ -1,3 +1,4 @@
+//! Contract tests for runtime substrate primitives.
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::expect_used)]
 

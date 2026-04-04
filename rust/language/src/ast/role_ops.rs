@@ -1,3 +1,5 @@
+//! Validation and safety checks for parameterized role types.
+
 use super::*;
 
 // Validation implementations for role types.

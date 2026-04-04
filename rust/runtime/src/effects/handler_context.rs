@@ -1,3 +1,5 @@
+//! Context helpers and error-wrapping combinators for effect handlers.
+
 use super::{ChoreoResult, ChoreographyError};
 
 impl ChoreographyError {

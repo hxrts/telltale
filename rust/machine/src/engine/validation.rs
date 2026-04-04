@@ -1,3 +1,4 @@
+// Public accessors and validation queries for protocol machine state.
 impl ProtocolMachine {
     /// Access the simulation clock.
     #[must_use]

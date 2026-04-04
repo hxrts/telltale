@@ -1,3 +1,4 @@
+//! Deterministic test vectors for heap and Merkle tree encoding.
 use serde::Deserialize;
 use std::fs;
 use telltale_runtime::heap::{

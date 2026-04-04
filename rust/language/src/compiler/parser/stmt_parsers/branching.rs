@@ -1,3 +1,5 @@
+//! Parsers for choice branches and guarded selection.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::Role;

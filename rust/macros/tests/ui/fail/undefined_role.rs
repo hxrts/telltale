@@ -1,3 +1,4 @@
+//! Compile-fail: undefined role used in send statement.
 use telltale_macros::tell;
 
 tell! {

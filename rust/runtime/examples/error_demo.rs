@@ -1,7 +1,6 @@
+//! Demo of improved parser error messages with span information.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Demo: Improved error messages with span information
 //
 // This example demonstrates the enhanced error reporting in the choreography parser.
 // Run with: cargo run --example error_demo

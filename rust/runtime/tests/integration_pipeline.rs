@@ -1,7 +1,6 @@
+//! Integration tests for end-to-end choreography execution.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Integration tests for end-to-end choreography execution
 //
 // These tests verify the complete pipeline from choreography construction
 // through projection and analysis.

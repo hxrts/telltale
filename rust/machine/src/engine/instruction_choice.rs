@@ -1,3 +1,4 @@
+// Select and branch instruction execution for choice points.
 impl ProtocolMachine {
     fn recv_choose_payload(
         &mut self,

@@ -1,3 +1,5 @@
+//! Parsers for authority expressions and capability statements.
+
 use std::collections::{HashMap, HashSet};
 
 use crate::ast::{AuthorityBindingMode, Role};

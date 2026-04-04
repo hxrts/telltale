@@ -1,4 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
+//! Replay fragment persistence and semantic-object identity tests.
 #![allow(clippy::expect_used)]
 #![allow(missing_docs)]
 

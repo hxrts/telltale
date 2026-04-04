@@ -255,6 +255,67 @@ pub struct ScenarioBundleSummary {
     pub root_branch_id: BranchId,
 }
 
+/// Canonical generic report model rendered by the first shared viewer shell.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ViewerReport {
+    pub artifacts: Vec<ArtifactInventoryEntry>,
+    pub scenario_summaries: Vec<ViewerScenarioReport>,
+    pub artifact_family_counts: BTreeMap<ViewerArtifactKind, u64>,
+}
+
+/// Stable scenario card content derived from one scenario bundle artifact.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ViewerScenarioReport {
+    pub artifact_id: ArtifactId,
+    pub summary: ScenarioBundleSummary,
+}
+
+impl ViewerReport {
+    /// Load the canonical generic viewer report through the typed query surface.
+    ///
+    /// # Errors
+    ///
+    /// Returns any query or decoding errors from the backing application service.
+    pub fn load(service: &impl ViewerApplicationService) -> Result<Self, ViewerModelError> {
+        let ViewerQueryResult::ArtifactInventory { artifacts } =
+            service.query(ViewerQuery::ListArtifacts)?
+        else {
+            return Err(ViewerModelError::UnexpectedQueryShape {
+                expected: "artifact_inventory".to_string(),
+            });
+        };
+        let mut artifact_family_counts: BTreeMap<ViewerArtifactKind, u64> = BTreeMap::new();
+        let mut scenario_summaries = Vec::new();
+        for artifact in &artifacts {
+            *artifact_family_counts.entry(artifact.kind).or_insert(0) = artifact_family_counts
+                .get(&artifact.kind)
+                .copied()
+                .unwrap_or(0)
+                .saturating_add(1);
+            if artifact.kind == ViewerArtifactKind::ScenarioBundle {
+                let ViewerQueryResult::ScenarioSummary { summary } =
+                    service.query(ViewerQuery::ScenarioSummary {
+                        artifact_id: artifact.artifact_id.clone(),
+                    })?
+                else {
+                    return Err(ViewerModelError::UnexpectedQueryShape {
+                        expected: "scenario_summary".to_string(),
+                    });
+                };
+                scenario_summaries.push(ViewerScenarioReport {
+                    artifact_id: artifact.artifact_id.clone(),
+                    summary,
+                });
+            }
+        }
+        Ok(Self {
+            artifacts,
+            scenario_summaries,
+            artifact_family_counts,
+        })
+    }
+}
+
 /// Stable graph projection family requested by the UI layer.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -856,6 +917,7 @@ pub enum ViewerModelError {
     UnsupportedSchemaVersion { supported: u32, found: u32 },
     NotFound { kind: String, id: String },
     Serialization { message: String },
+    UnexpectedQueryShape { expected: String },
 }
 
 impl fmt::Display for ViewerModelError {
@@ -869,6 +931,12 @@ impl fmt::Display for ViewerModelError {
             ),
             Self::NotFound { kind, id } => write!(f, "missing {kind} `{id}`"),
             Self::Serialization { message } => write!(f, "serialization error: {message}"),
+            Self::UnexpectedQueryShape { expected } => {
+                write!(
+                    f,
+                    "application service returned an unexpected query result; expected {expected}"
+                )
+            }
         }
     }
 }
@@ -914,6 +982,7 @@ mod tests {
                 semantic_objects: telltale_machine::ProtocolMachineSemanticObjects::default(),
                 reconfiguration_trace: Vec::new(),
                 environment_trace: EnvironmentTrace::default(),
+                checkpoints: Vec::new(),
             },
             analysis: ScenarioAnalysisArtifact {
                 normalized_observability: NormalizedObservability {
@@ -968,6 +1037,7 @@ mod tests {
                 total_obs_events: 0,
                 total_invoked_events: 0,
                 checkpoint_writes: 0,
+                checkpoint_error: None,
             },
         }
     }

@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+//! Protocol bundle invariant verification via the Lean runner.
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;

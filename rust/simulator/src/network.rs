@@ -89,6 +89,14 @@ pub struct NetworkModel<H: EffectHandler> {
     tick_duration: Duration,
 }
 
+#[derive(Debug, Clone)]
+pub(crate) struct NetworkCheckpointState {
+    rng: SimRng,
+    in_flight: Vec<InFlightMessage>,
+    dynamic: DynamicNetworkState,
+    current_tick: u64,
+}
+
 impl<H: EffectHandler> NetworkModel<H> {
     fn lock_in_flight(&self) -> Result<std::sync::MutexGuard<'_, Vec<InFlightMessage>>, String> {
         self.in_flight
@@ -232,6 +240,24 @@ impl<H: EffectHandler> NetworkModel<H> {
     /// Remove one federation partitioning policy.
     pub fn clear_federation(&self, federation: &str) -> Result<(), String> {
         self.lock_dynamic()?.federations.remove(federation);
+        Ok(())
+    }
+
+    pub(crate) fn checkpoint_state(&self) -> Result<NetworkCheckpointState, String> {
+        Ok(NetworkCheckpointState {
+            rng: self.lock_rng()?.clone(),
+            in_flight: self.lock_in_flight()?.clone(),
+            dynamic: self.lock_dynamic()?.clone(),
+            current_tick: self.current_tick.load(Ordering::Relaxed),
+        })
+    }
+
+    pub(crate) fn restore_state(&self, checkpoint: &NetworkCheckpointState) -> Result<(), String> {
+        *self.lock_rng()? = checkpoint.rng.clone();
+        *self.lock_in_flight()? = checkpoint.in_flight.clone();
+        *self.lock_dynamic()? = checkpoint.dynamic.clone();
+        self.current_tick
+            .store(checkpoint.current_tick, Ordering::Relaxed);
         Ok(())
     }
 

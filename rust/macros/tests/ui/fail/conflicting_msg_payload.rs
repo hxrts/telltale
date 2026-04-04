@@ -1,3 +1,4 @@
+//! Compile-fail: conflicting message payload declarations.
 use telltale_macros::tell;
 
 tell! {

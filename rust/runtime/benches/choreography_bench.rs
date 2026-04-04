@@ -1,7 +1,6 @@
+//! Benchmarks for choreographic programming critical paths.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Benchmarks for choreographic programming critical paths
 //
 // This benchmark suite tests the performance of:
 // - Projection algorithm (global choreography → local types)

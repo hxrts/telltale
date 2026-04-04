@@ -1,5 +1,6 @@
 #![cfg(feature = "runner")]
 #![allow(clippy::expect_used)]
+//! Cross-target protocol machine tests (threaded vs single-thread).
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicUsize, Ordering};

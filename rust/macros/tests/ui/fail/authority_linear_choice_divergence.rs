@@ -1,3 +1,4 @@
+//! Compile-fail: authority linear choice divergence detection.
 use telltale_macros::tell;
 
 tell! {

@@ -1,3 +1,4 @@
+// Commit finalization and endpoint delegation for threaded mode.
 impl ThreadedProtocolMachine {
     fn issue_delegation_receipt(
         &mut self,

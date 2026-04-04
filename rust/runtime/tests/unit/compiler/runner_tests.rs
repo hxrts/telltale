@@ -1,3 +1,4 @@
+    //! Unit tests for code generation runner helpers.
     use super::*;
     use crate::ast::Role;
 

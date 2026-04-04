@@ -1,3 +1,4 @@
+// Replay effect handler that replays recorded effect exchanges.
 impl EffectHandler for ReplayEffectHandler<'_> {
     fn handler_identity(&self) -> String {
         "replay_handler".to_string()

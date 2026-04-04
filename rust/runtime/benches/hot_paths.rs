@@ -1,3 +1,4 @@
+//! Hot-path benchmarks with allocation counting.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 

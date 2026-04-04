@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+//! Regular practical fragment checks via Lean projection runner.
 
 use telltale_bridge::{local_to_json, LeanRunner};
 use telltale_language::ast::convert::local_to_local_r;

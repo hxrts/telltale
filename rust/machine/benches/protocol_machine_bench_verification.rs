@@ -1,3 +1,4 @@
+//! Verification and allocation-counting benchmarks.
 #![allow(missing_docs)]
 
 use criterion::{black_box, BatchSize, Criterion};

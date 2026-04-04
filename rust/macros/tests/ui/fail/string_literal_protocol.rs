@@ -1,3 +1,4 @@
+//! Compile-fail: string literal passed to tell! macro.
 use telltale_macros::tell;
 
 tell!(r#"

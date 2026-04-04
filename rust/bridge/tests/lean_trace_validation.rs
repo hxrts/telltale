@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+//! Trace validation comparing Rust protocol machine to Lean runner.
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;

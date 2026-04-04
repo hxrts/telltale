@@ -1,4 +1,5 @@
 #![allow(clippy::as_conversions, clippy::expect_used)]
+//! Property-based tests for protocol machine trace consistency.
 
 use std::collections::BTreeMap;
 

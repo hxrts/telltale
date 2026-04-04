@@ -1,5 +1,6 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
+//! Heap and Merkle tree parity tests between Rust and Lean.
 
 use serde::Deserialize;
 use std::fs;

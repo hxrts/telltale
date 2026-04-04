@@ -1,3 +1,4 @@
+//! Compile-fail: observational effect misused in authority check.
 use telltale_macros::tell;
 
 tell! {

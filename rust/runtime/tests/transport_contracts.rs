@@ -1,3 +1,4 @@
+//! Machine-checkable transport contract profile tests.
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::unwrap_used)]
 

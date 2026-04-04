@@ -1,7 +1,6 @@
+//! Programmatic choreography construction with algebraic effects.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Programmatic Choreography Construction with Algebraic Effects
 //
 // This example demonstrates building complex choreographic protocols programmatically
 // using the algebraic effect API. It shows the two-phase commit protocol as a

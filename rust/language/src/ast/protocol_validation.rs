@@ -1,3 +1,5 @@
+//! Validation helpers for protocol role and choice declarations.
+
 use super::{Branch, NonEmptyVec, Protocol, Role, ValidationError};
 
 fn is_declared_role(roles: &[Role], role: &Role) -> bool {

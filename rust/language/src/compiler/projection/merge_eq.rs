@@ -1,3 +1,5 @@
+//! Structural equality for local session types.
+
 use super::*;
 
 impl PartialEq for LocalType {

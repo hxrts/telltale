@@ -1,3 +1,4 @@
+//! Contract and behavioral tests for effect handlers.
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]

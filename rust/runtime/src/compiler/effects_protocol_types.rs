@@ -1,3 +1,5 @@
+//! Code generation for protocol message and label types.
+
 use crate::ast::{MessageType, Protocol};
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};

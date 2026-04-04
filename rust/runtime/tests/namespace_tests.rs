@@ -1,10 +1,7 @@
+//! Tests for namespace support in choreographic protocols.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-/// Tests for namespace support in choreographic protocols
-///
-/// This module tests the namespace functionality added to support multiple
-/// choreographies in the same crate without type conflicts.
 use telltale_runtime::compiler::{
     generate_choreography_code_with_namespacing, parse_choreography_str, project,
 };

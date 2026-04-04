@@ -1,8 +1,4 @@
-// WASM compatibility tests for choreography system
-//
-// These tests verify that core choreographic programming features
-// work correctly when compiled to WASM.
-//
+//! WASM compatibility tests for core choreography features.
 #![cfg(all(target_arch = "wasm32", feature = "_wasm_integration_tests"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]

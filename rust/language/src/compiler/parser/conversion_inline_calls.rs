@@ -1,3 +1,5 @@
+//! Inline expansion of protocol call statements.
+
 use super::super::error::{ErrorSpan, ParseError};
 use super::super::types::{ChoiceBranch, Statement};
 use std::collections::HashMap;

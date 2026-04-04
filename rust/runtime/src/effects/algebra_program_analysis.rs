@@ -1,3 +1,5 @@
+//! Analysis utilities for free-algebra effect programs.
+
 use super::{Effect, Program};
 use crate::effects::RoleId;
 use std::collections::HashSet;

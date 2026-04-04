@@ -1,3 +1,4 @@
+//! Pass: choice protocol with branching on seller decision.
 use telltale_macros::tell;
 
 tell! {

@@ -1,4 +1,5 @@
 #![allow(clippy::expect_used)]
+//! Admission contract enforcement for protocol bundles.
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;

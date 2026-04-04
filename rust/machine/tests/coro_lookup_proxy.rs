@@ -1,3 +1,4 @@
+//! Coroutine lookup proxy stability tests.
 #![allow(missing_docs)]
 
 use std::collections::BTreeMap;

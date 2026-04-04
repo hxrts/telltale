@@ -1,3 +1,5 @@
+//! CLI binary for formatting `.tell` choreography source files.
+
 use std::env;
 use std::fs;
 use std::io::{self, Read};

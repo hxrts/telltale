@@ -1,4 +1,5 @@
 #![allow(clippy::as_conversions, clippy::expect_used)]
+//! Differential step-level comparison between Rust and Lean runners.
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;

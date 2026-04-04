@@ -1,3 +1,4 @@
+//! Authority control-flow corpus pass/fail acceptance tests.
 use std::fs;
 use std::path::{Path, PathBuf};
 

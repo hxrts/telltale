@@ -1,3 +1,5 @@
+// Unit and property-based tests for `FixedQ32` arithmetic.
+
 use super::*;
 use proptest::prelude::*;
 

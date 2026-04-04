@@ -1,3 +1,4 @@
+// Tag instruction: records knowledge facts on coroutines.
 impl ProtocolMachine {
     pub(crate) fn step_tag(
         &mut self,

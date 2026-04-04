@@ -1,3 +1,5 @@
+//! Graph algorithms for choreographic protocol analysis.
+
 use crate::ast::{Protocol, Role};
 use std::collections::{HashMap, HashSet};
 

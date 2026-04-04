@@ -1,3 +1,4 @@
+//! Shared helpers, fixtures, and allocator for protocol machine benchmarks.
 #![allow(missing_docs)]
 
 use std::alloc::{GlobalAlloc, Layout, System};

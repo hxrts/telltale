@@ -1,3 +1,5 @@
+    // Semantic state and session-store invariant tests.
+
     fn simple_send_recv_image() -> CodeImage {
         let mut local_types = BTreeMap::new();
         local_types.insert(

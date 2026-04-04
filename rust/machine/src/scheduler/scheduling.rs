@@ -1,3 +1,4 @@
+// Coroutine scheduling: lane selection and policy dispatch.
 impl Scheduler {
     /// Pick the next coroutine to execute, or `None` if none are ready.
     pub fn schedule(&mut self) -> Option<usize> {

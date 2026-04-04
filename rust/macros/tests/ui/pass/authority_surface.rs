@@ -1,3 +1,4 @@
+//! Pass: authority surface with effect declarations.
 use telltale::tell;
 
 tell! {

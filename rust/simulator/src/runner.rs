@@ -28,7 +28,7 @@ use telltale_machine::{
 use telltale_types::{GlobalType, LocalTypeR};
 
 use crate::checkpoint::CheckpointStore;
-use crate::execution::{execute_scenario_rounds, ScenarioMiddleware};
+use crate::execution::{execute_scenario_rounds, ScenarioMiddleware, ScenarioMiddlewareCheckpoint};
 use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
 use crate::reconfiguration::{ReconfigurationRecord, ReconfigurationSummary};
@@ -389,7 +389,29 @@ pub struct ScenarioReplayArtifact {
     pub reconfiguration_trace: Vec<ReconfigurationRecord>,
     /// Canonical environment trace captured from shared environment hooks.
     pub environment_trace: EnvironmentTrace,
+    /// Serialized canonical checkpoints captured during the run.
+    pub checkpoints: Vec<CheckpointArtifact>,
 }
+
+/// One serialized canonical checkpoint emitted during scenario execution.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct CheckpointArtifact {
+    /// Tick at which the checkpoint was captured.
+    pub tick: u64,
+    /// Serialized protocol-machine state payload.
+    pub machine_state: Vec<u8>,
+    /// Exact middleware state needed for semantics-preserving resume.
+    #[serde(skip_serializing, skip_deserializing, default)]
+    middleware_state: Option<ScenarioMiddlewareCheckpoint>,
+}
+
+impl PartialEq for CheckpointArtifact {
+    fn eq(&self, other: &Self) -> bool {
+        self.tick == other.tick && self.machine_state == other.machine_state
+    }
+}
+
+impl Eq for CheckpointArtifact {}
 
 /// Structured statistics emitted by scenario execution.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
@@ -428,6 +450,8 @@ pub struct ScenarioStats {
     pub total_invoked_events: usize,
     /// Number of checkpoint writes attempted by interval policy.
     pub checkpoint_writes: usize,
+    /// Last non-fatal checkpoint capture error observed during the run.
+    pub checkpoint_error: Option<String>,
 }
 
 /// Theorem-native progress summary for one scenario run.
@@ -753,6 +777,7 @@ fn execute_loaded_scenario_machine(
     resolved_execution: crate::scenario::ResolvedExecution,
     theorem_profile: ResolvedTheoremProfile,
     rounds_to_run: u64,
+    middleware_checkpoint: Option<&ScenarioMiddlewareCheckpoint>,
 ) -> Result<ScenarioResult, String> {
     let initial_session_snapshots = machine.session_snapshots();
     let initial_role_state = current_role_state(&machine, &coro_info);
@@ -768,6 +793,7 @@ fn execute_loaded_scenario_machine(
     })?;
     let mut step_idx: usize = 0;
     let mut checkpoint_writes: usize = 0;
+    let mut checkpoint_states: Vec<(u64, ScenarioMiddlewareCheckpoint)> = Vec::new();
 
     if steps_limit > 0 {
         record_all_roles(&machine, &coro_info, 0, &mut trace);
@@ -784,9 +810,16 @@ fn execute_loaded_scenario_machine(
         CheckpointStore::with_dir(interval, dir)
     });
 
-    let middleware =
-        ScenarioMiddleware::from_scenario(scenario, handler, machine.clock().tick_duration)
-            .map_err(|e| format!("middleware setup: {e}"))?;
+    let middleware = match middleware_checkpoint {
+        Some(checkpoint) => ScenarioMiddleware::from_checkpoint(
+            scenario,
+            handler,
+            machine.clock().tick_duration,
+            checkpoint,
+        ),
+        None => ScenarioMiddleware::from_scenario(scenario, handler, machine.clock().tick_duration),
+    }
+    .map_err(|e| format!("middleware setup: {e}"))?;
     let mut environment = EnvironmentController::new(
         &scenario.roles,
         scenario
@@ -832,6 +865,8 @@ fn execute_loaded_scenario_machine(
                 if let Some(interval) = scenario.checkpoint_interval {
                     if interval != 0 && machine.clock().tick % interval == 0 {
                         checkpoint_writes = checkpoint_writes.saturating_add(1);
+                        checkpoint_states
+                            .push((machine.clock().tick, middleware.checkpoint_state()?));
                     }
                 }
                 if let SimulationMachine::Canonical(inner) = machine {
@@ -868,6 +903,26 @@ fn execute_loaded_scenario_machine(
     let environment_trace = environment.trace().clone();
     let normalized_observability =
         crate::analysis::normalized_observability(&obs_trace, &reconfiguration_trace);
+    let checkpoint_artifacts = checkpoints
+        .as_ref()
+        .map(|store| {
+            store
+                .checkpoints()
+                .iter()
+                .map(|(tick, machine_state)| CheckpointArtifact {
+                    tick: *tick,
+                    machine_state: machine_state.clone(),
+                    middleware_state: checkpoint_states
+                        .iter()
+                        .find(|(checkpoint_tick, _)| checkpoint_tick == tick)
+                        .map(|(_, state)| state.clone()),
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let checkpoint_error = checkpoints
+        .as_ref()
+        .and_then(|store| store.last_persist_error().map(ToOwned::to_owned));
     let final_session_snapshots = machine.session_snapshots();
     let productive_step_count = productive_event_count(&obs_trace);
     let theorem_progress = theorem_progress_summary(
@@ -902,6 +957,7 @@ fn execute_loaded_scenario_machine(
             semantic_objects,
             reconfiguration_trace,
             environment_trace: environment_trace.clone(),
+            checkpoints: checkpoint_artifacts,
         },
         analysis: ScenarioAnalysisArtifact {
             normalized_observability,
@@ -924,6 +980,7 @@ fn execute_loaded_scenario_machine(
             total_obs_events: machine.trace().len(),
             total_invoked_events,
             checkpoint_writes,
+            checkpoint_error,
         },
     })
 }
@@ -976,6 +1033,52 @@ pub fn resume_with_scenario_from_checkpoint(
         resolved_execution,
         theorem_profile,
         rounds_to_run,
+        None,
+    )
+}
+
+/// Resume a canonical simulator run from an exact checkpoint artifact emitted by a prior run.
+///
+/// This path restores both protocol-machine and middleware state, so adversary,
+/// network, and reconfiguration behavior continues exactly from the checkpoint.
+///
+/// # Errors
+///
+/// Returns an error if the checkpoint cannot be decoded or the scenario is not
+/// resumable under the canonical backend.
+pub fn resume_with_checkpoint_artifact(
+    scenario: &Scenario,
+    checkpoint: &CheckpointArtifact,
+    handler: &dyn EffectHandler,
+    environment_models: Option<EnvironmentModels<'_>>,
+    rounds: Option<u64>,
+) -> Result<ScenarioResult, String> {
+    let machine: ProtocolMachine = serde_cbor::from_slice(&checkpoint.machine_state)
+        .map_err(|e| format!("decode checkpoint artifact: {e}"))?;
+    let resolved_execution = scenario.resolved_execution()?;
+    if resolved_execution.backend != ResolvedExecutionBackend::Canonical {
+        return Err(
+            "checkpoint replay currently requires the canonical simulator backend".to_string(),
+        );
+    }
+    let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
+    let rounds_to_run =
+        rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &machine));
+    let coro_info: CoroInfo = machine
+        .coroutines()
+        .into_iter()
+        .map(|coro| (coro.id, coro.role.clone()))
+        .collect();
+    execute_loaded_scenario_machine(
+        scenario,
+        handler,
+        environment_models,
+        SimulationMachine::Canonical(machine),
+        coro_info,
+        resolved_execution,
+        theorem_profile,
+        rounds_to_run,
+        checkpoint.middleware_state.as_ref(),
     )
 }
 
@@ -1032,5 +1135,6 @@ pub fn run_with_scenario_and_environment(
         resolved_execution,
         theorem_profile,
         scenario.steps.saturating_sub(1),
+        None,
     )
 }

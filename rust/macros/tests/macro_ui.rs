@@ -1,3 +1,4 @@
+//! UI test harness for procedural macro compile-time diagnostics.
 #[test]
 fn choreography_macro_ui() {
     let t = trybuild::TestCases::new();
@@ -10,6 +11,7 @@ fn choreography_macro_ui() {
     t.pass("tests/ui/pass/namespaced_protocol.rs");
     t.pass("tests/ui/pass/profiled_protocol.rs");
     t.pass("tests/ui/pass/role_derive.rs");
+    t.pass("tests/ui/pass/viewer_ownership_markers.rs");
     t.compile_fail("tests/ui/fail/string_literal_protocol.rs");
     t.compile_fail("tests/ui/fail/legacy_brace_protocol.rs");
     t.compile_fail("tests/ui/fail/duplicate_roles.rs");
@@ -20,4 +22,7 @@ fn choreography_macro_ui() {
     t.compile_fail("tests/ui/fail/authority_observational_choice_with_check.rs");
     t.compile_fail("tests/ui/fail/missing_message_attr.rs");
     t.compile_fail("tests/ui/fail/missing_route_attr.rs");
+    t.compile_fail("tests/ui/fail/actor_owned_missing_label.rs");
+    t.compile_fail("tests/ui/fail/observed_only_rejects_args.rs");
+    t.compile_fail("tests/ui/fail/weak_identifier_rejects_const.rs");
 }

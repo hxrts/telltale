@@ -1,3 +1,5 @@
+//! Reconfiguration and placement types for protocol role migration.
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};

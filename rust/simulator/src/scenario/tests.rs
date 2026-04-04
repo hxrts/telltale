@@ -1,3 +1,5 @@
+//! Tests for scenario parsing and validation.
+
 use super::*;
 
 #[test]

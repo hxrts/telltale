@@ -1,3 +1,5 @@
+//! Tier 4: classical analysis protocol fixtures (queueing, mixing).
+
 use std::collections::BTreeMap;
 
 use telltale_bridge::{ClassicalClaims, InvariantClaims, LittlesLawConfig, MixingConfig};

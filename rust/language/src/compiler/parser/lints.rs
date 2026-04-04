@@ -1,3 +1,5 @@
+//! Parser-level lint diagnostics and fix suggestions.
+
 use super::*;
 use crate::ast::Protocol;
 use std::fmt::Write;

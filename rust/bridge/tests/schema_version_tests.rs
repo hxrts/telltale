@@ -1,3 +1,5 @@
+//! Schema version roundtrip and compatibility tests.
+
 use serde_json::json;
 use std::collections::BTreeMap;
 use telltale_bridge::{

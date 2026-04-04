@@ -1,3 +1,4 @@
+// Recording effect handler that captures request-response exchanges.
 impl EffectHandler for RecordingEffectHandler<'_> {
     fn handler_identity(&self) -> String {
         self.inner.handler_identity()

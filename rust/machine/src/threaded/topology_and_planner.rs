@@ -1,3 +1,4 @@
+// Topology queries and fault-injection accessors for threaded mode.
 impl ThreadedProtocolMachine {
     /// Partitioned site-links currently active in topology state.
     #[must_use]

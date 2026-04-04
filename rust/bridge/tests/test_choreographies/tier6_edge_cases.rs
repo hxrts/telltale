@@ -1,3 +1,5 @@
+//! Tier 6: edge case protocol fixtures (recursion, self-loops).
+
 use std::collections::BTreeMap;
 
 use telltale_bridge::InvariantClaims;

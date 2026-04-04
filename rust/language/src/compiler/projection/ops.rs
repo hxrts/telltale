@@ -1,3 +1,5 @@
+//! Parallel projection merging and sequential composition.
+
 use super::merge::{merge_labeled_local_types, LabeledLocalType};
 use super::*;
 use proc_macro2::Ident;

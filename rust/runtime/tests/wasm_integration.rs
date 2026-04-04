@@ -1,8 +1,4 @@
-// WASM integration test - Full protocol execution
-//
-// This test demonstrates a complete two-party protocol executing in WASM,
-// including message exchange, timeouts, and error handling.
-//
+//! WASM integration test for full two-party protocol execution.
 #![cfg(all(target_arch = "wasm32", feature = "_wasm_integration_tests"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]

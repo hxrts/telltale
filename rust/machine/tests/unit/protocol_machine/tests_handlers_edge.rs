@@ -1,3 +1,4 @@
+    // Edge-case handler callback audit tests.
 
     #[derive(Default)]
     struct CallbackAuditHandler {

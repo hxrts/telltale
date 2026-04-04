@@ -1,7 +1,6 @@
+//! Client-server protocol example using TelltaleHandler.
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
-
-// Client-Server protocol example using TelltaleHandler
 //
 // This example demonstrates a simple request-response protocol between
 // a client and server using Telltale's session-typed channels.

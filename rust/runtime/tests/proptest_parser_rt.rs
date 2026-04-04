@@ -1,3 +1,4 @@
+//! Property-based round-trip tests for parser and formatter.
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]

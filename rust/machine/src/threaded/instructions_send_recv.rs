@@ -1,3 +1,4 @@
+// Send and receive instructions for threaded mode.
 struct SendPrepared {
     ep: Endpoint,
     sid: SessionId,

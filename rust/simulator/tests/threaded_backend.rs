@@ -115,11 +115,83 @@ step_size = "0.01"
     Scenario::parse(&toml).expect("parse scenario")
 }
 
+fn middleware_active_scenario(
+    name: &str,
+    backend: &str,
+    scheduler_concurrency: u64,
+    worker_threads: u64,
+) -> Scenario {
+    let toml = format!(
+        r#"
+name = "{name}"
+roles = ["A", "B"]
+steps = 8
+seed = 17
+
+[execution]
+backend = "{backend}"
+scheduler_concurrency = {scheduler_concurrency}
+worker_threads = {worker_threads}
+
+[network]
+base_latency_ms = 1
+latency_variance = "0.0"
+loss_probability = "0.0"
+
+[[adversaries]]
+id = "timing_once"
+trigger = {{ at_tick = 2 }}
+action = {{ type = "timing_disturbance", ticks = 1 }}
+budget = {{ total = 1, mode = "activation", assumption_failure = "fairness_failure" }}
+
+[[reconfigurations]]
+trigger = {{ at_tick = 1 }}
+action = {{ type = "handoff", handoff_id = "handoff#1", from_role = "A", to_role = "B" }}
+
+[properties]
+invariants = ["no_faults", "simplex"]
+
+[field]
+layer = "mean_field"
+
+[field.params]
+beta = "1.0"
+species = ["up", "down"]
+initial_state = ["0.5", "0.5"]
+step_size = "0.01"
+"#
+    );
+    Scenario::parse(&toml).expect("parse middleware-active scenario")
+}
+
+fn assert_authoritative_equivalence(
+    left: &telltale_simulator::runner::ScenarioResult,
+    right: &telltale_simulator::runner::ScenarioResult,
+) {
+    assert_eq!(left.replay.obs_trace, right.replay.obs_trace);
+    assert_eq!(left.replay.effect_trace, right.replay.effect_trace);
+    assert_eq!(
+        left.replay.output_condition_trace,
+        right.replay.output_condition_trace
+    );
+    assert_eq!(left.replay.semantic_objects, right.replay.semantic_objects);
+    assert_eq!(
+        left.replay.adversary_budget_history,
+        right.replay.adversary_budget_history
+    );
+    assert_eq!(
+        left.replay.reconfiguration_trace,
+        right.replay.reconfiguration_trace
+    );
+    assert_eq!(left.analysis, right.analysis);
+    assert_eq!(left.violations, right.violations);
+}
+
 #[test]
-fn threaded_backend_matches_canonical_at_scheduler_concurrency_one() {
+fn threaded_backend_matches_canonical_for_middleware_active_exact_runs() {
     let (global, local_types) = simple_protocol();
-    let canonical = scenario("canonical", 1, 1);
-    let threaded = scenario("threaded", 1, 2);
+    let canonical = middleware_active_scenario("threaded_phase19_canonical", "canonical", 1, 1);
+    let threaded = middleware_active_scenario("threaded_phase19_exact", "threaded", 1, 2);
 
     let canonical_result = run_with_scenario(
         &local_types,
@@ -138,22 +210,7 @@ fn threaded_backend_matches_canonical_at_scheduler_concurrency_one() {
     )
     .expect("threaded run");
 
-    assert_eq!(
-        canonical_result.replay.obs_trace, threaded_result.replay.obs_trace,
-        "threaded backend must preserve canonical observable traces at scheduler_concurrency = 1"
-    );
-    assert_eq!(
-        canonical_result.replay.effect_trace,
-        threaded_result.replay.effect_trace
-    );
-    assert_eq!(
-        canonical_result.replay.output_condition_trace,
-        threaded_result.replay.output_condition_trace
-    );
-    assert_eq!(
-        canonical_result.replay.semantic_objects,
-        threaded_result.replay.semantic_objects
-    );
+    assert_authoritative_equivalence(&canonical_result, &threaded_result);
 }
 
 #[test]
@@ -180,10 +237,10 @@ fn threaded_backend_reports_resolved_execution_settings() {
 }
 
 #[test]
-fn threaded_backend_is_worker_count_invariant_for_fixed_scheduler_concurrency() {
+fn threaded_backend_is_worker_count_invariant_for_middleware_active_exact_runs() {
     let (global, local_types) = simple_protocol();
-    let workers2 = scenario("threaded", 2, 2);
-    let workers4 = scenario("threaded", 2, 4);
+    let workers2 = middleware_active_scenario("threaded_phase19_workers2", "threaded", 1, 2);
+    let workers4 = middleware_active_scenario("threaded_phase19_workers4", "threaded", 1, 4);
 
     let result2 = run_with_scenario(
         &local_types,
@@ -202,14 +259,5 @@ fn threaded_backend_is_worker_count_invariant_for_fixed_scheduler_concurrency() 
     )
     .expect("threaded run with four workers");
 
-    assert_eq!(result2.replay.obs_trace, result4.replay.obs_trace);
-    assert_eq!(result2.replay.effect_trace, result4.replay.effect_trace);
-    assert_eq!(
-        result2.replay.output_condition_trace,
-        result4.replay.output_condition_trace
-    );
-    assert_eq!(
-        result2.replay.semantic_objects,
-        result4.replay.semantic_objects
-    );
+    assert_authoritative_equivalence(&result2, &result4);
 }

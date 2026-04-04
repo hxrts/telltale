@@ -1,3 +1,5 @@
+//! Lean runner projection export via the protocol-machine binary.
+
 use super::*;
 use std::io::Write;
 

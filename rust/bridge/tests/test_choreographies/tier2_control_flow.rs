@@ -1,3 +1,5 @@
+//! Tier 2: control flow protocol fixtures (choice, branching).
+
 use std::collections::BTreeMap;
 
 use telltale_bridge::InvariantClaims;

@@ -1,4 +1,5 @@
 #![allow(clippy::as_conversions, clippy::expect_used)]
+//! Rust/Lean protocol machine correspondence tests.
 
 #[path = "test_choreographies/mod.rs"]
 mod test_choreographies;

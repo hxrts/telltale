@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+//! Contract tests verifying doc-level invariants and authority tiers.
 
 use std::fs;
 use std::path::PathBuf;

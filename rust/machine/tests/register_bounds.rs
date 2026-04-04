@@ -1,4 +1,5 @@
 #![cfg(not(target_arch = "wasm32"))]
+//! Property tests for register and resource bound enforcement.
 #![allow(missing_docs)]
 
 use cfg_if::cfg_if;

@@ -1,3 +1,5 @@
+    // Runtime progress and dispatch correctness tests.
+
     #[test]
     fn test_vm_simple_send_recv() {
         let local_types = simple_send_recv_types();

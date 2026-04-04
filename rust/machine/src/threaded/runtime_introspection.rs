@@ -1,3 +1,4 @@
+// Runtime introspection and snapshot queries for threaded mode.
 impl ThreadedProtocolMachine {
     /// Snapshot all session states.
     ///

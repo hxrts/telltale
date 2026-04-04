@@ -1,3 +1,4 @@
+// Session store serialization and index rebuilding.
 impl<'de> Deserialize<'de> for SessionState {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

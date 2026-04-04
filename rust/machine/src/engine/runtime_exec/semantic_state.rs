@@ -1,3 +1,4 @@
+// Semantic state helpers: effect-request validation and ownership.
 impl ProtocolMachine {
     fn coro_owner_id(coro_id: usize) -> FragmentOwnerId {
         format!("coro:{coro_id}")

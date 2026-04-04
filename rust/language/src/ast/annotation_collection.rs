@@ -1,3 +1,5 @@
+//! Typed accessors for protocol annotation collections.
+
 use super::{DslAnnotationEntry, ProtocolAnnotation};
 use std::collections::HashMap;
 use std::time::Duration;

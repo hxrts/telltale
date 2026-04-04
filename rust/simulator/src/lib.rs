@@ -94,9 +94,11 @@ pub use reconfiguration::{
 };
 pub use rng::SimRng;
 pub use runner::{
-    compare_scheduler_runs, CriticalCapacityPhase, CriticalCapacitySummary,
-    ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus,
-    SchedulerFairnessRequirement, SchedulerProfileSummary, TheoremProgressSummary,
+    compare_scheduler_runs, remaining_rounds_from_checkpoint, resume_with_checkpoint_artifact,
+    resume_with_scenario_from_checkpoint, CheckpointArtifact, CriticalCapacityPhase,
+    CriticalCapacitySummary, ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison,
+    SchedulerEnvelopeStatus, SchedulerFairnessRequirement, SchedulerProfileSummary,
+    TheoremProgressSummary,
 };
 pub use sweep::{
     compare_sweep_results, run_sweep, SweepAxis, SweepBinding, SweepConfig, SweepDiffReport,

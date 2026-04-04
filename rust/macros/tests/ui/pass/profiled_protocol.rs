@@ -1,3 +1,4 @@
+//! Pass: protocol with an execution profile declaration.
 use telltale_macros::tell;
 
 tell! {

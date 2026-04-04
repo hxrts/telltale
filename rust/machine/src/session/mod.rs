@@ -1,3 +1,4 @@
+//! Session state, edge tracking, and verified buffer management.
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};

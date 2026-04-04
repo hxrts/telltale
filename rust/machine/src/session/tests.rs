@@ -1,3 +1,4 @@
+// Tests for session lifecycle, buffer operations, and auth trees.
     use serde_json::json;
     fn default_types() -> BTreeMap<String, LocalTypeR> {
         let mut m = BTreeMap::new();

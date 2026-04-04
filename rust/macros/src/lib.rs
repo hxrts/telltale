@@ -17,6 +17,7 @@ use proc_macro::TokenStream;
 
 mod choreography;
 mod message;
+mod ownership;
 mod parse;
 mod role;
 mod roles;
@@ -115,6 +116,46 @@ pub fn session(attr: TokenStream, input: TokenStream) -> TokenStream {
 #[proc_macro]
 pub fn tell(input: TokenStream) -> TokenStream {
     choreography::tell(input)
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Marks an observed-only surface that must not become an authoritative owner.
+#[proc_macro_attribute]
+pub fn observed_only(attr: TokenStream, input: TokenStream) -> TokenStream {
+    ownership::observed_only(attr.into(), input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Marks an actor-owned async/runtime surface with an explicit owner label.
+#[proc_macro_attribute]
+pub fn actor_owned(attr: TokenStream, input: TokenStream) -> TokenStream {
+    ownership::actor_owned(attr.into(), input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Marks a function or module that mints an authoritative-source projection.
+#[proc_macro_attribute]
+pub fn authoritative_source(attr: TokenStream, input: TokenStream) -> TokenStream {
+    ownership::authoritative_source(attr.into(), input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Marks a strong-reference boundary in UI/viewer plumbing.
+#[proc_macro_attribute]
+pub fn strong_reference(attr: TokenStream, input: TokenStream) -> TokenStream {
+    ownership::strong_reference(attr.into(), input.into())
+        .unwrap_or_else(|err| err.to_compile_error())
+        .into()
+}
+
+/// Marks a weak identifier that must not be silently upgraded.
+#[proc_macro_attribute]
+pub fn weak_identifier(attr: TokenStream, input: TokenStream) -> TokenStream {
+    ownership::weak_identifier(attr.into(), input.into())
         .unwrap_or_else(|err| err.to_compile_error())
         .into()
 }

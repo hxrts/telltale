@@ -1,3 +1,5 @@
+//! Mock handler with scripted responses for interpreter testing.
+
 use super::{
     async_trait, ChoreoHandler, ChoreoResult, ChoreographyError, DeserializeOwned, RoleId,
     Serialize,

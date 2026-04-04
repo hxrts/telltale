@@ -1,3 +1,4 @@
+//! Runtime workload benchmarks for the protocol machine.
 #![allow(missing_docs)]
 
 use criterion::{black_box, BatchSize, Criterion};

@@ -1,3 +1,4 @@
+//! Compile-fail: duplicate role declarations.
 use telltale_macros::tell;
 
 tell! {

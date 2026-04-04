@@ -1,3 +1,5 @@
+//! Parsers for semantic protocol operations (begin, commit, etc.).
+
 use super::{next_required, parse_role_ref, syntax_error, ParseError, Rule};
 use crate::ast::CommitmentOutcome;
 use crate::compiler::parser::declarations::parse_progress_attachment;

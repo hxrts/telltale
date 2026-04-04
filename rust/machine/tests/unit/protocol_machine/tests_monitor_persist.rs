@@ -1,3 +1,5 @@
+    // Monitor precheck and persistence rejection tests.
+
     #[test]
     fn test_monitor_precheck_rejects_open_role_dst_arity_mismatch() {
         let image = open_test_image(Instr::Open {
