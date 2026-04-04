@@ -33,15 +33,33 @@ if [[ -n "${ignored_staged}" ]]; then
 fi
 echo -e "${GREEN}OK${NC}"
 
-# 1. Format check (staged .rs files only)
+# 1. Format check (only crates with staged .rs files)
 echo -n "Checking formatting... "
 staged_rs=$(git diff --cached --name-only --diff-filter=d | grep '\.rs$' || true)
 if [[ -z "$staged_rs" ]]; then
     echo -e "${GREEN}OK${NC} (no Rust files staged)"
 else
-    fmt_failed=0
-    echo "$staged_rs" | xargs rustfmt --check 2>/dev/null || fmt_failed=1
-    if [[ $fmt_failed -eq 0 ]]; then
+    # Derive affected crate names so cargo fmt picks up the right edition
+    fmt_crates=""
+    seen_fmt=""
+    while IFS= read -r rs_file; do
+        crate_dir="$rs_file"
+        while [[ "$crate_dir" != "." ]]; do
+            crate_dir="$(dirname "$crate_dir")"
+            if [[ -f "$crate_dir/Cargo.toml" ]]; then
+                crate_name=$(grep -m1 '^name' "$crate_dir/Cargo.toml" | sed 's/.*= *"//;s/".*//')
+                if [[ -n "$crate_name" && ! " $seen_fmt " =~ " $crate_name " ]]; then
+                    fmt_crates="$fmt_crates -p $crate_name"
+                    seen_fmt="$seen_fmt $crate_name"
+                fi
+                break
+            fi
+        done
+    done <<< "$staged_rs"
+
+    if [[ -z "$fmt_crates" ]]; then
+        echo -e "${GREEN}OK${NC} (no crates affected)"
+    elif eval cargo fmt $fmt_crates -- --check 2>/dev/null; then
         echo -e "${GREEN}OK${NC}"
     else
         echo -e "${RED}FAILED${NC}"
