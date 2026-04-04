@@ -77,8 +77,8 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Topology](603_topology.md) | Guide | Mixed |
 | [Lean Verification](801_lean_verification.md) | Reference | Mixed |
 | [Capability Admission](702_capability_admission.md) | Reference | Normative |
-| [Theorem Program](804_theorem_program.md) | Concept | Mixed |
-| [Distributed and Classical Families](805_distributed_classical_families.md) | Reference | Mixed |
+| [Theorem Program](803_theorem_program.md) | Concept | Mixed |
+| [Distributed and Classical Families](804_distributed_classical_families.md) | Reference | Mixed |
 | [Examples](205_examples.md) | Guide | Informative |
 | [WASM Guide](206_wasm_guide.md) | Guide | Informative |
 | [API Reference](901_api_reference.md) | Reference | Informative |
@@ -86,7 +86,6 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Verification Inventory](902_verification_inventory.md) | Reference | Informative |
 | [Capability Model](701_capability_model.md) | Reference | Normative |
 | [Authority Language Surface](703_authority_language_surface.md) | Reference | Normative |
-| [Semantic Runtime Naming Parity](803_semantic_runtime_name_parity.md) | Reference | Normative |
 | [Conservation Framework](102_conservation_framework.md) | Concept | Normative |
 
 ## Paths by Role
@@ -101,7 +100,7 @@ Start with [Architecture](104_architecture.md). Then read [Effect Handlers and S
 
 ### Paper Reviewers
 
-Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](801_lean_verification.md), and [Rust-Lean Bridge and Parity](802_rust_lean_parity.md). Continue with [Capability Admission](702_capability_admission.md) and [Theorem Program](804_theorem_program.md). See [Distributed and Classical Families](805_distributed_classical_families.md) and [Glossary and Notation Index](903_glossary_notation.md) for reference.
+Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](801_lean_verification.md), and [Rust-Lean Bridge and Parity](802_rust_lean_parity.md). Continue with [Capability Admission](702_capability_admission.md) and [Theorem Program](803_theorem_program.md). See [Distributed and Classical Families](804_distributed_classical_families.md) and [Glossary and Notation Index](903_glossary_notation.md) for reference.
 
 ## Further Reading
 

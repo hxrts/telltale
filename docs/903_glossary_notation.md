@@ -7,8 +7,8 @@ It serves as the stable lookup for terminology and notation.
 
 | Term | Meaning | Primary Docs |
 |---|---|---|
-| coherence | Session-wide compatibility invariant between local type state, buffers, and global structure. | [Theory](103_theory.md), [Theorem Program](804_theorem_program.md) |
-| harmony | Projection and protocol evolution commute under declared premises. | [Theory](103_theory.md), [Theorem Program](804_theorem_program.md) |
+| coherence | Session-wide compatibility invariant between local type state, buffers, and global structure. | [Theory](103_theory.md), [Theorem Program](803_theorem_program.md) |
+| harmony | Projection and protocol evolution commute under declared premises. | [Theory](103_theory.md), [Theorem Program](803_theorem_program.md) |
 | projection | Mapping from global choreography to per-role local session types. | [Choreographic Projection Patterns](203_projection.md) |
 | local type | Per-role protocol view used for runtime typing and progression. | [Theory](103_theory.md), [Session Lifecycle](403_session_lifecycle.md) |
 | effect handler | Runtime boundary that interprets protocol-machine or choreography actions. | [Choreography Effect Handlers](301_effect_handlers.md), [Effect Handlers and Session Types](303_effect_session_bridge.md) |
@@ -67,7 +67,7 @@ It serves as the stable lookup for terminology and notation.
 | `!T.S` | Send `T`, then continue as `S`. | [Theory](103_theory.md) |
 | `?T.S` | Receive `T`, then continue as `S`. | [Theory](103_theory.md) |
 | `end` | Session termination state. | [Theory](103_theory.md) |
-| `Consume` | Recursive receiver-side trace alignment kernel used in coherence proofs. | [Theory](103_theory.md), [Theorem Program](804_theorem_program.md) |
+| `Consume` | Recursive receiver-side trace alignment kernel used in coherence proofs. | [Theory](103_theory.md), [Theorem Program](803_theorem_program.md) |
 | `n = 1` | Canonical single-step concurrency regime for exact parity. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) |
 | `n > 1` | Higher-concurrency regime admitted under envelope and premise-scoped constraints. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) |
 | `Full`, `ModuloEffects`, `ModuloCommutativity`, `Replay` | Runtime determinism profiles. | [Protocol Machine Architecture](401_protocol_machine_architecture.md), [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) |
@@ -91,4 +91,4 @@ Prefer existing symbols from this index unless precision requires a different on
 - [Theory](103_theory.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)
-- [Theorem Program](804_theorem_program.md)
+- [Theorem Program](803_theorem_program.md)

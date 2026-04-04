@@ -208,4 +208,4 @@ Admission and capability drift are controlled by repository lanes.
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)
 - [Lean Verification](801_lean_verification.md)
-- [Theorem Program](804_theorem_program.md)
+- [Theorem Program](803_theorem_program.md)
