@@ -1,0 +1,5 @@
+error: #[weak_identifier] is only supported on struct, enum, type, fn items, not const
+ --> tests/ui/fail/weak_identifier_rejects_const.rs:4:1
+  |
+4 | const ARTIFACT_ID: &str = "artifact";
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

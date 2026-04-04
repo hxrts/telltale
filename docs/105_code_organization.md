@@ -22,6 +22,8 @@ telltale/
 │   ├── machine/            telltale-machine
 │   ├── simulator/          telltale-simulator
 │   ├── viewer/             telltale-viewer
+│   ├── ui/                 telltale-ui
+│   ├── web/                telltale-web
 │   ├── bridge/             telltale-bridge
 │   ├── transport/          telltale-transport
 │   └── lints/              telltale-lints
@@ -48,6 +50,8 @@ The main direct dependency directions are:
 - `telltale-macros` is used by `telltale-runtime` and the root `telltale` crate.
 - `telltale-machine` is used by `telltale-simulator`, `telltale-bridge`, and the root `telltale` crate.
 - `telltale-simulator` is used by `telltale-viewer` as the authoritative source of simulation artifacts.
+- `telltale-viewer` is used by `telltale-ui` as the pure artifact/query/command layer.
+- `telltale-ui` is used by `telltale-web` as the shared portable Dioxus UI core.
 - The root `telltale` crate is used by `telltale-runtime` as a facade dependency.
 - `telltale-runtime` is used by `telltale-bridge` through optional features and by `telltale-transport`.
 
@@ -123,6 +127,20 @@ It owns viewer artifact envelopes, schema/version handling, branch patch types, 
 This crate is intentionally renderer-free.
 Browser APIs and Dioxus component concerns belong in the future `telltale-web` and `telltale-ui` layers, not here.
 The goal is to keep artifact loading, branch mutation requests, and historical inspection state deterministic and reusable across shells.
+
+### telltale-ui
+
+`telltale-ui` is the portable Dioxus UI core for shared simulator tooling.
+It owns the global shell layout, reusable panels/cards/toolbars/badges, graph rendering primitives, viewer route state, readiness/publication diagnostics, and the task-owner helper used by long-lived UI work.
+
+This crate is intentionally browser-free.
+It consumes `telltale-viewer` through the typed query/command boundary and renders observed projections over authoritative artifacts.
+
+### telltale-web
+
+`telltale-web` is the thin browser/WASM shell around `telltale-ui`.
+It owns `Dioxus.toml`, `index.html`, Tailwind packaging, browser bootstrap, and any future browser-specific integration.
+The goal is to keep platform interop here and keep the reusable UI core portable.
 
 ### telltale-runtime
 

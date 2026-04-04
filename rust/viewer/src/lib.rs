@@ -1164,4 +1164,47 @@ mod tests {
             other => panic!("unexpected lineage result: {other:?}"),
         }
     }
+
+    #[test]
+    fn branch_lineage_graph_projection_is_deterministic() {
+        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(
+            ScenarioBundleArtifact::new(None, sample_result(), None),
+        ));
+        let mut service = InMemoryViewerService::new();
+        service
+            .command(ViewerCommand::ImportArtifact {
+                artifact_id: "run/demo".to_string(),
+                artifact,
+            })
+            .expect("import artifact");
+        service
+            .command(ViewerCommand::CreateBranch {
+                run_id: "run/demo".to_string(),
+                branch_id: "branch/alt".to_string(),
+                parent_branch_id: "root".to_string(),
+                from_step: 3,
+                patch: ScenarioBranchPatch {
+                    operations: vec![ScenarioPatchOperation::SetSeed { seed: 99 }],
+                },
+            })
+            .expect("create branch");
+
+        let projection = service
+            .query(ViewerQuery::GraphProjection(GraphProjectionRequest {
+                run_id: "run/demo".to_string(),
+                branch_id: "root".to_string(),
+                step: None,
+                kind: GraphProjectionKind::BranchLineage,
+            }))
+            .expect("branch lineage graph");
+        match projection {
+            ViewerQueryResult::GraphProjection { projection } => {
+                assert_eq!(projection.nodes.len(), 2);
+                assert_eq!(projection.edges.len(), 1);
+                assert_eq!(projection.edges[0].from, "root");
+                assert_eq!(projection.edges[0].to, "branch/alt");
+            }
+            other => panic!("unexpected graph projection result: {other:?}"),
+        }
+    }
 }

@@ -25,6 +25,7 @@ telltale-machine = { path = "../machine", version = "11.0.0" }
 telltale-theory = { path = "../theory", version = "11.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+serde_cbor = { workspace = true }
 toml = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }

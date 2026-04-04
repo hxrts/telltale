@@ -1,0 +1,214 @@
+:root {
+  --font-sans:
+    "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
+  --font-mono:
+    "JetBrains Mono", "SF Mono", SFMono-Regular, Consolas, "Liberation Mono",
+    Menlo, monospace;
+  --background: oklch(0.96 0.015 85);
+  --foreground: oklch(0.24 0.02 80);
+  --card: oklch(0.99 0.005 90);
+  --border: oklch(0.83 0.02 82);
+  --accent: oklch(0.62 0.12 65);
+  --muted: oklch(0.9 0.015 88);
+  --success: oklch(0.7 0.13 150);
+  --warning: oklch(0.74 0.14 55);
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background:
+    radial-gradient(circle at top left, oklch(0.98 0.05 90) 0, transparent 28%),
+    linear-gradient(145deg, oklch(0.95 0.025 88), oklch(0.92 0.03 82));
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.tt-shell {
+  display: grid;
+  grid-template-columns: minmax(18rem, 23rem) 1fr;
+  min-height: 100vh;
+}
+
+.tt-shell__sidebar {
+  background: color-mix(in oklch, var(--card) 92%, white 8%);
+  border-right: 1px solid var(--border);
+  padding: 1.5rem;
+}
+
+.tt-shell__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.tt-shell__content {
+  padding: 1.5rem;
+}
+
+.tt-top-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(18px);
+  background: color-mix(in oklch, var(--card) 88%, white 12%);
+  border-bottom: 1px solid var(--border);
+  padding: 1rem 1.5rem;
+}
+
+.tt-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tt-toolbar__label,
+.tt-panel__subtitle,
+.tt-card__subtitle,
+.tt-key-value__label,
+.tt-graph__edge-label {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  opacity: 0.78;
+}
+
+.tt-toolbar__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.tt-nav-btn {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--foreground);
+  padding: 0.55rem 0.95rem;
+}
+
+.tt-nav-btn--active {
+  background: color-mix(in oklch, var(--accent) 22%, white 78%);
+}
+
+.tt-page-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+}
+
+.tt-page-grid--wide {
+  grid-template-columns: minmax(28rem, 2fr) minmax(17rem, 1fr);
+}
+
+.tt-panel,
+.tt-card {
+  background: color-mix(in oklch, var(--card) 95%, white 5%);
+  border: 1px solid var(--border);
+  border-radius: 1.2rem;
+  box-shadow: 0 20px 60px rgba(73, 60, 38, 0.08);
+}
+
+.tt-panel {
+  padding: 1rem 1.1rem;
+}
+
+.tt-panel__header {
+  margin-bottom: 1rem;
+}
+
+.tt-panel__title,
+.tt-card__title,
+.tt-inspector__title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.tt-card {
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.tt-card__metric,
+.tt-note,
+.tt-list-row {
+  margin-top: 0.35rem;
+}
+
+.tt-inspector {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.tt-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.tt-badge--success {
+  background: color-mix(in oklch, var(--success) 18%, white 82%);
+}
+
+.tt-badge--warning {
+  background: color-mix(in oklch, var(--warning) 18%, white 82%);
+}
+
+.tt-badge--muted {
+  background: color-mix(in oklch, var(--muted) 74%, white 26%);
+}
+
+.tt-key-value {
+  display: grid;
+  grid-template-columns: minmax(8rem, 10rem) 1fr;
+  gap: 0.75rem;
+  margin-top: 0.45rem;
+}
+
+.tt-key-value__value {
+  font-family: var(--font-mono);
+}
+
+.tt-graph-shell {
+  border-radius: 1rem;
+  background: color-mix(in oklch, var(--muted) 44%, white 56%);
+  padding: 0.75rem;
+}
+
+.tt-graph {
+  width: 100%;
+  min-height: 20rem;
+}
+
+.tt-graph__node {
+  fill: color-mix(in oklch, var(--accent) 38%, white 62%);
+  stroke: var(--foreground);
+  stroke-width: 1.5;
+}
+
+.tt-graph__node-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+}
+
+.tt-graph__edge {
+  stroke: var(--foreground);
+  stroke-width: 1.5;
+  opacity: 0.58;
+}
+
+@media (max-width: 900px) {
+  .tt-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .tt-shell__sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}

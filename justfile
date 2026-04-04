@@ -184,6 +184,7 @@ check-focused-assurance:
     just check-extension-dispatch
     just check-semantic-assurance
     just check-runtime-boundaries
+    just check-viewer-tooling
 
 # Verify that CI/workflow ownership flows through the canonical PR/deep lane recipes.
 check-ci-assurance-lanes:
@@ -462,9 +463,21 @@ check-aura-borrowed-lints:
     just check-session-ingress-boundary
     just check-time-domain-boundaries
     just check-style-boundaries
+    just check-viewer-tooling-boundaries
     just check-docs-semantic-drift
     just check-verification-inventory
     just check-macro-boundaries
+
+# Enforce the shared viewer/webapp boundary and docs alignment.
+check-viewer-tooling-boundaries:
+    ./scripts/check/viewer-tooling-boundaries.sh
+
+# Focused shared webapp verification split: pure model, ownership/lints, and UI integration.
+check-viewer-tooling:
+    cargo test -p telltale-viewer --lib
+    cargo test -p telltale-ui --test shell_rendering -- --nocapture
+    cargo check -p telltale-web
+    just check-viewer-tooling-boundaries
 
 # Refresh generated Lean metrics in docs
 sync-lean-metrics:

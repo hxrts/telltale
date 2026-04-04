@@ -1,0 +1,5 @@
+error: #[observed_only] does not accept arguments
+ --> tests/ui/fail/observed_only_rejects_args.rs:3:17
+  |
+3 | #[observed_only("bad")]
+  |                 ^^^^^

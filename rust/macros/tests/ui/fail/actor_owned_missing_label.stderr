@@ -1,0 +1,7 @@
+error: #[actor_owned("...")] requires one string label
+ --> tests/ui/fail/actor_owned_missing_label.rs:3:1
+  |
+3 | #[actor_owned]
+  | ^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `actor_owned` (in Nightly builds, run with -Z macro-backtrace for more info)

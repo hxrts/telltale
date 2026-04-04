@@ -7,14 +7,14 @@ error: Choreography parse error:
 
        Macro token input is parsed from original source text.
        Use the canonical indentation-based DSL surface in token form.
- --> tests/ui/fail/legacy_brace_protocol.rs:3:1
-  |
-3 | / tell! {
-4 | |     protocol PingPong {
-5 | |         roles Alice, Bob;
-6 | |         Alice -> Bob: Ping;
-... |
-9 | | }
-  | |_^
-  |
-  = note: this error originates in the macro `tell` (in Nightly builds, run with -Z macro-backtrace for more info)
+  --> tests/ui/fail/legacy_brace_protocol.rs:4:1
+   |
+ 4 | / tell! {
+ 5 | |     protocol PingPong {
+ 6 | |         roles Alice, Bob;
+ 7 | |         Alice -> Bob: Ping;
+...  |
+10 | | }
+   | |_^
+   |
+   = note: this error originates in the macro `tell` (in Nightly builds, run with -Z macro-backtrace for more info)

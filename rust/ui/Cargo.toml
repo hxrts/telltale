@@ -1,0 +1,26 @@
+[package]
+name = "telltale-ui"
+version = "11.0.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Portable Dioxus UI core for the Telltale simulator webapp"
+readme = "../../README.md"
+repository = "https://github.com/hxrts/telltale"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[dependencies]
+dioxus = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+telltale-macros = { path = "../macros", version = "11.0.0" }
+telltale-machine = { path = "../machine", version = "11.0.0" }
+telltale-simulator = { path = "../simulator", version = "11.0.0" }
+telltale-viewer = { path = "../viewer", version = "11.0.0" }
+
+[dev-dependencies]
+dioxus-ssr = { workspace = true }
+
+[lints]
+workspace = true

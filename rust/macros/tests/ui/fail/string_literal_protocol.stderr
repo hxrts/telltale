@@ -1,11 +1,11 @@
 error: string-literal tell input was removed; use the canonical indentation-based token DSL directly
- --> tests/ui/fail/string_literal_protocol.rs:3:7
+ --> tests/ui/fail/string_literal_protocol.rs:4:7
   |
-3 |   tell!(r#"
+4 |   tell!(r#"
   |  _______^
-4 | | protocol PingPong =
-5 | |   roles Alice, Bob
-6 | |   Alice -> Bob : Ping
-7 | |   Bob -> Alice : Pong
-8 | | "#);
+5 | | protocol PingPong =
+6 | |   roles Alice, Bob
+7 | |   Alice -> Bob : Ping
+8 | |   Bob -> Alice : Pong
+9 | | "#);
   | |__^

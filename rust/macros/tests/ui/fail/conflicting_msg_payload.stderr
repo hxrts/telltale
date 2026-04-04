@@ -1,12 +1,12 @@
 error: message 'Msg' is used with conflicting payload types in the same protocol
- --> tests/ui/fail/conflicting_msg_payload.rs:3:1
+ --> tests/ui/fail/conflicting_msg_payload.rs:4:1
   |
-3 | / tell! {
-4 | |     protocol Bad =
-5 | |       roles A, B
-6 | |       A -> B : Msg
-7 | |       A -> B : Msg(u64)
-8 | | }
+4 | / tell! {
+5 | |     protocol Bad =
+6 | |       roles A, B
+7 | |       A -> B : Msg
+8 | |       A -> B : Msg(u64)
+9 | | }
   | |_^
   |
   = note: this error originates in the macro `tell` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,4 +1,7 @@
 //! Replay a simulation run from a checkpoint.
+//!
+//! This compatibility CLI keeps a terse textual summary for terminal use.
+//! Rich human-facing inspection should prefer the shared viewer/webapp layers.
 
 use std::path::PathBuf;
 

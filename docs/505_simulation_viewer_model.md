@@ -1,9 +1,10 @@
 # Simulation Viewer Model
 
-This page describes the Phase 1 model and service boundary for the simulator
+This page describes the typed model and service boundary for the simulator
 webapp work.
-It is intentionally about typed artifacts and application-service contracts,
-not about Dioxus rendering.
+It is intentionally about artifacts and application-service contracts first,
+with only the minimum crate-split notes needed to explain how `telltale-ui`
+and `telltale-web` consume it.
 
 ## Scope
 
@@ -15,9 +16,10 @@ The simulator web stack is split into three layers:
   model layer
 - `telltale-web`: the thin WASM/browser shell around `telltale-ui`
 
-Only `telltale-viewer` exists at this phase.
-Its job is to keep browser APIs and renderer-local state out of the
+`telltale-viewer` keeps browser APIs and renderer-local state out of the
 authoritative artifact boundary.
+`telltale-ui` and `telltale-web` are now present, but they are intentionally
+downstream of this crate split rather than new semantic authorities.
 
 ## Artifact Families
 
@@ -65,6 +67,11 @@ This is deliberate.
 The UI should inspect authoritative artifacts through typed queries and emit
 typed branch/scenario patch commands rather than mutate run state directly.
 
+`ViewerReport` is the first canonical report model built from that query
+surface.
+It lets the UI render artifact inventories and scenario summaries without
+opening downstream-specific assumptions in the Dioxus layer.
+
 ## Branch Patches
 
 Branch editing is patch-based.
@@ -96,7 +103,29 @@ like a real application service:
 - commands mutate branch/workspace state explicitly
 - the browser shell does not become the semantic owner of simulation state
 
+## Ownership and Portability Notes
+
+The shared viewer stack borrows Aura's split and ownership discipline:
+
+- `telltale-viewer` remains pure and renderer-free
+- `telltale-ui` is an `Observed` surface over authoritative artifacts
+- `telltale-web` is the thin browser shell and owns `Dioxus.toml`,
+  `index.html`, Tailwind packaging, and future browser-only APIs
+
+The first shared ownership-marker set comes from `telltale-macros`:
+
+- `#[observed_only]`
+- `#[actor_owned("...")]`
+- `#[authoritative_source("...")]`
+- `#[strong_reference("...")]`
+- `#[weak_identifier("...")]`
+
+These markers are intentionally lightweight.
+They validate the declared boundary shape and are backed by compile-fail tests
+and repo-level boundary checks.
+
 ## Related Docs
 
 - [Simulation Overview](501_simulation_overview.md)
+- [Simulation Viewer Webapp](506_simulation_viewer_webapp.md)
 - [Code Organization](105_code_organization.md)

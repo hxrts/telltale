@@ -49,6 +49,10 @@ See [Simulation Scenarios](503_simulation_scenarios.md) for the full schema and 
 Replay artifacts retain the resolved adversary program and budget-consumption history so theorem-side assumption failures are inspectable after the fact.
 `ScenarioResult.analysis.normalized_observability` provides the companion envelope-aware analysis view for order-insensitive and footprint-aware comparison.
 
+The shared viewer stack sits directly on top of those artifacts.
+`telltale-viewer` owns the pure model/query/command layer, `telltale-ui` owns the portable Dioxus shell and reusable components, and `telltale-web` owns the browser packaging.
+The preferred human-facing inspection path is now the shared viewer rather than ad hoc textual replay output.
+
 ### Decision and Approximation Modules
 
 The `decision` module provides offline theorem-facing checks that return structured certificates and counterexamples for coherence, subtyping, capacity predicates, and theorem-profile eligibility.
@@ -85,6 +89,7 @@ These APIs currently sit beside the harness API rather than inside it.
 - [Simulation Scenarios](503_simulation_scenarios.md): TOML schema, adversaries, reconfiguration, network, properties, checkpointing
 - [Simulation Fields](504_simulation_fields.md): field model trait, built-in families, environment extension hooks
 - [Simulation Viewer Model](505_simulation_viewer_model.md): pure artifact envelopes, query/command boundary, branch patch model
+- [Simulation Viewer Webapp](506_simulation_viewer_webapp.md): Dioxus shell, global layout, ownership markers, testing split, local development
 
 ## CLI
 
