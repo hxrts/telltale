@@ -9,6 +9,7 @@ Detailed behavior lives in the focused pages linked below.
 The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
+The authoritative replay lane is explicit: fresh exact runs use `run_with_scenario(...)`, canonical exact reproduction uses `run_canonical_replay(...)`, and exact checkpoint resume uses `resume_with_checkpoint_artifact(...)`.
 
 ## Key Concepts
 
@@ -48,6 +49,7 @@ See [Simulation Scenarios](503_simulation_scenarios.md) for the full schema and 
 `ScenarioStats` includes theorem-native progress, reconfiguration accounting, and adversary budget summaries as separate fields.
 Replay artifacts retain the resolved adversary program and budget-consumption history so theorem-side assumption failures are inspectable after the fact.
 `ScenarioResult.analysis.normalized_observability` provides the companion envelope-aware analysis view for order-insensitive and footprint-aware comparison.
+Batch, sweep, and approximation manifests now also record execution-regime classification instead of requiring downstream tools to infer it indirectly.
 
 The shared viewer stack sits directly on top of those artifacts.
 `telltale-viewer` owns the pure model/query/command layer, `telltale-ui` owns the portable Dioxus shell and reusable components, and `telltale-web` owns the browser packaging.
@@ -58,6 +60,7 @@ The preferred human-facing inspection path is now the shared viewer rather than 
 The `decision` module provides offline theorem-facing checks that return structured certificates and counterexamples for coherence, subtyping, capacity predicates, and theorem-profile eligibility.
 The `approximation` module provides non-authoritative analysis runs for `batched_stochastic`, `mean_field`, and `continuum_field` families.
 Approximation artifacts declare an approximation family, theorem-side scope, and explicit non-goals.
+Nested distributed simulation now publishes its own explicit observed-only manifest classification rather than remaining unclassified.
 
 ## Quick Start
 

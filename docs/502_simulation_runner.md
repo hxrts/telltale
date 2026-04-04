@@ -37,13 +37,15 @@ These artifacts support deterministic replay and post-run validation.
 
 ## Runner Entry Points
 
-The runner exposes three main entry points.
+The runner exposes four main entry points.
 
 - `run(...)` executes one choreography and returns one sampled trace.
 - `run_multi_session_canonical(...)` executes multiple choreographies on one canonical protocol machine and returns one trace per input choreography.
 - `run_with_scenario(...)` executes one choreography with scenario middleware and returns `ScenarioResult`.
+- `run_canonical_replay(...)` re-executes one scenario through the authoritative canonical replay lane even when the original scenario was run under another exact backend.
 
 Use `run_with_scenario(...)` when adversaries, network behavior, properties, checkpoints, or replay artifacts are required.
+Use `run_canonical_replay(...)` when exact artifact reproduction through the canonical lane matters.
 Use the smaller entry points when only sampled state traces are needed.
 
 `ScenarioStats.execution_regime` records the proof-side concurrency class for the resolved run.
@@ -88,16 +90,17 @@ See [Simulation Fields](504_simulation_fields.md) for field adapter variants and
 ### Batch and Sweep
 
 `run_batch(...)` and `run_batch_with(...)` run many `HarnessSpec` values concurrently while preserving result order.
-`BatchRunResult.manifest` records one resolved theorem-profile entry per input spec.
+`BatchRunResult.manifest` records one resolved execution-regime plus theorem-profile entry per input spec.
 
 `run_sweep(...)` extends batch execution into deterministic parameter sweeps over `seed`, `capacity_budget`, `scheduler_profile`, `reconfiguration_program`, and `adversary_budget`.
-`SweepRunResult.manifest` records parameter bindings, theorem profiles, eligibility witnesses, and capacity-predicate reports per expanded run.
+`SweepRunResult.manifest` records parameter bindings, execution-regime classification, theorem profiles, eligibility witnesses, and capacity-predicate reports per expanded run.
 Use `compare_sweep_results(...)` to diff experiment families by theorem eligibility and productive-step deltas.
 
 ### Distributed Simulation
 
 `DistributedSimBuilder::execution_contract(...)` accepts a `NestedExecutionContract` for outer scheduler concurrency plus inner rounds-per-step.
 That outer/inner VM contract is part of simulation semantics, not a worker-pool tuning knob.
+`DistributedSimulation::manifest()` publishes the explicit observed-only classification for this lane, including the nested execution contract and theorem-profile ineligibility reason.
 
 ## Sampling and Step Mapping
 
@@ -124,6 +127,7 @@ Scenario runs and replay share the same execution core and use a fixed per-round
 
 Checkpoint persistence is best-effort.
 Serialization and file-write failures do not fail the run.
+Checkpoint resume through `resume_with_checkpoint_artifact(...)` also restores middleware state, so adversary, network, and reconfiguration behavior continue exactly from the captured tick.
 
 ## Determinism and Reproducibility
 
