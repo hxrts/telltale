@@ -161,6 +161,8 @@ Module access (not re-exported at crate root):
   Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
 - `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`
   Typed persisted replay/checkpoint wrappers for on-disk simulator artifacts.
+- `telltale_viewer::{SemanticComparisonResult, TheoremAwareCounterexample, DeterministicSweepReport, ExperimentSuiteReport, EffectTraceArtifact, MinimizationResult, ViewerExtensionManifest}`
+  Shared viewer/webapp tooling surfaces for comparison, counterexamples, sweeps, effects, minimization, and downstream overlays.
 - Contract checks in `rust/simulator/src/contracts.rs`:
   `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
 - Preset helpers in `rust/simulator/src/presets.rs`

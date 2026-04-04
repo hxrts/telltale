@@ -37,11 +37,15 @@ use telltale_simulator::scenario::{
 };
 use telltale_simulator::trace::Trace;
 use telltale_viewer::{
-    create_branch_command, delete_branch_command, update_branch_command, ArtifactId, BranchId,
-    GraphProjection, GraphProjectionKind, GraphProjectionRequest, InMemoryViewerService,
-    ScenarioBundleArtifact, ScenarioBundleSummary, SearchResult, ViewerApplicationService,
-    ViewerArtifact, ViewerArtifactFile, ViewerCommand, ViewerModelError, ViewerQuery,
-    ViewerQueryResult, ViewerReport,
+    create_branch_command, delete_branch_command, minimize_branch_command, mocked_rerun_command,
+    update_branch_command, ArtifactId, BranchId, EffectTraceArtifact, ExperimentSuiteCase,
+    ExperimentSuiteDefinition, ExperimentSuiteReport, GraphProjection, GraphProjectionKind,
+    GraphProjectionRequest, InMemoryViewerService, MinimizationResult, RegressionThreshold,
+    ScenarioBundleArtifact, ScenarioBundleSummary, SearchResult, SemanticComparisonRequest,
+    SemanticComparisonResult, SweepCaseSpec, SweepExplorerRequest, SweepExplorerView,
+    TheoremAwareCounterexample, ViewerApplicationService, ViewerArtifact, ViewerArtifactFile,
+    ViewerCommand, ViewerExtensionDescriptor, ViewerExtensionManifest, ViewerExtensionSlot,
+    ViewerModelError, ViewerQuery, ViewerQueryResult, ViewerReport,
 };
 
 type BoxedTask = Pin<Box<dyn Future<Output = ()> + 'static>>;
@@ -57,6 +61,8 @@ pub enum ViewerPage {
     Overview,
     Graph,
     Insight,
+    Sweeps,
+    Effects,
 }
 
 impl ViewerPage {
@@ -66,6 +72,8 @@ impl ViewerPage {
             Self::Overview => "Artifacts",
             Self::Graph => "Graphs",
             Self::Insight => "Insights",
+            Self::Sweeps => "Sweeps",
+            Self::Effects => "Effects",
         }
     }
 }
@@ -144,10 +152,12 @@ pub struct GraphNodeLayout {
     pub y: i32,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct RunInsightWorkspace {
     pub theorem_profile: Option<ResolvedTheoremProfile>,
     pub execution_regime: Option<ExecutionRegime>,
+    pub semantic_comparison: Option<SemanticComparisonResult>,
+    pub counterexample: Option<TheoremAwareCounterexample>,
     pub watch_expressions: Vec<WatchExpression>,
     pub annotations: Vec<RunAnnotation>,
     pub provenance: BranchProvenance,
@@ -155,6 +165,22 @@ pub struct RunInsightWorkspace {
     pub causality: Vec<CausalityEvent>,
     pub bookmarks: Vec<RunBookmark>,
     pub archive_status: String,
+    pub minimization: Option<MinimizationResult>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SweepExplorerWorkspace {
+    pub explorer: SweepExplorerView,
+    pub all_cases: Vec<telltale_viewer::SweepCaseResult>,
+    pub suite: ExperimentSuiteReport,
+    pub selected_case: Option<String>,
+    pub active_filter: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EffectWorkspace {
+    pub effect_trace: EffectTraceArtifact,
+    pub mock_command_log: Vec<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -206,11 +232,14 @@ pub struct RunBookmark {
     pub label: String,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ViewerWorkspace {
     pub report: ViewerReport,
     pub graph: ViewerGraphWorkspace,
     pub insights: RunInsightWorkspace,
+    pub sweeps: SweepExplorerWorkspace,
+    pub effects: EffectWorkspace,
+    pub extensions: ViewerExtensionManifest,
     pub diagnostics: ViewerPublicationDiagnostics,
     pub pages: Vec<ViewerPage>,
 }
@@ -237,12 +266,27 @@ pub fn load_workspace_from_service(
         .unwrap_or_else(|| "demo".to_string());
 
     let projections = load_projections(service, &run_id, &active_branch);
+    let semantic_comparison = load_primary_comparison(service, &report);
+    let counterexample =
+        load_primary_counterexample(service, &report, semantic_comparison.as_ref());
+    let minimization =
+        load_primary_minimization(service, active_artifact.as_deref(), &active_branch);
+    let sweeps = load_sweep_workspace(service, &report)?;
+    let effects = load_effect_workspace(
+        service,
+        active_artifact.as_deref().unwrap_or("demo-run"),
+        &active_branch,
+    )?;
+    let extensions = load_extensions(service)?;
     let insights = build_insights(
         first_scenario,
         active_artifact.as_ref(),
         &active_branch,
         &run_id,
         &projections,
+        semantic_comparison,
+        counterexample,
+        minimization,
     );
     let diagnostics = build_publication_diagnostics(&report, harness_mode, active_artifact);
 
@@ -261,9 +305,159 @@ pub fn load_workspace_from_service(
             command_log: Vec::new(),
         },
         insights,
+        sweeps,
+        effects,
+        extensions,
         diagnostics,
-        pages: vec![ViewerPage::Overview, ViewerPage::Graph, ViewerPage::Insight],
+        pages: vec![
+            ViewerPage::Overview,
+            ViewerPage::Graph,
+            ViewerPage::Insight,
+            ViewerPage::Sweeps,
+            ViewerPage::Effects,
+        ],
     })
+}
+
+fn load_extensions(
+    service: &impl ViewerApplicationService,
+) -> Result<ViewerExtensionManifest, ViewerModelError> {
+    match service.query(ViewerQuery::ExtensionManifest)? {
+        ViewerQueryResult::ExtensionManifest { manifest } => Ok(*manifest),
+        _ => Err(ViewerModelError::UnexpectedQueryShape {
+            expected: "extension_manifest".to_string(),
+        }),
+    }
+}
+
+fn load_primary_comparison(
+    service: &impl ViewerApplicationService,
+    report: &ViewerReport,
+) -> Option<SemanticComparisonResult> {
+    let scenario_ids = report
+        .scenario_summaries
+        .iter()
+        .map(|scenario| scenario.artifact_id.clone())
+        .collect::<Vec<_>>();
+    let [baseline_artifact_id, candidate_artifact_id, ..] = scenario_ids.as_slice() else {
+        return None;
+    };
+    match service
+        .query(ViewerQuery::SemanticComparison(SemanticComparisonRequest {
+            baseline_artifact_id: baseline_artifact_id.clone(),
+            candidate_artifact_id: candidate_artifact_id.clone(),
+        }))
+        .ok()?
+    {
+        ViewerQueryResult::SemanticComparison { comparison } => Some(*comparison),
+        _ => None,
+    }
+}
+
+fn load_primary_counterexample(
+    service: &impl ViewerApplicationService,
+    report: &ViewerReport,
+    comparison: Option<&SemanticComparisonResult>,
+) -> Option<TheoremAwareCounterexample> {
+    if let Some(comparison) = comparison {
+        let request = SemanticComparisonRequest {
+            baseline_artifact_id: comparison.baseline_artifact_id.clone(),
+            candidate_artifact_id: comparison.candidate_artifact_id.clone(),
+        };
+        if let Ok(ViewerQueryResult::Counterexample { counterexample }) =
+            service.query(ViewerQuery::ComparisonCounterexample(request))
+        {
+            return Some(*counterexample);
+        }
+    }
+    let artifact_id = report.scenario_summaries.first()?.artifact_id.clone();
+    match service
+        .query(ViewerQuery::ArtifactCounterexample { artifact_id })
+        .ok()?
+    {
+        ViewerQueryResult::Counterexample { counterexample } => Some(*counterexample),
+        _ => None,
+    }
+}
+
+fn load_primary_minimization(
+    service: &impl ViewerApplicationService,
+    artifact_id: Option<&str>,
+    branch_id: &str,
+) -> Option<MinimizationResult> {
+    let artifact_id = artifact_id?;
+    let request_id = format!("minimize:{artifact_id}:{branch_id}");
+    match service
+        .query(ViewerQuery::Minimization { request_id })
+        .ok()?
+    {
+        ViewerQueryResult::Minimization { result } => Some(*result),
+        _ => None,
+    }
+}
+
+fn load_sweep_workspace(
+    service: &impl ViewerApplicationService,
+    report: &ViewerReport,
+) -> Result<SweepExplorerWorkspace, ViewerModelError> {
+    let first = report
+        .scenario_summaries
+        .first()
+        .ok_or_else(|| ViewerModelError::NotFound {
+            kind: "scenario_summary".to_string(),
+            id: "root".to_string(),
+        })?;
+    let sweep_id = format!("sweep/{}", first.summary.scenario_name);
+    let explorer = match service.query(ViewerQuery::SweepExplorer(SweepExplorerRequest {
+        sweep_id: sweep_id.clone(),
+        filter_text: None,
+        group_by: Some("theorem_profile".to_string()),
+        max_results: Some(8),
+    }))? {
+        ViewerQueryResult::SweepExplorer { explorer } => *explorer,
+        _ => {
+            return Err(ViewerModelError::UnexpectedQueryShape {
+                expected: "sweep_explorer".to_string(),
+            });
+        }
+    };
+    let suite_id = format!("suite/{}", first.summary.scenario_name);
+    let suite = match service.query(ViewerQuery::ExperimentSuite {
+        suite_id: suite_id.clone(),
+    })? {
+        ViewerQueryResult::ExperimentSuite { suite } => *suite,
+        _ => {
+            return Err(ViewerModelError::UnexpectedQueryShape {
+                expected: "experiment_suite".to_string(),
+            });
+        }
+    };
+    Ok(SweepExplorerWorkspace {
+        all_cases: explorer.visible_cases.clone(),
+        explorer,
+        suite,
+        selected_case: None,
+        active_filter: String::new(),
+    })
+}
+
+fn load_effect_workspace(
+    service: &impl ViewerApplicationService,
+    artifact_id: &str,
+    branch_id: &str,
+) -> Result<EffectWorkspace, ViewerModelError> {
+    match service.query(ViewerQuery::EffectTrace {
+        artifact_id: artifact_id.to_string(),
+        branch_id: branch_id.to_string(),
+    })? {
+        ViewerQueryResult::EffectTrace { effect_trace } => Ok(EffectWorkspace {
+            effect_trace: *effect_trace,
+            mock_command_log: Vec::new(),
+        }),
+        _ => Err(ViewerModelError::UnexpectedQueryShape {
+            expected: "effect_trace".to_string(),
+        }),
+    }
 }
 
 fn load_projections(
@@ -308,6 +502,9 @@ fn build_insights(
     active_branch: &str,
     run_id: &str,
     projections: &[GraphProjection],
+    semantic_comparison: Option<SemanticComparisonResult>,
+    counterexample: Option<TheoremAwareCounterexample>,
+    minimization: Option<MinimizationResult>,
 ) -> RunInsightWorkspace {
     let total_steps = projections
         .iter()
@@ -320,6 +517,8 @@ fn build_insights(
             ResolvedExecutionBackend::Canonical => ExecutionRegime::CanonicalExact,
             ResolvedExecutionBackend::Threaded => ExecutionRegime::ThreadedExact,
         }),
+        semantic_comparison,
+        counterexample,
         watch_expressions: build_watch_expressions(first_scenario),
         annotations: build_initial_annotations(active_artifact),
         provenance: BranchProvenance {
@@ -345,6 +544,7 @@ fn build_insights(
             label: "initial step".to_string(),
         }],
         archive_status: "loaded from artifact archive".to_string(),
+        minimization,
     }
 }
 
@@ -503,7 +703,7 @@ pub struct WorkspaceHandle {
 }
 
 #[observed_only]
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq)]
 pub struct InteractiveViewerState {
     pub workspace: ViewerWorkspace,
     pub active_page: ViewerPage,
@@ -769,6 +969,72 @@ impl InteractiveViewerState {
             ),
         });
     }
+
+    pub fn filter_sweeps(&mut self, needle: &str) {
+        self.workspace.sweeps.active_filter = needle.to_string();
+        let lowered = needle.to_lowercase();
+        self.workspace.sweeps.explorer.visible_cases = self
+            .workspace
+            .sweeps
+            .all_cases
+            .iter()
+            .filter(|case| {
+                needle.is_empty()
+                    || case.case_id.to_lowercase().contains(&lowered)
+                    || case.artifact_id.to_lowercase().contains(&lowered)
+            })
+            .cloned()
+            .collect();
+    }
+
+    pub fn drill_into_sweep_case(&mut self, case_id: &str) {
+        self.workspace.sweeps.selected_case = Some(case_id.to_string());
+        if let Some(case) = self
+            .workspace
+            .sweeps
+            .explorer
+            .visible_cases
+            .iter()
+            .find(|case| case.case_id == case_id)
+        {
+            self.workspace.diagnostics.active_artifact = Some(case.artifact_id.clone());
+            self.workspace.graph.active_branch = "root".to_string();
+            self.workspace.insights.run_diff.candidate_branch = "root".to_string();
+        }
+    }
+
+    pub fn request_mocked_rerun(&mut self) {
+        let command = mocked_rerun_command(
+            self.workspace.insights.provenance.run_id.clone(),
+            self.workspace.graph.active_branch.clone(),
+            "ready",
+        );
+        self.workspace
+            .effects
+            .mock_command_log
+            .push(format!("{command:?}"));
+    }
+
+    pub fn request_minimization(&mut self) {
+        let artifact_id = self
+            .workspace
+            .diagnostics
+            .active_artifact
+            .clone()
+            .unwrap_or_else(|| "demo-run".to_string());
+        let command = minimize_branch_command(
+            format!(
+                "minimize:{artifact_id}:{}",
+                self.workspace.graph.active_branch
+            ),
+            artifact_id,
+            self.workspace.graph.active_branch.clone(),
+        );
+        self.workspace
+            .effects
+            .mock_command_log
+            .push(format!("{command:?}"));
+    }
 }
 
 #[observed_only]
@@ -833,6 +1099,26 @@ pub fn TelltaleUiRoot(workspace: ViewerWorkspace) -> Element {
                 next.add_bookmark();
                 state.set(next);
             },
+            on_filter_sweeps: move |needle: String| {
+                let mut next = state();
+                next.filter_sweeps(&needle);
+                state.set(next);
+            },
+            on_drill_sweep_case: move |case_id: String| {
+                let mut next = state();
+                next.drill_into_sweep_case(&case_id);
+                state.set(next);
+            },
+            on_request_mocked_rerun: move |_| {
+                let mut next = state();
+                next.request_mocked_rerun();
+                state.set(next);
+            },
+            on_request_minimization: move |_| {
+                let mut next = state();
+                next.request_minimization();
+                state.set(next);
+            },
         }
     }
 }
@@ -852,6 +1138,10 @@ fn InteractiveViewerFrame(
     on_search: EventHandler<String>,
     on_reload_archive: EventHandler<()>,
     on_add_bookmark: EventHandler<()>,
+    on_filter_sweeps: EventHandler<String>,
+    on_drill_sweep_case: EventHandler<String>,
+    on_request_mocked_rerun: EventHandler<()>,
+    on_request_minimization: EventHandler<()>,
 ) -> Element {
     rsx! {
         ViewerFrame {
@@ -874,9 +1164,23 @@ fn InteractiveViewerFrame(
         }
         if matches!(state.active_page, ViewerPage::Insight) {
             InsightControlsOverlay {
-                state,
+                state: state.clone(),
                 on_reload_archive,
                 on_add_bookmark,
+            }
+        }
+        if matches!(state.active_page, ViewerPage::Sweeps) {
+            SweepControlsOverlay {
+                state: state.clone(),
+                on_filter_sweeps,
+                on_drill_sweep_case,
+            }
+        }
+        if matches!(state.active_page, ViewerPage::Effects) {
+            EffectControlsOverlay {
+                state,
+                on_request_mocked_rerun,
+                on_request_minimization,
             }
         }
     }
@@ -916,6 +1220,8 @@ pub fn ViewerFrame(
                         ViewerPage::Overview => rsx! { OverviewPage { workspace: workspace.clone() } },
                         ViewerPage::Graph => rsx! { GraphPage { workspace: workspace.clone() } },
                         ViewerPage::Insight => rsx! { InsightPage { workspace: workspace.clone() } },
+                        ViewerPage::Sweeps => rsx! { SweepsPage { workspace: workspace.clone() } },
+                        ViewerPage::Effects => rsx! { EffectsPage { workspace: workspace.clone() } },
                     }
                 }
             }
@@ -989,6 +1295,13 @@ fn TopNav(
 
 #[component]
 fn OverviewPage(workspace: ViewerWorkspace) -> Element {
+    let overview_extensions = workspace
+        .extensions
+        .descriptors
+        .iter()
+        .filter(|descriptor| descriptor.slot == ViewerExtensionSlot::OverviewPanel)
+        .cloned()
+        .collect::<Vec<ViewerExtensionDescriptor>>();
     rsx! {
         div {
             class: "tt-page-grid",
@@ -1014,6 +1327,17 @@ fn OverviewPage(workspace: ViewerWorkspace) -> Element {
                     }
                 }
             }
+            if !overview_extensions.is_empty() {
+                Panel {
+                    title: "Downstream Extensions",
+                    subtitle: "Portable overlay slots for downstream consumers",
+                    children: rsx! {
+                        for descriptor in overview_extensions {
+                            div { class: "tt-note", "{descriptor.title}: {descriptor.summary}" }
+                        }
+                    }
+                }
+            }
         }
     }
 }
@@ -1036,6 +1360,13 @@ fn ScenarioSummaryCard(scenario: ScenarioBundleSummary) -> Element {
 #[observed_only]
 #[component]
 fn GraphPage(workspace: ViewerWorkspace) -> Element {
+    let graph_extensions = workspace
+        .extensions
+        .descriptors
+        .iter()
+        .filter(|descriptor| descriptor.slot == ViewerExtensionSlot::GraphAnnotation)
+        .cloned()
+        .collect::<Vec<ViewerExtensionDescriptor>>();
     let projection = workspace
         .graph
         .active_projection()
@@ -1098,6 +1429,17 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                 children: rsx! {
                     for command in &workspace.graph.command_log {
                         div { class: "tt-list-row", "{command:?}" }
+                    }
+                }
+            }
+            if !graph_extensions.is_empty() {
+                Panel {
+                    title: "Graph Extensions",
+                    subtitle: "Downstream graph annotations and badges",
+                    children: rsx! {
+                        for descriptor in graph_extensions {
+                            div { class: "tt-note", "{descriptor.title}: {descriptor.summary}" }
+                        }
                     }
                 }
             }
@@ -1165,6 +1507,18 @@ fn GraphCanvas(projection: GraphProjection, active_step: u64, layout: GraphLayou
 #[observed_only]
 #[component]
 fn InsightPage(workspace: ViewerWorkspace) -> Element {
+    let insight_extensions = workspace
+        .extensions
+        .descriptors
+        .iter()
+        .filter(|descriptor| {
+            matches!(
+                descriptor.slot,
+                ViewerExtensionSlot::InsightPanel | ViewerExtensionSlot::TimeTravelPanel
+            )
+        })
+        .cloned()
+        .collect::<Vec<ViewerExtensionDescriptor>>();
     rsx! {
         div {
             class: "tt-page-grid",
@@ -1220,6 +1574,10 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                     KeyValueLine { label: "Candidate".to_string(), value: workspace.insights.run_diff.candidate_branch.clone() }
                     KeyValueLine { label: "Changed steps".to_string(), value: workspace.insights.run_diff.changed_steps.to_string() }
                     KeyValueLine { label: "Command count".to_string(), value: workspace.insights.run_diff.command_count.to_string() }
+                    if let Some(comparison) = &workspace.insights.semantic_comparison {
+                        KeyValueLine { label: "Semantic relation".to_string(), value: format!("{:?}", comparison.relation) }
+                        KeyValueLine { label: "Comparison summary".to_string(), value: comparison.summary.clone() }
+                    }
                 }
             }
             Panel {
@@ -1237,6 +1595,115 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                 children: rsx! {
                     for bookmark in &workspace.insights.bookmarks {
                         div { class: "tt-note", "{bookmark.label}" }
+                    }
+                }
+            }
+            Panel {
+                title: "Counterexample",
+                subtitle: "Theorem-aware semantic evidence",
+                children: rsx! {
+                    if let Some(counterexample) = &workspace.insights.counterexample {
+                        KeyValueLine { label: "Summary".to_string(), value: counterexample.summary.clone() }
+                        KeyValueLine {
+                            label: "Failed assumption".to_string(),
+                            value: counterexample
+                                .first_failed_assumption
+                                .clone()
+                                .unwrap_or_else(|| "none".to_string())
+                        }
+                        if let Some(divergence) = &counterexample.divergence {
+                            div { class: "tt-note", "{divergence.label}: {divergence.baseline_detail} -> {divergence.candidate_detail}" }
+                        }
+                    } else {
+                        div { class: "tt-note", "No counterexample loaded." }
+                    }
+                }
+            }
+            Panel {
+                title: "Minimization",
+                subtitle: "Reduced deterministic witness",
+                children: rsx! {
+                    if let Some(minimization) = &workspace.insights.minimization {
+                        KeyValueLine { label: "Summary".to_string(), value: minimization.summary.clone() }
+                        KeyValueLine { label: "Minimized steps".to_string(), value: minimization.minimized_steps.to_string() }
+                    } else {
+                        div { class: "tt-note", "No minimization request loaded." }
+                    }
+                }
+            }
+            if !insight_extensions.is_empty() {
+                Panel {
+                    title: "Extension Panels",
+                    subtitle: "Downstream overlays without shell forks",
+                    children: rsx! {
+                        for descriptor in insight_extensions {
+                            div { class: "tt-note", "{descriptor.title}: {descriptor.summary}" }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[observed_only]
+#[component]
+fn SweepsPage(workspace: ViewerWorkspace) -> Element {
+    rsx! {
+        div {
+            class: "tt-page-grid tt-page-grid--wide",
+            Panel {
+                title: "Sweep Explorer",
+                subtitle: "Filtering, outliers, and drill-down over deterministic result sets",
+                children: rsx! {
+                    KeyValueLine { label: "Sweep".to_string(), value: workspace.sweeps.explorer.sweep_id.clone() }
+                    KeyValueLine { label: "Visible cases".to_string(), value: workspace.sweeps.explorer.visible_cases.len().to_string() }
+                    KeyValueLine { label: "Outliers".to_string(), value: workspace.sweeps.explorer.outlier_case_ids.len().to_string() }
+                    for case in &workspace.sweeps.explorer.visible_cases {
+                        div { class: "tt-note", "{case.case_id} [{case.artifact_id}]" }
+                    }
+                }
+            }
+            Panel {
+                title: "Suite Baselines",
+                subtitle: "Baseline-vs-candidate regression reporting",
+                children: rsx! {
+                    KeyValueLine { label: "Suite".to_string(), value: workspace.sweeps.suite.definition.suite_id.clone() }
+                    for case in &workspace.sweeps.suite.cases {
+                        div { class: "tt-note", "{case.case_id}: {case.threshold_passed}" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[observed_only]
+#[component]
+fn EffectsPage(workspace: ViewerWorkspace) -> Element {
+    rsx! {
+        div {
+            class: "tt-page-grid tt-page-grid--wide",
+            Panel {
+                title: "Effect Trace",
+                subtitle: "Typed requests, resolutions, and replay-visible outcomes",
+                children: rsx! {
+                    KeyValueLine { label: "Artifact".to_string(), value: workspace.effects.effect_trace.artifact_id.clone() }
+                    KeyValueLine { label: "Branch".to_string(), value: workspace.effects.effect_trace.branch_id.clone() }
+                    for entry in &workspace.effects.effect_trace.entries {
+                        div { class: "tt-note", "{entry.step}: {entry.kind} [{entry.detail}]" }
+                    }
+                }
+            }
+            Panel {
+                title: "Effect Overrides",
+                subtitle: "Mocked rerun commands attached to this branch",
+                children: rsx! {
+                    for override_spec in &workspace.effects.effect_trace.overrides {
+                        div { class: "tt-note", "{override_spec.operation}: {override_spec.mode:?}" }
+                    }
+                    for command in &workspace.effects.mock_command_log {
+                        div { class: "tt-note", "{command}" }
                     }
                 }
             }
@@ -1366,6 +1833,88 @@ fn InsightControlsOverlay(
     }
 }
 
+#[observed_only]
+#[component]
+fn SweepControlsOverlay(
+    state: InteractiveViewerState,
+    on_filter_sweeps: EventHandler<String>,
+    on_drill_sweep_case: EventHandler<String>,
+) -> Element {
+    let first_case_id = state
+        .workspace
+        .sweeps
+        .explorer
+        .visible_cases
+        .first()
+        .map(|case| case.case_id.clone());
+    rsx! {
+        section {
+            class: "tt-shell__overlay",
+            div {
+                class: "tt-page-grid",
+                Panel {
+                    title: "Sweep Controls",
+                    subtitle: "Filter, outliers, and drill-down",
+                    children: rsx! {
+                        Toolbar {
+                            label: "Sweep",
+                            children: rsx! {
+                                button { class: "tt-nav-btn", onclick: move |_| on_filter_sweeps.call("baseline".to_string()), "Filter baseline" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_filter_sweeps.call(String::new()), "Clear Filter" }
+                                if let Some(case_id) = first_case_id.clone() {
+                                    button {
+                                        class: "tt-nav-btn",
+                                        onclick: move |_| on_drill_sweep_case.call(case_id.clone()),
+                                        "Open {case_id}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[observed_only]
+#[component]
+fn EffectControlsOverlay(
+    state: InteractiveViewerState,
+    on_request_mocked_rerun: EventHandler<()>,
+    on_request_minimization: EventHandler<()>,
+) -> Element {
+    rsx! {
+        section {
+            class: "tt-shell__overlay",
+            div {
+                class: "tt-page-grid",
+                Panel {
+                    title: "Effect Commands",
+                    subtitle: "Mocked reruns and witness reduction",
+                    children: rsx! {
+                        Toolbar {
+                            label: "Effects",
+                            children: rsx! {
+                                button { class: "tt-nav-btn", onclick: move |_| on_request_mocked_rerun.call(()), "Mock Rerun" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_request_minimization.call(()), "Minimize" }
+                            }
+                        }
+                    }
+                }
+                Panel {
+                    title: "Active Target",
+                    subtitle: "Effect scope",
+                    children: rsx! {
+                        KeyValueLine { label: "Artifact".to_string(), value: state.workspace.effects.effect_trace.artifact_id.clone() }
+                        KeyValueLine { label: "Branch".to_string(), value: state.workspace.effects.effect_trace.branch_id.clone() }
+                    }
+                }
+            }
+        }
+    }
+}
+
 #[component]
 fn Panel(title: String, subtitle: String, children: Element) -> Element {
     rsx! {
@@ -1468,10 +2017,36 @@ fn demo_service() -> InMemoryViewerService {
         theorem: TheoremProfileSpec::default(),
         extensions: BTreeMap::new(),
     };
+    let mut alternate_scenario = scenario.clone();
+    alternate_scenario.name = "demo_mesh_alt".to_string();
+    alternate_scenario.theorem = TheoremProfileSpec {
+        assumption_bundle: TheoremAssumptionBundle::ObservedTransport,
+        ..TheoremProfileSpec::default()
+    };
+    let mut alternate_result = sample_result();
+    alternate_result
+        .trace
+        .records
+        .push(telltale_simulator::trace::StepRecord {
+            step: 3,
+            role: "alpha".to_string(),
+            state: Vec::new(),
+        });
+    alternate_result.stats.theorem_profile.assumption_bundle =
+        TheoremAssumptionBundle::ObservedTransport;
+    alternate_result.stats.theorem_profile.eligibility_reason =
+        Some("observed transport is not theorem-exact".to_string());
     let scenario_bundle = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
         ScenarioBundleArtifact::new(
             Some(scenario),
             sample_result(),
+            Some(ContractCheckReport::pass()),
+        ),
+    )));
+    let alternate_bundle = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
+        ScenarioBundleArtifact::new(
+            Some(alternate_scenario),
+            alternate_result,
             Some(ContractCheckReport::pass()),
         ),
     )));
@@ -1492,6 +2067,12 @@ fn demo_service() -> InMemoryViewerService {
         .expect("scenario bundle should import");
     service
         .command(ViewerCommand::ImportArtifact {
+            artifact_id: "demo-run-alt".to_string(),
+            artifact: Box::new(alternate_bundle),
+        })
+        .expect("alternate scenario bundle should import");
+    service
+        .command(ViewerCommand::ImportArtifact {
             artifact_id: "demo-decision".to_string(),
             artifact: Box::new(decision_report),
         })
@@ -1502,6 +2083,87 @@ fn demo_service() -> InMemoryViewerService {
             artifact: Box::new(environment_trace),
         })
         .expect("environment trace should import");
+    service
+        .command(ViewerCommand::ExecuteSweep {
+            sweep_id: "sweep/demo_mesh".to_string(),
+            baseline_artifact_id: Some("demo-run".to_string()),
+            cases: vec![
+                SweepCaseSpec {
+                    case_id: "baseline".to_string(),
+                    artifact_id: "demo-run".to_string(),
+                    parameters: BTreeMap::from([("seed".to_string(), "7".to_string())]),
+                },
+                SweepCaseSpec {
+                    case_id: "observed".to_string(),
+                    artifact_id: "demo-run-alt".to_string(),
+                    parameters: BTreeMap::from([(
+                        "assumption_bundle".to_string(),
+                        "observed_transport".to_string(),
+                    )]),
+                },
+            ],
+        })
+        .expect("demo sweep should execute");
+    service
+        .command(ViewerCommand::ExecuteExperimentSuite {
+            definition: ExperimentSuiteDefinition {
+                suite_id: "suite/demo_mesh".to_string(),
+                threshold: RegressionThreshold {
+                    max_changed_steps: 0,
+                    allow_normalization_only: true,
+                },
+                cases: vec![ExperimentSuiteCase {
+                    case_id: "baseline-vs-observed".to_string(),
+                    baseline_artifact_id: "demo-run".to_string(),
+                    candidate_artifact_id: "demo-run-alt".to_string(),
+                }],
+            },
+        })
+        .expect("demo suite should execute");
+    service
+        .command(ViewerCommand::RequestMinimization {
+            request: telltale_viewer::MinimizationRequest {
+                request_id: "minimize:demo-run:root".to_string(),
+                artifact_id: "demo-run".to_string(),
+                branch_id: "root".to_string(),
+                strategy: telltale_viewer::MinimizationStrategy::FirstDivergencePrefix,
+            },
+        })
+        .expect("demo minimization should execute");
+    service
+        .command(mocked_rerun_command(
+            "demo-run".to_string(),
+            "root".to_string(),
+            "ready",
+        ))
+        .expect("demo mocked rerun should queue");
+    service
+        .command(ViewerCommand::RegisterExtensions {
+            manifest: ViewerExtensionManifest {
+                descriptors: vec![
+                    ViewerExtensionDescriptor {
+                        id: "demo.overview.policy".to_string(),
+                        title: "Policy Overlay".to_string(),
+                        slot: ViewerExtensionSlot::OverviewPanel,
+                        summary: "Downstream policies can add summary cards here.".to_string(),
+                    },
+                    ViewerExtensionDescriptor {
+                        id: "demo.graph.annotations".to_string(),
+                        title: "Graph Badges".to_string(),
+                        slot: ViewerExtensionSlot::GraphAnnotation,
+                        summary: "Domain-specific graph annotations belong in this slot."
+                            .to_string(),
+                    },
+                    ViewerExtensionDescriptor {
+                        id: "demo.insight.panel".to_string(),
+                        title: "Insight Overlay".to_string(),
+                        slot: ViewerExtensionSlot::InsightPanel,
+                        summary: "Downstream reports can extend the insight page here.".to_string(),
+                    },
+                ],
+            },
+        })
+        .expect("demo extensions should register");
     service
 }
 

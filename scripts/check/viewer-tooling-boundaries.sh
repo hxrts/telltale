@@ -39,10 +39,17 @@ check_no_hits 'web_sys|js_sys|wasm_bindgen|wasm_bindgen_futures' rust/viewer/src
 check_no_hits 'dioxus' rust/viewer/src
 check_no_hits 'ScenarioBranchPatch|ScenarioPatchOperation' rust/ui/src rust/web/src
 check_no_hits 'ViewerCommand::CreateBranch|ViewerCommand::UpdateBranch|ViewerCommand::DeleteBranch' rust/ui/src rust/web/src
+check_no_hits 'SemanticComparisonResult \{|TheoremAwareCounterexample \{|MinimizationResult \{' rust/ui/src rust/web/src
+check_no_hits 'EffectTraceArtifact \{|DeterministicSweepReport \{|ExperimentSuiteReport \{' rust/ui/src rust/web/src
 check_has_hits 'telltale-viewer' docs/505_simulation_viewer.md
 check_has_hits 'telltale-ui' docs/505_simulation_viewer.md
 check_has_hits 'telltale-web' docs/505_simulation_viewer.md
 check_has_hits 'Observed' docs/506_simulation_viewer_webapp.md
+check_has_hits 'semantic comparison' docs/505_simulation_viewer.md
+check_has_hits 'counterexample' docs/505_simulation_viewer.md
+check_has_hits 'sweep' docs/506_simulation_viewer_webapp.md
+check_has_hits 'effect' docs/506_simulation_viewer_webapp.md
+check_has_hits 'downstream' docs/506_simulation_viewer_webapp.md
 
 if [[ "$fail" -ne 0 ]]; then
   exit 1

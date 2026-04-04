@@ -61,6 +61,11 @@ That viewer now exposes:
 - deterministic step-forward, step-backward, and jump-to-step time travel
 - typed branch create/update/delete flows
 - an insight workspace for regime display, watch expressions, run diff, causality, provenance, bookmarks, and archive reload
+- semantic comparison and first-divergence analysis over generic simulator artifacts
+- theorem-aware counterexamples for comparison and theorem-eligibility failures
+- deterministic sweep and suite exploration with drill-down into runs and branches
+- typed effect inspection and mocked rerun requests
+- deterministic minimization summaries and downstream extension slots
 
 ### Decision and Approximation Modules
 

@@ -43,6 +43,12 @@ The initial typed envelope supports these families:
 - observability comparisons
 - approximation manifests
 - contract-check reports
+- semantic comparison results
+- theorem-aware counterexamples
+- deterministic sweep reports
+- experiment-suite reports
+- effect-trace artifacts
+- minimization results
 
 Each saved artifact uses one stable format marker and one explicit schema
 version so later UI layers can reject unsupported files cleanly.
@@ -60,6 +66,13 @@ Queries:
 - request graph projections
 - search loaded artifacts
 - select one historical inspection position
+- compare two artifacts semantically
+- find the first meaningful divergence between two artifacts
+- load theorem-aware counterexamples
+- load sweep explorer and experiment-suite reports
+- load typed effect traces
+- load deterministic minimization results
+- load downstream extension manifests
 
 Commands:
 
@@ -68,6 +81,11 @@ Commands:
 - update a branch
 - delete a branch
 - request a rerun for a branch
+- execute a deterministic archived-artifact sweep
+- execute a baseline-vs-candidate experiment suite
+- request a mocked rerun with typed effect overrides
+- request deterministic minimization for a branch
+- register downstream extension manifests
 
 This is deliberate.
 The UI should inspect authoritative artifacts through typed queries and emit
@@ -77,6 +95,20 @@ typed branch/scenario patch commands rather than mutate run state directly.
 surface.
 It lets the UI render artifact inventories and scenario summaries without
 opening downstream-specific assumptions in the Dioxus layer.
+
+The newer reusable tooling surfaces build on that same boundary:
+
+- `SemanticComparisonResult` for exact, normalization-equivalent, and
+  safety-visible divergence classification
+- `TheoremAwareCounterexample` for reusable theorem and divergence witnesses
+- `DeterministicSweepReport` and `ExperimentSuiteReport` for archived sweep and
+  baseline/candidate execution families
+- `EffectTraceArtifact` and `EffectOverrideSpec` for effect inspection and
+  mocked reruns
+- `MinimizationRequest` and `MinimizationResult` for deterministic witness
+  reduction
+- `ViewerExtensionManifest` for downstream overlays, graph annotations, and
+  time-travel extension panels
 
 ## Branch Patches
 
@@ -95,6 +127,38 @@ The current patch surface includes:
 
 Later phases can extend the patch language, but the UI should continue to emit
 typed deltas rather than mutate simulator state in place.
+
+## Comparison and Counterexamples
+
+Semantic comparison is now a first-class viewer concern.
+The pure model layer exposes `SemanticComparisonRequest`,
+`SemanticComparisonResult`, and `SemanticDivergencePoint`.
+Those types deliberately sit above raw mismatch blobs:
+
+- exact raw match stays distinct from normalization-equivalent match
+- classification-only changes remain visible without being misreported as raw
+  divergence
+- the first semantically meaningful divergence is queryable directly
+
+`TheoremAwareCounterexample` composes with that comparison surface.
+It can be derived either from theorem-eligibility failure on one artifact or
+from a comparison that leaves the expected semantic regime.
+The viewer crate marks the helper constructors for these artifacts as
+authoritative sources so the browser shell does not mint them locally.
+
+## Sweeps, Effects, and Minimization
+
+The pure model layer now also owns:
+
+- deterministic archived-artifact sweep execution through `ExecuteSweep`
+- baseline-vs-candidate experiment suites through `ExecuteExperimentSuite`
+- typed effect inspection via `EffectTraceArtifact`
+- typed mocked rerun requests via `EffectOverrideSpec`
+- deterministic branch minimization via `MinimizationRequest`
+
+These are still command/query surfaces, not browser-owned mutation.
+The browser shell issues requests; the application service owns the resulting
+artifacts and summaries.
 
 ## Application Service
 
@@ -129,6 +193,19 @@ The first shared ownership-marker set comes from `telltale-macros`:
 These markers are intentionally lightweight.
 They validate the declared boundary shape and are backed by compile-fail tests
 and repo-level boundary checks.
+
+## Downstream Integration
+
+Downstream projects should consume the shared viewer stack by importing the
+stable artifact and extension contracts instead of forking the shell.
+The supported downstream integration surface is now:
+
+- viewer artifacts and query/command types from `telltale-viewer`
+- extension manifests through `ViewerExtensionManifest`
+- extension slots for overview panels, graph annotations, time-travel panels,
+  and insight panels
+- the existing ownership markers where they define public viewer/webapp
+  boundaries, while narrower repo-local lint scripts remain internal
 
 ## Related Docs
 

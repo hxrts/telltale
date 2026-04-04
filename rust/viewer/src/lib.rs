@@ -12,11 +12,17 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::fs;
 use std::path::Path;
+use telltale_macros::authoritative_source;
 
-pub use telltale_simulator::analysis::{NormalizedObservability, ObservabilityComparison};
+pub use telltale_simulator::analysis::{
+    compare_observability, NormalizedObservability, ObservabilityComparison, ObservabilityRelation,
+};
 pub use telltale_simulator::approximation::ApproximationManifest;
 pub use telltale_simulator::contracts::ContractCheckReport;
-pub use telltale_simulator::decision::DecisionReport;
+pub use telltale_simulator::decision::{
+    decide_theorem_eligibility, DecisionCounterexample, DecisionKind, DecisionOutcome,
+    DecisionReport,
+};
 pub use telltale_simulator::environment::{EnvironmentTrace, TransmissionIntent};
 pub use telltale_simulator::reconfiguration::ReconfigurationRecord;
 pub use telltale_simulator::runner::{
@@ -158,6 +164,18 @@ pub enum ViewerArtifact {
     ApproximationManifest(ApproximationManifest),
     /// Standalone contract-check report.
     ContractCheckReport(ContractCheckReport),
+    /// Higher-level semantic comparison result.
+    SemanticComparison(Box<SemanticComparisonResult>),
+    /// Reusable theorem-aware counterexample.
+    Counterexample(Box<TheoremAwareCounterexample>),
+    /// Deterministic sweep report over archived run artifacts.
+    SweepReport(Box<DeterministicSweepReport>),
+    /// Experiment-suite baseline/candidate report.
+    ExperimentSuite(Box<ExperimentSuiteReport>),
+    /// Typed effect-trace artifact for one run or branch.
+    EffectTrace(Box<EffectTraceArtifact>),
+    /// Deterministic minimization result.
+    Minimization(Box<MinimizationResult>),
 }
 
 impl ViewerArtifact {
@@ -175,6 +193,12 @@ impl ViewerArtifact {
             Self::ObservabilityComparison(_) => ViewerArtifactKind::ObservabilityComparison,
             Self::ApproximationManifest(_) => ViewerArtifactKind::ApproximationManifest,
             Self::ContractCheckReport(_) => ViewerArtifactKind::ContractCheckReport,
+            Self::SemanticComparison(_) => ViewerArtifactKind::SemanticComparison,
+            Self::Counterexample(_) => ViewerArtifactKind::Counterexample,
+            Self::SweepReport(_) => ViewerArtifactKind::SweepReport,
+            Self::ExperimentSuite(_) => ViewerArtifactKind::ExperimentSuite,
+            Self::EffectTrace(_) => ViewerArtifactKind::EffectTrace,
+            Self::Minimization(_) => ViewerArtifactKind::Minimization,
         }
     }
 }
@@ -193,6 +217,12 @@ pub enum ViewerArtifactKind {
     ObservabilityComparison,
     ApproximationManifest,
     ContractCheckReport,
+    SemanticComparison,
+    Counterexample,
+    SweepReport,
+    ExperimentSuite,
+    EffectTrace,
+    Minimization,
 }
 
 /// Scenario-plus-result bundle used by the viewer stack.
@@ -331,12 +361,36 @@ pub enum GraphProjectionKind {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ViewerQuery {
     ListArtifacts,
-    LoadArtifact { artifact_id: ArtifactId },
-    ScenarioSummary { artifact_id: ArtifactId },
-    BranchLineage { run_id: RunId },
+    LoadArtifact {
+        artifact_id: ArtifactId,
+    },
+    ScenarioSummary {
+        artifact_id: ArtifactId,
+    },
+    BranchLineage {
+        run_id: RunId,
+    },
     GraphProjection(GraphProjectionRequest),
     Search(SearchQuery),
     HistoricalInspection(HistoricalInspectionState),
+    SemanticComparison(SemanticComparisonRequest),
+    FirstDivergence(SemanticComparisonRequest),
+    ComparisonCounterexample(SemanticComparisonRequest),
+    ArtifactCounterexample {
+        artifact_id: ArtifactId,
+    },
+    SweepExplorer(SweepExplorerRequest),
+    ExperimentSuite {
+        suite_id: String,
+    },
+    EffectTrace {
+        artifact_id: ArtifactId,
+        branch_id: BranchId,
+    },
+    Minimization {
+        request_id: String,
+    },
+    ExtensionManifest,
 }
 
 /// Stable query result surface returned by the application service.
@@ -363,6 +417,30 @@ pub enum ViewerQueryResult {
     },
     HistoricalInspection {
         state: HistoricalInspectionState,
+    },
+    SemanticComparison {
+        comparison: Box<SemanticComparisonResult>,
+    },
+    FirstDivergence {
+        divergence: Option<SemanticDivergencePoint>,
+    },
+    Counterexample {
+        counterexample: Box<TheoremAwareCounterexample>,
+    },
+    SweepExplorer {
+        explorer: Box<SweepExplorerView>,
+    },
+    ExperimentSuite {
+        suite: Box<ExperimentSuiteReport>,
+    },
+    EffectTrace {
+        effect_trace: Box<EffectTraceArtifact>,
+    },
+    Minimization {
+        result: Box<MinimizationResult>,
+    },
+    ExtensionManifest {
+        manifest: Box<ViewerExtensionManifest>,
     },
 }
 
@@ -421,6 +499,9 @@ pub enum SearchDomain {
     Branch,
     EventLabel,
     Artifact,
+    Divergence,
+    Sweep,
+    Effect,
 }
 
 /// Search request over loaded viewer artifacts.
@@ -477,6 +558,25 @@ pub enum ViewerCommand {
         run_id: RunId,
         branch_id: BranchId,
     },
+    ExecuteSweep {
+        sweep_id: String,
+        baseline_artifact_id: Option<ArtifactId>,
+        cases: Vec<SweepCaseSpec>,
+    },
+    ExecuteExperimentSuite {
+        definition: ExperimentSuiteDefinition,
+    },
+    RequestMockedRerun {
+        run_id: RunId,
+        branch_id: BranchId,
+        overrides: Vec<EffectOverrideSpec>,
+    },
+    RequestMinimization {
+        request: MinimizationRequest,
+    },
+    RegisterExtensions {
+        manifest: ViewerExtensionManifest,
+    },
 }
 
 /// Build a typed branch-creation command for one deterministic fork point.
@@ -524,6 +624,41 @@ pub fn delete_branch_command(run_id: RunId, branch_id: BranchId) -> ViewerComman
     ViewerCommand::DeleteBranch { run_id, branch_id }
 }
 
+/// Build a typed mocked-rerun command for one effect operation.
+#[must_use]
+pub fn mocked_rerun_command(
+    run_id: RunId,
+    branch_id: BranchId,
+    operation: impl Into<String>,
+) -> ViewerCommand {
+    ViewerCommand::RequestMockedRerun {
+        run_id,
+        branch_id,
+        overrides: vec![EffectOverrideSpec {
+            operation: operation.into(),
+            mode: EffectOverrideMode::ForceSuccess,
+            payload: None,
+        }],
+    }
+}
+
+/// Build a typed minimization request command for one branch.
+#[must_use]
+pub fn minimize_branch_command(
+    request_id: impl Into<String>,
+    artifact_id: ArtifactId,
+    branch_id: BranchId,
+) -> ViewerCommand {
+    ViewerCommand::RequestMinimization {
+        request: MinimizationRequest {
+            request_id: request_id.into(),
+            artifact_id,
+            branch_id,
+            strategy: MinimizationStrategy::FirstDivergencePrefix,
+        },
+    }
+}
+
 /// Stable command result surface returned by the application service boundary.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -533,6 +668,11 @@ pub enum ViewerCommandResult {
     BranchUpdated { run_id: RunId, branch_id: BranchId },
     BranchDeleted { run_id: RunId, branch_id: BranchId },
     RerunRequested { run_id: RunId, branch_id: BranchId },
+    SweepExecuted { sweep_id: String },
+    ExperimentSuiteExecuted { suite_id: String },
+    MockedRerunRequested { run_id: RunId, branch_id: BranchId },
+    MinimizationRequested { request_id: String },
+    ExtensionsRegistered { count: usize },
 }
 
 /// Typed branch/scenario patch emitted by the UI layer.
@@ -602,6 +742,247 @@ pub struct BranchLineageNode {
     pub patch_count: u64,
 }
 
+/// Stable comparison relation over generic simulator artifacts.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticComparisonClass {
+    ExactMatch,
+    EquivalentUnderNormalization,
+    SafetyVisibleDivergence,
+}
+
+/// First semantically meaningful divergence family.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SemanticDivergenceKind {
+    TraceRecord,
+    Observability,
+    Reconfiguration,
+    TheoremProfile,
+    ExecutionRegime,
+    EffectTrace,
+    StepCount,
+}
+
+/// Stable divergence point for comparison and counterexample workflows.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SemanticDivergencePoint {
+    pub kind: SemanticDivergenceKind,
+    pub step: Option<u64>,
+    pub label: String,
+    pub baseline_detail: String,
+    pub candidate_detail: String,
+}
+
+/// Generic semantic comparison result consumed by the webapp and downstreams.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SemanticComparisonResult {
+    pub baseline_artifact_id: ArtifactId,
+    pub candidate_artifact_id: ArtifactId,
+    pub relation: SemanticComparisonClass,
+    pub normalized_observability: ObservabilityComparison,
+    pub classification_changed_only: bool,
+    pub first_divergence: Option<SemanticDivergencePoint>,
+    pub summary: String,
+}
+
+/// Comparison request between two viewer artifacts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SemanticComparisonRequest {
+    pub baseline_artifact_id: ArtifactId,
+    pub candidate_artifact_id: ArtifactId,
+}
+
+/// Reusable theorem-aware counterexample surface.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct TheoremAwareCounterexample {
+    pub summary: String,
+    pub theorem_profile: Option<ResolvedTheoremProfile>,
+    pub execution_regime: Option<telltale_simulator::scenario::ExecutionRegime>,
+    pub first_failed_assumption: Option<String>,
+    pub divergence: Option<SemanticDivergencePoint>,
+    pub decision_report: Option<DecisionReport>,
+}
+
+/// Deterministic sweep case specification over archived artifacts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SweepCaseSpec {
+    pub case_id: String,
+    pub artifact_id: ArtifactId,
+    pub parameters: BTreeMap<String, String>,
+}
+
+/// One deterministic sweep case outcome.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SweepCaseResult {
+    pub case_id: String,
+    pub artifact_id: ArtifactId,
+    pub parameters: BTreeMap<String, String>,
+    pub theorem_profile: Option<ResolvedTheoremProfile>,
+    pub execution_regime: Option<telltale_simulator::scenario::ExecutionRegime>,
+    pub comparison_to_baseline: Option<SemanticComparisonResult>,
+}
+
+/// Canonical deterministic sweep report over archived artifacts.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DeterministicSweepReport {
+    pub sweep_id: String,
+    pub baseline_artifact_id: Option<ArtifactId>,
+    pub cases: Vec<SweepCaseResult>,
+}
+
+/// Query model for one sweep explorer view.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SweepExplorerRequest {
+    pub sweep_id: String,
+    pub filter_text: Option<String>,
+    pub group_by: Option<String>,
+    pub max_results: Option<usize>,
+}
+
+/// Explorer view returned for one deterministic sweep report.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SweepExplorerView {
+    pub sweep_id: String,
+    pub total_cases: usize,
+    pub visible_cases: Vec<SweepCaseResult>,
+    pub outlier_case_ids: Vec<String>,
+}
+
+/// One baseline-vs-candidate experiment-suite case.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExperimentSuiteCase {
+    pub case_id: String,
+    pub baseline_artifact_id: ArtifactId,
+    pub candidate_artifact_id: ArtifactId,
+}
+
+/// Regression-threshold policy for one suite.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RegressionThreshold {
+    pub max_changed_steps: u64,
+    pub allow_normalization_only: bool,
+}
+
+/// Canonical experiment-suite definition built on comparison/sweep layers.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExperimentSuiteDefinition {
+    pub suite_id: String,
+    pub threshold: RegressionThreshold,
+    pub cases: Vec<ExperimentSuiteCase>,
+}
+
+/// One case outcome within an experiment-suite report.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExperimentSuiteCaseResult {
+    pub case_id: String,
+    pub comparison: SemanticComparisonResult,
+    pub threshold_passed: bool,
+    pub counterexample: Option<TheoremAwareCounterexample>,
+}
+
+/// Reusable experiment-suite report with baseline/candidate regression output.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ExperimentSuiteReport {
+    pub definition: ExperimentSuiteDefinition,
+    pub cases: Vec<ExperimentSuiteCaseResult>,
+}
+
+/// Stable effect-trace entry for viewer inspection.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EffectTraceEntry {
+    pub step: u64,
+    pub kind: String,
+    pub detail: String,
+}
+
+/// Typed effect-trace artifact used by the effect workspace.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EffectTraceArtifact {
+    pub artifact_id: ArtifactId,
+    pub branch_id: BranchId,
+    pub entries: Vec<EffectTraceEntry>,
+    pub overrides: Vec<EffectOverrideSpec>,
+}
+
+/// Effect override mode for mocked reruns.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EffectOverrideMode {
+    ForceSuccess,
+    ForceFailure,
+    ReplacePayload,
+}
+
+/// Typed effect override attached to a rerun request.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EffectOverrideSpec {
+    pub operation: String,
+    pub mode: EffectOverrideMode,
+    pub payload: Option<serde_json::Value>,
+}
+
+/// Deterministic minimization strategy.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MinimizationStrategy {
+    FirstDivergencePrefix,
+    FirstViolationPrefix,
+}
+
+/// Request to minimize one artifact or branch.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MinimizationRequest {
+    pub request_id: String,
+    pub artifact_id: ArtifactId,
+    pub branch_id: BranchId,
+    pub strategy: MinimizationStrategy,
+}
+
+/// Stable minimization result for a failing run or branch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MinimizationResult {
+    pub request: MinimizationRequest,
+    pub minimized_steps: u64,
+    pub patch: ScenarioBranchPatch,
+    pub retained_counterexample: Option<TheoremAwareCounterexample>,
+    pub summary: String,
+}
+
+impl PartialEq for MinimizationResult {
+    fn eq(&self, other: &Self) -> bool {
+        self.request == other.request
+            && self.minimized_steps == other.minimized_steps
+            && self.retained_counterexample == other.retained_counterexample
+            && self.summary == other.summary
+    }
+}
+
+/// Extension slot for downstream overlays and panels.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ViewerExtensionSlot {
+    OverviewPanel,
+    GraphAnnotation,
+    TimeTravelPanel,
+    InsightPanel,
+}
+
+/// Stable downstream overlay descriptor.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ViewerExtensionDescriptor {
+    pub id: String,
+    pub title: String,
+    pub slot: ViewerExtensionSlot,
+    pub summary: String,
+}
+
+/// Stable downstream integration manifest for viewer extensions.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ViewerExtensionManifest {
+    pub descriptors: Vec<ViewerExtensionDescriptor>,
+}
+
 /// Stable application-service trait shared by UI and shell layers.
 pub trait ViewerApplicationService {
     /// Execute one typed query.
@@ -627,6 +1008,11 @@ pub trait ViewerApplicationService {
 pub struct InMemoryViewerService {
     artifacts: BTreeMap<ArtifactId, ViewerArtifactFile>,
     runs: BTreeMap<RunId, RunWorkspace>,
+    sweeps: BTreeMap<String, DeterministicSweepReport>,
+    suites: BTreeMap<String, ExperimentSuiteReport>,
+    mocked_reruns: BTreeMap<(RunId, BranchId), Vec<EffectOverrideSpec>>,
+    minimizations: BTreeMap<String, MinimizationResult>,
+    extensions: ViewerExtensionManifest,
 }
 
 #[derive(Default)]
@@ -674,6 +1060,235 @@ impl InMemoryViewerService {
             ViewerArtifact::ScenarioBundle(bundle) => Some(bundle.as_ref()),
             _ => None,
         }
+    }
+
+    fn scenario_bundle_for_artifact(
+        &self,
+        artifact_id: &str,
+    ) -> Result<&ScenarioBundleArtifact, ViewerModelError> {
+        let artifact =
+            self.artifacts
+                .get(artifact_id)
+                .ok_or_else(|| ViewerModelError::NotFound {
+                    kind: "artifact".to_string(),
+                    id: artifact_id.to_string(),
+                })?;
+        match &artifact.artifact {
+            ViewerArtifact::ScenarioBundle(bundle) => Ok(bundle.as_ref()),
+            _ => Err(ViewerModelError::UnexpectedQueryShape {
+                expected: "scenario_bundle".to_string(),
+            }),
+        }
+    }
+
+    fn semantic_comparison(
+        &self,
+        request: &SemanticComparisonRequest,
+    ) -> Result<SemanticComparisonResult, ViewerModelError> {
+        let baseline = self.scenario_bundle_for_artifact(&request.baseline_artifact_id)?;
+        let candidate = self.scenario_bundle_for_artifact(&request.candidate_artifact_id)?;
+        Ok(build_semantic_comparison_result(
+            request.baseline_artifact_id.clone(),
+            request.candidate_artifact_id.clone(),
+            baseline,
+            candidate,
+        ))
+    }
+
+    fn comparison_counterexample(
+        &self,
+        request: &SemanticComparisonRequest,
+    ) -> Result<TheoremAwareCounterexample, ViewerModelError> {
+        let baseline = self.scenario_bundle_for_artifact(&request.baseline_artifact_id)?;
+        let candidate = self.scenario_bundle_for_artifact(&request.candidate_artifact_id)?;
+        Ok(build_comparison_counterexample(
+            request.baseline_artifact_id.clone(),
+            request.candidate_artifact_id.clone(),
+            baseline,
+            candidate,
+        ))
+    }
+
+    fn artifact_counterexample(
+        &self,
+        artifact_id: &str,
+    ) -> Result<TheoremAwareCounterexample, ViewerModelError> {
+        let bundle = self.scenario_bundle_for_artifact(artifact_id)?;
+        Ok(build_artifact_counterexample(bundle))
+    }
+
+    fn effect_trace_for_branch(
+        &self,
+        artifact_id: &str,
+        branch_id: &str,
+    ) -> Result<EffectTraceArtifact, ViewerModelError> {
+        let bundle = self.scenario_bundle_for_artifact(artifact_id)?;
+        Ok(EffectTraceArtifact {
+            artifact_id: artifact_id.to_string(),
+            branch_id: branch_id.to_string(),
+            entries: build_effect_trace_entries(bundle),
+            overrides: self
+                .mocked_reruns
+                .get(&(artifact_id.to_string(), branch_id.to_string()))
+                .cloned()
+                .unwrap_or_default(),
+        })
+    }
+
+    fn sweep_explorer(
+        &self,
+        request: &SweepExplorerRequest,
+    ) -> Result<SweepExplorerView, ViewerModelError> {
+        let report =
+            self.sweeps
+                .get(&request.sweep_id)
+                .ok_or_else(|| ViewerModelError::NotFound {
+                    kind: "sweep".to_string(),
+                    id: request.sweep_id.clone(),
+                })?;
+        let mut visible = report.cases.clone();
+        if let Some(filter) = request.filter_text.as_ref() {
+            let needle = filter.to_lowercase();
+            visible.retain(|case| {
+                case.case_id.to_lowercase().contains(&needle)
+                    || case.artifact_id.to_lowercase().contains(&needle)
+                    || case.parameters.iter().any(|(key, value)| {
+                        key.to_lowercase().contains(&needle)
+                            || value.to_lowercase().contains(&needle)
+                    })
+            });
+        }
+        if let Some(max_results) = request.max_results {
+            visible.truncate(max_results);
+        }
+        let outlier_case_ids = report
+            .cases
+            .iter()
+            .filter_map(|case| {
+                case.comparison_to_baseline.as_ref().and_then(|comparison| {
+                    (comparison.relation == SemanticComparisonClass::SafetyVisibleDivergence)
+                        .then(|| case.case_id.clone())
+                })
+            })
+            .collect();
+        Ok(SweepExplorerView {
+            sweep_id: request.sweep_id.clone(),
+            total_cases: report.cases.len(),
+            visible_cases: visible,
+            outlier_case_ids,
+        })
+    }
+
+    fn build_sweep_report(
+        &self,
+        sweep_id: String,
+        baseline_artifact_id: Option<ArtifactId>,
+        cases: Vec<SweepCaseSpec>,
+    ) -> Result<DeterministicSweepReport, ViewerModelError> {
+        let mut results = Vec::new();
+        for case in cases {
+            let bundle = self.scenario_bundle_for_artifact(&case.artifact_id)?;
+            let comparison_to_baseline = if let Some(baseline_id) = baseline_artifact_id.as_ref() {
+                Some(self.semantic_comparison(&SemanticComparisonRequest {
+                    baseline_artifact_id: baseline_id.clone(),
+                    candidate_artifact_id: case.artifact_id.clone(),
+                })?)
+            } else {
+                None
+            };
+            results.push(SweepCaseResult {
+                case_id: case.case_id,
+                artifact_id: case.artifact_id,
+                parameters: case.parameters,
+                theorem_profile: Some(bundle.result.stats.theorem_profile.clone()),
+                execution_regime: Some(bundle.result.stats.execution_regime),
+                comparison_to_baseline,
+            });
+        }
+        Ok(DeterministicSweepReport {
+            sweep_id,
+            baseline_artifact_id,
+            cases: results,
+        })
+    }
+
+    fn build_suite_report(
+        &self,
+        definition: ExperimentSuiteDefinition,
+    ) -> Result<ExperimentSuiteReport, ViewerModelError> {
+        let mut cases = Vec::new();
+        for case in &definition.cases {
+            let comparison = self.semantic_comparison(&SemanticComparisonRequest {
+                baseline_artifact_id: case.baseline_artifact_id.clone(),
+                candidate_artifact_id: case.candidate_artifact_id.clone(),
+            })?;
+            let changed_steps = comparison
+                .first_divergence
+                .as_ref()
+                .and_then(|point| point.step);
+            let threshold_passed = if comparison.relation
+                == SemanticComparisonClass::EquivalentUnderNormalization
+                && definition.threshold.allow_normalization_only
+            {
+                true
+            } else {
+                changed_steps.unwrap_or(0) <= definition.threshold.max_changed_steps
+                    && comparison.relation != SemanticComparisonClass::SafetyVisibleDivergence
+            };
+            let counterexample = (!threshold_passed)
+                .then(|| {
+                    self.comparison_counterexample(&SemanticComparisonRequest {
+                        baseline_artifact_id: case.baseline_artifact_id.clone(),
+                        candidate_artifact_id: case.candidate_artifact_id.clone(),
+                    })
+                })
+                .transpose()?;
+            cases.push(ExperimentSuiteCaseResult {
+                case_id: case.case_id.clone(),
+                comparison,
+                threshold_passed,
+                counterexample,
+            });
+        }
+        Ok(ExperimentSuiteReport { definition, cases })
+    }
+
+    fn build_minimization_result(
+        &self,
+        request: MinimizationRequest,
+    ) -> Result<MinimizationResult, ViewerModelError> {
+        let bundle = self.scenario_bundle_for_artifact(&request.artifact_id)?;
+        let retained_counterexample = self.artifact_counterexample(&request.artifact_id).ok();
+        let minimized_steps = match request.strategy {
+            MinimizationStrategy::FirstDivergencePrefix => retained_counterexample
+                .as_ref()
+                .and_then(|counterexample| counterexample.divergence.as_ref())
+                .and_then(|point| point.step)
+                .or_else(|| bundle.result.violations.first().map(|_| 1))
+                .unwrap_or_else(|| bundle.result.stats.rounds_executed.max(1)),
+            MinimizationStrategy::FirstViolationPrefix => {
+                if bundle.result.violations.is_empty() {
+                    1
+                } else {
+                    1
+                }
+            }
+        };
+        let minimized_steps = minimized_steps.max(1);
+        Ok(MinimizationResult {
+            request: request.clone(),
+            minimized_steps,
+            patch: ScenarioBranchPatch {
+                operations: vec![ScenarioPatchOperation::SetSteps {
+                    steps: minimized_steps,
+                }],
+            },
+            retained_counterexample,
+            summary: format!(
+                "minimized `{}` on branch `{}` to {} step(s)",
+                request.artifact_id, request.branch_id, minimized_steps
+            ),
+        })
     }
 
     fn graph_projection_for_request(
@@ -975,6 +1590,78 @@ impl InMemoryViewerService {
                 }
             }
         }
+        if query.domain.is_none() || query.domain == Some(SearchDomain::Divergence) {
+            let scenario_ids = self
+                .artifacts
+                .iter()
+                .filter_map(|(artifact_id, artifact)| {
+                    matches!(artifact.artifact, ViewerArtifact::ScenarioBundle(_))
+                        .then(|| artifact_id.clone())
+                })
+                .collect::<Vec<_>>();
+            for pair in scenario_ids.windows(2) {
+                if let [baseline_artifact_id, candidate_artifact_id] = pair {
+                    let request = SemanticComparisonRequest {
+                        baseline_artifact_id: baseline_artifact_id.clone(),
+                        candidate_artifact_id: candidate_artifact_id.clone(),
+                    };
+                    if let Ok(comparison) = self.semantic_comparison(&request) {
+                        if let Some(point) = comparison.first_divergence {
+                            let haystack = format!(
+                                "{} {} {}",
+                                comparison.summary, point.label, point.baseline_detail
+                            )
+                            .to_lowercase();
+                            if haystack.contains(&needle) {
+                                matches.push(SearchResult {
+                                    artifact_id: candidate_artifact_id.clone(),
+                                    domain: SearchDomain::Divergence,
+                                    label: point.label,
+                                    detail: comparison.summary,
+                                    branch_id: Some("root".to_string()),
+                                    step: point.step,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if query.domain.is_none() || query.domain == Some(SearchDomain::Sweep) {
+            for report in self.sweeps.values() {
+                for case in &report.cases {
+                    if case.case_id.to_lowercase().contains(&needle) {
+                        matches.push(SearchResult {
+                            artifact_id: case.artifact_id.clone(),
+                            domain: SearchDomain::Sweep,
+                            label: case.case_id.clone(),
+                            detail: report.sweep_id.clone(),
+                            branch_id: Some("root".to_string()),
+                            step: None,
+                        });
+                    }
+                }
+            }
+        }
+        if query.domain.is_none() || query.domain == Some(SearchDomain::Effect) {
+            for artifact_id in self.artifacts.keys() {
+                if let Ok(effect_trace) = self.effect_trace_for_branch(artifact_id, "root") {
+                    for entry in effect_trace.entries {
+                        let haystack = format!("{} {}", entry.kind, entry.detail).to_lowercase();
+                        if haystack.contains(&needle) {
+                            matches.push(SearchResult {
+                                artifact_id: artifact_id.clone(),
+                                domain: SearchDomain::Effect,
+                                label: entry.kind,
+                                detail: entry.detail,
+                                branch_id: Some("root".to_string()),
+                                step: Some(entry.step),
+                            });
+                        }
+                    }
+                }
+            }
+        }
         Ok(ViewerQueryResult::SearchResults { matches })
     }
 
@@ -1056,6 +1743,70 @@ impl ViewerApplicationService for InMemoryViewerService {
             ViewerQuery::HistoricalInspection(state) => {
                 Ok(ViewerQueryResult::HistoricalInspection { state })
             }
+            ViewerQuery::SemanticComparison(request) => {
+                let comparison = self.semantic_comparison(&request)?;
+                Ok(ViewerQueryResult::SemanticComparison {
+                    comparison: Box::new(comparison),
+                })
+            }
+            ViewerQuery::FirstDivergence(request) => {
+                let divergence = self.semantic_comparison(&request)?.first_divergence;
+                Ok(ViewerQueryResult::FirstDivergence { divergence })
+            }
+            ViewerQuery::ComparisonCounterexample(request) => {
+                let counterexample = self.comparison_counterexample(&request)?;
+                Ok(ViewerQueryResult::Counterexample {
+                    counterexample: Box::new(counterexample),
+                })
+            }
+            ViewerQuery::ArtifactCounterexample { artifact_id } => {
+                let counterexample = self.artifact_counterexample(&artifact_id)?;
+                Ok(ViewerQueryResult::Counterexample {
+                    counterexample: Box::new(counterexample),
+                })
+            }
+            ViewerQuery::SweepExplorer(request) => {
+                let explorer = self.sweep_explorer(&request)?;
+                Ok(ViewerQueryResult::SweepExplorer {
+                    explorer: Box::new(explorer),
+                })
+            }
+            ViewerQuery::ExperimentSuite { suite_id } => {
+                let suite = self.suites.get(&suite_id).cloned().ok_or_else(|| {
+                    ViewerModelError::NotFound {
+                        kind: "suite".to_string(),
+                        id: suite_id.clone(),
+                    }
+                })?;
+                Ok(ViewerQueryResult::ExperimentSuite {
+                    suite: Box::new(suite),
+                })
+            }
+            ViewerQuery::EffectTrace {
+                artifact_id,
+                branch_id,
+            } => {
+                let effect_trace = self.effect_trace_for_branch(&artifact_id, &branch_id)?;
+                Ok(ViewerQueryResult::EffectTrace {
+                    effect_trace: Box::new(effect_trace),
+                })
+            }
+            ViewerQuery::Minimization { request_id } => {
+                let result = self
+                    .minimizations
+                    .get(&request_id)
+                    .cloned()
+                    .ok_or_else(|| ViewerModelError::NotFound {
+                        kind: "minimization".to_string(),
+                        id: request_id.clone(),
+                    })?;
+                Ok(ViewerQueryResult::Minimization {
+                    result: Box::new(result),
+                })
+            }
+            ViewerQuery::ExtensionManifest => Ok(ViewerQueryResult::ExtensionManifest {
+                manifest: Box::new(self.extensions.clone()),
+            }),
         }
     }
 
@@ -1158,7 +1909,289 @@ impl ViewerApplicationService for InMemoryViewerService {
                 branch.rerun_requested = true;
                 Ok(ViewerCommandResult::RerunRequested { run_id, branch_id })
             }
+            ViewerCommand::ExecuteSweep {
+                sweep_id,
+                baseline_artifact_id,
+                cases,
+            } => {
+                let report =
+                    self.build_sweep_report(sweep_id.clone(), baseline_artifact_id.clone(), cases)?;
+                self.sweeps.insert(sweep_id.clone(), report);
+                Ok(ViewerCommandResult::SweepExecuted { sweep_id })
+            }
+            ViewerCommand::ExecuteExperimentSuite { definition } => {
+                let suite_id = definition.suite_id.clone();
+                let report = self.build_suite_report(definition)?;
+                self.suites.insert(suite_id.clone(), report);
+                Ok(ViewerCommandResult::ExperimentSuiteExecuted { suite_id })
+            }
+            ViewerCommand::RequestMockedRerun {
+                run_id,
+                branch_id,
+                overrides,
+            } => {
+                self.mocked_reruns
+                    .insert((run_id.clone(), branch_id.clone()), overrides);
+                Ok(ViewerCommandResult::MockedRerunRequested { run_id, branch_id })
+            }
+            ViewerCommand::RequestMinimization { request } => {
+                let request_id = request.request_id.clone();
+                let result = self.build_minimization_result(request)?;
+                self.minimizations.insert(request_id.clone(), result);
+                Ok(ViewerCommandResult::MinimizationRequested { request_id })
+            }
+            ViewerCommand::RegisterExtensions { manifest } => {
+                let count = manifest.descriptors.len();
+                self.extensions = manifest;
+                Ok(ViewerCommandResult::ExtensionsRegistered { count })
+            }
         }
+    }
+}
+
+fn effect_trace_entry_detail(value: &impl Serialize) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"unserializable\"".to_string())
+}
+
+fn build_effect_trace_entries(bundle: &ScenarioBundleArtifact) -> Vec<EffectTraceEntry> {
+    let mut entries = Vec::new();
+    for (index, exchange) in bundle.result.replay.effect_exchanges.iter().enumerate() {
+        entries.push(EffectTraceEntry {
+            step: u64::try_from(index).unwrap_or(u64::MAX),
+            kind: "effect_exchange".to_string(),
+            detail: effect_trace_entry_detail(exchange),
+        });
+    }
+    for (index, trace) in bundle.result.replay.effect_trace.iter().enumerate() {
+        entries.push(EffectTraceEntry {
+            step: u64::try_from(index).unwrap_or(u64::MAX),
+            kind: "effect_trace".to_string(),
+            detail: effect_trace_entry_detail(trace),
+        });
+    }
+    if entries.is_empty() {
+        entries.push(EffectTraceEntry {
+            step: 0,
+            kind: "no_effects_recorded".to_string(),
+            detail: "run emitted no effect traffic".to_string(),
+        });
+    }
+    entries
+}
+
+fn first_trace_divergence(
+    baseline: &ScenarioBundleArtifact,
+    candidate: &ScenarioBundleArtifact,
+) -> Option<SemanticDivergencePoint> {
+    let left = &baseline.result.trace.records;
+    let right = &candidate.result.trace.records;
+    let common_len = left.len().min(right.len());
+    for index in 0..common_len {
+        if left[index] != right[index] {
+            return Some(SemanticDivergencePoint {
+                kind: SemanticDivergenceKind::TraceRecord,
+                step: Some(left[index].step.min(right[index].step)),
+                label: "trace record mismatch".to_string(),
+                baseline_detail: format!("{:?}", left[index]),
+                candidate_detail: format!("{:?}", right[index]),
+            });
+        }
+    }
+    if left.len() != right.len() {
+        return Some(SemanticDivergencePoint {
+            kind: SemanticDivergenceKind::StepCount,
+            step: Some(u64::try_from(common_len).unwrap_or(u64::MAX)),
+            label: "trace length mismatch".to_string(),
+            baseline_detail: left.len().to_string(),
+            candidate_detail: right.len().to_string(),
+        });
+    }
+    if baseline.result.replay.reconfiguration_trace != candidate.result.replay.reconfiguration_trace
+    {
+        return Some(SemanticDivergencePoint {
+            kind: SemanticDivergenceKind::Reconfiguration,
+            step: baseline
+                .result
+                .replay
+                .reconfiguration_trace
+                .first()
+                .map(|record| record.logical_step)
+                .or_else(|| {
+                    candidate
+                        .result
+                        .replay
+                        .reconfiguration_trace
+                        .first()
+                        .map(|record| record.logical_step)
+                }),
+            label: "reconfiguration mismatch".to_string(),
+            baseline_detail: format!("{:?}", baseline.result.replay.reconfiguration_trace),
+            candidate_detail: format!("{:?}", candidate.result.replay.reconfiguration_trace),
+        });
+    }
+    if baseline.result.replay.effect_trace != candidate.result.replay.effect_trace {
+        return Some(SemanticDivergencePoint {
+            kind: SemanticDivergenceKind::EffectTrace,
+            step: Some(0),
+            label: "effect trace mismatch".to_string(),
+            baseline_detail: effect_trace_entry_detail(&baseline.result.replay.effect_trace),
+            candidate_detail: effect_trace_entry_detail(&candidate.result.replay.effect_trace),
+        });
+    }
+    if baseline.result.stats.execution_regime != candidate.result.stats.execution_regime {
+        return Some(SemanticDivergencePoint {
+            kind: SemanticDivergenceKind::ExecutionRegime,
+            step: None,
+            label: "execution regime mismatch".to_string(),
+            baseline_detail: format!("{:?}", baseline.result.stats.execution_regime),
+            candidate_detail: format!("{:?}", candidate.result.stats.execution_regime),
+        });
+    }
+    if baseline.result.stats.theorem_profile != candidate.result.stats.theorem_profile {
+        return Some(SemanticDivergencePoint {
+            kind: SemanticDivergenceKind::TheoremProfile,
+            step: None,
+            label: "theorem profile mismatch".to_string(),
+            baseline_detail: format!("{:?}", baseline.result.stats.theorem_profile),
+            candidate_detail: format!("{:?}", candidate.result.stats.theorem_profile),
+        });
+    }
+    None
+}
+
+#[authoritative_source("viewer_semantic_comparison")]
+fn build_semantic_comparison_result(
+    baseline_artifact_id: ArtifactId,
+    candidate_artifact_id: ArtifactId,
+    baseline: &ScenarioBundleArtifact,
+    candidate: &ScenarioBundleArtifact,
+) -> SemanticComparisonResult {
+    let normalized_observability = compare_observability(
+        &baseline.result.replay.obs_trace,
+        &baseline.result.replay.reconfiguration_trace,
+        &baseline.result.analysis.normalized_observability,
+        &candidate.result.replay.obs_trace,
+        &candidate.result.replay.reconfiguration_trace,
+        &candidate.result.analysis.normalized_observability,
+    );
+    let first_divergence = first_trace_divergence(baseline, candidate);
+    let classification_changed_only = matches!(
+        first_divergence.as_ref().map(|point| point.kind),
+        Some(SemanticDivergenceKind::TheoremProfile | SemanticDivergenceKind::ExecutionRegime)
+    ) && normalized_observability.relation
+        == ObservabilityRelation::ExactRawMatch;
+    let mut relation = match normalized_observability.relation {
+        ObservabilityRelation::ExactRawMatch => SemanticComparisonClass::ExactMatch,
+        ObservabilityRelation::EquivalentUnderNormalization => {
+            SemanticComparisonClass::EquivalentUnderNormalization
+        }
+        ObservabilityRelation::SafetyVisibleDivergence => {
+            SemanticComparisonClass::SafetyVisibleDivergence
+        }
+    };
+    if first_divergence.is_some() && !classification_changed_only {
+        relation = SemanticComparisonClass::SafetyVisibleDivergence;
+    }
+    let summary = if classification_changed_only {
+        "runtime artifacts match exactly but theorem/regime classification changed".to_string()
+    } else {
+        match relation {
+            SemanticComparisonClass::ExactMatch => "artifacts match exactly".to_string(),
+            SemanticComparisonClass::EquivalentUnderNormalization => {
+                "raw traces differ but normalized observability matches".to_string()
+            }
+            SemanticComparisonClass::SafetyVisibleDivergence => {
+                "safety-visible divergence detected".to_string()
+            }
+        }
+    };
+    SemanticComparisonResult {
+        baseline_artifact_id,
+        candidate_artifact_id,
+        relation,
+        normalized_observability,
+        classification_changed_only,
+        first_divergence,
+        summary,
+    }
+}
+
+#[authoritative_source("viewer_comparison_counterexample")]
+fn build_comparison_counterexample(
+    baseline_artifact_id: ArtifactId,
+    candidate_artifact_id: ArtifactId,
+    baseline: &ScenarioBundleArtifact,
+    candidate: &ScenarioBundleArtifact,
+) -> TheoremAwareCounterexample {
+    let comparison = build_semantic_comparison_result(
+        baseline_artifact_id.clone(),
+        candidate_artifact_id.clone(),
+        baseline,
+        candidate,
+    );
+    let first_failed_assumption = if comparison.classification_changed_only {
+        Some("theorem_profile_or_execution_regime_changed".to_string())
+    } else if comparison.relation == SemanticComparisonClass::EquivalentUnderNormalization {
+        Some("raw_trace_exactness_not_preserved".to_string())
+    } else if comparison.relation == SemanticComparisonClass::SafetyVisibleDivergence {
+        Some("normalized_equivalence_failed".to_string())
+    } else {
+        None
+    };
+    TheoremAwareCounterexample {
+        summary: format!(
+            "comparison between `{baseline_artifact_id}` and `{candidate_artifact_id}` failed semantic equivalence expectations"
+        ),
+        theorem_profile: Some(candidate.result.stats.theorem_profile.clone()),
+        execution_regime: Some(candidate.result.stats.execution_regime),
+        first_failed_assumption,
+        divergence: comparison.first_divergence,
+        decision_report: None,
+    }
+}
+
+#[authoritative_source("viewer_artifact_counterexample")]
+fn build_artifact_counterexample(bundle: &ScenarioBundleArtifact) -> TheoremAwareCounterexample {
+    let decision_report = bundle
+        .scenario
+        .as_ref()
+        .map(decide_theorem_eligibility)
+        .or_else(|| {
+            Some(DecisionReport {
+                kind: DecisionKind::TheoremEligibility,
+                outcome: DecisionOutcome::Certified(
+                    telltale_simulator::decision::DecisionCertificate::TheoremEligibility {
+                        eligibility: bundle.result.stats.theorem_profile.eligibility,
+                    },
+                ),
+            })
+        });
+    let first_failed_assumption =
+        decision_report
+            .as_ref()
+            .and_then(|report| match &report.outcome {
+                DecisionOutcome::Counterexample(DecisionCounterexample::TheoremEligibility {
+                    cause,
+                }) => Some(format!("{cause:?}")),
+                _ => None,
+            });
+    TheoremAwareCounterexample {
+        summary: if let Some(reason) = bundle
+            .result
+            .stats
+            .theorem_profile
+            .eligibility_reason
+            .clone()
+        {
+            reason
+        } else {
+            "artifact has no failing theorem-side decision".to_string()
+        },
+        theorem_profile: Some(bundle.result.stats.theorem_profile.clone()),
+        execution_regime: Some(bundle.result.stats.execution_regime),
+        first_failed_assumption,
+        divergence: None,
+        decision_report,
     }
 }
 
@@ -1504,5 +2537,250 @@ mod tests {
             }
         ));
         assert!(matches!(delete, ViewerCommand::DeleteBranch { .. }));
+    }
+
+    #[test]
+    fn semantic_comparison_and_divergence_queries_are_stable() {
+        let mut baseline = sample_result();
+        baseline
+            .trace
+            .records
+            .push(telltale_simulator::trace::StepRecord {
+                step: 1,
+                role: "alpha".to_string(),
+                state: Vec::new(),
+            });
+        let mut candidate = baseline.clone();
+        candidate
+            .trace
+            .records
+            .push(telltale_simulator::trace::StepRecord {
+                step: 2,
+                role: "beta".to_string(),
+                state: Vec::new(),
+            });
+
+        let mut service = InMemoryViewerService::new();
+        for (artifact_id, result) in [("run/base", baseline), ("run/candidate", candidate)] {
+            service
+                .command(ViewerCommand::ImportArtifact {
+                    artifact_id: artifact_id.to_string(),
+                    artifact: Box::new(ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(
+                        Box::new(ScenarioBundleArtifact::new(None, result, None)),
+                    ))),
+                })
+                .expect("import scenario bundle");
+        }
+
+        let request = SemanticComparisonRequest {
+            baseline_artifact_id: "run/base".to_string(),
+            candidate_artifact_id: "run/candidate".to_string(),
+        };
+        let comparison = service
+            .query(ViewerQuery::SemanticComparison(request.clone()))
+            .expect("comparison query");
+        match comparison {
+            ViewerQueryResult::SemanticComparison { comparison } => {
+                assert_eq!(
+                    comparison.relation,
+                    SemanticComparisonClass::SafetyVisibleDivergence
+                );
+                assert!(comparison.first_divergence.is_some());
+            }
+            other => panic!("unexpected comparison result: {other:?}"),
+        }
+
+        let divergence = service
+            .query(ViewerQuery::FirstDivergence(request))
+            .expect("first divergence query");
+        match divergence {
+            ViewerQueryResult::FirstDivergence { divergence } => {
+                assert_eq!(
+                    divergence.expect("divergence point").kind,
+                    SemanticDivergenceKind::StepCount
+                );
+            }
+            other => panic!("unexpected divergence result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn counterexample_sweep_effect_and_minimization_queries_round_trip() {
+        let mut service = InMemoryViewerService::new();
+        let mut ineligible_result = sample_result();
+        ineligible_result.stats.theorem_profile.assumption_bundle =
+            TheoremAssumptionBundle::ObservedTransport;
+        ineligible_result.stats.theorem_profile.eligibility = TheoremEligibility::Ineligible;
+        ineligible_result.stats.theorem_profile.eligibility_reason =
+            Some("observed transport is not exact".to_string());
+
+        for (artifact_id, result) in [
+            ("run/base", sample_result()),
+            ("run/ineligible", ineligible_result),
+        ] {
+            service
+                .command(ViewerCommand::ImportArtifact {
+                    artifact_id: artifact_id.to_string(),
+                    artifact: Box::new(ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(
+                        Box::new(ScenarioBundleArtifact::new(None, result, None)),
+                    ))),
+                })
+                .expect("import scenario bundle");
+        }
+
+        let counterexample = service
+            .query(ViewerQuery::ArtifactCounterexample {
+                artifact_id: "run/ineligible".to_string(),
+            })
+            .expect("artifact counterexample");
+        match counterexample {
+            ViewerQueryResult::Counterexample { counterexample } => {
+                assert!(
+                    counterexample.summary.contains("exact")
+                        || counterexample.decision_report.is_some()
+                );
+            }
+            other => panic!("unexpected counterexample result: {other:?}"),
+        }
+
+        service
+            .command(ViewerCommand::ExecuteSweep {
+                sweep_id: "sweep/demo".to_string(),
+                baseline_artifact_id: Some("run/base".to_string()),
+                cases: vec![
+                    SweepCaseSpec {
+                        case_id: "base".to_string(),
+                        artifact_id: "run/base".to_string(),
+                        parameters: BTreeMap::from([("seed".to_string(), "7".to_string())]),
+                    },
+                    SweepCaseSpec {
+                        case_id: "ineligible".to_string(),
+                        artifact_id: "run/ineligible".to_string(),
+                        parameters: BTreeMap::from([(
+                            "assumption_bundle".to_string(),
+                            "observed_transport".to_string(),
+                        )]),
+                    },
+                ],
+            })
+            .expect("execute sweep");
+        let sweep = service
+            .query(ViewerQuery::SweepExplorer(SweepExplorerRequest {
+                sweep_id: "sweep/demo".to_string(),
+                filter_text: Some("ineligible".to_string()),
+                group_by: Some("assumption_bundle".to_string()),
+                max_results: Some(4),
+            }))
+            .expect("load sweep explorer");
+        match sweep {
+            ViewerQueryResult::SweepExplorer { explorer } => {
+                assert_eq!(explorer.total_cases, 2);
+                assert_eq!(explorer.visible_cases.len(), 1);
+            }
+            other => panic!("unexpected sweep explorer result: {other:?}"),
+        }
+
+        service
+            .command(ViewerCommand::ExecuteExperimentSuite {
+                definition: ExperimentSuiteDefinition {
+                    suite_id: "suite/demo".to_string(),
+                    threshold: RegressionThreshold {
+                        max_changed_steps: 0,
+                        allow_normalization_only: true,
+                    },
+                    cases: vec![ExperimentSuiteCase {
+                        case_id: "base-vs-ineligible".to_string(),
+                        baseline_artifact_id: "run/base".to_string(),
+                        candidate_artifact_id: "run/ineligible".to_string(),
+                    }],
+                },
+            })
+            .expect("execute suite");
+        let suite = service
+            .query(ViewerQuery::ExperimentSuite {
+                suite_id: "suite/demo".to_string(),
+            })
+            .expect("load suite");
+        match suite {
+            ViewerQueryResult::ExperimentSuite { suite } => {
+                assert_eq!(suite.cases.len(), 1);
+            }
+            other => panic!("unexpected suite result: {other:?}"),
+        }
+
+        service
+            .command(mocked_rerun_command(
+                "run/base".to_string(),
+                "root".to_string(),
+                "ready",
+            ))
+            .expect("queue mocked rerun");
+        let effect_trace = service
+            .query(ViewerQuery::EffectTrace {
+                artifact_id: "run/base".to_string(),
+                branch_id: "root".to_string(),
+            })
+            .expect("load effect trace");
+        match effect_trace {
+            ViewerQueryResult::EffectTrace { effect_trace } => {
+                assert_eq!(effect_trace.overrides.len(), 1);
+                assert!(!effect_trace.entries.is_empty());
+            }
+            other => panic!("unexpected effect trace result: {other:?}"),
+        }
+
+        service
+            .command(minimize_branch_command(
+                "minimize:run/base:root",
+                "run/base".to_string(),
+                "root".to_string(),
+            ))
+            .expect("request minimization");
+        let minimization = service
+            .query(ViewerQuery::Minimization {
+                request_id: "minimize:run/base:root".to_string(),
+            })
+            .expect("load minimization");
+        match minimization {
+            ViewerQueryResult::Minimization { result } => {
+                assert!(result.minimized_steps >= 1);
+            }
+            other => panic!("unexpected minimization result: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn downstream_extension_manifest_round_trips_without_internal_assumptions() {
+        let mut service = InMemoryViewerService::new();
+        service
+            .command(ViewerCommand::RegisterExtensions {
+                manifest: ViewerExtensionManifest {
+                    descriptors: vec![
+                        ViewerExtensionDescriptor {
+                            id: "downstream.overview".to_string(),
+                            title: "Overview Overlay".to_string(),
+                            slot: ViewerExtensionSlot::OverviewPanel,
+                            summary: "External summary panel".to_string(),
+                        },
+                        ViewerExtensionDescriptor {
+                            id: "downstream.graph".to_string(),
+                            title: "Graph Overlay".to_string(),
+                            slot: ViewerExtensionSlot::GraphAnnotation,
+                            summary: "External graph annotations".to_string(),
+                        },
+                    ],
+                },
+            })
+            .expect("register extensions");
+        let manifest = service
+            .query(ViewerQuery::ExtensionManifest)
+            .expect("load extension manifest");
+        match manifest {
+            ViewerQueryResult::ExtensionManifest { manifest } => {
+                assert_eq!(manifest.descriptors.len(), 2);
+                assert_eq!(manifest.descriptors[0].id, "downstream.overview");
+            }
+            other => panic!("unexpected extension manifest: {other:?}"),
+        }
     }
 }

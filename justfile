@@ -483,7 +483,7 @@ check-viewer-tooling-boundaries:
 # Focused shared webapp verification split: pure model, ownership/lints, and UI integration.
 check-viewer-tooling:
     cargo test -p telltale-viewer --lib
-    cargo test -p telltale-ui --test shell_rendering -- --nocapture
+    cargo test -p telltale-ui --test shell_rendering --test interactive_workspace -- --nocapture
     cargo check -p telltale-web
     just check-viewer-tooling-boundaries
 
