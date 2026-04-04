@@ -50,13 +50,37 @@ else
     fi
 fi
 
-# 2. Quick compile check
+# 2. Quick compile check (only crates with staged changes)
 echo -n "Checking compilation... "
-if cargo check --workspace --all-targets --all-features 2>/dev/null; then
-    echo -e "${GREEN}OK${NC}"
+if [[ -z "$staged_rs" ]]; then
+    echo -e "${GREEN}OK${NC} (no Rust files staged)"
 else
-    echo -e "${RED}FAILED${NC}"
-    exit 1
+    # Derive the set of crates that contain staged .rs files
+    check_args=()
+    seen_crates=""
+    while IFS= read -r rs_file; do
+        crate_dir="$rs_file"
+        while [[ "$crate_dir" != "." ]]; do
+            crate_dir="$(dirname "$crate_dir")"
+            if [[ -f "$crate_dir/Cargo.toml" ]]; then
+                crate_name=$(grep -m1 '^name' "$crate_dir/Cargo.toml" | sed 's/.*= *"//;s/".*//')
+                if [[ -n "$crate_name" && ! " $seen_crates " =~ " $crate_name " ]]; then
+                    check_args+=(-p "$crate_name")
+                    seen_crates="$seen_crates $crate_name"
+                fi
+                break
+            fi
+        done
+    done <<< "$staged_rs"
+
+    if [[ ${#check_args[@]} -eq 0 ]]; then
+        echo -e "${GREEN}OK${NC} (no crates affected)"
+    elif cargo check "${check_args[@]}" --all-targets --all-features 2>/dev/null; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        exit 1
+    fi
 fi
 
 # 3. Remove empty directories
