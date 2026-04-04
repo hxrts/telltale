@@ -85,6 +85,12 @@ It currently renders:
 This gives the viewer a first serious run-analysis lane instead of only a
 graph browser.
 
+The archive controls are intentionally part of the insight workspace rather
+than a separate browser-owned workflow.
+Reloading an archived artifact set preserves the deterministic viewer state,
+and any subsequent branch fork still goes back through the typed command path
+instead of mutating the archived run in place.
+
 ## Downstream Handoff
 
 Aura is unblocked to start integrating once it consumes these shared surfaces:

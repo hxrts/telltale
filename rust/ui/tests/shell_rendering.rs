@@ -54,3 +54,12 @@ fn insight_page_renders_diff_and_provenance_surfaces() {
     assert!(html.contains("Causality"));
     assert!(html.contains("Provenance"));
 }
+
+#[test]
+fn insight_page_renders_regime_watch_and_bookmark_surfaces() {
+    let html = render_page(ViewerPage::Insight);
+    assert!(html.contains("Execution regime"));
+    assert!(html.contains("Watch Expressions"));
+    assert!(html.contains("Bookmarks"));
+    assert!(html.contains("initial step"));
+}
