@@ -1,5 +1,4 @@
 /// Iterator and `FromStr` trait implementations for `FixedQ32`.
-
 impl Sum for FixedQ32 {
     fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
         iter.fold(Self::zero(), |acc, x| acc.saturating_add(x))
