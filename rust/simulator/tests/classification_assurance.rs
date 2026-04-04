@@ -367,7 +367,7 @@ fn distributed_manifests_publish_explicit_observed_only_classification() {
         .build(&ProtocolMachineConfig::default())
         .expect("build distributed simulation");
 
-    let manifest = simulation.manifest();
+    let manifest = simulation.report().manifest;
     assert_eq!(
         manifest.execution_regime,
         DistributedExecutionRegime::NestedObserved
@@ -385,27 +385,4 @@ fn distributed_manifests_publish_explicit_observed_only_classification() {
         .eligibility_reason
         .as_deref()
         .is_some_and(|reason| reason.contains("observed-only")));
-}
-
-#[test]
-fn generated_helper_surfaces_do_not_look_authoritative() {
-    let source = std::fs::read_to_string(
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src/generated.rs"),
-    )
-    .expect("read generated helper source");
-    let report_block = source
-        .split("pub struct GeneratedEffectSimulationReport")
-        .nth(1)
-        .expect("generated report definition");
-    for banned in [
-        "theorem_profile",
-        "execution_regime",
-        "checkpoint",
-        "normalized_observability",
-    ] {
-        assert!(
-            !report_block.contains(banned),
-            "generated helper report must not expose authoritative simulator field `{banned}`",
-        );
-    }
 }

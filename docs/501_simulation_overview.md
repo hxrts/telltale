@@ -10,6 +10,7 @@ The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
 The authoritative replay lane is explicit: fresh exact runs use `run_with_scenario(...)`, canonical exact reproduction uses `run_canonical_replay(...)`, and exact checkpoint resume uses `resume_with_checkpoint_artifact(...)`.
+On-disk checkpoint and replay bundles now use the typed `PersistedReplayArtifact` contract rather than ad hoc raw CBOR machine dumps.
 
 ## Key Concepts
 
@@ -67,6 +68,7 @@ The `decision` module provides offline theorem-facing checks that return structu
 The `approximation` module provides non-authoritative analysis runs for `batched_stochastic`, `mean_field`, and `continuum_field` families.
 Approximation artifacts declare an approximation family, theorem-side scope, and explicit non-goals.
 Nested distributed simulation now publishes its own explicit observed-only manifest classification rather than remaining unclassified.
+That observed-only classification now travels through `DistributedRunResult`, not a manifest-only side accessor.
 
 ## Quick Start
 
@@ -90,7 +92,7 @@ See [Simulation Fields](504_simulation_fields.md) for custom `FieldModel` integr
 
 The simulator exposes generated effect-family helper types under `telltale_simulator::generated`, such as `GeneratedEffectScenario`.
 Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
-These APIs currently sit beside the harness API rather than inside it.
+These helper APIs sit beside the harness API rather than inside it, and their helper reports intentionally do not expose theorem profiles, checkpoints, normalized observability, or other authoritative simulator-only fields.
 
 ## Document Map
 

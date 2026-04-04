@@ -3537,7 +3537,9 @@ dependencies = [
  "telltale-machine",
  "telltale-theory",
  "telltale-types",
+ "tempfile",
  "toml 0.8.23",
+ "trybuild",
 ]
 
 [[package]]

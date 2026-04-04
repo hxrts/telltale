@@ -113,11 +113,11 @@ The main public front doors are `telltale_machine::model`, `telltale_machine::ru
 ### telltale-simulator
 
 `telltale-simulator` wraps the protocol machine with deterministic testing and simulation infrastructure.
-It provides runner entry points, `SimulationHarness`, scenario parsing, field/environment hooks, fault injection, network modeling, property checks, checkpoints, replay artifacts, and distributed simulation helpers.
+It provides runner entry points, `SimulationHarness`, scenario parsing, field/environment hooks, fault injection, network modeling, property checks, typed persisted replay/checkpoint artifacts, replay artifacts, and distributed simulation reports.
 
 This crate depends directly on `telltale-machine` and `telltale-types`.
 It is the preferred test path for third-party implementations of protocol-machine `EffectHandler`.
-Its generated-effect helpers exist as adjacent APIs, but the main integration path is still `SimulationHarness`.
+Its generated-effect helpers exist as adjacent APIs behind a narrower helper boundary, but the main integration path is still `SimulationHarness`.
 
 ### telltale-viewer
 

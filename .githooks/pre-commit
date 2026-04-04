@@ -33,6 +33,33 @@ if [[ -n "${ignored_staged}" ]]; then
 fi
 echo -e "${GREEN}OK${NC}"
 
+# 0.5. Simulator-only staged path: run targeted subsystem checks and skip the
+# broader staged-crate fallback path so unrelated workspace breakage does not
+# block simulator-only work.
+if ./scripts/check/simulator-subsystem.sh --applies-to-staged >/dev/null 2>&1; then
+    echo -n "Checking simulator subsystem... "
+    if just check-simulator-subsystem-staged >/dev/null; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        exit 1
+    fi
+
+    empty_dirs=$(find . -type d -empty -not -path './.git/*' -not -path '*/target/*' -not -path '*/node_modules/*' -not -path '*/.lake/*' 2>/dev/null)
+    if [[ -n "$empty_dirs" ]]; then
+        echo "Removing empty directories:"
+        echo "$empty_dirs" | while read -r d; do
+            echo "  $d"
+            rmdir "$d"
+        done
+    fi
+
+    echo -e "${GREEN}Pre-commit checks passed!${NC}"
+    echo ""
+    echo "Tip: Run './scripts/lint-check.sh' for comprehensive style guide checks"
+    exit 0
+fi
+
 # 1. Format check (only crates with staged .rs files)
 echo -n "Checking formatting... "
 staged_rs=$(git diff --cached --name-only --diff-filter=d | grep '\.rs$' || true)

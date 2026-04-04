@@ -158,6 +158,9 @@ Module access (not re-exported at crate root):
 - `telltale_simulator::runner::run`, `run_concurrent`, `run_with_scenario`, `ChoreographySpec`
 - `telltale_simulator::scenario::{Scenario, ExecutionSpec, ExecutionBackend, ResolvedExecution, ResolvedExecutionBackend}`
 - `telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport, ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep}`
+  Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
+- `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`
+  Typed persisted replay/checkpoint wrappers for on-disk simulator artifacts.
 - Contract checks in `rust/simulator/src/contracts.rs`:
   `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
 - Preset helpers in `rust/simulator/src/presets.rs`

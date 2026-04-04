@@ -1,0 +1,5 @@
+error[E0609]: no field `theorem_profile` on type `GeneratedEffectSimulationReport`
+  --> tests/ui/generated_helper_theorem_profile.rs:10:20
+   |
+10 |     let _ = report.theorem_profile;
+   |                    ^^^^^^^^^^^^^^^ unknown field

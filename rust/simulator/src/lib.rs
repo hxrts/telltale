@@ -34,6 +34,7 @@ pub mod field_handlers;
 pub mod generated;
 pub mod harness;
 pub mod network;
+pub mod persistence;
 pub mod presets;
 pub mod property;
 pub mod reconfiguration;
@@ -64,8 +65,8 @@ pub use decision::{
     SyncSubtypeWitness, TheoremEligibilityCounterexample, WellFormednessViolation,
 };
 pub use distributed::{
-    DistributedExecutionRegime, DistributedRunManifest, DistributedSimBuilder,
-    DistributedSimulation, NestedExecutionContract,
+    DistributedExecutionRegime, DistributedRunManifest, DistributedRunResult,
+    DistributedSimBuilder, DistributedSimulation, DistributedSiteResult, NestedExecutionContract,
 };
 pub use environment::{
     EnvironmentArtifact, EnvironmentController, EnvironmentModels, EnvironmentSnapshot,
@@ -89,6 +90,7 @@ pub use harness::{
     HostAdapter, SimulationHarness,
 };
 pub use network::{NetworkConfig, NetworkModel};
+pub use persistence::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload};
 pub use property::{Property, PropertyMonitor};
 pub use reconfiguration::{
     ReconfigurationAction, ReconfigurationController, ReconfigurationEffect,
@@ -99,8 +101,8 @@ pub use rng::SimRng;
 pub use runner::{
     canonical_replay_scenario, compare_scheduler_runs, remaining_rounds_from_checkpoint,
     resume_with_checkpoint_artifact, resume_with_scenario_from_checkpoint, run_canonical_replay,
-    CheckpointArtifact, CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact,
-    SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus, SchedulerFairnessRequirement,
+    CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact, SchedulerBoundMode,
+    SchedulerComparison, SchedulerEnvelopeStatus, SchedulerFairnessRequirement,
     SchedulerProfileSummary, TheoremProgressSummary,
 };
 pub use sweep::{

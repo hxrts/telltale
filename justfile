@@ -247,6 +247,14 @@ check-tooling-convergence:
 check-source-doc-snippets:
     ./scripts/check/source-doc-snippets.sh
 
+# Narrow subsystem-safe simulator verification path for staged simulator-only changes.
+check-simulator-subsystem-staged:
+    ./scripts/check/simulator-subsystem.sh
+
+# Self-test the staged simulator subsystem classification logic.
+check-simulator-subsystem-self-test:
+    ./scripts/check/simulator-subsystem.sh --self-test
+
 # Check that key public verification/capability docs stay aligned with
 # source-derived rows and trusted ledgers.
 check-docs-as-contract:

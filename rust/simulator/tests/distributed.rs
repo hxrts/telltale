@@ -266,7 +266,7 @@ fn test_distributed_two_site() {
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
-    sim.run(50).expect("run outer machine");
+    let _report = sim.run(50).expect("run outer machine");
 
     assert_eq!(sim.handler().site_all_done("site_A"), Some(true));
     assert_eq!(sim.handler().site_all_done("site_B"), Some(true));
@@ -324,7 +324,7 @@ fn test_nested_matches_flat_per_site() {
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
-    sim.run(50).expect("run outer machine");
+    let _report = sim.run(50).expect("run outer machine");
 
     let nested_a = normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace"));
     let nested_b = normalized_pairs(&sim.handler().site_trace("site_B").expect("site B trace"));
@@ -370,7 +370,7 @@ fn test_distributed_concurrency_configuration() {
     assert_eq!(sim.execution_contract(), contract);
     assert_eq!(sim.handler().rounds_per_step(), 3);
 
-    sim.run(50).expect("run outer machine");
+    let _report = sim.run(50).expect("run outer machine");
     assert_eq!(sim.handler().site_all_done("site_A"), Some(true));
     assert_eq!(sim.handler().site_all_done("site_B"), Some(true));
 }
@@ -396,7 +396,7 @@ fn nested_distributed_sites_export_semantic_objects_not_just_traces() {
         .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
         .expect("build distributed sim");
 
-    sim.run(50).expect("run outer machine");
+    let _report = sim.run(50).expect("run outer machine");
 
     let site_a = sim
         .handler()
@@ -437,7 +437,7 @@ fn distributed_harness_replays_identical_semantic_outcomes_for_identical_inputs(
         let mut sim = builder
             .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
             .expect("build distributed sim");
-        sim.run(50).expect("run outer machine");
+        let _report = sim.run(50).expect("run outer machine");
 
         (
             normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace")),
@@ -484,7 +484,7 @@ fn nested_execution_contract_variation_preserves_per_site_authoritative_results(
         let mut sim = builder
             .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
             .expect("build distributed sim");
-        sim.run(50).expect("run outer machine");
+        let report = sim.run(50).expect("run outer machine");
 
         (
             normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace")),
@@ -495,7 +495,7 @@ fn nested_execution_contract_variation_preserves_per_site_authoritative_results(
             sim.handler()
                 .site_semantic_objects("site_B")
                 .expect("site B semantic objects"),
-            sim.manifest(),
+            report,
         )
     };
 
@@ -524,13 +524,61 @@ fn nested_execution_contract_variation_preserves_per_site_authoritative_results(
         serial.3, grouped.3,
         "site B semantic objects must remain invariant under nested scheduling changes"
     );
-    assert_eq!(serial.4.execution_regime, grouped.4.execution_regime);
     assert_eq!(
-        serial.4.theorem_profile.assumption_bundle,
-        grouped.4.theorem_profile.assumption_bundle
+        serial.4.manifest.execution_regime,
+        grouped.4.manifest.execution_regime
     );
     assert_eq!(
-        serial.4.theorem_profile.eligibility,
-        grouped.4.theorem_profile.eligibility
+        serial.4.manifest.theorem_profile.assumption_bundle,
+        grouped.4.manifest.theorem_profile.assumption_bundle
+    );
+    assert_eq!(
+        serial.4.manifest.theorem_profile.eligibility,
+        grouped.4.manifest.theorem_profile.eligibility
+    );
+}
+
+#[test]
+fn distributed_run_report_aligns_manifest_and_site_results() {
+    let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
+    let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
+    let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
+    let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
+
+    let mut sim = DistributedSimBuilder::new()
+        .add_site("site_A", vec![inner_image.clone()])
+        .add_site("site_B", vec![inner_image])
+        .inter_site(outer_image)
+        .execution_contract(NestedExecutionContract {
+            outer_scheduler_concurrency: 2,
+            inner_rounds_per_step: 2,
+        })
+        .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
+        .expect("build distributed sim");
+
+    let report = sim.run(50).expect("run outer machine");
+
+    assert_eq!(report.manifest.sites, vec!["site_A", "site_B"]);
+    assert_eq!(report.sites.len(), 2);
+    assert!(
+        !report.outer_obs_trace.is_empty(),
+        "outer VM should emit observable events in the nested report"
+    );
+    let site_a = report
+        .sites
+        .iter()
+        .find(|site| site.site == "site_A")
+        .expect("site A report");
+    assert_eq!(
+        site_a.obs_trace,
+        sim.handler().site_trace("site_A").expect("site A trace"),
+        "site reports must retain the same raw observable trace exposed by the nested handler"
+    );
+    assert_eq!(
+        site_a.semantic_objects,
+        sim.handler()
+            .site_semantic_objects("site_A")
+            .expect("site A semantic objects"),
+        "site reports must retain the same canonical semantic objects exposed by the nested handler"
     );
 }

@@ -34,6 +34,7 @@ The runner skips the first two reserved registers and samples field-backed state
 
 `ScenarioReplayArtifact` contains the resolved adversary schedule, observable events, effect traces, semantic audit records, `ProtocolMachineSemanticObjects`, the canonical reconfiguration trace, and the canonical `EnvironmentTrace`.
 These artifacts support deterministic replay and post-run validation.
+`PersistedReplayArtifact` is the typed on-disk wrapper for replayable run data and exact checkpoint artifacts.
 
 ## Runner Entry Points
 
@@ -100,7 +101,7 @@ Use `compare_sweep_results(...)` to diff experiment families by theorem eligibil
 
 `DistributedSimBuilder::execution_contract(...)` accepts a `NestedExecutionContract` for outer scheduler concurrency plus inner rounds-per-step.
 That outer/inner VM contract is part of simulation semantics, not a worker-pool tuning knob.
-`DistributedSimulation::manifest()` publishes the explicit observed-only classification for this lane, including the nested execution contract and theorem-profile ineligibility reason.
+`DistributedSimulation::run(...)` now returns `DistributedRunResult`, which carries the observed-only classification manifest plus outer-VM trace data and per-site nested results in one aligned report surface.
 
 ## Sampling and Step Mapping
 
@@ -127,7 +128,19 @@ Scenario runs and replay share the same execution core and use a fixed per-round
 
 Checkpoint persistence is best-effort.
 Serialization and file-write failures do not fail the run.
-Checkpoint resume through `resume_with_checkpoint_artifact(...)` also restores middleware state, so adversary, network, and reconfiguration behavior continue exactly from the captured tick.
+Persisted checkpoint files are typed `PersistedReplayArtifact` CBOR payloads.
+Checkpoint resume through `resume_with_checkpoint_artifact(...)` restores middleware state, so adversary, network, and reconfiguration behavior continue exactly from the captured tick.
+
+## Helper Boundary
+
+Generated effect-family helpers remain non-authoritative support APIs.
+`GeneratedEffectSimulationReport` is intentionally narrow: it exposes the scripted helper scenario, semantic objects, and semantic audit log through helper accessors, but not theorem profiles, replay contracts, normalized observability, or checkpoint data.
+
+## Local Workflow
+
+Repository-wide CI remains `just ci-dry-run`.
+For staged diffs that are restricted to the simulator subsystem, the narrower local gate is now `just check-simulator-subsystem-staged`.
+That path still enforces Rust formatting, simulator compile/test coverage, and simulator-doc link checks without being blocked by unrelated pre-existing breakage elsewhere in the workspace.
 
 ## Determinism and Reproducibility
 

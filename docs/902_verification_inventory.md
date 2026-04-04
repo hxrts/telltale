@@ -249,6 +249,10 @@ than duplicating their inner gate lists by hand.
 | PR-critical assurance | `just check-pr-critical` | `justfile`, `.github/workflows/check.yml`, `.github/workflows/verify.yml` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Scheduled deep assurance | `just check-deep-assurance` | `justfile`, `.github/workflows/verify.yml`, scale-budget and larger-corpus verification lanes | `just ci-dry-run full`, direct local recipe use | `verify.yml` |
 
+For staged diffs restricted to the simulator subsystem, the narrower local gate is now `just check-simulator-subsystem-staged`.
+That path is intentionally local-only and does not replace the canonical repo-wide lanes above.
+It exists so simulator-only staged work still gets formatting, compile, test, and simulator-doc link enforcement without being blocked by unrelated pre-existing breakage elsewhere in the workspace.
+
 ## Property Coverage Baseline
 
 This baseline records whether each conserved-property bucket has at least one

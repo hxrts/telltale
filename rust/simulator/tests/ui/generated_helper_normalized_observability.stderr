@@ -1,0 +1,5 @@
+error[E0609]: no field `normalized_observability` on type `GeneratedEffectSimulationReport`
+  --> tests/ui/generated_helper_normalized_observability.rs:10:20
+   |
+10 |     let _ = report.normalized_observability;
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^ unknown field

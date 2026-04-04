@@ -290,12 +290,43 @@ impl<T> ScenarioEffectResult<T> {
 /// Report tying a scripted generated-effect scenario to semantic runtime output.
 #[derive(Debug, Clone, Default)]
 pub struct GeneratedEffectSimulationReport {
-    /// The scripted scenario that was executed.
-    pub scenario: GeneratedEffectScenario,
-    /// Canonical semantic objects emitted by the guest runtime.
-    pub semantic_objects: ProtocolMachineSemanticObjects,
-    /// Semantic audit records emitted while running the scenario.
-    pub semantic_audit_log: Vec<SemanticAuditRecord>,
+    scenario: GeneratedEffectScenario,
+    semantic_objects: ProtocolMachineSemanticObjects,
+    semantic_audit_log: Vec<SemanticAuditRecord>,
+}
+
+impl GeneratedEffectSimulationReport {
+    /// Construct one generated-effect helper report.
+    #[must_use]
+    pub fn new(
+        scenario: GeneratedEffectScenario,
+        semantic_objects: ProtocolMachineSemanticObjects,
+        semantic_audit_log: Vec<SemanticAuditRecord>,
+    ) -> Self {
+        Self {
+            scenario,
+            semantic_objects,
+            semantic_audit_log,
+        }
+    }
+
+    /// Borrow the scripted helper scenario.
+    #[must_use]
+    pub fn scenario(&self) -> &GeneratedEffectScenario {
+        &self.scenario
+    }
+
+    /// Borrow the semantic objects emitted by the helper run.
+    #[must_use]
+    pub fn semantic_objects(&self) -> &ProtocolMachineSemanticObjects {
+        &self.semantic_objects
+    }
+
+    /// Borrow the helper semantic audit log.
+    #[must_use]
+    pub fn semantic_audit_log(&self) -> &[SemanticAuditRecord] {
+        &self.semantic_audit_log
+    }
 }
 
 fn base_step(

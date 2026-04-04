@@ -209,9 +209,9 @@ Predicate strings are parsed by `parse_predicate`.
 
 ## Checkpointing and Replay
 
-`CheckpointStore` snapshots protocol-machine state as CBOR bytes at configured intervals.
-When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
-Replay loads a checkpoint and re-executes the same shared middleware loop used by fresh scenario runs.
+`CheckpointStore` snapshots protocol-machine state through the typed persisted replay contract at configured intervals.
+When `checkpoint_interval` is set, `run_with_scenario(...)` writes `PersistedReplayArtifact` checkpoint files under `artifacts/<scenario.name>/`.
+Replay loads one of those persisted artifacts and re-executes the same shared middleware loop used by fresh scenario runs.
 `resume_with_checkpoint_artifact(...)` is the exact resume path because it restores both protocol-machine state and simulator middleware state from the captured artifact.
 
 Scenario replay artifacts also retain the resolved adversary schedule, budget-consumption history, assumption diagnostics, and the canonical reconfiguration trace.

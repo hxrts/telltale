@@ -1,0 +1,5 @@
+error[E0609]: no field `checkpoints` on type `GeneratedEffectSimulationReport`
+  --> tests/ui/generated_helper_checkpoints.rs:10:20
+   |
+10 |     let _ = report.checkpoints;
+   |                    ^^^^^^^^^^^ unknown field
