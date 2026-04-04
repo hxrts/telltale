@@ -36,8 +36,9 @@ use telltale_simulator::scenario::{
 };
 use telltale_simulator::trace::Trace;
 use telltale_viewer::{
-    ArtifactId, BranchId, GraphProjection, GraphProjectionKind, GraphProjectionRequest,
-    InMemoryViewerService, ScenarioBundleArtifact, ScenarioBundleSummary, ViewerApplicationService,
+    create_branch_command, delete_branch_command, update_branch_command, ArtifactId, BranchId,
+    GraphProjection, GraphProjectionKind, GraphProjectionRequest, InMemoryViewerService,
+    ScenarioBundleArtifact, ScenarioBundleSummary, SearchResult, ViewerApplicationService,
     ViewerArtifact, ViewerArtifactFile, ViewerCommand, ViewerModelError, ViewerQuery,
     ViewerQueryResult, ViewerReport,
 };
@@ -118,12 +119,27 @@ pub struct ViewerGraphWorkspace {
     pub active_step: u64,
     pub selected_node: Option<String>,
     pub selected_edge: Option<String>,
+    pub layout: GraphLayoutState,
+    pub search_query: String,
+    pub search_results: Vec<SearchResult>,
+    pub command_log: Vec<String>,
 }
 
 impl ViewerGraphWorkspace {
     fn active_projection(&self) -> Option<&GraphProjection> {
         self.projections.get(self.active_projection)
     }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct GraphLayoutState {
+    pub positions: BTreeMap<String, GraphNodeLayout>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GraphNodeLayout {
+    pub x: i32,
+    pub y: i32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -133,6 +149,10 @@ pub struct RunInsightWorkspace {
     pub watch_expressions: Vec<WatchExpression>,
     pub annotations: Vec<RunAnnotation>,
     pub provenance: BranchProvenance,
+    pub run_diff: RunDiffSnapshot,
+    pub causality: Vec<CausalityEvent>,
+    pub bookmarks: Vec<RunBookmark>,
+    pub archive_status: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -160,6 +180,28 @@ pub struct BranchProvenance {
     pub parent_branch: Option<SelectedBranchId>,
     pub patch_count: u64,
     pub rerun_requested: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RunDiffSnapshot {
+    pub baseline_branch: SelectedBranchId,
+    pub candidate_branch: SelectedBranchId,
+    pub changed_steps: u64,
+    pub command_count: u64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CausalityEvent {
+    pub step: u64,
+    pub label: String,
+    pub detail: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RunBookmark {
+    pub branch_id: SelectedBranchId,
+    pub step: u64,
+    pub label: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -214,6 +256,11 @@ pub fn load_workspace_from_service(
             edges: Vec::new(),
         });
     }
+    let total_steps = projections
+        .iter()
+        .flat_map(|projection| projection.nodes.iter().filter_map(|node| node.step))
+        .max()
+        .unwrap_or(0);
 
     let insights = RunInsightWorkspace {
         theorem_profile: first_scenario.map(|scenario| scenario.summary.theorem_profile.clone()),
@@ -245,11 +292,28 @@ pub fn load_workspace_from_service(
             })
             .unwrap_or_default(),
         provenance: BranchProvenance {
-            run_id,
+            run_id: run_id.clone(),
             parent_branch: None,
             patch_count: 0,
             rerun_requested: false,
         },
+        run_diff: RunDiffSnapshot {
+            baseline_branch: "root".to_string(),
+            candidate_branch: active_branch.clone(),
+            changed_steps: total_steps,
+            command_count: 0,
+        },
+        causality: projections
+            .iter()
+            .find(|projection| projection.kind == GraphProjectionKind::ExecutionTimeline)
+            .map(causality_from_projection)
+            .unwrap_or_default(),
+        bookmarks: vec![RunBookmark {
+            branch_id: active_branch.clone(),
+            step: 0,
+            label: "initial step".to_string(),
+        }],
+        archive_status: "loaded from artifact archive".to_string(),
     };
 
     let diagnostics = ViewerPublicationDiagnostics {
@@ -268,17 +332,52 @@ pub fn load_workspace_from_service(
     Ok(ViewerWorkspace {
         report,
         graph: ViewerGraphWorkspace {
+            layout: deterministic_layout(&projections),
             projections,
             active_projection: 0,
             active_branch,
             active_step: 0,
             selected_node: None,
             selected_edge: None,
+            search_query: String::new(),
+            search_results: Vec::new(),
+            command_log: Vec::new(),
         },
         insights,
         diagnostics,
         pages: vec![ViewerPage::Overview, ViewerPage::Graph, ViewerPage::Insight],
     })
+}
+
+fn deterministic_layout(projections: &[GraphProjection]) -> GraphLayoutState {
+    let mut positions = BTreeMap::new();
+    for projection in projections {
+        let total = projection.nodes.len().max(1) as i32;
+        for (index, node) in projection.nodes.iter().enumerate() {
+            positions.entry(node.id.clone()).or_insert(GraphNodeLayout {
+                x: 80 + ((index as i32) * 520 / total),
+                y: 110 + (((index as i32) % 2) * 90),
+            });
+        }
+    }
+    GraphLayoutState { positions }
+}
+
+fn causality_from_projection(projection: &GraphProjection) -> Vec<CausalityEvent> {
+    projection
+        .nodes
+        .iter()
+        .filter_map(|node| {
+            node.step.map(|step| CausalityEvent {
+                step,
+                label: node.label.clone(),
+                detail: format!(
+                    "projection node `{}` became visible at step {step}",
+                    node.id
+                ),
+            })
+        })
+        .collect()
 }
 
 #[derive(Clone)]
@@ -337,18 +436,386 @@ pub struct WorkspaceHandle {
     pub workspace: ViewerWorkspace,
 }
 
+#[observed_only]
+#[derive(Clone, PartialEq, Eq)]
+pub struct InteractiveViewerState {
+    pub workspace: ViewerWorkspace,
+    pub active_page: ViewerPage,
+    branch_counter: u64,
+}
+
+impl InteractiveViewerState {
+    pub fn from_workspace(workspace: ViewerWorkspace) -> Self {
+        Self {
+            active_page: workspace.diagnostics.active_page,
+            workspace,
+            branch_counter: 0,
+        }
+    }
+
+    fn projection_step_limit(&self) -> u64 {
+        self.workspace
+            .graph
+            .active_projection()
+            .and_then(|projection| projection.nodes.iter().filter_map(|node| node.step).max())
+            .unwrap_or(0)
+    }
+
+    fn branch_lineage_projection_mut(&mut self) -> Option<&mut GraphProjection> {
+        self.workspace
+            .graph
+            .projections
+            .iter_mut()
+            .find(|projection| projection.kind == GraphProjectionKind::BranchLineage)
+    }
+
+    pub fn set_page(&mut self, page: ViewerPage) {
+        self.active_page = page;
+        self.workspace.diagnostics.active_page = page;
+    }
+
+    pub fn select_projection(&mut self, index: usize) {
+        if index < self.workspace.graph.projections.len() {
+            self.workspace.graph.active_projection = index;
+            self.workspace.graph.active_step = self
+                .projection_step_limit()
+                .min(self.workspace.graph.active_step);
+        }
+    }
+
+    pub fn step_forward(&mut self) {
+        let limit = self.projection_step_limit();
+        if self.workspace.graph.active_step < limit {
+            self.workspace.graph.active_step += 1;
+            self.workspace.graph.selected_node =
+                self.workspace
+                    .graph
+                    .active_projection()
+                    .and_then(|projection| {
+                        projection
+                            .nodes
+                            .iter()
+                            .find(|node| node.step == Some(self.workspace.graph.active_step))
+                            .map(|node| node.id.clone())
+                    });
+        }
+    }
+
+    pub fn step_backward(&mut self) {
+        if self.workspace.graph.active_step > 0 {
+            self.workspace.graph.active_step -= 1;
+            self.workspace.graph.selected_node =
+                self.workspace
+                    .graph
+                    .active_projection()
+                    .and_then(|projection| {
+                        projection
+                            .nodes
+                            .iter()
+                            .find(|node| node.step == Some(self.workspace.graph.active_step))
+                            .map(|node| node.id.clone())
+                    });
+        }
+    }
+
+    pub fn jump_to_step(&mut self, step: u64) {
+        self.workspace.graph.active_step = step.min(self.projection_step_limit());
+        self.workspace.graph.selected_node =
+            self.workspace
+                .graph
+                .active_projection()
+                .and_then(|projection| {
+                    projection
+                        .nodes
+                        .iter()
+                        .find(|node| node.step == Some(self.workspace.graph.active_step))
+                        .map(|node| node.id.clone())
+                });
+    }
+
+    pub fn fork_branch_from_current_step(&mut self) {
+        self.branch_counter = self.branch_counter.saturating_add(1);
+        let parent_branch = self.workspace.graph.active_branch.clone();
+        let branch_id = format!("branch/{}", self.branch_counter);
+        let active_step = self.workspace.graph.active_step;
+        let command = create_branch_command(
+            self.workspace.insights.provenance.run_id.clone(),
+            branch_id.clone(),
+            parent_branch.clone(),
+            active_step,
+        );
+        self.workspace
+            .graph
+            .command_log
+            .push(format!("{command:?}"));
+        if let Some(projection) = self.branch_lineage_projection_mut() {
+            projection.nodes.push(telltale_viewer::GraphNode {
+                id: branch_id.clone(),
+                label: branch_id.clone(),
+                category: "branch".to_string(),
+                step: Some(active_step),
+            });
+            projection.edges.push(telltale_viewer::GraphEdge {
+                from: parent_branch.clone(),
+                to: branch_id.clone(),
+                label: "fork".to_string(),
+                step: Some(active_step),
+            });
+        }
+        self.workspace.graph.active_branch = branch_id.clone();
+        self.workspace.insights.provenance.parent_branch = Some(parent_branch);
+        self.workspace.insights.provenance.patch_count = self
+            .workspace
+            .insights
+            .provenance
+            .patch_count
+            .saturating_add(1);
+        self.workspace.insights.run_diff.candidate_branch = branch_id.clone();
+        self.workspace.insights.run_diff.changed_steps = self.workspace.graph.active_step;
+        self.workspace.insights.run_diff.command_count =
+            u64::try_from(self.workspace.graph.command_log.len()).unwrap_or(u64::MAX);
+        self.workspace.insights.annotations.push(RunAnnotation {
+            target: AnnotationTarget::Branch(branch_id.clone()),
+            text: format!(
+                "Forked a deterministic branch at step {}",
+                self.workspace.graph.active_step
+            ),
+        });
+    }
+
+    pub fn update_active_branch(&mut self) {
+        if self.workspace.graph.active_branch == "root" {
+            return;
+        }
+        let branch_id = self.workspace.graph.active_branch.clone();
+        let command = update_branch_command(
+            self.workspace.insights.provenance.run_id.clone(),
+            branch_id.clone(),
+            self.workspace.graph.active_step,
+        );
+        self.workspace
+            .graph
+            .command_log
+            .push(format!("{command:?}"));
+        self.workspace.insights.provenance.patch_count = self
+            .workspace
+            .insights
+            .provenance
+            .patch_count
+            .saturating_add(1);
+        self.workspace.insights.annotations.push(RunAnnotation {
+            target: AnnotationTarget::Branch(branch_id.clone()),
+            text: format!("Updated branch `{branch_id}` through a typed patch command."),
+        });
+        self.workspace.insights.run_diff.command_count =
+            u64::try_from(self.workspace.graph.command_log.len()).unwrap_or(u64::MAX);
+    }
+
+    pub fn delete_active_branch(&mut self) {
+        if self.workspace.graph.active_branch == "root" {
+            return;
+        }
+        let branch_id = self.workspace.graph.active_branch.clone();
+        let command = delete_branch_command(
+            self.workspace.insights.provenance.run_id.clone(),
+            branch_id.clone(),
+        );
+        self.workspace
+            .graph
+            .command_log
+            .push(format!("{command:?}"));
+        if let Some(projection) = self.branch_lineage_projection_mut() {
+            if let Some(node) = projection
+                .nodes
+                .iter_mut()
+                .find(|node| node.id == branch_id)
+            {
+                node.category = "branch_deleted".to_string();
+                node.label = format!("{branch_id} (deleted)");
+            }
+        }
+        self.workspace.graph.active_branch = "root".to_string();
+        self.workspace.insights.annotations.push(RunAnnotation {
+            target: AnnotationTarget::Branch(branch_id.clone()),
+            text: format!("Deleted branch `{branch_id}` through a typed command."),
+        });
+        self.workspace.insights.run_diff.candidate_branch = "root".to_string();
+        self.workspace.insights.run_diff.command_count =
+            u64::try_from(self.workspace.graph.command_log.len()).unwrap_or(u64::MAX);
+    }
+
+    pub fn search(&mut self, query: String) {
+        self.workspace.graph.search_query = query.clone();
+        let needle = query.to_lowercase();
+        self.workspace.graph.search_results = self
+            .workspace
+            .graph
+            .projections
+            .iter()
+            .flat_map(|projection| {
+                projection
+                    .nodes
+                    .iter()
+                    .filter(|node| {
+                        node.label.to_lowercase().contains(&needle)
+                            || node.id.to_lowercase().contains(&needle)
+                    })
+                    .map(|node| SearchResult {
+                        artifact_id: self
+                            .workspace
+                            .diagnostics
+                            .active_artifact
+                            .clone()
+                            .unwrap_or_else(|| "demo-run".to_string()),
+                        domain: telltale_viewer::SearchDomain::EventLabel,
+                        label: node.label.clone(),
+                        detail: format!("{:?}", projection.kind),
+                        branch_id: Some(self.workspace.graph.active_branch.clone()),
+                        step: node.step,
+                    })
+            })
+            .collect();
+    }
+
+    pub fn reload_archive(&mut self) {
+        self.workspace.insights.archive_status = "reloaded from archived artifact set".to_string();
+        self.workspace.insights.annotations.push(RunAnnotation {
+            target: AnnotationTarget::Artifact(
+                self.workspace
+                    .diagnostics
+                    .active_artifact
+                    .clone()
+                    .unwrap_or_else(|| "demo-run".to_string()),
+            ),
+            text: "Reloaded the archived artifact set and preserved deterministic viewer state."
+                .to_string(),
+        });
+    }
+
+    pub fn add_bookmark(&mut self) {
+        self.workspace.insights.bookmarks.push(RunBookmark {
+            branch_id: self.workspace.graph.active_branch.clone(),
+            step: self.workspace.graph.active_step,
+            label: format!(
+                "bookmark:{}@{}",
+                self.workspace.graph.active_branch, self.workspace.graph.active_step
+            ),
+        });
+    }
+}
+
+#[observed_only]
 #[component]
 pub fn TelltaleUiRoot(workspace: ViewerWorkspace) -> Element {
-    let mut active_page = use_signal(|| workspace.diagnostics.active_page);
+    let mut state = use_signal(|| InteractiveViewerState::from_workspace(workspace));
     rsx! {
-        ViewerFrame {
-            workspace,
-            active_page: active_page(),
-            on_navigate: move |page| active_page.set(page),
+        InteractiveViewerFrame {
+            state: state(),
+            on_navigate: move |page| {
+                let mut next = state();
+                next.set_page(page);
+                state.set(next);
+            },
+            on_select_projection: move |index| {
+                let mut next = state();
+                next.select_projection(index);
+                state.set(next);
+            },
+            on_step_forward: move |_| {
+                let mut next = state();
+                next.step_forward();
+                state.set(next);
+            },
+            on_step_backward: move |_| {
+                let mut next = state();
+                next.step_backward();
+                state.set(next);
+            },
+            on_jump_to_step: move |step| {
+                let mut next = state();
+                next.jump_to_step(step);
+                state.set(next);
+            },
+            on_fork_branch: move |_| {
+                let mut next = state();
+                next.fork_branch_from_current_step();
+                state.set(next);
+            },
+            on_update_branch: move |_| {
+                let mut next = state();
+                next.update_active_branch();
+                state.set(next);
+            },
+            on_delete_branch: move |_| {
+                let mut next = state();
+                next.delete_active_branch();
+                state.set(next);
+            },
+            on_search: move |query| {
+                let mut next = state();
+                next.search(query);
+                state.set(next);
+            },
+            on_reload_archive: move |_| {
+                let mut next = state();
+                next.reload_archive();
+                state.set(next);
+            },
+            on_add_bookmark: move |_| {
+                let mut next = state();
+                next.add_bookmark();
+                state.set(next);
+            },
         }
     }
 }
 
+#[observed_only]
+#[component]
+fn InteractiveViewerFrame(
+    state: InteractiveViewerState,
+    on_navigate: EventHandler<ViewerPage>,
+    on_select_projection: EventHandler<usize>,
+    on_step_forward: EventHandler<()>,
+    on_step_backward: EventHandler<()>,
+    on_jump_to_step: EventHandler<u64>,
+    on_fork_branch: EventHandler<()>,
+    on_update_branch: EventHandler<()>,
+    on_delete_branch: EventHandler<()>,
+    on_search: EventHandler<String>,
+    on_reload_archive: EventHandler<()>,
+    on_add_bookmark: EventHandler<()>,
+) -> Element {
+    rsx! {
+        ViewerFrame {
+            workspace: state.workspace.clone(),
+            active_page: state.active_page,
+            on_navigate,
+        }
+        if matches!(state.active_page, ViewerPage::Graph) {
+            GraphControlsOverlay {
+                state: state.clone(),
+                on_select_projection,
+                on_step_forward,
+                on_step_backward,
+                on_jump_to_step,
+                on_fork_branch,
+                on_update_branch,
+                on_delete_branch,
+                on_search,
+            }
+        }
+        if matches!(state.active_page, ViewerPage::Insight) {
+            InsightControlsOverlay {
+                state,
+                on_reload_archive,
+                on_add_bookmark,
+            }
+        }
+    }
+}
+
+#[observed_only]
 #[component]
 pub fn ViewerFrame(
     workspace: ViewerWorkspace,
@@ -499,6 +966,7 @@ fn ScenarioSummaryCard(scenario: ScenarioBundleSummary) -> Element {
     }
 }
 
+#[observed_only]
 #[component]
 fn GraphPage(workspace: ViewerWorkspace) -> Element {
     let projection = workspace
@@ -518,9 +986,26 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
             class: "tt-page-grid tt-page-grid--wide",
             Panel {
                 title: "Graph Workspace",
-                subtitle: format!("{:?} / branch {}", projection.kind, projection.branch_id),
+                subtitle: format!(
+                    "{:?} / branch {} / step {}",
+                    projection.kind, workspace.graph.active_branch, workspace.graph.active_step
+                ),
                 children: rsx! {
-                    GraphCanvas { projection: projection.clone() }
+                    GraphCanvas {
+                        projection: projection.clone(),
+                        active_step: workspace.graph.active_step,
+                        layout: workspace.graph.layout.clone(),
+                    }
+                    if !workspace.graph.search_query.is_empty() {
+                        InspectorSection {
+                            title: format!("Search: {}", workspace.graph.search_query),
+                            children: rsx! {
+                                for hit in &workspace.graph.search_results {
+                                    div { class: "tt-list-row", "{hit.label} [{hit.detail}]" }
+                                }
+                            }
+                        }
+                    }
                 }
             }
             Panel {
@@ -534,8 +1019,18 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                             children: rsx! {
                                 div { class: "tt-card__metric", "run: {item.run_id}" }
                                 div { class: "tt-card__metric", "branch: {item.branch_id}" }
+                                div { class: "tt-card__metric", "step cap: {item.nodes.iter().filter_map(|node| node.step).max().unwrap_or(0)}" }
                             }
                         }
+                    }
+                }
+            }
+            Panel {
+                title: "Command Log",
+                subtitle: "Typed branch commands emitted by the graph workspace",
+                children: rsx! {
+                    for command in &workspace.graph.command_log {
+                        div { class: "tt-list-row", "{command:?}" }
                     }
                 }
             }
@@ -544,21 +1039,33 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
 }
 
 #[component]
-fn GraphCanvas(projection: GraphProjection) -> Element {
-    let total = projection.nodes.len().max(1) as i32;
+fn GraphCanvas(projection: GraphProjection, active_step: u64, layout: GraphLayoutState) -> Element {
+    let visible_nodes = projection
+        .nodes
+        .iter()
+        .filter(|node| node.step.is_none_or(|step| step <= active_step))
+        .cloned()
+        .collect::<Vec<_>>();
+    let visible_edges = projection
+        .edges
+        .iter()
+        .filter(|edge| edge.step.is_none_or(|step| step <= active_step))
+        .cloned()
+        .collect::<Vec<_>>();
+    let total = visible_nodes.len().max(1) as i32;
     rsx! {
         div {
             class: "tt-graph-shell",
             svg {
                 class: "tt-graph",
                 view_box: "0 0 640 320",
-                for (index, edge) in projection.edges.iter().enumerate() {
+                for (index, edge) in visible_edges.iter().enumerate() {
                     line {
                         key: "{index}",
-                        x1: "{60 + ((index as i32) * 90) % 520}",
-                        y1: "{60 + ((index as i32) * 40) % 180}",
-                        x2: "{150 + ((index as i32) * 90) % 520}",
-                        y2: "{120 + ((index as i32) * 40) % 180}",
+                        x1: "{layout.positions.get(&edge.from).map(|point| point.x).unwrap_or(60 + ((index as i32) * 90) % 520)}",
+                        y1: "{layout.positions.get(&edge.from).map(|point| point.y).unwrap_or(60 + ((index as i32) * 40) % 180)}",
+                        x2: "{layout.positions.get(&edge.to).map(|point| point.x).unwrap_or(150 + ((index as i32) * 90) % 520)}",
+                        y2: "{layout.positions.get(&edge.to).map(|point| point.y).unwrap_or(120 + ((index as i32) * 40) % 180)}",
                         class: "tt-graph__edge",
                     }
                     text {
@@ -568,17 +1075,17 @@ fn GraphCanvas(projection: GraphProjection) -> Element {
                         "{edge.label}"
                     }
                 }
-                for (index, node) in projection.nodes.iter().enumerate() {
+                for (index, node) in visible_nodes.iter().enumerate() {
                     circle {
                         key: "{node.id}",
-                        cx: "{80 + ((index as i32) * 520 / total)}",
-                        cy: "{110 + (((index as i32) % 2) * 90)}",
+                        cx: "{layout.positions.get(&node.id).map(|point| point.x).unwrap_or(80 + ((index as i32) * 520 / total))}",
+                        cy: "{layout.positions.get(&node.id).map(|point| point.y).unwrap_or(110 + (((index as i32) % 2) * 90))}",
                         r: "24",
                         class: "tt-graph__node"
                     }
                     text {
-                        x: "{52 + ((index as i32) * 520 / total)}",
-                        y: "{114 + (((index as i32) % 2) * 90)}",
+                        x: "{layout.positions.get(&node.id).map(|point| point.x - 28).unwrap_or(52 + ((index as i32) * 520 / total))}",
+                        y: "{layout.positions.get(&node.id).map(|point| point.y + 4).unwrap_or(114 + (((index as i32) % 2) * 90))}",
                         class: "tt-graph__node-label",
                         "{node.label}"
                     }
@@ -588,6 +1095,7 @@ fn GraphCanvas(projection: GraphProjection) -> Element {
     }
 }
 
+#[observed_only]
 #[component]
 fn InsightPage(workspace: ViewerWorkspace) -> Element {
     rsx! {
@@ -631,8 +1139,159 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                 children: rsx! {
                     KeyValueLine { label: "Run".to_string(), value: workspace.insights.provenance.run_id.clone() }
                     KeyValueLine { label: "Patches".to_string(), value: workspace.insights.provenance.patch_count.to_string() }
+                    KeyValueLine { label: "Archive".to_string(), value: workspace.insights.archive_status.clone() }
                     for annotation in &workspace.insights.annotations {
                         div { class: "tt-note", "{annotation.text}" }
+                    }
+                }
+            }
+            Panel {
+                title: "Run Diff",
+                subtitle: "Baseline vs active branch",
+                children: rsx! {
+                    KeyValueLine { label: "Baseline".to_string(), value: workspace.insights.run_diff.baseline_branch.clone() }
+                    KeyValueLine { label: "Candidate".to_string(), value: workspace.insights.run_diff.candidate_branch.clone() }
+                    KeyValueLine { label: "Changed steps".to_string(), value: workspace.insights.run_diff.changed_steps.to_string() }
+                    KeyValueLine { label: "Command count".to_string(), value: workspace.insights.run_diff.command_count.to_string() }
+                }
+            }
+            Panel {
+                title: "Causality",
+                subtitle: "Visible outcome explanation chain",
+                children: rsx! {
+                    for event in &workspace.insights.causality {
+                        div { class: "tt-note", "{event.step}: {event.label} [{event.detail}]" }
+                    }
+                }
+            }
+            Panel {
+                title: "Bookmarks",
+                subtitle: "Pinned branches and historical steps",
+                children: rsx! {
+                    for bookmark in &workspace.insights.bookmarks {
+                        div { class: "tt-note", "{bookmark.label}" }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[observed_only]
+#[component]
+fn GraphControlsOverlay(
+    state: InteractiveViewerState,
+    on_select_projection: EventHandler<usize>,
+    on_step_forward: EventHandler<()>,
+    on_step_backward: EventHandler<()>,
+    on_jump_to_step: EventHandler<u64>,
+    on_fork_branch: EventHandler<()>,
+    on_update_branch: EventHandler<()>,
+    on_delete_branch: EventHandler<()>,
+    on_search: EventHandler<String>,
+) -> Element {
+    let max_step = state.projection_step_limit();
+    rsx! {
+        section {
+            class: "tt-shell__overlay",
+            div {
+                class: "tt-page-grid",
+                Panel {
+                    title: "Time Travel",
+                    subtitle: "Deterministic replay stepping",
+                    children: rsx! {
+                        Toolbar {
+                            label: "History",
+                            children: rsx! {
+                                button { class: "tt-nav-btn", onclick: move |_| on_step_backward.call(()), "Step -" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_step_forward.call(()), "Step +" }
+                                for step in 0..=max_step {
+                                    button {
+                                        class: if step == state.workspace.graph.active_step { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
+                                        onclick: move |_| on_jump_to_step.call(step),
+                                        "{step}"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Panel {
+                    title: "Projection Switcher",
+                    subtitle: "Graph views over one authoritative run",
+                    children: rsx! {
+                        for (index, projection) in state.workspace.graph.projections.iter().enumerate() {
+                            button {
+                                class: if index == state.workspace.graph.active_projection { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
+                                onclick: move |_| on_select_projection.call(index),
+                                "{projection.kind:?}"
+                            }
+                        }
+                    }
+                }
+                Panel {
+                    title: "Branch Commands",
+                    subtitle: "Typed branch/scenario patch emission",
+                    children: rsx! {
+                        Toolbar {
+                            label: "Branch",
+                            children: rsx! {
+                                button { class: "tt-nav-btn", onclick: move |_| on_fork_branch.call(()), "Fork Here" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_update_branch.call(()), "Update Branch" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_delete_branch.call(()), "Delete Branch" }
+                            }
+                        }
+                    }
+                }
+                Panel {
+                    title: "Search",
+                    subtitle: "Node, role, and branch lookup",
+                    children: rsx! {
+                        Toolbar {
+                            label: "Lookup",
+                            children: rsx! {
+                                button { class: "tt-nav-btn", onclick: move |_| on_search.call("alpha".to_string()), "Find alpha" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_search.call("branch".to_string()), "Find branch" }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[observed_only]
+#[component]
+fn InsightControlsOverlay(
+    state: InteractiveViewerState,
+    on_reload_archive: EventHandler<()>,
+    on_add_bookmark: EventHandler<()>,
+) -> Element {
+    rsx! {
+        section {
+            class: "tt-shell__overlay",
+            div {
+                class: "tt-page-grid",
+                Panel {
+                    title: "Archive Controls",
+                    subtitle: "Reload exact artifact sets and fork new runs",
+                    children: rsx! {
+                        Toolbar {
+                            label: "Archive",
+                            children: rsx! {
+                                button { class: "tt-nav-btn", onclick: move |_| on_reload_archive.call(()), "Reload Archive" }
+                                button { class: "tt-nav-btn", onclick: move |_| on_add_bookmark.call(()), "Bookmark Step" }
+                            }
+                        }
+                    }
+                }
+                Panel {
+                    title: "Active Branch",
+                    subtitle: "Insight focus",
+                    children: rsx! {
+                        KeyValueLine { label: "Branch".to_string(), value: state.workspace.graph.active_branch.clone() }
+                        KeyValueLine { label: "Step".to_string(), value: state.workspace.graph.active_step.to_string() }
                     }
                 }
             }

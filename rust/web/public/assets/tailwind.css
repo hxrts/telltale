@@ -47,6 +47,10 @@ body {
   padding: 1.5rem;
 }
 
+.tt-shell__overlay {
+  padding: 0 1.5rem 1.5rem;
+}
+
 .tt-top-nav {
   position: sticky;
   top: 0;

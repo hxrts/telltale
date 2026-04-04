@@ -46,3 +46,11 @@ fn every_primary_page_reuses_the_global_shell() {
         assert_eq!(html.matches("id=\"tt-top-nav\"").count(), 1);
     }
 }
+
+#[test]
+fn insight_page_renders_diff_and_provenance_surfaces() {
+    let html = render_page(ViewerPage::Insight);
+    assert!(html.contains("Run Diff"));
+    assert!(html.contains("Causality"));
+    assert!(html.contains("Provenance"));
+}

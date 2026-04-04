@@ -1,4 +1,4 @@
-# Simulation Viewer Model
+# Simulation Viewer
 
 This page describes the typed model and service boundary for the simulator
 webapp work.
@@ -21,9 +21,15 @@ authoritative artifact boundary.
 `telltale-ui` and `telltale-web` are now present, but they are intentionally
 downstream of this crate split rather than new semantic authorities.
 
+The viewer layer now also owns the typed command builders used by the
+graph/time-travel workspace.
+That keeps branch patch construction in `telltale-viewer` and lets
+`telltale-ui` stay an `Observed` command-emission shell instead of directly
+authoring patch details.
+
 ## Artifact Families
 
-The viewer model is built around the simulator artifacts that already exist in
+The viewer is built around the simulator artifacts that already exist in
 `telltale-simulator`.
 The initial typed envelope supports these families:
 

@@ -54,6 +54,12 @@ Batch, sweep, and approximation manifests now also record execution-regime class
 The shared viewer stack sits directly on top of those artifacts.
 `telltale-viewer` owns the pure model/query/command layer, `telltale-ui` owns the portable Dioxus shell and reusable components, and `telltale-web` owns the browser packaging.
 The preferred human-facing inspection path is now the shared viewer rather than ad hoc textual replay output.
+That viewer now exposes:
+
+- a graph workspace for choreography, instantiated protocol, execution timeline, and branch-lineage projections
+- deterministic step-forward, step-backward, and jump-to-step time travel
+- typed branch create/update/delete flows
+- an insight workspace for regime display, watch expressions, run diff, causality, provenance, bookmarks, and archive reload
 
 ### Decision and Approximation Modules
 
@@ -91,8 +97,8 @@ These APIs currently sit beside the harness API rather than inside it.
 - [Simulation Runner](502_simulation_runner.md): execution mechanics, stats, harness API, batch/sweep, distributed simulation
 - [Simulation Scenarios](503_simulation_scenarios.md): TOML schema, adversaries, reconfiguration, network, properties, checkpointing
 - [Simulation Fields](504_simulation_fields.md): field model trait, built-in families, environment extension hooks
-- [Simulation Viewer Model](505_simulation_viewer_model.md): pure artifact envelopes, query/command boundary, branch patch model
-- [Simulation Viewer Webapp](506_simulation_viewer_webapp.md): Dioxus shell, global layout, ownership markers, testing split, local development
+- [Simulation Viewer](505_simulation_viewer.md): pure artifact envelopes, query/command boundary, branch patch model
+- [Simulation Viewer Webapp](506_simulation_viewer_webapp.md): Dioxus shell, graph/time-travel workspace, run-insight workspace, ownership markers, testing split, local development
 
 ## CLI
 

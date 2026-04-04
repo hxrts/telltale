@@ -42,4 +42,8 @@
     transition-delay: 0s !important;
     scroll-behavior: auto !important;
   }
+
+  .tt-shell__overlay {
+    padding: 0 1.5rem 1.5rem;
+  }
 }

@@ -19,6 +19,9 @@ struct ReplayArgs {
 fn main() {
     let raw_args: Vec<String> = std::env::args().skip(1).collect();
     let replay_args = parse_args(&raw_args).unwrap_or_else(|e| usage(&format!("{e}\n")));
+    eprintln!(
+        "warning: `telltale-simulator-replay` is a compatibility summary CLI; prefer the shared viewer/webapp for graph, time-travel, and run-insight debugging"
+    );
 
     let scenario =
         Scenario::from_file(&replay_args.scenario_path).unwrap_or_else(|e| fatal(&e.to_string()));

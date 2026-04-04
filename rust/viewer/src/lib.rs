@@ -400,6 +400,7 @@ pub struct GraphNode {
     pub id: String,
     pub label: String,
     pub category: String,
+    pub step: Option<u64>,
 }
 
 /// One stable graph edge.
@@ -408,6 +409,7 @@ pub struct GraphEdge {
     pub from: String,
     pub to: String,
     pub label: String,
+    pub step: Option<u64>,
 }
 
 /// Stable search domains indexed by the pure model layer.
@@ -475,6 +477,51 @@ pub enum ViewerCommand {
         run_id: RunId,
         branch_id: BranchId,
     },
+}
+
+/// Build a typed branch-creation command for one deterministic fork point.
+#[must_use]
+pub fn create_branch_command(
+    run_id: RunId,
+    branch_id: BranchId,
+    parent_branch_id: BranchId,
+    from_step: u64,
+) -> ViewerCommand {
+    ViewerCommand::CreateBranch {
+        run_id,
+        branch_id,
+        parent_branch_id,
+        from_step,
+        patch: ScenarioBranchPatch {
+            operations: vec![ScenarioPatchOperation::SetSteps {
+                steps: from_step.saturating_add(1),
+            }],
+        },
+    }
+}
+
+/// Build a typed branch-update command for one deterministic edit.
+#[must_use]
+pub fn update_branch_command(
+    run_id: RunId,
+    branch_id: BranchId,
+    active_step: u64,
+) -> ViewerCommand {
+    ViewerCommand::UpdateBranch {
+        run_id,
+        branch_id,
+        patch: ScenarioBranchPatch {
+            operations: vec![ScenarioPatchOperation::SetSeed {
+                seed: active_step.saturating_add(100),
+            }],
+        },
+    }
+}
+
+/// Build a typed branch-deletion command.
+#[must_use]
+pub fn delete_branch_command(run_id: RunId, branch_id: BranchId) -> ViewerCommand {
+    ViewerCommand::DeleteBranch { run_id, branch_id }
 }
 
 /// Stable command result surface returned by the application service boundary.
@@ -608,6 +655,183 @@ impl InMemoryViewerService {
             workspace
         })
     }
+
+    fn scenario_bundle_for_run(&self, run: &RunWorkspace) -> Option<&ScenarioBundleArtifact> {
+        let artifact_id = run.root_artifact_id.as_ref()?;
+        let artifact = self.artifacts.get(artifact_id)?;
+        match &artifact.artifact {
+            ViewerArtifact::ScenarioBundle(bundle) => Some(bundle),
+            _ => None,
+        }
+    }
+
+    fn graph_projection_for_request(
+        &self,
+        run_id: &str,
+        request: &GraphProjectionRequest,
+        run: &RunWorkspace,
+    ) -> GraphProjection {
+        let step_limit = request.step;
+        let bundle = self.scenario_bundle_for_run(run);
+        let (nodes, edges) = match request.kind {
+            GraphProjectionKind::BranchLineage => self.branch_lineage_projection(run),
+            GraphProjectionKind::ChoreographyStructure => {
+                self.choreography_projection(bundle, step_limit)
+            }
+            GraphProjectionKind::InstantiatedProtocol => {
+                self.instantiated_protocol_projection(bundle, step_limit)
+            }
+            GraphProjectionKind::ExecutionTimeline => {
+                self.execution_timeline_projection(bundle, step_limit)
+            }
+        };
+        GraphProjection {
+            run_id: run_id.to_string(),
+            branch_id: request.branch_id.clone(),
+            step: request.step,
+            kind: request.kind,
+            nodes,
+            edges,
+        }
+    }
+
+    fn branch_lineage_projection(&self, run: &RunWorkspace) -> (Vec<GraphNode>, Vec<GraphEdge>) {
+        let nodes = run
+            .branches
+            .iter()
+            .map(|(branch_id, branch)| GraphNode {
+                id: branch_id.clone(),
+                label: branch_id.clone(),
+                category: if branch.deleted {
+                    "branch_deleted".to_string()
+                } else {
+                    "branch".to_string()
+                },
+                step: Some(branch.from_step),
+            })
+            .collect::<Vec<_>>();
+        let edges = run
+            .branches
+            .iter()
+            .filter_map(|(branch_id, branch)| {
+                branch.parent_branch_id.as_ref().map(|parent| GraphEdge {
+                    from: parent.clone(),
+                    to: branch_id.clone(),
+                    label: "fork".to_string(),
+                    step: Some(branch.from_step),
+                })
+            })
+            .collect::<Vec<_>>();
+        (nodes, edges)
+    }
+
+    fn choreography_projection(
+        &self,
+        bundle: Option<&ScenarioBundleArtifact>,
+        step_limit: Option<u64>,
+    ) -> (Vec<GraphNode>, Vec<GraphEdge>) {
+        let Some(bundle) = bundle else {
+            return (Vec::new(), Vec::new());
+        };
+        let roles = bundle
+            .scenario
+            .as_ref()
+            .map(|scenario| scenario.roles.clone())
+            .unwrap_or_else(|| bundle.trace_roles());
+        let nodes = roles
+            .iter()
+            .map(|role| GraphNode {
+                id: role.clone(),
+                label: role.clone(),
+                category: "role".to_string(),
+                step: step_limit,
+            })
+            .collect::<Vec<_>>();
+        let mut edges = Vec::new();
+        for pair in roles.windows(2) {
+            if let [from, to] = pair {
+                edges.push(GraphEdge {
+                    from: from.clone(),
+                    to: to.clone(),
+                    label: "flow".to_string(),
+                    step: step_limit,
+                });
+            }
+        }
+        (nodes, edges)
+    }
+
+    fn instantiated_protocol_projection(
+        &self,
+        bundle: Option<&ScenarioBundleArtifact>,
+        step_limit: Option<u64>,
+    ) -> (Vec<GraphNode>, Vec<GraphEdge>) {
+        let Some(bundle) = bundle else {
+            return (Vec::new(), Vec::new());
+        };
+        let records = bundle
+            .result
+            .trace
+            .records
+            .iter()
+            .filter(|record| step_limit.is_none_or(|limit| record.step <= limit))
+            .collect::<Vec<_>>();
+        let nodes = records
+            .iter()
+            .map(|record| GraphNode {
+                id: format!("{}@{}", record.role, record.step),
+                label: format!("{} @ {}", record.role, record.step),
+                category: "session_step".to_string(),
+                step: Some(record.step),
+            })
+            .collect::<Vec<_>>();
+        let edges = records
+            .windows(2)
+            .map(|window| GraphEdge {
+                from: format!("{}@{}", window[0].role, window[0].step),
+                to: format!("{}@{}", window[1].role, window[1].step),
+                label: "continuation".to_string(),
+                step: Some(window[1].step),
+            })
+            .collect::<Vec<_>>();
+        (nodes, edges)
+    }
+
+    fn execution_timeline_projection(
+        &self,
+        bundle: Option<&ScenarioBundleArtifact>,
+        step_limit: Option<u64>,
+    ) -> (Vec<GraphNode>, Vec<GraphEdge>) {
+        let Some(bundle) = bundle else {
+            return (Vec::new(), Vec::new());
+        };
+        let records = bundle
+            .result
+            .trace
+            .records
+            .iter()
+            .filter(|record| step_limit.is_none_or(|limit| record.step <= limit))
+            .collect::<Vec<_>>();
+        let nodes = records
+            .iter()
+            .map(|record| GraphNode {
+                id: format!("step-{}", record.step),
+                label: format!("step {} ({})", record.step, record.role),
+                category: "timeline_step".to_string(),
+                step: Some(record.step),
+            })
+            .collect::<Vec<_>>();
+        let edges = records
+            .windows(2)
+            .map(|window| GraphEdge {
+                from: format!("step-{}", window[0].step),
+                to: format!("step-{}", window[1].step),
+                label: window[1].role.clone(),
+                step: Some(window[1].step),
+            })
+            .collect::<Vec<_>>();
+        (nodes, edges)
+    }
 }
 
 impl ViewerApplicationService for InMemoryViewerService {
@@ -687,48 +911,8 @@ impl ViewerApplicationService for InMemoryViewerService {
                         id: request.branch_id,
                     });
                 }
-                let (nodes, edges) = match request.kind {
-                    GraphProjectionKind::BranchLineage => {
-                        let nodes = run
-                            .branches
-                            .keys()
-                            .map(|branch_id| GraphNode {
-                                id: branch_id.clone(),
-                                label: branch_id.clone(),
-                                category: "branch".to_string(),
-                            })
-                            .collect::<Vec<_>>();
-                        let edges = run
-                            .branches
-                            .iter()
-                            .filter_map(|(branch_id, branch)| {
-                                branch.parent_branch_id.as_ref().map(|parent| GraphEdge {
-                                    from: parent.clone(),
-                                    to: branch_id.clone(),
-                                    label: "fork".to_string(),
-                                })
-                            })
-                            .collect::<Vec<_>>();
-                        (nodes, edges)
-                    }
-                    _ => (
-                        vec![GraphNode {
-                            id: "root".to_string(),
-                            label: format!("{:?}", request.kind),
-                            category: "projection".to_string(),
-                        }],
-                        Vec::new(),
-                    ),
-                };
                 Ok(ViewerQueryResult::GraphProjection {
-                    projection: GraphProjection {
-                        run_id: request.run_id,
-                        branch_id: request.branch_id,
-                        step: request.step,
-                        kind: request.kind,
-                        nodes,
-                        edges,
-                    },
+                    projection: self.graph_projection_for_request(&request.run_id, &request, run),
                 })
             }
             ViewerQuery::Search(query) => {
@@ -780,6 +964,25 @@ impl ViewerApplicationService for InMemoryViewerService {
                                         step: Some(record.step),
                                     });
                                 }
+                            }
+                        }
+                    }
+                }
+                if query.domain.is_none() || query.domain == Some(SearchDomain::Branch) {
+                    for (run_id, run) in &self.runs {
+                        for (branch_id, branch) in &run.branches {
+                            if branch_id.to_lowercase().contains(&needle) {
+                                matches.push(SearchResult {
+                                    artifact_id: run
+                                        .root_artifact_id
+                                        .clone()
+                                        .unwrap_or_else(|| run_id.clone()),
+                                    domain: SearchDomain::Branch,
+                                    label: branch_id.clone(),
+                                    detail: format!("from step {}", branch.from_step),
+                                    branch_id: Some(branch_id.clone()),
+                                    step: Some(branch.from_step),
+                                });
                             }
                         }
                     }
@@ -1131,16 +1334,20 @@ mod tests {
         }
 
         service
-            .command(ViewerCommand::CreateBranch {
-                run_id: "run/demo".to_string(),
-                branch_id: "branch/alt".to_string(),
-                parent_branch_id: "root".to_string(),
-                from_step: 3,
-                patch: ScenarioBranchPatch {
-                    operations: vec![ScenarioPatchOperation::SetSeed { seed: 99 }],
-                },
-            })
+            .command(create_branch_command(
+                "run/demo".to_string(),
+                "branch/alt".to_string(),
+                "root".to_string(),
+                3,
+            ))
             .expect("create branch");
+        service
+            .command(update_branch_command(
+                "run/demo".to_string(),
+                "branch/alt".to_string(),
+                3,
+            ))
+            .expect("update branch");
         service
             .command(ViewerCommand::RequestRerun {
                 run_id: "run/demo".to_string(),
@@ -1178,15 +1385,12 @@ mod tests {
             })
             .expect("import artifact");
         service
-            .command(ViewerCommand::CreateBranch {
-                run_id: "run/demo".to_string(),
-                branch_id: "branch/alt".to_string(),
-                parent_branch_id: "root".to_string(),
-                from_step: 3,
-                patch: ScenarioBranchPatch {
-                    operations: vec![ScenarioPatchOperation::SetSeed { seed: 99 }],
-                },
-            })
+            .command(create_branch_command(
+                "run/demo".to_string(),
+                "branch/alt".to_string(),
+                "root".to_string(),
+                3,
+            ))
             .expect("create branch");
 
         let projection = service
@@ -1206,5 +1410,34 @@ mod tests {
             }
             other => panic!("unexpected graph projection result: {other:?}"),
         }
+    }
+
+    #[test]
+    fn branch_command_builders_emit_typed_patch_commands() {
+        let create = create_branch_command(
+            "run/demo".to_string(),
+            "branch/next".to_string(),
+            "root".to_string(),
+            4,
+        );
+        let update = update_branch_command("run/demo".to_string(), "branch/next".to_string(), 9);
+        let delete = delete_branch_command("run/demo".to_string(), "branch/next".to_string());
+
+        assert!(matches!(
+            create,
+            ViewerCommand::CreateBranch {
+                from_step: 4,
+                patch: ScenarioBranchPatch { .. },
+                ..
+            }
+        ));
+        assert!(matches!(
+            update,
+            ViewerCommand::UpdateBranch {
+                patch: ScenarioBranchPatch { .. },
+                ..
+            }
+        ));
+        assert!(matches!(delete, ViewerCommand::DeleteBranch { .. }));
     }
 }

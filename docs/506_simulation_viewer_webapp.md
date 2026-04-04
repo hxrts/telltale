@@ -2,8 +2,8 @@
 
 This page describes the current shared Dioxus webapp surface for simulator
 inspection.
-It covers the crate split, global layout, ownership discipline, testing split,
-and local development workflow.
+It covers the crate split, global layout, graph and run-insight workspaces,
+ownership discipline, testing split, and local development workflow.
 
 ## Crate Split
 
@@ -37,6 +37,77 @@ The current ownership markers used by the shared viewer stack are:
 These are intentionally structural.
 The real semantic authority still lives in simulator artifacts and the
 application-service boundary.
+
+## Graph Workspace and Time Travel
+
+The shared webapp now includes a graph workspace for deterministic structure
+and replay browsing.
+The graph page can switch between these projection families from the same
+authoritative artifact set:
+
+- choreography structure
+- instantiated protocol structure
+- execution timeline
+- branch lineage
+
+Time travel is explicit.
+Users can:
+
+- step forward and backward through deterministic execution history
+- jump directly to a historical step
+- switch projections without losing typed selection state
+- search nodes, branches, and labels through the pure `telltale-viewer` index
+
+Branch management is command-driven rather than mutation-driven.
+The graph workspace emits typed viewer commands for:
+
+- branch creation from the active historical step
+- branch update through a typed patch
+- branch deletion
+
+Those commands are minted in `telltale-viewer`, while `telltale-ui` remains an
+`Observed` shell over the resulting command stream and graph projections.
+
+## Run Insight Workspace
+
+The insight page is the companion debugging surface for one active run or
+branch.
+It currently renders:
+
+- execution regime and theorem scheduler profile
+- watch expressions over sampled semantic facts
+- branch provenance and narrative annotations
+- a run-diff summary for the active branch
+- causality/explanation rows derived from the execution timeline projection
+- bookmarks for historical steps and branches
+- archive reload status for exact artifact-set re-entry
+
+This gives the viewer a first serious run-analysis lane instead of only a
+graph browser.
+
+## Downstream Handoff
+
+Aura is unblocked to start integrating once it consumes these shared surfaces:
+
+- `telltale_viewer::ViewerArtifactFile` and `telltale_viewer::ViewerArtifact`
+  as the stable artifact envelope
+- `telltale_viewer::ViewerReport`, `ViewerQuery`, `ViewerCommand`, and
+  `ViewerApplicationService` as the query/command boundary
+- `telltale_viewer::GraphProjection` and `GraphProjectionKind` as the graph
+  projection contract
+- `telltale_ui::TelltaleUiRoot`, `ViewerFrame`, `ViewerPage`, and
+  `ViewerWorkspace` as the portable Dioxus shell and shared workspace model
+
+The intended downstream extension points are:
+
+- artifact and insight overlays layered on top of the shared pages
+- graph annotations and domain-specific badges that do not replace the
+  authoritative projection contract
+- downstream application-service implementations that feed the same
+  query/command surface
+
+Downstreams should not fork the core shell just to add overlays.
+The shared Telltale crates now provide the minimum handoff surface Aura needs.
 
 ## Testing Split
 
@@ -76,10 +147,11 @@ all exercised from one entrypoint.
 ## Simulator CLI Note
 
 Textual replay output remains available for compatibility and quick terminal
-checks, but the shared viewer is now the preferred human-facing inspection
-surface for artifact summaries, graph browsing, and run insights.
+checks, but it is now explicitly a compatibility summary path.
+The shared viewer is the preferred human-facing inspection surface for graph
+navigation, time travel, branch management, and run insights.
 
 ## Related Docs
 
 - [Simulation Overview](501_simulation_overview.md)
-- [Simulation Viewer Model](505_simulation_viewer_model.md)
+- [Simulation Viewer](505_simulation_viewer.md)
