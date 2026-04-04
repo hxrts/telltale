@@ -70,4 +70,4 @@ The main parity and extension lanes are:
 - [Simulation Overview](501_simulation_overview.md)
 - [Simulation Runner](502_simulation_runner.md)
 - [Simulation Scenarios](503_simulation_scenarios.md)
-- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)

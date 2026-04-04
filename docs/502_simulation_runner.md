@@ -221,4 +221,4 @@ They do not replace canonical replay traces.
 - [Simulation Overview](501_simulation_overview.md)
 - [Simulation Scenarios](503_simulation_scenarios.md)
 - [Simulation Fields](504_simulation_fields.md)
-- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)

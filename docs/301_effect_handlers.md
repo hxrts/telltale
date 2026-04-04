@@ -290,7 +290,7 @@ Use middleware to add logging, metrics, retries, or fault injection. Middleware 
 
 InMemoryHandler and TelltaleHandler both work in WASM environments. They use futures channels for communication.
 
-For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](804_wasm_guide.md) for details.
+For WASM network communication, implement a custom handler. Use web-sys WebSocket or fetch APIs. See [WASM Guide](206_wasm_guide.md) for details.
 
 ## Parameterized Roles
 

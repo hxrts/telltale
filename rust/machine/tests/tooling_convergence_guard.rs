@@ -50,16 +50,16 @@ const TOOLING_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../docs/503_simulation_scenarios.md"),
     ),
     (
-        "../../../docs/803_topology.md",
-        include_str!("../../../docs/803_topology.md"),
+        "../../../docs/603_topology.md",
+        include_str!("../../../docs/603_topology.md"),
     ),
     (
         "../../../docs/205_examples.md",
         include_str!("../../../docs/205_examples.md"),
     ),
     (
-        "../../../docs/804_wasm_guide.md",
-        include_str!("../../../docs/804_wasm_guide.md"),
+        "../../../docs/206_wasm_guide.md",
+        include_str!("../../../docs/206_wasm_guide.md"),
     ),
     (
         "../../runtime/examples/authority_surface.rs",

@@ -92,4 +92,4 @@ The compiler is intentionally simple. Full ISA coverage is provided by direct by
 
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Session Lifecycle](403_session_lifecycle.md)
-- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)

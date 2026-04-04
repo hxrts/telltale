@@ -103,7 +103,7 @@ The conservation framework is realized through a closed set of semantic objects.
 | `CanonicalHandle` | Non-forgeable reference obtained from authoritative materialization | `evidence` |
 | `ProgressContract` | Explicit liveness and budget contract governing waits and escalation | premise/commitment support |
 
-These objects are first-class in the Lean formalization, represented canonically in Rust, and referenced in the protocol machine semantic audit surface. See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for the runtime accessors and [Lean Verification](701_lean_verification.md) for the proof surfaces.
+These objects are first-class in the Lean formalization, represented canonically in Rust, and referenced in the protocol machine semantic audit surface. See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for the runtime accessors and [Lean Verification](801_lean_verification.md) for the proof surfaces.
 
 ## Implementation Techniques
 
@@ -134,4 +134,4 @@ Instead of "the system hung," a developer sees: which operation, which owner, wh
 - [Theory](103_theory.md)
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Authority Language Surface](604_authority_language_surface.md)
+- [Authority Language Surface](703_authority_language_surface.md)

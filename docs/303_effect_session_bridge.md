@@ -344,5 +344,5 @@ request/outcome model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`.
 
 - [Choreography Effect Handlers](301_effect_handlers.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Lean Verification](701_lean_verification.md)
-- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
+- [Lean Verification](801_lean_verification.md)
+- [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)

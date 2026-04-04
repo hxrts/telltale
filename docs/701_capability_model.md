@@ -154,7 +154,7 @@ A concern should stay host-only when any of the following hold:
 
 ## Related Docs
 
-- [Capability Admission](602_capability_admission.md)
-- [Authority Language Surface](604_authority_language_surface.md)
+- [Capability Admission](702_capability_admission.md)
+- [Authority Language Surface](703_authority_language_surface.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Verification Inventory](806_verification_inventory.md)
+- [Verification Inventory](902_verification_inventory.md)

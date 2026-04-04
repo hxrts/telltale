@@ -109,4 +109,4 @@ This command runs one scenario through the simulator entrypoint and emits the sa
 
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
-- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
+- [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)

@@ -60,7 +60,7 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
         pattern: "record_stale_late_result",
     },
     PatternExpectation {
-        path: "../../../docs/803_topology.md",
+        path: "../../../docs/603_topology.md",
         pattern: "`tell!` emits a topology helper module",
     },
     PatternExpectation {
@@ -68,7 +68,7 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
         pattern: "Protocol::proof_status",
     },
     PatternExpectation {
-        path: "../../../docs/804_wasm_guide.md",
+        path: "../../../docs/206_wasm_guide.md",
         pattern: "Protocol definitions written with `tell!`",
     },
     PatternExpectation {
@@ -135,7 +135,7 @@ pub(crate) const FORBIDDEN_PATTERNS: &[PatternExpectation] = &[
         pattern: "Program::new()",
     },
     PatternExpectation {
-        path: "../../../docs/804_wasm_guide.md",
+        path: "../../../docs/206_wasm_guide.md",
         pattern: "Program::new()",
     },
     PatternExpectation {
@@ -147,7 +147,7 @@ pub(crate) const FORBIDDEN_PATTERNS: &[PatternExpectation] = &[
         pattern: "choreography!(",
     },
     PatternExpectation {
-        path: "../../../docs/803_topology.md",
+        path: "../../../docs/603_topology.md",
         pattern: "`choreography!`",
     },
     PatternExpectation {
@@ -155,7 +155,7 @@ pub(crate) const FORBIDDEN_PATTERNS: &[PatternExpectation] = &[
         pattern: "`choreography!`",
     },
     PatternExpectation {
-        path: "../../../docs/804_wasm_guide.md",
+        path: "../../../docs/206_wasm_guide.md",
         pattern: "`choreography!`",
     },
 ];

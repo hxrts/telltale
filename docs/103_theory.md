@@ -257,7 +257,7 @@ On the Rust side, `telltale-types` defines `GlobalType` and `LocalTypeR`.
 The runtime and machine layers then realize those structures operationally.
 
 On the Lean side, the formalization provides the theorem libraries that justify those structures.
-See [Lean Verification](701_lean_verification.md) for the proof pipeline and source layout.
+See [Lean Verification](801_lean_verification.md) for the proof pipeline and source layout.
 See [Introduction](101_introduction.md) for the system-level overview.
 
 ## Conservation and Session Structure
@@ -289,4 +289,4 @@ Within this documentation:
 
 - [Introduction](101_introduction.md)
 - [Choreographic DSL](202_choreographic_dsl.md)
-- [Lean Verification](701_lean_verification.md)
+- [Lean Verification](801_lean_verification.md)

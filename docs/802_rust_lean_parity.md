@@ -238,7 +238,7 @@ This heap lane is narrower than a full cryptographic equivalence proof.
 Lean does not currently implement BLAKE3.
 Instead, Lean reconstructs canonical bytes, tagged preimages, ordering, proof-path structure, and deterministic replay from the published corpus, and Rust must match the published digest values exactly.
 
-The authoritative digest corpus remains the published heap vector set documented in [Resource Heap](802_resource_heap.md).
+The authoritative digest corpus remains the published heap vector set documented in [Resource Heap](602_resource_heap.md).
 `rust/runtime/tests/data/heap_vectors_v1.json` remains the minimal public digest vector file.
 `rust/runtime/tests/data/heap_lean_parity_v1.json` is the richer Rust↔Lean parity corpus.
 
@@ -595,5 +595,5 @@ Rust protocol-machine code uses one canonical snake_case naming surface. Lean-sp
 
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
-- [Lean Verification](701_lean_verification.md)
-- [Capability Admission](602_capability_admission.md)
+- [Lean Verification](801_lean_verification.md)
+- [Capability Admission](702_capability_admission.md)

@@ -177,7 +177,7 @@ Key exports:
 - `ProtocolMachineSemanticObjects` and semantic-object schema helpers
   These come from the same canonical semantic-object family as `telltale_machine::model::semantic_objects`, not a bridge-local duplicate.
 
-See [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) for details.
+See [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) for details.
 
 ### `telltale-transport`
 

@@ -152,7 +152,7 @@ check_no_match 'Program::new\(' \
   docs/204_extensions.md \
   docs/301_effect_handlers.md \
   docs/205_examples.md \
-  docs/804_wasm_guide.md
+  docs/206_wasm_guide.md
 
 check_no_match 'compose race\b' docs examples
 check_no_match 'compose fallback\b' docs examples

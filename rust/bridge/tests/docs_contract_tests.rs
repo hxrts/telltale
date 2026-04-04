@@ -78,7 +78,7 @@ fn authority_tier_name(tier: AuthorityMetatheoryTier) -> &'static str {
 
 #[test]
 fn capability_admission_source_derived_boundary_rows_match_runtime_contracts() {
-    let doc = read_doc("docs/602_capability_admission.md");
+    let doc = read_doc("docs/702_capability_admission.md");
     assert!(
         doc.contains("Source-Derived Rows"),
         "capability admission doc should explicitly mark source-derived rows"
@@ -120,7 +120,7 @@ fn capability_admission_source_derived_boundary_rows_match_runtime_contracts() {
 
 #[test]
 fn authority_evidence_doc_source_derived_boundary_rows_match_capability_inventory() {
-    let doc = read_doc("docs/604_authority_language_surface.md");
+    let doc = read_doc("docs/703_authority_language_surface.md");
     assert!(
         doc.contains("Source-Derived Boundary Rows"),
         "authority/evidence doc should explicitly mark source-derived boundary rows"
@@ -148,7 +148,7 @@ fn authority_evidence_doc_source_derived_boundary_rows_match_capability_inventor
 
 #[test]
 fn authority_language_source_derived_support_matrix_matches_fixture_statuses() {
-    let doc = read_doc("docs/604_authority_language_surface.md");
+    let doc = read_doc("docs/703_authority_language_surface.md");
     assert!(
         doc.contains("Source-Derived Support Matrix"),
         "authority language doc should explicitly mark source-derived support matrices"
@@ -231,9 +231,9 @@ fn authority_language_source_derived_support_matrix_matches_fixture_statuses() {
 
 #[test]
 fn capability_scope_docs_keep_general_host_auth_out_of_scope() {
-    let inventory = read_doc("docs/806_verification_inventory.md");
-    let authority_scope = read_doc("docs/601_capability_model.md");
-    let authority_evidence = read_doc("docs/604_authority_language_surface.md");
+    let inventory = read_doc("docs/902_verification_inventory.md");
+    let authority_scope = read_doc("docs/701_capability_model.md");
+    let authority_evidence = read_doc("docs/703_authority_language_surface.md");
     let effect_bridge = read_doc("docs/303_effect_session_bridge.md");
 
     for (name, doc) in [
@@ -257,7 +257,7 @@ fn capability_scope_docs_keep_general_host_auth_out_of_scope() {
 
 #[test]
 fn authority_evidence_doc_keeps_language_capability_mapping_table_in_sync() {
-    let doc = read_doc("docs/604_authority_language_surface.md");
+    let doc = read_doc("docs/703_authority_language_surface.md");
     assert!(
         doc.contains("| DSL form | Capability class | Lifecycle emphasis |"),
         "authority/evidence doc must carry the language capability mapping table"
@@ -277,7 +277,7 @@ fn authority_evidence_doc_keeps_language_capability_mapping_table_in_sync() {
 
 #[test]
 fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
-    let doc = read_doc("docs/806_verification_inventory.md");
+    let doc = read_doc("docs/902_verification_inventory.md");
 
     for needle in [
         "The numeric rows in this section are source-derived and checked by",

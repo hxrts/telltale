@@ -20,7 +20,7 @@ Telltale enforces conservation over six properties: evidence, authority, identit
 
 Within that conservation framework, protocol-critical capability semantics are first class. The runtime and Lean model distinguish four capability classes: admission, ownership, evidence, and transition. This taxonomy covers protocol-critical authority, finalization, and handoff/reconfiguration semantics. It does not attempt to absorb general host application authorization.
 
-See [Capability Model](601_capability_model.md) for the full taxonomy.
+See [Capability Model](701_capability_model.md) for the full taxonomy.
 
 ## Runtime Architecture
 
@@ -48,7 +48,7 @@ The protocol machine compiles local types to bytecode instructions. It manages s
 
 The Lean 4 formalization spans roughly 653 files and 133k lines in the core libraries (generated metrics in `lean/CODE_MAP.md`). It covers global types, local types, projection, and operational semantics. Deadlock-freedom claims are assumption-scoped with explicit premises for well-typedness, progress reachability, and fair scheduling.
 
-The `telltale-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](701_lean_verification.md) for the verification pipeline.
+The `telltale-bridge` crate provides JSON export and import for cross-validation between Rust and Lean. See [Lean Verification](801_lean_verification.md) for the verification pipeline.
 
 ## Document Index
 
@@ -71,29 +71,29 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Simulation Runner](502_simulation_runner.md) | Reference | Normative |
 | [Simulation Scenarios](503_simulation_scenarios.md) | Guide | Mixed |
 | [Simulation Fields](504_simulation_fields.md) | Reference | Informative |
-| [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) | Reference | Normative |
-| [Content Addressing](801_content_addressing.md) | Reference | Mixed |
-| [Resource Heap](802_resource_heap.md) | Reference | Mixed |
-| [Topology](803_topology.md) | Guide | Mixed |
-| [Lean Verification](701_lean_verification.md) | Reference | Mixed |
-| [Capability Admission](602_capability_admission.md) | Reference | Normative |
-| [Theorem Program](705_theorem_program.md) | Concept | Mixed |
-| [Distributed and Classical Families](706_distributed_classical_families.md) | Reference | Mixed |
+| [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) | Reference | Normative |
+| [Content Addressing](601_content_addressing.md) | Reference | Mixed |
+| [Resource Heap](602_resource_heap.md) | Reference | Mixed |
+| [Topology](603_topology.md) | Guide | Mixed |
+| [Lean Verification](801_lean_verification.md) | Reference | Mixed |
+| [Capability Admission](702_capability_admission.md) | Reference | Normative |
+| [Theorem Program](804_theorem_program.md) | Concept | Mixed |
+| [Distributed and Classical Families](805_distributed_classical_families.md) | Reference | Mixed |
 | [Examples](205_examples.md) | Guide | Informative |
-| [WASM Guide](804_wasm_guide.md) | Guide | Informative |
-| [API Reference](805_api_reference.md) | Reference | Informative |
-| [Glossary and Notation Index](807_glossary_notation.md) | Reference | Informative |
-| [Verification Inventory](806_verification_inventory.md) | Reference | Informative |
-| [Capability Model](601_capability_model.md) | Reference | Normative |
-| [Authority Language Surface](604_authority_language_surface.md) | Reference | Normative |
-| [Semantic Runtime Naming Parity](704_semantic_runtime_name_parity.md) | Reference | Normative |
+| [WASM Guide](206_wasm_guide.md) | Guide | Informative |
+| [API Reference](901_api_reference.md) | Reference | Informative |
+| [Glossary and Notation Index](903_glossary_notation.md) | Reference | Informative |
+| [Verification Inventory](902_verification_inventory.md) | Reference | Informative |
+| [Capability Model](701_capability_model.md) | Reference | Normative |
+| [Authority Language Surface](703_authority_language_surface.md) | Reference | Normative |
+| [Semantic Runtime Naming Parity](803_semantic_runtime_name_parity.md) | Reference | Normative |
 | [Conservation Framework](102_conservation_framework.md) | Concept | Normative |
 
 ## Paths by Role
 
 ### Library Users
 
-Start with [Getting Started](201_getting_started.md). Then read [Choreographic DSL](202_choreographic_dsl.md). Continue with [Examples](205_examples.md) and [API Reference](805_api_reference.md).
+Start with [Getting Started](201_getting_started.md). Then read [Choreographic DSL](202_choreographic_dsl.md). Continue with [Examples](205_examples.md) and [API Reference](901_api_reference.md).
 
 ### Protocol-Machine Integrators
 
@@ -101,7 +101,7 @@ Start with [Architecture](104_architecture.md). Then read [Effect Handlers and S
 
 ### Paper Reviewers
 
-Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](701_lean_verification.md), and [Rust-Lean Bridge and Parity](703_rust_lean_parity.md). Continue with [Capability Admission](602_capability_admission.md) and [Theorem Program](705_theorem_program.md). See [Distributed and Classical Families](706_distributed_classical_families.md) and [Glossary and Notation Index](807_glossary_notation.md) for reference.
+Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](801_lean_verification.md), and [Rust-Lean Bridge and Parity](802_rust_lean_parity.md). Continue with [Capability Admission](702_capability_admission.md) and [Theorem Program](804_theorem_program.md). See [Distributed and Classical Families](805_distributed_classical_families.md) and [Glossary and Notation Index](903_glossary_notation.md) for reference.
 
 ## Further Reading
 
@@ -109,4 +109,4 @@ For MPST theory, see [A Very Gentle Introduction to Multiparty Session Types](ht
 
 For choreographic programming, see [Introduction to Choreographies](https://www.fabriziomontesi.com/files/m13_choreographies_behaviorally.pdf). For integration with session types, see [Applied Choreographies](https://arxiv.org/pdf/2209.01886.pdf).
 
-See [Glossary and Notation Index](807_glossary_notation.md) for shared terminology.
+See [Glossary and Notation Index](903_glossary_notation.md) for shared terminology.

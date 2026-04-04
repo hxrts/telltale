@@ -191,13 +191,13 @@ The current correspondence table for the shared core is:
 
 Lean still includes a `delegate` constructor in `GlobalType` that is not exposed in the Rust core `GlobalType`.
 That remains a known parity gap in the shared foundational type layer.
-The larger proof and runtime correspondence story is documented in [Lean Verification](701_lean_verification.md) and [Rust-Lean Bridge and Parity](703_rust_lean_parity.md).
+The larger proof and runtime correspondence story is documented in [Lean Verification](801_lean_verification.md) and [Rust-Lean Bridge and Parity](802_rust_lean_parity.md).
 
 ## Related Docs
 
 - [Architecture](104_architecture.md)
 - [Theory](103_theory.md)
 - [Choreographic DSL](202_choreographic_dsl.md)
-- [Content Addressing](801_content_addressing.md)
-- [Lean Verification](701_lean_verification.md)
-- [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
+- [Content Addressing](601_content_addressing.md)
+- [Lean Verification](801_lean_verification.md)
+- [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)

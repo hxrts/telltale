@@ -54,18 +54,18 @@ if ! rg -q "parse_protocol_machine_run_output_strict" rust/bridge/src/protocol_m
   )
 fi
 
-if ! rg -q "## Bridge Normalization Trust Surface" docs/806_verification_inventory.md; then
+if ! rg -q "## Bridge Normalization Trust Surface" docs/902_verification_inventory.md; then
   errors+=(
-    "docs/806_verification_inventory.md: missing 'Bridge Normalization Trust Surface' section"
+    "docs/902_verification_inventory.md: missing 'Bridge Normalization Trust Surface' section"
   )
 fi
 
 for needle in \
   "semantic-audit tick normalization"
 do
-  if ! rg -q "${needle}" docs/806_verification_inventory.md; then
+  if ! rg -q "${needle}" docs/902_verification_inventory.md; then
     errors+=(
-      "docs/806_verification_inventory.md: missing bridge normalization ledger row for '${needle}'"
+      "docs/902_verification_inventory.md: missing bridge normalization ledger row for '${needle}'"
     )
   fi
 done
@@ -73,22 +73,22 @@ done
 for needle in \
   "irreducible trusted comparison logic"
 do
-  if ! rg -q "${needle}" docs/806_verification_inventory.md; then
+  if ! rg -q "${needle}" docs/902_verification_inventory.md; then
     errors+=(
-      "docs/806_verification_inventory.md: missing bridge normalization classification '${needle}'"
+      "docs/902_verification_inventory.md: missing bridge normalization classification '${needle}'"
     )
   fi
 done
 
-if rg -q '^\| runner JSON schema backfill \|' docs/806_verification_inventory.md; then
+if rg -q '^\| runner JSON schema backfill \|' docs/902_verification_inventory.md; then
   errors+=(
-    "docs/806_verification_inventory.md: compatibility-only schema backfill must stay outside the trusted bridge ledger"
+    "docs/902_verification_inventory.md: compatibility-only schema backfill must stay outside the trusted bridge ledger"
   )
 fi
 
-if rg -q "session-status ordering" docs/806_verification_inventory.md; then
+if rg -q "session-status ordering" docs/902_verification_inventory.md; then
   errors+=(
-    "docs/806_verification_inventory.md: session-status ordering should no longer be listed as trusted normalization"
+    "docs/902_verification_inventory.md: session-status ordering should no longer be listed as trusted normalization"
   )
 fi
 

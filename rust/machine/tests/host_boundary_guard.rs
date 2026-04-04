@@ -27,8 +27,8 @@ const DOC_SOURCES: &[(&str, &str)] = &[
         include_str!("../../../docs/403_session_lifecycle.md"),
     ),
     (
-        "../../../docs/805_api_reference.md",
-        include_str!("../../../docs/805_api_reference.md"),
+        "../../../docs/901_api_reference.md",
+        include_str!("../../../docs/901_api_reference.md"),
     ),
     (
         "../../runtime/src/bin/effect_scaffold.rs",

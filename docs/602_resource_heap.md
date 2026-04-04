@@ -148,7 +148,7 @@ Those tagged preimages are part of the public heap contract.
 ### Canonical Encoding Model
 
 The heap uses a runtime-local canonical binary format.
-It does not reuse the type-level artifact encoding in [Content Addressing](801_content_addressing.md).
+It does not reuse the type-level artifact encoding in [Content Addressing](601_content_addressing.md).
 The current format is versioned by `HEAP_ENCODING_VERSION`.
 
 Every canonical heap value starts with the same prelude.
@@ -204,7 +204,7 @@ The digest algorithm itself is still treated as an operational conformance targe
 Rust and Lean must agree on the published heap vectors exactly, but Lean does not currently reimplement BLAKE3.
 This section therefore defines both the boundary that an external embedder must match and the boundary that the current Rust↔Lean heap lane enforces.
 
-See [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) for the Lean mirror boundary.
+See [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) for the Lean mirror boundary.
 
 ## Determinism Contract
 
@@ -249,6 +249,6 @@ This contract now has a focused Lean mirror.
 `lean/Runtime/Resources/HeapModel.lean` mirrors active/nullifier ordering, proof-index semantics, and deterministic replay for the published heap corpus.
 The published vectors and the strict Rust↔Lean heap parity suite are the current conformance boundary for other implementations.
 
-Use [Content Addressing](801_content_addressing.md) for the type-level artifact identity system.
+Use [Content Addressing](601_content_addressing.md) for the type-level artifact identity system.
 Use [Choreography Effect Handlers](301_effect_handlers.md) for choreography runtime integration.
-See [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) for the Rust↔Lean conformance lane.
+See [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) for the Rust↔Lean conformance lane.
