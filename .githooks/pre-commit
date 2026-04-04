@@ -52,6 +52,16 @@ else
     exit 1
 fi
 
+# 3. Remove empty directories
+empty_dirs=$(find . -type d -empty -not -path './.git/*' -not -path '*/target/*' -not -path '*/node_modules/*' -not -path '*/.lake/*' 2>/dev/null)
+if [[ -n "$empty_dirs" ]]; then
+    echo "Removing empty directories:"
+    echo "$empty_dirs" | while read -r d; do
+        echo "  $d"
+        rmdir "$d"
+    done
+fi
+
 echo -e "${GREEN}Pre-commit checks passed!${NC}"
 echo ""
 echo "Tip: Run './scripts/lint-check.sh' for comprehensive style guide checks"
