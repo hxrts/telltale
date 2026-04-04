@@ -287,7 +287,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Protocol-Machine Simulation](501_simulation_overview.md) for harness config fields and preset helpers.
+This lane validates runtime behavior without reimplementing protocol-machine checks in the host project. See [Simulation Overview](501_simulation_overview.md) for harness config fields and preset helpers.
 
 ## Performance and Diagnostics Controls
 

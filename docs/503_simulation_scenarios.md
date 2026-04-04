@@ -1,4 +1,4 @@
-# Protocol-Machine Simulation Scenarios
+# Simulation Scenarios
 
 This page documents scenario configuration and middleware behavior.
 It covers the TOML schema, budgeted adversary declarations, first-class reconfiguration, network modeling, properties, checkpointing, and current limits.
@@ -225,6 +225,6 @@ They are also not yet wired into `SimulationHarness`.
 
 ## Related Docs
 
-- [Protocol-Machine Simulation](501_simulation_overview.md)
-- [Protocol-Machine Simulation Runner](502_simulation_runner.md)
-- [Protocol-Machine Simulation Fields](504_simulation_fields.md)
+- [Simulation Overview](501_simulation_overview.md)
+- [Simulation Runner](502_simulation_runner.md)
+- [Simulation Fields](504_simulation_fields.md)

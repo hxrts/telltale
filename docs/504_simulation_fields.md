@@ -1,4 +1,4 @@
-# Protocol-Machine Simulation Fields
+# Simulation Fields
 
 This page documents the simulator's field/environment-dynamics layer and the generic external environment boundary.
 
@@ -67,7 +67,7 @@ The main parity and extension lanes are:
 
 ## Related Docs
 
-- [Protocol-Machine Simulation](501_simulation_overview.md)
-- [Protocol-Machine Simulation Runner](502_simulation_runner.md)
-- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
+- [Simulation Overview](501_simulation_overview.md)
+- [Simulation Runner](502_simulation_runner.md)
+- [Simulation Scenarios](503_simulation_scenarios.md)
 - [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)

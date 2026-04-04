@@ -342,6 +342,21 @@ for scan_root in "${SCAN_ROOTS[@]}"; do
   done < <(rg -l -0 'docs/|\.\.\/' "$scan_root" 2>/dev/null || true)
 done
 
+# ── Scan All docs/*.md for Title Matching ────────────────────────────
+# The rg-based scan above only finds files containing 'docs/' or '../'.
+# Docs with only relative sibling links (e.g. 201_getting_started.md)
+# are missed. Process all docs/*.md so title matching covers every file.
+
+for md in docs/*.md; do
+  [[ -f "$md" ]] || continue
+  [[ "$md" == */SUMMARY.md ]] && continue
+  local_key="docs_title_scan:$md"
+  if [[ -z "${SEEN[$local_key]:-}" ]]; then
+    SEEN[$local_key]=1
+    process_file "$md"
+  fi
+done
+
 # ── Scan Root Files ───────────────────────────────────────────────────
 
 for rel_name in "${ROOT_FILES[@]}"; do

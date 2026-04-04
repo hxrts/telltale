@@ -25,7 +25,7 @@ let result = harness.run(&spec)?;
 assert_contracts(&result, &ContractCheckConfig::default())?;
 ```
 
-This pattern makes extension runtime checks reusable across projects. See [Protocol-Machine Simulation](501_simulation_overview.md) for harness config files and preset constructors.
+This pattern makes extension runtime checks reusable across projects. See [Simulation Overview](501_simulation_overview.md) for harness config files and preset constructors.
 
 ## Runtime Effect Extensions
 

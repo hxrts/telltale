@@ -198,4 +198,4 @@ That is the supported deterministic test path for host integrations.
 - [Choreographic DSL](202_choreographic_dsl.md)
 - [Choreography Effect Handlers](301_effect_handlers.md)
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
-- [Protocol-Machine Simulation](501_simulation_overview.md)
+- [Simulation Overview](501_simulation_overview.md)

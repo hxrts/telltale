@@ -596,4 +596,4 @@ Rust protocol-machine code uses one canonical snake_case naming surface. Lean-sp
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
 - [Lean Verification](701_lean_verification.md)
-- [Capability and Admission](602_capability_admission.md)
+- [Capability Admission](602_capability_admission.md)

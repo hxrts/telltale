@@ -67,16 +67,16 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Protocol Machine Architecture](401_protocol_machine_architecture.md) | Reference | Normative |
 | [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md) | Reference | Normative |
 | [Session Lifecycle](403_session_lifecycle.md) | Reference | Normative |
-| [Protocol-Machine Simulation](501_simulation_overview.md) | Guide | Mixed |
-| [Protocol-Machine Simulation Runner](502_simulation_runner.md) | Reference | Normative |
-| [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md) | Guide | Mixed |
-| [Protocol-Machine Simulation Fields](504_simulation_fields.md) | Reference | Informative |
+| [Simulation Overview](501_simulation_overview.md) | Guide | Mixed |
+| [Simulation Runner](502_simulation_runner.md) | Reference | Normative |
+| [Simulation Scenarios](503_simulation_scenarios.md) | Guide | Mixed |
+| [Simulation Fields](504_simulation_fields.md) | Reference | Informative |
 | [Rust-Lean Bridge and Parity](703_rust_lean_parity.md) | Reference | Normative |
 | [Content Addressing](801_content_addressing.md) | Reference | Mixed |
 | [Resource Heap](802_resource_heap.md) | Reference | Mixed |
 | [Topology](803_topology.md) | Guide | Mixed |
 | [Lean Verification](701_lean_verification.md) | Reference | Mixed |
-| [Capability and Admission](602_capability_admission.md) | Reference | Normative |
+| [Capability Admission](602_capability_admission.md) | Reference | Normative |
 | [Theorem Program](705_theorem_program.md) | Concept | Mixed |
 | [Distributed and Classical Families](706_distributed_classical_families.md) | Reference | Mixed |
 | [Examples](205_examples.md) | Guide | Informative |
@@ -86,7 +86,7 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Verification Inventory](806_verification_inventory.md) | Reference | Informative |
 | [Capability Model](601_capability_model.md) | Reference | Normative |
 | [Authority Language Surface](604_authority_language_surface.md) | Reference | Normative |
-| [Semantic Runtime Name Parity](704_semantic_runtime_name_parity.md) | Reference | Normative |
+| [Semantic Runtime Naming Parity](704_semantic_runtime_name_parity.md) | Reference | Normative |
 | [Conservation Framework](102_conservation_framework.md) | Concept | Normative |
 
 ## Paths by Role
@@ -97,11 +97,11 @@ Start with [Getting Started](201_getting_started.md). Then read [Choreographic D
 
 ### Protocol-Machine Integrators
 
-Start with [Architecture](104_architecture.md). Then read [Effect Handlers and Session Types](303_effect_session_bridge.md) and [Protocol Machine Architecture](401_protocol_machine_architecture.md). Continue with [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md) and [Session Lifecycle](403_session_lifecycle.md). See [Protocol-Machine Simulation](501_simulation_overview.md) for testing.
+Start with [Architecture](104_architecture.md). Then read [Effect Handlers and Session Types](303_effect_session_bridge.md) and [Protocol Machine Architecture](401_protocol_machine_architecture.md). Continue with [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md) and [Session Lifecycle](403_session_lifecycle.md). See [Simulation Overview](501_simulation_overview.md) for testing.
 
 ### Paper Reviewers
 
-Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](701_lean_verification.md), and [Rust-Lean Bridge and Parity](703_rust_lean_parity.md). Continue with [Capability and Admission](602_capability_admission.md) and [Theorem Program](705_theorem_program.md). See [Distributed and Classical Families](706_distributed_classical_families.md) and [Glossary and Notation Index](807_glossary_notation.md) for reference.
+Start with [Conservation Framework](102_conservation_framework.md) and [Architecture](104_architecture.md). Then read [Theory](103_theory.md), [Lean Verification](701_lean_verification.md), and [Rust-Lean Bridge and Parity](703_rust_lean_parity.md). Continue with [Capability Admission](602_capability_admission.md) and [Theorem Program](705_theorem_program.md). See [Distributed and Classical Families](706_distributed_classical_families.md) and [Glossary and Notation Index](807_glossary_notation.md) for reference.
 
 ## Further Reading
 

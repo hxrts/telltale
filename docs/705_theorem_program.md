@@ -76,6 +76,6 @@ Rust admission paths in `rust/machine/src/runtime_contracts.rs` and `rust/machin
 ## Related Docs
 
 - [Lean Verification](701_lean_verification.md)
-- [Capability and Admission](602_capability_admission.md)
+- [Capability Admission](602_capability_admission.md)
 - [Distributed and Classical Families](706_distributed_classical_families.md)
 - [Glossary and Notation Index](807_glossary_notation.md)

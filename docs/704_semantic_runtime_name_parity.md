@@ -1,4 +1,4 @@
-# Semantic Runtime Name Parity
+# Semantic Runtime Naming Parity
 
 This file is the canonical cross-check for shared Lean and Rust semantic/runtime
 object names.

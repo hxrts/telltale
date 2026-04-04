@@ -1,4 +1,4 @@
-# Protocol-Machine Simulation
+# Simulation Overview
 
 This page is the top-level guide for `telltale-simulator`.
 It describes the supported simulator surface at a high level.
@@ -91,9 +91,9 @@ The helper `compare_observability(...)` reports `exact_raw_match`, `equivalent_u
 
 Use these pages for detailed behavior.
 
-- [Protocol-Machine Simulation Runner](502_simulation_runner.md)
-- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
-- [Protocol-Machine Simulation Fields](504_simulation_fields.md)
+- [Simulation Runner](502_simulation_runner.md)
+- [Simulation Scenarios](503_simulation_scenarios.md)
+- [Simulation Fields](504_simulation_fields.md)
 
 ## CLI
 

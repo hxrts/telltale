@@ -1,4 +1,4 @@
-# Protocol-Machine Simulation Runner
+# Simulation Runner
 
 This page documents runner behavior in `telltale-simulator`.
 It covers traces, runner entry points, harness behavior, and scenario round order.
@@ -218,7 +218,7 @@ They do not replace canonical replay traces.
 
 ## Related Docs
 
-- [Protocol-Machine Simulation](501_simulation_overview.md)
-- [Protocol-Machine Simulation Scenarios](503_simulation_scenarios.md)
-- [Protocol-Machine Simulation Fields](504_simulation_fields.md)
+- [Simulation Overview](501_simulation_overview.md)
+- [Simulation Scenarios](503_simulation_scenarios.md)
+- [Simulation Fields](504_simulation_fields.md)
 - [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)

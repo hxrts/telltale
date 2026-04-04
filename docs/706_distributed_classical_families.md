@@ -69,6 +69,6 @@ Capability bits indicate that a witness exists for the corresponding theorem fam
 ## Related Docs
 
 - [Lean Verification](701_lean_verification.md)
-- [Capability and Admission](602_capability_admission.md)
+- [Capability Admission](602_capability_admission.md)
 - [Theorem Program](705_theorem_program.md)
 - [Glossary and Notation Index](807_glossary_notation.md)

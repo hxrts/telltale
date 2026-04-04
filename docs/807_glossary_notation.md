@@ -12,9 +12,9 @@ It serves as the stable lookup for terminology and notation.
 | projection | Mapping from global choreography to per-role local session types. | [Choreographic Projection Patterns](203_projection.md) |
 | local type | Per-role protocol view used for runtime typing and progression. | [Theory](103_theory.md), [Session Lifecycle](403_session_lifecycle.md) |
 | effect handler | Runtime boundary that interprets protocol-machine or choreography actions. | [Choreography Effect Handlers](301_effect_handlers.md), [Effect Handlers and Session Types](303_effect_session_bridge.md) |
-| theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](701_lean_verification.md), [Capability and Admission](602_capability_admission.md) |
+| theorem-pack | Lean-exported capability inventory used by runtime admission gates. | [Lean Verification](701_lean_verification.md), [Capability Admission](602_capability_admission.md) |
 | capability taxonomy | The four first-class protocol-critical capability classes: admission, ownership, evidence, transition. | [Capability Model](601_capability_model.md), [Authority Language Surface](604_authority_language_surface.md) |
-| admission | Runtime gate process that checks contracts and capability evidence. | [Capability and Admission](602_capability_admission.md) |
+| admission | Runtime gate process that checks contracts and capability evidence. | [Capability Admission](602_capability_admission.md) |
 | ownership capability | Runtime host authority token carrying owner label, generation, and scope. | [Effect Handlers and Session Types](303_effect_session_bridge.md), [Session Lifecycle](403_session_lifecycle.md) |
 | evidence | Typed proof object or witness consumed by protocol-critical authority flow. | [Authority Language Surface](604_authority_language_surface.md) |
 | receipt | Single-use transfer or handoff proof emitted by an explicit ownership/delegation path. | [Session Lifecycle](403_session_lifecycle.md), [Authority Language Surface](604_authority_language_surface.md) |

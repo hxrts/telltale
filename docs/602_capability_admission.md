@@ -1,4 +1,4 @@
-# Capability and Admission
+# Capability Admission
 
 This document defines the capability gates that control runtime admission and profile selection.
 

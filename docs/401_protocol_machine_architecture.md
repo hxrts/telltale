@@ -336,8 +336,8 @@ Release conformance surfaces are exported through theorem-pack APIs and enforced
 
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
 - [Session Lifecycle](403_session_lifecycle.md)
-- [Protocol-Machine Simulation](501_simulation_overview.md)
+- [Simulation Overview](501_simulation_overview.md)
 - [Rust-Lean Bridge and Parity](703_rust_lean_parity.md)
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Lean Verification](701_lean_verification.md)
-- [Capability and Admission](602_capability_admission.md)
+- [Capability Admission](602_capability_admission.md)
