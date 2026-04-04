@@ -202,16 +202,41 @@ impl LinkAdmissionModel for FakeAdmissionModel {
     }
 }
 
-struct FakeEnvironmentAdapter {
+struct RejectingAdmissionModel;
+
+impl LinkAdmissionModel for RejectingAdmissionModel {
+    fn evaluate_links(
+        &self,
+        snapshot: &EnvironmentSnapshot,
+        reachability: &[PotentialLink],
+        _capabilities: &BTreeMap<String, NodeCapabilityState>,
+    ) -> Result<Vec<LinkAdmissionDecision>, String> {
+        if reachability
+            .iter()
+            .any(|link| link.from == "A" && link.to == "B")
+        {
+            return Err(format!(
+                "unsupported relationship at tick {} for reachability-derived admission state",
+                snapshot.tick
+            ));
+        }
+        Ok(Vec::new())
+    }
+}
+
+struct FakeEnvironmentAdapter<A> {
     handler: PassthroughHandler,
     topology: FakeTopologyModel,
     medium: FakeMediumModel,
     mobility: FakeMobilityModel,
     node_capabilities: FakeNodeCapabilityModel,
-    admission: FakeAdmissionModel,
+    admission: A,
 }
 
-impl HostAdapter for FakeEnvironmentAdapter {
+impl<A> HostAdapter for FakeEnvironmentAdapter<A>
+where
+    A: LinkAdmissionModel,
+{
     fn effect_handler(&self) -> &dyn EffectHandler {
         &self.handler
     }
@@ -355,4 +380,27 @@ fn composed_environment_models_are_deterministic_for_same_seed_and_snapshot() {
         second.replay.semantic_objects
     );
     assert_eq!(first.analysis, second.analysis);
+}
+
+#[test]
+fn environment_models_fail_closed_on_unsupported_relationships() {
+    let (global_type, local_types) = finite_protocol();
+    let spec = HarnessSpec::new(local_types, global_type, scenario_without_builtin_field());
+    let adapter = FakeEnvironmentAdapter {
+        handler: PassthroughHandler,
+        topology: FakeTopologyModel,
+        medium: FakeMediumModel,
+        mobility: FakeMobilityModel,
+        node_capabilities: FakeNodeCapabilityModel,
+        admission: RejectingAdmissionModel,
+    };
+    let harness = SimulationHarness::new(&adapter);
+
+    let error = harness
+        .run(&spec)
+        .expect_err("unsupported environment state must fail closed");
+    assert!(
+        error.contains("unsupported relationship at tick"),
+        "environment failures should surface structured generic diagnostics, got `{error}`",
+    );
 }

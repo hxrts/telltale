@@ -2,6 +2,11 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::scenario::{
+    ResolvedTheoremProfile, TheoremAssumptionBundle, TheoremEligibility, TheoremEnvelopeProfile,
+    TheoremSchedulerProfile,
+};
+use serde::{Deserialize, Serialize};
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::runtime::loader::CodeImage;
@@ -9,12 +14,52 @@ use telltale_machine::runtime::runner::NestedProtocolMachineHandler;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 /// Explicit outer/inner execution contract for nested VM simulation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NestedExecutionContract {
     /// Scheduler lane width for the outer protocol machine.
     pub outer_scheduler_concurrency: usize,
     /// Number of inner protocol-machine rounds attempted per outer handler callback.
     pub inner_rounds_per_step: usize,
+}
+
+/// Explicit execution-regime classification for nested distributed simulations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DistributedExecutionRegime {
+    /// Nested distributed execution is currently an observed-only integration lane.
+    NestedObserved,
+}
+
+/// Classification manifest for one distributed simulation instance.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DistributedRunManifest {
+    /// Stable site names participating in the nested simulation.
+    pub sites: Vec<String>,
+    /// Nested execution contract used by the outer and inner machines.
+    pub execution_contract: NestedExecutionContract,
+    /// Execution-regime classification for this distributed lane.
+    pub execution_regime: DistributedExecutionRegime,
+    /// Theorem/profile classification exported for manifest consistency.
+    pub theorem_profile: ResolvedTheoremProfile,
+}
+
+fn distributed_theorem_profile(contract: NestedExecutionContract) -> ResolvedTheoremProfile {
+    let scheduler_profile = if contract.outer_scheduler_concurrency <= 1 {
+        TheoremSchedulerProfile::CanonicalExact
+    } else {
+        TheoremSchedulerProfile::ThreadedEnvelope
+    };
+
+    ResolvedTheoremProfile {
+        scheduler_profile,
+        envelope_profile: TheoremEnvelopeProfile::None,
+        assumption_bundle: TheoremAssumptionBundle::ObservedTransport,
+        eligibility: TheoremEligibility::Ineligible,
+        eligibility_reason: Some(
+            "nested distributed execution is currently classified as observed-only and does not map to a theorem-backed scenario execution regime"
+                .to_string(),
+        ),
+    }
 }
 
 impl Default for NestedExecutionContract {
@@ -109,8 +154,10 @@ impl DistributedSimBuilder {
 
         let mut nested = NestedProtocolMachineHandler::new()
             .with_rounds_per_step(self.execution_contract.inner_rounds_per_step);
+        let mut manifest_sites = Vec::new();
 
         for (site, protocols) in self.sites {
+            manifest_sites.push(site.clone());
             let mut inner_vm = ProtocolMachine::new(config.clone());
             for image in protocols {
                 inner_vm
@@ -125,6 +172,7 @@ impl DistributedSimBuilder {
             outer_vm,
             handler: nested,
             execution_contract: self.execution_contract,
+            site_names: manifest_sites,
         })
     }
 }
@@ -140,6 +188,7 @@ pub struct DistributedSimulation {
     outer_vm: ProtocolMachine,
     handler: NestedProtocolMachineHandler,
     execution_contract: NestedExecutionContract,
+    site_names: Vec<String>,
 }
 
 impl DistributedSimulation {
@@ -174,6 +223,19 @@ impl DistributedSimulation {
     #[must_use]
     pub fn execution_contract(&self) -> NestedExecutionContract {
         self.execution_contract
+    }
+
+    /// Stable manifest describing the distributed execution lane and classification.
+    #[must_use]
+    pub fn manifest(&self) -> DistributedRunManifest {
+        let mut sites = self.site_names.clone();
+        sites.sort();
+        DistributedRunManifest {
+            sites,
+            execution_contract: self.execution_contract,
+            execution_regime: DistributedExecutionRegime::NestedObserved,
+            theorem_profile: distributed_theorem_profile(self.execution_contract),
+        }
     }
 }
 

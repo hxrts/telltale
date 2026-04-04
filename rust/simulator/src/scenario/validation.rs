@@ -32,9 +32,16 @@ fn validate_roles(scenario: &Scenario) -> Result<BTreeSet<String>, String> {
 }
 
 fn validate_limits(scenario: &Scenario) -> Result<(), String> {
-    scenario.resolved_execution()?;
+    let execution = scenario.resolved_execution()?;
     if matches!(scenario.checkpoint_interval, Some(0)) {
         return Err("scenario.checkpoint_interval must be > 0 when set".to_string());
+    }
+    if scenario.checkpoint_interval.is_some()
+        && matches!(execution.backend, super::ResolvedExecutionBackend::Threaded)
+    {
+        return Err(
+            "scenario checkpoints currently require the canonical simulator backend".to_string(),
+        );
     }
     Ok(())
 }

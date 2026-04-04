@@ -9,7 +9,9 @@ use crate::decision::{
 };
 use crate::harness::{BatchConfig, HarnessSpec, HostAdapter, SimulationHarness};
 use crate::runner::{ScenarioResult, SchedulerProfileSummary};
-use crate::scenario::{ReconfigurationSpec, ResolvedTheoremProfile, TheoremSchedulerProfile};
+use crate::scenario::{
+    ExecutionRegime, ReconfigurationSpec, ResolvedTheoremProfile, TheoremSchedulerProfile,
+};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SweepConfig {
@@ -61,6 +63,7 @@ pub struct SweepManifestEntry {
     pub input_index: usize,
     pub scenario_name: String,
     pub bindings: Vec<SweepBinding>,
+    pub execution_regime: Option<ExecutionRegime>,
     pub theorem_profile: Option<ResolvedTheoremProfile>,
     pub scheduler_profile: Option<SchedulerProfileSummary>,
     pub theorem_eligibility: DecisionReport,
@@ -182,6 +185,17 @@ where
                     input_index: idx,
                     scenario_name: item.spec.scenario.name.clone(),
                     bindings: item.bindings.clone(),
+                    execution_regime: result
+                        .as_ref()
+                        .ok()
+                        .map(|run| run.stats.execution_regime)
+                        .or_else(|| {
+                            item.spec
+                                .scenario
+                                .resolved_execution()
+                                .ok()
+                                .map(|execution| execution.regime())
+                        }),
                     theorem_profile: result
                         .as_ref()
                         .ok()
@@ -435,6 +449,11 @@ budget = { total = 1, mode = "activation" }
         assert_eq!(first.manifest.runs.len(), 4);
         assert_eq!(first.manifest.runs[0].input_index, 0);
         assert_eq!(first.manifest.runs[3].input_index, 3);
+        assert!(first
+            .manifest
+            .runs
+            .iter()
+            .all(|entry| entry.execution_regime.is_some()));
     }
 
     #[test]

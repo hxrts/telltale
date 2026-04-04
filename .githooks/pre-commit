@@ -33,14 +33,21 @@ if [[ -n "${ignored_staged}" ]]; then
 fi
 echo -e "${GREEN}OK${NC}"
 
-# 1. Format check (fast)
+# 1. Format check (staged .rs files only)
 echo -n "Checking formatting... "
-if cargo fmt --all -- --check 2>/dev/null; then
-    echo -e "${GREEN}OK${NC}"
+staged_rs=$(git diff --cached --name-only --diff-filter=d | grep '\.rs$' || true)
+if [[ -z "$staged_rs" ]]; then
+    echo -e "${GREEN}OK${NC} (no Rust files staged)"
 else
-    echo -e "${RED}FAILED${NC}"
-    echo "Run 'cargo fmt --all' to fix formatting"
-    exit 1
+    fmt_failed=0
+    echo "$staged_rs" | xargs rustfmt --check 2>/dev/null || fmt_failed=1
+    if [[ $fmt_failed -eq 0 ]]; then
+        echo -e "${GREEN}OK${NC}"
+    else
+        echo -e "${RED}FAILED${NC}"
+        echo "Run 'cargo fmt --all' to fix formatting"
+        exit 1
+    fi
 fi
 
 # 2. Quick compile check

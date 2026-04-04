@@ -10,7 +10,7 @@ use telltale_types::{FixedQ32, GlobalType, LocalTypeR};
 use crate::analysis::NormalizedObservability;
 use crate::field::FieldSpec;
 use crate::runner::{run_with_scenario, ScenarioResult, SchedulerProfileSummary};
-use crate::scenario::{ResolvedTheoremProfile, Scenario, TheoremEligibility};
+use crate::scenario::{ExecutionRegime, ResolvedTheoremProfile, Scenario, TheoremEligibility};
 use crate::trace::Trace;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -48,6 +48,7 @@ pub enum ApproximationAdmissibility {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ApproximationManifest {
     pub scenario_name: String,
+    pub execution_regime: ExecutionRegime,
     pub family: ApproximationFamily,
     pub scope: ApproximationScope,
     pub non_goals: Vec<String>,
@@ -96,6 +97,7 @@ pub fn run_approximation(
     Ok(ApproximationArtifact {
         manifest: ApproximationManifest {
             scenario_name: scenario.name.clone(),
+            execution_regime: exact.stats.execution_regime,
             family: approximation.family,
             scope: approximation.scope,
             non_goals: approximation.non_goals.clone(),
@@ -363,6 +365,10 @@ step_size = "0.01"
         assert_eq!(first.manifest, second.manifest);
         assert_eq!(first.trace.records, second.trace.records);
         assert_eq!(
+            first.manifest.execution_regime,
+            ExecutionRegime::CanonicalExact
+        );
+        assert_eq!(
             first.manifest.admissibility,
             ApproximationAdmissibility::TheoremBacked
         );
@@ -400,5 +406,97 @@ step_size = "0.01"
             .per_role_final_l1_error
             .values()
             .all(|error| *error == FixedQ32::zero()));
+    }
+
+    #[test]
+    fn approximation_admissibility_fails_closed_for_mismatched_or_empirical_regimes() {
+        let scenario = mean_field_scenario();
+        let theorem_profile = scenario
+            .resolved_theorem_profile()
+            .expect("resolve theorem profile");
+
+        let mismatch = approximation_admissibility(
+            &ApproximationSpec {
+                family: ApproximationFamily::ContinuumField,
+                scope: ApproximationScope::ContinuumLimit,
+                non_goals: Vec::new(),
+            },
+            &scenario,
+            &theorem_profile,
+        );
+        assert_eq!(
+            mismatch,
+            (
+                ApproximationAdmissibility::Unsupported,
+                Some(
+                    "scenario field layer does not match the selected approximation family"
+                        .to_string()
+                ),
+            )
+        );
+
+        let empirical = approximation_admissibility(
+            &ApproximationSpec {
+                family: ApproximationFamily::MeanField,
+                scope: ApproximationScope::EmpiricalOnly,
+                non_goals: Vec::new(),
+            },
+            &scenario,
+            &theorem_profile,
+        );
+        assert_eq!(empirical, (ApproximationAdmissibility::EmpiricalOnly, None));
+
+        let ineligible_scenario = Scenario::parse(
+            r#"
+name = "approximation_ineligible"
+roles = ["A", "B"]
+steps = 4
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[theorem]
+assumption_bundle = "fault_free_transport"
+
+[network]
+base_latency_ms = 1
+latency_variance = "0.0"
+loss_probability = "0.0"
+
+[field]
+layer = "mean_field"
+
+[field.params]
+beta = "1.0"
+species = ["up", "down"]
+initial_state = ["0.5", "0.5"]
+step_size = "0.01"
+"#,
+        )
+        .expect("parse approximation-ineligible scenario");
+        let ineligible_profile = ineligible_scenario
+            .resolved_theorem_profile()
+            .expect("resolve ineligible theorem profile");
+        let ineligible = approximation_admissibility(
+            &ApproximationSpec {
+                family: ApproximationFamily::MeanField,
+                scope: ApproximationScope::MeanFieldLimit,
+                non_goals: Vec::new(),
+            },
+            &ineligible_scenario,
+            &ineligible_profile,
+        );
+        assert_eq!(
+            ineligible,
+            (
+                ApproximationAdmissibility::Unsupported,
+                Some(
+                    "theorem profile is ineligible for the selected approximation scope"
+                        .to_string()
+                ),
+            )
+        );
     }
 }

@@ -13,7 +13,7 @@ use crate::contracts::{assert_contracts, ContractCheckConfig};
 use crate::environment::EnvironmentModels;
 use crate::field::FieldModel;
 use crate::runner::{run_with_scenario_and_environment, ScenarioResult};
-use crate::scenario::{ResolvedTheoremProfile, Scenario};
+use crate::scenario::{ExecutionRegime, ResolvedTheoremProfile, Scenario};
 use crate::sweep::{run_sweep, SweepConfig, SweepRunResult};
 use crate::EffectHandler;
 
@@ -206,6 +206,8 @@ pub struct BatchRunManifest {
 pub struct BatchRunManifestEntry {
     /// Scenario name.
     pub scenario_name: String,
+    /// Resolved execution regime when execution resolution succeeded.
+    pub execution_regime: Option<ExecutionRegime>,
     /// Resolved theorem/profile data when execution resolution succeeded.
     pub theorem_profile: Option<ResolvedTheoremProfile>,
     /// Resolution error when execution settings could not be resolved.
@@ -383,11 +385,13 @@ fn build_batch_manifest(specs: &[HarnessSpec], parallelism: usize) -> BatchRunMa
             .map(|spec| match spec.scenario.resolved_execution() {
                 Ok(execution) => BatchRunManifestEntry {
                     scenario_name: spec.scenario.name.clone(),
+                    execution_regime: Some(execution.regime()),
                     theorem_profile: Some(spec.scenario.resolve_theorem_profile_for(&execution)),
                     theorem_profile_error: None,
                 },
                 Err(error) => BatchRunManifestEntry {
                     scenario_name: spec.scenario.name.clone(),
+                    execution_regime: None,
                     theorem_profile: None,
                     theorem_profile_error: Some(error),
                 },
@@ -715,11 +719,19 @@ mod tests {
             &first.stats.theorem_profile
         );
         assert_eq!(
+            batch.manifest.runs[0].execution_regime,
+            Some(first.stats.execution_regime)
+        );
+        assert_eq!(
             batch.manifest.runs[1]
                 .theorem_profile
                 .as_ref()
                 .expect("second theorem profile"),
             &second.stats.theorem_profile
+        );
+        assert_eq!(
+            batch.manifest.runs[1].execution_regime,
+            Some(second.stats.execution_regime)
         );
     }
 }

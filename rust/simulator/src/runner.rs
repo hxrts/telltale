@@ -33,8 +33,8 @@ use crate::harness::derive_initial_states;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
 use crate::reconfiguration::{ReconfigurationRecord, ReconfigurationSummary};
 use crate::scenario::{
-    ExecutionRegime, ResolvedExecutionBackend, ResolvedSchedulerPolicy, ResolvedTheoremProfile,
-    Scenario,
+    ExecutionBackend, ExecutionRegime, ExecutionSpec, ResolvedExecutionBackend,
+    ResolvedSchedulerPolicy, ResolvedTheoremProfile, Scenario,
 };
 use crate::trace::{StepRecord, Trace};
 use crate::value_conv::{f64s_to_values, registers_to_f64s};
@@ -766,6 +766,42 @@ pub fn run_with_scenario(
         handler,
         None,
     )
+}
+
+/// Build the authoritative canonical replay variant of a scenario.
+///
+/// This disables checkpoint emission and forces the canonical serialized execution lane
+/// used for replay, debugging, and exact artifact reproduction.
+#[must_use]
+pub fn canonical_replay_scenario(scenario: &Scenario) -> Scenario {
+    let mut replay = scenario.clone();
+    replay.execution = ExecutionSpec {
+        backend: ExecutionBackend::Canonical,
+        scheduler_policy: replay.execution.scheduler_policy,
+        scheduler_concurrency: Some(1),
+        worker_threads: Some(1),
+    };
+    replay.checkpoint_interval = None;
+    replay
+}
+
+/// Re-run a scenario through the authoritative canonical replay lane.
+///
+/// This is the public replay surface for reproducing exact simulator artifacts under the
+/// canonical backend, even when the original scenario was executed under a different exact lane.
+///
+/// # Errors
+///
+/// Returns an error if the canonical replay run fails.
+pub fn run_canonical_replay(
+    local_types: &BTreeMap<String, LocalTypeR>,
+    global_type: &GlobalType,
+    initial_states: &BTreeMap<String, Vec<FixedQ32>>,
+    scenario: &Scenario,
+    handler: &dyn EffectHandler,
+) -> Result<ScenarioResult, String> {
+    let replay = canonical_replay_scenario(scenario);
+    run_with_scenario(local_types, global_type, initial_states, &replay, handler)
 }
 
 fn execute_loaded_scenario_machine(

@@ -440,3 +440,93 @@ fn core_scenario_schema_remains_domain_neutral() {
         );
     }
 }
+
+#[test]
+fn invalid_execution_combinations_fail_closed_with_stable_reasons() {
+    let cases = [
+        (
+            "canonical_parallelism_rejected",
+            r#"
+name = "canonical_parallelism_rejected"
+roles = ["A", "B"]
+steps = 1
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 2
+worker_threads = 1
+"#,
+            "canonical simulator backend requires scheduler_concurrency = 1 and worker_threads = 1",
+        ),
+        (
+            "canonical_workers_rejected",
+            r#"
+name = "canonical_workers_rejected"
+roles = ["A", "B"]
+steps = 1
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 2
+"#,
+            "canonical simulator backend requires scheduler_concurrency = 1 and worker_threads = 1",
+        ),
+        (
+            "threaded_checkpoint_rejected",
+            r#"
+name = "threaded_checkpoint_rejected"
+roles = ["A", "B"]
+steps = 1
+checkpoint_interval = 1
+
+[execution]
+backend = "threaded"
+scheduler_concurrency = 1
+worker_threads = 2
+"#,
+            "scenario checkpoints currently require the canonical simulator backend",
+        ),
+        (
+            "exact_envelope_overclaim_rejected",
+            r#"
+name = "exact_envelope_overclaim_rejected"
+roles = ["A", "B"]
+steps = 1
+
+[execution]
+backend = "threaded"
+scheduler_concurrency = 2
+worker_threads = 2
+
+[theorem]
+envelope_profile = "exact"
+"#,
+            "envelope profile exact requires an exact execution regime",
+        ),
+    ];
+
+    for (name, source, expected) in cases {
+        if name == "exact_envelope_overclaim_rejected" {
+            let scenario =
+                Scenario::parse(source).expect("ineligible theorem profile should still parse");
+            let theorem = scenario
+                .resolved_theorem_profile()
+                .expect("resolve theorem profile");
+            assert_eq!(theorem.eligibility, TheoremEligibility::Ineligible);
+            assert!(
+                theorem
+                    .eligibility_reason
+                    .as_deref()
+                    .is_some_and(|reason| reason.contains(expected)),
+                "case `{name}` should report stable theorem ineligibility reason",
+            );
+        } else {
+            let error = Scenario::parse(source).unwrap_err();
+            assert!(
+                error.contains(expected),
+                "case `{name}` should fail closed with reason containing `{expected}`, got `{error}`",
+            );
+        }
+    }
+}

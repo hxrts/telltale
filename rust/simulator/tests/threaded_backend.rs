@@ -7,6 +7,9 @@ use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
+use telltale_simulator::contracts::{evaluate_contracts, ContractCheckConfig};
+use telltale_simulator::decision::theorem_eligibility_from_result;
+use telltale_simulator::run_canonical_replay;
 use telltale_simulator::runner::run_with_scenario;
 use telltale_simulator::scenario::{ExecutionRegime, ResolvedExecutionBackend, Scenario};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -260,4 +263,38 @@ fn threaded_backend_is_worker_count_invariant_for_middleware_active_exact_runs()
     .expect("threaded run with four workers");
 
     assert_authoritative_equivalence(&result2, &result4);
+}
+
+#[test]
+fn threaded_exact_runs_replay_through_the_canonical_lane() {
+    let (global, local_types) = simple_protocol();
+    let threaded = middleware_active_scenario("threaded_phase19_replay", "threaded", 1, 3);
+
+    let exact = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &threaded,
+        &PassthroughHandler,
+    )
+    .expect("threaded exact run");
+    let replayed = run_canonical_replay(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &threaded,
+        &PassthroughHandler,
+    )
+    .expect("canonical replay run");
+
+    assert_authoritative_equivalence(&exact, &replayed);
+    assert_eq!(
+        evaluate_contracts(&exact, &ContractCheckConfig::default()),
+        evaluate_contracts(&replayed, &ContractCheckConfig::default())
+    );
+    assert_eq!(
+        theorem_eligibility_from_result(&exact),
+        theorem_eligibility_from_result(&replayed),
+        "threaded exact replay should preserve theorem eligibility under the canonical lane"
+    );
 }

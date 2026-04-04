@@ -465,3 +465,72 @@ fn distributed_harness_replays_identical_semantic_outcomes_for_identical_inputs(
         "site B semantic objects should replay identically"
     );
 }
+
+#[test]
+fn nested_execution_contract_variation_preserves_per_site_authoritative_results() {
+    let (inner_global, inner_locals) = simple_protocol("A", "B", "msg");
+    let inner_image = CodeImage::from_local_types(&inner_locals, &inner_global);
+
+    let (outer_global, outer_locals) = outer_loop_protocol("site_A", "site_B", "tick");
+    let outer_image = CodeImage::from_local_types(&outer_locals, &outer_global);
+
+    let run_once = |contract| {
+        let builder = DistributedSimBuilder::new()
+            .add_site("site_A", vec![inner_image.clone()])
+            .add_site("site_B", vec![inner_image.clone()])
+            .inter_site(outer_image.clone())
+            .execution_contract(contract);
+
+        let mut sim = builder
+            .build_with(&ProtocolMachineConfig::default(), |_| Box::new(NoOpHandler))
+            .expect("build distributed sim");
+        sim.run(50).expect("run outer machine");
+
+        (
+            normalized_pairs(&sim.handler().site_trace("site_A").expect("site A trace")),
+            normalized_pairs(&sim.handler().site_trace("site_B").expect("site B trace")),
+            sim.handler()
+                .site_semantic_objects("site_A")
+                .expect("site A semantic objects"),
+            sim.handler()
+                .site_semantic_objects("site_B")
+                .expect("site B semantic objects"),
+            sim.manifest(),
+        )
+    };
+
+    let serial = run_once(NestedExecutionContract {
+        outer_scheduler_concurrency: 1,
+        inner_rounds_per_step: 1,
+    });
+    let grouped = run_once(NestedExecutionContract {
+        outer_scheduler_concurrency: 2,
+        inner_rounds_per_step: 3,
+    });
+
+    assert_eq!(
+        serial.0, grouped.0,
+        "site A normalized trace must remain invariant"
+    );
+    assert_eq!(
+        serial.1, grouped.1,
+        "site B normalized trace must remain invariant"
+    );
+    assert_eq!(
+        serial.2, grouped.2,
+        "site A semantic objects must remain invariant under nested scheduling changes"
+    );
+    assert_eq!(
+        serial.3, grouped.3,
+        "site B semantic objects must remain invariant under nested scheduling changes"
+    );
+    assert_eq!(serial.4.execution_regime, grouped.4.execution_regime);
+    assert_eq!(
+        serial.4.theorem_profile.assumption_bundle,
+        grouped.4.theorem_profile.assumption_bundle
+    );
+    assert_eq!(
+        serial.4.theorem_profile.eligibility,
+        grouped.4.theorem_profile.eligibility
+    );
+}
