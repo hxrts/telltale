@@ -59,10 +59,10 @@ assert_contracts(&result, &ContractCheckConfig::default())?;
 This path runs protocol-machine execution, scenario middleware, replay capture, and post-run contract checks.
 It is the recommended integration lane for external projects.
 
-Use `DirectAdapter` when the host already owns the `EffectHandler`.
-Use `FieldAdapter::from_scenario(...)` when built-in scenario field parameters should construct the handler and initial states.
-Use `FieldAdapter::new(...)` or `FieldAdapter::from_boxed_model(...)` when a Rust integration wants to supply a custom `FieldModel`.
-If the host adapter supplies initial states directly, the base `Scenario` does not need built-in field params at all.
+`DirectAdapter` is for hosts that already own the `EffectHandler`.
+`FieldAdapter::from_scenario(...)` constructs the handler and initial states from built-in scenario field parameters.
+`FieldAdapter::new(...)` and `FieldAdapter::from_boxed_model(...)` accept a custom `FieldModel` from the host integration.
+If the host adapter supplies initial states directly, the `Scenario` does not need built-in field params at all.
 
 ### Batch and Sweep Execution
 

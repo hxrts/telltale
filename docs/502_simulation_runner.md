@@ -51,24 +51,14 @@ Use `run_with_scenario(...)` when budgeted adversaries, network behavior, proper
 Use the smaller entry points when only sampled state traces are needed.
 
 `run_with_scenario(...)` resolves execution through `Scenario.execution`.
-That resolution decides:
+That resolution selects the machine backend, scheduler policy, scheduler lane count, and worker thread count.
+`Scenario.execution.backend = "auto"` resolves to the authoritative canonical backend with `scheduler_concurrency = 1` and `worker_threads = 1` unless the scenario explicitly requests a different backend.
 
-- which machine backend to use
-- which scheduler policy the protocol machine runs under
-- how many scheduler lanes one round may use
-- how many worker threads the threaded backend may use
+`ScenarioStats.execution_regime` records the proof-side concurrency class for the resolved run.
+`canonical_exact` means single-step cooperative execution. `threaded_exact` means threaded execution at concurrency 1, which is theorem-equal to canonical. `threaded_envelope_bounded` means threaded execution at concurrency greater than 1, which is only authoritative modulo the declared envelope.
 
-`Scenario.execution.backend = "auto"` now resolves to the authoritative canonical backend.
-That means `scheduler_concurrency = 1` and `worker_threads = 1` unless the scenario explicitly requests a different backend.
-
-`ScenarioStats.execution_regime` records the proof-side concurrency class for the resolved run:
-
-- `canonical_exact`
-- `threaded_exact`
-- `threaded_envelope_bounded`
-
-`scheduler_concurrency` may change semantics.
-`worker_threads` must not change authoritative outputs for a fixed threaded scheduler configuration.
+Changing `scheduler_concurrency` may change semantics.
+Changing `worker_threads` must not change authoritative outputs for a fixed threaded scheduler configuration.
 
 ### Theorem Profile
 
@@ -103,20 +93,11 @@ The same theorem-eligibility witness format is available both offline and from a
 Approximation runs are now explicit and separate from `ScenarioResult`.
 Use `run_approximation(...)` with an `ApproximationSpec` when the caller wants a non-authoritative artifact for `batched_stochastic`, `mean_field`, or `continuum_field` analysis.
 
-Approximation artifacts retain:
-
-- an `ApproximationManifest`
-- the sampled state `Trace`
-- `NormalizedObservability`
-- shared observables such as final per-role states and productive-step counts
-
+Approximation artifacts retain an `ApproximationManifest`, the sampled state `Trace`, `NormalizedObservability`, and shared observables such as final per-role states and productive-step counts.
 They intentionally do not pretend to be canonical replay artifacts.
-Instead the manifest declares:
 
-- the approximation family
-- the theorem-side scope
-- explicit non-goals
-- whether the approximation is theorem-backed, empirical-only, or unsupported for this scenario/profile pair
+The manifest declares the approximation family, theorem-side scope, explicit non-goals, and whether the approximation is theorem-backed, empirical-only, or unsupported for the given scenario and profile pair.
+This distinction prevents accidental use of approximate results where authoritative replay is required.
 
 Use `compare_exact_and_approximate(...)` to compare an authoritative `ScenarioResult` against one approximation artifact.
 That report compares normalized observability, productive-step counts, and final-state error without blurring the authoritative replay lane.

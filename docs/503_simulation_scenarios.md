@@ -191,9 +191,7 @@ Loss is evaluated before latency scheduling.
 Dropped messages never enter the in-flight queue.
 Zero effective latency produces immediate delivery.
 
-Use `network` for baseline transport parameters.
-Use `reconfigurations` for topology/federation/link cutovers.
-Use `adversaries` for budgeted disturbances and theorem-facing assumption diagnostics.
+The three middleware surfaces serve distinct purposes: `network` defines baseline transport parameters, `reconfigurations` handles topology and federation cutovers, and `adversaries` injects budgeted disturbances with theorem-facing assumption diagnostics.
 
 ## Property Monitoring
 

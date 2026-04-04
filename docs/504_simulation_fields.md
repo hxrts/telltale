@@ -9,11 +9,7 @@ The field layer is responsible for evolving shared fields, latent environment st
 It does not by itself decide topology, medium contention, mobility, or admission.
 
 The simulator-facing Rust abstraction is `FieldModel` in `rust/simulator/src/field.rs`.
-A `FieldModel` supplies:
-
-- a stable layer name
-- a `Box<dyn EffectHandler>` via `build_handler()`
-- default per-role initial states via `derive_initial_states(roles)`
+A `FieldModel` supplies a stable layer name, an `EffectHandler` via `build_handler()`, and default per-role initial states via `derive_initial_states(roles)`.
 
 The built-in scenario schema uses the serde-tagged `FieldSpec` catalog through `Scenario.field`.
 Current built-in families are `mean_field`, `hamiltonian`, and `continuum_field`.
@@ -30,13 +26,7 @@ The runner stores field state in coroutine registers starting at register `2`.
 ## Environment Boundary
 
 External projects should extend the simulator through the domain-neutral environment hooks in `rust/simulator/src/environment.rs`.
-The shared execution core now accepts:
-
-- `TopologyModel`
-- `MediumModel`
-- `MobilityModel`
-- `NodeCapabilityModel`
-- `LinkAdmissionModel`
+The shared execution core accepts five external model traits: `TopologyModel` for graph structure and reachability, `MediumModel` for link-level delay/loss/collision behavior, `MobilityModel` for node position updates, `NodeCapabilityModel` for per-node resource or radio constraints, and `LinkAdmissionModel` for connection-level admission decisions.
 
 These hooks all receive the same `EnvironmentSnapshot` each round.
 That snapshot exposes current tick, logical step, participating roles, field-backed node state, node poses, node capabilities, and potential links.
