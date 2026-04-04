@@ -1,6 +1,6 @@
 [package]
 name = "telltale-simulator"
-version = "10.0.0"
+version = "11.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -20,9 +20,9 @@ wasm = ["getrandom/js", "telltale-machine/wasm"]
 multi-thread = ["telltale-machine/multi-thread"]
 
 [dependencies]
-telltale-types = { path = "../types", version = "10.0.0" }
-telltale-machine = { path = "../machine", version = "10.0.0" }
-telltale-theory = { path = "../theory", version = "10.0.0" }
+telltale-types = { path = "../types", version = "11.0.0" }
+telltale-machine = { path = "../machine", version = "11.0.0" }
+telltale-theory = { path = "../theory", version = "11.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 toml = { workspace = true }
