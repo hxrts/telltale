@@ -809,14 +809,14 @@ fn execute_loaded_scenario_machine(
     handler: &dyn EffectHandler,
     environment_models: Option<EnvironmentModels<'_>>,
     mut machine: SimulationMachine,
-    coro_info: CoroInfo,
-    resolved_execution: crate::scenario::ResolvedExecution,
+    coro_info: &CoroInfo,
+    resolved_execution: &crate::scenario::ResolvedExecution,
     theorem_profile: ResolvedTheoremProfile,
     rounds_to_run: u64,
     middleware_checkpoint: Option<&ScenarioMiddlewareCheckpoint>,
 ) -> Result<ScenarioResult, String> {
     let initial_session_snapshots = machine.session_snapshots();
-    let initial_role_state = current_role_state(&machine, &coro_info);
+    let initial_role_state = current_role_state(&machine, coro_info);
 
     let mut trace = Trace::new();
     let steps_limit = usize::try_from(rounds_to_run.saturating_add(1))
@@ -832,7 +832,7 @@ fn execute_loaded_scenario_machine(
     let mut checkpoint_states: Vec<(u64, ScenarioMiddlewareCheckpoint)> = Vec::new();
 
     if steps_limit > 0 {
-        record_all_roles(&machine, &coro_info, 0, &mut trace);
+        record_all_roles(&machine, coro_info, 0, &mut trace);
         step_idx = 1;
     }
 
@@ -876,12 +876,12 @@ fn execute_loaded_scenario_machine(
                 return Ok(());
             }
 
-            record_all_roles(machine, &coro_info, step_idx, &mut trace);
+            record_all_roles(machine, coro_info, step_idx, &mut trace);
             step_idx += 1;
 
             if environment.is_active() {
                 let current_tick = machine.clock().tick;
-                let current_role_state = current_role_state(machine, &coro_info);
+                let current_role_state = current_role_state(machine, coro_info);
                 environment.begin_round(current_tick, completed_rounds, current_role_state)?;
                 let transmissions =
                     transmissions_at_tick(machine.trace(), current_tick, completed_rounds);
@@ -916,7 +916,7 @@ fn execute_loaded_scenario_machine(
 
     if trace.records.is_empty() {
         let fallback_step = steps_limit.saturating_sub(1);
-        record_all_roles(&machine, &coro_info, fallback_step, &mut trace);
+        record_all_roles(&machine, coro_info, fallback_step, &mut trace);
     }
 
     let obs_trace = machine.trace().to_vec();
@@ -1057,7 +1057,7 @@ pub fn resume_with_scenario_from_checkpoint(
         rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &machine));
     let coro_info: CoroInfo = machine
         .coroutines()
-        .into_iter()
+        .iter()
         .map(|coro| (coro.id, coro.role.clone()))
         .collect();
     execute_loaded_scenario_machine(
@@ -1065,8 +1065,8 @@ pub fn resume_with_scenario_from_checkpoint(
         handler,
         environment_models,
         SimulationMachine::Canonical(machine),
-        coro_info,
-        resolved_execution,
+        &coro_info,
+        &resolved_execution,
         theorem_profile,
         rounds_to_run,
         None,
@@ -1102,7 +1102,7 @@ pub fn resume_with_checkpoint_artifact(
         rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &machine));
     let coro_info: CoroInfo = machine
         .coroutines()
-        .into_iter()
+        .iter()
         .map(|coro| (coro.id, coro.role.clone()))
         .collect();
     execute_loaded_scenario_machine(
@@ -1110,8 +1110,8 @@ pub fn resume_with_checkpoint_artifact(
         handler,
         environment_models,
         SimulationMachine::Canonical(machine),
-        coro_info,
-        resolved_execution,
+        &coro_info,
+        &resolved_execution,
         theorem_profile,
         rounds_to_run,
         checkpoint.middleware_state.as_ref(),
@@ -1167,8 +1167,8 @@ pub fn run_with_scenario_and_environment(
         handler,
         environment_models,
         machine,
-        coro_info,
-        resolved_execution,
+        &coro_info,
+        &resolved_execution,
         theorem_profile,
         scenario.steps.saturating_sub(1),
         None,

@@ -29,7 +29,7 @@ enum ScenarioTransportCheckpoint {
     Adversary(AdversaryCheckpointState),
     Network {
         network: NetworkCheckpointState,
-        adversary: AdversaryCheckpointState,
+        adversary: Box<AdversaryCheckpointState>,
     },
 }
 
@@ -210,7 +210,7 @@ impl<'a> ScenarioMiddleware<'a> {
             }
             ScenarioTransport::Network(net) => ScenarioTransportCheckpoint::Network {
                 network: net.checkpoint_state()?,
-                adversary: net.inner().checkpoint_state()?,
+                adversary: Box::new(net.inner().checkpoint_state()?),
             },
         };
         Ok(ScenarioMiddlewareCheckpoint {

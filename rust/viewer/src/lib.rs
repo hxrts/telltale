@@ -139,7 +139,7 @@ impl ViewerArtifactFile {
 #[serde(tag = "kind", content = "payload", rename_all = "snake_case")]
 pub enum ViewerArtifact {
     /// Full scenario-plus-result bundle.
-    ScenarioBundle(ScenarioBundleArtifact),
+    ScenarioBundle(Box<ScenarioBundleArtifact>),
     /// Standalone theorem/decision report.
     DecisionReport(DecisionReport),
     /// Standalone environment trace.
@@ -347,7 +347,7 @@ pub enum ViewerQueryResult {
         artifacts: Vec<ArtifactInventoryEntry>,
     },
     ArtifactFile {
-        artifact: ViewerArtifactFile,
+        artifact: Box<ViewerArtifactFile>,
     },
     ScenarioSummary {
         summary: ScenarioBundleSummary,
@@ -455,7 +455,7 @@ pub struct HistoricalInspectionState {
 pub enum ViewerCommand {
     ImportArtifact {
         artifact_id: ArtifactId,
-        artifact: ViewerArtifactFile,
+        artifact: Box<ViewerArtifactFile>,
     },
     CreateBranch {
         run_id: RunId,
@@ -570,7 +570,7 @@ pub enum ScenarioPatchOperation {
         theorem: TheoremProfileSpec,
     },
     ReplaceScenario {
-        scenario: Scenario,
+        scenario: Box<Scenario>,
     },
     UpsertExtension {
         namespace: String,
@@ -605,9 +605,20 @@ pub struct BranchLineageNode {
 /// Stable application-service trait shared by UI and shell layers.
 pub trait ViewerApplicationService {
     /// Execute one typed query.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ViewerModelError` when the requested artifact, run, or branch does not
+    /// exist, or when the query cannot be satisfied by the backing service.
     fn query(&self, query: ViewerQuery) -> Result<ViewerQueryResult, ViewerModelError>;
 
     /// Execute one typed command.
+    ///
+    /// # Errors
+    ///
+    /// Returns `ViewerModelError` when the target artifact, run, or branch does not
+    /// exist, when imported artifacts fail validation, or when the command cannot be
+    /// applied by the backing service.
     fn command(&mut self, command: ViewerCommand) -> Result<ViewerCommandResult, ViewerModelError>;
 }
 
@@ -660,7 +671,7 @@ impl InMemoryViewerService {
         let artifact_id = run.root_artifact_id.as_ref()?;
         let artifact = self.artifacts.get(artifact_id)?;
         match &artifact.artifact {
-            ViewerArtifact::ScenarioBundle(bundle) => Some(bundle),
+            ViewerArtifact::ScenarioBundle(bundle) => Some(bundle.as_ref()),
             _ => None,
         }
     }
@@ -774,7 +785,7 @@ impl InMemoryViewerService {
             .trace
             .records
             .iter()
-            .filter(|record| step_limit.is_none_or(|limit| record.step <= limit))
+            .filter(|record| step_limit.map_or(true, |limit| record.step <= limit))
             .collect::<Vec<_>>();
         let nodes = records
             .iter()
@@ -810,7 +821,7 @@ impl InMemoryViewerService {
             .trace
             .records
             .iter()
-            .filter(|record| step_limit.is_none_or(|limit| record.step <= limit))
+            .filter(|record| step_limit.map_or(true, |limit| record.step <= limit))
             .collect::<Vec<_>>();
         let nodes = records
             .iter()
@@ -832,163 +843,216 @@ impl InMemoryViewerService {
             .collect::<Vec<_>>();
         (nodes, edges)
     }
+
+    fn artifact_inventory(&self) -> Vec<ArtifactInventoryEntry> {
+        self.artifacts
+            .iter()
+            .map(|(artifact_id, artifact)| ArtifactInventoryEntry {
+                artifact_id: artifact_id.clone(),
+                kind: artifact.kind(),
+                label: format!("{artifact_id}: {:?}", artifact.kind()),
+            })
+            .collect()
+    }
+
+    fn load_artifact(&self, artifact_id: &str) -> Result<ViewerQueryResult, ViewerModelError> {
+        let artifact =
+            self.artifacts
+                .get(artifact_id)
+                .cloned()
+                .ok_or_else(|| ViewerModelError::NotFound {
+                    kind: "artifact".to_string(),
+                    id: artifact_id.to_string(),
+                })?;
+        Ok(ViewerQueryResult::ArtifactFile {
+            artifact: Box::new(artifact),
+        })
+    }
+
+    fn scenario_summary(
+        &self,
+        artifact_id: ArtifactId,
+    ) -> Result<ViewerQueryResult, ViewerModelError> {
+        let Some(ViewerArtifact::ScenarioBundle(bundle)) =
+            self.artifacts.get(&artifact_id).map(|file| &file.artifact)
+        else {
+            return Err(ViewerModelError::NotFound {
+                kind: "scenario_bundle".to_string(),
+                id: artifact_id,
+            });
+        };
+        Ok(ViewerQueryResult::ScenarioSummary {
+            summary: bundle.summary(),
+        })
+    }
+
+    fn branch_lineage(&self, run_id: RunId) -> Result<ViewerQueryResult, ViewerModelError> {
+        let run = self
+            .runs
+            .get(&run_id)
+            .ok_or_else(|| ViewerModelError::NotFound {
+                kind: "run".to_string(),
+                id: run_id.clone(),
+            })?;
+        Ok(ViewerQueryResult::BranchLineage {
+            lineage: BranchLineageProjection {
+                run_id,
+                branches: run
+                    .branches
+                    .iter()
+                    .map(|(branch_id, branch)| BranchLineageNode {
+                        branch_id: branch_id.clone(),
+                        parent_branch_id: branch.parent_branch_id.clone(),
+                        from_step: branch.from_step,
+                        deleted: branch.deleted,
+                        rerun_requested: branch.rerun_requested,
+                        patch_count: u64::try_from(branch.patches.len()).unwrap_or(u64::MAX),
+                    })
+                    .collect(),
+            },
+        })
+    }
+
+    fn graph_projection(
+        &self,
+        request: GraphProjectionRequest,
+    ) -> Result<ViewerQueryResult, ViewerModelError> {
+        let run = self
+            .runs
+            .get(&request.run_id)
+            .ok_or_else(|| ViewerModelError::NotFound {
+                kind: "run".to_string(),
+                id: request.run_id.clone(),
+            })?;
+        if !run.branches.contains_key(&request.branch_id) {
+            return Err(ViewerModelError::NotFound {
+                kind: "branch".to_string(),
+                id: request.branch_id,
+            });
+        }
+        Ok(ViewerQueryResult::GraphProjection {
+            projection: self.graph_projection_for_request(&request.run_id, &request, run),
+        })
+    }
+
+    fn search(&self, query: &SearchQuery) -> Result<ViewerQueryResult, ViewerModelError> {
+        let needle = query.text.to_lowercase();
+        let mut matches = Vec::new();
+        for (artifact_id, artifact) in &self.artifacts {
+            self.search_artifact_inventory_matches(
+                &mut matches,
+                artifact_id,
+                artifact,
+                &needle,
+                query.domain,
+            );
+            if let ViewerArtifact::ScenarioBundle(bundle) = &artifact.artifact {
+                self.search_bundle_matches(
+                    &mut matches,
+                    artifact_id,
+                    bundle,
+                    &needle,
+                    query.domain,
+                );
+            }
+        }
+        if query.domain.is_none() || query.domain == Some(SearchDomain::Branch) {
+            for (run_id, run) in &self.runs {
+                for (branch_id, branch) in &run.branches {
+                    if branch_id.to_lowercase().contains(&needle) {
+                        matches.push(SearchResult {
+                            artifact_id: run
+                                .root_artifact_id
+                                .clone()
+                                .unwrap_or_else(|| run_id.clone()),
+                            domain: SearchDomain::Branch,
+                            label: branch_id.clone(),
+                            detail: format!("from step {}", branch.from_step),
+                            branch_id: Some(branch_id.clone()),
+                            step: Some(branch.from_step),
+                        });
+                    }
+                }
+            }
+        }
+        Ok(ViewerQueryResult::SearchResults { matches })
+    }
+
+    fn search_artifact_inventory_matches(
+        &self,
+        matches: &mut Vec<SearchResult>,
+        artifact_id: &str,
+        artifact: &ViewerArtifactFile,
+        needle: &str,
+        domain: Option<SearchDomain>,
+    ) {
+        let kind_match = format!("{:?}", artifact.kind()).to_lowercase();
+        if (domain.is_none() || domain == Some(SearchDomain::Artifact))
+            && (artifact_id.to_lowercase().contains(needle) || kind_match.contains(needle))
+        {
+            matches.push(SearchResult {
+                artifact_id: artifact_id.to_string(),
+                domain: SearchDomain::Artifact,
+                label: artifact_id.to_string(),
+                detail: format!("{:?}", artifact.kind()),
+                branch_id: None,
+                step: None,
+            });
+        }
+    }
+
+    fn search_bundle_matches(
+        &self,
+        matches: &mut Vec<SearchResult>,
+        artifact_id: &str,
+        bundle: &ScenarioBundleArtifact,
+        needle: &str,
+        domain: Option<SearchDomain>,
+    ) {
+        if domain.is_none() || domain == Some(SearchDomain::Role) {
+            for role in bundle
+                .trace_roles()
+                .into_iter()
+                .filter(|role| role.to_lowercase().contains(needle))
+            {
+                matches.push(SearchResult {
+                    artifact_id: artifact_id.to_string(),
+                    domain: SearchDomain::Role,
+                    label: role.clone(),
+                    detail: "trace role".to_string(),
+                    branch_id: Some("root".to_string()),
+                    step: None,
+                });
+            }
+        }
+        if domain.is_none() || domain == Some(SearchDomain::Step) {
+            for record in &bundle.result.trace.records {
+                if record.role.to_lowercase().contains(needle) {
+                    matches.push(SearchResult {
+                        artifact_id: artifact_id.to_string(),
+                        domain: SearchDomain::Step,
+                        label: format!("step {}", record.step),
+                        detail: record.role.clone(),
+                        branch_id: Some("root".to_string()),
+                        step: Some(record.step),
+                    });
+                }
+            }
+        }
+    }
 }
 
 impl ViewerApplicationService for InMemoryViewerService {
     fn query(&self, query: ViewerQuery) -> Result<ViewerQueryResult, ViewerModelError> {
         match query {
             ViewerQuery::ListArtifacts => Ok(ViewerQueryResult::ArtifactInventory {
-                artifacts: self
-                    .artifacts
-                    .iter()
-                    .map(|(artifact_id, artifact)| ArtifactInventoryEntry {
-                        artifact_id: artifact_id.clone(),
-                        kind: artifact.kind(),
-                        label: format!("{artifact_id}: {:?}", artifact.kind()),
-                    })
-                    .collect(),
+                artifacts: self.artifact_inventory(),
             }),
-            ViewerQuery::LoadArtifact { artifact_id } => {
-                let artifact = self.artifacts.get(&artifact_id).cloned().ok_or_else(|| {
-                    ViewerModelError::NotFound {
-                        kind: "artifact".to_string(),
-                        id: artifact_id.clone(),
-                    }
-                })?;
-                Ok(ViewerQueryResult::ArtifactFile { artifact })
-            }
-            ViewerQuery::ScenarioSummary { artifact_id } => {
-                let Some(ViewerArtifact::ScenarioBundle(bundle)) =
-                    self.artifacts.get(&artifact_id).map(|file| &file.artifact)
-                else {
-                    return Err(ViewerModelError::NotFound {
-                        kind: "scenario_bundle".to_string(),
-                        id: artifact_id,
-                    });
-                };
-                Ok(ViewerQueryResult::ScenarioSummary {
-                    summary: bundle.summary(),
-                })
-            }
-            ViewerQuery::BranchLineage { run_id } => {
-                let run = self
-                    .runs
-                    .get(&run_id)
-                    .ok_or_else(|| ViewerModelError::NotFound {
-                        kind: "run".to_string(),
-                        id: run_id.clone(),
-                    })?;
-                Ok(ViewerQueryResult::BranchLineage {
-                    lineage: BranchLineageProjection {
-                        run_id,
-                        branches: run
-                            .branches
-                            .iter()
-                            .map(|(branch_id, branch)| BranchLineageNode {
-                                branch_id: branch_id.clone(),
-                                parent_branch_id: branch.parent_branch_id.clone(),
-                                from_step: branch.from_step,
-                                deleted: branch.deleted,
-                                rerun_requested: branch.rerun_requested,
-                                patch_count: u64::try_from(branch.patches.len())
-                                    .unwrap_or(u64::MAX),
-                            })
-                            .collect(),
-                    },
-                })
-            }
-            ViewerQuery::GraphProjection(request) => {
-                let run =
-                    self.runs
-                        .get(&request.run_id)
-                        .ok_or_else(|| ViewerModelError::NotFound {
-                            kind: "run".to_string(),
-                            id: request.run_id.clone(),
-                        })?;
-                if !run.branches.contains_key(&request.branch_id) {
-                    return Err(ViewerModelError::NotFound {
-                        kind: "branch".to_string(),
-                        id: request.branch_id,
-                    });
-                }
-                Ok(ViewerQueryResult::GraphProjection {
-                    projection: self.graph_projection_for_request(&request.run_id, &request, run),
-                })
-            }
-            ViewerQuery::Search(query) => {
-                let needle = query.text.to_lowercase();
-                let mut matches = Vec::new();
-                for (artifact_id, artifact) in &self.artifacts {
-                    let kind_match = format!("{:?}", artifact.kind()).to_lowercase();
-                    if query.domain.is_none() || query.domain == Some(SearchDomain::Artifact) {
-                        if artifact_id.to_lowercase().contains(&needle)
-                            || kind_match.contains(&needle)
-                        {
-                            matches.push(SearchResult {
-                                artifact_id: artifact_id.clone(),
-                                domain: SearchDomain::Artifact,
-                                label: artifact_id.clone(),
-                                detail: format!("{:?}", artifact.kind()),
-                                branch_id: None,
-                                step: None,
-                            });
-                        }
-                    }
-
-                    if let ViewerArtifact::ScenarioBundle(bundle) = &artifact.artifact {
-                        if query.domain.is_none() || query.domain == Some(SearchDomain::Role) {
-                            for role in bundle
-                                .trace_roles()
-                                .into_iter()
-                                .filter(|role| role.to_lowercase().contains(&needle))
-                            {
-                                matches.push(SearchResult {
-                                    artifact_id: artifact_id.clone(),
-                                    domain: SearchDomain::Role,
-                                    label: role.clone(),
-                                    detail: "trace role".to_string(),
-                                    branch_id: Some("root".to_string()),
-                                    step: None,
-                                });
-                            }
-                        }
-                        if query.domain.is_none() || query.domain == Some(SearchDomain::Step) {
-                            for record in &bundle.result.trace.records {
-                                if record.role.to_lowercase().contains(&needle) {
-                                    matches.push(SearchResult {
-                                        artifact_id: artifact_id.clone(),
-                                        domain: SearchDomain::Step,
-                                        label: format!("step {}", record.step),
-                                        detail: record.role.clone(),
-                                        branch_id: Some("root".to_string()),
-                                        step: Some(record.step),
-                                    });
-                                }
-                            }
-                        }
-                    }
-                }
-                if query.domain.is_none() || query.domain == Some(SearchDomain::Branch) {
-                    for (run_id, run) in &self.runs {
-                        for (branch_id, branch) in &run.branches {
-                            if branch_id.to_lowercase().contains(&needle) {
-                                matches.push(SearchResult {
-                                    artifact_id: run
-                                        .root_artifact_id
-                                        .clone()
-                                        .unwrap_or_else(|| run_id.clone()),
-                                    domain: SearchDomain::Branch,
-                                    label: branch_id.clone(),
-                                    detail: format!("from step {}", branch.from_step),
-                                    branch_id: Some(branch_id.clone()),
-                                    step: Some(branch.from_step),
-                                });
-                            }
-                        }
-                    }
-                }
-                Ok(ViewerQueryResult::SearchResults { matches })
-            }
+            ViewerQuery::LoadArtifact { artifact_id } => self.load_artifact(&artifact_id),
+            ViewerQuery::ScenarioSummary { artifact_id } => self.scenario_summary(artifact_id),
+            ViewerQuery::BranchLineage { run_id } => self.branch_lineage(run_id),
+            ViewerQuery::GraphProjection(request) => self.graph_projection(request),
+            ViewerQuery::Search(query) => self.search(&query),
             ViewerQuery::HistoricalInspection(state) => {
                 Ok(ViewerQueryResult::HistoricalInspection { state })
             }
@@ -1001,6 +1065,7 @@ impl ViewerApplicationService for InMemoryViewerService {
                 artifact_id,
                 artifact,
             } => {
+                let artifact = *artifact;
                 artifact.validate()?;
                 self.artifacts.insert(artifact_id.clone(), artifact.clone());
                 if matches!(artifact.artifact, ViewerArtifact::ScenarioBundle(_)) {
@@ -1247,9 +1312,9 @@ mod tests {
 
     #[test]
     fn viewer_artifact_file_round_trips_and_validates_version() {
-        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(
+        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
             ScenarioBundleArtifact::new(None, sample_result(), None),
-        ));
+        )));
         let file = NamedTempFile::new().expect("temp file");
         artifact.write_json(file.path()).expect("write artifact");
         let loaded = ViewerArtifactFile::load_json(file.path()).expect("load artifact");
@@ -1311,14 +1376,14 @@ mod tests {
 
     #[test]
     fn in_memory_service_supports_artifact_inventory_and_branch_commands() {
-        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(
+        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
             ScenarioBundleArtifact::new(None, sample_result(), None),
-        ));
+        )));
         let mut service = InMemoryViewerService::new();
         service
             .command(ViewerCommand::ImportArtifact {
                 artifact_id: "run/demo".to_string(),
-                artifact,
+                artifact: Box::new(artifact),
             })
             .expect("import artifact");
 
@@ -1374,14 +1439,14 @@ mod tests {
 
     #[test]
     fn branch_lineage_graph_projection_is_deterministic() {
-        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(
+        let artifact = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
             ScenarioBundleArtifact::new(None, sample_result(), None),
-        ));
+        )));
         let mut service = InMemoryViewerService::new();
         service
             .command(ViewerCommand::ImportArtifact {
                 artifact_id: "run/demo".to_string(),
-                artifact,
+                artifact: Box::new(artifact),
             })
             .expect("import artifact");
         service

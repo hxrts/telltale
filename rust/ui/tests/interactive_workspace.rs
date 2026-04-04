@@ -53,7 +53,7 @@ fn search_reload_and_bookmark_state_are_stable() {
     let workspace = demo_workspace();
     let mut state = InteractiveViewerState::from_workspace(workspace);
     state.set_page(ViewerPage::Graph);
-    state.search("alpha".to_string());
+    state.search("alpha");
     state.add_bookmark();
     state.reload_archive();
 

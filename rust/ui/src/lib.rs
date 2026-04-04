@@ -5,6 +5,7 @@
 //! `telltale-viewer`.
 
 #![allow(missing_docs)]
+#![allow(clippy::incompatible_msrv)]
 
 use dioxus::prelude::*;
 use std::collections::BTreeMap;
@@ -59,6 +60,7 @@ pub enum ViewerPage {
 }
 
 impl ViewerPage {
+    #[must_use]
     pub const fn label(self) -> &'static str {
         match self {
             Self::Overview => "Artifacts",
@@ -214,6 +216,12 @@ pub struct ViewerWorkspace {
 }
 
 #[observed_only]
+/// Load one deterministic viewer workspace from the typed viewer application service.
+///
+/// # Errors
+///
+/// Returns `ViewerModelError` when the underlying service cannot load the report or
+/// graph projections needed to seed the portable UI workspace.
 pub fn load_workspace_from_service(
     service: &impl ViewerApplicationService,
     harness_mode: HarnessMode,
@@ -228,106 +236,15 @@ pub fn load_workspace_from_service(
         .clone()
         .unwrap_or_else(|| "demo".to_string());
 
-    let mut projections = Vec::new();
-    for kind in [
-        GraphProjectionKind::ChoreographyStructure,
-        GraphProjectionKind::InstantiatedProtocol,
-        GraphProjectionKind::ExecutionTimeline,
-        GraphProjectionKind::BranchLineage,
-    ] {
-        if let Ok(ViewerQueryResult::GraphProjection { projection }) =
-            service.query(ViewerQuery::GraphProjection(GraphProjectionRequest {
-                run_id: run_id.clone(),
-                branch_id: active_branch.clone(),
-                step: None,
-                kind,
-            }))
-        {
-            projections.push(projection);
-        }
-    }
-    if projections.is_empty() {
-        projections.push(GraphProjection {
-            run_id: run_id.clone(),
-            branch_id: active_branch.clone(),
-            step: Some(0),
-            kind: GraphProjectionKind::BranchLineage,
-            nodes: Vec::new(),
-            edges: Vec::new(),
-        });
-    }
-    let total_steps = projections
-        .iter()
-        .flat_map(|projection| projection.nodes.iter().filter_map(|node| node.step))
-        .max()
-        .unwrap_or(0);
-
-    let insights = RunInsightWorkspace {
-        theorem_profile: first_scenario.map(|scenario| scenario.summary.theorem_profile.clone()),
-        execution_regime: first_scenario.map(|scenario| match scenario.summary.execution_backend {
-            ResolvedExecutionBackend::Canonical => ExecutionRegime::CanonicalExact,
-            ResolvedExecutionBackend::Threaded => ExecutionRegime::ThreadedExact,
-        }),
-        watch_expressions: first_scenario
-            .map(|scenario| {
-                vec![
-                    WatchExpression {
-                        label: "sampled steps".to_string(),
-                        value: scenario.summary.total_steps_sampled.to_string(),
-                    },
-                    WatchExpression {
-                        label: "obs events".to_string(),
-                        value: scenario.summary.total_obs_events.to_string(),
-                    },
-                ]
-            })
-            .unwrap_or_default(),
-        annotations: active_artifact
-            .as_ref()
-            .map(|artifact_id| {
-                vec![RunAnnotation {
-                    target: AnnotationTarget::Artifact(artifact_id.clone()),
-                    text: "Loaded through the typed viewer query surface.".to_string(),
-                }]
-            })
-            .unwrap_or_default(),
-        provenance: BranchProvenance {
-            run_id: run_id.clone(),
-            parent_branch: None,
-            patch_count: 0,
-            rerun_requested: false,
-        },
-        run_diff: RunDiffSnapshot {
-            baseline_branch: "root".to_string(),
-            candidate_branch: active_branch.clone(),
-            changed_steps: total_steps,
-            command_count: 0,
-        },
-        causality: projections
-            .iter()
-            .find(|projection| projection.kind == GraphProjectionKind::ExecutionTimeline)
-            .map(causality_from_projection)
-            .unwrap_or_default(),
-        bookmarks: vec![RunBookmark {
-            branch_id: active_branch.clone(),
-            step: 0,
-            label: "initial step".to_string(),
-        }],
-        archive_status: "loaded from artifact archive".to_string(),
-    };
-
-    let diagnostics = ViewerPublicationDiagnostics {
-        readiness: if report.artifacts.is_empty() {
-            ViewerReadinessState::Loading
-        } else {
-            ViewerReadinessState::Ready
-        },
-        harness_mode,
-        artifact_count: report.artifacts.len(),
-        scenario_count: report.scenario_summaries.len(),
-        active_page: ViewerPage::Overview,
-        active_artifact,
-    };
+    let projections = load_projections(service, &run_id, &active_branch);
+    let insights = build_insights(
+        first_scenario,
+        active_artifact.as_ref(),
+        &active_branch,
+        &run_id,
+        &projections,
+    );
+    let diagnostics = build_publication_diagnostics(&report, harness_mode, active_artifact);
 
     Ok(ViewerWorkspace {
         report,
@@ -349,14 +266,150 @@ pub fn load_workspace_from_service(
     })
 }
 
+fn load_projections(
+    service: &impl ViewerApplicationService,
+    run_id: &str,
+    active_branch: &str,
+) -> Vec<GraphProjection> {
+    let mut projections = Vec::new();
+    for kind in [
+        GraphProjectionKind::ChoreographyStructure,
+        GraphProjectionKind::InstantiatedProtocol,
+        GraphProjectionKind::ExecutionTimeline,
+        GraphProjectionKind::BranchLineage,
+    ] {
+        if let Ok(ViewerQueryResult::GraphProjection { projection }) =
+            service.query(ViewerQuery::GraphProjection(GraphProjectionRequest {
+                run_id: run_id.to_string(),
+                branch_id: active_branch.to_string(),
+                step: None,
+                kind,
+            }))
+        {
+            projections.push(projection);
+        }
+    }
+    if projections.is_empty() {
+        projections.push(GraphProjection {
+            run_id: run_id.to_string(),
+            branch_id: active_branch.to_string(),
+            step: Some(0),
+            kind: GraphProjectionKind::BranchLineage,
+            nodes: Vec::new(),
+            edges: Vec::new(),
+        });
+    }
+    projections
+}
+
+fn build_insights(
+    first_scenario: Option<&telltale_viewer::ViewerScenarioReport>,
+    active_artifact: Option<&SelectedArtifactId>,
+    active_branch: &str,
+    run_id: &str,
+    projections: &[GraphProjection],
+) -> RunInsightWorkspace {
+    let total_steps = projections
+        .iter()
+        .flat_map(|projection| projection.nodes.iter().filter_map(|node| node.step))
+        .max()
+        .unwrap_or(0);
+    RunInsightWorkspace {
+        theorem_profile: first_scenario.map(|scenario| scenario.summary.theorem_profile.clone()),
+        execution_regime: first_scenario.map(|scenario| match scenario.summary.execution_backend {
+            ResolvedExecutionBackend::Canonical => ExecutionRegime::CanonicalExact,
+            ResolvedExecutionBackend::Threaded => ExecutionRegime::ThreadedExact,
+        }),
+        watch_expressions: build_watch_expressions(first_scenario),
+        annotations: build_initial_annotations(active_artifact),
+        provenance: BranchProvenance {
+            run_id: run_id.to_string(),
+            parent_branch: None,
+            patch_count: 0,
+            rerun_requested: false,
+        },
+        run_diff: RunDiffSnapshot {
+            baseline_branch: "root".to_string(),
+            candidate_branch: active_branch.to_string(),
+            changed_steps: total_steps,
+            command_count: 0,
+        },
+        causality: projections
+            .iter()
+            .find(|projection| projection.kind == GraphProjectionKind::ExecutionTimeline)
+            .map(causality_from_projection)
+            .unwrap_or_default(),
+        bookmarks: vec![RunBookmark {
+            branch_id: active_branch.to_string(),
+            step: 0,
+            label: "initial step".to_string(),
+        }],
+        archive_status: "loaded from artifact archive".to_string(),
+    }
+}
+
+fn build_watch_expressions(
+    first_scenario: Option<&telltale_viewer::ViewerScenarioReport>,
+) -> Vec<WatchExpression> {
+    first_scenario
+        .map(|scenario| {
+            vec![
+                WatchExpression {
+                    label: "sampled steps".to_string(),
+                    value: scenario.summary.total_steps_sampled.to_string(),
+                },
+                WatchExpression {
+                    label: "obs events".to_string(),
+                    value: scenario.summary.total_obs_events.to_string(),
+                },
+            ]
+        })
+        .unwrap_or_default()
+}
+
+fn build_initial_annotations(active_artifact: Option<&SelectedArtifactId>) -> Vec<RunAnnotation> {
+    active_artifact
+        .map(|artifact_id| {
+            vec![RunAnnotation {
+                target: AnnotationTarget::Artifact(artifact_id.clone()),
+                text: "Loaded through the typed viewer query surface.".to_string(),
+            }]
+        })
+        .unwrap_or_default()
+}
+
+fn build_publication_diagnostics(
+    report: &ViewerReport,
+    harness_mode: HarnessMode,
+    active_artifact: Option<SelectedArtifactId>,
+) -> ViewerPublicationDiagnostics {
+    ViewerPublicationDiagnostics {
+        readiness: if report.artifacts.is_empty() {
+            ViewerReadinessState::Loading
+        } else {
+            ViewerReadinessState::Ready
+        },
+        harness_mode,
+        artifact_count: report.artifacts.len(),
+        scenario_count: report.scenario_summaries.len(),
+        active_page: ViewerPage::Overview,
+        active_artifact,
+    }
+}
+
+fn usize_to_i32(value: usize) -> i32 {
+    i32::try_from(value).unwrap_or(i32::MAX)
+}
+
 fn deterministic_layout(projections: &[GraphProjection]) -> GraphLayoutState {
     let mut positions = BTreeMap::new();
     for projection in projections {
-        let total = projection.nodes.len().max(1) as i32;
+        let total = usize_to_i32(projection.nodes.len().max(1));
         for (index, node) in projection.nodes.iter().enumerate() {
+            let index = usize_to_i32(index);
             positions.entry(node.id.clone()).or_insert(GraphNodeLayout {
-                x: 80 + ((index as i32) * 520 / total),
-                y: 110 + (((index as i32) % 2) * 90),
+                x: 80 + (index * 520 / total),
+                y: 110 + ((index % 2) * 90),
             });
         }
     }
@@ -386,6 +439,7 @@ pub struct ViewerTaskRuntime {
 }
 
 impl ViewerTaskRuntime {
+    #[must_use]
     pub fn dioxus() -> Self {
         Self {
             spawn: Arc::new(|future| {
@@ -405,6 +459,7 @@ pub struct ViewerTaskOwner {
 }
 
 impl ViewerTaskOwner {
+    #[must_use]
     pub fn new(runtime: ViewerTaskRuntime) -> Self {
         Self {
             runtime,
@@ -412,6 +467,11 @@ impl ViewerTaskOwner {
         }
     }
 
+    /// Spawn one named UI task through the current runtime.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal task-label lock has been poisoned.
     pub fn spawn_named<F>(&self, label: impl Into<String>, future: F)
     where
         F: Future<Output = ()> + 'static,
@@ -423,6 +483,12 @@ impl ViewerTaskOwner {
         (self.runtime.spawn)(Box::pin(future));
     }
 
+    /// Return the labels recorded for spawned tasks.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal task-label lock has been poisoned.
+    #[must_use]
     pub fn labels(&self) -> Vec<String> {
         self.labels
             .lock()
@@ -445,6 +511,7 @@ pub struct InteractiveViewerState {
 }
 
 impl InteractiveViewerState {
+    #[must_use]
     pub fn from_workspace(workspace: ViewerWorkspace) -> Self {
         Self {
             active_page: workspace.diagnostics.active_page,
@@ -644,8 +711,8 @@ impl InteractiveViewerState {
             u64::try_from(self.workspace.graph.command_log.len()).unwrap_or(u64::MAX);
     }
 
-    pub fn search(&mut self, query: String) {
-        self.workspace.graph.search_query = query.clone();
+    pub fn search(&mut self, query: &str) {
+        self.workspace.graph.search_query = query.to_string();
         let needle = query.to_lowercase();
         self.workspace.graph.search_results = self
             .workspace
@@ -751,9 +818,9 @@ pub fn TelltaleUiRoot(workspace: ViewerWorkspace) -> Element {
                 next.delete_active_branch();
                 state.set(next);
             },
-            on_search: move |query| {
+            on_search: move |query: String| {
                 let mut next = state();
-                next.search(query);
+                next.search(&query);
                 state.set(next);
             },
             on_reload_archive: move |_| {
@@ -1043,49 +1110,49 @@ fn GraphCanvas(projection: GraphProjection, active_step: u64, layout: GraphLayou
     let visible_nodes = projection
         .nodes
         .iter()
-        .filter(|node| node.step.is_none_or(|step| step <= active_step))
+        .filter(|node| node.step.map_or(true, |step| step <= active_step))
         .cloned()
         .collect::<Vec<_>>();
     let visible_edges = projection
         .edges
         .iter()
-        .filter(|edge| edge.step.is_none_or(|step| step <= active_step))
+        .filter(|edge| edge.step.map_or(true, |step| step <= active_step))
         .cloned()
         .collect::<Vec<_>>();
-    let total = visible_nodes.len().max(1) as i32;
+    let total = usize_to_i32(visible_nodes.len().max(1));
     rsx! {
         div {
             class: "tt-graph-shell",
             svg {
                 class: "tt-graph",
                 view_box: "0 0 640 320",
-                for (index, edge) in visible_edges.iter().enumerate() {
+                for (index, edge) in visible_edges.iter().enumerate().map(|(index, edge)| (usize_to_i32(index), edge)) {
                     line {
                         key: "{index}",
-                        x1: "{layout.positions.get(&edge.from).map(|point| point.x).unwrap_or(60 + ((index as i32) * 90) % 520)}",
-                        y1: "{layout.positions.get(&edge.from).map(|point| point.y).unwrap_or(60 + ((index as i32) * 40) % 180)}",
-                        x2: "{layout.positions.get(&edge.to).map(|point| point.x).unwrap_or(150 + ((index as i32) * 90) % 520)}",
-                        y2: "{layout.positions.get(&edge.to).map(|point| point.y).unwrap_or(120 + ((index as i32) * 40) % 180)}",
+                        x1: "{layout.positions.get(&edge.from).map(|point| point.x).unwrap_or(60 + (index * 90) % 520)}",
+                        y1: "{layout.positions.get(&edge.from).map(|point| point.y).unwrap_or(60 + (index * 40) % 180)}",
+                        x2: "{layout.positions.get(&edge.to).map(|point| point.x).unwrap_or(150 + (index * 90) % 520)}",
+                        y2: "{layout.positions.get(&edge.to).map(|point| point.y).unwrap_or(120 + (index * 40) % 180)}",
                         class: "tt-graph__edge",
                     }
                     text {
-                        x: "{100 + ((index as i32) * 90) % 520}",
-                        y: "{82 + ((index as i32) * 40) % 180}",
+                        x: "{100 + (index * 90) % 520}",
+                        y: "{82 + (index * 40) % 180}",
                         class: "tt-graph__edge-label",
                         "{edge.label}"
                     }
                 }
-                for (index, node) in visible_nodes.iter().enumerate() {
+                for (index, node) in visible_nodes.iter().enumerate().map(|(index, node)| (usize_to_i32(index), node)) {
                     circle {
                         key: "{node.id}",
-                        cx: "{layout.positions.get(&node.id).map(|point| point.x).unwrap_or(80 + ((index as i32) * 520 / total))}",
-                        cy: "{layout.positions.get(&node.id).map(|point| point.y).unwrap_or(110 + (((index as i32) % 2) * 90))}",
+                        cx: "{layout.positions.get(&node.id).map(|point| point.x).unwrap_or(80 + (index * 520 / total))}",
+                        cy: "{layout.positions.get(&node.id).map(|point| point.y).unwrap_or(110 + ((index % 2) * 90))}",
                         r: "24",
                         class: "tt-graph__node"
                     }
                     text {
-                        x: "{layout.positions.get(&node.id).map(|point| point.x - 28).unwrap_or(52 + ((index as i32) * 520 / total))}",
-                        y: "{layout.positions.get(&node.id).map(|point| point.y + 4).unwrap_or(114 + (((index as i32) % 2) * 90))}",
+                        x: "{layout.positions.get(&node.id).map(|point| point.x - 28).unwrap_or(52 + (index * 520 / total))}",
+                        y: "{layout.positions.get(&node.id).map(|point| point.y + 4).unwrap_or(114 + ((index % 2) * 90))}",
                         class: "tt-graph__node-label",
                         "{node.label}"
                     }
@@ -1367,6 +1434,12 @@ fn KeyValueLine(label: String, value: String) -> Element {
 }
 
 #[authoritative_source("viewer_demo_workspace")]
+/// Build the deterministic demo workspace shown by the first shared viewer shell.
+///
+/// # Panics
+///
+/// Panics if the typed viewer service fails to load the built-in demo artifacts.
+#[must_use]
 pub fn demo_workspace() -> ViewerWorkspace {
     let service = demo_service();
     load_workspace_from_service(&service, HarnessMode::Deterministic)
@@ -1395,12 +1468,13 @@ fn demo_service() -> InMemoryViewerService {
         theorem: TheoremProfileSpec::default(),
         extensions: BTreeMap::new(),
     };
-    let scenario_bundle =
-        ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(ScenarioBundleArtifact::new(
+    let scenario_bundle = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
+        ScenarioBundleArtifact::new(
             Some(scenario),
             sample_result(),
             Some(ContractCheckReport::pass()),
-        )));
+        ),
+    )));
     let decision_report = ViewerArtifactFile::new(ViewerArtifact::DecisionReport(DecisionReport {
         kind: DecisionKind::TheoremEligibility,
         outcome: DecisionOutcome::Certified(DecisionCertificate::TheoremEligibility {
@@ -1413,19 +1487,19 @@ fn demo_service() -> InMemoryViewerService {
     service
         .command(ViewerCommand::ImportArtifact {
             artifact_id: "demo-run".to_string(),
-            artifact: scenario_bundle,
+            artifact: Box::new(scenario_bundle),
         })
         .expect("scenario bundle should import");
     service
         .command(ViewerCommand::ImportArtifact {
             artifact_id: "demo-decision".to_string(),
-            artifact: decision_report,
+            artifact: Box::new(decision_report),
         })
         .expect("decision report should import");
     service
         .command(ViewerCommand::ImportArtifact {
             artifact_id: "demo-environment".to_string(),
-            artifact: environment_trace,
+            artifact: Box::new(environment_trace),
         })
         .expect("environment trace should import");
     service

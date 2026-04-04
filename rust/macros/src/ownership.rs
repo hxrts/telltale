@@ -84,7 +84,7 @@ fn labeled_item(
 
 fn ensure_allowed(marker: &str, item: &Item, allowed_kinds: &[&str]) -> syn::Result<()> {
     let kind = item_kind(item);
-    if allowed_kinds.iter().any(|allowed| *allowed == kind) {
+    if allowed_kinds.contains(&kind) {
         return Ok(());
     }
     Err(syn::Error::new_spanned(
