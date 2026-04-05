@@ -14,6 +14,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
             EffectRequestBody::Acquire { .. } => "handle_acquire",
             EffectRequestBody::Release { .. } => "handle_release",
             EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            EffectRequestBody::WalSync { .. } => "wal_sync",
             EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
         };
         let entry = match self.next_entry(expected_kind) {
@@ -40,7 +41,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
                     };
                 }
             }
-            "handle_recv" | "invoke_step" | "handle_release" => {
+            "handle_recv" | "invoke_step" | "handle_release" | "wal_sync" => {
                 if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
                     return match outcome {
                         EffectResult::Success(()) => match request.body {
@@ -49,6 +50,9 @@ impl EffectHandler for ReplayEffectHandler<'_> {
                             }
                             EffectRequestBody::InvokeStep { state, .. } => {
                                 EffectOutcome::success(EffectResponse::InvokeStep { state })
+                            }
+                            EffectRequestBody::WalSync { .. } => {
+                                EffectOutcome::success(EffectResponse::WalSync)
                             }
                             _ => EffectOutcome::success(EffectResponse::Release),
                         },
@@ -238,6 +242,20 @@ impl EffectHandler for ReplayEffectHandler<'_> {
             .into_output_condition_hint()
             .ok()
             .flatten()
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+
+    fn wal_sync(&self, sync: &crate::durable::WalSyncRequest) -> EffectResult<()> {
+        self.handle_effect(EffectRequest::wal_sync(
+            sync.tick,
+            sync.operation_id.clone(),
+            sync.clone(),
+        ))
+        .into_unit("wal_sync")
+        .unwrap_or_else(EffectResult::failure)
     }
 }
 

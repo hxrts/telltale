@@ -7,8 +7,10 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use crate::effect::{EffectFailure, EffectHandler, EffectOutcome, EffectRequest};
-use crate::semantic_objects::{AgreementEvidence, AgreementLevel, FinalizationOutcome};
+use crate::effect::{EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectResult};
+use crate::semantic_objects::{
+    AgreementEvidence, AgreementLevel, AgreementState, FinalizationOutcome,
+};
 
 /// Stable schema version for persisted durability artifacts.
 pub const PERSISTED_DURABILITY_SCHEMA_VERSION: &str = "telltale.machine.durability.v1";
@@ -71,6 +73,25 @@ pub enum AgreementWalEntry {
 pub struct AgreementWalArtifact {
     /// Append-only WAL entries in canonical order.
     pub entries: Vec<AgreementWalEntry>,
+}
+
+/// Typed request payload for the internal `wal_sync` effect.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct WalSyncRequest {
+    /// Operation whose durable state is being synchronized.
+    pub operation_id: String,
+    /// Coroutine released by the visibility gate on success.
+    pub downstream_coroutine_id: String,
+    /// Required agreement level for the gated step.
+    pub gate_level: AgreementLevel,
+    /// Current agreement state snapshot for the operation when available.
+    #[serde(default)]
+    pub agreement_state: Option<AgreementState>,
+    /// Agreement evidence attached to the operation when available.
+    #[serde(default)]
+    pub agreement_evidence: Vec<AgreementEvidence>,
+    /// Tick at which the gate is attempting to cross.
+    pub tick: u64,
 }
 
 impl AgreementWalEntry {
@@ -532,6 +553,251 @@ where
             )));
         }
         outcome
+    }
+
+    fn handle_send(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[crate::coroutine::Value],
+    ) -> crate::effect::EffectResult<crate::coroutine::Value> {
+        self.inner.handle_send(role, partner, label, state)
+    }
+
+    fn send_decision(
+        &self,
+        input: crate::effect::SendDecisionInput<'_>,
+    ) -> crate::effect::EffectResult<crate::effect::SendDecision> {
+        self.inner.send_decision(input)
+    }
+
+    fn handle_recv(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &mut Vec<crate::coroutine::Value>,
+        payload: &crate::coroutine::Value,
+    ) -> crate::effect::EffectResult<()> {
+        self.inner.handle_recv(role, partner, label, state, payload)
+    }
+
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[crate::coroutine::Value],
+    ) -> crate::effect::EffectResult<String> {
+        self.inner.handle_choose(role, partner, labels, state)
+    }
+
+    fn step(
+        &self,
+        role: &str,
+        state: &mut Vec<crate::coroutine::Value>,
+    ) -> crate::effect::EffectResult<()> {
+        self.inner.step(role, state)
+    }
+}
+
+/// Test and integration behavior for the internal `wal_sync` effect.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WalSyncMode {
+    /// Persist entries and report immediate success.
+    Immediate,
+    /// Block at the visibility gate without persisting.
+    Blocked,
+    /// Fail the visibility gate without persisting.
+    Failure {
+        /// Stable error surfaced by the internal effect.
+        message: String,
+    },
+}
+
+impl Default for WalSyncMode {
+    fn default() -> Self {
+        Self::Immediate
+    }
+}
+
+/// Effect-handler wrapper that owns one durable agreement WAL and services the
+/// internal `wal_sync` effect.
+pub struct AgreementWalHandler<'a, W>
+where
+    W: AgreementWal,
+{
+    inner: &'a dyn EffectHandler,
+    wal: Mutex<W>,
+    sync_mode: WalSyncMode,
+}
+
+impl<'a, W> AgreementWalHandler<'a, W>
+where
+    W: AgreementWal,
+{
+    /// Create one agreement-WAL wrapper around an inner handler.
+    #[must_use]
+    pub fn new(inner: &'a dyn EffectHandler, wal: W) -> Self {
+        Self {
+            inner,
+            wal: Mutex::new(wal),
+            sync_mode: WalSyncMode::Immediate,
+        }
+    }
+
+    /// Create one agreement-WAL wrapper with an explicit sync mode.
+    #[must_use]
+    pub fn with_sync_mode(inner: &'a dyn EffectHandler, wal: W, sync_mode: WalSyncMode) -> Self {
+        Self {
+            inner,
+            wal: Mutex::new(wal),
+            sync_mode,
+        }
+    }
+
+    /// Load the current typed WAL snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the WAL backend cannot be loaded.
+    pub fn wal_snapshot(&self) -> Result<AgreementWalArtifact, String> {
+        let wal = self
+            .wal
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        wal.load()
+    }
+
+    fn build_entries(
+        &self,
+        wal: &W,
+        sync: &WalSyncRequest,
+    ) -> Result<Vec<AgreementWalEntry>, String> {
+        let existing = wal.load()?;
+        let existing_ids: std::collections::BTreeSet<_> = existing
+            .entries
+            .iter()
+            .map(AgreementWalEntry::stable_identity)
+            .collect();
+        let mut entries = Vec::new();
+
+        for evidence in sync
+            .agreement_evidence
+            .iter()
+            .filter(|evidence| evidence.operation_id == sync.operation_id)
+        {
+            let entry = AgreementWalEntry::EvidenceProduced {
+                evidence: evidence.clone(),
+                tick: sync.tick,
+            };
+            if !existing_ids.contains(&entry.stable_identity()) {
+                entries.push(entry);
+            }
+        }
+
+        if let Some(state) = &sync.agreement_state {
+            let previous_level = existing
+                .entries
+                .iter()
+                .filter_map(|entry| match entry {
+                    AgreementWalEntry::Escalation {
+                        operation_id,
+                        new_level,
+                        ..
+                    } if operation_id == &sync.operation_id => Some(*new_level),
+                    _ => None,
+                })
+                .max_by_key(|level| level.rank())
+                .unwrap_or(AgreementLevel::None);
+            if state.level.rank() > previous_level.rank() {
+                let entry = AgreementWalEntry::Escalation {
+                    operation_id: sync.operation_id.clone(),
+                    previous_level,
+                    new_level: state.level,
+                    evidence_id: state.evidence_ids.last().cloned(),
+                    tick: sync.tick,
+                };
+                if !existing_ids.contains(&entry.stable_identity()) {
+                    entries.push(entry);
+                }
+            }
+            if let Some(outcome) = state.finalization {
+                let entry = AgreementWalEntry::Finalization {
+                    operation_id: sync.operation_id.clone(),
+                    outcome,
+                    materialization_proof_id: state
+                        .evidence_ids
+                        .iter()
+                        .find(|evidence_id| evidence_id.contains("proof"))
+                        .cloned(),
+                    canonical_handle_id: None,
+                    tick: sync.tick,
+                };
+                if !existing_ids.contains(&entry.stable_identity()) {
+                    entries.push(entry);
+                }
+            }
+        }
+
+        let gate = AgreementWalEntry::VisibilityGateCrossing {
+            operation_id: sync.operation_id.clone(),
+            downstream_coroutine_id: sync.downstream_coroutine_id.clone(),
+            gate_level: sync.gate_level,
+            tick: sync.tick,
+        };
+        if !existing_ids.contains(&gate.stable_identity()) {
+            entries.push(gate);
+        }
+
+        Ok(entries)
+    }
+}
+
+impl<W> EffectHandler for AgreementWalHandler<'_, W>
+where
+    W: AgreementWal + Send,
+{
+    fn handler_identity(&self) -> String {
+        format!("agreement_wal<{}>", self.inner.handler_identity())
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+
+    fn wal_sync(&self, sync: &WalSyncRequest) -> EffectResult<()> {
+        match &self.sync_mode {
+            WalSyncMode::Immediate => {
+                let mut wal = self
+                    .wal
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let entries = match self.build_entries(&*wal, sync) {
+                    Ok(entries) => entries,
+                    Err(err) => {
+                        return EffectResult::failure(EffectFailure::unavailable(format!(
+                            "load agreement WAL for `{}`: {err}",
+                            sync.operation_id
+                        )));
+                    }
+                };
+                for entry in entries {
+                    if let Err(err) = wal.append(entry) {
+                        return EffectResult::failure(EffectFailure::unavailable(format!(
+                            "persist agreement WAL for `{}`: {err}",
+                            sync.operation_id
+                        )));
+                    }
+                }
+                EffectResult::success(())
+            }
+            WalSyncMode::Blocked => EffectResult::Blocked,
+            WalSyncMode::Failure { message } => {
+                EffectResult::failure(EffectFailure::unavailable(message.clone()))
+            }
+        }
     }
 
     fn handle_send(

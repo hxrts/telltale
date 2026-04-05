@@ -49,16 +49,17 @@ impl ProtocolMachine {
     ) {
         let mut request = request.clone();
         request.effect_id = Some(effect_id);
-        self.effect_exchanges.push(
-            EffectExchangeRecord {
-                effect_id,
-                handler_identity: handler_identity.to_string(),
-                ordering_key: self.clock.tick,
-                request,
-                outcome: outcome.clone(),
-            },
-            &self.config.observability_retention,
-        );
+        let exchange = EffectExchangeRecord {
+            effect_id,
+            handler_identity: handler_identity.to_string(),
+            ordering_key: self.clock.tick,
+            request,
+            outcome: outcome.clone(),
+        };
+        self.sync_runtime_effect_from_exchange(&exchange);
+        self.effect_exchanges
+            .push(exchange, &self.config.observability_retention);
+        self.next_effect_id = self.next_effect_id.max(effect_id.saturating_add(1));
     }
 
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<FragmentOwnerId> {
@@ -67,6 +68,39 @@ impl ProtocolMachine {
                 .current_ownership(sid)
                 .map(|capability| capability.owner_id.clone())
         })
+    }
+
+    fn current_wal_sync_request(
+        &self,
+        session: Option<SessionId>,
+        coro_id: usize,
+    ) -> crate::durable::WalSyncRequest {
+        let objects = self.semantic_objects();
+        let agreement_state = objects
+            .agreement_states
+            .into_iter()
+            .filter(|state| state.session == session)
+            .max_by_key(|state| (state.last_updated_tick.unwrap_or(0), state.level.rank()));
+        let operation_id = agreement_state
+            .as_ref()
+            .map(|state| state.operation_id.clone())
+            .unwrap_or_else(|| format!("wal_sync:coro:{coro_id}"));
+        let agreement_evidence = objects
+            .agreement_evidence
+            .into_iter()
+            .filter(|evidence| evidence.operation_id == operation_id)
+            .collect();
+        crate::durable::WalSyncRequest {
+            operation_id,
+            downstream_coroutine_id: format!("coro:{coro_id}"),
+            gate_level: agreement_state
+                .as_ref()
+                .map(|state| state.level)
+                .unwrap_or(crate::semantic_objects::AgreementLevel::Finalized),
+            agreement_state,
+            agreement_evidence,
+            tick: self.clock.tick,
+        }
     }
 
     fn effect_operation_id(effect_id: u64) -> String {
@@ -507,6 +541,98 @@ impl ProtocolMachine {
                 .get("reason")
                 .and_then(serde_json::Value::as_str)
                 .map(ToString::to_string),
+            true,
+        );
+    }
+
+    fn sync_runtime_effect_from_exchange(&mut self, exchange: &EffectExchangeRecord) {
+        if self
+            .outstanding_effects
+            .as_slice()
+            .iter()
+            .any(|effect| effect.effect_id == exchange.effect_id)
+        {
+            return;
+        }
+
+        let status = match &exchange.outcome.status {
+            crate::effect::EffectOutcomeStatus::Success => OutstandingEffectStatus::Succeeded,
+            crate::effect::EffectOutcomeStatus::Blocked => OutstandingEffectStatus::Blocked,
+            crate::effect::EffectOutcomeStatus::Failure { .. } => OutstandingEffectStatus::Failed,
+        };
+        let effect_kind = match &exchange.request.body {
+            crate::effect::EffectRequestBody::SendDecision { .. } => "send_decision",
+            crate::effect::EffectRequestBody::Receive { .. } => "handle_recv",
+            crate::effect::EffectRequestBody::Choose { .. } => "handle_choose",
+            crate::effect::EffectRequestBody::InvokeStep { .. } => "invoke_step",
+            crate::effect::EffectRequestBody::Acquire { .. } => "handle_acquire",
+            crate::effect::EffectRequestBody::Release { .. } => "handle_release",
+            crate::effect::EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            crate::effect::EffectRequestBody::WalSync { .. } => "wal_sync",
+            crate::effect::EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
+        };
+        let operation_id = exchange
+            .request
+            .operation_id
+            .clone()
+            .unwrap_or_else(|| Self::effect_operation_id(exchange.effect_id));
+        let session = exchange.request.session;
+        let owner_id = self.current_operation_owner(session);
+        let budget_ticks = Some(1);
+        let inputs =
+            serde_json::to_value(&exchange.request).expect("typed effect request should serialize");
+        let outputs =
+            serde_json::to_value(&exchange.outcome).expect("typed effect outcome should serialize");
+
+        self.outstanding_effects.push(
+            OutstandingEffect {
+                effect_id: exchange.effect_id,
+                operation_id: operation_id.clone(),
+                session,
+                owner_id: owner_id.clone(),
+                effect_interface: Some(exchange.request.metadata.interface_name.clone()),
+                effect_operation: Some(exchange.request.metadata.operation_name.clone()),
+                effect_kind: effect_kind.to_string(),
+                handler_identity: exchange.handler_identity.clone(),
+                status,
+                ordering_key: exchange.ordering_key,
+                budget_ticks,
+                retry_policy: "forbid_late_results".to_string(),
+                invalidation_token: Self::effect_invalidation_token(exchange.effect_id),
+                completed_at_tick: Some(self.clock.tick),
+                inputs,
+                outputs,
+            },
+            &self.config.observability_retention,
+        );
+        self.operation_instances.push(
+            OperationInstance {
+                operation_id: operation_id.clone(),
+                session,
+                owner_id,
+                kind: exchange.request.metadata.operation_name.clone(),
+                phase: Self::effect_status_phase(status),
+                handler_identity: Some(exchange.handler_identity.clone()),
+                effect_ids: vec![exchange.effect_id],
+                dependent_operation_ids: Vec::new(),
+                terminal_publication: Self::effect_terminal_publication(status),
+                budget_ticks,
+                requires_proof: false,
+            },
+            &self.config.observability_retention,
+        );
+        self.set_progress_contract_state(
+            &operation_id,
+            session,
+            Self::progress_state_for_effect_status(status),
+            budget_ticks,
+            match &exchange.outcome.status {
+                crate::effect::EffectOutcomeStatus::Failure { failure } => {
+                    Some(failure.message.clone())
+                }
+                crate::effect::EffectOutcomeStatus::Success
+                | crate::effect::EffectOutcomeStatus::Blocked => None,
+            },
             true,
         );
     }

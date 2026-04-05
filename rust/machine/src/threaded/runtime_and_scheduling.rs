@@ -353,7 +353,7 @@ impl ThreadedProtocolMachine {
                 return Ok(false);
             };
             let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
-            return self.commit_pick_result(&pick, result, tick, &handler_identity);
+            return self.commit_pick_result(&pick, result, tick, handler, &handler_identity);
         }
 
         let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
@@ -366,7 +366,7 @@ impl ThreadedProtocolMachine {
 
         let mut progressed = false;
         for (pick, result) in picks.into_iter().zip(results.into_iter()) {
-            progressed |= self.commit_pick_result(&pick, result, tick, &handler_identity)?;
+            progressed |= self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
         }
         Ok(progressed)
     }
@@ -376,6 +376,7 @@ impl ThreadedProtocolMachine {
         pick: &Picked,
         result: Result<(StepPack, Option<OutputConditionHint>), Fault>,
         tick: u64,
+        handler: &dyn EffectHandler,
         handler_identity: &str,
     ) -> Result<bool, ProtocolMachineError> {
         match result {
@@ -385,6 +386,7 @@ impl ThreadedProtocolMachine {
                     &pick.session,
                     pack,
                     output_hint,
+                    handler,
                     handler_identity,
                 ) {
                     Ok(outcome) => match outcome {

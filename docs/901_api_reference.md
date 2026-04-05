@@ -129,10 +129,11 @@ Module access (not re-exported at crate root):
   `EffectInterfaceMetadata`, `EffectExchangeRecord`, `EffectCompositionPolicy`
   `EffectSemanticClass`, `EffectRetryShape`, `EffectResponsibilityDomain`,
   `SendDecision`, `SendDecisionInput`
+  The typed internal durability request is `EffectRequestBody::WalSync`.
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
 - Durability:
-  `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryMetadata, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload}`
-  These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, and recovery metadata.
+  `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryMetadata, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest}`
+  These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, recovery metadata, and the internal `wal_sync` durability boundary.
   Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`

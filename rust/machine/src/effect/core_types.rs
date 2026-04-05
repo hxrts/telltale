@@ -526,6 +526,7 @@ impl EffectInterfaceMetadata {
             "topology_events" | "topology_event" => {
                 Self::runtime_topology_events(interface_name, operation_name)
             }
+            "wal_sync" => Self::wal_sync(),
             "output_condition_hint" => Self::output_condition_hint(),
             _ => Self::default_runtime_command(interface_name, operation_name, effect_kind),
         }
@@ -627,6 +628,23 @@ impl EffectInterfaceMetadata {
             retry_shape: EffectRetryShape::Forbidden,
             reentrancy_policy: EffectReentrancyPolicy::Allow,
             handler_domain: EffectHandlerDomain::External,
+        }
+    }
+
+    fn wal_sync() -> Self {
+        Self {
+            interface_name: "Wal".to_string(),
+            operation_name: "sync".to_string(),
+            authority_class: EffectAuthorityClass::Authoritative,
+            semantic_class: EffectSemanticClass::Authoritative,
+            agreement_use: EffectAgreementUse::Required,
+            region_scope: EffectRegionScope::Fragment,
+            admissibility: EffectAdmissibility::InternalOnly,
+            totality: EffectTotality::MayBlock,
+            timeout_policy: EffectTimeoutPolicy::Required { budget_ticks: None },
+            retry_shape: EffectRetryShape::Bounded { max_retries: 3 },
+            reentrancy_policy: EffectReentrancyPolicy::RejectSameFragment,
+            handler_domain: EffectHandlerDomain::Internal,
         }
     }
 
@@ -864,6 +882,21 @@ impl EffectRequest {
             },
         )
     }
+
+    #[must_use]
+    pub fn wal_sync(
+        tick: u64,
+        operation_id: impl Into<String>,
+        sync: crate::durable::WalSyncRequest,
+    ) -> Self {
+        Self::new(
+            tick,
+            None,
+            Some(operation_id.into()),
+            "wal_sync",
+            EffectRequestBody::WalSync { sync },
+        )
+    }
 }
 
 /// Typed request payload families.
@@ -909,6 +942,9 @@ pub enum EffectRequestBody {
     TopologyEvents {
         tick: u64,
     },
+    WalSync {
+        sync: crate::durable::WalSyncRequest,
+    },
     OutputConditionHint {
         role: String,
         state: Vec<Value>,
@@ -951,6 +987,7 @@ pub enum EffectResponse {
     Acquire { evidence: Value },
     Release,
     TopologyEvents { events: Vec<TopologyPerturbation> },
+    WalSync,
     OutputConditionHint { hint: Option<OutputConditionHint> },
 }
 
@@ -1024,7 +1061,7 @@ impl EffectOutcome {
         }
     }
 
-    /// Convert this outcome into a typed `EffectResult<()>` for receive/release.
+    /// Convert this outcome into a typed `EffectResult<()>` for unit-like effects.
     ///
     /// # Errors
     ///
@@ -1039,6 +1076,9 @@ impl EffectOutcome {
                     Ok(EffectResult::Success(()))
                 }
                 EffectResponse::InvokeStep { .. } if expected_kind == "invoke_step" => {
+                    Ok(EffectResult::Success(()))
+                }
+                EffectResponse::WalSync if expected_kind == "wal_sync" => {
                     Ok(EffectResult::Success(()))
                 }
                 other => Err(EffectFailure::contract_violation(format!(

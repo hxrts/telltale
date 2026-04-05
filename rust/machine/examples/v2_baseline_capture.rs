@@ -74,6 +74,9 @@ cfg_if! {
                 EffectRequestBody::TopologyEvents { .. } => {
                     EffectOutcome::success(EffectResponse::TopologyEvents { events: Vec::new() })
                 }
+                EffectRequestBody::WalSync { .. } => {
+                    EffectOutcome::success(EffectResponse::WalSync)
+                }
                 EffectRequestBody::OutputConditionHint { .. } => {
                     EffectOutcome::success(EffectResponse::OutputConditionHint { hint: None })
                 }

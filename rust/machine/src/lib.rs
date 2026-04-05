@@ -152,12 +152,12 @@ pub mod model {
     /// Durable execution artifact contracts.
     pub mod durability {
         pub use crate::durable::{
-            AgreementWal, AgreementWalArtifact, AgreementWalEntry, DurableRecoveryMetadata,
-            EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
-            EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementWal,
-            FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
-            PersistedDurabilityArtifact, PersistedDurabilityPayload,
-            PERSISTED_DURABILITY_SCHEMA_VERSION,
+            AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
+            DurableRecoveryMetadata, EvidenceIdResolver, EvidenceOutcomeCache,
+            EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+            FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal,
+            InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+            WalSyncMode, WalSyncRequest, PERSISTED_DURABILITY_SCHEMA_VERSION,
         };
     }
 
@@ -326,11 +326,12 @@ pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use durable::{
-    AgreementWal, AgreementWalArtifact, AgreementWalEntry, DurableRecoveryMetadata,
-    EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
-    EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementWal,
-    FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
-    PersistedDurabilityArtifact, PersistedDurabilityPayload, PERSISTED_DURABILITY_SCHEMA_VERSION,
+    AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
+    DurableRecoveryMetadata, EvidenceIdResolver, EvidenceOutcomeCache,
+    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+    FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+    PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest,
+    PERSISTED_DURABILITY_SCHEMA_VERSION,
 };
 pub use effect::{
     CorruptionType, EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,

@@ -110,6 +110,7 @@ impl EffectTraceTape {
             EffectRequestBody::Acquire { .. } => "handle_acquire",
             EffectRequestBody::Release { .. } => "handle_release",
             EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            EffectRequestBody::WalSync { .. } => "wal_sync",
             EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
         };
         let request_json =

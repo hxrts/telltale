@@ -594,7 +594,7 @@ impl ProtocolMachine {
         };
 
         // 3. Commit atomically.
-        self.commit_pack(idx, pack, output_hint, &handler_identity)
+        self.commit_pack(idx, pack, output_hint, handler, &handler_identity)
     }
 
     // ---- Per-instruction step functions (each owns its type logic) ----
