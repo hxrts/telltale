@@ -79,11 +79,12 @@ Its digest algorithm remains an operational conformance surface checked through
 published vectors and runtime tests rather than a first-class Lean hash model.
 
 The simulator assurance story now includes explicit exact-backend parity,
-canonical replay reproduction, exact checkpoint resume, batch-order
-reproducibility, fail-closed theorem-classification matrices, approximation
-admissibility gates, nested distributed invariance, and helper-surface
-non-authoritativeness checks. These remain executable assurance lanes rather
-than part of the current mechanized formal claim.
+canonical replay reproduction, exact checkpoint resume, durable WAL fault
+injection and crash/recovery matrices, batch-order reproducibility, fail-closed
+theorem-classification matrices, approximation admissibility gates, nested
+distributed invariance, and helper-surface non-authoritativeness checks. These
+remain executable assurance lanes rather than part of the current mechanized
+formal claim.
 
 ## Claimed Surface
 
@@ -273,7 +274,7 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Premise | End-to-end supported/fail-closed lowering | `rust/tests/dsl_runtime_semantics_tests.rs` | The theory-backed supported subset is explicit and executable: `choice`, `call`, counted `loop`, and recursion remain parser -> projection -> theory-conversion -> protocol-machine clean. `par`, `case/of`, and `timeout` stay outside that theory-convertible subset and are covered through the executable/runtime and boundary suites above |
 | Admission | Theorem-pack and bundle assurance | `rust/bridge/tests/protocol_bundle_admission_contracts.rs`, `rust/bridge/tests/invariant_verification.rs`, `rust/machine/src/runtime_contracts.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Proof-bundle declarations, capability drops, admission-gated runtime requests, and the explicit transported-theorem boundary ledger are now exercised end to end with stable diagnostics. Runtime-critical instantiated premises are separated from Lean-only assumption boundaries and black-box/background theorem inventory |
 | Distributed topology | Deterministic harness | `rust/simulator/tests/distributed.rs`, `rust/machine/tests/topology_effect_ingress.rs`, `rust/runtime/tests/generated_topology_public_path.rs` | Distributed replay, ordered topology ingress, generated helpers, and invalid placement rejection now run through executable runtime paths without ambient network dependency |
-| Simulator replay and classification assurance | Deterministic executable regression net | `rust/simulator/tests/correctness_regression.rs`, `rust/simulator/tests/threaded_backend.rs`, `rust/simulator/tests/classification_assurance.rs`, `rust/simulator/tests/environment_models.rs`, `rust/simulator/tests/distributed.rs` | Canonical exact, threaded exact, canonical replay, exact checkpoint resume, fail-closed theorem eligibility, approximation admissibility, normalized observability boundaries, observed-only distributed manifests, and non-authoritative helper surfaces are now checked together as one simulator-facing assurance family |
+| Simulator replay and classification assurance | Deterministic executable regression net | `rust/simulator/tests/correctness_regression.rs`, `rust/simulator/tests/threaded_backend.rs`, `rust/simulator/tests/classification_assurance.rs`, `rust/simulator/tests/environment_models.rs`, `rust/simulator/tests/distributed.rs`, `rust/simulator/tests/durable_assurance.rs` | Canonical exact, threaded exact, canonical replay, exact checkpoint resume, durable WAL fault injection, crash/recovery coverage matrices, write-ahead and evidence-consistency monitors, fail-closed theorem eligibility, approximation admissibility, normalized observability boundaries, observed-only distributed manifests, and non-authoritative helper surfaces are now checked together as one simulator-facing assurance family |
 | Agreement | Runtime commitment semantics | `rust/machine/src/effect/core_types.rs`, `rust/machine/src/semantic_objects.rs`, `rust/machine/tests/threaded_equivalence.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | Agreement profiles and child-effect rollups are checked as runtime semantics across scenario tables, lowering, and cross-driver parity |
 | Extension boundary | Deterministic parse-to-runtime dispatch + middleware stacks | `rust/runtime/tests/extension_integration.rs`, `rust/runtime/tests/middleware_semantic_hardening.rs` | Registered statement rules now parse into `Protocol::Extension`, lower into runtime extension effects, execute through deterministic extensible handlers, fail with stable diagnostics when handlers are missing or payloads are malformed, and remain middleware-safe under retry, metrics, trace, and seeded fault injection |
 | Generated deployment path | Public helper end-to-end execution | `rust/runtime/tests/generated_topology_public_path.rs` | `handler(...)`, `with_topology(...)`, and named inline topology helpers are exercised as public surfaces with real loopback remote transport, negative validation coverage, executable region semantics, preservation of inline role-family constraints, and a transport-agnostic runtime topology API |

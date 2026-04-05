@@ -165,6 +165,8 @@ Module access (not re-exported at crate root):
 - `telltale_simulator::runner::{resume_with_checkpoint_artifact, resume_with_durable_checkpoint_artifact, DurableResumeArtifacts, DurableResumeSummary}`
   `resume_with_checkpoint_artifact(...)` is the exact non-durable checkpoint lane.
   Scenarios that declare `DurabilityMode::Wal` must resume through `resume_with_durable_checkpoint_artifact(...)` so the simulator cannot bypass the typed WAL/evidence contract.
+- `telltale_simulator::durability::{FaultInjectingAgreementWal, DurableFaultProgram, ScheduledDurableFault, DurableFaultKind, DurableFaultRecord, DurableRecoveryRun, DurablePropertyReport, run_durable_recovery_case, durable_property_report}`
+  This is the reusable simulator-side durability assurance surface for deterministic fault injection, crash/recovery comparison, and durable property monitoring.
 - `telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport, ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep}`
   Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
 - `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`

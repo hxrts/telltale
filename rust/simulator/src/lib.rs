@@ -24,6 +24,7 @@ pub mod checkpoint;
 pub mod contracts;
 pub mod decision;
 pub mod distributed;
+pub mod durability;
 pub mod environment;
 #[doc(hidden)]
 pub mod execution;
@@ -67,6 +68,12 @@ pub use decision::{
 pub use distributed::{
     DistributedExecutionRegime, DistributedRunManifest, DistributedRunResult,
     DistributedSimBuilder, DistributedSimulation, DistributedSiteResult, NestedExecutionContract,
+};
+pub use durability::{
+    durable_property_report, monitor_evidence_consistency, monitor_monotonic_wal_levels,
+    monitor_recovery_equivalence, monitor_write_ahead, run_durable_recovery_case, DurableFaultKind,
+    DurableFaultOutcome, DurableFaultProgram, DurableFaultRecord, DurablePropertyReport,
+    DurableRecoveryRun, FaultInjectingAgreementWal, ScheduledDurableFault,
 };
 pub use environment::{
     EnvironmentArtifact, EnvironmentController, EnvironmentModels, EnvironmentSnapshot,

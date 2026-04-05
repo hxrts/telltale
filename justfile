@@ -473,6 +473,7 @@ check-aura-borrowed-lints:
     just check-style-boundaries
     just check-viewer-tooling-boundaries
     just check-durable-boundaries
+    just check-durable-assurance
     just check-docs-semantic-drift
     just check-verification-inventory
     just check-macro-boundaries
@@ -480,6 +481,12 @@ check-aura-borrowed-lints:
 # Keep typed durability artifacts on the authoritative machine/runtime side.
 check-durable-boundaries:
     ./scripts/check/durable-boundaries.sh
+
+# Focused durability verification split: machine contracts, simulator assurance, and boundaries.
+check-durable-assurance:
+    TMPDIR=/tmp cargo test -p telltale-machine --test durable_contracts -- --nocapture
+    TMPDIR=/tmp cargo test -p telltale-simulator --test durable_assurance -- --nocapture
+    just check-durable-boundaries
 
 # Enforce the shared viewer/webapp boundary and docs alignment.
 check-viewer-tooling-boundaries:
