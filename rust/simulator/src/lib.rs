@@ -70,10 +70,12 @@ pub use distributed::{
     DistributedSimBuilder, DistributedSimulation, DistributedSiteResult, NestedExecutionContract,
 };
 pub use durability::{
-    durable_property_report, monitor_evidence_consistency, monitor_monotonic_wal_levels,
-    monitor_recovery_equivalence, monitor_write_ahead, run_durable_recovery_case, DurableFaultKind,
-    DurableFaultOutcome, DurableFaultProgram, DurableFaultRecord, DurablePropertyReport,
-    DurableRecoveryRun, FaultInjectingAgreementWal, ScheduledDurableFault,
+    durable_property_report, inspect_durable_artifacts, monitor_evidence_consistency,
+    monitor_monotonic_wal_levels, monitor_recovery_equivalence, monitor_write_ahead,
+    run_durable_recovery_case, DurableFaultKind, DurableFaultOutcome, DurableFaultProgram,
+    DurableFaultRecord, DurableInspectionReport, DurablePropertyReport, DurableRecoveryRun,
+    DurableWalEntryKind, DurableWalEntryProjection, EvidenceCacheEntryProjection,
+    FaultInjectingAgreementWal, ScheduledDurableFault,
 };
 pub use environment::{
     EnvironmentArtifact, EnvironmentController, EnvironmentModels, EnvironmentSnapshot,

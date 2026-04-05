@@ -23,6 +23,7 @@ pub use telltale_simulator::decision::{
     decide_theorem_eligibility, DecisionCounterexample, DecisionKind, DecisionOutcome,
     DecisionReport,
 };
+pub use telltale_simulator::durability::DurableInspectionReport;
 pub use telltale_simulator::environment::{EnvironmentTrace, TransmissionIntent};
 pub use telltale_simulator::reconfiguration::ReconfigurationRecord;
 pub use telltale_simulator::runner::{
@@ -174,6 +175,8 @@ pub enum ViewerArtifact {
     ExperimentSuite(Box<ExperimentSuiteReport>),
     /// Typed effect-trace artifact for one run or branch.
     EffectTrace(Box<EffectTraceArtifact>),
+    /// Observed-only durable inspection report.
+    DurableInspection(Box<DurableInspectionReport>),
     /// Deterministic minimization result.
     Minimization(Box<MinimizationResult>),
 }
@@ -198,6 +201,7 @@ impl ViewerArtifact {
             Self::SweepReport(_) => ViewerArtifactKind::SweepReport,
             Self::ExperimentSuite(_) => ViewerArtifactKind::ExperimentSuite,
             Self::EffectTrace(_) => ViewerArtifactKind::EffectTrace,
+            Self::DurableInspection(_) => ViewerArtifactKind::DurableInspection,
             Self::Minimization(_) => ViewerArtifactKind::Minimization,
         }
     }
@@ -222,6 +226,7 @@ pub enum ViewerArtifactKind {
     SweepReport,
     ExperimentSuite,
     EffectTrace,
+    DurableInspection,
     Minimization,
 }
 
@@ -2339,6 +2344,7 @@ mod tests {
                 total_invoked_events: 0,
                 checkpoint_writes: 0,
                 checkpoint_error: None,
+                durable_recovery: None,
             },
         }
     }
@@ -2357,6 +2363,41 @@ mod tests {
     }
 
     #[test]
+    fn durable_inspection_artifact_round_trips_through_viewer_surface() {
+        let artifact = ViewerArtifactFile::new(ViewerArtifact::DurableInspection(Box::new(
+            DurableInspectionReport {
+                wal_entries: vec![telltale_simulator::durability::DurableWalEntryProjection {
+                    tick: 4,
+                    operation_id: "op#durable".to_string(),
+                    kind: telltale_simulator::durability::DurableWalEntryKind::Escalation,
+                    detail: "provisional -> soft_safe evidence=e#1".to_string(),
+                }],
+                evidence_cache_entries: vec![
+                    telltale_simulator::durability::EvidenceCacheEntryProjection {
+                        evidence_id: "e#1".to_string(),
+                        interface_name: "Storage".to_string(),
+                        operation_name: "commit".to_string(),
+                        outcome_status: "success".to_string(),
+                    },
+                ],
+                recovery: None,
+            },
+        )));
+        let file = NamedTempFile::new().expect("temp file");
+        artifact.write_json(file.path()).expect("write artifact");
+        let loaded = ViewerArtifactFile::load_json(file.path()).expect("load artifact");
+        assert_eq!(loaded.kind(), ViewerArtifactKind::DurableInspection);
+        match loaded.artifact {
+            ViewerArtifact::DurableInspection(report) => {
+                assert_eq!(report.wal_entries.len(), 1);
+                assert_eq!(report.evidence_cache_entries.len(), 1);
+                assert_eq!(report.wal_entries[0].operation_id, "op#durable");
+            }
+            other => panic!("unexpected artifact kind: {other:?}"),
+        }
+    }
+
+    #[test]
     fn viewer_artifact_file_rejects_unknown_schema_version() {
         let mut artifact = ViewerArtifactFile::new(ViewerArtifact::DecisionReport(
             telltale_simulator::decision::decide_theorem_eligibility(&Scenario {
@@ -2371,6 +2412,7 @@ mod tests {
                 adversaries: Vec::new(),
                 properties: None,
                 checkpoint_interval: None,
+                durability: Default::default(),
                 theorem: Default::default(),
                 extensions: BTreeMap::new(),
             }),

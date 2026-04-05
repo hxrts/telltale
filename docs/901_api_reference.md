@@ -135,6 +135,8 @@ Module access (not re-exported at crate root):
   `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata, DurableRecoveryPlan, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest}`
   These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, recovery metadata, typed recovery planning, and the internal `wal_sync` durability boundary.
   Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
+  Downstream integrations should implement `AgreementWal` and/or `EvidenceOutcomeCache` directly rather than introducing backend-branded wrapper APIs.
+  The supported contract is append/read/load plus fail-closed error returns; storage-specific retries, replication, or transport details must remain behind that trait boundary.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`
 - Runtime contracts:
@@ -167,6 +169,11 @@ Module access (not re-exported at crate root):
   Scenarios that declare `DurabilityMode::Wal` must resume through `resume_with_durable_checkpoint_artifact(...)` so the simulator cannot bypass the typed WAL/evidence contract.
 - `telltale_simulator::durability::{FaultInjectingAgreementWal, DurableFaultProgram, ScheduledDurableFault, DurableFaultKind, DurableFaultRecord, DurableRecoveryRun, DurablePropertyReport, run_durable_recovery_case, durable_property_report}`
   This is the reusable simulator-side durability assurance surface for deterministic fault injection, crash/recovery comparison, and durable property monitoring.
+- `telltale_simulator::durability::{DurableInspectionReport, DurableWalEntryProjection, EvidenceCacheEntryProjection, inspect_durable_artifacts}`
+  These are observed-only tooling projections of authoritative durable artifacts for viewer and CLI inspection.
+- CLI surface:
+  `cargo run -p telltale-simulator --bin durable -- --wal <wal.cbor> --cache <cache.cbor> [--checkpoint <checkpoint.cbor> --scenario <scenario.toml>] [--json]`
+  This inspection-only lane projects typed WAL/cache/recovery artifacts without exposing backend-specific storage details.
 - `telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport, ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep}`
   Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
 - `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`

@@ -238,6 +238,38 @@ struct CountingHandler {
     step_calls: Arc<AtomicUsize>,
 }
 
+#[derive(Debug, Default)]
+struct FakeRemoteAgreementWal {
+    entries: Vec<AgreementWalEntry>,
+    load_calls: usize,
+}
+
+impl AgreementWal for FakeRemoteAgreementWal {
+    fn append(&mut self, entry: AgreementWalEntry) -> Result<(), String> {
+        self.entries.push(entry);
+        AgreementWalArtifact {
+            entries: self.entries.clone(),
+        }
+        .validate_monotonic_escalations()
+    }
+
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementWalEntry>, String> {
+        Ok(self
+            .entries
+            .iter()
+            .filter(|entry| entry.tick() > tick)
+            .cloned()
+            .collect())
+    }
+
+    fn load(&self) -> Result<AgreementWalArtifact, String> {
+        let _ = self.load_calls;
+        Ok(AgreementWalArtifact {
+            entries: self.entries.clone(),
+        })
+    }
+}
+
 impl EffectHandler for CountingHandler {
     fn handler_identity(&self) -> String {
         "counting_handler".to_string()
@@ -355,6 +387,25 @@ fn agreement_wal_handler_records_and_replays_wal_sync() {
 
     let replay = ReplayEffectHandler::new(recorder.effect_trace());
     assert!(matches!(replay.wal_sync(&sync), EffectResult::Success(())));
+}
+
+#[test]
+fn custom_agreement_wal_backend_integrates_without_storage_specific_assumptions() {
+    let backend = FakeRemoteAgreementWal::default();
+    let base = CountingHandler::default();
+    let handler = AgreementWalHandler::new(&base, backend);
+    let sync = sample_wal_sync_request();
+
+    assert!(matches!(handler.wal_sync(&sync), EffectResult::Success(())));
+
+    let snapshot = handler.wal_snapshot().expect("load fake backend snapshot");
+    assert!(snapshot.entries.iter().any(|entry| {
+        matches!(
+            entry,
+            AgreementWalEntry::VisibilityGateCrossing { operation_id, .. }
+                if operation_id == &sync.operation_id
+        )
+    }));
 }
 
 #[test]

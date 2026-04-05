@@ -258,6 +258,58 @@ pub struct DurablePropertyReport {
     pub violations: Vec<String>,
 }
 
+/// Projection kind for one durable WAL entry in inspection tooling.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DurableWalEntryKind {
+    /// Agreement-level escalation entry.
+    Escalation,
+    /// Evidence production entry.
+    EvidenceProduced,
+    /// Finalization entry.
+    Finalization,
+    /// Visibility-gate crossing entry.
+    VisibilityGateCrossing,
+}
+
+/// Observed-only projection of one durable WAL entry.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DurableWalEntryProjection {
+    /// Tick at which the durable transition was observed.
+    pub tick: u64,
+    /// Stable operation id for the entry.
+    pub operation_id: String,
+    /// Projection kind for viewer/CLI tooling.
+    pub kind: DurableWalEntryKind,
+    /// Human-readable detail string.
+    pub detail: String,
+}
+
+/// Observed-only projection of one evidence-cache entry.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct EvidenceCacheEntryProjection {
+    /// Stable evidence id.
+    pub evidence_id: String,
+    /// Effect interface that produced the cached evidence.
+    pub interface_name: String,
+    /// Effect operation that produced the cached evidence.
+    pub operation_name: String,
+    /// Stable outcome-status label.
+    pub outcome_status: String,
+}
+
+/// Observed-only durable inspection report for viewer and CLI surfaces.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DurableInspectionReport {
+    /// Projected WAL entries.
+    pub wal_entries: Vec<DurableWalEntryProjection>,
+    /// Projected evidence-cache entries.
+    pub evidence_cache_entries: Vec<EvidenceCacheEntryProjection>,
+    /// Typed durable recovery summary when available.
+    #[serde(default)]
+    pub recovery: Option<crate::runner::DurableResumeSummary>,
+}
+
 /// Evaluate the durable property monitors used by simulator assurance tests.
 #[must_use]
 pub fn durable_property_report(
@@ -285,6 +337,90 @@ pub fn durable_property_report(
         Err(err) => report.violations.push(err),
     }
     report
+}
+
+/// Project authoritative durable artifacts into one observed-only inspection report.
+#[must_use]
+pub fn inspect_durable_artifacts(
+    wal: &AgreementWalArtifact,
+    evidence_cache: &EvidenceOutcomeCacheArtifact,
+    recovery: Option<&crate::runner::DurableResumeSummary>,
+) -> DurableInspectionReport {
+    DurableInspectionReport {
+        wal_entries: wal
+            .entries
+            .iter()
+            .map(|entry| match entry {
+                AgreementWalEntry::Escalation {
+                    operation_id,
+                    previous_level,
+                    new_level,
+                    evidence_id,
+                    tick,
+                } => DurableWalEntryProjection {
+                    tick: *tick,
+                    operation_id: operation_id.clone(),
+                    kind: DurableWalEntryKind::Escalation,
+                    detail: format!(
+                        "{previous_level:?} -> {new_level:?}{}",
+                        evidence_id
+                            .as_ref()
+                            .map(|evidence_id| format!(" evidence={evidence_id}"))
+                            .unwrap_or_default()
+                    ),
+                },
+                AgreementWalEntry::EvidenceProduced { evidence, tick } => {
+                    DurableWalEntryProjection {
+                        tick: *tick,
+                        operation_id: evidence.operation_id.clone(),
+                        kind: DurableWalEntryKind::EvidenceProduced,
+                        detail: format!(
+                            "{:?} level={:?} authoritative={}",
+                            evidence.kind, evidence.level, evidence.authoritative
+                        ),
+                    }
+                }
+                AgreementWalEntry::Finalization {
+                    operation_id,
+                    outcome,
+                    materialization_proof_id,
+                    canonical_handle_id,
+                    tick,
+                } => DurableWalEntryProjection {
+                    tick: *tick,
+                    operation_id: operation_id.clone(),
+                    kind: DurableWalEntryKind::Finalization,
+                    detail: format!(
+                        "{outcome:?} proof={} handle={}",
+                        materialization_proof_id.as_deref().unwrap_or("-"),
+                        canonical_handle_id.as_deref().unwrap_or("-")
+                    ),
+                },
+                AgreementWalEntry::VisibilityGateCrossing {
+                    operation_id,
+                    downstream_coroutine_id,
+                    gate_level,
+                    tick,
+                } => DurableWalEntryProjection {
+                    tick: *tick,
+                    operation_id: operation_id.clone(),
+                    kind: DurableWalEntryKind::VisibilityGateCrossing,
+                    detail: format!("downstream={downstream_coroutine_id} gate={gate_level:?}"),
+                },
+            })
+            .collect(),
+        evidence_cache_entries: evidence_cache
+            .entries
+            .iter()
+            .map(|entry| EvidenceCacheEntryProjection {
+                evidence_id: entry.evidence_id.clone(),
+                interface_name: entry.interface_name.clone(),
+                operation_name: entry.operation_name.clone(),
+                outcome_status: format!("{:?}", entry.outcome.status),
+            })
+            .collect(),
+        recovery: recovery.cloned(),
+    }
 }
 
 /// Check the write-ahead property against WAL gate crossings and recorded `wal_sync` effects.
