@@ -472,9 +472,14 @@ check-aura-borrowed-lints:
     just check-time-domain-boundaries
     just check-style-boundaries
     just check-viewer-tooling-boundaries
+    just check-durable-boundaries
     just check-docs-semantic-drift
     just check-verification-inventory
     just check-macro-boundaries
+
+# Keep typed durability artifacts on the authoritative machine/runtime side.
+check-durable-boundaries:
+    ./scripts/check/durable-boundaries.sh
 
 # Enforce the shared viewer/webapp boundary and docs alignment.
 check-viewer-tooling-boundaries:

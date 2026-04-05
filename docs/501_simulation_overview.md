@@ -18,6 +18,8 @@ The simulator wraps the protocol machine defined in `telltale-machine`.
 The protocol machine owns scheduling and session-type enforcement.
 The simulator adds middleware layers (adversaries, network, properties, checkpoints) and environment dynamics (fields) around that core.
 See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for the underlying execution model.
+Durable agreement journals and evidence-scoped recovery metadata remain authoritative machine/runtime artifacts.
+Simulator reports and viewer projections should consume typed durable artifacts rather than minting a parallel simulator-local durability state model.
 
 `ObsEvent` is the protocol machine's trace of communication actions such as sends, receives, choices, and offers.
 Scenario execution order, property monitoring, and replay artifacts all operate over this event stream.
