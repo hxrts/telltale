@@ -136,7 +136,7 @@ Module access (not re-exported at crate root):
   These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, recovery metadata, typed recovery planning, and the internal `wal_sync` durability boundary.
   Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
   Downstream integrations should implement `AgreementWal` and/or `EvidenceOutcomeCache` directly rather than introducing backend-branded wrapper APIs.
-  The supported contract is append/read/load plus fail-closed error returns; storage-specific retries, replication, or transport details must remain behind that trait boundary.
+  The supported contract is append/read/load plus fail-closed error returns. Storage-specific retries, replication, or transport details must remain behind that trait boundary.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`
 - Runtime contracts:

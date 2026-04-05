@@ -15,11 +15,12 @@ use telltale_simulator::durability::{
     durable_property_report, inspect_durable_artifacts, monitor_evidence_consistency,
     monitor_monotonic_wal_levels, monitor_recovery_equivalence, monitor_write_ahead,
     run_durable_recovery_case, DurableFaultKind, DurableFaultOutcome, DurableFaultProgram,
-    DurableWalEntryKind, FaultInjectingAgreementWal, ScheduledDurableFault,
+    DurableInspectionReport, DurableWalEntryKind, FaultInjectingAgreementWal,
+    ScheduledDurableFault,
 };
 use telltale_simulator::runner::{
     resume_with_durable_checkpoint_artifact, run_canonical_replay, run_with_scenario,
-    DurableResumeArtifacts,
+    DurableResumeArtifacts, DurableResumeSummary,
 };
 use telltale_simulator::scenario::{DurabilityMode, Scenario};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -573,6 +574,16 @@ fn durable_property_monitors_fail_closed_with_precise_diagnostics() {
 
 #[test]
 fn inspect_durable_artifacts_projects_every_entry_family_and_recovery_summary() {
+    let (wal, evidence_cache, summary) = durable_projection_fixture();
+    let report = inspect_durable_artifacts(&wal, &evidence_cache, Some(&summary));
+    assert_durable_projection_report(&report, &summary);
+}
+
+fn durable_projection_fixture() -> (
+    AgreementWalArtifact,
+    EvidenceOutcomeCacheArtifact,
+    DurableResumeSummary,
+) {
     let wal = AgreementWalArtifact {
         entries: vec![
             AgreementWalEntry::Escalation {
@@ -639,9 +650,15 @@ fn inspect_durable_artifacts_projects_every_entry_family_and_recovery_summary() 
         .stats
         .durable_recovery
         .as_ref()
-        .expect("durable recovery summary");
+        .expect("durable recovery summary")
+        .clone();
+    (wal, evidence_cache, summary)
+}
 
-    let report = inspect_durable_artifacts(&wal, &evidence_cache, Some(summary));
+fn assert_durable_projection_report(
+    report: &DurableInspectionReport,
+    summary: &DurableResumeSummary,
+) {
     assert_eq!(report.wal_entries.len(), 4);
     assert_eq!(
         report
@@ -671,7 +688,7 @@ fn inspect_durable_artifacts_projects_every_entry_family_and_recovery_summary() 
     );
     assert_eq!(report.evidence_cache_entries.len(), 1);
     assert_eq!(report.evidence_cache_entries[0].evidence_id, "soft#1");
-    let projected_recovery = report.recovery.expect("recovery summary");
+    let projected_recovery = report.recovery.as_ref().expect("recovery summary");
     assert_eq!(
         projected_recovery.execution_regime,
         summary.execution_regime

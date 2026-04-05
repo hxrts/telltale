@@ -1093,8 +1093,8 @@ impl InMemoryViewerService {
         let baseline = self.scenario_bundle_for_artifact(&request.baseline_artifact_id)?;
         let candidate = self.scenario_bundle_for_artifact(&request.candidate_artifact_id)?;
         Ok(build_semantic_comparison_result(
-            request.baseline_artifact_id.clone(),
-            request.candidate_artifact_id.clone(),
+            &request.baseline_artifact_id,
+            &request.candidate_artifact_id,
             baseline,
             candidate,
         ))
@@ -1107,8 +1107,8 @@ impl InMemoryViewerService {
         let baseline = self.scenario_bundle_for_artifact(&request.baseline_artifact_id)?;
         let candidate = self.scenario_bundle_for_artifact(&request.candidate_artifact_id)?;
         Ok(build_comparison_counterexample(
-            request.baseline_artifact_id.clone(),
-            request.candidate_artifact_id.clone(),
+            &request.baseline_artifact_id,
+            &request.candidate_artifact_id,
             baseline,
             candidate,
         ))
@@ -1260,7 +1260,7 @@ impl InMemoryViewerService {
 
     fn build_minimization_result(
         &self,
-        request: MinimizationRequest,
+        request: &MinimizationRequest,
     ) -> Result<MinimizationResult, ViewerModelError> {
         let bundle = self.scenario_bundle_for_artifact(&request.artifact_id)?;
         let retained_counterexample = self.artifact_counterexample(&request.artifact_id).ok();
@@ -1271,13 +1271,7 @@ impl InMemoryViewerService {
                 .and_then(|point| point.step)
                 .or_else(|| bundle.result.violations.first().map(|_| 1))
                 .unwrap_or_else(|| bundle.result.stats.rounds_executed.max(1)),
-            MinimizationStrategy::FirstViolationPrefix => {
-                if bundle.result.violations.is_empty() {
-                    1
-                } else {
-                    1
-                }
-            }
+            MinimizationStrategy::FirstViolationPrefix => 1,
         };
         let minimized_steps = minimized_steps.max(1);
         Ok(MinimizationResult {
@@ -1294,6 +1288,65 @@ impl InMemoryViewerService {
                 request.artifact_id, request.branch_id, minimized_steps
             ),
         })
+    }
+
+    fn search_branch_matches(&self, matches: &mut Vec<SearchResult>, needle: &str) {
+        for (run_id, run) in &self.runs {
+            for (branch_id, branch) in &run.branches {
+                if branch_id.to_lowercase().contains(needle) {
+                    matches.push(SearchResult {
+                        artifact_id: run
+                            .root_artifact_id
+                            .clone()
+                            .unwrap_or_else(|| run_id.clone()),
+                        domain: SearchDomain::Branch,
+                        label: branch_id.clone(),
+                        detail: format!("from step {}", branch.from_step),
+                        branch_id: Some(branch_id.clone()),
+                        step: Some(branch.from_step),
+                    });
+                }
+            }
+        }
+    }
+
+    fn scenario_bundle_artifact_ids(&self) -> Vec<ArtifactId> {
+        self.artifacts
+            .iter()
+            .filter(|(_, artifact)| matches!(artifact.artifact, ViewerArtifact::ScenarioBundle(_)))
+            .map(|(artifact_id, _)| artifact_id.clone())
+            .collect()
+    }
+
+    fn search_divergence_matches(&self, matches: &mut Vec<SearchResult>, needle: &str) {
+        let scenario_ids = self.scenario_bundle_artifact_ids();
+        for pair in scenario_ids.windows(2) {
+            if let [baseline_artifact_id, candidate_artifact_id] = pair {
+                let request = SemanticComparisonRequest {
+                    baseline_artifact_id: baseline_artifact_id.clone(),
+                    candidate_artifact_id: candidate_artifact_id.clone(),
+                };
+                if let Ok(comparison) = self.semantic_comparison(&request) {
+                    if let Some(point) = comparison.first_divergence {
+                        let haystack = format!(
+                            "{} {} {}",
+                            comparison.summary, point.label, point.baseline_detail
+                        )
+                        .to_lowercase();
+                        if haystack.contains(needle) {
+                            matches.push(SearchResult {
+                                artifact_id: candidate_artifact_id.clone(),
+                                domain: SearchDomain::Divergence,
+                                label: point.label,
+                                detail: comparison.summary,
+                                branch_id: Some("root".to_string()),
+                                step: point.step,
+                            });
+                        }
+                    }
+                }
+            }
+        }
     }
 
     fn graph_projection_for_request(
@@ -1555,6 +1608,118 @@ impl InMemoryViewerService {
         })
     }
 
+    fn import_artifact_command(
+        &mut self,
+        artifact_id: ArtifactId,
+        artifact: &ViewerArtifactFile,
+    ) -> Result<ViewerCommandResult, ViewerModelError> {
+        artifact.validate()?;
+        self.artifacts.insert(artifact_id.clone(), artifact.clone());
+        if matches!(artifact.artifact, ViewerArtifact::ScenarioBundle(_)) {
+            let workspace = self.ensure_run_workspace(&artifact_id);
+            workspace.root_artifact_id = Some(artifact_id.clone());
+        }
+        Ok(ViewerCommandResult::ArtifactImported { artifact_id })
+    }
+
+    fn create_branch_command(
+        &mut self,
+        run_id: RunId,
+        branch_id: BranchId,
+        parent_branch_id: BranchId,
+        from_step: u64,
+        patch: ScenarioBranchPatch,
+    ) -> Result<ViewerCommandResult, ViewerModelError> {
+        let run = self.ensure_run_workspace(&run_id);
+        if !run.branches.contains_key(&parent_branch_id) {
+            return Err(ViewerModelError::NotFound {
+                kind: "parent_branch".to_string(),
+                id: parent_branch_id,
+            });
+        }
+        run.branches.insert(
+            branch_id.clone(),
+            BranchWorkspace {
+                parent_branch_id: Some(parent_branch_id),
+                from_step,
+                patches: vec![patch],
+                deleted: false,
+                rerun_requested: false,
+            },
+        );
+        Ok(ViewerCommandResult::BranchCreated { run_id, branch_id })
+    }
+
+    fn update_branch_command(
+        &mut self,
+        run_id: RunId,
+        branch_id: BranchId,
+        patch: ScenarioBranchPatch,
+    ) -> Result<ViewerCommandResult, ViewerModelError> {
+        let run = self
+            .runs
+            .get_mut(&run_id)
+            .ok_or_else(|| ViewerModelError::NotFound {
+                kind: "run".to_string(),
+                id: run_id.clone(),
+            })?;
+        let branch =
+            run.branches
+                .get_mut(&branch_id)
+                .ok_or_else(|| ViewerModelError::NotFound {
+                    kind: "branch".to_string(),
+                    id: branch_id.clone(),
+                })?;
+        branch.patches.push(patch);
+        Ok(ViewerCommandResult::BranchUpdated { run_id, branch_id })
+    }
+
+    fn mark_branch_deleted(
+        &mut self,
+        run_id: RunId,
+        branch_id: BranchId,
+    ) -> Result<ViewerCommandResult, ViewerModelError> {
+        let run = self
+            .runs
+            .get_mut(&run_id)
+            .ok_or_else(|| ViewerModelError::NotFound {
+                kind: "run".to_string(),
+                id: run_id.clone(),
+            })?;
+        let branch =
+            run.branches
+                .get_mut(&branch_id)
+                .ok_or_else(|| ViewerModelError::NotFound {
+                    kind: "branch".to_string(),
+                    id: branch_id.clone(),
+                })?;
+        branch.deleted = true;
+        Ok(ViewerCommandResult::BranchDeleted { run_id, branch_id })
+    }
+
+    fn mark_rerun_requested(
+        &mut self,
+        run_id: RunId,
+        branch_id: BranchId,
+    ) -> Result<ViewerCommandResult, ViewerModelError> {
+        let run = self
+            .runs
+            .get_mut(&run_id)
+            .ok_or_else(|| ViewerModelError::NotFound {
+                kind: "run".to_string(),
+                id: run_id.clone(),
+            })?;
+        let branch =
+            run.branches
+                .get_mut(&branch_id)
+                .ok_or_else(|| ViewerModelError::NotFound {
+                    kind: "branch".to_string(),
+                    id: branch_id.clone(),
+                })?;
+        branch.rerun_requested = true;
+        Ok(ViewerCommandResult::RerunRequested { run_id, branch_id })
+    }
+
     fn search(&self, query: &SearchQuery) -> Result<ViewerQueryResult, ViewerModelError> {
         let needle = query.text.to_lowercase();
         let mut matches = Vec::new();
@@ -1577,60 +1742,10 @@ impl InMemoryViewerService {
             }
         }
         if query.domain.is_none() || query.domain == Some(SearchDomain::Branch) {
-            for (run_id, run) in &self.runs {
-                for (branch_id, branch) in &run.branches {
-                    if branch_id.to_lowercase().contains(&needle) {
-                        matches.push(SearchResult {
-                            artifact_id: run
-                                .root_artifact_id
-                                .clone()
-                                .unwrap_or_else(|| run_id.clone()),
-                            domain: SearchDomain::Branch,
-                            label: branch_id.clone(),
-                            detail: format!("from step {}", branch.from_step),
-                            branch_id: Some(branch_id.clone()),
-                            step: Some(branch.from_step),
-                        });
-                    }
-                }
-            }
+            self.search_branch_matches(&mut matches, &needle);
         }
         if query.domain.is_none() || query.domain == Some(SearchDomain::Divergence) {
-            let scenario_ids = self
-                .artifacts
-                .iter()
-                .filter_map(|(artifact_id, artifact)| {
-                    matches!(artifact.artifact, ViewerArtifact::ScenarioBundle(_))
-                        .then(|| artifact_id.clone())
-                })
-                .collect::<Vec<_>>();
-            for pair in scenario_ids.windows(2) {
-                if let [baseline_artifact_id, candidate_artifact_id] = pair {
-                    let request = SemanticComparisonRequest {
-                        baseline_artifact_id: baseline_artifact_id.clone(),
-                        candidate_artifact_id: candidate_artifact_id.clone(),
-                    };
-                    if let Ok(comparison) = self.semantic_comparison(&request) {
-                        if let Some(point) = comparison.first_divergence {
-                            let haystack = format!(
-                                "{} {} {}",
-                                comparison.summary, point.label, point.baseline_detail
-                            )
-                            .to_lowercase();
-                            if haystack.contains(&needle) {
-                                matches.push(SearchResult {
-                                    artifact_id: candidate_artifact_id.clone(),
-                                    domain: SearchDomain::Divergence,
-                                    label: point.label,
-                                    detail: comparison.summary,
-                                    branch_id: Some("root".to_string()),
-                                    step: point.step,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+            self.search_divergence_matches(&mut matches, &needle);
         }
         if query.domain.is_none() || query.domain == Some(SearchDomain::Sweep) {
             for report in self.sweeps.values() {
@@ -1820,99 +1935,24 @@ impl ViewerApplicationService for InMemoryViewerService {
             ViewerCommand::ImportArtifact {
                 artifact_id,
                 artifact,
-            } => {
-                let artifact = *artifact;
-                artifact.validate()?;
-                self.artifacts.insert(artifact_id.clone(), artifact.clone());
-                if matches!(artifact.artifact, ViewerArtifact::ScenarioBundle(_)) {
-                    let workspace = self.ensure_run_workspace(&artifact_id);
-                    workspace.root_artifact_id = Some(artifact_id.clone());
-                }
-                Ok(ViewerCommandResult::ArtifactImported { artifact_id })
-            }
+            } => self.import_artifact_command(artifact_id, &artifact),
             ViewerCommand::CreateBranch {
                 run_id,
                 branch_id,
                 parent_branch_id,
                 from_step,
                 patch,
-            } => {
-                let run = self.ensure_run_workspace(&run_id);
-                if !run.branches.contains_key(&parent_branch_id) {
-                    return Err(ViewerModelError::NotFound {
-                        kind: "parent_branch".to_string(),
-                        id: parent_branch_id,
-                    });
-                }
-                run.branches.insert(
-                    branch_id.clone(),
-                    BranchWorkspace {
-                        parent_branch_id: Some(parent_branch_id),
-                        from_step,
-                        patches: vec![patch],
-                        deleted: false,
-                        rerun_requested: false,
-                    },
-                );
-                Ok(ViewerCommandResult::BranchCreated { run_id, branch_id })
-            }
+            } => self.create_branch_command(run_id, branch_id, parent_branch_id, from_step, patch),
             ViewerCommand::UpdateBranch {
                 run_id,
                 branch_id,
                 patch,
-            } => {
-                let run = self
-                    .runs
-                    .get_mut(&run_id)
-                    .ok_or_else(|| ViewerModelError::NotFound {
-                        kind: "run".to_string(),
-                        id: run_id.clone(),
-                    })?;
-                let branch =
-                    run.branches
-                        .get_mut(&branch_id)
-                        .ok_or_else(|| ViewerModelError::NotFound {
-                            kind: "branch".to_string(),
-                            id: branch_id.clone(),
-                        })?;
-                branch.patches.push(patch);
-                Ok(ViewerCommandResult::BranchUpdated { run_id, branch_id })
-            }
+            } => self.update_branch_command(run_id, branch_id, patch),
             ViewerCommand::DeleteBranch { run_id, branch_id } => {
-                let run = self
-                    .runs
-                    .get_mut(&run_id)
-                    .ok_or_else(|| ViewerModelError::NotFound {
-                        kind: "run".to_string(),
-                        id: run_id.clone(),
-                    })?;
-                let branch =
-                    run.branches
-                        .get_mut(&branch_id)
-                        .ok_or_else(|| ViewerModelError::NotFound {
-                            kind: "branch".to_string(),
-                            id: branch_id.clone(),
-                        })?;
-                branch.deleted = true;
-                Ok(ViewerCommandResult::BranchDeleted { run_id, branch_id })
+                self.mark_branch_deleted(run_id, branch_id)
             }
             ViewerCommand::RequestRerun { run_id, branch_id } => {
-                let run = self
-                    .runs
-                    .get_mut(&run_id)
-                    .ok_or_else(|| ViewerModelError::NotFound {
-                        kind: "run".to_string(),
-                        id: run_id.clone(),
-                    })?;
-                let branch =
-                    run.branches
-                        .get_mut(&branch_id)
-                        .ok_or_else(|| ViewerModelError::NotFound {
-                            kind: "branch".to_string(),
-                            id: branch_id.clone(),
-                        })?;
-                branch.rerun_requested = true;
-                Ok(ViewerCommandResult::RerunRequested { run_id, branch_id })
+                self.mark_rerun_requested(run_id, branch_id)
             }
             ViewerCommand::ExecuteSweep {
                 sweep_id,
@@ -1941,7 +1981,7 @@ impl ViewerApplicationService for InMemoryViewerService {
             }
             ViewerCommand::RequestMinimization { request } => {
                 let request_id = request.request_id.clone();
-                let result = self.build_minimization_result(request)?;
+                let result = self.build_minimization_result(&request)?;
                 self.minimizations.insert(request_id.clone(), result);
                 Ok(ViewerCommandResult::MinimizationRequested { request_id })
             }
@@ -2066,8 +2106,8 @@ fn first_trace_divergence(
 
 #[authoritative_source("viewer_semantic_comparison")]
 fn build_semantic_comparison_result(
-    baseline_artifact_id: ArtifactId,
-    candidate_artifact_id: ArtifactId,
+    baseline_artifact_id: &str,
+    candidate_artifact_id: &str,
     baseline: &ScenarioBundleArtifact,
     candidate: &ScenarioBundleArtifact,
 ) -> SemanticComparisonResult {
@@ -2111,8 +2151,8 @@ fn build_semantic_comparison_result(
         }
     };
     SemanticComparisonResult {
-        baseline_artifact_id,
-        candidate_artifact_id,
+        baseline_artifact_id: baseline_artifact_id.to_string(),
+        candidate_artifact_id: candidate_artifact_id.to_string(),
         relation,
         normalized_observability,
         classification_changed_only,
@@ -2123,14 +2163,14 @@ fn build_semantic_comparison_result(
 
 #[authoritative_source("viewer_comparison_counterexample")]
 fn build_comparison_counterexample(
-    baseline_artifact_id: ArtifactId,
-    candidate_artifact_id: ArtifactId,
+    baseline_artifact_id: &str,
+    candidate_artifact_id: &str,
     baseline: &ScenarioBundleArtifact,
     candidate: &ScenarioBundleArtifact,
 ) -> TheoremAwareCounterexample {
     let comparison = build_semantic_comparison_result(
-        baseline_artifact_id.clone(),
-        candidate_artifact_id.clone(),
+        baseline_artifact_id,
+        candidate_artifact_id,
         baseline,
         candidate,
     );
@@ -2161,7 +2201,7 @@ fn build_artifact_counterexample(bundle: &ScenarioBundleArtifact) -> TheoremAwar
         .scenario
         .as_ref()
         .map(decide_theorem_eligibility)
-        .or_else(|| {
+        .or({
             Some(DecisionReport {
                 kind: DecisionKind::TheoremEligibility,
                 outcome: DecisionOutcome::Certified(
@@ -2706,6 +2746,15 @@ mod tests {
     #[test]
     fn counterexample_sweep_effect_and_minimization_queries_round_trip() {
         let mut service = InMemoryViewerService::new();
+        import_counterexample_fixture(&mut service);
+        assert_counterexample_query(&service);
+        assert_sweep_query(&mut service);
+        assert_suite_query(&mut service);
+        assert_effect_trace_query(&mut service);
+        assert_minimization_query(&mut service);
+    }
+
+    fn import_counterexample_fixture(service: &mut InMemoryViewerService) {
         let mut ineligible_result = sample_result();
         ineligible_result.stats.theorem_profile.assumption_bundle =
             TheoremAssumptionBundle::ObservedTransport;
@@ -2726,7 +2775,9 @@ mod tests {
                 })
                 .expect("import scenario bundle");
         }
+    }
 
+    fn assert_counterexample_query(service: &InMemoryViewerService) {
         let counterexample = service
             .query(ViewerQuery::ArtifactCounterexample {
                 artifact_id: "run/ineligible".to_string(),
@@ -2741,7 +2792,9 @@ mod tests {
             }
             other => panic!("unexpected counterexample result: {other:?}"),
         }
+    }
 
+    fn assert_sweep_query(service: &mut InMemoryViewerService) {
         service
             .command(ViewerCommand::ExecuteSweep {
                 sweep_id: "sweep/demo".to_string(),
@@ -2778,7 +2831,9 @@ mod tests {
             }
             other => panic!("unexpected sweep explorer result: {other:?}"),
         }
+    }
 
+    fn assert_suite_query(service: &mut InMemoryViewerService) {
         service
             .command(ViewerCommand::ExecuteExperimentSuite {
                 definition: ExperimentSuiteDefinition {
@@ -2806,7 +2861,9 @@ mod tests {
             }
             other => panic!("unexpected suite result: {other:?}"),
         }
+    }
 
+    fn assert_effect_trace_query(service: &mut InMemoryViewerService) {
         service
             .command(mocked_rerun_command(
                 "run/base".to_string(),
@@ -2827,7 +2884,9 @@ mod tests {
             }
             other => panic!("unexpected effect trace result: {other:?}"),
         }
+    }
 
+    fn assert_minimization_query(service: &mut InMemoryViewerService) {
         service
             .command(minimize_branch_command(
                 "minimize:run/base:root",

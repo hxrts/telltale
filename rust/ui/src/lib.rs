@@ -1995,9 +1995,8 @@ pub fn demo_workspace() -> ViewerWorkspace {
         .expect("demo workspace should load through the typed viewer service")
 }
 
-fn demo_service() -> InMemoryViewerService {
-    let mut service = InMemoryViewerService::new();
-    let scenario = Scenario {
+fn demo_scenario() -> Scenario {
+    Scenario {
         name: "demo_mesh".to_string(),
         roles: vec!["alpha".to_string(), "beta".to_string(), "gamma".to_string()],
         steps: 4,
@@ -2017,8 +2016,11 @@ fn demo_service() -> InMemoryViewerService {
         theorem: TheoremProfileSpec::default(),
         durability: DurabilitySpec::default(),
         extensions: BTreeMap::new(),
-    };
-    let mut alternate_scenario = scenario.clone();
+    }
+}
+
+fn demo_alternate_bundle() -> ViewerArtifactFile {
+    let mut alternate_scenario = demo_scenario();
     alternate_scenario.name = "demo_mesh_alt".to_string();
     alternate_scenario.theorem = TheoremProfileSpec {
         assumption_bundle: TheoremAssumptionBundle::ObservedTransport,
@@ -2037,17 +2039,20 @@ fn demo_service() -> InMemoryViewerService {
         TheoremAssumptionBundle::ObservedTransport;
     alternate_result.stats.theorem_profile.eligibility_reason =
         Some("observed transport is not theorem-exact".to_string());
-    let scenario_bundle = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
-        ScenarioBundleArtifact::new(
-            Some(scenario),
-            sample_result(),
-            Some(ContractCheckReport::pass()),
-        ),
-    )));
-    let alternate_bundle = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
+    ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
         ScenarioBundleArtifact::new(
             Some(alternate_scenario),
             alternate_result,
+            Some(ContractCheckReport::pass()),
+        ),
+    )))
+}
+
+fn import_demo_artifacts(service: &mut InMemoryViewerService) {
+    let scenario_bundle = ViewerArtifactFile::new(ViewerArtifact::ScenarioBundle(Box::new(
+        ScenarioBundleArtifact::new(
+            Some(demo_scenario()),
+            sample_result(),
             Some(ContractCheckReport::pass()),
         ),
     )));
@@ -2060,30 +2065,34 @@ fn demo_service() -> InMemoryViewerService {
     let environment_trace =
         ViewerArtifactFile::new(ViewerArtifact::EnvironmentTrace(EnvironmentTrace::default()));
 
-    service
-        .command(ViewerCommand::ImportArtifact {
-            artifact_id: "demo-run".to_string(),
-            artifact: Box::new(scenario_bundle),
-        })
-        .expect("scenario bundle should import");
-    service
-        .command(ViewerCommand::ImportArtifact {
-            artifact_id: "demo-run-alt".to_string(),
-            artifact: Box::new(alternate_bundle),
-        })
-        .expect("alternate scenario bundle should import");
-    service
-        .command(ViewerCommand::ImportArtifact {
-            artifact_id: "demo-decision".to_string(),
-            artifact: Box::new(decision_report),
-        })
-        .expect("decision report should import");
-    service
-        .command(ViewerCommand::ImportArtifact {
-            artifact_id: "demo-environment".to_string(),
-            artifact: Box::new(environment_trace),
-        })
-        .expect("environment trace should import");
+    for (artifact_id, artifact, message) in [
+        ("demo-run", scenario_bundle, "scenario bundle should import"),
+        (
+            "demo-run-alt",
+            demo_alternate_bundle(),
+            "alternate scenario bundle should import",
+        ),
+        (
+            "demo-decision",
+            decision_report,
+            "decision report should import",
+        ),
+        (
+            "demo-environment",
+            environment_trace,
+            "environment trace should import",
+        ),
+    ] {
+        service
+            .command(ViewerCommand::ImportArtifact {
+                artifact_id: artifact_id.to_string(),
+                artifact: Box::new(artifact),
+            })
+            .expect(message);
+    }
+}
+
+fn configure_demo_sweep(service: &mut InMemoryViewerService) {
     service
         .command(ViewerCommand::ExecuteSweep {
             sweep_id: "sweep/demo_mesh".to_string(),
@@ -2105,6 +2114,9 @@ fn demo_service() -> InMemoryViewerService {
             ],
         })
         .expect("demo sweep should execute");
+}
+
+fn configure_demo_suite(service: &mut InMemoryViewerService) {
     service
         .command(ViewerCommand::ExecuteExperimentSuite {
             definition: ExperimentSuiteDefinition {
@@ -2121,6 +2133,9 @@ fn demo_service() -> InMemoryViewerService {
             },
         })
         .expect("demo suite should execute");
+}
+
+fn configure_demo_effects_and_extensions(service: &mut InMemoryViewerService) {
     service
         .command(ViewerCommand::RequestMinimization {
             request: telltale_viewer::MinimizationRequest {
@@ -2165,6 +2180,14 @@ fn demo_service() -> InMemoryViewerService {
             },
         })
         .expect("demo extensions should register");
+}
+
+fn demo_service() -> InMemoryViewerService {
+    let mut service = InMemoryViewerService::new();
+    import_demo_artifacts(&mut service);
+    configure_demo_sweep(&mut service);
+    configure_demo_suite(&mut service);
+    configure_demo_effects_and_extensions(&mut service);
     service
 }
 

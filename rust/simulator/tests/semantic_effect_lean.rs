@@ -353,14 +353,37 @@ fn initial_states() -> BTreeMap<String, Vec<FixedQ32>> {
     ])
 }
 
-fn machine_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
-    let (global, local_types) = simple_send_recv_protocol();
-    let image =
-        telltale_machine::runtime::loader::CodeImage::from_local_types(&local_types, &global);
+fn reduced_fixture(
+    name: &str,
+    effect_kind: &str,
+    lifecycle: &str,
+    interface_name: impl Into<String>,
+    operation_name: impl Into<String>,
+    publication_materialized: bool,
+    output_predicate: Option<String>,
+) -> ReducedSemanticEffectFixture {
+    ReducedSemanticEffectFixture {
+        name: name.to_string(),
+        effect_kind: effect_kind.to_string(),
+        lifecycle: lifecycle.to_string(),
+        interface_name: interface_name.into(),
+        operation_name: operation_name.into(),
+        publication_materialized,
+        output_predicate,
+    }
+}
 
+fn semantic_effect_image() -> telltale_machine::runtime::loader::CodeImage {
+    let (global, local_types) = simple_send_recv_protocol();
+    telltale_machine::runtime::loader::CodeImage::from_local_types(&local_types, &global)
+}
+
+fn blocked_machine_fixture(
+    image: &telltale_machine::runtime::loader::CodeImage,
+) -> ReducedSemanticEffectFixture {
     let mut blocked_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     blocked_machine
-        .load_choreography(&image)
+        .load_choreography(image)
         .expect("load blocked-send machine");
     blocked_machine
         .step(&SimulatorSemanticEffectHandler)
@@ -378,10 +401,23 @@ fn machine_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
         .iter()
         .find(|exchange| exchange.effect_id == blocked_effect.effect_id)
         .expect("matching blocked send exchange");
+    reduced_fixture(
+        "blocked_send",
+        "send_decision",
+        "blocked",
+        blocked_exchange.request.metadata.interface_name.clone(),
+        blocked_exchange.request.metadata.operation_name.clone(),
+        false,
+        None,
+    )
+}
 
+fn internal_machine_fixtures(
+    image: &telltale_machine::runtime::loader::CodeImage,
+) -> Vec<ReducedSemanticEffectFixture> {
     let mut internal_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     internal_machine
-        .load_choreography(&image)
+        .load_choreography(image)
         .expect("load internal-effects machine");
     internal_machine
         .run(&SimulatorSemanticEffectHandler, 64)
@@ -429,72 +465,74 @@ fn machine_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
                     telltale_machine::CanonicalHandleKind::Materialization
                 )
             });
-
-    let mut fixtures = vec![
-        ReducedSemanticEffectFixture {
-            name: "blocked_send".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "blocked".to_string(),
-            interface_name: blocked_exchange.request.metadata.interface_name.clone(),
-            operation_name: blocked_exchange.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "send_publication".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "succeeded".to_string(),
-            interface_name: send_success.request.metadata.interface_name.clone(),
-            operation_name: send_success.request.metadata.operation_name.clone(),
+    vec![
+        reduced_fixture(
+            "send_publication",
+            "send_decision",
+            "succeeded",
+            send_success.request.metadata.interface_name.clone(),
+            send_success.request.metadata.operation_name.clone(),
             publication_materialized,
-            output_predicate: predicate.clone(),
-        },
-        ReducedSemanticEffectFixture {
-            name: "output_condition_hint".to_string(),
-            effect_kind: "output_condition_hint".to_string(),
-            lifecycle: "succeeded".to_string(),
-            interface_name: output_hint.request.metadata.interface_name.clone(),
-            operation_name: output_hint.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: predicate,
-        },
-        ReducedSemanticEffectFixture {
-            name: "wal_sync".to_string(),
-            effect_kind: "wal_sync".to_string(),
-            lifecycle: "succeeded".to_string(),
-            interface_name: wal_sync.request.metadata.interface_name.clone(),
-            operation_name: wal_sync.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "failed_invoke".to_string(),
-            effect_kind: "invoke_step".to_string(),
-            lifecycle: "failed".to_string(),
-            interface_name: "Runtime".to_string(),
-            operation_name: "invoke".to_string(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "send_before_fault".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "succeeded_then_faulted".to_string(),
-            interface_name: "Transport".to_string(),
-            operation_name: "sendDecision".to_string(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "resumed_send".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "resumed".to_string(),
-            interface_name: "Transport".to_string(),
-            operation_name: "sendDecision".to_string(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-    ];
+            predicate.clone(),
+        ),
+        reduced_fixture(
+            "output_condition_hint",
+            "output_condition_hint",
+            "succeeded",
+            output_hint.request.metadata.interface_name.clone(),
+            output_hint.request.metadata.operation_name.clone(),
+            false,
+            predicate,
+        ),
+        reduced_fixture(
+            "wal_sync",
+            "wal_sync",
+            "succeeded",
+            wal_sync.request.metadata.interface_name.clone(),
+            wal_sync.request.metadata.operation_name.clone(),
+            false,
+            None,
+        ),
+    ]
+}
+
+fn machine_negative_fixtures() -> Vec<ReducedSemanticEffectFixture> {
+    vec![
+        reduced_fixture(
+            "failed_invoke",
+            "invoke_step",
+            "failed",
+            "Runtime",
+            "invoke",
+            false,
+            None,
+        ),
+        reduced_fixture(
+            "send_before_fault",
+            "send_decision",
+            "succeeded_then_faulted",
+            "Transport",
+            "sendDecision",
+            false,
+            None,
+        ),
+        reduced_fixture(
+            "resumed_send",
+            "send_decision",
+            "resumed",
+            "Transport",
+            "sendDecision",
+            false,
+            None,
+        ),
+    ]
+}
+
+fn machine_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
+    let image = semantic_effect_image();
+    let mut fixtures = vec![blocked_machine_fixture(&image)];
+    fixtures.extend(internal_machine_fixtures(&image));
+    fixtures.extend(machine_negative_fixtures());
     fixtures.sort();
     fixtures
 }
@@ -795,18 +833,34 @@ fn run_low_level_simulator(
     let resolved = scenario
         .resolved_execution()
         .expect("resolve simulator execution");
-    let _ = execute_scenario_rounds(
+    match execute_scenario_rounds(
         &mut machine,
         scenario,
         &middleware,
         usize::try_from(resolved.scheduler_concurrency).unwrap_or(usize::MAX),
         scenario.steps,
         |_, _| Ok(()),
-    );
+    ) {
+        Ok(_) | Err(_) => {}
+    }
     machine
 }
 
-fn simulator_negative_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
+fn assert_same_exchange_metadata(
+    left: &telltale_machine::EffectExchangeRecord,
+    right: &telltale_machine::EffectExchangeRecord,
+) {
+    assert_eq!(
+        left.request.metadata.interface_name,
+        right.request.metadata.interface_name
+    );
+    assert_eq!(
+        left.request.metadata.operation_name,
+        right.request.metadata.operation_name
+    );
+}
+
+fn simulator_failed_invoke_negative_fixture() -> ReducedSemanticEffectFixture {
     let failed_invoke_image = single_role_end_image(vec![
         Instr::Set {
             dst: 1,
@@ -849,15 +903,27 @@ fn simulator_negative_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
                 && !exchange.succeeded()
         })
         .expect("threaded failed invoke exchange");
-    assert_eq!(
-        failed_invoke_canonical.request.metadata.interface_name,
-        failed_invoke_threaded.request.metadata.interface_name
-    );
-    assert_eq!(
-        failed_invoke_canonical.request.metadata.operation_name,
-        failed_invoke_threaded.request.metadata.operation_name
-    );
+    assert_same_exchange_metadata(failed_invoke_canonical, failed_invoke_threaded);
+    reduced_fixture(
+        "failed_invoke",
+        "invoke_step",
+        "failed",
+        failed_invoke_canonical
+            .request
+            .metadata
+            .interface_name
+            .clone(),
+        failed_invoke_canonical
+            .request
+            .metadata
+            .operation_name
+            .clone(),
+        false,
+        None,
+    )
+}
 
+fn simulator_send_before_fault_negative_fixture() -> ReducedSemanticEffectFixture {
     let (send_recv_global, send_recv_locals) = simple_send_recv_protocol();
     let send_recv_image = telltale_machine::runtime::loader::CodeImage::from_local_types(
         &send_recv_locals,
@@ -899,15 +965,32 @@ fn simulator_negative_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
             ) && exchange.succeeded()
         })
         .expect("threaded send before fault");
-    assert_eq!(
-        send_before_fault_canonical.request.metadata.interface_name,
-        send_before_fault_threaded.request.metadata.interface_name
-    );
-    assert_eq!(
-        send_before_fault_canonical.request.metadata.operation_name,
-        send_before_fault_threaded.request.metadata.operation_name
-    );
+    assert_same_exchange_metadata(send_before_fault_canonical, send_before_fault_threaded);
+    reduced_fixture(
+        "send_before_fault",
+        "send_decision",
+        "succeeded_then_faulted",
+        send_before_fault_canonical
+            .request
+            .metadata
+            .interface_name
+            .clone(),
+        send_before_fault_canonical
+            .request
+            .metadata
+            .operation_name
+            .clone(),
+        false,
+        None,
+    )
+}
 
+fn simulator_resumed_send_negative_fixture() -> ReducedSemanticEffectFixture {
+    let (send_recv_global, send_recv_locals) = simple_send_recv_protocol();
+    let send_recv_image = telltale_machine::runtime::loader::CodeImage::from_local_types(
+        &send_recv_locals,
+        &send_recv_global,
+    );
     let resumed_canonical_scenario =
         scenario_for_low_level_backend("resumed_send_canonical", "canonical", 8);
     let resumed_threaded_scenario =
@@ -944,67 +1027,31 @@ fn simulator_negative_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
             ) && exchange.succeeded()
         })
         .expect("threaded resumed send");
-    assert_eq!(
-        resumed_send_canonical.request.metadata.interface_name,
-        resumed_send_threaded.request.metadata.interface_name
-    );
-    assert_eq!(
-        resumed_send_canonical.request.metadata.operation_name,
-        resumed_send_threaded.request.metadata.operation_name
-    );
+    assert_same_exchange_metadata(resumed_send_canonical, resumed_send_threaded);
+    reduced_fixture(
+        "resumed_send",
+        "send_decision",
+        "resumed",
+        resumed_send_canonical
+            .request
+            .metadata
+            .interface_name
+            .clone(),
+        resumed_send_canonical
+            .request
+            .metadata
+            .operation_name
+            .clone(),
+        false,
+        None,
+    )
+}
 
+fn simulator_negative_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
     let mut fixtures = vec![
-        ReducedSemanticEffectFixture {
-            name: "failed_invoke".to_string(),
-            effect_kind: "invoke_step".to_string(),
-            lifecycle: "failed".to_string(),
-            interface_name: failed_invoke_canonical
-                .request
-                .metadata
-                .interface_name
-                .clone(),
-            operation_name: failed_invoke_canonical
-                .request
-                .metadata
-                .operation_name
-                .clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "send_before_fault".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "succeeded_then_faulted".to_string(),
-            interface_name: send_before_fault_canonical
-                .request
-                .metadata
-                .interface_name
-                .clone(),
-            operation_name: send_before_fault_canonical
-                .request
-                .metadata
-                .operation_name
-                .clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "resumed_send".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "resumed".to_string(),
-            interface_name: resumed_send_canonical
-                .request
-                .metadata
-                .interface_name
-                .clone(),
-            operation_name: resumed_send_canonical
-                .request
-                .metadata
-                .operation_name
-                .clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
+        simulator_failed_invoke_negative_fixture(),
+        simulator_send_before_fault_negative_fixture(),
+        simulator_resumed_send_negative_fixture(),
     ];
     fixtures.sort();
     fixtures

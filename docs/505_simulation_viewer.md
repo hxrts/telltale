@@ -157,7 +157,7 @@ The pure model layer now also owns:
 - deterministic branch minimization via `MinimizationRequest`
 
 These are still command/query surfaces, not browser-owned mutation.
-The browser shell issues requests; the application service owns the resulting
+The browser shell issues requests, and the application service owns the resulting
 artifacts and summaries.
 
 ## Application Service

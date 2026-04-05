@@ -24,7 +24,7 @@ use telltale_simulator::environment::{
 use telltale_simulator::harness::{
     BatchConfig, DirectAdapter, HarnessSpec, HostAdapter, SimulationHarness,
 };
-use telltale_simulator::persistence::PersistedReplayArtifact;
+use telltale_simulator::persistence::{CheckpointArtifact, PersistedReplayArtifact};
 use telltale_simulator::reconfiguration::{
     ReconfigurationAction, ReconfigurationEffect, ReconfigurationEffectKind,
     ReconfigurationFootprint, ReconfigurationRecord,
@@ -559,38 +559,52 @@ fn durable_recovery_covers_checkpoint_and_wal_boundary_cases() {
         .find(|checkpoint| checkpoint.tick == 4)
         .expect("checkpoint at tick 4");
 
-    let cases = [
-        (
-            "before_checkpoint_failure",
-            1u64,
-            None,
-            None,
-            Some("no checkpoint exists"),
-        ),
-        (
-            "checkpoint_boundary",
-            4u64,
-            Some(DurableResumeArtifacts {
+    for case in durable_boundary_cases() {
+        assert_durable_boundary_case(&case, &global, &local_types, &scenario, checkpoint, &full);
+    }
+}
+
+struct DurableBoundaryCase {
+    label: &'static str,
+    crash_tick: u64,
+    durable: Option<DurableResumeArtifacts>,
+    expected_action: Option<telltale_machine::DurableRecoveryAction>,
+    expected_error: Option<&'static str>,
+}
+
+fn durable_boundary_cases() -> Vec<DurableBoundaryCase> {
+    vec![
+        DurableBoundaryCase {
+            label: "before_checkpoint_failure",
+            crash_tick: 1,
+            durable: None,
+            expected_action: None,
+            expected_error: Some("no checkpoint exists"),
+        },
+        DurableBoundaryCase {
+            label: "checkpoint_boundary",
+            crash_tick: 4,
+            durable: Some(DurableResumeArtifacts {
                 wal: AgreementWalArtifact::default(),
                 evidence_cache: EvidenceOutcomeCacheArtifact::default(),
             }),
-            None,
-            None,
-        ),
-        (
-            "post_checkpoint_pre_wal",
-            5u64,
-            Some(DurableResumeArtifacts {
+            expected_action: None,
+            expected_error: None,
+        },
+        DurableBoundaryCase {
+            label: "post_checkpoint_pre_wal",
+            crash_tick: 5,
+            durable: Some(DurableResumeArtifacts {
                 wal: AgreementWalArtifact::default(),
                 evidence_cache: EvidenceOutcomeCacheArtifact::default(),
             }),
-            None,
-            None,
-        ),
-        (
-            "post_wal_pre_gate",
-            5u64,
-            Some(DurableResumeArtifacts {
+            expected_action: None,
+            expected_error: None,
+        },
+        DurableBoundaryCase {
+            label: "post_wal_pre_gate",
+            crash_tick: 5,
+            durable: Some(DurableResumeArtifacts {
                 wal: AgreementWalArtifact {
                     entries: vec![AgreementWalEntry::Escalation {
                         operation_id: "durable:soft".to_string(),
@@ -602,13 +616,15 @@ fn durable_recovery_covers_checkpoint_and_wal_boundary_cases() {
                 },
                 evidence_cache: EvidenceOutcomeCacheArtifact::default(),
             }),
-            Some(telltale_machine::DurableRecoveryAction::ResumeFromEvidenceBoundary),
-            None,
-        ),
-        (
-            "post_finalization_pre_checkpoint",
-            5u64,
-            Some(DurableResumeArtifacts {
+            expected_action: Some(
+                telltale_machine::DurableRecoveryAction::ResumeFromEvidenceBoundary,
+            ),
+            expected_error: None,
+        },
+        DurableBoundaryCase {
+            label: "post_finalization_pre_checkpoint",
+            crash_tick: 5,
+            durable: Some(DurableResumeArtifacts {
                 wal: AgreementWalArtifact {
                     entries: vec![
                         AgreementWalEntry::Finalization {
@@ -628,87 +644,104 @@ fn durable_recovery_covers_checkpoint_and_wal_boundary_cases() {
                 },
                 evidence_cache: EvidenceOutcomeCacheArtifact::default(),
             }),
-            Some(telltale_machine::DurableRecoveryAction::ReuseFinalized),
-            None,
-        ),
-    ];
+            expected_action: Some(telltale_machine::DurableRecoveryAction::ReuseFinalized),
+            expected_error: None,
+        },
+    ]
+}
 
-    for (label, crash_tick, durable, expected_action, expected_error) in cases {
-        match (durable, expected_error) {
-            (None, Some(expected_error)) => {
-                let err = telltale_simulator::durability::run_durable_recovery_case(
-                    &local_types,
-                    &global,
-                    &BTreeMap::new(),
-                    &scenario,
-                    &PassthroughHandler,
-                    None,
-                    crash_tick,
-                    &DurableResumeArtifacts {
-                        wal: AgreementWalArtifact::default(),
-                        evidence_cache: EvidenceOutcomeCacheArtifact::default(),
-                    },
-                )
-                .expect_err("before-checkpoint case should fail closed");
-                assert!(
-                    err.contains(expected_error),
-                    "expected `{expected_error}` in `{label}`, got `{err}`"
-                );
-            }
-            (Some(durable), None) => {
-                let max_steps = match label {
-                    "checkpoint_boundary" | "post_checkpoint_pre_wal" => None,
-                    "post_wal_pre_gate" | "post_finalization_pre_checkpoint" => Some(0),
-                    _ => unreachable!(),
-                };
-                let resumed = resume_with_durable_checkpoint_artifact(
-                    &scenario,
-                    checkpoint,
-                    &durable,
-                    &PassthroughHandler,
-                    None,
-                    max_steps,
-                )
-                .unwrap_or_else(|err| panic!("durable resume {label}: {err}"));
-                let summary = resumed
-                    .stats
-                    .durable_recovery
-                    .as_ref()
-                    .expect("durable summary");
-                match label {
-                    "checkpoint_boundary" | "post_checkpoint_pre_wal" => {
-                        assert!(summary.decisions.is_empty());
-                        assert_authoritative_equivalence(&full, &resumed);
-                    }
-                    "post_wal_pre_gate" => {
-                        let decision = summary
-                            .decisions
-                            .iter()
-                            .find(|decision| decision.operation_id == "durable:soft")
-                            .expect("soft-safe decision");
-                        assert_eq!(
-                            decision.action,
-                            expected_action.expect("expected action for post-WAL case")
-                        );
-                        assert!(!decision.gate_crossed);
-                    }
-                    "post_finalization_pre_checkpoint" => {
-                        let decision = summary
-                            .decisions
-                            .iter()
-                            .find(|decision| decision.operation_id == "durable:gate")
-                            .expect("gate decision");
-                        assert_eq!(
-                            decision.action,
-                            expected_action.expect("expected action for post-finalization case")
-                        );
-                        assert!(decision.gate_crossed);
-                    }
-                    _ => unreachable!(),
-                }
-            }
-            _ => panic!("invalid crash-boundary case configuration for {label}"),
+fn assert_durable_boundary_case(
+    case: &DurableBoundaryCase,
+    global: &GlobalType,
+    local_types: &BTreeMap<String, LocalTypeR>,
+    scenario: &Scenario,
+    checkpoint: &CheckpointArtifact,
+    full: &ScenarioResult,
+) {
+    match (&case.durable, case.expected_error) {
+        (None, Some(expected_error)) => {
+            let err = telltale_simulator::durability::run_durable_recovery_case(
+                local_types,
+                global,
+                &BTreeMap::new(),
+                scenario,
+                &PassthroughHandler,
+                None,
+                case.crash_tick,
+                &DurableResumeArtifacts {
+                    wal: AgreementWalArtifact::default(),
+                    evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+                },
+            )
+            .expect_err("before-checkpoint case should fail closed");
+            assert!(
+                err.contains(expected_error),
+                "expected `{expected_error}` in `{}`, got `{err}`",
+                case.label
+            );
         }
+        (Some(durable), None) => {
+            let max_steps = match case.label {
+                "checkpoint_boundary" | "post_checkpoint_pre_wal" => None,
+                "post_wal_pre_gate" | "post_finalization_pre_checkpoint" => Some(0),
+                _ => unreachable!(),
+            };
+            let resumed = resume_with_durable_checkpoint_artifact(
+                scenario,
+                checkpoint,
+                durable,
+                &PassthroughHandler,
+                None,
+                max_steps,
+            )
+            .unwrap_or_else(|err| panic!("durable resume {}: {err}", case.label));
+            let summary = resumed
+                .stats
+                .durable_recovery
+                .as_ref()
+                .expect("durable summary");
+            match case.label {
+                "checkpoint_boundary" | "post_checkpoint_pre_wal" => {
+                    assert!(summary.decisions.is_empty());
+                    assert_authoritative_equivalence(full, &resumed);
+                }
+                "post_wal_pre_gate" => {
+                    let decision = summary
+                        .decisions
+                        .iter()
+                        .find(|decision| decision.operation_id == "durable:soft")
+                        .expect("soft-safe decision");
+                    assert_eq!(
+                        decision.action,
+                        case.expected_action
+                            .as_ref()
+                            .expect("expected action")
+                            .clone()
+                    );
+                    assert!(!decision.gate_crossed);
+                }
+                "post_finalization_pre_checkpoint" => {
+                    let decision = summary
+                        .decisions
+                        .iter()
+                        .find(|decision| decision.operation_id == "durable:gate")
+                        .expect("gate decision");
+                    assert_eq!(
+                        decision.action,
+                        case.expected_action
+                            .as_ref()
+                            .expect("expected action")
+                            .clone()
+                    );
+                    assert!(decision.gate_crossed);
+                }
+                _ => unreachable!(),
+            }
+        }
+        _ => panic!(
+            "invalid crash-boundary case configuration for {}",
+            case.label
+        ),
     }
 }
 
