@@ -174,6 +174,7 @@ Their intended justification remains the existing protocol-machine `invoke` boun
 
 Typed effect requests and outcomes are part of the parity surface directly.
 Rust and Lean must agree on effect-interface metadata, request bodies, outcome statuses, and replay-visible effect exchanges.
+That now includes the internal `wal_sync` effect metadata and the shared durable recovery vocabulary used to classify checkpoint-plus-WAL resume decisions.
 
 ## Effect Interface Justification
 
@@ -194,6 +195,18 @@ This is why the current language design is nominal-first:
 - lowering stays centered on the existing protocol-machine `invoke` and `EffectSpec` story
 - generalized effect polymorphism waits until the nominal surface,
   lowering, and parity/audit semantics are stable
+
+### Durability Alignment
+
+The durability layer is now part of the documented Rust↔Lean correspondence boundary for runtime effects.
+
+- Rust `EffectRequestBody::WalSync` corresponds to Lean `walSyncMetadata` plus the shared `EffectRequestBody` / `EffectResponse` effect model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`
+- Rust `DurableRecoveryAction` / `DurableRecoveryDecision` correspond to Lean `Runtime.ProtocolMachine.Model.DurableRecoveryAction` / `DurableRecoveryDecision`
+- The current Lean theorem surface for this layer is intentionally narrow:
+  `walSyncMetadata_legal`, internal-handler admissibility, recovery-rank monotonicity from `AgreementEscalation`, and gate-crossing / terminal-truth consequences from `DurableRecoveryDecision.sound`
+
+The simulator-side WAL backend wrappers and fault-injection helpers remain Rust assurance surfaces.
+They consume the typed durability vocabulary above but are not themselves part of the current mechanized claim.
 
 ## Choreography Projection Parity
 

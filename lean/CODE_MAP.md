@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-04-04
+**Last Updated:** 2026-04-05
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -42,9 +42,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,133 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   176 |  34,561 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   178 |  34,681 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **656** | **134,173** |                                                            |
+| **Total**      | **658** | **134,293** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -599,7 +599,8 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 | Config.lean | 85 | VMConfig, VMState, ResourcePool |
 | State.lean | 304 | Full machine state, session table, buffer management |
 | Program.lean | 137 | Program representation and code segments |
-| Effects.lean | 167 | Effect-interface metadata, request/outcome exchange objects, and reentrancy primitives |
+| Effects.lean | 167 | Effect-interface metadata, request/outcome exchange objects, `wal_sync` parity surface, and reentrancy primitives |
+| Durability.lean | 48 | Durable recovery vocabulary plus canonical `walSyncMetadata` mirror |
 | EffectAlgebra.lean | 111 | Effect classification, immediate-effect discipline, and multi-effect composition semantics |
 | SemanticObjects/Core.lean | 241 | Canonical protocol-machine semantic object implementation layer |
 | SemanticObjects/Discipline.lean | 96 | Semantic-object predicate surface for identity, ownership, and observed-read discipline |
@@ -691,6 +692,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 |------|------:|-------------|
 | Proofs/ProtocolMachine/InstrSpec.lean | 1,415 | Preservation theorems for all 8 instruction types, quotient-respecting variants |
 | Proofs/ProtocolMachine/Effects.lean | 247 | Effect admissibility, classification, immediate-effect, and multi-effect composition theorem layer |
+| Proofs/ProtocolMachine/Durability.lean | 61 | `wal_sync` legality, recovery-rank monotonicity, and durable gate-crossing/terminal-truth theorems |
 | Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
 | Proofs/ProtocolMachine/MonitorContracts.lean | 23 | Proof-only monitor contract predicates moved out of `Runtime/ProtocolMachine/Runtime/Monitor.lean` |
 | Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |

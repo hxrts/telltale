@@ -38,6 +38,9 @@ check_has_hits() {
 check_no_hits 'PersistedDurabilityArtifact|PersistedDurabilityPayload|AgreementWalArtifact|DurableRecoveryMetadata|EvidenceOutcomeCacheArtifact' \
   rust/simulator/src/generated.rs rust/viewer/src rust/ui/src rust/web/src
 check_has_hits 'telltale_machine::model::durability' docs/901_api_reference.md
+check_has_hits 'wal_sync' docs/802_rust_lean_parity.md
+check_has_hits 'walSyncMetadata' lean/Runtime/ProtocolMachine/Model/Durability.lean
+check_has_hits 'durableRecoveryDecision_gate_crossing_requires_recovered_agreement' lean/Runtime/Proofs/ProtocolMachine/Durability.lean
 check_has_hits 'typed checkpoint and replay artifacts' work/durable.md
 check_has_hits 'helper/viewer projections' work/durable.md
 
