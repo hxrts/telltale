@@ -43,6 +43,12 @@ fn validate_limits(scenario: &Scenario) -> Result<(), String> {
             "scenario checkpoints currently require the canonical simulator backend".to_string(),
         );
     }
+    if scenario.requires_durable_resume() && scenario.checkpoint_interval.is_none() {
+        return Err(
+            "scenario durability.mode = wal requires checkpoint_interval so recovery has a typed base checkpoint"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 

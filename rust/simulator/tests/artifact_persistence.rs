@@ -4,6 +4,9 @@ use std::collections::BTreeMap;
 use std::process::id as process_id;
 
 use telltale_machine::coroutine::Value;
+use telltale_machine::model::durability::{
+    AgreementWalArtifact, AgreementWalEntry, EvidenceOutcomeCacheArtifact,
+};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, SendDecision, SendDecisionInput,
 };
@@ -27,10 +30,13 @@ use telltale_simulator::reconfiguration::{
     ReconfigurationFootprint, ReconfigurationRecord,
 };
 use telltale_simulator::runner::{
-    canonical_replay_scenario, resume_with_checkpoint_artifact, run_with_scenario,
+    canonical_replay_scenario, resume_with_checkpoint_artifact,
+    resume_with_durable_checkpoint_artifact, run_with_scenario, DurableResumeArtifacts,
     ScenarioReplayArtifact, ScenarioResult,
 };
-use telltale_simulator::scenario::{Scenario, TheoremAssumptionBundle, TheoremSchedulerProfile};
+use telltale_simulator::scenario::{
+    DurabilityMode, Scenario, TheoremAssumptionBundle, TheoremSchedulerProfile,
+};
 use telltale_simulator::sweep::{run_sweep, SweepAxis, SweepConfig};
 use telltale_simulator::{
     compare_observability, normalized_observability, BatchRunManifest, DistributedRunManifest,
@@ -289,6 +295,15 @@ step_size = "0.01"
     Scenario::parse(&toml).expect("parse finite theorem scenario")
 }
 
+fn durable_middleware_heavy_scenario(
+    name: &str,
+    theorem_bundle: TheoremAssumptionBundle,
+) -> Scenario {
+    let mut scenario = middleware_heavy_scenario(name, theorem_bundle);
+    scenario.durability.mode = DurabilityMode::Wal;
+    scenario
+}
+
 fn assert_authoritative_equivalence(left: &ScenarioResult, right: &ScenarioResult) {
     assert_eq!(left.replay.theorem_profile, right.replay.theorem_profile);
     assert_eq!(left.replay.obs_trace, right.replay.obs_trace);
@@ -491,6 +506,285 @@ fn persisted_checkpoint_files_round_trip_through_the_typed_loader() {
             .expect("resume in-memory checkpoint");
 
     assert_authoritative_equivalence(&resumed_in_memory, &resumed);
+    assert_authoritative_equivalence(&full, &resumed);
+}
+
+#[test]
+fn durable_resume_reports_preserve_execution_and_theorem_vocabulary() {
+    let (global, local_types) = loop_protocol();
+    let scenario = middleware_heavy_scenario(
+        &scenario_name("phase22_durable_resume"),
+        TheoremAssumptionBundle::ObservedTransport,
+    );
+    let full = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("full run");
+    let checkpoint = full
+        .replay
+        .checkpoints
+        .iter()
+        .find(|checkpoint| checkpoint.tick == 4)
+        .expect("checkpoint at tick 4");
+    let durable = DurableResumeArtifacts {
+        wal: AgreementWalArtifact {
+            entries: vec![
+                AgreementWalEntry::Escalation {
+                    operation_id: "durable:resume".to_string(),
+                    previous_level: telltale_machine::AgreementLevel::Provisional,
+                    new_level: telltale_machine::AgreementLevel::SoftSafe,
+                    evidence_id: Some("resume#1".to_string()),
+                    tick: 5,
+                },
+                AgreementWalEntry::VisibilityGateCrossing {
+                    operation_id: "durable:resume".to_string(),
+                    downstream_coroutine_id: "coro:0".to_string(),
+                    gate_level: telltale_machine::AgreementLevel::SoftSafe,
+                    tick: 5,
+                },
+            ],
+        },
+        evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+    };
+
+    let resumed = resume_with_durable_checkpoint_artifact(
+        &scenario,
+        checkpoint,
+        &durable,
+        &PassthroughHandler,
+        None,
+        None,
+    )
+    .expect("durable resume");
+
+    let durable_summary = resumed
+        .stats
+        .durable_recovery
+        .as_ref()
+        .expect("durable recovery summary");
+    assert_eq!(
+        durable_summary.execution_regime,
+        resumed.stats.execution_regime
+    );
+    assert_eq!(
+        durable_summary.theorem_profile,
+        resumed.stats.theorem_profile
+    );
+    assert!(durable_summary
+        .decisions
+        .iter()
+        .any(|decision| decision.operation_id == "durable:resume"));
+}
+
+#[test]
+fn durable_scenarios_require_wal_aware_resume_path() {
+    let (global, local_types) = loop_protocol();
+    let scenario = durable_middleware_heavy_scenario(
+        &scenario_name("phase22_durable_requires_wal"),
+        TheoremAssumptionBundle::ObservedTransport,
+    );
+    let full = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("full durable run");
+    let checkpoint = full
+        .replay
+        .checkpoints
+        .iter()
+        .find(|checkpoint| checkpoint.tick == 4)
+        .expect("checkpoint at tick 4");
+
+    let err =
+        resume_with_checkpoint_artifact(&scenario, checkpoint, &PassthroughHandler, None, None)
+            .expect_err("durable scenario should reject generic checkpoint resume");
+    assert!(err.contains("resume_with_durable_checkpoint_artifact"));
+}
+
+#[test]
+fn durable_resume_classifies_crash_positions() {
+    let (global, local_types) = loop_protocol();
+    let scenario = durable_middleware_heavy_scenario(
+        &scenario_name("phase22_durable_crash_positions"),
+        TheoremAssumptionBundle::ObservedTransport,
+    );
+    let full = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("full durable run");
+    let checkpoint = full
+        .replay
+        .checkpoints
+        .iter()
+        .find(|checkpoint| checkpoint.tick == 4)
+        .expect("checkpoint at tick 4");
+
+    let cases = [
+        (
+            "before_transition",
+            DurableResumeArtifacts {
+                wal: AgreementWalArtifact::default(),
+                evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+            },
+        ),
+        (
+            "between_wal_and_gate",
+            DurableResumeArtifacts {
+                wal: AgreementWalArtifact {
+                    entries: vec![AgreementWalEntry::Escalation {
+                        operation_id: "durable:soft".to_string(),
+                        previous_level: telltale_machine::AgreementLevel::Provisional,
+                        new_level: telltale_machine::AgreementLevel::SoftSafe,
+                        evidence_id: Some("soft#1".to_string()),
+                        tick: 5,
+                    }],
+                },
+                evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+            },
+        ),
+        (
+            "during_wal_sync",
+            DurableResumeArtifacts {
+                wal: AgreementWalArtifact {
+                    entries: vec![AgreementWalEntry::Finalization {
+                        operation_id: "durable:final".to_string(),
+                        outcome: telltale_machine::FinalizationOutcome::Finalized,
+                        materialization_proof_id: Some("proof#1".to_string()),
+                        canonical_handle_id: Some("handle#1".to_string()),
+                        tick: 5,
+                    }],
+                },
+                evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+            },
+        ),
+        (
+            "after_finalization_before_checkpoint",
+            DurableResumeArtifacts {
+                wal: AgreementWalArtifact {
+                    entries: vec![
+                        AgreementWalEntry::Finalization {
+                            operation_id: "durable:gate".to_string(),
+                            outcome: telltale_machine::FinalizationOutcome::Finalized,
+                            materialization_proof_id: Some("proof#2".to_string()),
+                            canonical_handle_id: Some("handle#2".to_string()),
+                            tick: 5,
+                        },
+                        AgreementWalEntry::VisibilityGateCrossing {
+                            operation_id: "durable:gate".to_string(),
+                            downstream_coroutine_id: "coro:0".to_string(),
+                            gate_level: telltale_machine::AgreementLevel::Finalized,
+                            tick: 5,
+                        },
+                    ],
+                },
+                evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+            },
+        ),
+    ];
+
+    for (label, durable) in cases {
+        let resumed = resume_with_durable_checkpoint_artifact(
+            &scenario,
+            checkpoint,
+            &durable,
+            &PassthroughHandler,
+            None,
+            Some(0),
+        )
+        .unwrap_or_else(|err| panic!("durable resume {label}: {err}"));
+        let summary = resumed
+            .stats
+            .durable_recovery
+            .as_ref()
+            .expect("durable summary");
+        match label {
+            "before_transition" => assert!(summary.decisions.is_empty()),
+            "between_wal_and_gate" => {
+                let decision = summary
+                    .decisions
+                    .iter()
+                    .find(|decision| decision.operation_id == "durable:soft")
+                    .expect("soft-safe decision");
+                assert_eq!(
+                    decision.action,
+                    telltale_machine::DurableRecoveryAction::ResumeFromEvidenceBoundary
+                );
+                assert!(!decision.gate_crossed);
+            }
+            "during_wal_sync" => {
+                let decision = summary
+                    .decisions
+                    .iter()
+                    .find(|decision| decision.operation_id == "durable:final")
+                    .expect("finalized decision");
+                assert_eq!(
+                    decision.action,
+                    telltale_machine::DurableRecoveryAction::ReuseFinalized
+                );
+                assert!(!decision.gate_crossed);
+            }
+            "after_finalization_before_checkpoint" => {
+                let decision = summary
+                    .decisions
+                    .iter()
+                    .find(|decision| decision.operation_id == "durable:gate")
+                    .expect("gate decision");
+                assert_eq!(
+                    decision.action,
+                    telltale_machine::DurableRecoveryAction::ReuseFinalized
+                );
+                assert!(decision.gate_crossed);
+            }
+            _ => unreachable!(),
+        }
+    }
+}
+
+#[test]
+fn durable_resume_converges_with_uninterrupted_execution() {
+    let (global, local_types) = loop_protocol();
+    let scenario = durable_middleware_heavy_scenario(
+        &scenario_name("phase22_durable_equivalence"),
+        TheoremAssumptionBundle::ObservedTransport,
+    );
+    let full = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("full durable run");
+    let checkpoint = full
+        .replay
+        .checkpoints
+        .iter()
+        .find(|checkpoint| checkpoint.tick == 4)
+        .expect("checkpoint at tick 4");
+    let resumed = resume_with_durable_checkpoint_artifact(
+        &scenario,
+        checkpoint,
+        &DurableResumeArtifacts {
+            wal: AgreementWalArtifact::default(),
+            evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+        },
+        &PassthroughHandler,
+        None,
+        None,
+    )
+    .expect("durable resume");
+
     assert_authoritative_equivalence(&full, &resumed);
 }
 

@@ -100,10 +100,11 @@ pub use reconfiguration::{
 pub use rng::SimRng;
 pub use runner::{
     canonical_replay_scenario, compare_scheduler_runs, remaining_rounds_from_checkpoint,
-    resume_with_checkpoint_artifact, resume_with_scenario_from_checkpoint, run_canonical_replay,
-    CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact, SchedulerBoundMode,
-    SchedulerComparison, SchedulerEnvelopeStatus, SchedulerFairnessRequirement,
-    SchedulerProfileSummary, TheoremProgressSummary,
+    resume_with_checkpoint_artifact, resume_with_durable_checkpoint_artifact,
+    resume_with_scenario_from_checkpoint, run_canonical_replay, CriticalCapacityPhase,
+    CriticalCapacitySummary, DurableResumeArtifacts, DurableResumeSummary,
+    ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus,
+    SchedulerFairnessRequirement, SchedulerProfileSummary, TheoremProgressSummary,
 };
 pub use sweep::{
     compare_sweep_results, run_sweep, SweepAxis, SweepBinding, SweepConfig, SweepDiffReport,

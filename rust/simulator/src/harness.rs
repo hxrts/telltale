@@ -575,6 +575,7 @@ mod tests {
             properties: None,
             checkpoint_interval: None,
             theorem: crate::scenario::TheoremProfileSpec::default(),
+            durability: crate::scenario::DurabilitySpec::default(),
             extensions: BTreeMap::new(),
         }
     }

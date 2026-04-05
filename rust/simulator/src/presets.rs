@@ -6,7 +6,8 @@ use crate::field::FieldSpec;
 use crate::property::Property;
 use crate::scenario::{
     AdversaryActionSpec, AdversaryBudgetModeSpec, AdversaryBudgetSpec, AdversarySpec,
-    ExecutionSpec, LivenessSpec, PropertiesSpec, Scenario, TheoremProfileSpec, TriggerSpec,
+    DurabilitySpec, ExecutionSpec, LivenessSpec, PropertiesSpec, Scenario, TheoremProfileSpec,
+    TriggerSpec,
 };
 
 /// Build a deterministic baseline scenario with no network or adversary declarations.
@@ -30,6 +31,7 @@ pub fn deterministic_baseline(
         properties: None,
         checkpoint_interval: None,
         theorem: TheoremProfileSpec::default(),
+        durability: DurabilitySpec::default(),
         extensions: Default::default(),
     }
 }

@@ -57,9 +57,31 @@ pub struct Scenario {
     /// Optional theorem/profile declaration for theorem-indexed reporting.
     #[serde(default)]
     pub theorem: TheoremProfileSpec,
+    /// Durable execution contract for checkpoint-resume lanes.
+    #[serde(default)]
+    pub durability: DurabilitySpec,
     /// Domain-owned extension config keyed by external namespace.
     #[serde(default)]
     pub extensions: BTreeMap<String, toml::Value>,
+}
+
+/// Durable execution contract for one simulator scenario.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct DurabilitySpec {
+    /// Requested durable execution mode.
+    #[serde(default)]
+    pub mode: DurabilityMode,
+}
+
+/// Durable execution mode for one simulator scenario.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DurabilityMode {
+    /// Scenario does not require WAL-aware resume.
+    #[default]
+    Disabled,
+    /// Scenario requires checkpoint plus WAL/evidence artifacts for resume.
+    Wal,
 }
 
 /// Execution configuration for one simulator run.
@@ -581,6 +603,12 @@ impl ResolvedExecution {
 }
 
 impl Scenario {
+    /// Whether the scenario declares WAL-aware durable execution.
+    #[must_use]
+    pub fn requires_durable_resume(&self) -> bool {
+        matches!(self.durability.mode, DurabilityMode::Wal)
+    }
+
     /// Resolve theorem/profile information against one resolved execution.
     #[must_use]
     pub fn resolve_theorem_profile_for(

@@ -870,6 +870,55 @@ pub struct DurableRecoveryMetadata {
     pub cached_evidence_ids: Vec<String>,
 }
 
+/// Resume action chosen for one operation during durable recovery.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum DurableRecoveryAction {
+    /// No durable transition exists beyond the checkpoint.
+    ReexecuteFromScratch,
+    /// Replay from the last persisted evidence boundary.
+    ResumeFromEvidenceBoundary,
+    /// Reuse the finalized durable result without re-executing.
+    ReuseFinalized,
+    /// Preserve the terminal rejected/aborted/timed-out outcome.
+    PreserveTerminal,
+}
+
+/// Typed recovery decision for one durable operation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct DurableRecoveryDecision {
+    /// Operation being classified for recovery.
+    pub operation_id: String,
+    /// Highest agreement level observed in the WAL suffix.
+    pub level: AgreementLevel,
+    /// Terminal finalization outcome when one exists.
+    #[serde(default)]
+    pub finalization: Option<FinalizationOutcome>,
+    /// Recovery action derived from the durable suffix.
+    pub action: DurableRecoveryAction,
+    /// Evidence ids available in the persisted evidence cache.
+    #[serde(default)]
+    pub cached_evidence_ids: Vec<String>,
+    /// Whether the WAL suffix proves a visibility-gate crossing.
+    #[serde(default)]
+    pub gate_crossed: bool,
+}
+
+/// Typed durable recovery state derived from one checkpoint plus WAL suffix.
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DurableRecoveryPlan {
+    /// Decoded machine state at the checkpoint boundary.
+    pub machine: crate::ProtocolMachine,
+    /// Typed summary metadata for the durable suffix.
+    pub metadata: DurableRecoveryMetadata,
+    /// WAL entries strictly after the checkpoint tick.
+    pub wal_suffix: Vec<AgreementWalEntry>,
+    /// Evidence cache snapshot available during recovery.
+    pub evidence_cache: EvidenceOutcomeCacheArtifact,
+    /// Per-operation recovery decisions derived from the suffix.
+    pub decisions: Vec<DurableRecoveryDecision>,
+}
+
 /// Kind-tagged persisted durability payload family.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "payload")]
@@ -1038,5 +1087,145 @@ impl PersistedDurabilityArtifact {
                     .to_string(),
             ),
         }
+    }
+}
+
+impl DurableRecoveryPlan {
+    /// Build a typed recovery plan from one checkpointed machine and durable suffix.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the WAL suffix violates monotonic escalation ordering.
+    pub fn from_checkpoint(
+        checkpoint_tick: u64,
+        machine: crate::ProtocolMachine,
+        wal: &AgreementWalArtifact,
+        evidence_cache: EvidenceOutcomeCacheArtifact,
+    ) -> Result<Self, String> {
+        wal.validate_monotonic_escalations()?;
+        let wal_suffix = wal.read_since(checkpoint_tick);
+        let metadata = DurableRecoveryMetadata {
+            checkpoint_tick,
+            wal_tail_start_tick: wal_suffix.first().map(AgreementWalEntry::tick),
+            highest_recovered_tick: wal_suffix.last().map(AgreementWalEntry::tick),
+            resumed_operation_ids: Vec::new(),
+            terminal_operation_ids: Vec::new(),
+            cached_evidence_ids: evidence_cache
+                .entries
+                .iter()
+                .map(|entry| entry.evidence_id.clone())
+                .collect(),
+        };
+        let mut plan = Self {
+            machine,
+            metadata,
+            wal_suffix,
+            evidence_cache,
+            decisions: Vec::new(),
+        };
+        plan.decisions = plan.build_decisions();
+        plan.metadata.resumed_operation_ids = plan
+            .decisions
+            .iter()
+            .filter(|decision| {
+                matches!(
+                    decision.action,
+                    DurableRecoveryAction::ReexecuteFromScratch
+                        | DurableRecoveryAction::ResumeFromEvidenceBoundary
+                )
+            })
+            .map(|decision| decision.operation_id.clone())
+            .collect();
+        plan.metadata.terminal_operation_ids = plan
+            .decisions
+            .iter()
+            .filter(|decision| {
+                matches!(
+                    decision.action,
+                    DurableRecoveryAction::ReuseFinalized | DurableRecoveryAction::PreserveTerminal
+                )
+            })
+            .map(|decision| decision.operation_id.clone())
+            .collect();
+        Ok(plan)
+    }
+
+    fn build_decisions(&self) -> Vec<DurableRecoveryDecision> {
+        let mut operation_ids = std::collections::BTreeSet::new();
+        for entry in &self.wal_suffix {
+            operation_ids.insert(entry.operation_id().to_string());
+        }
+
+        operation_ids
+            .into_iter()
+            .map(|operation_id| {
+                let mut level = AgreementLevel::None;
+                let mut finalization = None;
+                let mut gate_crossed = false;
+                let mut evidence_ids = Vec::new();
+
+                for entry in self
+                    .wal_suffix
+                    .iter()
+                    .filter(|entry| entry.operation_id() == operation_id)
+                {
+                    match entry {
+                        AgreementWalEntry::Escalation { new_level, .. } => {
+                            if new_level.rank() > level.rank() {
+                                level = *new_level;
+                            }
+                        }
+                        AgreementWalEntry::EvidenceProduced { evidence, .. } => {
+                            evidence_ids.push(evidence.evidence_id.clone());
+                            if evidence.level.rank() > level.rank() {
+                                level = evidence.level;
+                            }
+                        }
+                        AgreementWalEntry::Finalization { outcome, .. } => {
+                            finalization = Some(*outcome);
+                            if matches!(outcome, FinalizationOutcome::Finalized) {
+                                level = AgreementLevel::Finalized;
+                            }
+                        }
+                        AgreementWalEntry::VisibilityGateCrossing { .. } => {
+                            gate_crossed = true;
+                        }
+                    }
+                }
+
+                let cached_evidence_ids = self
+                    .evidence_cache
+                    .entries
+                    .iter()
+                    .filter(|entry| {
+                        evidence_ids
+                            .iter()
+                            .any(|evidence_id| evidence_id == &entry.evidence_id)
+                    })
+                    .map(|entry| entry.evidence_id.clone())
+                    .collect::<Vec<_>>();
+                let action = match finalization {
+                    Some(FinalizationOutcome::Finalized) => DurableRecoveryAction::ReuseFinalized,
+                    Some(
+                        FinalizationOutcome::Aborted
+                        | FinalizationOutcome::Rejected
+                        | FinalizationOutcome::TimedOut,
+                    ) => DurableRecoveryAction::PreserveTerminal,
+                    None if level.at_least(AgreementLevel::SoftSafe) => {
+                        DurableRecoveryAction::ResumeFromEvidenceBoundary
+                    }
+                    None => DurableRecoveryAction::ReexecuteFromScratch,
+                };
+
+                DurableRecoveryDecision {
+                    operation_id,
+                    level,
+                    finalization,
+                    action,
+                    cached_evidence_ids,
+                    gate_crossed,
+                }
+            })
+            .collect()
     }
 }

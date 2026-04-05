@@ -9,7 +9,7 @@ Detailed behavior lives in the focused pages linked below.
 The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
-The authoritative replay lane is explicit: fresh exact runs use `run_with_scenario(...)`, canonical exact reproduction uses `run_canonical_replay(...)`, and exact checkpoint resume uses `resume_with_checkpoint_artifact(...)`.
+The authoritative replay lane is explicit: fresh exact runs use `run_with_scenario(...)`, canonical exact reproduction uses `run_canonical_replay(...)`, exact non-durable checkpoint resume uses `resume_with_checkpoint_artifact(...)`, and durable scenarios resume through `resume_with_durable_checkpoint_artifact(...)` with typed WAL and evidence artifacts.
 On-disk checkpoint and replay bundles now use the typed `PersistedReplayArtifact` contract rather than ad hoc raw CBOR machine dumps.
 
 ## Key Concepts

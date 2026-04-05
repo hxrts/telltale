@@ -132,8 +132,8 @@ Module access (not re-exported at crate root):
   The typed internal durability request is `EffectRequestBody::WalSync`.
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
 - Durability:
-  `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryMetadata, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest}`
-  These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, recovery metadata, and the internal `wal_sync` durability boundary.
+  `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata, DurableRecoveryPlan, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest}`
+  These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, recovery metadata, typed recovery planning, and the internal `wal_sync` durability boundary.
   Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`
@@ -161,7 +161,10 @@ Key exports:
 Module access (not re-exported at crate root):
 - `telltale_simulator::trace::Trace`, `StepRecord`
 - `telltale_simulator::runner::run`, `run_concurrent`, `run_with_scenario`, `ChoreographySpec`
-- `telltale_simulator::scenario::{Scenario, ExecutionSpec, ExecutionBackend, ResolvedExecution, ResolvedExecutionBackend}`
+- `telltale_simulator::scenario::{Scenario, ExecutionSpec, ExecutionBackend, ResolvedExecution, ResolvedExecutionBackend, DurabilitySpec, DurabilityMode}`
+- `telltale_simulator::runner::{resume_with_checkpoint_artifact, resume_with_durable_checkpoint_artifact, DurableResumeArtifacts, DurableResumeSummary}`
+  `resume_with_checkpoint_artifact(...)` is the exact non-durable checkpoint lane.
+  Scenarios that declare `DurabilityMode::Wal` must resume through `resume_with_durable_checkpoint_artifact(...)` so the simulator cannot bypass the typed WAL/evidence contract.
 - `telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport, ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep}`
   Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
 - `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`

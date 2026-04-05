@@ -153,7 +153,8 @@ pub mod model {
     pub mod durability {
         pub use crate::durable::{
             AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
-            DurableRecoveryMetadata, EvidenceIdResolver, EvidenceOutcomeCache,
+            DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata,
+            DurableRecoveryPlan, EvidenceIdResolver, EvidenceOutcomeCache,
             EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
             FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal,
             InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
@@ -327,9 +328,10 @@ pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use durable::{
     AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
-    DurableRecoveryMetadata, EvidenceIdResolver, EvidenceOutcomeCache,
-    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
-    FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+    DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata, DurableRecoveryPlan,
+    EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
+    EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementWal,
+    FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
     PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest,
     PERSISTED_DURABILITY_SCHEMA_VERSION,
 };

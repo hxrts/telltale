@@ -8,10 +8,10 @@ use telltale_machine::coroutine::Value;
 use telltale_machine::instr::InvokeAction;
 use telltale_machine::model::durability::{
     AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
-    DurableRecoveryMetadata, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry,
-    EvidencePersistenceHandler, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal,
-    InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
-    WalSyncMode, WalSyncRequest,
+    DurableRecoveryAction, DurableRecoveryMetadata, DurableRecoveryPlan,
+    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+    FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+    PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest,
 };
 use telltale_machine::model::effects::{
     EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse, EffectResult,
@@ -62,6 +62,73 @@ fn sample_wal_artifact() -> AgreementWalArtifact {
                 downstream_coroutine_id: "coro#9".to_string(),
                 gate_level: AgreementLevel::Finalized,
                 tick: 7,
+            },
+        ],
+    }
+}
+
+fn recovery_fixture_wal() -> AgreementWalArtifact {
+    AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "prov#1".to_string(),
+                    operation_id: "op#provisional".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::Provisional,
+                    kind: AgreementEvidenceKind::Witness,
+                    reference: "witness://1".to_string(),
+                    authoritative: true,
+                },
+                tick: 2,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#provisional".to_string(),
+                previous_level: AgreementLevel::None,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: Some("prov#1".to_string()),
+                tick: 2,
+            },
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "soft#1".to_string(),
+                    operation_id: "op#softsafe".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::SoftSafe,
+                    kind: AgreementEvidenceKind::CommitFact,
+                    reference: "commit://1".to_string(),
+                    authoritative: true,
+                },
+                tick: 3,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#softsafe".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("soft#1".to_string()),
+                tick: 3,
+            },
+            AgreementWalEntry::Finalization {
+                operation_id: "op#finalized".to_string(),
+                outcome: FinalizationOutcome::Finalized,
+                materialization_proof_id: Some("proof#final".to_string()),
+                canonical_handle_id: Some("handle#final".to_string()),
+                tick: 4,
+            },
+            AgreementWalEntry::VisibilityGateCrossing {
+                operation_id: "op#finalized".to_string(),
+                downstream_coroutine_id: "coro#4".to_string(),
+                gate_level: AgreementLevel::Finalized,
+                tick: 4,
+            },
+            AgreementWalEntry::Finalization {
+                operation_id: "op#terminal".to_string(),
+                outcome: FinalizationOutcome::TimedOut,
+                materialization_proof_id: None,
+                canonical_handle_id: None,
+                tick: 5,
             },
         ],
     }
@@ -646,4 +713,159 @@ fn blocked_wal_sync_escalates_through_progress_contract_states() {
             ProgressState::TimedOut,
         ]
     );
+}
+
+#[test]
+fn durable_recovery_plan_classifies_levels_and_terminal_outcomes() {
+    let machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let evidence_cache = EvidenceOutcomeCacheArtifact {
+        entries: vec![
+            EvidenceOutcomeCacheEntry {
+                evidence_id: "prov#1".to_string(),
+                interface_name: "Storage".to_string(),
+                operation_name: "write".to_string(),
+                outcome: EffectOutcome::success(EffectResponse::Release),
+            },
+            EvidenceOutcomeCacheEntry {
+                evidence_id: "soft#1".to_string(),
+                interface_name: "Storage".to_string(),
+                operation_name: "write".to_string(),
+                outcome: EffectOutcome::success(EffectResponse::Release),
+            },
+        ],
+    };
+    let plan =
+        DurableRecoveryPlan::from_checkpoint(1, machine, &recovery_fixture_wal(), evidence_cache)
+            .expect("build recovery plan");
+
+    let provisional = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#provisional")
+        .expect("provisional decision");
+    assert_eq!(
+        provisional.action,
+        DurableRecoveryAction::ReexecuteFromScratch
+    );
+
+    let softsafe = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#softsafe")
+        .expect("soft-safe decision");
+    assert_eq!(
+        softsafe.action,
+        DurableRecoveryAction::ResumeFromEvidenceBoundary
+    );
+    assert_eq!(softsafe.cached_evidence_ids, vec!["soft#1".to_string()]);
+
+    let finalized = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#finalized")
+        .expect("finalized decision");
+    assert_eq!(finalized.action, DurableRecoveryAction::ReuseFinalized);
+    assert!(finalized.gate_crossed);
+
+    let terminal = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#terminal")
+        .expect("terminal decision");
+    assert_eq!(terminal.action, DurableRecoveryAction::PreserveTerminal);
+}
+
+#[test]
+fn durable_recovery_plan_covers_crash_positions() {
+    let wal = recovery_fixture_wal();
+
+    let before_transition = DurableRecoveryPlan::from_checkpoint(
+        10,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &AgreementWalArtifact::default(),
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("empty recovery plan");
+    assert!(before_transition.decisions.is_empty());
+
+    let between_wal_and_gate = DurableRecoveryPlan::from_checkpoint(
+        2,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("between wal and gate plan");
+    let softsafe = between_wal_and_gate
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#softsafe")
+        .expect("soft-safe decision");
+    assert!(!softsafe.gate_crossed);
+    assert_eq!(
+        softsafe.action,
+        DurableRecoveryAction::ResumeFromEvidenceBoundary
+    );
+
+    let during_wal_sync = DurableRecoveryPlan::from_checkpoint(
+        3,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("during wal_sync plan");
+    let finalized = during_wal_sync
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#finalized")
+        .expect("finalized decision");
+    assert_eq!(finalized.action, DurableRecoveryAction::ReuseFinalized);
+
+    let after_finalization_before_checkpoint = DurableRecoveryPlan::from_checkpoint(
+        3,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &AgreementWalArtifact {
+            entries: wal
+                .entries
+                .iter()
+                .filter(|entry| entry.tick() >= 4)
+                .cloned()
+                .collect(),
+        },
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("post-finalization plan");
+    assert!(after_finalization_before_checkpoint
+        .decisions
+        .iter()
+        .any(|decision| decision.operation_id == "op#finalized"
+            && decision.action == DurableRecoveryAction::ReuseFinalized));
+}
+
+#[test]
+fn durable_recovery_plan_is_deterministic_for_checkpoint_plus_wal_equivalence() {
+    let wal = recovery_fixture_wal();
+    let cache = EvidenceOutcomeCacheArtifact {
+        entries: vec![EvidenceOutcomeCacheEntry {
+            evidence_id: "soft#1".to_string(),
+            interface_name: "Storage".to_string(),
+            operation_name: "write".to_string(),
+            outcome: EffectOutcome::success(EffectResponse::Release),
+        }],
+    };
+    let first = DurableRecoveryPlan::from_checkpoint(
+        1,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        cache.clone(),
+    )
+    .expect("first recovery plan");
+    let second = DurableRecoveryPlan::from_checkpoint(
+        1,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        cache,
+    )
+    .expect("second recovery plan");
+    assert_eq!(first.metadata, second.metadata);
+    assert_eq!(first.decisions, second.decisions);
 }
