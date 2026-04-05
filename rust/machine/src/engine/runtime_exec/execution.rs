@@ -28,6 +28,7 @@ impl ProtocolMachine {
         // before unblocking and scheduler selection.
         self.ingest_topology_events(handler)?;
         self.prune_expired_timeouts();
+        self.try_unblock_senders();
         self.try_unblock_receivers();
         self.evaluate_progress_contracts()?;
         self.ensure_ready_eligibility();

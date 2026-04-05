@@ -442,6 +442,34 @@ Parity fixtures are enforced by:
 - `rust/simulator/tests/field_handler_parity.rs`
 - `lean/Runtime/Tests/SimulatorParity.lean` (built as `simulator_parity_tests`)
 
+## Reduced Semantic-Effect Parity
+
+Lean also publishes a reduced semantic-effect fixture surface for the protocol-machine/runtime boundary.
+This lane is narrower than full executable protocol-machine equivalence: it checks the semantic classification we rely on for effect-facing debugging and replay exactness without claiming that Lean executes the full Rust effect handler stack.
+
+The reduced surface covers:
+
+- effect kind
+- lifecycle classification (`blocked` / `succeeded`)
+- interface and operation naming
+- output-condition predicate material visible to publications
+- whether the successful send path materializes an authoritative publication handle
+
+Parity fixtures are enforced by:
+
+- `lean/Runtime/Tests/SemanticEffectParity.lean` (built as `semantic_effect_parity_runner`)
+- `rust/machine/tests/semantic_effect_lean.rs`
+- `rust/simulator/tests/semantic_effect_lean.rs`
+
+The machine and simulator tests compare canonical Rust outputs against the Lean fixture bundle for:
+
+- one blocked-send fixture
+- one successful send/publication fixture
+- one `output_condition_hint` fixture
+- one `wal_sync` fixture
+
+This lane is intended to keep Lean, Rust machine semantics, replay/runtime behavior, and simulator artifact extraction aligned on the effect-visible semantic slice that matters for time-travel debugging and exact replay.
+
 ## Lean Module Boundaries
 
 The `lean/Runtime/ProtocolMachine` directory is organized into executable and proof modules.

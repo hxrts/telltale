@@ -190,11 +190,11 @@ fn replay_and_persistence_histories_preserve_semantic_identity() {
     assert_eq!(
         normalize_semantic_audit_log(&baseline.fragment.semantic_audit_log),
         normalize_semantic_audit_log(&replay.fragment.semantic_audit_log),
-        "record/replay must preserve semantic audit semantics apart from replay handler provenance"
+        "record/replay must preserve semantic audit semantics"
     );
-    assert_ne!(
+    assert_eq!(
         baseline.fragment.semantic_audit_log, replay.fragment.semantic_audit_log,
-        "replay should remain distinguishable from baseline at the raw audit-provenance layer"
+        "record/replay must now preserve raw semantic audit provenance exactly"
     );
     assert_eq!(
         baseline.semantic_objects, restored.semantic_objects,

@@ -69,15 +69,15 @@ fn exec_instr(
     coro: &Arc<Mutex<Coroutine>>,
     session: &Arc<Mutex<SessionState>>,
     ctx: &ThreadedExecCtx<'_>,
-) -> Result<(StepPack, Option<OutputConditionHint>), Fault> {
+) -> Result<ThreadedExecSuccess, ThreadedExecFault> {
     let mut coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
     let pc = coro_guard.pc;
     let program = ctx
         .programs
         .get(coro_guard.program_id)
-        .ok_or(Fault::PcOutOfBounds)?;
+        .ok_or_else(|| ThreadedExecFault::new(Fault::PcOutOfBounds))?;
     if pc >= program.len() {
-        return Err(Fault::PcOutOfBounds);
+        return Err(ThreadedExecFault::new(Fault::PcOutOfBounds));
     }
     let instr = program[pc].clone();
     let role = coro_guard.role.clone();
@@ -91,13 +91,14 @@ fn exec_instr(
             role: role.clone(),
         });
 
-    monitor_precheck(ctx.step.config.monitor_mode, session, &ep, &role, &instr)?;
+    monitor_precheck(ctx.step.config.monitor_mode, session, &ep, &role, &instr)
+        .map_err(ThreadedExecFault::new)?;
     if coro_guard.cost_budget < ctx.step.config.instruction_cost {
-        return Err(Fault::OutOfCredits);
+        return Err(ThreadedExecFault::new(Fault::OutOfCredits));
     }
     coro_guard.cost_budget -= ctx.step.config.instruction_cost;
 
-    let pack = match instr {
+    let (pack, effect_observations) = match instr {
         Instr::Send { chan, val } => {
             step_send(&mut coro_guard, session, &role, chan, val, &ctx.step)
         }
@@ -107,20 +108,35 @@ fn exec_instr(
         Instr::Halt => {
             let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             step_halt(&mut session_guard, &ep, ctx.step.tick)
+                .map(|pack| (pack, Vec::new()))
+                .map_err(ThreadedExecFault::new)
         }
-        Instr::Jump { target } => Ok(StepPack {
-            coro_update: CoroUpdate::SetPc(target),
-            type_update: None,
-            events: vec![],
-        }),
-        Instr::Yield => Ok(StepPack {
-            coro_update: CoroUpdate::AdvancePc,
-            type_update: None,
-            events: vec![],
-        }),
+        Instr::Jump { target } => Ok((
+            StepPack {
+                coro_update: CoroUpdate::SetPc(target),
+                type_update: None,
+                events: vec![],
+            },
+            Vec::new(),
+        )),
+        Instr::Yield => Ok((
+            StepPack {
+                coro_update: CoroUpdate::AdvancePc,
+                type_update: None,
+                events: vec![],
+            },
+            Vec::new(),
+        )),
         Instr::Invoke { action } => {
             let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
-            step_invoke(&mut coro_guard, &session_guard, &role, action, ctx.step.handler, ctx.step.tick)
+            step_invoke(
+                &mut coro_guard,
+                &session_guard,
+                &role,
+                action,
+                ctx.step.handler,
+                ctx.step.tick,
+            )
         }
         Instr::Acquire { layer, dst } => step_acquire(
             &mut coro_guard,
@@ -151,9 +167,15 @@ fn exec_instr(
             ghost,
             ctx.step.config,
             ctx.step.tick,
-        ),
-        Instr::Join => step_join(&mut coro_guard, sid, ctx.step.tick),
-        Instr::Abort => step_abort(&mut coro_guard, sid, ctx.step.tick),
+        )
+        .map(|pack| (pack, Vec::new()))
+        .map_err(ThreadedExecFault::new),
+        Instr::Join => step_join(&mut coro_guard, sid, ctx.step.tick)
+            .map(|pack| (pack, Vec::new()))
+            .map_err(ThreadedExecFault::new),
+        Instr::Abort => step_abort(&mut coro_guard, sid, ctx.step.tick)
+            .map(|pack| (pack, Vec::new()))
+            .map_err(ThreadedExecFault::new),
         Instr::Transfer {
             endpoint,
             target,
@@ -165,8 +187,12 @@ fn exec_instr(
             target,
             bundle,
             ctx.step.tick,
-        ),
-        Instr::Tag { fact, dst } => step_tag(&mut coro_guard, &role, fact, dst, ctx.step.tick),
+        )
+        .map(|pack| (pack, Vec::new()))
+        .map_err(ThreadedExecFault::new),
+        Instr::Tag { fact, dst } => step_tag(&mut coro_guard, &role, fact, dst, ctx.step.tick)
+            .map(|pack| (pack, Vec::new()))
+            .map_err(ThreadedExecFault::new),
         Instr::Check {
             knowledge,
             target,
@@ -179,7 +205,9 @@ fn exec_instr(
             target,
             dst,
             ctx.step.tick,
-        ),
+        )
+        .map(|pack| (pack, Vec::new()))
+        .map_err(ThreadedExecFault::new),
         Instr::Set { dst, val } => {
             let v = match val {
                 crate::instr::ImmValue::Unit => Value::Unit,
@@ -187,23 +215,29 @@ fn exec_instr(
                 crate::instr::ImmValue::Bool(b) => Value::Bool(b),
                 crate::instr::ImmValue::Str(s) => Value::Str(s),
             };
-            Ok(StepPack {
-                coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst, val: v },
-                type_update: None,
-                events: vec![],
-            })
+            Ok((
+                StepPack {
+                    coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst, val: v },
+                    type_update: None,
+                    events: vec![],
+                },
+                Vec::new(),
+            ))
         }
         Instr::Move { dst, src } => {
             let v = coro_guard
                 .regs
                 .get(usize::from(src))
                 .cloned()
-                .ok_or(Fault::OutOfRegisters)?;
-            Ok(StepPack {
-                coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst, val: v },
-                type_update: None,
-                events: vec![],
-            })
+                .ok_or_else(|| ThreadedExecFault::new(Fault::OutOfRegisters))?;
+            Ok((
+                StepPack {
+                    coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst, val: v },
+                    type_update: None,
+                    events: vec![],
+                },
+                Vec::new(),
+            ))
         }
         Instr::Choose { chan, ref table } => {
             let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
@@ -227,16 +261,17 @@ fn exec_instr(
                 &ctx.step,
             )
         }
-        Instr::Spawn { target, ref args } => Ok(step_spawn(target, args)),
+        Instr::Spawn { target, ref args } => Ok((step_spawn(target, args), Vec::new())),
         Instr::Close {
             session: session_reg,
         } => {
             let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
-            let close_ep = endpoint_from_reg(&coro_guard, session_reg)?;
+            let close_ep =
+                endpoint_from_reg(&coro_guard, session_reg).map_err(ThreadedExecFault::new)?;
             if !coro_guard.owned_endpoints.contains(&close_ep) {
-                return Err(Fault::Close {
+                return Err(ThreadedExecFault::new(Fault::Close {
                     message: "endpoint not owned".to_string(),
-                });
+                }));
             }
             step_close(
                 &mut session_guard,
@@ -245,6 +280,8 @@ fn exec_instr(
                 ctx.step.tick,
                 &ctx.step,
             )
+            .map(|pack| (pack, Vec::new()))
+            .map_err(ThreadedExecFault::new)
         }
         Instr::Open {
             ref roles,
@@ -261,33 +298,43 @@ fn exec_instr(
             handlers,
             dsts,
             ctx.step.tick,
-        ),
+        )
+        .map(|pack| (pack, Vec::new()))
+        .map_err(ThreadedExecFault::new),
     }?;
 
-    let output_hint = if pack.events.is_empty() {
+    let output_observation = if pack.events.is_empty() {
         None
     } else {
-        Some(
-            ctx.step
-                .handler
-                .handle_effect(EffectRequest::output_condition_hint(
-                    ctx.step.tick,
-                    sid,
-                    None,
-                    role.as_str(),
-                    &coro_guard.regs,
-                ))
-                .into_output_condition_hint()
-                .ok()
-                .flatten()
-                .unwrap_or(OutputConditionHint {
-                    predicate_ref: "protocol_machine.observable_output".to_string(),
-                    witness_ref: None,
-                }),
-        )
+        let request = EffectRequest::output_condition_hint(
+            ctx.step.tick,
+            sid,
+            None,
+            role.as_str(),
+            &coro_guard.regs,
+        );
+        let outcome = ctx.step.handler.handle_effect(request.clone());
+        let hint = outcome
+            .clone()
+            .into_output_condition_hint()
+            .ok()
+            .flatten()
+            .unwrap_or(OutputConditionHint {
+                predicate_ref: "protocol_machine.observable_output".to_string(),
+                witness_ref: None,
+            });
+        Some(OutputHintObservation {
+            request,
+            outcome,
+            hint: Some(hint),
+        })
     };
 
-    Ok((pack, output_hint))
+    Ok(ThreadedExecSuccess {
+        pack,
+        effect_observations,
+        output_observation,
+    })
 }
 
 fn monitor_precheck(

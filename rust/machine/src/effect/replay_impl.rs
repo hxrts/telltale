@@ -1,7 +1,10 @@
 // Replay effect handler that replays recorded effect exchanges.
 impl EffectHandler for ReplayEffectHandler<'_> {
     fn handler_identity(&self) -> String {
-        "replay_handler".to_string()
+        self.peek_handler_identity().unwrap_or_else(|| {
+            self.fallback
+                .map_or_else(|| "replay_handler".to_string(), EffectHandler::handler_identity)
+        })
     }
 
     #[allow(clippy::too_many_lines)]
@@ -245,7 +248,10 @@ impl EffectHandler for ReplayEffectHandler<'_> {
     }
 
     fn supports_wal_sync(&self) -> bool {
-        true
+        self.trace_contains_kind("wal_sync")
+            || self
+                .fallback
+                .is_some_and(crate::effect::EffectHandler::supports_wal_sync)
     }
 
     fn wal_sync(&self, sync: &crate::durable::WalSyncRequest) -> EffectResult<()> {

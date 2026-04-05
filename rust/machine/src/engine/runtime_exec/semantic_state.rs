@@ -709,6 +709,67 @@ impl ProtocolMachine {
         Ok(())
     }
 
+    fn override_effect_status(
+        &mut self,
+        effect_id: u64,
+        status: OutstandingEffectStatus,
+        outputs: serde_json::Value,
+    ) -> Result<(), ProtocolMachineError> {
+        let Some(effect_index) = self
+            .outstanding_effects
+            .as_slice()
+            .iter()
+            .position(|effect| effect.effect_id == effect_id)
+        else {
+            return Err(ProtocolMachineError::HandlerError(
+                EffectFailure::contract_violation(format!(
+                    "[host-contract] override for effect {effect_id} requires a live outstanding-effect record"
+                )),
+            ));
+        };
+
+        let operation_id;
+        let session;
+        let budget_ticks;
+        let reason;
+        {
+            let effect = &mut self.outstanding_effects.as_mut_slice()[effect_index];
+            effect.status = status;
+            effect.outputs = outputs;
+            effect.completed_at_tick = Some(self.clock.tick);
+            effect.ordering_key = self.clock.tick;
+            operation_id = effect.operation_id.clone();
+            session = effect.session;
+            budget_ticks = effect.budget_ticks;
+            reason = effect
+                .outputs
+                .get("reason")
+                .and_then(serde_json::Value::as_str)
+                .map(ToString::to_string);
+        }
+
+        if let Some(operation) = self
+            .operation_instances
+            .as_mut_slice()
+            .iter_mut()
+            .find(|operation| operation.operation_id == operation_id)
+        {
+            operation.phase = Self::effect_status_phase(status);
+            operation.terminal_publication = Self::effect_terminal_publication(status);
+        }
+
+        self.set_progress_contract_state(
+            &operation_id,
+            session,
+            Self::progress_state_for_effect_status(status),
+            budget_ticks,
+            reason,
+            true,
+        );
+
+        Ok(())
+    }
+
     fn invalidate_outstanding_effects_for_session(&mut self, session: SessionId, reason: &str) {
         let mut invalidated = Vec::new();
         for effect in self.outstanding_effects.as_mut_slice().iter_mut() {

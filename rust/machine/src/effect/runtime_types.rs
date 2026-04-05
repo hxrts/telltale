@@ -252,6 +252,18 @@ impl<'a> ReplayEffectHandler<'a> {
         self.entries.len().saturating_sub(cursor)
     }
 
+    fn trace_contains_kind(&self, kind: &str) -> bool {
+        self.entries.iter().any(|entry| entry.effect_kind == kind)
+    }
+
+    fn peek_handler_identity(&self) -> Option<String> {
+        let cursor = *self
+            .cursor
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.entries.get(cursor).map(|entry| entry.handler_identity.clone())
+    }
+
     fn next_entry(&self, expected_kind: &str) -> Result<EffectTraceEntry, String> {
         let mut cursor = self
             .cursor

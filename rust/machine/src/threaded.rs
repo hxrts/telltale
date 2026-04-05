@@ -72,6 +72,45 @@ use crate::transfer_semantics::{
 
 // Lane identifier in the threaded runtime.
 
+struct OutputHintObservation {
+    request: EffectRequest,
+    outcome: EffectOutcome,
+    hint: Option<OutputConditionHint>,
+}
+
+#[derive(Clone)]
+struct EffectObservation {
+    request: EffectRequest,
+    outcome: EffectOutcome,
+}
+
+struct ThreadedExecSuccess {
+    pack: StepPack,
+    effect_observations: Vec<EffectObservation>,
+    output_observation: Option<OutputHintObservation>,
+}
+
+struct ThreadedExecFault {
+    fault: Fault,
+    effect_observations: Vec<EffectObservation>,
+}
+
+impl ThreadedExecFault {
+    fn new(fault: Fault) -> Self {
+        Self {
+            fault,
+            effect_observations: Vec::new(),
+        }
+    }
+
+    fn with_observation(fault: Fault, observation: EffectObservation) -> Self {
+        Self {
+            fault,
+            effect_observations: vec![observation],
+        }
+    }
+}
+
 include!("threaded/prelude.rs");
 include!("threaded/runtime_and_scheduling.rs");
 include!("threaded/semantic_state.rs");

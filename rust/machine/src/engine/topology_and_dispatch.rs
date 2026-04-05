@@ -477,6 +477,43 @@ impl ProtocolMachine {
         Ok(())
     }
 
+    /// Try to unblock coroutines that are waiting on sends.
+    fn try_unblock_senders(&mut self) {
+        let blocked_ids = self.sched.blocked_ids();
+        for coro_id in blocked_ids {
+            let Some(idx) = self.coro_index(coro_id) else {
+                continue;
+            };
+            let role = &self.coroutines[idx].role;
+            if self.paused_roles.contains(role)
+                || self.is_site_crashed(role)
+                || self.is_site_timed_out(role)
+            {
+                continue;
+            }
+            let reason = self.sched.block_reason(coro_id).cloned();
+            if let Some(BlockReason::Send { edge }) = reason {
+                if self.is_site_crashed(&edge.sender)
+                    || self.is_site_crashed(&edge.receiver)
+                    || self.is_site_timed_out(&edge.sender)
+                    || self.is_site_timed_out(&edge.receiver)
+                    || self.is_edge_partitioned(&edge.sender, &edge.receiver)
+                {
+                    continue;
+                }
+                let can_send = self
+                    .sessions
+                    .get(edge.sid)
+                    .and_then(|session| session.buffers.get(&edge))
+                    .is_some_and(|buffer| !buffer.is_full());
+                if can_send {
+                    self.sched.unblock(coro_id);
+                    self.sync_ready_eligibility_for(coro_id);
+                }
+            }
+        }
+    }
+
     /// Try to unblock coroutines that are waiting on receives.
     fn try_unblock_receivers(&mut self) {
         let blocked_ids = self.sched.blocked_ids();
@@ -732,14 +769,8 @@ impl ProtocolMachine {
             || self.is_site_timed_out(&partner)
             || self.is_edge_partitioned(role, &partner)
         {
-            let effect_id = self.issue_runtime_effect(
-                "send_decision",
-                Some(sid),
-                &handler_identity,
-                effect_inputs.clone(),
-            );
-            self.complete_runtime_effect(
-                effect_id,
+            self.override_effect_status(
+                predicted_effect_id,
                 OutstandingEffectStatus::Blocked,
                 json!({
                     "status": "blocked",

@@ -1,5 +1,21 @@
 // Commit finalization and endpoint delegation for threaded mode.
 impl ThreadedProtocolMachine {
+    fn record_effect_observations(
+        &mut self,
+        observations: Vec<EffectObservation>,
+        handler_identity: &str,
+    ) {
+        for observation in observations {
+            let predicted_effect_id = self.next_effect_id;
+            self.record_effect_exchange(
+                &observation.request,
+                &observation.outcome,
+                handler_identity,
+                predicted_effect_id,
+            );
+        }
+    }
+
     fn issue_delegation_receipt(
         &mut self,
         endpoint: Endpoint,
@@ -65,7 +81,8 @@ impl ThreadedProtocolMachine {
         coro: &Arc<Mutex<Coroutine>>,
         session: &Arc<Mutex<SessionState>>,
         pack: StepPack,
-        output_hint: Option<OutputConditionHint>,
+        effect_observations: Vec<EffectObservation>,
+        output_observation: Option<OutputHintObservation>,
         handler: &dyn EffectHandler,
         handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
@@ -74,6 +91,23 @@ impl ThreadedProtocolMachine {
             .lock()
             .expect("threaded ProtocolMachine lock poisoned")
             .sid;
+
+        self.record_effect_observations(effect_observations, handler_identity);
+
+        let output_hint = if let Some(observation) = output_observation {
+            self.ensure_effect_request_allowed(&observation.request)
+                .map_err(|failure| Fault::Invoke { failure })?;
+            let predicted_effect_id = self.next_effect_id;
+            self.record_effect_exchange(
+                &observation.request,
+                &observation.outcome,
+                handler_identity,
+                predicted_effect_id,
+            );
+            observation.hint
+        } else {
+            None
+        };
 
         if !pack.events.is_empty()
             && !matches!(

@@ -11,10 +11,12 @@ mod test_support;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
+use telltale_machine::durable::WalSyncRequest;
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, EffectTraceEntry, RecordingEffectHandler,
     SendDecision, SendDecisionInput, TopologyPerturbation,
 };
+use telltale_machine::model::output_condition::OutputConditionHint;
 use telltale_machine::trace::normalize_trace_v1;
 use telltale_machine::{CanonicalHandleKind, DelegationStatus, SemanticAuditRecord};
 use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig};
@@ -86,6 +88,134 @@ impl EffectHandler for OrderedTopologyHandler {
     fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
         EffectResult::success(self.events_by_tick.get(&tick).cloned().unwrap_or_default())
     }
+}
+
+#[derive(Debug, Clone, Default)]
+struct InternalEffectReplayHandler;
+
+impl EffectHandler for InternalEffectReplayHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Str(label.to_string()))
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        match labels.first().cloned() {
+            Some(label) => EffectResult::success(label),
+            None => EffectResult::failure(EffectFailure::invalid_input("no labels")),
+        }
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        let events = match tick {
+            1 => vec![TopologyPerturbation::Partition {
+                from: "A".to_string(),
+                to: "B".to_string(),
+            }],
+            2 => vec![TopologyPerturbation::Heal {
+                from: "A".to_string(),
+                to: "B".to_string(),
+            }],
+            _ => Vec::new(),
+        };
+        EffectResult::success(events)
+    }
+
+    fn output_condition_hint(
+        &self,
+        sid: usize,
+        role: &str,
+        _state: &[telltale_machine::Value],
+    ) -> Option<OutputConditionHint> {
+        Some(OutputConditionHint {
+            predicate_ref: "machine.replay.internal_effects".to_string(),
+            witness_ref: Some(format!("sid:{sid}:role:{role}")),
+        })
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+
+    fn wal_sync(&self, _sync: &WalSyncRequest) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+}
+
+fn assert_internal_effect_replay_exact(baseline: &ProtocolMachine, replay: &ProtocolMachine) {
+    assert_eq!(
+        baseline.canonical_replay_fragment().obs_trace,
+        replay.canonical_replay_fragment().obs_trace,
+        "replay must preserve observable outputs exactly when internal effects are replayed"
+    );
+    assert_eq!(
+        baseline.effect_trace(),
+        replay.effect_trace(),
+        "replay must preserve raw effect trace entries exactly"
+    );
+    assert_eq!(
+        baseline.effect_exchanges(),
+        replay.effect_exchanges(),
+        "replay must preserve typed effect exchanges exactly"
+    );
+    assert_eq!(
+        baseline.semantic_objects(),
+        replay.semantic_objects(),
+        "replay must preserve semantic objects exactly"
+    );
+    assert!(
+        baseline.effect_exchanges().iter().any(|exchange| matches!(
+            exchange.request.body,
+            telltale_machine::model::effects::EffectRequestBody::OutputConditionHint { .. }
+        )),
+        "baseline exchanges should include output-condition hint effects"
+    );
+    assert!(
+        baseline.effect_exchanges().iter().any(|exchange| matches!(
+            exchange.request.body,
+            telltale_machine::model::effects::EffectRequestBody::WalSync { .. }
+        )),
+        "baseline exchanges should include wal_sync effects"
+    );
+    assert!(
+        baseline
+            .effect_trace()
+            .iter()
+            .any(|entry| entry.effect_kind == "topology_event"),
+        "baseline trace should include topology ingress effects"
+    );
 }
 
 #[test]
@@ -290,6 +420,32 @@ fn run_replay_shared_accepts_arc_backed_trace() {
         baseline_effect_semantics, replay_effect_semantics,
         "arc-backed replay must preserve effect semantics (excluding handler identity)"
     );
+}
+
+#[test]
+fn replay_preserves_internal_effects_exactly_when_recorded() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let handler = InternalEffectReplayHandler;
+    let recording = RecordingEffectHandler::new(&handler);
+
+    let mut baseline = ProtocolMachine::new(ProtocolMachineConfig::default());
+    baseline.load_choreography(&image).expect("load baseline");
+    baseline.run(&recording, 64).expect("run baseline");
+
+    let encoded_trace =
+        serde_json::to_vec(&recording.effect_trace()).expect("serialize recorded effect trace");
+    let decoded_trace: Vec<EffectTraceEntry> =
+        serde_json::from_slice(&encoded_trace).expect("deserialize recorded effect trace");
+
+    let mut replay_vm = ProtocolMachine::new(ProtocolMachineConfig::default());
+    replay_vm
+        .load_choreography(&image)
+        .expect("load replay ProtocolMachine");
+    replay_vm
+        .run_replay_shared(&handler, Arc::from(decoded_trace), 64)
+        .expect("run replay ProtocolMachine");
+
+    assert_internal_effect_replay_exact(&baseline, &replay_vm);
 }
 
 #[test]
@@ -506,6 +662,53 @@ cfg_if! {
             assert_eq!(
                 baseline_effect_semantics, replay_effect_semantics,
                 "threaded arc-backed replay must preserve effect semantics (excluding handler identity)"
+            );
+        }
+
+        #[test]
+        fn threaded_replay_preserves_internal_effects_exactly_when_recorded() {
+            let image = simple_send_recv_image("A", "B", "m");
+            let handler = InternalEffectReplayHandler;
+            let recording = RecordingEffectHandler::new(&handler);
+
+            let mut baseline =
+                ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+            baseline.load_choreography(&image).expect("load baseline");
+            baseline.run(&recording, 64).expect("run baseline");
+
+            let encoded_trace = serde_json::to_vec(&recording.effect_trace())
+                .expect("serialize recorded effect trace");
+            let decoded_trace: Vec<EffectTraceEntry> =
+                serde_json::from_slice(&encoded_trace).expect("deserialize recorded effect trace");
+
+            let mut replay_vm =
+                ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+            replay_vm
+                .load_choreography(&image)
+                .expect("load replay ProtocolMachine");
+            replay_vm
+                .run_replay_shared(&handler, Arc::from(decoded_trace), 64)
+                .expect("run replay ProtocolMachine");
+
+            assert_eq!(
+                baseline.canonical_replay_fragment().obs_trace,
+                replay_vm.canonical_replay_fragment().obs_trace,
+                "threaded replay must preserve observable outputs exactly"
+            );
+            assert_eq!(
+                baseline.effect_trace(),
+                replay_vm.effect_trace(),
+                "threaded replay must preserve raw effect trace entries exactly"
+            );
+            assert_eq!(
+                baseline.effect_exchanges(),
+                replay_vm.effect_exchanges(),
+                "threaded replay must preserve typed effect exchanges exactly"
+            );
+            assert_eq!(
+                baseline.semantic_objects(),
+                replay_vm.semantic_objects(),
+                "threaded replay must preserve semantic objects exactly"
             );
         }
 
