@@ -2398,6 +2398,63 @@ mod tests {
     }
 
     #[test]
+    fn durable_inspection_artifact_supports_non_empty_recovery_summaries() {
+        let recovery: telltale_simulator::runner::DurableResumeSummary =
+            serde_json::from_value(serde_json::json!({
+                "execution_regime": "canonical_exact",
+                "theorem_profile": {
+                    "scheduler_profile": "canonical_exact",
+                    "envelope_profile": "exact",
+                    "assumption_bundle": "fault_free_transport",
+                    "eligibility": "exact",
+                    "eligibility_reason": null
+                },
+                "metadata": {
+                    "checkpoint_tick": 4,
+                    "wal_tail_start_tick": 5,
+                    "highest_recovered_tick": 6,
+                    "resumed_operation_ids": ["op#durable"],
+                    "terminal_operation_ids": [],
+                    "cached_evidence_ids": ["proof#1"]
+                },
+                "decisions": [{
+                    "operation_id": "op#durable",
+                    "level": "finalized",
+                    "finalization": "finalized",
+                    "action": "reuse_finalized",
+                    "cached_evidence_ids": ["proof#1"],
+                    "gate_crossed": true
+                }]
+            }))
+            .expect("decode durable resume summary");
+        let artifact = ViewerArtifactFile::new(ViewerArtifact::DurableInspection(Box::new(
+            DurableInspectionReport {
+                wal_entries: vec![telltale_simulator::durability::DurableWalEntryProjection {
+                    tick: 4,
+                    operation_id: "op#durable".to_string(),
+                    kind: telltale_simulator::durability::DurableWalEntryKind::Finalization,
+                    detail: "Finalized proof=proof#1 handle=handle#1".to_string(),
+                }],
+                evidence_cache_entries: Vec::new(),
+                recovery: Some(recovery),
+            },
+        )));
+        let file = NamedTempFile::new().expect("temp file");
+        artifact.write_json(file.path()).expect("write artifact");
+        let loaded = ViewerArtifactFile::load_json(file.path()).expect("load artifact");
+        match loaded.artifact {
+            ViewerArtifact::DurableInspection(report) => {
+                let recovery = report.recovery.expect("recovery summary");
+                assert_eq!(recovery.metadata.checkpoint_tick, 4);
+                assert_eq!(recovery.decisions.len(), 1);
+                assert_eq!(recovery.decisions[0].operation_id, "op#durable");
+                assert!(recovery.decisions[0].gate_crossed);
+            }
+            other => panic!("unexpected artifact kind: {other:?}"),
+        }
+    }
+
+    #[test]
     fn viewer_artifact_file_rejects_unknown_schema_version() {
         let mut artifact = ViewerArtifactFile::new(ViewerArtifact::DecisionReport(
             telltale_simulator::decision::decide_theorem_eligibility(&Scenario {

@@ -322,3 +322,204 @@ fn durable_binary_projects_wal_cache_and_recovery_summary() {
     assert!(durable_json["evidence_cache_entries"].is_array());
     assert!(durable_json["recovery"].is_object());
 }
+
+#[test]
+fn durable_binary_fails_closed_on_payload_kind_mismatch_and_partial_recovery_args() {
+    let tmp = tempdir().expect("tempdir");
+    let wal_path = tmp.path().join("wal.cbor");
+    let cache_path = tmp.path().join("cache.cbor");
+
+    PersistedDurabilityArtifact::evidence_outcome_cache(EvidenceOutcomeCacheArtifact::default())
+        .write_to_path(&wal_path)
+        .expect("write cache payload at wal path");
+    PersistedDurabilityArtifact::agreement_wal(AgreementWalArtifact::default())
+        .write_to_path(&cache_path)
+        .expect("write wal payload at cache path");
+
+    let swapped = Command::new(env!("CARGO_BIN_EXE_durable"))
+        .current_dir(tmp.path())
+        .args([
+            "--wal",
+            wal_path.to_str().expect("wal path utf8"),
+            "--cache",
+            cache_path.to_str().expect("cache path utf8"),
+            "--json",
+        ])
+        .output()
+        .expect("run durable binary with swapped payloads");
+    assert!(!swapped.status.success(), "swapped payloads should fail");
+    let swapped_stderr = String::from_utf8_lossy(&swapped.stderr);
+    assert!(
+        swapped_stderr.contains("agreement WAL")
+            || swapped_stderr.contains("evidence outcome cache"),
+        "expected typed payload mismatch in stderr, got {swapped_stderr}"
+    );
+
+    let partial = Command::new(env!("CARGO_BIN_EXE_durable"))
+        .current_dir(tmp.path())
+        .args([
+            "--wal",
+            {
+                PersistedDurabilityArtifact::agreement_wal(AgreementWalArtifact::default())
+                    .write_to_path(&wal_path)
+                    .expect("rewrite valid wal payload");
+                wal_path.to_str().expect("wal path utf8")
+            },
+            "--cache",
+            {
+                PersistedDurabilityArtifact::evidence_outcome_cache(
+                    EvidenceOutcomeCacheArtifact::default(),
+                )
+                .write_to_path(&cache_path)
+                .expect("rewrite valid cache payload");
+                cache_path.to_str().expect("cache path utf8")
+            },
+            "--checkpoint",
+            wal_path.to_str().expect("wal path utf8"),
+            "--json",
+        ])
+        .output()
+        .expect("run durable binary with partial recovery args");
+    assert!(
+        !partial.status.success(),
+        "partial recovery args should fail"
+    );
+    assert!(String::from_utf8_lossy(&partial.stderr)
+        .contains("use --checkpoint and --scenario together"));
+}
+
+#[test]
+fn durable_binary_fails_closed_when_recovery_cannot_supply_a_field_handler() {
+    let tmp = tempdir().expect("tempdir");
+    let (global_type, local_types) = finite_protocol();
+    let scenario = durable_cli_scenario("cli_durable_missing_field");
+    let config = HarnessConfig {
+        spec: HarnessSpec::new(local_types, global_type, scenario.clone()),
+        contracts: ContractCheckConfig::default(),
+    };
+
+    let config_path = tmp.path().join("config.json");
+    std::fs::write(
+        &config_path,
+        serde_json::to_vec_pretty(&config).expect("serialize config"),
+    )
+    .expect("write config");
+    let run = Command::new(env!("CARGO_BIN_EXE_run"))
+        .current_dir(tmp.path())
+        .args(["--config", config_path.to_str().expect("config path utf8")])
+        .output()
+        .expect("run simulator binary");
+    assert!(run.status.success(), "durable fixture run should succeed");
+
+    let checkpoint_path = tmp
+        .path()
+        .join("artifacts")
+        .join("cli_durable_missing_field")
+        .join("checkpoint_2.cbor");
+    let wal_path = tmp.path().join("wal.cbor");
+    let cache_path = tmp.path().join("cache.cbor");
+    PersistedDurabilityArtifact::agreement_wal(AgreementWalArtifact::default())
+        .write_to_path(&wal_path)
+        .expect("write wal artifact");
+    PersistedDurabilityArtifact::evidence_outcome_cache(EvidenceOutcomeCacheArtifact::default())
+        .write_to_path(&cache_path)
+        .expect("write cache artifact");
+
+    let missing_field_scenario = tmp.path().join("missing_field.toml");
+    std::fs::write(
+        &missing_field_scenario,
+        r#"
+name = "missing_field"
+roles = ["A", "B"]
+steps = 6
+seed = 11
+checkpoint_interval = 2
+
+[execution]
+backend = "canonical"
+scheduler_concurrency = 1
+worker_threads = 1
+
+[durability]
+mode = "wal"
+"#,
+    )
+    .expect("write missing-field scenario");
+
+    let durable = Command::new(env!("CARGO_BIN_EXE_durable"))
+        .current_dir(tmp.path())
+        .args([
+            "--wal",
+            wal_path.to_str().expect("wal path utf8"),
+            "--cache",
+            cache_path.to_str().expect("cache path utf8"),
+            "--checkpoint",
+            checkpoint_path.to_str().expect("checkpoint path utf8"),
+            "--scenario",
+            missing_field_scenario
+                .to_str()
+                .expect("missing-field scenario path utf8"),
+            "--json",
+        ])
+        .output()
+        .expect("run durable binary without field handler");
+    assert!(!durable.status.success(), "missing field should fail");
+    assert!(String::from_utf8_lossy(&durable.stderr)
+        .contains("scenario is missing built-in field parameters"));
+}
+
+#[test]
+fn durable_binary_text_mode_emits_human_facing_summary_lines() {
+    let tmp = tempdir().expect("tempdir");
+    let wal_path = tmp.path().join("wal.cbor");
+    PersistedDurabilityArtifact::agreement_wal(AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::Escalation {
+                operation_id: "cli:text".to_string(),
+                previous_level: telltale_machine::AgreementLevel::Provisional,
+                new_level: telltale_machine::AgreementLevel::SoftSafe,
+                evidence_id: Some("cli#text".to_string()),
+                tick: 3,
+            },
+            AgreementWalEntry::VisibilityGateCrossing {
+                operation_id: "cli:text".to_string(),
+                downstream_coroutine_id: "coro:0".to_string(),
+                gate_level: telltale_machine::AgreementLevel::SoftSafe,
+                tick: 3,
+            },
+        ],
+    })
+    .write_to_path(&wal_path)
+    .expect("write wal artifact");
+    let cache_path = tmp.path().join("cache.cbor");
+    PersistedDurabilityArtifact::evidence_outcome_cache(EvidenceOutcomeCacheArtifact {
+        entries: vec![
+            telltale_machine::model::durability::EvidenceOutcomeCacheEntry {
+                evidence_id: "cli#text".to_string(),
+                interface_name: "Storage".to_string(),
+                operation_name: "write".to_string(),
+                outcome: telltale_machine::model::effects::EffectOutcome::success(
+                    telltale_machine::model::effects::EffectResponse::Release,
+                ),
+            },
+        ],
+    })
+    .write_to_path(&cache_path)
+    .expect("write cache artifact");
+
+    let durable = Command::new(env!("CARGO_BIN_EXE_durable"))
+        .current_dir(tmp.path())
+        .args([
+            "--wal",
+            wal_path.to_str().expect("wal path utf8"),
+            "--cache",
+            cache_path.to_str().expect("cache path utf8"),
+        ])
+        .output()
+        .expect("run durable binary in text mode");
+    assert!(durable.status.success(), "text mode should succeed");
+    let stdout = String::from_utf8_lossy(&durable.stdout);
+    assert!(stdout.contains("durable inspection: 2 wal entries, 1 cache entries"));
+    assert!(stdout.contains("wal tick=3 op=cli:text kind=Escalation"));
+    assert!(stdout.contains("cache evidence=cli#text Storage.write status=Success"));
+}

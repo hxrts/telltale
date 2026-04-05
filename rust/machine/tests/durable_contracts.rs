@@ -8,7 +8,7 @@ use telltale_machine::coroutine::Value;
 use telltale_machine::instr::InvokeAction;
 use telltale_machine::model::durability::{
     AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
-    DurableRecoveryAction, DurableRecoveryMetadata, DurableRecoveryPlan,
+    DurableRecoveryAction, DurableRecoveryMetadata, DurableRecoveryPlan, EvidenceOutcomeCache,
     EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
     FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
     PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest,
@@ -244,6 +244,24 @@ struct FakeRemoteAgreementWal {
     load_calls: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum FailingWalMode {
+    Append,
+    Load,
+    Read,
+}
+
+#[derive(Debug)]
+struct FailingAgreementWal {
+    mode: FailingWalMode,
+}
+
+impl FailingAgreementWal {
+    fn new(mode: FailingWalMode) -> Self {
+        Self { mode }
+    }
+}
+
 impl AgreementWal for FakeRemoteAgreementWal {
     fn append(&mut self, entry: AgreementWalEntry) -> Result<(), String> {
         self.entries.push(entry);
@@ -267,6 +285,29 @@ impl AgreementWal for FakeRemoteAgreementWal {
         Ok(AgreementWalArtifact {
             entries: self.entries.clone(),
         })
+    }
+}
+
+impl AgreementWal for FailingAgreementWal {
+    fn append(&mut self, _entry: AgreementWalEntry) -> Result<(), String> {
+        match self.mode {
+            FailingWalMode::Append => Err("append backend down".to_string()),
+            FailingWalMode::Load | FailingWalMode::Read => Ok(()),
+        }
+    }
+
+    fn read_since(&self, _tick: u64) -> Result<Vec<AgreementWalEntry>, String> {
+        match self.mode {
+            FailingWalMode::Read => Err("read backend down".to_string()),
+            FailingWalMode::Append | FailingWalMode::Load => Ok(Vec::new()),
+        }
+    }
+
+    fn load(&self) -> Result<AgreementWalArtifact, String> {
+        match self.mode {
+            FailingWalMode::Load => Err("load backend down".to_string()),
+            FailingWalMode::Append | FailingWalMode::Read => Ok(AgreementWalArtifact::default()),
+        }
     }
 }
 
@@ -430,6 +471,188 @@ fn agreement_wal_backends_preserve_order_and_filter_by_tick() {
     let dir = tempdir().expect("create temp dir");
     let path = dir.path().join("wal.cbor");
     exercise_backend(&mut FileAgreementWal::new(path), &expected).expect("exercise file wal");
+}
+
+#[test]
+fn interleaved_multi_operation_wal_preserves_order_identities_and_read_boundaries() {
+    let interleaved = AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "a#e1".to_string(),
+                    operation_id: "op#a".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::Provisional,
+                    kind: AgreementEvidenceKind::Witness,
+                    reference: "witness://a#e1".to_string(),
+                    authoritative: true,
+                },
+                tick: 1,
+            },
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "b#e1".to_string(),
+                    operation_id: "op#b".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::Provisional,
+                    kind: AgreementEvidenceKind::Witness,
+                    reference: "witness://b#e1".to_string(),
+                    authoritative: true,
+                },
+                tick: 2,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#a".to_string(),
+                previous_level: AgreementLevel::None,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: Some("a#e1".to_string()),
+                tick: 3,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#b".to_string(),
+                previous_level: AgreementLevel::None,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: Some("b#e1".to_string()),
+                tick: 4,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#a".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("a#e1".to_string()),
+                tick: 5,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#b".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("b#e1".to_string()),
+                tick: 6,
+            },
+        ],
+    };
+    interleaved
+        .validate_monotonic_escalations()
+        .expect("interleaved wal remains monotonic per operation");
+
+    let identities = interleaved
+        .entries
+        .iter()
+        .map(AgreementWalEntry::stable_identity)
+        .collect::<Vec<_>>();
+    let unique_identities = identities
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(unique_identities.len(), identities.len());
+
+    let mut in_memory = InMemoryAgreementWal::new();
+    for entry in &interleaved.entries {
+        in_memory
+            .append(entry.clone())
+            .expect("append interleaved entry");
+    }
+    assert_eq!(in_memory.load().expect("load wal"), interleaved);
+    assert_eq!(
+        in_memory.read_since(3).expect("read suffix"),
+        interleaved.entries[3..].to_vec()
+    );
+
+    let dir = tempdir().expect("create temp dir");
+    let path = dir.path().join("interleaved-wal.cbor");
+    let mut file_wal = FileAgreementWal::new(path);
+    for entry in &interleaved.entries {
+        file_wal
+            .append(entry.clone())
+            .expect("append file interleaved entry");
+    }
+    assert_eq!(file_wal.load().expect("load file wal"), interleaved);
+    assert_eq!(
+        file_wal.read_since(3).expect("read file suffix"),
+        interleaved.entries[3..].to_vec()
+    );
+}
+
+#[test]
+fn file_backed_durability_surfaces_fail_closed_on_corruption_truncation_and_payload_mismatch() {
+    let garbled = PersistedDurabilityArtifact::from_slice(b"not cbor")
+        .expect_err("garbled bytes should fail decode");
+    assert!(garbled.contains("decode persisted durability artifact"));
+
+    let valid_bytes = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
+        .to_cbor()
+        .expect("encode wal");
+    let truncated = PersistedDurabilityArtifact::from_slice(&valid_bytes[..valid_bytes.len() / 2])
+        .expect_err("truncated bytes should fail decode");
+    assert!(truncated.contains("decode persisted durability artifact"));
+
+    let dir = tempdir().expect("create temp dir");
+    let wal_path = dir.path().join("wal.cbor");
+    std::fs::write(&wal_path, &valid_bytes[..valid_bytes.len() / 2]).expect("write truncated wal");
+    let wal_error = FileAgreementWal::new(&wal_path)
+        .load()
+        .expect_err("truncated wal file should fail");
+    assert!(wal_error.contains("decode persisted durability artifact"));
+
+    let cache_path = dir.path().join("cache.cbor");
+    PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
+        .write_to_path(&cache_path)
+        .expect("write mismatched cache payload");
+    let cache_error = FileEvidenceOutcomeCache::new(&cache_path)
+        .load()
+        .expect_err("mismatched cache payload should fail");
+    assert!(cache_error.contains("agreement WAL payload"));
+
+    let wrong_wal_path = dir.path().join("wrong-wal.cbor");
+    PersistedDurabilityArtifact::evidence_outcome_cache(EvidenceOutcomeCacheArtifact::default())
+        .write_to_path(&wrong_wal_path)
+        .expect("write mismatched wal payload");
+    let wrong_wal_error = FileAgreementWal::new(&wrong_wal_path)
+        .load()
+        .expect_err("mismatched wal payload should fail");
+    assert!(wrong_wal_error.contains("evidence outcome cache payload"));
+}
+
+#[test]
+fn downstream_wal_backend_failures_block_visibility_and_surface_precise_errors() {
+    let base = CountingHandler::default();
+    let sync = sample_wal_sync_request();
+
+    let append_handler =
+        AgreementWalHandler::new(&base, FailingAgreementWal::new(FailingWalMode::Append));
+    match append_handler.wal_sync(&sync) {
+        EffectResult::Failure(failure) => {
+            assert_eq!(
+                failure.kind,
+                telltale_machine::model::effects::EffectFailureKind::Unavailable
+            );
+            assert!(failure.message.contains("persist agreement WAL"));
+            assert!(failure.message.contains("append backend down"));
+        }
+        other => panic!("append failure should block visibility, got {other:?}"),
+    }
+
+    let load_handler =
+        AgreementWalHandler::new(&base, FailingAgreementWal::new(FailingWalMode::Load));
+    match load_handler.wal_sync(&sync) {
+        EffectResult::Failure(failure) => {
+            assert_eq!(
+                failure.kind,
+                telltale_machine::model::effects::EffectFailureKind::Unavailable
+            );
+            assert!(failure.message.contains("load agreement WAL"));
+            assert!(failure.message.contains("load backend down"));
+        }
+        other => panic!("load failure should block visibility, got {other:?}"),
+    }
+
+    let read_backend = FailingAgreementWal::new(FailingWalMode::Read);
+    let read_error = read_backend
+        .read_since(0)
+        .expect_err("read failure should surface");
+    assert!(read_error.contains("read backend down"));
 }
 
 #[test]

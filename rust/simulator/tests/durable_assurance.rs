@@ -12,10 +12,15 @@ use telltale_machine::model::effects::{
     EffectResponse, EffectResult, SendDecision, SendDecisionInput,
 };
 use telltale_simulator::durability::{
-    durable_property_report, run_durable_recovery_case, DurableFaultKind, DurableFaultOutcome,
-    DurableFaultProgram, FaultInjectingAgreementWal, ScheduledDurableFault,
+    durable_property_report, inspect_durable_artifacts, monitor_evidence_consistency,
+    monitor_monotonic_wal_levels, monitor_recovery_equivalence, monitor_write_ahead,
+    run_durable_recovery_case, DurableFaultKind, DurableFaultOutcome, DurableFaultProgram,
+    DurableWalEntryKind, FaultInjectingAgreementWal, ScheduledDurableFault,
 };
-use telltale_simulator::runner::{run_canonical_replay, run_with_scenario, DurableResumeArtifacts};
+use telltale_simulator::runner::{
+    resume_with_durable_checkpoint_artifact, run_canonical_replay, run_with_scenario,
+    DurableResumeArtifacts,
+};
 use telltale_simulator::scenario::{DurabilityMode, Scenario};
 use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -479,4 +484,271 @@ fn durable_execution_parity_holds_across_direct_replay_and_resume_lanes() {
 
     assert_authoritative_equivalence(&direct, &replay);
     assert_authoritative_equivalence(&direct, &recovery.resumed);
+}
+
+#[test]
+fn durable_property_monitors_fail_closed_with_precise_diagnostics() {
+    let missing_sync_wal = AgreementWalArtifact {
+        entries: vec![AgreementWalEntry::VisibilityGateCrossing {
+            operation_id: "durable:gate".to_string(),
+            downstream_coroutine_id: "coro:0".to_string(),
+            gate_level: telltale_machine::AgreementLevel::SoftSafe,
+            tick: 5,
+        }],
+    };
+    let write_ahead = monitor_write_ahead(&missing_sync_wal, &[]);
+    assert!(write_ahead.is_err());
+    assert!(write_ahead
+        .expect_err("missing wal_sync should fail")
+        .contains("durable:gate"));
+
+    let regressed_wal = AgreementWalArtifact {
+        entries: vec![AgreementWalEntry::Escalation {
+            operation_id: "durable:regress".to_string(),
+            previous_level: telltale_machine::AgreementLevel::Finalized,
+            new_level: telltale_machine::AgreementLevel::SoftSafe,
+            evidence_id: Some("regress#1".to_string()),
+            tick: 4,
+        }],
+    };
+    let monotonic = monitor_monotonic_wal_levels(&regressed_wal);
+    assert!(monotonic.is_err());
+    assert!(monotonic
+        .expect_err("regressed wal should fail")
+        .contains("regression"));
+
+    let consistent_wal = AgreementWalArtifact {
+        entries: vec![AgreementWalEntry::EvidenceProduced {
+            evidence: telltale_machine::AgreementEvidence {
+                evidence_id: "known#1".to_string(),
+                operation_id: "durable:known".to_string(),
+                session: None,
+                owner_id: None,
+                level: telltale_machine::AgreementLevel::SoftSafe,
+                kind: telltale_machine::AgreementEvidenceKind::CommitFact,
+                reference: "commit://known#1".to_string(),
+                authoritative: true,
+            },
+            tick: 4,
+        }],
+    };
+    let inconsistent_cache = EvidenceOutcomeCacheArtifact {
+        entries: vec![EvidenceOutcomeCacheEntry {
+            evidence_id: "missing#1".to_string(),
+            interface_name: "Storage".to_string(),
+            operation_name: "write".to_string(),
+            outcome: EffectOutcome::success(EffectResponse::Release),
+        }],
+    };
+    let evidence_consistency = monitor_evidence_consistency(&consistent_wal, &inconsistent_cache);
+    assert!(evidence_consistency.is_err());
+    assert!(evidence_consistency
+        .expect_err("missing evidence should fail")
+        .contains("missing#1"));
+
+    let (global, local_types) = loop_protocol();
+    let scenario = durable_scenario(&scenario_name("phase24_monitor_failures"));
+    let recovery = run_durable_recovery_case(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+        None,
+        4,
+        &DurableResumeArtifacts {
+            wal: AgreementWalArtifact::default(),
+            evidence_cache: EvidenceOutcomeCacheArtifact::default(),
+        },
+    )
+    .expect("recovery case");
+    let mut drifted = recovery.resumed.clone();
+    drifted.replay.theorem_profile.eligibility_reason = Some("drift".to_string());
+    let recovery_equivalence = monitor_recovery_equivalence(&recovery.uninterrupted, &drifted);
+    assert!(recovery_equivalence.is_err());
+    assert!(recovery_equivalence
+        .expect_err("drifted replay should fail")
+        .contains("theorem profile drifted"));
+}
+
+#[test]
+fn inspect_durable_artifacts_projects_every_entry_family_and_recovery_summary() {
+    let wal = AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::Escalation {
+                operation_id: "durable:escalate".to_string(),
+                previous_level: telltale_machine::AgreementLevel::Provisional,
+                new_level: telltale_machine::AgreementLevel::SoftSafe,
+                evidence_id: Some("soft#1".to_string()),
+                tick: 3,
+            },
+            AgreementWalEntry::EvidenceProduced {
+                evidence: telltale_machine::AgreementEvidence {
+                    evidence_id: "soft#1".to_string(),
+                    operation_id: "durable:escalate".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: telltale_machine::AgreementLevel::SoftSafe,
+                    kind: telltale_machine::AgreementEvidenceKind::CommitFact,
+                    reference: "commit://soft#1".to_string(),
+                    authoritative: true,
+                },
+                tick: 3,
+            },
+            AgreementWalEntry::Finalization {
+                operation_id: "durable:final".to_string(),
+                outcome: telltale_machine::FinalizationOutcome::Finalized,
+                materialization_proof_id: Some("proof#1".to_string()),
+                canonical_handle_id: Some("handle#1".to_string()),
+                tick: 4,
+            },
+            AgreementWalEntry::VisibilityGateCrossing {
+                operation_id: "durable:gate".to_string(),
+                downstream_coroutine_id: "coro:0".to_string(),
+                gate_level: telltale_machine::AgreementLevel::Finalized,
+                tick: 5,
+            },
+        ],
+    };
+    let evidence_cache = EvidenceOutcomeCacheArtifact {
+        entries: vec![EvidenceOutcomeCacheEntry {
+            evidence_id: "soft#1".to_string(),
+            interface_name: "Storage".to_string(),
+            operation_name: "write".to_string(),
+            outcome: EffectOutcome::success(EffectResponse::Release),
+        }],
+    };
+    let (global, local_types) = loop_protocol();
+    let scenario = durable_scenario(&scenario_name("phase24_durable_projection"));
+    let recovery = run_durable_recovery_case(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+        None,
+        4,
+        &DurableResumeArtifacts {
+            wal: wal.clone(),
+            evidence_cache: evidence_cache.clone(),
+        },
+    )
+    .expect("recovery case");
+    let summary = recovery
+        .resumed
+        .stats
+        .durable_recovery
+        .as_ref()
+        .expect("durable recovery summary");
+
+    let report = inspect_durable_artifacts(&wal, &evidence_cache, Some(summary));
+    assert_eq!(report.wal_entries.len(), 4);
+    assert_eq!(
+        report
+            .wal_entries
+            .iter()
+            .map(|entry| entry.kind.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            DurableWalEntryKind::Escalation,
+            DurableWalEntryKind::EvidenceProduced,
+            DurableWalEntryKind::Finalization,
+            DurableWalEntryKind::VisibilityGateCrossing,
+        ]
+    );
+    assert_eq!(
+        report
+            .wal_entries
+            .iter()
+            .map(|entry| entry.operation_id.clone())
+            .collect::<Vec<_>>(),
+        vec![
+            "durable:escalate".to_string(),
+            "durable:escalate".to_string(),
+            "durable:final".to_string(),
+            "durable:gate".to_string(),
+        ]
+    );
+    assert_eq!(report.evidence_cache_entries.len(), 1);
+    assert_eq!(report.evidence_cache_entries[0].evidence_id, "soft#1");
+    let projected_recovery = report.recovery.expect("recovery summary");
+    assert_eq!(
+        projected_recovery.execution_regime,
+        summary.execution_regime
+    );
+    assert_eq!(projected_recovery.theorem_profile, summary.theorem_profile);
+    assert_eq!(projected_recovery.decisions, summary.decisions);
+}
+
+#[test]
+fn repeated_durable_resume_is_idempotent_for_the_same_checkpoint_and_wal_suffix() {
+    let (global, local_types) = loop_protocol();
+    let scenario = durable_scenario(&scenario_name("phase24_durable_idempotent"));
+    let full = run_with_scenario(
+        &local_types,
+        &global,
+        &BTreeMap::new(),
+        &scenario,
+        &PassthroughHandler,
+    )
+    .expect("full durable run");
+    let checkpoint = full
+        .replay
+        .checkpoints
+        .iter()
+        .find(|checkpoint| checkpoint.tick == 4)
+        .expect("checkpoint at tick 4");
+    let durable = DurableResumeArtifacts {
+        wal: AgreementWalArtifact {
+            entries: vec![
+                AgreementWalEntry::Escalation {
+                    operation_id: "durable:soft".to_string(),
+                    previous_level: telltale_machine::AgreementLevel::Provisional,
+                    new_level: telltale_machine::AgreementLevel::SoftSafe,
+                    evidence_id: Some("soft#1".to_string()),
+                    tick: 5,
+                },
+                AgreementWalEntry::Finalization {
+                    operation_id: "durable:soft".to_string(),
+                    outcome: telltale_machine::FinalizationOutcome::Finalized,
+                    materialization_proof_id: Some("proof#soft".to_string()),
+                    canonical_handle_id: None,
+                    tick: 5,
+                },
+            ],
+        },
+        evidence_cache: EvidenceOutcomeCacheArtifact {
+            entries: vec![EvidenceOutcomeCacheEntry {
+                evidence_id: "soft#1".to_string(),
+                interface_name: "Storage".to_string(),
+                operation_name: "write".to_string(),
+                outcome: EffectOutcome::success(EffectResponse::Release),
+            }],
+        },
+    };
+
+    let resumed_once = resume_with_durable_checkpoint_artifact(
+        &scenario,
+        checkpoint,
+        &durable,
+        &PassthroughHandler,
+        None,
+        None,
+    )
+    .expect("first durable resume");
+    let resumed_twice = resume_with_durable_checkpoint_artifact(
+        &scenario,
+        checkpoint,
+        &durable,
+        &PassthroughHandler,
+        None,
+        None,
+    )
+    .expect("second durable resume");
+
+    assert_authoritative_equivalence(&resumed_once, &resumed_twice);
+    assert_eq!(
+        resumed_once.stats.durable_recovery,
+        resumed_twice.stats.durable_recovery
+    );
 }
