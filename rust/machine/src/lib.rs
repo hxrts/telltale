@@ -153,9 +153,11 @@ pub mod model {
     pub mod durability {
         pub use crate::durable::{
             AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry,
-            DurableRecoveryMetadata, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry,
-            FileAgreementJournal, InMemoryAgreementJournal, PersistedDurabilityArtifact,
-            PersistedDurabilityPayload, PERSISTED_DURABILITY_SCHEMA_VERSION,
+            DurableRecoveryMetadata, EvidenceIdResolver, EvidenceOutcomeCache,
+            EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+            FileAgreementJournal, FileEvidenceOutcomeCache, InMemoryAgreementJournal,
+            InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+            PERSISTED_DURABILITY_SCHEMA_VERSION,
         };
     }
 
@@ -325,9 +327,10 @@ pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use durable::{
     AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
-    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, FileAgreementJournal,
-    InMemoryAgreementJournal, PersistedDurabilityArtifact, PersistedDurabilityPayload,
-    PERSISTED_DURABILITY_SCHEMA_VERSION,
+    EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
+    EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementJournal,
+    FileEvidenceOutcomeCache, InMemoryAgreementJournal, InMemoryEvidenceOutcomeCache,
+    PersistedDurabilityArtifact, PersistedDurabilityPayload, PERSISTED_DURABILITY_SCHEMA_VERSION,
 };
 pub use effect::{
     CorruptionType, EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,

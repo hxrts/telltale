@@ -3,10 +3,11 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 
-use crate::effect::EffectOutcome;
+use crate::effect::{EffectFailure, EffectHandler, EffectOutcome, EffectRequest};
 use crate::semantic_objects::{AgreementEvidence, AgreementLevel, FinalizationOutcome};
 
 /// Stable schema version for persisted durability artifacts.
@@ -299,6 +300,287 @@ pub struct EvidenceOutcomeCacheArtifact {
     pub entries: Vec<EvidenceOutcomeCacheEntry>,
 }
 
+impl EvidenceOutcomeCacheArtifact {
+    /// Return one cached effect outcome by evidence id.
+    #[must_use]
+    pub fn get(&self, evidence_id: &str) -> Option<&EvidenceOutcomeCacheEntry> {
+        self.entries
+            .iter()
+            .find(|entry| entry.evidence_id == evidence_id)
+    }
+}
+
+/// Narrow append/query contract for persisted evidence outcome caches.
+pub trait EvidenceOutcomeCache {
+    /// Load one cached outcome by evidence id.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backend cannot load the cache.
+    fn get(&self, evidence_id: &str) -> Result<Option<EvidenceOutcomeCacheEntry>, String>;
+
+    /// Persist one cached outcome.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backend cannot persist the cache entry.
+    fn put(&mut self, entry: EvidenceOutcomeCacheEntry) -> Result<(), String>;
+
+    /// Load the full cache artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backend cannot load the cache.
+    fn load(&self) -> Result<EvidenceOutcomeCacheArtifact, String>;
+}
+
+/// In-memory evidence outcome cache backend.
+#[derive(Debug, Clone, Default)]
+pub struct InMemoryEvidenceOutcomeCache {
+    artifact: EvidenceOutcomeCacheArtifact,
+}
+
+impl InMemoryEvidenceOutcomeCache {
+    /// Create one empty in-memory cache.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl EvidenceOutcomeCache for InMemoryEvidenceOutcomeCache {
+    fn get(&self, evidence_id: &str) -> Result<Option<EvidenceOutcomeCacheEntry>, String> {
+        Ok(self.artifact.get(evidence_id).cloned())
+    }
+
+    fn put(&mut self, entry: EvidenceOutcomeCacheEntry) -> Result<(), String> {
+        self.artifact
+            .entries
+            .retain(|candidate| candidate.evidence_id != entry.evidence_id);
+        self.artifact.entries.push(entry);
+        Ok(())
+    }
+
+    fn load(&self) -> Result<EvidenceOutcomeCacheArtifact, String> {
+        Ok(self.artifact.clone())
+    }
+}
+
+/// File-backed evidence outcome cache backend for local durable execution.
+#[derive(Debug, Clone)]
+pub struct FileEvidenceOutcomeCache {
+    path: PathBuf,
+}
+
+impl FileEvidenceOutcomeCache {
+    /// Create one file-backed cache rooted at `path`.
+    #[must_use]
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+
+    fn load_artifact(&self) -> Result<EvidenceOutcomeCacheArtifact, String> {
+        if !self.path.exists() {
+            return Ok(EvidenceOutcomeCacheArtifact::default());
+        }
+        PersistedDurabilityArtifact::from_path(&self.path)?.into_evidence_outcome_cache()
+    }
+
+    fn store_artifact(&self, artifact: &EvidenceOutcomeCacheArtifact) -> Result<(), String> {
+        PersistedDurabilityArtifact::evidence_outcome_cache(artifact.clone())
+            .write_to_path(&self.path)
+    }
+}
+
+impl EvidenceOutcomeCache for FileEvidenceOutcomeCache {
+    fn get(&self, evidence_id: &str) -> Result<Option<EvidenceOutcomeCacheEntry>, String> {
+        Ok(self.load_artifact()?.get(evidence_id).cloned())
+    }
+
+    fn put(&mut self, entry: EvidenceOutcomeCacheEntry) -> Result<(), String> {
+        let mut artifact = self.load_artifact()?;
+        artifact
+            .entries
+            .retain(|candidate| candidate.evidence_id != entry.evidence_id);
+        artifact.entries.push(entry);
+        self.store_artifact(&artifact)
+    }
+
+    fn load(&self) -> Result<EvidenceOutcomeCacheArtifact, String> {
+        self.load_artifact()
+    }
+}
+
+/// Request-to-evidence-id resolver used by evidence-scoped persistence.
+pub trait EvidenceIdResolver: Send + Sync {
+    /// Resolve the evidence id for one request when the request should be
+    /// cached durably.
+    fn evidence_id_for_request(&self, request: &EffectRequest) -> Option<String>;
+}
+
+impl<F> EvidenceIdResolver for F
+where
+    F: Fn(&EffectRequest) -> Option<String> + Send + Sync,
+{
+    fn evidence_id_for_request(&self, request: &EffectRequest) -> Option<String> {
+        self(request)
+    }
+}
+
+/// Effect-handler wrapper that persists agreement-relevant outcomes keyed by
+/// semantic evidence id.
+pub struct EvidencePersistenceHandler<'a, C, R>
+where
+    C: EvidenceOutcomeCache,
+    R: EvidenceIdResolver,
+{
+    inner: &'a dyn EffectHandler,
+    cache: Mutex<C>,
+    resolver: R,
+}
+
+impl<'a, C, R> EvidencePersistenceHandler<'a, C, R>
+where
+    C: EvidenceOutcomeCache,
+    R: EvidenceIdResolver,
+{
+    /// Create one evidence-persistence wrapper around an inner handler.
+    #[must_use]
+    pub fn new(inner: &'a dyn EffectHandler, cache: C, resolver: R) -> Self {
+        Self {
+            inner,
+            cache: Mutex::new(cache),
+            resolver,
+        }
+    }
+
+    /// Load one cached outcome by evidence id.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache cannot be loaded.
+    pub fn cached_outcome(&self, evidence_id: &str) -> Result<Option<EffectOutcome>, String> {
+        let cache = self
+            .cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        Ok(cache.get(evidence_id)?.map(|entry| entry.outcome))
+    }
+
+    /// Load the full typed cache artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cache cannot be loaded.
+    pub fn cache_snapshot(&self) -> Result<EvidenceOutcomeCacheArtifact, String> {
+        let cache = self
+            .cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        cache.load()
+    }
+}
+
+impl<C, R> EffectHandler for EvidencePersistenceHandler<'_, C, R>
+where
+    C: EvidenceOutcomeCache + Send,
+    R: EvidenceIdResolver,
+{
+    fn handler_identity(&self) -> String {
+        format!("evidence_persistence<{}>", self.inner.handler_identity())
+    }
+
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        let evidence_id = self.resolver.evidence_id_for_request(&request);
+        let interface_name = request.metadata.interface_name.clone();
+        let operation_name = request.metadata.operation_name.clone();
+
+        if let Some(evidence_id) = evidence_id.clone() {
+            let cache = self
+                .cache
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            match cache.get(&evidence_id) {
+                Ok(Some(entry)) => return entry.outcome,
+                Ok(None) => {}
+                Err(err) => {
+                    return EffectOutcome::failure(EffectFailure::unavailable(format!(
+                        "load evidence outcome cache `{evidence_id}`: {err}"
+                    )));
+                }
+            }
+        }
+
+        let outcome = self.inner.handle_effect(request);
+        let Some(evidence_id) = evidence_id else {
+            return outcome;
+        };
+
+        let entry = EvidenceOutcomeCacheEntry {
+            evidence_id: evidence_id.clone(),
+            interface_name,
+            operation_name,
+            outcome: outcome.clone(),
+        };
+        let mut cache = self
+            .cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Err(err) = cache.put(entry) {
+            return EffectOutcome::failure(EffectFailure::unavailable(format!(
+                "persist evidence outcome `{evidence_id}`: {err}"
+            )));
+        }
+        outcome
+    }
+
+    fn handle_send(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[crate::coroutine::Value],
+    ) -> crate::effect::EffectResult<crate::coroutine::Value> {
+        self.inner.handle_send(role, partner, label, state)
+    }
+
+    fn send_decision(
+        &self,
+        input: crate::effect::SendDecisionInput<'_>,
+    ) -> crate::effect::EffectResult<crate::effect::SendDecision> {
+        self.inner.send_decision(input)
+    }
+
+    fn handle_recv(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &mut Vec<crate::coroutine::Value>,
+        payload: &crate::coroutine::Value,
+    ) -> crate::effect::EffectResult<()> {
+        self.inner.handle_recv(role, partner, label, state, payload)
+    }
+
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[crate::coroutine::Value],
+    ) -> crate::effect::EffectResult<String> {
+        self.inner.handle_choose(role, partner, labels, state)
+    }
+
+    fn step(
+        &self,
+        role: &str,
+        state: &mut Vec<crate::coroutine::Value>,
+    ) -> crate::effect::EffectResult<()> {
+        self.inner.step(role, state)
+    }
+}
+
 /// Typed recovery metadata derived from one checkpoint plus durable journal
 /// suffix.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -457,6 +739,36 @@ impl PersistedDurabilityArtifact {
             ),
             PersistedDurabilityPayload::RecoveryMetadata(_) => Err(
                 "persisted durability artifact contains recovery metadata, not an agreement journal"
+                    .to_string(),
+            ),
+        }
+    }
+
+    /// Borrow the evidence-outcome-cache payload when this artifact wraps one.
+    #[must_use]
+    pub fn evidence_outcome_cache_artifact(&self) -> Option<&EvidenceOutcomeCacheArtifact> {
+        match &self.payload {
+            PersistedDurabilityPayload::EvidenceOutcomeCache(cache) => Some(cache),
+            PersistedDurabilityPayload::AgreementJournal(_)
+            | PersistedDurabilityPayload::RecoveryMetadata(_) => None,
+        }
+    }
+
+    /// Consume the wrapper into one evidence outcome cache artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if this persisted artifact is not an evidence outcome
+    /// cache payload.
+    pub fn into_evidence_outcome_cache(self) -> Result<EvidenceOutcomeCacheArtifact, String> {
+        match self.payload {
+            PersistedDurabilityPayload::EvidenceOutcomeCache(cache) => Ok(cache),
+            PersistedDurabilityPayload::AgreementJournal(_) => Err(
+                "persisted durability artifact contains an agreement journal payload, not an evidence outcome cache"
+                    .to_string(),
+            ),
+            PersistedDurabilityPayload::RecoveryMetadata(_) => Err(
+                "persisted durability artifact contains recovery metadata, not an evidence outcome cache"
                     .to_string(),
             ),
         }

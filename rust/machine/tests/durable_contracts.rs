@@ -1,11 +1,19 @@
 //! Focused typed durability contract tests.
 
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use telltale_machine::coroutine::Value;
 use telltale_machine::model::durability::{
     AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
-    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, FileAgreementJournal,
-    InMemoryAgreementJournal, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+    FileAgreementJournal, FileEvidenceOutcomeCache, InMemoryAgreementJournal,
+    InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
 };
-use telltale_machine::model::effects::EffectOutcome;
+use telltale_machine::model::effects::{
+    EffectHandler, EffectOutcome, EffectRequest, EffectResponse, RecordingEffectHandler,
+    ReplayEffectHandler,
+};
 use telltale_machine::model::semantic_objects::{
     AgreementEvidence, AgreementEvidenceKind, AgreementLevel, FinalizationOutcome,
 };
@@ -49,6 +57,94 @@ fn sample_journal_artifact() -> AgreementJournalArtifact {
             },
         ],
     }
+}
+
+#[derive(Debug, Default)]
+struct CountingHandler {
+    acquire_calls: Arc<AtomicUsize>,
+    step_calls: Arc<AtomicUsize>,
+}
+
+impl EffectHandler for CountingHandler {
+    fn handler_identity(&self) -> String {
+        "counting_handler".to_string()
+    }
+
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> telltale_machine::model::effects::EffectResult<Value> {
+        telltale_machine::model::effects::EffectResult::success(Value::Unit)
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        telltale_machine::model::effects::EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> telltale_machine::model::effects::EffectResult<String> {
+        telltale_machine::model::effects::EffectResult::success(
+            labels.first().cloned().unwrap_or_default(),
+        )
+    }
+
+    fn step(
+        &self,
+        _role: &str,
+        _state: &mut Vec<Value>,
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        self.step_calls.fetch_add(1, Ordering::Relaxed);
+        telltale_machine::model::effects::EffectResult::success(())
+    }
+
+    fn handle_acquire(
+        &self,
+        _sid: usize,
+        _role: &str,
+        _layer: &str,
+        _state: &[Value],
+    ) -> telltale_machine::model::effects::EffectResult<Value> {
+        let call = self.acquire_calls.fetch_add(1, Ordering::Relaxed) + 1;
+        telltale_machine::model::effects::EffectResult::success(Value::Str(format!(
+            "evidence-value-{call}"
+        )))
+    }
+}
+
+fn acquire_request(operation_id: &str) -> EffectRequest {
+    EffectRequest::acquire(
+        1,
+        7,
+        Some(operation_id.to_string()),
+        "Coordinator",
+        "Storage",
+        &[],
+    )
+}
+
+fn step_request(operation_id: &str) -> EffectRequest {
+    EffectRequest::invoke_step(
+        2,
+        Some(7),
+        Some(operation_id.to_string()),
+        "Coordinator",
+        &[],
+    )
 }
 
 #[test]
@@ -183,4 +279,98 @@ fn persisted_durability_artifact_round_trips_cache_and_recovery_metadata() {
         loaded_recovery.payload,
         PersistedDurabilityPayload::RecoveryMetadata(_)
     ));
+}
+
+#[test]
+fn evidence_persistence_handler_reuses_cached_outcomes_across_recovery() {
+    let handler = CountingHandler::default();
+    let dir = tempdir().expect("create temp dir");
+    let path = dir.path().join("evidence-cache.cbor");
+
+    let first_wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        FileEvidenceOutcomeCache::new(&path),
+        |request: &EffectRequest| {
+            request
+                .operation_id
+                .as_ref()
+                .map(|operation_id| format!("evidence::{operation_id}"))
+        },
+    );
+    let first = first_wrapper.handle_effect(acquire_request("op#recover"));
+    assert!(matches!(
+        first.response,
+        Some(EffectResponse::Acquire { .. })
+    ));
+    assert_eq!(handler.acquire_calls.load(Ordering::Relaxed), 1);
+
+    let second_wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        FileEvidenceOutcomeCache::new(&path),
+        |request: &EffectRequest| {
+            request
+                .operation_id
+                .as_ref()
+                .map(|operation_id| format!("evidence::{operation_id}"))
+        },
+    );
+    let second = second_wrapper.handle_effect(acquire_request("op#recover"));
+    assert_eq!(handler.acquire_calls.load(Ordering::Relaxed), 1);
+    assert_eq!(first, second);
+    assert!(second_wrapper
+        .cached_outcome("evidence::op#recover")
+        .expect("load cached outcome")
+        .is_some());
+}
+
+#[test]
+fn evidence_persistence_handler_ignores_non_agreement_requests() {
+    let handler = CountingHandler::default();
+    let wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        InMemoryEvidenceOutcomeCache::new(),
+        |_request: &EffectRequest| None,
+    );
+
+    let first = wrapper.handle_effect(step_request("op#step"));
+    let second = wrapper.handle_effect(step_request("op#step"));
+    assert_eq!(handler.step_calls.load(Ordering::Relaxed), 2);
+    assert_eq!(first, second);
+    assert_eq!(
+        wrapper
+            .cache_snapshot()
+            .expect("load cache snapshot")
+            .entries
+            .len(),
+        0
+    );
+}
+
+#[test]
+fn evidence_persistence_handler_composes_with_recording_and_replay() {
+    let handler = CountingHandler::default();
+    let wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        InMemoryEvidenceOutcomeCache::new(),
+        |request: &EffectRequest| {
+            request
+                .operation_id
+                .as_ref()
+                .map(|operation_id| format!("evidence::{operation_id}"))
+        },
+    );
+    let recording = RecordingEffectHandler::new(&wrapper);
+
+    let first = recording.handle_effect(acquire_request("op#trace"));
+    let second = recording.handle_effect(acquire_request("op#trace"));
+    assert_eq!(handler.acquire_calls.load(Ordering::Relaxed), 1);
+    assert_eq!(first, second);
+    assert_eq!(recording.effect_trace().len(), 2);
+
+    let replay = ReplayEffectHandler::new(recording.effect_trace());
+    let replay_first = replay.handle_effect(acquire_request("op#trace"));
+    let replay_second = replay.handle_effect(acquire_request("op#trace"));
+    assert_eq!(replay_first, first);
+    assert_eq!(replay_second, second);
+    assert_eq!(replay.remaining(), 0);
 }

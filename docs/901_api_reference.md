@@ -131,7 +131,7 @@ Module access (not re-exported at crate root):
   `SendDecision`, `SendDecisionInput`
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
 - Durability:
-  `telltale_machine::model::durability::{AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, DurableRecoveryMetadata, FileAgreementJournal, InMemoryAgreementJournal, PersistedDurabilityArtifact, PersistedDurabilityPayload}`
+  `telltale_machine::model::durability::{AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryMetadata, FileAgreementJournal, FileEvidenceOutcomeCache, InMemoryAgreementJournal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload}`
   These are the authoritative typed contracts for durable agreement journals, evidence outcome caches, and recovery metadata.
   Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
