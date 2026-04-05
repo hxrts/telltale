@@ -35,7 +35,7 @@ check_has_hits() {
   fi
 }
 
-check_no_hits 'PersistedDurabilityArtifact|PersistedDurabilityPayload|AgreementJournalArtifact|DurableRecoveryMetadata|EvidenceOutcomeCacheArtifact' \
+check_no_hits 'PersistedDurabilityArtifact|PersistedDurabilityPayload|AgreementWalArtifact|DurableRecoveryMetadata|EvidenceOutcomeCacheArtifact' \
   rust/simulator/src/generated.rs rust/viewer/src rust/ui/src rust/web/src
 check_has_hits 'telltale_machine::model::durability' docs/901_api_reference.md
 check_has_hits 'typed checkpoint and replay artifacts' work/durable.md

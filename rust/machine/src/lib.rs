@@ -152,11 +152,11 @@ pub mod model {
     /// Durable execution artifact contracts.
     pub mod durability {
         pub use crate::durable::{
-            AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry,
-            DurableRecoveryMetadata, EvidenceIdResolver, EvidenceOutcomeCache,
-            EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
-            FileAgreementJournal, FileEvidenceOutcomeCache, InMemoryAgreementJournal,
-            InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+            AgreementWal, AgreementWalArtifact, AgreementWalEntry, DurableRecoveryMetadata,
+            EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
+            EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementWal,
+            FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+            PersistedDurabilityArtifact, PersistedDurabilityPayload,
             PERSISTED_DURABILITY_SCHEMA_VERSION,
         };
     }
@@ -326,10 +326,10 @@ pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use durable::{
-    AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
+    AgreementWal, AgreementWalArtifact, AgreementWalEntry, DurableRecoveryMetadata,
     EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
-    EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementJournal,
-    FileEvidenceOutcomeCache, InMemoryAgreementJournal, InMemoryEvidenceOutcomeCache,
+    EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementWal,
+    FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
     PersistedDurabilityArtifact, PersistedDurabilityPayload, PERSISTED_DURABILITY_SCHEMA_VERSION,
 };
 pub use effect::{

@@ -1,4 +1,4 @@
-//! Typed durability artifacts for agreement journals, evidence outcome caches,
+//! Typed durability artifacts for agreement WALs, evidence outcome caches,
 //! and recovery metadata.
 
 use std::collections::BTreeMap;
@@ -13,10 +13,10 @@ use crate::semantic_objects::{AgreementEvidence, AgreementLevel, FinalizationOut
 /// Stable schema version for persisted durability artifacts.
 pub const PERSISTED_DURABILITY_SCHEMA_VERSION: &str = "telltale.machine.durability.v1";
 
-/// One append-only agreement journal entry.
+/// One append-only agreement WAL entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case", tag = "kind")]
-pub enum AgreementJournalEntry {
+pub enum AgreementWalEntry {
     /// Agreement level advanced for one operation.
     Escalation {
         /// Operation whose agreement level changed.
@@ -66,15 +66,15 @@ pub enum AgreementJournalEntry {
     },
 }
 
-/// Typed agreement-journal artifact.
+/// Typed agreement-WAL artifact.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct AgreementJournalArtifact {
-    /// Append-only journal entries in canonical order.
-    pub entries: Vec<AgreementJournalEntry>,
+pub struct AgreementWalArtifact {
+    /// Append-only WAL entries in canonical order.
+    pub entries: Vec<AgreementWalEntry>,
 }
 
-impl AgreementJournalEntry {
-    /// Tick at which this journal entry was observed.
+impl AgreementWalEntry {
+    /// Tick at which this WAL entry was observed.
     #[must_use]
     pub const fn tick(&self) -> u64 {
         match self {
@@ -85,7 +85,7 @@ impl AgreementJournalEntry {
         }
     }
 
-    /// Stable operation id associated with this journal entry.
+    /// Stable operation id associated with this WAL entry.
     #[must_use]
     pub fn operation_id(&self) -> &str {
         match self {
@@ -135,10 +135,10 @@ impl AgreementJournalEntry {
     }
 }
 
-impl AgreementJournalArtifact {
-    /// Return the journal suffix strictly after `tick`.
+impl AgreementWalArtifact {
+    /// Return the WAL suffix strictly after `tick`.
     #[must_use]
-    pub fn read_since(&self, tick: u64) -> Vec<AgreementJournalEntry> {
+    pub fn read_since(&self, tick: u64) -> Vec<AgreementWalEntry> {
         self.entries
             .iter()
             .filter(|entry| entry.tick() > tick)
@@ -155,7 +155,7 @@ impl AgreementJournalArtifact {
     pub fn validate_monotonic_escalations(&self) -> Result<(), String> {
         let mut last_levels = BTreeMap::<String, AgreementLevel>::new();
         for entry in &self.entries {
-            let AgreementJournalEntry::Escalation {
+            let AgreementWalEntry::Escalation {
                 operation_id,
                 previous_level,
                 new_level,
@@ -166,13 +166,13 @@ impl AgreementJournalArtifact {
             };
             if new_level.rank() < previous_level.rank() {
                 return Err(format!(
-                    "agreement journal regression for `{operation_id}`: {previous_level:?} -> {new_level:?}"
+                    "agreement WAL regression for `{operation_id}`: {previous_level:?} -> {new_level:?}"
                 ));
             }
             if let Some(last) = last_levels.get(operation_id) {
                 if previous_level.rank() < last.rank() || new_level.rank() < last.rank() {
                     return Err(format!(
-                        "agreement journal reordered or regressed for `{operation_id}`: last={last:?}, entry={previous_level:?}->{new_level:?}"
+                        "agreement WAL reordered or regressed for `{operation_id}`: last={last:?}, entry={previous_level:?}->{new_level:?}"
                     ));
                 }
             }
@@ -182,100 +182,100 @@ impl AgreementJournalArtifact {
     }
 }
 
-/// Narrow append/query contract for durable agreement journals.
-pub trait AgreementJournal {
-    /// Append one journal entry.
+/// Narrow append/query contract for durable agreement WALs.
+pub trait AgreementWal {
+    /// Append one WAL entry.
     ///
     /// # Errors
     ///
     /// Returns an error if the backend cannot persist the entry or if the
-    /// resulting journal violates monotonic escalation ordering.
-    fn append(&mut self, entry: AgreementJournalEntry) -> Result<(), String>;
+    /// resulting WAL violates monotonic escalation ordering.
+    fn append(&mut self, entry: AgreementWalEntry) -> Result<(), String>;
 
     /// Read entries strictly after `tick`.
     ///
     /// # Errors
     ///
-    /// Returns an error if the backend cannot load the journal.
-    fn read_since(&self, tick: u64) -> Result<Vec<AgreementJournalEntry>, String>;
+    /// Returns an error if the backend cannot load the WAL.
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementWalEntry>, String>;
 
-    /// Load the full journal artifact.
+    /// Load the full WAL artifact.
     ///
     /// # Errors
     ///
-    /// Returns an error if the backend cannot load the journal.
-    fn load(&self) -> Result<AgreementJournalArtifact, String>;
+    /// Returns an error if the backend cannot load the WAL.
+    fn load(&self) -> Result<AgreementWalArtifact, String>;
 }
 
-/// In-memory agreement journal backend useful for focused tests and
+/// In-memory agreement WAL backend useful for focused tests and
 /// deterministic in-process integrations.
 #[derive(Debug, Clone, Default)]
-pub struct InMemoryAgreementJournal {
-    artifact: AgreementJournalArtifact,
+pub struct InMemoryAgreementWal {
+    artifact: AgreementWalArtifact,
 }
 
-impl InMemoryAgreementJournal {
-    /// Create one empty in-memory agreement journal.
+impl InMemoryAgreementWal {
+    /// Create one empty in-memory agreement WAL.
     #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 }
 
-impl AgreementJournal for InMemoryAgreementJournal {
-    fn append(&mut self, entry: AgreementJournalEntry) -> Result<(), String> {
+impl AgreementWal for InMemoryAgreementWal {
+    fn append(&mut self, entry: AgreementWalEntry) -> Result<(), String> {
         self.artifact.entries.push(entry);
         self.artifact.validate_monotonic_escalations()
     }
 
-    fn read_since(&self, tick: u64) -> Result<Vec<AgreementJournalEntry>, String> {
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementWalEntry>, String> {
         Ok(self.artifact.read_since(tick))
     }
 
-    fn load(&self) -> Result<AgreementJournalArtifact, String> {
+    fn load(&self) -> Result<AgreementWalArtifact, String> {
         Ok(self.artifact.clone())
     }
 }
 
-/// File-backed agreement journal backend for the initial local durability
+/// File-backed agreement WAL backend for the initial local durability
 /// rollout.
 #[derive(Debug, Clone)]
-pub struct FileAgreementJournal {
+pub struct FileAgreementWal {
     path: PathBuf,
 }
 
-impl FileAgreementJournal {
-    /// Create one file-backed journal rooted at `path`.
+impl FileAgreementWal {
+    /// Create one file-backed WAL rooted at `path`.
     #[must_use]
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self { path: path.into() }
     }
 
-    fn load_artifact(&self) -> Result<AgreementJournalArtifact, String> {
+    fn load_artifact(&self) -> Result<AgreementWalArtifact, String> {
         if !self.path.exists() {
-            return Ok(AgreementJournalArtifact::default());
+            return Ok(AgreementWalArtifact::default());
         }
-        PersistedDurabilityArtifact::from_path(&self.path)?.into_agreement_journal()
+        PersistedDurabilityArtifact::from_path(&self.path)?.into_agreement_wal()
     }
 
-    fn store_artifact(&self, artifact: &AgreementJournalArtifact) -> Result<(), String> {
+    fn store_artifact(&self, artifact: &AgreementWalArtifact) -> Result<(), String> {
         artifact.validate_monotonic_escalations()?;
-        PersistedDurabilityArtifact::agreement_journal(artifact.clone()).write_to_path(&self.path)
+        PersistedDurabilityArtifact::agreement_wal(artifact.clone()).write_to_path(&self.path)
     }
 }
 
-impl AgreementJournal for FileAgreementJournal {
-    fn append(&mut self, entry: AgreementJournalEntry) -> Result<(), String> {
+impl AgreementWal for FileAgreementWal {
+    fn append(&mut self, entry: AgreementWalEntry) -> Result<(), String> {
         let mut artifact = self.load_artifact()?;
         artifact.entries.push(entry);
         self.store_artifact(&artifact)
     }
 
-    fn read_since(&self, tick: u64) -> Result<Vec<AgreementJournalEntry>, String> {
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementWalEntry>, String> {
         Ok(self.load_artifact()?.read_since(tick))
     }
 
-    fn load(&self) -> Result<AgreementJournalArtifact, String> {
+    fn load(&self) -> Result<AgreementWalArtifact, String> {
         self.load_artifact()
     }
 }
@@ -581,15 +581,15 @@ where
     }
 }
 
-/// Typed recovery metadata derived from one checkpoint plus durable journal
+/// Typed recovery metadata derived from one checkpoint plus durable WAL
 /// suffix.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub struct DurableRecoveryMetadata {
     /// Checkpoint tick used as the recovery base.
     pub checkpoint_tick: u64,
-    /// First tick in the journal suffix applied on top of the checkpoint.
+    /// First tick in the WAL suffix applied on top of the checkpoint.
     #[serde(default)]
-    pub journal_tail_start_tick: Option<u64>,
+    pub wal_tail_start_tick: Option<u64>,
     /// Highest tick observed in the durable suffix.
     #[serde(default)]
     pub highest_recovered_tick: Option<u64>,
@@ -608,8 +608,8 @@ pub struct DurableRecoveryMetadata {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case", tag = "kind", content = "payload")]
 pub enum PersistedDurabilityPayload {
-    /// Agreement journal payload.
-    AgreementJournal(AgreementJournalArtifact),
+    /// Agreement WAL payload.
+    AgreementWal(AgreementWalArtifact),
     /// Evidence outcome cache payload.
     EvidenceOutcomeCache(EvidenceOutcomeCacheArtifact),
     /// Recovery metadata payload.
@@ -626,12 +626,12 @@ pub struct PersistedDurabilityArtifact {
 }
 
 impl PersistedDurabilityArtifact {
-    /// Wrap one agreement-journal artifact for persistence.
+    /// Wrap one agreement-WAL artifact for persistence.
     #[must_use]
-    pub fn agreement_journal(journal: AgreementJournalArtifact) -> Self {
+    pub fn agreement_wal(wal: AgreementWalArtifact) -> Self {
         Self {
             schema_version: PERSISTED_DURABILITY_SCHEMA_VERSION.to_string(),
-            payload: PersistedDurabilityPayload::AgreementJournal(journal),
+            payload: PersistedDurabilityPayload::AgreementWal(wal),
         }
     }
 
@@ -714,31 +714,31 @@ impl PersistedDurabilityArtifact {
         })
     }
 
-    /// Borrow the agreement-journal payload when this artifact wraps one.
+    /// Borrow the agreement-WAL payload when this artifact wraps one.
     #[must_use]
-    pub fn agreement_journal_artifact(&self) -> Option<&AgreementJournalArtifact> {
+    pub fn agreement_wal_artifact(&self) -> Option<&AgreementWalArtifact> {
         match &self.payload {
-            PersistedDurabilityPayload::AgreementJournal(journal) => Some(journal),
+            PersistedDurabilityPayload::AgreementWal(wal) => Some(wal),
             PersistedDurabilityPayload::EvidenceOutcomeCache(_)
             | PersistedDurabilityPayload::RecoveryMetadata(_) => None,
         }
     }
 
-    /// Consume the wrapper into one agreement-journal artifact.
+    /// Consume the wrapper into one agreement-WAL artifact.
     ///
     /// # Errors
     ///
-    /// Returns an error if this persisted artifact is not an agreement-journal
+    /// Returns an error if this persisted artifact is not an agreement-WAL
     /// payload.
-    pub fn into_agreement_journal(self) -> Result<AgreementJournalArtifact, String> {
+    pub fn into_agreement_wal(self) -> Result<AgreementWalArtifact, String> {
         match self.payload {
-            PersistedDurabilityPayload::AgreementJournal(journal) => Ok(journal),
+            PersistedDurabilityPayload::AgreementWal(wal) => Ok(wal),
             PersistedDurabilityPayload::EvidenceOutcomeCache(_) => Err(
-                "persisted durability artifact contains an evidence outcome cache payload, not an agreement journal"
+                "persisted durability artifact contains an evidence outcome cache payload, not an agreement WAL"
                     .to_string(),
             ),
             PersistedDurabilityPayload::RecoveryMetadata(_) => Err(
-                "persisted durability artifact contains recovery metadata, not an agreement journal"
+                "persisted durability artifact contains recovery metadata, not an agreement WAL"
                     .to_string(),
             ),
         }
@@ -749,7 +749,7 @@ impl PersistedDurabilityArtifact {
     pub fn evidence_outcome_cache_artifact(&self) -> Option<&EvidenceOutcomeCacheArtifact> {
         match &self.payload {
             PersistedDurabilityPayload::EvidenceOutcomeCache(cache) => Some(cache),
-            PersistedDurabilityPayload::AgreementJournal(_)
+            PersistedDurabilityPayload::AgreementWal(_)
             | PersistedDurabilityPayload::RecoveryMetadata(_) => None,
         }
     }
@@ -763,8 +763,8 @@ impl PersistedDurabilityArtifact {
     pub fn into_evidence_outcome_cache(self) -> Result<EvidenceOutcomeCacheArtifact, String> {
         match self.payload {
             PersistedDurabilityPayload::EvidenceOutcomeCache(cache) => Ok(cache),
-            PersistedDurabilityPayload::AgreementJournal(_) => Err(
-                "persisted durability artifact contains an agreement journal payload, not an evidence outcome cache"
+            PersistedDurabilityPayload::AgreementWal(_) => Err(
+                "persisted durability artifact contains an agreement WAL payload, not an evidence outcome cache"
                     .to_string(),
             ),
             PersistedDurabilityPayload::RecoveryMetadata(_) => Err(

@@ -131,8 +131,8 @@ Module access (not re-exported at crate root):
   `SendDecision`, `SendDecisionInput`
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
 - Durability:
-  `telltale_machine::model::durability::{AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryMetadata, FileAgreementJournal, FileEvidenceOutcomeCache, InMemoryAgreementJournal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload}`
-  These are the authoritative typed contracts for durable agreement journals, evidence outcome caches, and recovery metadata.
+  `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryMetadata, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload}`
+  These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, and recovery metadata.
   Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`
@@ -165,7 +165,7 @@ Module access (not re-exported at crate root):
   Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
 - `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`
   Typed persisted replay/checkpoint wrappers for on-disk simulator artifacts.
-  Durable agreement journals and recovery metadata intentionally remain machine-level typed contracts instead of simulator helper exports.
+  Durable agreement WALs and recovery metadata intentionally remain machine-level typed contracts instead of simulator helper exports.
 - `telltale_viewer::{SemanticComparisonResult, TheoremAwareCounterexample, DeterministicSweepReport, ExperimentSuiteReport, EffectTraceArtifact, MinimizationResult, ViewerExtensionManifest}`
   Shared viewer/webapp tooling surfaces for comparison, counterexamples, sweeps, effects, minimization, and downstream overlays.
 - Contract checks in `rust/simulator/src/contracts.rs`:

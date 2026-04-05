@@ -5,10 +5,10 @@ use std::sync::Arc;
 
 use telltale_machine::coroutine::Value;
 use telltale_machine::model::durability::{
-    AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
+    AgreementWal, AgreementWalArtifact, AgreementWalEntry, DurableRecoveryMetadata,
     EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
-    FileAgreementJournal, FileEvidenceOutcomeCache, InMemoryAgreementJournal,
-    InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+    FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+    PersistedDurabilityArtifact, PersistedDurabilityPayload,
 };
 use telltale_machine::model::effects::{
     EffectHandler, EffectOutcome, EffectRequest, EffectResponse, RecordingEffectHandler,
@@ -19,10 +19,10 @@ use telltale_machine::model::semantic_objects::{
 };
 use tempfile::tempdir;
 
-fn sample_journal_artifact() -> AgreementJournalArtifact {
-    AgreementJournalArtifact {
+fn sample_wal_artifact() -> AgreementWalArtifact {
+    AgreementWalArtifact {
         entries: vec![
-            AgreementJournalEntry::EvidenceProduced {
+            AgreementWalEntry::EvidenceProduced {
                 evidence: AgreementEvidence {
                     evidence_id: "evidence#1".to_string(),
                     operation_id: "op#1".to_string(),
@@ -35,21 +35,21 @@ fn sample_journal_artifact() -> AgreementJournalArtifact {
                 },
                 tick: 4,
             },
-            AgreementJournalEntry::Escalation {
+            AgreementWalEntry::Escalation {
                 operation_id: "op#1".to_string(),
                 previous_level: AgreementLevel::Provisional,
                 new_level: AgreementLevel::SoftSafe,
                 evidence_id: Some("evidence#1".to_string()),
                 tick: 4,
             },
-            AgreementJournalEntry::Finalization {
+            AgreementWalEntry::Finalization {
                 operation_id: "op#1".to_string(),
                 outcome: FinalizationOutcome::Finalized,
                 materialization_proof_id: Some("proof#1".to_string()),
                 canonical_handle_id: Some("handle#1".to_string()),
                 tick: 6,
             },
-            AgreementJournalEntry::VisibilityGateCrossing {
+            AgreementWalEntry::VisibilityGateCrossing {
                 operation_id: "op#1".to_string(),
                 downstream_coroutine_id: "coro#9".to_string(),
                 gate_level: AgreementLevel::Finalized,
@@ -148,8 +148,8 @@ fn step_request(operation_id: &str) -> EffectRequest {
 }
 
 #[test]
-fn persisted_durability_artifact_round_trips_journal_entries() {
-    let artifact = PersistedDurabilityArtifact::agreement_journal(sample_journal_artifact());
+fn persisted_durability_artifact_round_trips_wal_entries() {
+    let artifact = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact());
 
     let bytes = artifact.to_cbor().expect("encode durability artifact");
     let decoded =
@@ -158,43 +158,41 @@ fn persisted_durability_artifact_round_trips_journal_entries() {
 }
 
 #[test]
-fn agreement_journal_backends_preserve_order_and_filter_by_tick() {
+fn agreement_wal_backends_preserve_order_and_filter_by_tick() {
     fn exercise_backend(
-        journal: &mut dyn AgreementJournal,
-        expected: &AgreementJournalArtifact,
+        wal: &mut dyn AgreementWal,
+        expected: &AgreementWalArtifact,
     ) -> Result<(), String> {
         for entry in &expected.entries {
-            journal.append(entry.clone())?;
+            wal.append(entry.clone())?;
         }
-        let loaded = journal.load()?;
+        let loaded = wal.load()?;
         assert_eq!(loaded.entries, expected.entries);
-        let suffix = journal.read_since(4)?;
+        let suffix = wal.read_since(4)?;
         assert_eq!(suffix, expected.entries[2..].to_vec());
         Ok(())
     }
 
-    let expected = sample_journal_artifact();
-    exercise_backend(&mut InMemoryAgreementJournal::new(), &expected)
-        .expect("exercise in-memory journal");
+    let expected = sample_wal_artifact();
+    exercise_backend(&mut InMemoryAgreementWal::new(), &expected).expect("exercise in-memory wal");
 
     let dir = tempdir().expect("create temp dir");
-    let path = dir.path().join("journal.cbor");
-    exercise_backend(&mut FileAgreementJournal::new(path), &expected)
-        .expect("exercise file journal");
+    let path = dir.path().join("wal.cbor");
+    exercise_backend(&mut FileAgreementWal::new(path), &expected).expect("exercise file wal");
 }
 
 #[test]
-fn agreement_journal_artifact_validates_monotonic_escalation_order() {
-    let artifact = AgreementJournalArtifact {
+fn agreement_wal_artifact_validates_monotonic_escalation_order() {
+    let artifact = AgreementWalArtifact {
         entries: vec![
-            AgreementJournalEntry::Escalation {
+            AgreementWalEntry::Escalation {
                 operation_id: "op#regress".to_string(),
                 previous_level: AgreementLevel::SoftSafe,
                 new_level: AgreementLevel::Provisional,
                 evidence_id: None,
                 tick: 5,
             },
-            AgreementJournalEntry::Escalation {
+            AgreementWalEntry::Escalation {
                 operation_id: "op#regress".to_string(),
                 previous_level: AgreementLevel::Provisional,
                 new_level: AgreementLevel::SoftSafe,
@@ -211,16 +209,16 @@ fn agreement_journal_artifact_validates_monotonic_escalation_order() {
 }
 
 #[test]
-fn agreement_journal_serialization_is_byte_stable_for_identical_entries() {
-    let first = PersistedDurabilityArtifact::agreement_journal(sample_journal_artifact())
+fn agreement_wal_serialization_is_byte_stable_for_identical_entries() {
+    let first = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
         .to_cbor()
-        .expect("encode first journal");
-    let second = PersistedDurabilityArtifact::agreement_journal(sample_journal_artifact())
+        .expect("encode first wal");
+    let second = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
         .to_cbor()
-        .expect("encode second journal");
+        .expect("encode second wal");
     assert_eq!(first, second);
 
-    let identities: Vec<_> = sample_journal_artifact()
+    let identities: Vec<_> = sample_wal_artifact()
         .entries
         .into_iter()
         .map(|entry| entry.stable_identity())
@@ -248,7 +246,7 @@ fn persisted_durability_artifact_round_trips_cache_and_recovery_metadata() {
     });
     let recovery = PersistedDurabilityArtifact::recovery_metadata(DurableRecoveryMetadata {
         checkpoint_tick: 10,
-        journal_tail_start_tick: Some(11),
+        wal_tail_start_tick: Some(11),
         highest_recovered_tick: Some(13),
         resumed_operation_ids: vec!["op#2".to_string()],
         terminal_operation_ids: vec!["op#1".to_string()],
