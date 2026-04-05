@@ -72,7 +72,7 @@ impl CheckpointArtifact {
 #[serde(rename_all = "snake_case", tag = "kind", content = "payload")]
 pub enum PersistedReplayPayload {
     /// Exact checkpoint-resume artifact with middleware state.
-    Checkpoint(CheckpointArtifact),
+    Checkpoint(Box<CheckpointArtifact>),
     /// Replay-visible run artifact emitted by one completed scenario run.
     ScenarioReplay(Box<ScenarioReplayArtifact>),
 }
@@ -92,7 +92,7 @@ impl PersistedReplayArtifact {
     pub fn checkpoint(checkpoint: CheckpointArtifact) -> Self {
         Self {
             schema_version: PERSISTED_REPLAY_SCHEMA_VERSION.to_string(),
-            payload: PersistedReplayPayload::Checkpoint(checkpoint),
+            payload: PersistedReplayPayload::Checkpoint(Box::new(checkpoint)),
         }
     }
 
@@ -160,7 +160,7 @@ impl PersistedReplayArtifact {
     #[must_use]
     pub fn checkpoint_artifact(&self) -> Option<&CheckpointArtifact> {
         match &self.payload {
-            PersistedReplayPayload::Checkpoint(checkpoint) => Some(checkpoint),
+            PersistedReplayPayload::Checkpoint(checkpoint) => Some(checkpoint.as_ref()),
             PersistedReplayPayload::ScenarioReplay(_) => None,
         }
     }
@@ -172,7 +172,7 @@ impl PersistedReplayArtifact {
     /// Returns an error if this persisted artifact is not a checkpoint payload.
     pub fn into_checkpoint_artifact(self) -> Result<CheckpointArtifact, String> {
         match self.payload {
-            PersistedReplayPayload::Checkpoint(checkpoint) => Ok(checkpoint),
+            PersistedReplayPayload::Checkpoint(checkpoint) => Ok(*checkpoint),
             PersistedReplayPayload::ScenarioReplay(_) => Err(
                 "persisted replay artifact contains a scenario replay payload, not a checkpoint"
                     .to_string(),

@@ -19,7 +19,7 @@ use telltale_machine::model::effects::{
 use telltale_machine::model::output_condition::OutputConditionHint;
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::semantic_objects::OutstandingEffectStatus;
-use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_machine::{EffectExchangeRecord, ProtocolMachine, ProtocolMachineConfig};
 use test_support::simple_send_recv_image;
 
 #[derive(Debug, Clone, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
@@ -371,7 +371,26 @@ fn load_lean_fixtures() -> Option<Vec<ReducedSemanticEffectFixture>> {
     Some(bundle.fixtures)
 }
 
-fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
+fn fixture_from_exchange(
+    name: &str,
+    effect_kind: &str,
+    lifecycle: &str,
+    exchange: &EffectExchangeRecord,
+    publication_materialized: bool,
+    output_predicate: Option<String>,
+) -> ReducedSemanticEffectFixture {
+    ReducedSemanticEffectFixture {
+        name: name.to_string(),
+        effect_kind: effect_kind.to_string(),
+        lifecycle: lifecycle.to_string(),
+        interface_name: exchange.request.metadata.interface_name.clone(),
+        operation_name: exchange.request.metadata.operation_name.clone(),
+        publication_materialized,
+        output_predicate,
+    }
+}
+
+fn blocked_send_fixture() -> ReducedSemanticEffectFixture {
     let mut blocked_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     blocked_machine
         .load_choreography(&simple_send_recv_image("A", "B", "m"))
@@ -392,7 +411,17 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
         .iter()
         .find(|exchange| exchange.effect_id == blocked_effect.effect_id)
         .expect("matching blocked send exchange");
+    fixture_from_exchange(
+        "blocked_send",
+        "send_decision",
+        "blocked",
+        blocked_exchange,
+        false,
+        None,
+    )
+}
 
+fn internal_effect_fixtures() -> Vec<ReducedSemanticEffectFixture> {
     let mut internal_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     internal_machine
         .load_choreography(&simple_send_recv_image("A", "B", "m"))
@@ -443,7 +472,28 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
                     telltale_machine::CanonicalHandleKind::Materialization
                 )
             });
+    vec![
+        fixture_from_exchange(
+            "send_publication",
+            "send_decision",
+            "succeeded",
+            send_success,
+            publication_materialized,
+            predicate.clone(),
+        ),
+        fixture_from_exchange(
+            "output_condition_hint",
+            "output_condition_hint",
+            "succeeded",
+            output_hint,
+            false,
+            predicate,
+        ),
+        fixture_from_exchange("wal_sync", "wal_sync", "succeeded", wal_sync, false, None),
+    ]
+}
 
+fn failed_invoke_fixture() -> ReducedSemanticEffectFixture {
     let failed_invoke_image = single_role_end_image(vec![
         Instr::Set {
             dst: 1,
@@ -458,7 +508,10 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
     failed_invoke_machine
         .load_choreography(&failed_invoke_image)
         .expect("load failed invoke machine");
-    let _ = failed_invoke_machine.run(&FailedInvokeHandler, 32);
+    assert!(
+        failed_invoke_machine.run(&FailedInvokeHandler, 32).is_err(),
+        "failed invoke run should fail closed"
+    );
     let failed_invoke = failed_invoke_machine
         .effect_exchanges()
         .iter()
@@ -467,12 +520,27 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
                 && !exchange.succeeded()
         })
         .expect("failed invoke exchange");
+    fixture_from_exchange(
+        "failed_invoke",
+        "invoke_step",
+        "failed",
+        failed_invoke,
+        false,
+        None,
+    )
+}
 
+fn send_then_fault_fixture() -> ReducedSemanticEffectFixture {
     let mut send_then_fault_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     send_then_fault_machine
         .load_choreography(&simple_send_recv_image("A", "B", "m"))
         .expect("load send-then-fault machine");
-    let _ = send_then_fault_machine.run(&SendThenFaultHandler, 64);
+    assert!(
+        send_then_fault_machine
+            .run(&SendThenFaultHandler, 64)
+            .is_err(),
+        "send-then-fault run should fail closed"
+    );
     let send_before_fault = send_then_fault_machine
         .effect_exchanges()
         .iter()
@@ -483,7 +551,17 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
             ) && exchange.succeeded()
         })
         .expect("send before fault exchange");
+    fixture_from_exchange(
+        "send_before_fault",
+        "send_decision",
+        "succeeded_then_faulted",
+        send_before_fault,
+        false,
+        None,
+    )
+}
 
+fn resumed_send_fixture() -> ReducedSemanticEffectFixture {
     let mut resumed_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
     resumed_machine
         .load_choreography(&simple_send_recv_image("A", "B", "m"))
@@ -501,72 +579,22 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
             ) && exchange.succeeded()
         })
         .expect("resumed send exchange");
+    fixture_from_exchange(
+        "resumed_send",
+        "send_decision",
+        "resumed",
+        resumed_send,
+        false,
+        None,
+    )
+}
 
-    let mut fixtures = vec![
-        ReducedSemanticEffectFixture {
-            name: "blocked_send".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "blocked".to_string(),
-            interface_name: blocked_exchange.request.metadata.interface_name.clone(),
-            operation_name: blocked_exchange.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "send_publication".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "succeeded".to_string(),
-            interface_name: send_success.request.metadata.interface_name.clone(),
-            operation_name: send_success.request.metadata.operation_name.clone(),
-            publication_materialized,
-            output_predicate: predicate.clone(),
-        },
-        ReducedSemanticEffectFixture {
-            name: "output_condition_hint".to_string(),
-            effect_kind: "output_condition_hint".to_string(),
-            lifecycle: "succeeded".to_string(),
-            interface_name: output_hint.request.metadata.interface_name.clone(),
-            operation_name: output_hint.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: predicate,
-        },
-        ReducedSemanticEffectFixture {
-            name: "wal_sync".to_string(),
-            effect_kind: "wal_sync".to_string(),
-            lifecycle: "succeeded".to_string(),
-            interface_name: wal_sync.request.metadata.interface_name.clone(),
-            operation_name: wal_sync.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "failed_invoke".to_string(),
-            effect_kind: "invoke_step".to_string(),
-            lifecycle: "failed".to_string(),
-            interface_name: failed_invoke.request.metadata.interface_name.clone(),
-            operation_name: failed_invoke.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "send_before_fault".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "succeeded_then_faulted".to_string(),
-            interface_name: send_before_fault.request.metadata.interface_name.clone(),
-            operation_name: send_before_fault.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-        ReducedSemanticEffectFixture {
-            name: "resumed_send".to_string(),
-            effect_kind: "send_decision".to_string(),
-            lifecycle: "resumed".to_string(),
-            interface_name: resumed_send.request.metadata.interface_name.clone(),
-            operation_name: resumed_send.request.metadata.operation_name.clone(),
-            publication_materialized: false,
-            output_predicate: None,
-        },
-    ];
+fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
+    let mut fixtures = vec![blocked_send_fixture()];
+    fixtures.extend(internal_effect_fixtures());
+    fixtures.push(failed_invoke_fixture());
+    fixtures.push(send_then_fault_fixture());
+    fixtures.push(resumed_send_fixture());
     fixtures.sort();
     fixtures
 }

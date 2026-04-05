@@ -50,6 +50,7 @@ fn scan_blocking_lock_boundaries(file: &Path, source: &str) -> Vec<String> {
     const ALLOWED_PREFIXES: &[&str] = &["rust/machine/src/threaded/"];
     const ALLOWED_SUFFIXES: &[&str] = &[
         "rust/machine/src/nested.rs",
+        "rust/machine/src/durable.rs",
         "rust/machine/src/effect/runtime_types.rs",
         "rust/simulator/src/network.rs",
         "rust/simulator/src/fault.rs",

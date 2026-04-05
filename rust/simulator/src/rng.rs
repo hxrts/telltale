@@ -15,7 +15,7 @@ pub struct SimRng {
     seed: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 struct SimRngSnapshot {
     seed: u64,
     word_pos: u128,

@@ -402,18 +402,17 @@
             .filter(|effect| effect.effect_kind == "send_decision")
             .cloned()
             .collect();
-        let send_exchanges: Vec<_> = machine
-            .effect_exchanges()
-            .iter()
-            .filter(|exchange| {
-                matches!(
-                    exchange.request.body,
-                    crate::effect::EffectRequestBody::SendDecision { .. }
-                )
-            })
-            .collect();
         assert_eq!(
-            send_exchanges.len(),
+            machine
+                .effect_exchanges()
+                .iter()
+                .filter(|exchange| {
+                    matches!(
+                        exchange.request.body,
+                        crate::effect::EffectRequestBody::SendDecision { .. }
+                    )
+                })
+                .count(),
             2,
             "retry should issue one blocked exchange and one successful retry exchange"
         );

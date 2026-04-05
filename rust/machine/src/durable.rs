@@ -3,8 +3,8 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
 
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 
 use crate::effect::{EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectResult};
@@ -481,10 +481,7 @@ where
     ///
     /// Returns an error if the cache cannot be loaded.
     pub fn cached_outcome(&self, evidence_id: &str) -> Result<Option<EffectOutcome>, String> {
-        let cache = self
-            .cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let cache = self.cache.lock();
         Ok(cache.get(evidence_id)?.map(|entry| entry.outcome))
     }
 
@@ -494,10 +491,7 @@ where
     ///
     /// Returns an error if the cache cannot be loaded.
     pub fn cache_snapshot(&self) -> Result<EvidenceOutcomeCacheArtifact, String> {
-        let cache = self
-            .cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let cache = self.cache.lock();
         cache.load()
     }
 }
@@ -517,10 +511,7 @@ where
         let operation_name = request.metadata.operation_name.clone();
 
         if let Some(evidence_id) = evidence_id.clone() {
-            let cache = self
-                .cache
-                .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let cache = self.cache.lock();
             match cache.get(&evidence_id) {
                 Ok(Some(entry)) => return entry.outcome,
                 Ok(None) => {}
@@ -543,10 +534,7 @@ where
             operation_name,
             outcome: outcome.clone(),
         };
-        let mut cache = self
-            .cache
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let mut cache = self.cache.lock();
         if let Err(err) = cache.put(entry) {
             return EffectOutcome::failure(EffectFailure::unavailable(format!(
                 "persist evidence outcome `{evidence_id}`: {err}"
@@ -603,9 +591,10 @@ where
 }
 
 /// Test and integration behavior for the internal `wal_sync` effect.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub enum WalSyncMode {
     /// Persist entries and report immediate success.
+    #[default]
     Immediate,
     /// Block at the visibility gate without persisting.
     Blocked,
@@ -614,12 +603,6 @@ pub enum WalSyncMode {
         /// Stable error surfaced by the internal effect.
         message: String,
     },
-}
-
-impl Default for WalSyncMode {
-    fn default() -> Self {
-        Self::Immediate
-    }
 }
 
 /// Effect-handler wrapper that owns one durable agreement WAL and services the
@@ -663,10 +646,7 @@ where
     ///
     /// Returns an error if the WAL backend cannot be loaded.
     pub fn wal_snapshot(&self) -> Result<AgreementWalArtifact, String> {
-        let wal = self
-            .wal
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let wal = self.wal.lock();
         wal.load()
     }
 
@@ -770,10 +750,7 @@ where
     fn wal_sync(&self, sync: &WalSyncRequest) -> EffectResult<()> {
         match &self.sync_mode {
             WalSyncMode::Immediate => {
-                let mut wal = self
-                    .wal
-                    .lock()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                let mut wal = self.wal.lock();
                 let entries = match self.build_entries(&*wal, sync) {
                     Ok(entries) => entries,
                     Err(err) => {

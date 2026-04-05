@@ -31,9 +31,9 @@ use telltale_simulator::runner::{
     TheoremProgressSummary,
 };
 use telltale_simulator::scenario::{
-    ExecutionBackend, ExecutionRegime, ResolvedExecutionBackend, ResolvedSchedulerPolicy,
-    ResolvedTheoremProfile, Scenario, TheoremAssumptionBundle, TheoremEligibility,
-    TheoremEnvelopeProfile, TheoremProfileSpec, TheoremSchedulerProfile,
+    DurabilitySpec, ExecutionBackend, ExecutionRegime, ResolvedExecutionBackend,
+    ResolvedSchedulerPolicy, ResolvedTheoremProfile, Scenario, TheoremAssumptionBundle,
+    TheoremEligibility, TheoremEnvelopeProfile, TheoremProfileSpec, TheoremSchedulerProfile,
 };
 use telltale_simulator::trace::Trace;
 use telltale_viewer::{
@@ -2015,6 +2015,7 @@ fn demo_service() -> InMemoryViewerService {
         properties: None,
         checkpoint_interval: None,
         theorem: TheoremProfileSpec::default(),
+        durability: DurabilitySpec::default(),
         extensions: BTreeMap::new(),
     };
     let mut alternate_scenario = scenario.clone();
@@ -2254,6 +2255,7 @@ fn sample_result() -> ScenarioResult {
             environment_trace: EnvironmentTrace::default(),
             adversary_summary: AdversarySummary::default(),
             assumption_diagnostics: Vec::new(),
+            durable_recovery: None,
             backend: ResolvedExecutionBackend::Canonical,
             scheduler_concurrency: 1,
             worker_threads: 1,

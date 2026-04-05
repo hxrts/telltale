@@ -17,10 +17,10 @@ The numeric rows in this section are source-derived and checked by
 
 | Metric | Value | Source |
 |---|---:|---|
-| Lean core-library files | 656 | `lean/CODE_MAP.md` total row |
-| Lean core-library lines | 134,173 | `lean/CODE_MAP.md` total row |
+| Lean core-library files | 658 | `lean/CODE_MAP.md` total row |
+| Lean core-library lines | 134,293 | `lean/CODE_MAP.md` total row |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
-| Aura-derived boundary checks | 7 | `just check-aura-borrowed-lints` |
+| Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 10 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 13 | `rust/macros/tests/macro_ui.rs` |

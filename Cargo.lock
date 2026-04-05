@@ -3453,6 +3453,7 @@ dependencies = [
  "cfg-if",
  "criterion",
  "getrandom 0.2.17",
+ "parking_lot 0.12.5",
  "proptest",
  "rayon",
  "serde",
