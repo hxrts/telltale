@@ -264,6 +264,10 @@ impl<'a> ReplayEffectHandler<'a> {
         self.entries.get(cursor).map(|entry| entry.handler_identity.clone())
     }
 
+    fn recorded_handler_identity(&self) -> Option<String> {
+        self.entries.first().map(|entry| entry.handler_identity.clone())
+    }
+
     fn next_entry(&self, expected_kind: &str) -> Result<EffectTraceEntry, String> {
         let mut cursor = self
             .cursor

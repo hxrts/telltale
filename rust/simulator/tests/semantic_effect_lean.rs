@@ -7,12 +7,18 @@ use std::process::Command;
 
 use serde::Deserialize;
 use telltale_machine::durable::WalSyncRequest;
+use telltale_machine::instr::{ImmValue, Instr, InvokeAction};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectRequestBody, EffectResult, SendDecision, SendDecisionInput,
     TopologyPerturbation,
 };
 use telltale_machine::model::output_condition::OutputConditionHint;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::semantic_objects::{OperationPhase, OutstandingEffectStatus};
+use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
+use telltale_simulator::backend::SimulationMachine;
+use telltale_simulator::execution::{execute_scenario_rounds, ScenarioMiddleware};
+use telltale_simulator::persistence::{PersistedReplayArtifact, PersistedReplayPayload};
 use telltale_simulator::runner::{canonical_replay_scenario, run_with_scenario, ScenarioResult};
 use telltale_simulator::scenario::Scenario;
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
@@ -32,6 +38,22 @@ struct ReducedSemanticEffectFixture {
 struct ReducedSemanticEffectBundle {
     schema_version: String,
     fixtures: Vec<ReducedSemanticEffectFixture>,
+}
+
+fn single_role_end_image(program: Vec<Instr>) -> CodeImage {
+    CodeImage {
+        programs: {
+            let mut programs = BTreeMap::new();
+            programs.insert("A".to_string(), program);
+            programs
+        },
+        global_type: GlobalType::End,
+        local_types: {
+            let mut local_types = BTreeMap::new();
+            local_types.insert("A".to_string(), LocalTypeR::End);
+            local_types
+        },
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -118,6 +140,172 @@ impl EffectHandler for SimulatorSemanticEffectHandler {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct FailedInvokeHandler;
+
+impl EffectHandler for FailedInvokeHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Unit)
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        labels.first().cloned().map_or_else(
+            || EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            EffectResult::success,
+        )
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        EffectResult::failure(EffectFailure::contract_violation("invoke failed"))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SendThenFaultHandler;
+
+impl EffectHandler for SendThenFaultHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Str(label.to_string()))
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        labels.first().cloned().map_or_else(
+            || EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            EffectResult::success,
+        )
+    }
+
+    fn step(&self, role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        if role == "B" {
+            EffectResult::failure(EffectFailure::contract_violation("late fault"))
+        } else {
+            EffectResult::success(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ResumedSendHandler;
+
+impl EffectHandler for ResumedSendHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Unit)
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        labels.first().cloned().map_or_else(
+            || EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            EffectResult::success,
+        )
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        let events = match tick {
+            1 => vec![TopologyPerturbation::Partition {
+                from: "A".to_string(),
+                to: "B".to_string(),
+            }],
+            2 => vec![TopologyPerturbation::Heal {
+                from: "A".to_string(),
+                to: "B".to_string(),
+            }],
+            _ => Vec::new(),
+        };
+        EffectResult::success(events)
+    }
+}
+
 fn semantic_effect_runner_path() -> Option<PathBuf> {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let path = crate_dir
@@ -165,6 +353,152 @@ fn initial_states() -> BTreeMap<String, Vec<FixedQ32>> {
     ])
 }
 
+fn machine_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
+    let (global, local_types) = simple_send_recv_protocol();
+    let image =
+        telltale_machine::runtime::loader::CodeImage::from_local_types(&local_types, &global);
+
+    let mut blocked_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    blocked_machine
+        .load_choreography(&image)
+        .expect("load blocked-send machine");
+    blocked_machine
+        .step(&SimulatorSemanticEffectHandler)
+        .expect("run blocked send step");
+    let blocked_effect = blocked_machine
+        .outstanding_effects()
+        .iter()
+        .find(|effect| {
+            effect.effect_kind == "send_decision"
+                && effect.status == OutstandingEffectStatus::Blocked
+        })
+        .expect("blocked send effect");
+    let blocked_exchange = blocked_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| exchange.effect_id == blocked_effect.effect_id)
+        .expect("matching blocked send exchange");
+
+    let mut internal_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    internal_machine
+        .load_choreography(&image)
+        .expect("load internal-effects machine");
+    internal_machine
+        .run(&SimulatorSemanticEffectHandler, 64)
+        .expect("run internal-effects machine");
+    let predicate = internal_machine
+        .output_condition_checks()
+        .first()
+        .map(|check| check.meta.predicate_ref.clone());
+    let send_success = internal_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("successful send exchange");
+    let output_hint = internal_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::OutputConditionHint { .. }
+            )
+        })
+        .expect("output hint exchange");
+    let wal_sync = internal_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| matches!(exchange.request.body, EffectRequestBody::WalSync { .. }))
+        .expect("wal sync exchange");
+    let publication_materialized = !internal_machine
+        .semantic_objects()
+        .publication_events
+        .is_empty()
+        && internal_machine
+            .semantic_objects()
+            .canonical_handles
+            .iter()
+            .any(|handle| {
+                matches!(
+                    handle.kind,
+                    telltale_machine::CanonicalHandleKind::Materialization
+                )
+            });
+
+    let mut fixtures = vec![
+        ReducedSemanticEffectFixture {
+            name: "blocked_send".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "blocked".to_string(),
+            interface_name: blocked_exchange.request.metadata.interface_name.clone(),
+            operation_name: blocked_exchange.request.metadata.operation_name.clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "send_publication".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "succeeded".to_string(),
+            interface_name: send_success.request.metadata.interface_name.clone(),
+            operation_name: send_success.request.metadata.operation_name.clone(),
+            publication_materialized,
+            output_predicate: predicate.clone(),
+        },
+        ReducedSemanticEffectFixture {
+            name: "output_condition_hint".to_string(),
+            effect_kind: "output_condition_hint".to_string(),
+            lifecycle: "succeeded".to_string(),
+            interface_name: output_hint.request.metadata.interface_name.clone(),
+            operation_name: output_hint.request.metadata.operation_name.clone(),
+            publication_materialized: false,
+            output_predicate: predicate,
+        },
+        ReducedSemanticEffectFixture {
+            name: "wal_sync".to_string(),
+            effect_kind: "wal_sync".to_string(),
+            lifecycle: "succeeded".to_string(),
+            interface_name: wal_sync.request.metadata.interface_name.clone(),
+            operation_name: wal_sync.request.metadata.operation_name.clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "failed_invoke".to_string(),
+            effect_kind: "invoke_step".to_string(),
+            lifecycle: "failed".to_string(),
+            interface_name: "Runtime".to_string(),
+            operation_name: "invoke".to_string(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "send_before_fault".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "succeeded_then_faulted".to_string(),
+            interface_name: "Transport".to_string(),
+            operation_name: "sendDecision".to_string(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "resumed_send".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "resumed".to_string(),
+            interface_name: "Transport".to_string(),
+            operation_name: "sendDecision".to_string(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+    ];
+    fixtures.sort();
+    fixtures
+}
+
 fn scenario_with_backend(name: &str, backend: &str, steps: u64) -> Scenario {
     let worker_threads = if backend == "canonical" { 1 } else { 2 };
     let toml = format!(
@@ -193,8 +527,13 @@ step_size = "0.01"
 }
 
 fn blocked_send_fixture_from_result(result: &ScenarioResult) -> ReducedSemanticEffectFixture {
-    let blocked_exchange = result
-        .replay
+    blocked_send_fixture_from_replay(&result.replay)
+}
+
+fn blocked_send_fixture_from_replay(
+    replay: &telltale_simulator::runner::ScenarioReplayArtifact,
+) -> ReducedSemanticEffectFixture {
+    let blocked_exchange = replay
         .semantic_objects
         .outstanding_effects
         .iter()
@@ -203,15 +542,13 @@ fn blocked_send_fixture_from_result(result: &ScenarioResult) -> ReducedSemanticE
                 && effect.status == OutstandingEffectStatus::Blocked
         })
         .and_then(|effect| {
-            result
-                .replay
+            replay
                 .effect_exchanges
                 .iter()
                 .find(|exchange| exchange.effect_id == effect.effect_id)
         })
         .or_else(|| {
-            result
-                .replay
+            replay
                 .semantic_objects
                 .operation_instances
                 .iter()
@@ -220,8 +557,7 @@ fn blocked_send_fixture_from_result(result: &ScenarioResult) -> ReducedSemanticE
                 })
                 .and_then(|operation| {
                     operation.effect_ids.first().and_then(|effect_id| {
-                        result
-                            .replay
+                        replay
                             .effect_exchanges
                             .iter()
                             .find(|exchange| exchange.effect_id == *effect_id)
@@ -231,10 +567,9 @@ fn blocked_send_fixture_from_result(result: &ScenarioResult) -> ReducedSemanticE
         .unwrap_or_else(|| {
             panic!(
                 "blocked send effect: outstanding={:?}; operations={:?}; exchanges={:?}",
-                result.replay.semantic_objects.outstanding_effects,
-                result.replay.semantic_objects.operation_instances,
-                result
-                    .replay
+                replay.semantic_objects.outstanding_effects,
+                replay.semantic_objects.operation_instances,
+                replay
                     .effect_exchanges
                     .iter()
                     .map(|exchange| (
@@ -259,13 +594,17 @@ fn blocked_send_fixture_from_result(result: &ScenarioResult) -> ReducedSemanticE
 }
 
 fn internal_fixtures_from_result(result: &ScenarioResult) -> Vec<ReducedSemanticEffectFixture> {
-    let predicate = result
-        .replay
+    internal_fixtures_from_replay(&result.replay)
+}
+
+fn internal_fixtures_from_replay(
+    replay: &telltale_simulator::runner::ScenarioReplayArtifact,
+) -> Vec<ReducedSemanticEffectFixture> {
+    let predicate = replay
         .output_condition_trace
         .first()
         .map(|check| check.meta.predicate_ref.clone());
-    let send_success = result
-        .replay
+    let send_success = replay
         .effect_exchanges
         .iter()
         .find(|exchange| {
@@ -275,8 +614,7 @@ fn internal_fixtures_from_result(result: &ScenarioResult) -> Vec<ReducedSemantic
             ) && exchange.succeeded()
         })
         .expect("successful send exchange");
-    let output_hint = result
-        .replay
+    let output_hint = replay
         .effect_exchanges
         .iter()
         .find(|exchange| {
@@ -286,15 +624,13 @@ fn internal_fixtures_from_result(result: &ScenarioResult) -> Vec<ReducedSemantic
             )
         })
         .expect("output hint exchange");
-    let wal_sync = result
-        .replay
+    let wal_sync = replay
         .effect_exchanges
         .iter()
         .find(|exchange| matches!(exchange.request.body, EffectRequestBody::WalSync { .. }))
         .expect("wal sync exchange");
-    let publication_materialized = !result.replay.semantic_objects.publication_events.is_empty()
-        && result
-            .replay
+    let publication_materialized = !replay.semantic_objects.publication_events.is_empty()
+        && replay
             .semantic_objects
             .canonical_handles
             .iter()
@@ -338,16 +674,7 @@ fn internal_fixtures_from_result(result: &ScenarioResult) -> Vec<ReducedSemantic
     fixtures
 }
 
-#[test]
-fn simulator_semantic_effects_match_lean_reduced_fixture_surface() {
-    let Some(mut expected) = load_lean_fixtures() else {
-        eprintln!(
-            "semantic_effect_parity_runner not available; build with: cd lean && lake build semantic_effect_parity_runner"
-        );
-        return;
-    };
-    expected.sort();
-
+fn simulator_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
     let (global, local_types) = simple_send_recv_protocol();
     let initial = initial_states();
     let blocked = scenario_with_backend("semantic_effects_blocked", "canonical", 3);
@@ -363,7 +690,6 @@ fn simulator_semantic_effects_match_lean_reduced_fixture_surface() {
         &SimulatorSemanticEffectHandler,
     )
     .expect("run blocked semantic-effect scenario");
-
     let canonical_result = run_with_scenario(
         &local_types,
         &global,
@@ -400,9 +726,363 @@ fn simulator_semantic_effects_match_lean_reduced_fixture_surface() {
     replay_fixtures.push(blocked_fixture);
     replay_fixtures.sort();
 
-    assert_eq!(canonical_fixtures, expected);
-    assert_eq!(threaded_fixtures, expected);
-    assert_eq!(replay_fixtures, expected);
+    let mut bundle = canonical_fixtures.clone();
+    bundle.extend(simulator_negative_fixture_bundle());
+    bundle.sort();
+
     assert_eq!(canonical_fixtures, threaded_fixtures);
     assert_eq!(canonical_fixtures, replay_fixtures);
+    bundle
+}
+
+fn canonical_semantic_effect_result() -> ScenarioResult {
+    let (global, local_types) = simple_send_recv_protocol();
+    let initial = initial_states();
+    let canonical = scenario_with_backend("semantic_effects_canonical_phase5", "canonical", 8);
+    run_with_scenario(
+        &local_types,
+        &global,
+        &initial,
+        &canonical,
+        &SimulatorSemanticEffectHandler,
+    )
+    .expect("run canonical semantic-effect scenario")
+}
+
+fn blocked_semantic_effect_result() -> ScenarioResult {
+    let (global, local_types) = simple_send_recv_protocol();
+    let initial = initial_states();
+    let blocked = scenario_with_backend("semantic_effects_blocked_phase5", "canonical", 3);
+    run_with_scenario(
+        &local_types,
+        &global,
+        &initial,
+        &blocked,
+        &SimulatorSemanticEffectHandler,
+    )
+    .expect("run blocked semantic-effect scenario")
+}
+
+fn scenario_for_low_level_backend(name: &str, backend: &str, steps: u64) -> Scenario {
+    scenario_with_backend(name, backend, steps)
+}
+
+fn load_simulation_machine(
+    backend: &str,
+    scenario: &Scenario,
+    image: &CodeImage,
+) -> SimulationMachine {
+    let resolved = scenario
+        .resolved_execution()
+        .expect("resolve simulator execution");
+    let mut machine = SimulationMachine::new(ProtocolMachineConfig::default(), &resolved);
+    machine
+        .load_choreography_owned(image, format!("sim/{backend}/semantic_effects"))
+        .expect("load choreography into simulator machine");
+    machine
+}
+
+fn run_low_level_simulator(
+    backend: &str,
+    image: &CodeImage,
+    scenario: &Scenario,
+    handler: &dyn EffectHandler,
+) -> SimulationMachine {
+    let mut machine = load_simulation_machine(backend, scenario, image);
+    let middleware =
+        ScenarioMiddleware::from_scenario(scenario, handler, machine.clock().tick_duration)
+            .expect("build simulator middleware");
+    let resolved = scenario
+        .resolved_execution()
+        .expect("resolve simulator execution");
+    let _ = execute_scenario_rounds(
+        &mut machine,
+        scenario,
+        &middleware,
+        usize::try_from(resolved.scheduler_concurrency).unwrap_or(usize::MAX),
+        scenario.steps,
+        |_, _| Ok(()),
+    );
+    machine
+}
+
+fn simulator_negative_fixture_bundle() -> Vec<ReducedSemanticEffectFixture> {
+    let failed_invoke_image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Nat(1),
+        },
+        Instr::Invoke {
+            action: InvokeAction::Reg(1),
+        },
+        Instr::Halt,
+    ]);
+    let failed_canonical_scenario =
+        scenario_for_low_level_backend("failed_invoke_canonical", "canonical", 4);
+    let failed_threaded_scenario =
+        scenario_for_low_level_backend("failed_invoke_threaded", "threaded", 4);
+    let failed_canonical_machine = run_low_level_simulator(
+        "canonical",
+        &failed_invoke_image,
+        &failed_canonical_scenario,
+        &FailedInvokeHandler,
+    );
+    let failed_threaded_machine = run_low_level_simulator(
+        "threaded",
+        &failed_invoke_image,
+        &failed_threaded_scenario,
+        &FailedInvokeHandler,
+    );
+    let failed_invoke_canonical = failed_canonical_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(exchange.request.body, EffectRequestBody::InvokeStep { .. })
+                && !exchange.succeeded()
+        })
+        .expect("canonical failed invoke exchange");
+    let failed_invoke_threaded = failed_threaded_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(exchange.request.body, EffectRequestBody::InvokeStep { .. })
+                && !exchange.succeeded()
+        })
+        .expect("threaded failed invoke exchange");
+    assert_eq!(
+        failed_invoke_canonical.request.metadata.interface_name,
+        failed_invoke_threaded.request.metadata.interface_name
+    );
+    assert_eq!(
+        failed_invoke_canonical.request.metadata.operation_name,
+        failed_invoke_threaded.request.metadata.operation_name
+    );
+
+    let (send_recv_global, send_recv_locals) = simple_send_recv_protocol();
+    let send_recv_image = telltale_machine::runtime::loader::CodeImage::from_local_types(
+        &send_recv_locals,
+        &send_recv_global,
+    );
+    let fault_canonical_scenario =
+        scenario_for_low_level_backend("send_fault_canonical", "canonical", 8);
+    let fault_threaded_scenario =
+        scenario_for_low_level_backend("send_fault_threaded", "threaded", 8);
+    let fault_canonical_machine = run_low_level_simulator(
+        "canonical",
+        &send_recv_image,
+        &fault_canonical_scenario,
+        &SendThenFaultHandler,
+    );
+    let fault_threaded_machine = run_low_level_simulator(
+        "threaded",
+        &send_recv_image,
+        &fault_threaded_scenario,
+        &SendThenFaultHandler,
+    );
+    let send_before_fault_canonical = fault_canonical_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("canonical send before fault");
+    let send_before_fault_threaded = fault_threaded_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("threaded send before fault");
+    assert_eq!(
+        send_before_fault_canonical.request.metadata.interface_name,
+        send_before_fault_threaded.request.metadata.interface_name
+    );
+    assert_eq!(
+        send_before_fault_canonical.request.metadata.operation_name,
+        send_before_fault_threaded.request.metadata.operation_name
+    );
+
+    let resumed_canonical_scenario =
+        scenario_for_low_level_backend("resumed_send_canonical", "canonical", 8);
+    let resumed_threaded_scenario =
+        scenario_for_low_level_backend("resumed_send_threaded", "threaded", 8);
+    let resumed_canonical_machine = run_low_level_simulator(
+        "canonical",
+        &send_recv_image,
+        &resumed_canonical_scenario,
+        &ResumedSendHandler,
+    );
+    let resumed_threaded_machine = run_low_level_simulator(
+        "threaded",
+        &send_recv_image,
+        &resumed_threaded_scenario,
+        &ResumedSendHandler,
+    );
+    let resumed_send_canonical = resumed_canonical_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("canonical resumed send");
+    let resumed_send_threaded = resumed_threaded_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("threaded resumed send");
+    assert_eq!(
+        resumed_send_canonical.request.metadata.interface_name,
+        resumed_send_threaded.request.metadata.interface_name
+    );
+    assert_eq!(
+        resumed_send_canonical.request.metadata.operation_name,
+        resumed_send_threaded.request.metadata.operation_name
+    );
+
+    let mut fixtures = vec![
+        ReducedSemanticEffectFixture {
+            name: "failed_invoke".to_string(),
+            effect_kind: "invoke_step".to_string(),
+            lifecycle: "failed".to_string(),
+            interface_name: failed_invoke_canonical
+                .request
+                .metadata
+                .interface_name
+                .clone(),
+            operation_name: failed_invoke_canonical
+                .request
+                .metadata
+                .operation_name
+                .clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "send_before_fault".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "succeeded_then_faulted".to_string(),
+            interface_name: send_before_fault_canonical
+                .request
+                .metadata
+                .interface_name
+                .clone(),
+            operation_name: send_before_fault_canonical
+                .request
+                .metadata
+                .operation_name
+                .clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "resumed_send".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "resumed".to_string(),
+            interface_name: resumed_send_canonical
+                .request
+                .metadata
+                .interface_name
+                .clone(),
+            operation_name: resumed_send_canonical
+                .request
+                .metadata
+                .operation_name
+                .clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+    ];
+    fixtures.sort();
+    fixtures
+}
+
+#[test]
+fn simulator_semantic_effects_match_lean_reduced_fixture_surface() {
+    let Some(mut expected) = load_lean_fixtures() else {
+        eprintln!(
+            "semantic_effect_parity_runner not available; build with: cd lean && lake build semantic_effect_parity_runner"
+        );
+        return;
+    };
+    expected.sort();
+
+    assert_eq!(simulator_fixture_bundle(), expected);
+}
+
+#[test]
+fn simulator_reduced_semantic_effects_match_machine_reduced_fixture_bundle() {
+    assert_eq!(simulator_fixture_bundle(), machine_fixture_bundle());
+}
+
+#[test]
+fn semantic_effect_projection_survives_scenario_result_json_roundtrip() {
+    let canonical_result = canonical_semantic_effect_result();
+    let expected = internal_fixtures_from_result(&canonical_result);
+    let encoded = serde_json::to_vec(&canonical_result).expect("encode scenario result");
+    let decoded: ScenarioResult = serde_json::from_slice(&encoded).expect("decode scenario result");
+
+    assert_eq!(
+        decoded.replay.effect_exchanges,
+        canonical_result.replay.effect_exchanges
+    );
+    assert_eq!(
+        decoded.replay.semantic_objects,
+        canonical_result.replay.semantic_objects
+    );
+    assert_eq!(internal_fixtures_from_result(&decoded), expected);
+}
+
+#[test]
+fn semantic_effect_projection_survives_persisted_replay_roundtrip() {
+    let canonical_result = canonical_semantic_effect_result();
+    let expected = internal_fixtures_from_result(&canonical_result);
+    let persisted = PersistedReplayArtifact::scenario_replay(canonical_result.replay.clone());
+    let encoded = persisted.to_cbor().expect("encode persisted replay");
+    let decoded = PersistedReplayArtifact::from_slice(&encoded).expect("decode persisted replay");
+    let replay = match decoded.payload {
+        PersistedReplayPayload::ScenarioReplay(replay) => replay,
+        PersistedReplayPayload::Checkpoint(_) => panic!("expected scenario replay payload"),
+    };
+
+    assert_eq!(
+        replay.effect_exchanges,
+        canonical_result.replay.effect_exchanges
+    );
+    assert_eq!(
+        replay.semantic_objects,
+        canonical_result.replay.semantic_objects
+    );
+    assert_eq!(internal_fixtures_from_replay(&replay), expected);
+}
+
+#[test]
+fn blocked_semantic_effect_projection_survives_persisted_replay_roundtrip() {
+    let blocked_result = blocked_semantic_effect_result();
+    let expected = blocked_send_fixture_from_result(&blocked_result);
+    let persisted = PersistedReplayArtifact::scenario_replay(blocked_result.replay.clone());
+    let encoded = persisted
+        .to_cbor()
+        .expect("encode blocked persisted replay");
+    let decoded =
+        PersistedReplayArtifact::from_slice(&encoded).expect("decode blocked persisted replay");
+    let replay = match decoded.payload {
+        PersistedReplayPayload::ScenarioReplay(replay) => replay,
+        PersistedReplayPayload::Checkpoint(_) => panic!("expected scenario replay payload"),
+    };
+
+    assert_eq!(blocked_send_fixture_from_replay(&replay), expected);
 }

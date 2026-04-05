@@ -61,6 +61,30 @@ def fixtures : List ReducedSemanticEffectFixture :=
     , publicationMaterialized := false
     , outputPredicate := none
     }
+  , { name := "failed_invoke"
+    , effectKind := "invoke_step"
+    , lifecycle := "failed"
+    , interfaceName := "Runtime"
+    , operationName := "invoke"
+    , publicationMaterialized := false
+    , outputPredicate := none
+    }
+  , { name := "send_before_fault"
+    , effectKind := "send_decision"
+    , lifecycle := "succeeded_then_faulted"
+    , interfaceName := "Transport"
+    , operationName := "sendDecision"
+    , publicationMaterialized := false
+    , outputPredicate := none
+    }
+  , { name := "resumed_send"
+    , effectKind := "send_decision"
+    , lifecycle := "resumed"
+    , interfaceName := "Transport"
+    , operationName := "sendDecision"
+    , publicationMaterialized := false
+    , outputPredicate := none
+    }
   ]
 
 def main : IO Unit := do

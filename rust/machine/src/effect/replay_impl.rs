@@ -1,10 +1,12 @@
 // Replay effect handler that replays recorded effect exchanges.
 impl EffectHandler for ReplayEffectHandler<'_> {
     fn handler_identity(&self) -> String {
-        self.peek_handler_identity().unwrap_or_else(|| {
-            self.fallback
-                .map_or_else(|| "replay_handler".to_string(), EffectHandler::handler_identity)
-        })
+        self.peek_handler_identity()
+            .or_else(|| self.recorded_handler_identity())
+            .unwrap_or_else(|| {
+                self.fallback
+                    .map_or_else(|| "replay_handler".to_string(), EffectHandler::handler_identity)
+            })
     }
 
     #[allow(clippy::too_many_lines)]

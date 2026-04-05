@@ -11,11 +11,13 @@ use std::process::Command;
 
 use serde::Deserialize;
 use telltale_machine::durable::WalSyncRequest;
+use telltale_machine::instr::{ImmValue, Instr, InvokeAction};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectRequestBody, EffectResult, SendDecision, SendDecisionInput,
     TopologyPerturbation,
 };
 use telltale_machine::model::output_condition::OutputConditionHint;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::semantic_objects::OutstandingEffectStatus;
 use telltale_machine::{ProtocolMachine, ProtocolMachineConfig};
 use test_support::simple_send_recv_image;
@@ -35,6 +37,22 @@ struct ReducedSemanticEffectFixture {
 struct ReducedSemanticEffectBundle {
     schema_version: String,
     fixtures: Vec<ReducedSemanticEffectFixture>,
+}
+
+fn single_role_end_image(program: Vec<Instr>) -> CodeImage {
+    CodeImage {
+        programs: {
+            let mut programs = std::collections::BTreeMap::new();
+            programs.insert("A".to_string(), program);
+            programs
+        },
+        global_type: telltale_types::GlobalType::End,
+        local_types: {
+            let mut local_types = std::collections::BTreeMap::new();
+            local_types.insert("A".to_string(), telltale_types::LocalTypeR::End);
+            local_types
+        },
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -167,6 +185,172 @@ impl EffectHandler for InternalEffectReplayHandler {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct FailedInvokeHandler;
+
+impl EffectHandler for FailedInvokeHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Unit)
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        labels.first().cloned().map_or_else(
+            || EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            EffectResult::success,
+        )
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        EffectResult::failure(EffectFailure::contract_violation("invoke failed"))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SendThenFaultHandler;
+
+impl EffectHandler for SendThenFaultHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Str(label.to_string()))
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        labels.first().cloned().map_or_else(
+            || EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            EffectResult::success,
+        )
+    }
+
+    fn step(&self, role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        if role == "B" {
+            EffectResult::failure(EffectFailure::contract_violation("late fault"))
+        } else {
+            EffectResult::success(())
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ResumedSendHandler;
+
+impl EffectHandler for ResumedSendHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<telltale_machine::Value> {
+        EffectResult::success(telltale_machine::Value::Unit)
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(
+            input.payload.unwrap_or(telltale_machine::Value::Unit),
+        ))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<telltale_machine::Value>,
+        _payload: &telltale_machine::Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[telltale_machine::Value],
+    ) -> EffectResult<String> {
+        labels.first().cloned().map_or_else(
+            || EffectResult::failure(EffectFailure::invalid_input("no labels")),
+            EffectResult::success,
+        )
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<telltale_machine::Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+        let events = match tick {
+            1 => vec![TopologyPerturbation::Partition {
+                from: "A".to_string(),
+                to: "B".to_string(),
+            }],
+            2 => vec![TopologyPerturbation::Heal {
+                from: "A".to_string(),
+                to: "B".to_string(),
+            }],
+            _ => Vec::new(),
+        };
+        EffectResult::success(events)
+    }
+}
+
 fn semantic_effect_runner_path() -> Option<PathBuf> {
     let crate_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let path = crate_dir
@@ -260,6 +444,64 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
                 )
             });
 
+    let failed_invoke_image = single_role_end_image(vec![
+        Instr::Set {
+            dst: 1,
+            val: ImmValue::Nat(1),
+        },
+        Instr::Invoke {
+            action: InvokeAction::Reg(1),
+        },
+        Instr::Halt,
+    ]);
+    let mut failed_invoke_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    failed_invoke_machine
+        .load_choreography(&failed_invoke_image)
+        .expect("load failed invoke machine");
+    let _ = failed_invoke_machine.run(&FailedInvokeHandler, 32);
+    let failed_invoke = failed_invoke_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(exchange.request.body, EffectRequestBody::InvokeStep { .. })
+                && !exchange.succeeded()
+        })
+        .expect("failed invoke exchange");
+
+    let mut send_then_fault_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    send_then_fault_machine
+        .load_choreography(&simple_send_recv_image("A", "B", "m"))
+        .expect("load send-then-fault machine");
+    let _ = send_then_fault_machine.run(&SendThenFaultHandler, 64);
+    let send_before_fault = send_then_fault_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("send before fault exchange");
+
+    let mut resumed_machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    resumed_machine
+        .load_choreography(&simple_send_recv_image("A", "B", "m"))
+        .expect("load resumed machine");
+    resumed_machine
+        .run(&ResumedSendHandler, 64)
+        .expect("run resumed machine");
+    let resumed_send = resumed_machine
+        .effect_exchanges()
+        .iter()
+        .find(|exchange| {
+            matches!(
+                exchange.request.body,
+                EffectRequestBody::SendDecision { .. }
+            ) && exchange.succeeded()
+        })
+        .expect("resumed send exchange");
+
     let mut fixtures = vec![
         ReducedSemanticEffectFixture {
             name: "blocked_send".to_string(),
@@ -294,6 +536,33 @@ fn machine_fixtures() -> Vec<ReducedSemanticEffectFixture> {
             lifecycle: "succeeded".to_string(),
             interface_name: wal_sync.request.metadata.interface_name.clone(),
             operation_name: wal_sync.request.metadata.operation_name.clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "failed_invoke".to_string(),
+            effect_kind: "invoke_step".to_string(),
+            lifecycle: "failed".to_string(),
+            interface_name: failed_invoke.request.metadata.interface_name.clone(),
+            operation_name: failed_invoke.request.metadata.operation_name.clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "send_before_fault".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "succeeded_then_faulted".to_string(),
+            interface_name: send_before_fault.request.metadata.interface_name.clone(),
+            operation_name: send_before_fault.request.metadata.operation_name.clone(),
+            publication_materialized: false,
+            output_predicate: None,
+        },
+        ReducedSemanticEffectFixture {
+            name: "resumed_send".to_string(),
+            effect_kind: "send_decision".to_string(),
+            lifecycle: "resumed".to_string(),
+            interface_name: resumed_send.request.metadata.interface_name.clone(),
+            operation_name: resumed_send.request.metadata.operation_name.clone(),
             publication_materialized: false,
             output_predicate: None,
         },
