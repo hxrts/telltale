@@ -1,7 +1,8 @@
 //! Typed durability artifacts for agreement journals, evidence outcome caches,
 //! and recovery metadata.
 
-use std::path::Path;
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -69,6 +70,213 @@ pub enum AgreementJournalEntry {
 pub struct AgreementJournalArtifact {
     /// Append-only journal entries in canonical order.
     pub entries: Vec<AgreementJournalEntry>,
+}
+
+impl AgreementJournalEntry {
+    /// Tick at which this journal entry was observed.
+    #[must_use]
+    pub const fn tick(&self) -> u64 {
+        match self {
+            Self::Escalation { tick, .. }
+            | Self::EvidenceProduced { tick, .. }
+            | Self::Finalization { tick, .. }
+            | Self::VisibilityGateCrossing { tick, .. } => *tick,
+        }
+    }
+
+    /// Stable operation id associated with this journal entry.
+    #[must_use]
+    pub fn operation_id(&self) -> &str {
+        match self {
+            Self::Escalation { operation_id, .. }
+            | Self::Finalization { operation_id, .. }
+            | Self::VisibilityGateCrossing { operation_id, .. } => operation_id,
+            Self::EvidenceProduced { evidence, .. } => &evidence.operation_id,
+        }
+    }
+
+    /// Deterministic identity string for testing and replay-oriented analysis.
+    #[must_use]
+    pub fn stable_identity(&self) -> String {
+        match self {
+            Self::Escalation {
+                operation_id,
+                previous_level,
+                new_level,
+                evidence_id,
+                tick,
+            } => format!(
+                "escalation:{operation_id}:{previous_level:?}:{new_level:?}:{}:{tick}",
+                evidence_id.as_deref().unwrap_or("-")
+            ),
+            Self::EvidenceProduced { evidence, tick } => format!(
+                "evidence:{}:{}:{:?}:{tick}",
+                evidence.operation_id, evidence.evidence_id, evidence.level
+            ),
+            Self::Finalization {
+                operation_id,
+                outcome,
+                materialization_proof_id,
+                canonical_handle_id,
+                tick,
+            } => format!(
+                "finalization:{operation_id}:{outcome:?}:{}:{}:{tick}",
+                materialization_proof_id.as_deref().unwrap_or("-"),
+                canonical_handle_id.as_deref().unwrap_or("-")
+            ),
+            Self::VisibilityGateCrossing {
+                operation_id,
+                downstream_coroutine_id,
+                gate_level,
+                tick,
+            } => format!("gate:{operation_id}:{downstream_coroutine_id}:{gate_level:?}:{tick}"),
+        }
+    }
+}
+
+impl AgreementJournalArtifact {
+    /// Return the journal suffix strictly after `tick`.
+    #[must_use]
+    pub fn read_since(&self, tick: u64) -> Vec<AgreementJournalEntry> {
+        self.entries
+            .iter()
+            .filter(|entry| entry.tick() > tick)
+            .cloned()
+            .collect()
+    }
+
+    /// Validate monotonic escalation ordering for each operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an escalation entry regresses agreement level or
+    /// appears out of order for one operation.
+    pub fn validate_monotonic_escalations(&self) -> Result<(), String> {
+        let mut last_levels = BTreeMap::<String, AgreementLevel>::new();
+        for entry in &self.entries {
+            let AgreementJournalEntry::Escalation {
+                operation_id,
+                previous_level,
+                new_level,
+                ..
+            } = entry
+            else {
+                continue;
+            };
+            if new_level.rank() < previous_level.rank() {
+                return Err(format!(
+                    "agreement journal regression for `{operation_id}`: {previous_level:?} -> {new_level:?}"
+                ));
+            }
+            if let Some(last) = last_levels.get(operation_id) {
+                if previous_level.rank() < last.rank() || new_level.rank() < last.rank() {
+                    return Err(format!(
+                        "agreement journal reordered or regressed for `{operation_id}`: last={last:?}, entry={previous_level:?}->{new_level:?}"
+                    ));
+                }
+            }
+            last_levels.insert(operation_id.clone(), *new_level);
+        }
+        Ok(())
+    }
+}
+
+/// Narrow append/query contract for durable agreement journals.
+pub trait AgreementJournal {
+    /// Append one journal entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backend cannot persist the entry or if the
+    /// resulting journal violates monotonic escalation ordering.
+    fn append(&mut self, entry: AgreementJournalEntry) -> Result<(), String>;
+
+    /// Read entries strictly after `tick`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backend cannot load the journal.
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementJournalEntry>, String>;
+
+    /// Load the full journal artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backend cannot load the journal.
+    fn load(&self) -> Result<AgreementJournalArtifact, String>;
+}
+
+/// In-memory agreement journal backend useful for focused tests and
+/// deterministic in-process integrations.
+#[derive(Debug, Clone, Default)]
+pub struct InMemoryAgreementJournal {
+    artifact: AgreementJournalArtifact,
+}
+
+impl InMemoryAgreementJournal {
+    /// Create one empty in-memory agreement journal.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl AgreementJournal for InMemoryAgreementJournal {
+    fn append(&mut self, entry: AgreementJournalEntry) -> Result<(), String> {
+        self.artifact.entries.push(entry);
+        self.artifact.validate_monotonic_escalations()
+    }
+
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementJournalEntry>, String> {
+        Ok(self.artifact.read_since(tick))
+    }
+
+    fn load(&self) -> Result<AgreementJournalArtifact, String> {
+        Ok(self.artifact.clone())
+    }
+}
+
+/// File-backed agreement journal backend for the initial local durability
+/// rollout.
+#[derive(Debug, Clone)]
+pub struct FileAgreementJournal {
+    path: PathBuf,
+}
+
+impl FileAgreementJournal {
+    /// Create one file-backed journal rooted at `path`.
+    #[must_use]
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+
+    fn load_artifact(&self) -> Result<AgreementJournalArtifact, String> {
+        if !self.path.exists() {
+            return Ok(AgreementJournalArtifact::default());
+        }
+        PersistedDurabilityArtifact::from_path(&self.path)?.into_agreement_journal()
+    }
+
+    fn store_artifact(&self, artifact: &AgreementJournalArtifact) -> Result<(), String> {
+        artifact.validate_monotonic_escalations()?;
+        PersistedDurabilityArtifact::agreement_journal(artifact.clone()).write_to_path(&self.path)
+    }
+}
+
+impl AgreementJournal for FileAgreementJournal {
+    fn append(&mut self, entry: AgreementJournalEntry) -> Result<(), String> {
+        let mut artifact = self.load_artifact()?;
+        artifact.entries.push(entry);
+        self.store_artifact(&artifact)
+    }
+
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementJournalEntry>, String> {
+        Ok(self.load_artifact()?.read_since(tick))
+    }
+
+    fn load(&self) -> Result<AgreementJournalArtifact, String> {
+        self.load_artifact()
+    }
 }
 
 /// One persisted effect outcome keyed by semantic evidence id.
@@ -222,5 +430,35 @@ impl PersistedDurabilityArtifact {
                 path.display()
             )
         })
+    }
+
+    /// Borrow the agreement-journal payload when this artifact wraps one.
+    #[must_use]
+    pub fn agreement_journal_artifact(&self) -> Option<&AgreementJournalArtifact> {
+        match &self.payload {
+            PersistedDurabilityPayload::AgreementJournal(journal) => Some(journal),
+            PersistedDurabilityPayload::EvidenceOutcomeCache(_)
+            | PersistedDurabilityPayload::RecoveryMetadata(_) => None,
+        }
+    }
+
+    /// Consume the wrapper into one agreement-journal artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if this persisted artifact is not an agreement-journal
+    /// payload.
+    pub fn into_agreement_journal(self) -> Result<AgreementJournalArtifact, String> {
+        match self.payload {
+            PersistedDurabilityPayload::AgreementJournal(journal) => Ok(journal),
+            PersistedDurabilityPayload::EvidenceOutcomeCache(_) => Err(
+                "persisted durability artifact contains an evidence outcome cache payload, not an agreement journal"
+                    .to_string(),
+            ),
+            PersistedDurabilityPayload::RecoveryMetadata(_) => Err(
+                "persisted durability artifact contains recovery metadata, not an agreement journal"
+                    .to_string(),
+            ),
+        }
     }
 }

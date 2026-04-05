@@ -152,8 +152,9 @@ pub mod model {
     /// Durable execution artifact contracts.
     pub mod durability {
         pub use crate::durable::{
-            AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
-            EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, PersistedDurabilityArtifact,
+            AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry,
+            DurableRecoveryMetadata, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry,
+            FileAgreementJournal, InMemoryAgreementJournal, PersistedDurabilityArtifact,
             PersistedDurabilityPayload, PERSISTED_DURABILITY_SCHEMA_VERSION,
         };
     }
@@ -323,9 +324,10 @@ pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
 pub use durable::{
-    AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
-    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, PersistedDurabilityArtifact,
-    PersistedDurabilityPayload, PERSISTED_DURABILITY_SCHEMA_VERSION,
+    AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
+    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, FileAgreementJournal,
+    InMemoryAgreementJournal, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+    PERSISTED_DURABILITY_SCHEMA_VERSION,
 };
 pub use effect::{
     CorruptionType, EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,

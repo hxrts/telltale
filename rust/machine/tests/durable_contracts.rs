@@ -1,9 +1,9 @@
 //! Focused typed durability contract tests.
 
 use telltale_machine::model::durability::{
-    AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
-    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, PersistedDurabilityArtifact,
-    PersistedDurabilityPayload,
+    AgreementJournal, AgreementJournalArtifact, AgreementJournalEntry, DurableRecoveryMetadata,
+    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, FileAgreementJournal,
+    InMemoryAgreementJournal, PersistedDurabilityArtifact, PersistedDurabilityPayload,
 };
 use telltale_machine::model::effects::EffectOutcome;
 use telltale_machine::model::semantic_objects::{
@@ -11,9 +11,8 @@ use telltale_machine::model::semantic_objects::{
 };
 use tempfile::tempdir;
 
-#[test]
-fn persisted_durability_artifact_round_trips_journal_entries() {
-    let artifact = PersistedDurabilityArtifact::agreement_journal(AgreementJournalArtifact {
+fn sample_journal_artifact() -> AgreementJournalArtifact {
+    AgreementJournalArtifact {
         entries: vec![
             AgreementJournalEntry::EvidenceProduced {
                 evidence: AgreementEvidence {
@@ -49,12 +48,96 @@ fn persisted_durability_artifact_round_trips_journal_entries() {
                 tick: 7,
             },
         ],
-    });
+    }
+}
+
+#[test]
+fn persisted_durability_artifact_round_trips_journal_entries() {
+    let artifact = PersistedDurabilityArtifact::agreement_journal(sample_journal_artifact());
 
     let bytes = artifact.to_cbor().expect("encode durability artifact");
     let decoded =
         PersistedDurabilityArtifact::from_slice(&bytes).expect("decode durability artifact");
     assert_eq!(decoded, artifact);
+}
+
+#[test]
+fn agreement_journal_backends_preserve_order_and_filter_by_tick() {
+    fn exercise_backend(
+        journal: &mut dyn AgreementJournal,
+        expected: &AgreementJournalArtifact,
+    ) -> Result<(), String> {
+        for entry in &expected.entries {
+            journal.append(entry.clone())?;
+        }
+        let loaded = journal.load()?;
+        assert_eq!(loaded.entries, expected.entries);
+        let suffix = journal.read_since(4)?;
+        assert_eq!(suffix, expected.entries[2..].to_vec());
+        Ok(())
+    }
+
+    let expected = sample_journal_artifact();
+    exercise_backend(&mut InMemoryAgreementJournal::new(), &expected)
+        .expect("exercise in-memory journal");
+
+    let dir = tempdir().expect("create temp dir");
+    let path = dir.path().join("journal.cbor");
+    exercise_backend(&mut FileAgreementJournal::new(path), &expected)
+        .expect("exercise file journal");
+}
+
+#[test]
+fn agreement_journal_artifact_validates_monotonic_escalation_order() {
+    let artifact = AgreementJournalArtifact {
+        entries: vec![
+            AgreementJournalEntry::Escalation {
+                operation_id: "op#regress".to_string(),
+                previous_level: AgreementLevel::SoftSafe,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: None,
+                tick: 5,
+            },
+            AgreementJournalEntry::Escalation {
+                operation_id: "op#regress".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: None,
+                tick: 6,
+            },
+        ],
+    };
+
+    let error = artifact
+        .validate_monotonic_escalations()
+        .expect_err("regression should fail validation");
+    assert!(error.contains("regression"));
+}
+
+#[test]
+fn agreement_journal_serialization_is_byte_stable_for_identical_entries() {
+    let first = PersistedDurabilityArtifact::agreement_journal(sample_journal_artifact())
+        .to_cbor()
+        .expect("encode first journal");
+    let second = PersistedDurabilityArtifact::agreement_journal(sample_journal_artifact())
+        .to_cbor()
+        .expect("encode second journal");
+    assert_eq!(first, second);
+
+    let identities: Vec<_> = sample_journal_artifact()
+        .entries
+        .into_iter()
+        .map(|entry| entry.stable_identity())
+        .collect();
+    assert_eq!(
+        identities,
+        vec![
+            "evidence:op#1:evidence#1:SoftSafe:4".to_string(),
+            "escalation:op#1:Provisional:SoftSafe:evidence#1:4".to_string(),
+            "finalization:op#1:Finalized:proof#1:handle#1:6".to_string(),
+            "gate:op#1:coro#9:Finalized:7".to_string()
+        ]
+    );
 }
 
 #[test]
