@@ -436,6 +436,10 @@ impl InteractiveViewerState {
 
     pub fn update_active_branch(&mut self) {
         if self.workspace.graph.active_branch == "root" {
+            self.workspace
+                .graph
+                .command_log
+                .push("cannot update root branch".to_string());
             return;
         }
         let branch_id = self.workspace.graph.active_branch.clone();
@@ -464,6 +468,10 @@ impl InteractiveViewerState {
 
     pub fn delete_active_branch(&mut self) {
         if self.workspace.graph.active_branch == "root" {
+            self.workspace
+                .graph
+                .command_log
+                .push("cannot delete root branch".to_string());
             return;
         }
         let branch_id = self.workspace.graph.active_branch.clone();
