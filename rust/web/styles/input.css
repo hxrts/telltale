@@ -266,11 +266,20 @@ textarea {
 
 .tt-shell {
     display: flex;
-    min-height: 100vh;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.tt-shell__body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
 }
 
 .tt-shell__sidebar {
-    width: 240px;
+    width: 280px;
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     padding: 1rem;
@@ -278,30 +287,28 @@ textarea {
     overflow-y: auto;
 }
 
-.tt-shell__main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-}
-
 .tt-shell__content {
     flex: 1;
     padding: 1.5rem;
     overflow-y: auto;
+    min-width: 0;
 }
 
 .tt-shell__overlay {
-    padding: 0 1.5rem 1.5rem;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
 }
 
 /* Navigation */
 .tt-top-nav {
     display: flex;
+    justify-content: center;
     gap: 0.25rem;
     padding: 0.5rem 1.5rem;
     border-bottom: 1px solid var(--border);
     background: var(--card);
+    flex-shrink: 0;
 }
 
 .tt-nav-btn {

@@ -1146,13 +1146,8 @@ fn InteractiveViewerFrame(
     on_request_mocked_rerun: EventHandler<()>,
     on_request_minimization: EventHandler<()>,
 ) -> Element {
-    rsx! {
-        ViewerFrame {
-            workspace: state.workspace.clone(),
-            active_page: state.active_page,
-            on_navigate,
-        }
-        if matches!(state.active_page, ViewerPage::Graph) {
+    let overlay = match state.active_page {
+        ViewerPage::Graph => rsx! {
             GraphControlsOverlay {
                 state: state.clone(),
                 on_select_projection,
@@ -1164,27 +1159,36 @@ fn InteractiveViewerFrame(
                 on_delete_branch,
                 on_search,
             }
-        }
-        if matches!(state.active_page, ViewerPage::Insight) {
+        },
+        ViewerPage::Insight => rsx! {
             InsightControlsOverlay {
                 state: state.clone(),
                 on_reload_archive,
                 on_add_bookmark,
             }
-        }
-        if matches!(state.active_page, ViewerPage::Sweeps) {
+        },
+        ViewerPage::Sweeps => rsx! {
             SweepControlsOverlay {
                 state: state.clone(),
                 on_filter_sweeps,
                 on_drill_sweep_case,
             }
-        }
-        if matches!(state.active_page, ViewerPage::Effects) {
+        },
+        ViewerPage::Effects => rsx! {
             EffectControlsOverlay {
-                state,
+                state: state.clone(),
                 on_request_mocked_rerun,
                 on_request_minimization,
             }
+        },
+        _ => rsx! {},
+    };
+    rsx! {
+        ViewerFrame {
+            workspace: state.workspace.clone(),
+            active_page: state.active_page,
+            on_navigate,
+            sidebar_overlay: overlay,
         }
     }
 }
@@ -1195,6 +1199,7 @@ pub fn ViewerFrame(
     workspace: ViewerWorkspace,
     active_page: ViewerPage,
     on_navigate: EventHandler<ViewerPage>,
+    sidebar_overlay: Element,
 ) -> Element {
     let publication = ViewerPublicationDiagnostics {
         active_page,
@@ -1210,17 +1215,18 @@ pub fn ViewerFrame(
             class: "tt-shell",
             "data-harness-mode": "{shell_mode}",
             "data-readiness": "{publication.readiness.label()}",
+            TopNav { pages: workspace.pages.clone(), active_page, on_navigate }
             div {
-                class: "tt-shell__sidebar",
-                ScrollArea {
-                    ScrollAreaViewport {
-                        SidebarControls { workspace: workspace.clone(), publication: publication.clone() }
+                class: "tt-shell__body",
+                div {
+                    class: "tt-shell__sidebar",
+                    ScrollArea {
+                        ScrollAreaViewport {
+                            SidebarControls { workspace: workspace.clone(), publication: publication.clone() }
+                            {sidebar_overlay}
+                        }
                     }
                 }
-            }
-            div {
-                class: "tt-shell__main",
-                TopNav { pages: workspace.pages.clone(), active_page, on_navigate }
                 section {
                     class: "tt-shell__content",
                     ScrollArea {
@@ -1250,25 +1256,38 @@ fn SidebarControls(
         .clone()
         .unwrap_or_else(|| "none".to_string());
     rsx! {
-        StatusBadge {
-            tone: publication.status_tone(),
-            label: format!("{} / {} scenarios", publication.artifact_count, publication.scenario_count)
+        div {
+            class: "mb-4",
+            StatusBadge {
+                tone: publication.status_tone(),
+                label: format!("{} artifacts / {} scenarios", publication.artifact_count, publication.scenario_count)
+            }
         }
-        InspectorSection {
-            title: "Selection".to_string(),
+        SidebarSection {
+            title: "Selection",
             children: rsx! {
-                KeyValueLine { label: "Page".to_string(), value: publication.active_page.label().to_string() }
                 KeyValueLine { label: "Artifact".to_string(), value: active_artifact }
             }
         }
-        InspectorSection {
-            title: "Artifacts".to_string(),
+        SidebarSection {
+            title: "Artifacts",
             children: rsx! {
-                for artifact in workspace.report.artifacts.iter().take(5) {
-                    div { class: "tt-list-row", "{artifact.label}" }
+                div {
+                    class: "space-y-0.5",
+                    for artifact in workspace.report.artifacts.iter().take(8) {
+                        SidebarListItem { label: artifact.label.clone(), active: false }
+                    }
                 }
             }
         }
+    }
+}
+
+fn nav_tab_class(is_active: bool) -> &'static str {
+    if is_active {
+        "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-sm bg-accent px-3 text-xs font-sans uppercase leading-none tracking-[0.08em] text-foreground"
+    } else {
+        "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-sm px-3 text-xs font-sans uppercase leading-none tracking-[0.08em] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
     }
 }
 
@@ -1281,14 +1300,26 @@ fn TopNav(
     rsx! {
         nav {
             id: "tt-top-nav",
-            class: "tt-top-nav",
-            for page in pages {
-                button {
-                    class: if page == active_page { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
-                    onclick: move |_| on_navigate.call(page),
-                    "{page.label()}"
+            class: "flex items-center border-b border-border bg-background/95 backdrop-blur px-6 py-2 shrink-0",
+            div {
+                class: "flex items-center gap-3 mr-auto",
+                span {
+                    class: "text-xs font-sans font-bold uppercase tracking-[0.12em] text-foreground",
+                    "TELLTALE"
                 }
             }
+            div {
+                class: "flex items-center justify-center gap-2",
+                for page in pages {
+                    button {
+                        r#type: "button",
+                        class: nav_tab_class(page == active_page),
+                        onclick: move |_| on_navigate.call(page),
+                        "{page.label()}"
+                    }
+                }
+            }
+            div { class: "ml-auto w-24" }
         }
     }
 }
@@ -1728,69 +1759,62 @@ fn GraphControlsOverlay(
     rsx! {
         section {
             class: "tt-shell__overlay",
-            div {
-                class: "tt-page-grid",
-                Panel {
+                SidebarSection {
                     title: "Time Travel",
-                    subtitle: "Deterministic replay stepping",
                     children: rsx! {
-                        Toolbar {
-                            label: "History",
-                            children: rsx! {
-                                button { class: "tt-nav-btn", onclick: move |_| on_step_backward.call(()), "Step -" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_step_forward.call(()), "Step +" }
-                                for step in 0..=max_step {
-                                    button {
-                                        class: if step == state.workspace.graph.active_step { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
-                                        onclick: move |_| on_jump_to_step.call(step),
-                                        "{step}"
-                                    }
+                        div {
+                            class: "flex flex-wrap gap-1",
+                            SidebarButton { label: "Step -", onclick: move |_| on_step_backward.call(()) }
+                            SidebarButton { label: "Step +", onclick: move |_| on_step_forward.call(()) }
+                        }
+                        div {
+                            class: "flex flex-wrap gap-1 mt-1.5",
+                            for step in 0..=max_step {
+                                button {
+                                    r#type: "button",
+                                    class: nav_tab_class(step == state.workspace.graph.active_step),
+                                    onclick: move |_| on_jump_to_step.call(step),
+                                    "{step}"
                                 }
                             }
                         }
                     }
                 }
-                Panel {
-                    title: "Projection Switcher",
-                    subtitle: "Graph views over one authoritative run",
+                SidebarSection {
+                    title: "Projections",
                     children: rsx! {
-                        for (index, projection) in state.workspace.graph.projections.iter().enumerate() {
-                            button {
-                                class: if index == state.workspace.graph.active_projection { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
-                                onclick: move |_| on_select_projection.call(index),
-                                "{projection.kind:?}"
+                        div {
+                            class: "space-y-0.5",
+                            for (index, projection) in state.workspace.graph.projections.iter().enumerate() {
+                                SidebarListItem {
+                                    label: format!("{:?}", projection.kind),
+                                    active: index == state.workspace.graph.active_projection,
+                                }
                             }
                         }
                     }
                 }
-                Panel {
-                    title: "Branch Commands",
-                    subtitle: "Typed branch/scenario patch emission",
+                SidebarSection {
+                    title: "Branches",
                     children: rsx! {
-                        Toolbar {
-                            label: "Branch",
-                            children: rsx! {
-                                button { class: "tt-nav-btn", onclick: move |_| on_fork_branch.call(()), "Fork Here" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_update_branch.call(()), "Update Branch" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_delete_branch.call(()), "Delete Branch" }
-                            }
+                        div {
+                            class: "space-y-1",
+                            SidebarButton { label: "Fork Here", onclick: move |_| on_fork_branch.call(()) }
+                            SidebarButton { label: "Update Branch", onclick: move |_| on_update_branch.call(()) }
+                            SidebarButton { label: "Delete Branch", onclick: move |_| on_delete_branch.call(()) }
                         }
                     }
                 }
-                Panel {
+                SidebarSection {
                     title: "Search",
-                    subtitle: "Node, role, and branch lookup",
                     children: rsx! {
-                        Toolbar {
-                            label: "Lookup",
-                            children: rsx! {
-                                button { class: "tt-nav-btn", onclick: move |_| on_search.call("alpha".to_string()), "Find alpha" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_search.call("branch".to_string()), "Find branch" }
-                            }
+                        div {
+                            class: "space-y-1",
+                            SidebarButton { label: "Find alpha", onclick: move |_| on_search.call("alpha".to_string()) }
+                            SidebarButton { label: "Find branch", onclick: move |_| on_search.call("branch".to_string()) }
                         }
                     }
                 }
-            }
         }
     }
 }
@@ -1805,30 +1829,23 @@ fn InsightControlsOverlay(
     rsx! {
         section {
             class: "tt-shell__overlay",
-            div {
-                class: "tt-page-grid",
-                Panel {
-                    title: "Archive Controls",
-                    subtitle: "Reload exact artifact sets and fork new runs",
+                SidebarSection {
+                    title: "Archive",
                     children: rsx! {
-                        Toolbar {
-                            label: "Archive",
-                            children: rsx! {
-                                button { class: "tt-nav-btn", onclick: move |_| on_reload_archive.call(()), "Reload Archive" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_add_bookmark.call(()), "Bookmark Step" }
-                            }
+                        div {
+                            class: "space-y-1",
+                            SidebarButton { label: "Reload Archive", onclick: move |_| on_reload_archive.call(()) }
+                            SidebarButton { label: "Bookmark Step", onclick: move |_| on_add_bookmark.call(()) }
                         }
                     }
                 }
-                Panel {
+                SidebarSection {
                     title: "Active Branch",
-                    subtitle: "Insight focus",
                     children: rsx! {
                         KeyValueLine { label: "Branch".to_string(), value: state.workspace.graph.active_branch.clone() }
                         KeyValueLine { label: "Step".to_string(), value: state.workspace.graph.active_step.to_string() }
                     }
                 }
-            }
         }
     }
 }
@@ -1850,29 +1867,19 @@ fn SweepControlsOverlay(
     rsx! {
         section {
             class: "tt-shell__overlay",
-            div {
-                class: "tt-page-grid",
-                Panel {
-                    title: "Sweep Controls",
-                    subtitle: "Filter, outliers, and drill-down",
+                SidebarSection {
+                    title: "Sweeps",
                     children: rsx! {
-                        Toolbar {
-                            label: "Sweep",
-                            children: rsx! {
-                                button { class: "tt-nav-btn", onclick: move |_| on_filter_sweeps.call("baseline".to_string()), "Filter baseline" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_filter_sweeps.call(String::new()), "Clear Filter" }
-                                if let Some(case_id) = first_case_id.clone() {
-                                    button {
-                                        class: "tt-nav-btn",
-                                        onclick: move |_| on_drill_sweep_case.call(case_id.clone()),
-                                        "Open {case_id}"
-                                    }
-                                }
+                        div {
+                            class: "space-y-1",
+                            SidebarButton { label: "Filter baseline", onclick: move |_| on_filter_sweeps.call("baseline".to_string()) }
+                            SidebarButton { label: "Clear Filter", onclick: move |_| on_filter_sweeps.call(String::new()) }
+                            if let Some(case_id) = first_case_id.clone() {
+                                SidebarButton { label: "Open case", onclick: move |_| on_drill_sweep_case.call(case_id.clone()) }
                             }
                         }
                     }
                 }
-            }
         }
     }
 }
@@ -1887,30 +1894,23 @@ fn EffectControlsOverlay(
     rsx! {
         section {
             class: "tt-shell__overlay",
-            div {
-                class: "tt-page-grid",
-                Panel {
-                    title: "Effect Commands",
-                    subtitle: "Mocked reruns and witness reduction",
+                SidebarSection {
+                    title: "Effects",
                     children: rsx! {
-                        Toolbar {
-                            label: "Effects",
-                            children: rsx! {
-                                button { class: "tt-nav-btn", onclick: move |_| on_request_mocked_rerun.call(()), "Mock Rerun" }
-                                button { class: "tt-nav-btn", onclick: move |_| on_request_minimization.call(()), "Minimize" }
-                            }
+                        div {
+                            class: "space-y-1",
+                            SidebarButton { label: "Mock Rerun", onclick: move |_| on_request_mocked_rerun.call(()) }
+                            SidebarButton { label: "Minimize", onclick: move |_| on_request_minimization.call(()) }
                         }
                     }
                 }
-                Panel {
+                SidebarSection {
                     title: "Active Target",
-                    subtitle: "Effect scope",
                     children: rsx! {
                         KeyValueLine { label: "Artifact".to_string(), value: state.workspace.effects.effect_trace.artifact_id.clone() }
                         KeyValueLine { label: "Branch".to_string(), value: state.workspace.effects.effect_trace.branch_id.clone() }
                     }
                 }
-            }
         }
     }
 }
@@ -1987,9 +1987,50 @@ fn StatusBadge(tone: &'static str, label: String) -> Element {
 fn KeyValueLine(label: String, value: String) -> Element {
     rsx! {
         div {
-            class: "tt-key-value",
-            span { class: "tt-key-value__label", "{label}" }
-            span { class: "tt-key-value__value", "{value}" }
+            class: "flex justify-between items-baseline py-0.5 text-xs",
+            span { class: "font-sans text-muted-foreground", "{label}" }
+            span { class: "font-mono text-foreground", "{value}" }
+        }
+    }
+}
+
+#[component]
+fn SidebarSection(title: &'static str, children: Element) -> Element {
+    rsx! {
+        section {
+            class: "mb-4",
+            h3 {
+                class: "text-[0.625rem] font-sans font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 pb-1.5 border-b border-border",
+                "{title}"
+            }
+            {children}
+        }
+    }
+}
+
+#[component]
+fn SidebarListItem(label: String, active: bool) -> Element {
+    let class = if active {
+        "rounded-sm bg-accent px-2.5 py-2 min-w-0 overflow-hidden"
+    } else {
+        "rounded-sm px-2.5 py-2 min-w-0 overflow-hidden transition-colors hover:bg-accent/60 cursor-pointer"
+    };
+    rsx! {
+        div {
+            class: "{class}",
+            p { class: "m-0 text-xs text-foreground truncate", "{label}" }
+        }
+    }
+}
+
+#[component]
+fn SidebarButton(label: &'static str, onclick: EventHandler<MouseEvent>) -> Element {
+    rsx! {
+        button {
+            r#type: "button",
+            class: "inline-flex h-7 w-full items-center justify-center whitespace-nowrap rounded-sm border border-border bg-background px-3 text-xs font-sans font-medium leading-none text-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+            onclick: move |event| onclick.call(event),
+            "{label}"
         }
     }
 }
