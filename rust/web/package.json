@@ -2,7 +2,7 @@
   "name": "telltale-web",
   "private": true,
   "devDependencies": {
-    "tailwindcss": "^3.4.17"
+    "tailwindcss": "3.4.17"
   },
   "scripts": {
     "tailwind:watch": "npx tailwindcss -c tailwind.config.cjs -i ./styles/input.css -o ./public/assets/tailwind.css --watch",

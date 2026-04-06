@@ -1,49 +1,630 @@
+/* =============================================================================
+   Font Faces
+   ============================================================================= */
+
+@font-face {
+    font-family: "JetBrains Mono";
+    src: url("/fonts/JetBrainsMono-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "JetBrains Mono";
+    src: url("/fonts/JetBrainsMono-Italic.ttf") format("truetype");
+    font-weight: 400;
+    font-style: italic;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "JetBrains Mono";
+    src: url("/fonts/JetBrainsMono-Medium.ttf") format("truetype");
+    font-weight: 500;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "JetBrains Mono";
+    src: url("/fonts/JetBrainsMono-SemiBold.ttf") format("truetype");
+    font-weight: 600;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Perun";
+    src: url("/fonts/Perun-Regular.ttf") format("truetype");
+    font-weight: 400;
+    font-style: normal;
+    font-display: block;
+}
+
+@font-face {
+    font-family: "Perun";
+    src: url("/fonts/Perun-Italic.ttf") format("truetype");
+    font-weight: 400;
+    font-style: italic;
+    font-display: block;
+}
+
+@font-face {
+    font-family: "Perun";
+    src: url("/fonts/Perun-Medium.ttf") format("truetype");
+    font-weight: 500;
+    font-style: normal;
+    font-display: block;
+}
+
+@font-face {
+    font-family: "Perun";
+    src: url("/fonts/Perun-Bold.ttf") format("truetype");
+    font-weight: 700;
+    font-style: normal;
+    font-display: block;
+}
+
+@font-face {
+    font-family: "Perun";
+    src: url("/fonts/Perun-BoldItalic.ttf") format("truetype");
+    font-weight: 700;
+    font-style: italic;
+    font-display: block;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
-  :root {
-    --font-sans:
-      "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, serif;
-    --font-mono:
-      "JetBrains Mono", "SF Mono", SFMono-Regular, Consolas, "Liberation Mono",
-      Menlo, monospace;
-    --background: oklch(0.96 0.015 85);
-    --foreground: oklch(0.24 0.02 80);
-    --card: oklch(0.99 0.005 90);
-    --border: oklch(0.83 0.02 82);
-    --accent: oklch(0.62 0.12 65);
-    --muted: oklch(0.9 0.015 88);
-    --success: oklch(0.7 0.13 150);
-    --warning: oklch(0.74 0.14 55);
-  }
+    /*
+     * Typography policy (inherited from Aura):
+     * - `--font-sans` (Perun) is the default for interface chrome, headings,
+     *   labels, buttons, and readable copy.
+     * - `--font-mono` (JetBrains Mono) is reserved for identifiers, codes,
+     *   commands, logs, and editable machine-like input.
+     */
+    :root {
+        --font-sans:
+            "Perun", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+            "Helvetica Neue", Arial, sans-serif;
+        --font-mono:
+            "JetBrains Mono", "SF Mono", SFMono-Regular, Consolas,
+            "Liberation Mono", Menlo, monospace;
+        --background: oklch(0.18 0 0);
+        --foreground: oklch(0.97 0 0);
+        --card: oklch(0.18 0 0);
+        --card-foreground: oklch(0.97 0 0);
+        --popover: oklch(0.18 0 0);
+        --popover-foreground: oklch(0.97 0 0);
+        --primary: oklch(0.78 0 0);
+        --primary-foreground: oklch(0.18 0 0);
+        --secondary: oklch(0.3 0 0);
+        --secondary-foreground: oklch(0.97 0 0);
+        --muted: oklch(0.3 0 0);
+        --muted-foreground: oklch(0.68 0 0);
+        --accent: oklch(0.3 0 0);
+        --accent-foreground: oklch(0.97 0 0);
+        --destructive: oklch(0.5 0.18 25);
+        --destructive-foreground: oklch(0.97 0 0);
+        --border: oklch(0.35 0 0);
+        --input: oklch(0.3 0 0);
+        --ring: oklch(0.55 0 0);
+        --radius: 3px;
+        --success: oklch(0.7 0.13 150);
+        --warning: oklch(0.74 0.14 55);
+    }
 
-  * {
-    box-sizing: border-box;
-  }
+    .light {
+        --background: oklch(1 0 0);
+        --foreground: oklch(0.18 0 0);
+        --card: oklch(1 0 0);
+        --card-foreground: oklch(0.18 0 0);
+        --popover: oklch(1 0 0);
+        --popover-foreground: oklch(0.18 0 0);
+        --primary: oklch(0.35 0 0);
+        --primary-foreground: oklch(1 0 0);
+        --secondary: oklch(0.97 0 0);
+        --secondary-foreground: oklch(0.18 0 0);
+        --muted: oklch(0.97 0 0);
+        --muted-foreground: oklch(0.47 0 0);
+        --accent: oklch(0.97 0 0);
+        --accent-foreground: oklch(0.18 0 0);
+        --destructive: oklch(0.5 0.18 25);
+        --destructive-foreground: oklch(1 0 0);
+        --border: oklch(0.9 0 0);
+        --input: oklch(0.9 0 0);
+        --ring: oklch(0.68 0 0);
+    }
 
-  html,
-  body {
-    margin: 0;
-    min-height: 100%;
-    background:
-      radial-gradient(circle at top left, oklch(0.98 0.05 90) 0, transparent 28%),
-      linear-gradient(145deg, oklch(0.95 0.025 88), oklch(0.92 0.03 82));
-    color: var(--foreground);
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground;
+        font-family: var(--font-sans);
+        font-feature-settings:
+            "liga" 0,
+            "calt" 0;
+        font-kerning: normal;
+        text-rendering: optimizeLegibility;
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+
+    html[data-harness-mode="deterministic"] *,
+    html.tt-harness-mode * {
+        animation-duration: 0s !important;
+        animation-delay: 0s !important;
+        transition-duration: 0s !important;
+        transition-delay: 0s !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+@layer utilities {
+    /* Shadcn enter/exit animation keyframes (shared with Aura) */
+    @keyframes tt-enter {
+        from {
+            opacity: var(--tw-enter-opacity, 1);
+            transform: translate3d(
+                    var(--tw-enter-translate-x, 0),
+                    var(--tw-enter-translate-y, 0),
+                    0
+                )
+                scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), 1);
+        }
+    }
+
+    @keyframes tt-exit {
+        to {
+            opacity: var(--tw-exit-opacity, 1);
+            transform: translate3d(
+                    var(--tw-exit-translate-x, 0),
+                    var(--tw-exit-translate-y, 0),
+                    0
+                )
+                scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), 1);
+        }
+    }
+
+    .animate-in {
+        animation: tt-enter 150ms ease-out;
+    }
+
+    .animate-out {
+        animation: tt-exit 150ms ease-in forwards;
+    }
+
+    .fade-in-0 {
+        --tw-enter-opacity: 0;
+    }
+
+    .fade-out-0 {
+        --tw-exit-opacity: 0;
+    }
+
+    .slide-in-from-right-full {
+        --tw-enter-translate-x: 100%;
+    }
+
+    .slide-out-to-right-full {
+        --tw-exit-translate-x: 100%;
+    }
+
+    /* Override default border radius utilities to 3px */
+    .rounded,
+    .rounded-sm,
+    .rounded-md,
+    .rounded-lg,
+    .rounded-xl {
+        border-radius: 3px !important;
+    }
+}
+
+/* Remove bottom border from last list row in panel bodies */
+.tt-panel__body > .tt-list-row:last-child,
+.tt-inspector__body > .tt-list-row:last-child {
+    border-bottom: 0 !important;
+}
+
+/* =============================================================================
+   Typography Rules
+   ============================================================================= */
+
+button {
     font-family: var(--font-sans);
-  }
+    line-height: 1;
+    padding-top: 1px;
+    padding-bottom: 0;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
 
-  html[data-harness-mode="deterministic"] *,
-  html.tt-harness-mode * {
-    animation-duration: 0s !important;
-    animation-delay: 0s !important;
-    transition-duration: 0s !important;
-    transition-delay: 0s !important;
-    scroll-behavior: auto !important;
-  }
+code,
+kbd,
+pre {
+    font-family: var(--font-mono);
+    font-feature-settings:
+        "liga" 1,
+        "calt" 1,
+        "zero" 1,
+        "ss02" 1;
+}
 
-  .tt-shell__overlay {
+input,
+textarea {
+    font-family: var(--font-sans);
+}
+
+/* =============================================================================
+   Telltale Viewer Layout
+   ============================================================================= */
+
+.tt-shell {
+    display: flex;
+    min-height: 100vh;
+}
+
+.tt-shell__sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    padding: 1rem;
+    background: var(--card);
+    overflow-y: auto;
+}
+
+.tt-shell__main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.tt-shell__content {
+    flex: 1;
+    padding: 1.5rem;
+    overflow-y: auto;
+}
+
+.tt-shell__overlay {
     padding: 0 1.5rem 1.5rem;
-  }
+}
+
+/* Navigation */
+.tt-top-nav {
+    display: flex;
+    gap: 0.25rem;
+    padding: 0.5rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+}
+
+.tt-nav-btn {
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--radius);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: color 0.1s, background 0.1s;
+}
+
+.tt-nav-btn:hover {
+    color: var(--foreground);
+    background: var(--secondary);
+}
+
+.tt-nav-btn--active {
+    color: var(--foreground);
+    background: var(--secondary);
+}
+
+/* Page grids */
+.tt-page-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.tt-page-grid--wide {
+    grid-template-columns: 1fr;
+}
+
+/* =============================================================================
+   Panels
+   ============================================================================= */
+
+.tt-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+.tt-panel__header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.tt-panel__title {
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--foreground);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.tt-panel__subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+    margin: 0.125rem 0 0;
+    line-height: 1.3;
+}
+
+.tt-panel__body {
+    padding: 0.75rem 1rem;
+}
+
+/* =============================================================================
+   Cards
+   ============================================================================= */
+
+.tt-card {
+    background: var(--secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 0.625rem 0.75rem;
+    margin-bottom: 0.5rem;
+}
+
+.tt-card:last-child {
+    margin-bottom: 0;
+}
+
+.tt-card__title {
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--foreground);
+    margin: 0;
+    line-height: 1.3;
+}
+
+.tt-card__subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+    margin: 0.125rem 0 0;
+    line-height: 1.3;
+}
+
+.tt-card__body {
+    margin-top: 0.375rem;
+}
+
+.tt-card__metric {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--muted-foreground);
+    padding: 0.0625rem 0;
+    line-height: 1.4;
+}
+
+/* =============================================================================
+   Toolbar
+   ============================================================================= */
+
+.tt-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+}
+
+.tt-toolbar__label {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+}
+
+.tt-toolbar__controls {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+/* =============================================================================
+   Inspector
+   ============================================================================= */
+
+.tt-inspector {
+    margin-top: 0.625rem;
+}
+
+.tt-inspector__title {
+    font-family: var(--font-sans);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 0.375rem;
+    padding-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border);
+}
+
+.tt-inspector__body {
+    padding: 0;
+}
+
+/* =============================================================================
+   Status Badge
+   ============================================================================= */
+
+.tt-badge {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 0.1875rem 0.5rem;
+    border-radius: var(--radius);
+    line-height: 1.3;
+}
+
+.tt-badge--success {
+    background: oklch(0.7 0.13 150 / 0.15);
+    color: oklch(0.75 0.13 150);
+}
+
+.tt-badge--muted {
+    background: var(--secondary);
+    color: var(--muted-foreground);
+}
+
+.tt-badge--warning {
+    background: oklch(0.74 0.14 55 / 0.15);
+    color: oklch(0.78 0.14 55);
+}
+
+/* =============================================================================
+   Key-Value Line
+   ============================================================================= */
+
+.tt-key-value {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.1875rem 0;
+    font-size: 0.75rem;
+}
+
+.tt-key-value__label {
+    font-family: var(--font-sans);
+    color: var(--muted-foreground);
+}
+
+.tt-key-value__value {
+    font-family: var(--font-mono);
+    color: var(--foreground);
+}
+
+/* =============================================================================
+   Lists
+   ============================================================================= */
+
+.tt-list-row {
+    padding: 0.375rem 0;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    color: var(--foreground);
+    cursor: pointer;
+    transition: color 0.1s;
+}
+
+.tt-list-row:hover {
+    color: var(--primary);
+}
+
+.tt-list-row:last-child {
+    border-bottom: none;
+}
+
+.tt-note {
+    font-family: var(--font-sans);
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    padding: 0.25rem 0;
+}
+
+/* =============================================================================
+   Graph
+   ============================================================================= */
+
+.tt-graph-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.tt-graph {
+    width: 100%;
+    height: auto;
+    background: var(--background);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
+
+.tt-graph__edge {
+    stroke: var(--muted-foreground);
+    stroke-width: 1;
+    opacity: 0.5;
+}
+
+.tt-graph__edge-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    fill: var(--muted-foreground);
+}
+
+.tt-graph__node {
+    fill: var(--primary);
+    stroke: var(--border);
+    stroke-width: 1;
+}
+
+.tt-graph__node--active {
+    fill: var(--accent-foreground);
+    stroke: var(--foreground);
+    stroke-width: 1.5;
+}
+
+.tt-graph__node-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    fill: var(--foreground);
+    text-anchor: middle;
+}
+
+/* =============================================================================
+   Scrollbar
+   ============================================================================= */
+
+.tt-shell__content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tt-shell__content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tt-shell__content::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+.tt-shell__sidebar::-webkit-scrollbar {
+    width: 4px;
+}
+
+.tt-shell__sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tt-shell__sidebar::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
 }

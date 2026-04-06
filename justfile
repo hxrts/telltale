@@ -791,7 +791,24 @@ paper:
 paper-clean:
     rm -rf papers/build
 
-# Serve locally with live reload
+# Build viewer tailwind CSS (static copy + runtime asset)
+viewer-css:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd rust/web
+    npm install --prefer-offline 2>/dev/null
+    mkdir -p ./public/assets
+    npx tailwindcss -c tailwind.config.cjs -i ./styles/input.css -o ./styles/tailwind.css --minify
+    cp ./styles/tailwind.css ./public/assets/tailwind.css
+
+# Serve the simulator viewer webapp
+serve-viewer: viewer-css
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd rust/web
+    dx serve
+
+# Serve docs locally with live reload
 serve: summary _gen-assets
     #!/usr/bin/env bash
     trap 'just _clean-assets' EXIT

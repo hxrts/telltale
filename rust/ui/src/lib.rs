@@ -8,6 +8,9 @@
 #![allow(clippy::incompatible_msrv)]
 
 use dioxus::prelude::*;
+use dioxus_shadcn::components::badge::{Badge as ShadBadge, BadgeVariant};
+use dioxus_shadcn::components::card::Card as ShadCard;
+use dioxus_shadcn::components::scroll_area::{ScrollArea, ScrollAreaViewport};
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -1209,19 +1212,27 @@ pub fn ViewerFrame(
             "data-readiness": "{publication.readiness.label()}",
             div {
                 class: "tt-shell__sidebar",
-                SidebarControls { workspace: workspace.clone(), publication: publication.clone() }
+                ScrollArea {
+                    ScrollAreaViewport {
+                        SidebarControls { workspace: workspace.clone(), publication: publication.clone() }
+                    }
+                }
             }
             div {
                 class: "tt-shell__main",
                 TopNav { pages: workspace.pages.clone(), active_page, on_navigate }
                 section {
                     class: "tt-shell__content",
-                    match active_page {
-                        ViewerPage::Overview => rsx! { OverviewPage { workspace: workspace.clone() } },
-                        ViewerPage::Graph => rsx! { GraphPage { workspace: workspace.clone() } },
-                        ViewerPage::Insight => rsx! { InsightPage { workspace: workspace.clone() } },
-                        ViewerPage::Sweeps => rsx! { SweepsPage { workspace: workspace.clone() } },
-                        ViewerPage::Effects => rsx! { EffectsPage { workspace: workspace.clone() } },
+                    ScrollArea {
+                        ScrollAreaViewport {
+                            match active_page {
+                                ViewerPage::Overview => rsx! { OverviewPage { workspace: workspace.clone() } },
+                                ViewerPage::Graph => rsx! { GraphPage { workspace: workspace.clone() } },
+                                ViewerPage::Insight => rsx! { InsightPage { workspace: workspace.clone() } },
+                                ViewerPage::Sweeps => rsx! { SweepsPage { workspace: workspace.clone() } },
+                                ViewerPage::Effects => rsx! { EffectsPage { workspace: workspace.clone() } },
+                            }
+                        }
                     }
                 }
             }
@@ -1918,9 +1929,9 @@ fn EffectControlsOverlay(
 #[component]
 fn Panel(title: String, subtitle: String, children: Element) -> Element {
     rsx! {
-        section {
-            class: "tt-panel",
-            header {
+        ShadCard {
+            class: Some("tt-panel".to_string()),
+            div {
                 class: "tt-panel__header",
                 h2 { class: "tt-panel__title", "{title}" }
                 p { class: "tt-panel__subtitle", "{subtitle}" }
@@ -1933,8 +1944,8 @@ fn Panel(title: String, subtitle: String, children: Element) -> Element {
 #[component]
 fn Card(title: String, subtitle: String, children: Element) -> Element {
     rsx! {
-        article {
-            class: "tt-card",
+        ShadCard {
+            class: Some("tt-card".to_string()),
             h3 { class: "tt-card__title", "{title}" }
             p { class: "tt-card__subtitle", "{subtitle}" }
             div { class: "tt-card__body", {children} }
@@ -1964,10 +1975,22 @@ fn InspectorSection(title: String, children: Element) -> Element {
     }
 }
 
+fn badge_variant(tone: &str) -> BadgeVariant {
+    match tone {
+        "success" => BadgeVariant::Default,
+        "warning" => BadgeVariant::Outline,
+        _ => BadgeVariant::Secondary,
+    }
+}
+
 #[component]
 fn StatusBadge(tone: &'static str, label: String) -> Element {
     rsx! {
-        span { class: "tt-badge tt-badge--{tone}", "{label}" }
+        ShadBadge {
+            variant: badge_variant(tone),
+            class: Some(format!("tt-badge tt-badge--{tone}")),
+            "{label}"
+        }
     }
 }
 
