@@ -293,12 +293,16 @@ pub fn load_workspace_from_service(
     );
     let diagnostics = build_publication_diagnostics(&report, harness_mode, active_artifact);
 
+    let default_projection = projections
+        .iter()
+        .position(|p| p.kind == GraphProjectionKind::ExecutionTimeline)
+        .unwrap_or(0);
     Ok(ViewerWorkspace {
         report,
         graph: ViewerGraphWorkspace {
             layout: deterministic_layout(&projections),
             projections,
-            active_projection: 0,
+            active_projection: default_projection,
             active_branch,
             active_step: 0,
             selected_node: None,
@@ -726,8 +730,10 @@ impl InteractiveViewerState {
     fn projection_step_limit(&self) -> u64 {
         self.workspace
             .graph
-            .active_projection()
-            .and_then(|projection| projection.nodes.iter().filter_map(|node| node.step).max())
+            .projections
+            .iter()
+            .flat_map(|projection| projection.nodes.iter().filter_map(|node| node.step))
+            .max()
             .unwrap_or(0)
     }
 
