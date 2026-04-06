@@ -231,6 +231,12 @@
     border-bottom: 0 !important;
 }
 
+/* Compact vertical padding on shadcn Card slots */
+[data-slot="card"] {
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+}
+
 /* =============================================================================
    Typography Rules
    ============================================================================= */
