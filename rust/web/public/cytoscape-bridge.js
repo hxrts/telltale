@@ -1,14 +1,16 @@
 // Cytoscape.js bridge for the Telltale viewer graph canvas.
 // Called from Rust/WASM via wasm-bindgen JS interop.
 //
-// Color values use the same oklch palette as the Telltale design tokens:
-//   --background:       oklch(0.18 0 0)
-//   --foreground:       oklch(0.97 0 0)
-//   --primary:          oklch(0.78 0 0)
-//   --secondary:        oklch(0.30 0 0)
-//   --muted-foreground: oklch(0.68 0 0)
-//   --border:           oklch(0.35 0 0)
-//   --accent:           oklch(0.30 0 0)
+// Cytoscape renders to <canvas>, not CSS, so oklch() is not supported.
+// Colors are hex equivalents of the app design tokens:
+//   --background:       #2b2b2b
+//   --foreground:       #f5f5f5
+//   --primary:          #bfbfbf
+//   --secondary:        #474747
+//   --muted-foreground: #a3a3a3
+//   --border:           #545454
+//   --accent:           #474747
+//   --ring:             #808080
 
 window.__tt_cytoscape = null;
 
@@ -27,17 +29,19 @@ window.__tt_init_graph = function (containerId) {
         selector: "node",
         style: {
           "label": "data(label)",
-          "background-color": "oklch(0.30 0 0)",
-          "color": "oklch(0.68 0 0)",
+          "background-color": "#474747",
+          "color": "#a3a3a3",
           "text-valign": "bottom",
           "text-halign": "center",
           "font-size": "9px",
           "font-family": "'JetBrains Mono', monospace",
           "text-margin-y": 5,
+          "text-wrap": "ellipsis",
+          "text-max-width": "80px",
           "width": 20,
           "height": 20,
           "border-width": 1,
-          "border-color": "oklch(0.35 0 0)",
+          "border-color": "#545454",
           "transition-property": "background-color, border-color, opacity",
           "transition-duration": "150ms"
         }
@@ -45,19 +49,19 @@ window.__tt_init_graph = function (containerId) {
       {
         selector: "node:selected",
         style: {
-          "background-color": "oklch(0.78 0 0)",
-          "border-color": "oklch(0.55 0 0)",
+          "background-color": "#bfbfbf",
+          "border-color": "#808080",
           "border-width": 2,
-          "color": "oklch(0.97 0 0)"
+          "color": "#f5f5f5"
         }
       },
       {
         selector: "node.active-step",
         style: {
-          "background-color": "oklch(0.78 0 0)",
-          "border-color": "oklch(0.55 0 0)",
+          "background-color": "#bfbfbf",
+          "border-color": "#808080",
           "border-width": 1.5,
-          "color": "oklch(0.97 0 0)"
+          "color": "#f5f5f5"
         }
       },
       {
@@ -70,17 +74,20 @@ window.__tt_init_graph = function (containerId) {
         selector: "edge",
         style: {
           "width": 1,
-          "line-color": "oklch(0.35 0 0)",
-          "target-arrow-color": "oklch(0.35 0 0)",
+          "line-color": "#545454",
+          "target-arrow-color": "#545454",
           "target-arrow-shape": "triangle",
           "arrow-scale": 0.6,
           "curve-style": "bezier",
           "label": "data(label)",
           "font-size": "7px",
           "font-family": "'JetBrains Mono', monospace",
-          "color": "oklch(0.50 0 0)",
+          "color": "#777777",
           "text-rotation": "autorotate",
           "text-margin-y": -6,
+          "text-background-color": "#2b2b2b",
+          "text-background-opacity": 0.8,
+          "text-background-padding": "2px",
           "transition-property": "line-color, opacity",
           "transition-duration": "150ms"
         }
@@ -88,9 +95,10 @@ window.__tt_init_graph = function (containerId) {
       {
         selector: "edge:selected",
         style: {
-          "line-color": "oklch(0.55 0 0)",
-          "target-arrow-color": "oklch(0.55 0 0)",
-          "width": 1.5
+          "line-color": "#808080",
+          "target-arrow-color": "#808080",
+          "width": 1.5,
+          "color": "#a3a3a3"
         }
       },
       {
@@ -100,15 +108,7 @@ window.__tt_init_graph = function (containerId) {
         }
       }
     ],
-    layout: {
-      name: "cose",
-      animate: false,
-      randomize: false,
-      nodeOverlap: 20,
-      idealEdgeLength: 80,
-      nodeRepulsion: 8000,
-      gravity: 0.25
-    },
+    layout: { name: "preset" },
     minZoom: 0.3,
     maxZoom: 3,
     wheelSensitivity: 0.2,
@@ -149,16 +149,21 @@ window.__tt_update_graph = function (nodesJson, edgesJson) {
   }
 
   cy.add(elements);
+
+  // Run force-directed layout with randomized initial positions
   cy.layout({
     name: "cose",
     animate: true,
-    animationDuration: 250,
+    animationDuration: 400,
     animationEasing: "ease-out",
-    randomize: false,
-    nodeOverlap: 20,
-    idealEdgeLength: 80,
-    nodeRepulsion: 8000,
-    gravity: 0.25
+    randomize: true,
+    nodeOverlap: 30,
+    idealEdgeLength: function () { return 100; },
+    nodeRepulsion: function () { return 10000; },
+    gravity: 0.3,
+    numIter: 500,
+    fit: true,
+    padding: 30
   }).run();
 };
 
