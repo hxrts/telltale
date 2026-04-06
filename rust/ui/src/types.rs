@@ -321,6 +321,10 @@ impl InteractiveViewerState {
         self.workspace.diagnostics.active_page = page;
     }
 
+    pub fn select_artifact(&mut self, artifact_id: String) {
+        self.workspace.diagnostics.active_artifact = Some(artifact_id);
+    }
+
     pub fn select_projection(&mut self, index: usize) {
         if index < self.workspace.graph.projections.len() {
             self.workspace.graph.active_projection = index;

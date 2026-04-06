@@ -19,6 +19,11 @@ pub fn TelltaleUiRoot(workspace: ViewerWorkspace) -> Element {
                 next.set_page(page);
                 state.set(next);
             },
+            on_select_artifact: move |artifact_id: String| {
+                let mut next = state();
+                next.select_artifact(artifact_id);
+                state.set(next);
+            },
             on_select_projection: move |index| {
                 let mut next = state();
                 next.select_projection(index);
@@ -98,6 +103,7 @@ pub fn TelltaleUiRoot(workspace: ViewerWorkspace) -> Element {
 pub(crate) fn InteractiveViewerFrame(
     state: InteractiveViewerState,
     on_navigate: EventHandler<ViewerPage>,
+    on_select_artifact: EventHandler<String>,
     on_select_projection: EventHandler<usize>,
     on_step_forward: EventHandler<()>,
     on_step_backward: EventHandler<()>,
@@ -155,6 +161,7 @@ pub(crate) fn InteractiveViewerFrame(
             workspace: state.workspace.clone(),
             active_page: state.active_page,
             on_navigate,
+            on_select_artifact,
             sidebar_overlay: overlay,
         }
     }
@@ -166,6 +173,7 @@ pub fn ViewerFrame(
     workspace: ViewerWorkspace,
     active_page: ViewerPage,
     on_navigate: EventHandler<ViewerPage>,
+    on_select_artifact: EventHandler<String>,
     sidebar_overlay: Element,
 ) -> Element {
     let publication = ViewerPublicationDiagnostics {
@@ -189,7 +197,7 @@ pub fn ViewerFrame(
                     class: "tt-shell__sidebar",
                     ScrollArea {
                         ScrollAreaViewport {
-                            SidebarControls { workspace: workspace.clone(), publication: publication.clone() }
+                            SidebarControls { workspace: workspace.clone(), publication: publication.clone(), on_select_artifact }
                             {sidebar_overlay}
                         }
                     }
@@ -199,7 +207,7 @@ pub fn ViewerFrame(
                     ScrollArea {
                         ScrollAreaViewport {
                             match active_page {
-                                ViewerPage::Overview => rsx! { OverviewPage { workspace: workspace.clone() } },
+                                ViewerPage::Overview => rsx! { OverviewPage { workspace: workspace.clone(), on_select_artifact } },
                                 ViewerPage::Graph => rsx! { GraphPage { workspace: workspace.clone() } },
                                 ViewerPage::Insight => rsx! { InsightPage { workspace: workspace.clone() } },
                                 ViewerPage::Sweeps => rsx! { SweepsPage { workspace: workspace.clone() } },
@@ -217,6 +225,7 @@ pub fn ViewerFrame(
 pub(crate) fn SidebarControls(
     workspace: ViewerWorkspace,
     publication: ViewerPublicationDiagnostics,
+    on_select_artifact: EventHandler<String>,
 ) -> Element {
     let active_artifact = publication
         .active_artifact
@@ -233,7 +242,7 @@ pub(crate) fn SidebarControls(
         SidebarSection {
             title: "Selection",
             children: rsx! {
-                KeyValueLine { label: "Artifact".to_string(), value: active_artifact }
+                KeyValueLine { label: "Artifact".to_string(), value: active_artifact.clone() }
             }
         }
         SidebarSection {
@@ -242,7 +251,16 @@ pub(crate) fn SidebarControls(
                 div {
                     class: "space-y-0.5",
                     for artifact in workspace.report.artifacts.iter().take(8) {
-                        SidebarListItem { label: artifact.label.clone(), active: false }
+                        {
+                            let artifact_id = artifact.artifact_id.clone();
+                            let is_active = Some(&artifact.artifact_id) == publication.active_artifact.as_ref();
+                            rsx! {
+                                div {
+                                    onclick: move |_| on_select_artifact.call(artifact_id.clone()),
+                                    SidebarListItem { label: artifact.label.clone(), active: is_active }
+                                }
+                            }
+                        }
                     }
                 }
             }

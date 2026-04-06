@@ -11,7 +11,7 @@ use telltale_viewer::{
 };
 
 #[component]
-pub(crate) fn OverviewPage(workspace: ViewerWorkspace) -> Element {
+pub(crate) fn OverviewPage(workspace: ViewerWorkspace, on_select_artifact: EventHandler<String>) -> Element {
     let overview_extensions = workspace
         .extensions
         .descriptors
@@ -30,11 +30,20 @@ pub(crate) fn OverviewPage(workspace: ViewerWorkspace) -> Element {
                         EmptyState { message: "No artifacts loaded." }
                     }
                     for artifact in &workspace.report.artifacts {
-                        Card {
-                            title: artifact.label.clone(),
-                            subtitle: format!("{:?}", artifact.kind),
-                            children: rsx! {
-                                KeyValueLine { label: "Kind".to_string(), value: format!("{:?}", artifact.kind) }
+                        {
+                            let artifact_id = artifact.artifact_id.clone();
+                            rsx! {
+                                div {
+                                    class: "cursor-pointer",
+                                    onclick: move |_| on_select_artifact.call(artifact_id.clone()),
+                                    Card {
+                                        title: artifact.label.clone(),
+                                        subtitle: format!("{:?}", artifact.kind),
+                                        children: rsx! {
+                                            KeyValueLine { label: "Kind".to_string(), value: format!("{:?}", artifact.kind) }
+                                        }
+                                    }
+                                }
                             }
                         }
                     }
