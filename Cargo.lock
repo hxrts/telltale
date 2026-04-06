@@ -3863,11 +3863,15 @@ dependencies = [
  "dioxus-shadcn",
  "dioxus-ssr",
  "futures",
+ "js-sys",
  "serde",
+ "serde_json",
  "telltale-machine",
  "telltale-macros",
  "telltale-simulator",
  "telltale-viewer",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
