@@ -1,6 +1,7 @@
 //! Primitive UI components for the Telltale viewer.
 
 use dioxus::prelude::*;
+use dioxus::document::eval;
 use dioxus_shadcn::components::badge::{Badge as ShadBadge, BadgeVariant};
 use dioxus_shadcn::components::card::Card as ShadCard;
 use dioxus_shadcn::components::empty::{Empty, EmptyDescription, EmptyHeader};
@@ -123,21 +124,11 @@ pub(crate) fn nav_tab_class(is_active: bool) -> &'static str {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
 pub(crate) fn call_js(fn_name: &str, args: &[&str]) {
-    use wasm_bindgen::{JsCast, JsValue};
-    if let Some(window) = web_sys::window() {
-        if let Ok(val) = js_sys::Reflect::get(&window, &JsValue::from_str(fn_name)) {
-            if let Ok(func) = val.dyn_into::<js_sys::Function>() {
-                let js_args = js_sys::Array::new();
-                for arg in args {
-                    js_args.push(&JsValue::from_str(arg));
-                }
-                let _ = func.apply(&JsValue::NULL, &js_args);
-            }
-        }
-    }
+    let fn_name_json = serde_json::to_string(fn_name).unwrap_or_else(|_| "\"\"".to_string());
+    let args_json = serde_json::to_string(args).unwrap_or_else(|_| "[]".to_string());
+    let script = format!(
+        "const fnRef = globalThis[{fn_name_json}]; if (typeof fnRef === 'function') {{ fnRef(...{args_json}); }}"
+    );
+    let _ = eval(&script);
 }
-
-#[cfg(not(target_arch = "wasm32"))]
-pub(crate) fn call_js(_fn_name: &str, _args: &[&str]) {}
