@@ -47,8 +47,22 @@ jobs:
         with:
           command: clippy
           args: --workspace --all-targets --all-features -- -D warnings
+      - name: Reclaim disk before tests
+        run: |
+          set -euo pipefail
+          echo "=== Disk before test cleanup ==="
+          df -h /
+          rm -rf target/debug/incremental target/tmp .tmp || true
+          free_kb="$(df --output=avail / | tail -1 | tr -d ' ')"
+          min_free_kb="$((12 * 1024 * 1024))"
+          if [ "$free_kb" -lt "$min_free_kb" ]; then
+            echo "Free space below threshold; running cargo clean"
+            cargo clean
+          fi
+          echo "=== Disk after test cleanup ==="
+          df -h /
       - name: Run tests
-        run: just check-workspace-tests-split
+        run: just test-workspace
 
   wasm:
     name: WASM Build
