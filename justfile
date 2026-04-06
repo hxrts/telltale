@@ -343,6 +343,8 @@ check-arch: check-arch-rust
 check-workspace-tests-split:
     #!/usr/bin/env bash
     set -euo pipefail
+    tmpdir="${TMPDIR:-/tmp}"
+    mkdir -p "$tmpdir"
     packages=(
       telltale
       telltale-types
@@ -361,7 +363,11 @@ check-workspace-tests-split:
     )
     for pkg in "${packages[@]}"; do
       echo "==> cargo test -p ${pkg} --all-targets --all-features"
-      TMPDIR="${TMPDIR:-/tmp}" cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+      if [[ "$pkg" == "telltale-bridge" ]]; then
+        TMPDIR="$tmpdir" CARGO_BUILD_JOBS=1 cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+      else
+        TMPDIR="$tmpdir" cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+      fi
     done
 
 # Lean architecture/style-guide pattern checker
