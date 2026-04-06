@@ -125,10 +125,15 @@ pub(crate) fn pretty_json(raw: &str) -> String {
 
 #[component]
 pub(crate) fn CodeBlock(content: String) -> Element {
+    let escaped = content
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;");
     rsx! {
         pre {
-            class: "font-mono text-[0.6875rem] leading-relaxed text-muted-foreground bg-background rounded-sm px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all",
-            "{content}"
+            class: "font-mono text-[0.6875rem] leading-relaxed text-muted-foreground bg-background rounded-sm px-3 py-2 w-full min-w-0 max-w-full",
+            style: "white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;",
+            dangerous_inner_html: escaped,
         }
     }
 }
