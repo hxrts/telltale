@@ -24,37 +24,10 @@ pub(crate) fn OverviewPage(
         .collect::<Vec<ViewerExtensionDescriptor>>();
     rsx! {
         div {
-            class: "tt-page-grid",
+            class: "tt-page-grid tt-page-grid--wide",
             Panel {
-                title: "Artifact Inventory",
-                subtitle: "Typed query surface summaries",
-                children: rsx! {
-                    if workspace.report.artifacts.is_empty() {
-                        EmptyState { message: "No artifacts loaded." }
-                    }
-                    for artifact in &workspace.report.artifacts {
-                        {
-                            let artifact_id = artifact.artifact_id.clone();
-                            rsx! {
-                                div {
-                                    class: "cursor-pointer",
-                                    onclick: move |_| on_select_artifact.call(artifact_id.clone()),
-                                    Card {
-                                        title: artifact.label.clone(),
-                                        subtitle: format!("{:?}", artifact.kind),
-                                        children: rsx! {
-                                            KeyValueLine { label: "Kind".to_string(), value: format!("{:?}", artifact.kind) }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            Panel {
-                title: "Scenario Summaries",
-                subtitle: "Canonical report model",
+                title: "Scenarios",
+                subtitle: "Loaded simulation results",
                 children: rsx! {
                     if workspace.report.scenario_summaries.is_empty() {
                         EmptyState { message: "No scenarios loaded." }
