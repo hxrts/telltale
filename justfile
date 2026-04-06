@@ -56,9 +56,13 @@ ci-dry-run lane="fast":
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
     fi
+    # Fail fast on doc/index/link drift and other cheap metadata checks before
+    # any broader build/test work.
+    just check-doc-fast-fail
     cargo fmt --all -- --check
-    # Fail fast on the canonical PR-critical verification surface before the broader build/test lanes.
-    just check-pr-critical
+    # Then run the remaining canonical PR-critical verification surface before
+    # the broader build/test lanes.
+    just check-pr-critical-core
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -86,8 +90,28 @@ ci-dry-run lane="fast":
       just check-deep-assurance
     fi
 
+# Canonical doc/metadata fast-fail lane used by CI and local dry runs.
+check-doc-fast-fail:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    just check-doc-links-ci
+    just check-docs-as-contract
+    just check-docs-semantic-drift
+    just check-docs-index
+    just check-verification-inventory
+
 # Canonical PR-critical verification lane used by fast CI and local dry runs.
 check-pr-critical:
+    just check-doc-fast-fail
+    just check-pr-critical-core
+
+# Canonical PR-critical verification lane minus the cheap doc/metadata fast-fail
+# checks, so local wrappers can run those first without duplication.
+check-pr-critical-core:
     #!/usr/bin/env bash
     set -euo pipefail
     tmp_root="${TMPDIR:-/tmp}"
@@ -102,7 +126,6 @@ check-pr-critical:
     just check-parity
     just check-ownership-contracts
     just check-aura-borrowed-lints
-    just check-doc-links-ci
     just check-capability-gates
     just check-release-conformance
     just verify-lean-protocol-machine-targets
@@ -472,10 +495,10 @@ check-aura-borrowed-lints:
     just check-time-domain-boundaries
     just check-style-boundaries
     just check-viewer-tooling-boundaries
-    just check-durable-boundaries
-    just check-durable-assurance
     just check-docs-semantic-drift
     just check-verification-inventory
+    just check-durable-boundaries
+    just check-durable-assurance
     just check-macro-boundaries
 
 # Keep typed durability artifacts on the authoritative machine/runtime side.
