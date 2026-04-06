@@ -11,9 +11,6 @@ pub mod error;
 pub mod service;
 pub mod types;
 
-#[cfg(test)]
-mod tests;
-
 pub use error::ViewerModelError;
 pub use service::{InMemoryViewerService, ViewerApplicationService};
 pub use types::*;

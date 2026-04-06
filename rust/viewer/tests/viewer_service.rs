@@ -1,16 +1,22 @@
-#[cfg(test)]
-mod tests {
-    use super::*;
-        CriticalCapacityPhase, CriticalCapacitySummary, SchedulerBoundMode,
-        SchedulerEnvelopeStatus, SchedulerFairnessRequirement, SchedulerProfileSummary,
-        TheoremProgressSummary,
-    };
-    use telltale_simulator::scenario::{
-        ExecutionRegime, ResolvedExecutionBackend, ResolvedSchedulerPolicy,
-        TheoremAssumptionBundle, TheoremEligibility, TheoremEnvelopeProfile,
-        TheoremSchedulerProfile,
-    };
-    use tempfile::NamedTempFile;
+//! Integration tests for the viewer artifact, query, command, and service surfaces.
+
+use std::collections::BTreeMap;
+use telltale_viewer::*;
+use telltale_simulator::analysis::NormalizedObservability;
+use telltale_simulator::environment::EnvironmentTrace;
+use telltale_simulator::runner::{
+    CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact,
+    ScenarioReplayArtifact, ScenarioResult, ScenarioStats, SchedulerBoundMode,
+    SchedulerEnvelopeStatus, SchedulerFairnessRequirement, SchedulerProfileSummary,
+    TheoremProgressSummary,
+};
+use telltale_simulator::scenario::{
+    ExecutionRegime, ResolvedExecutionBackend, ResolvedSchedulerPolicy, ResolvedTheoremProfile,
+    TheoremAssumptionBundle, TheoremEligibility, TheoremEnvelopeProfile,
+    TheoremSchedulerProfile,
+};
+use telltale_simulator::trace::Trace;
+use tempfile::NamedTempFile;
 
     fn sample_result() -> ScenarioResult {
         ScenarioResult {
@@ -648,4 +654,3 @@ mod tests {
             other => panic!("unexpected extension manifest: {other:?}"),
         }
     }
-}
