@@ -1623,7 +1623,7 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                     KeyValueLine { label: "Patches".to_string(), value: workspace.insights.provenance.patch_count.to_string() }
                     KeyValueLine { label: "Archive".to_string(), value: workspace.insights.archive_status.clone() }
                     for annotation in &workspace.insights.annotations {
-                        div { class: "tt-note", "{annotation.text}" }
+                        p { class: "text-xs text-muted-foreground py-0.5", "{annotation.text}" }
                     }
                 }
             }
@@ -2024,7 +2024,7 @@ fn StatusBadge(tone: &'static str, label: String) -> Element {
     rsx! {
         ShadBadge {
             variant: badge_variant(tone),
-            class: Some(format!("tt-badge tt-badge--{tone}")),
+            class: Some("font-mono text-[0.6875rem]".to_string()),
             "{label}"
         }
     }
