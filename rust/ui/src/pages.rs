@@ -162,7 +162,13 @@ pub(crate) fn GraphPage(workspace: ViewerWorkspace) -> Element {
                         EmptyState { message: "No commands emitted." }
                     }
                     for (index, command) in workspace.graph.command_log.iter().enumerate() {
-                        KeyValueLine { label: format!("#{index}"), value: format!("{command:?}") }
+                        Card {
+                            title: format!("#{index}"),
+                            subtitle: String::new(),
+                            children: rsx! {
+                                CodeBlock { content: pretty_json(command) }
+                            }
+                        }
                     }
                 }
             }
@@ -365,7 +371,13 @@ pub(crate) fn InsightPage(workspace: ViewerWorkspace) -> Element {
                                 .unwrap_or_else(|| "none".to_string())
                         }
                         if let Some(divergence) = &counterexample.divergence {
-                            KeyValueLine { label: divergence.label.clone(), value: format!("{} -> {}", divergence.baseline_detail, divergence.candidate_detail) }
+                            Card {
+                                title: divergence.label.clone(),
+                                subtitle: "baseline -> candidate".to_string(),
+                                children: rsx! {
+                                    CodeBlock { content: format!("{}\n---\n{}", pretty_json(&divergence.baseline_detail), pretty_json(&divergence.candidate_detail)) }
+                                }
+                            }
                         }
                     } else {
                         EmptyState { message: "No counterexample loaded." }
