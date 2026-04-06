@@ -228,13 +228,16 @@ pub(crate) fn SidebarControls(
     on_select_artifact: EventHandler<String>,
 ) -> Element {
     rsx! {
-        p {
-            class: "text-[0.6875rem] font-mono text-muted-foreground mb-4",
-            "{publication.artifact_count} artifacts / {publication.scenario_count} scenarios"
-        }
-        SidebarSection {
-            title: "Artifacts",
-            children: rsx! {
+        section {
+            class: "mb-4",
+            h3 {
+                class: "text-[0.625rem] font-sans font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 pb-1.5 border-b border-border",
+                "ARTIFACTS"
+                span {
+                    class: "font-mono font-normal normal-case tracking-normal ml-2",
+                    "({publication.artifact_count} artifacts / {publication.scenario_count} scenarios)"
+                }
+            }
                 div {
                     class: "space-y-0.5",
                     for artifact in workspace.report.artifacts.iter().take(8) {
@@ -250,7 +253,6 @@ pub(crate) fn SidebarControls(
                         }
                     }
                 }
-            }
         }
     }
 }
