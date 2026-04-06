@@ -48,10 +48,7 @@ jobs:
           command: clippy
           args: --workspace --all-targets --all-features -- -D warnings
       - name: Run tests
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --workspace --all-targets --all-features
+        run: just check-workspace-tests-split
 
   wasm:
     name: WASM Build

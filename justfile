@@ -66,7 +66,7 @@ ci-dry-run lane="fast":
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
-    cargo test --workspace --all-targets --all-features
+    just check-workspace-tests-split
     just check-arch
     just check-telltale-style
     just check-semantic-name-parity
@@ -337,6 +337,32 @@ sim-run-out config output:
 
 # Backward-compatible alias used by CI dry-run pipeline
 check-arch: check-arch-rust
+
+# Run full workspace tests in smaller package groups to keep CI memory pressure
+# lower than one monolithic `cargo test --workspace`.
+check-workspace-tests-split:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    packages=(
+      telltale
+      telltale-types
+      telltale-theory
+      telltale-language
+      telltale-macros
+      telltale-machine
+      telltale-runtime
+      telltale-transport
+      telltale-bridge
+      telltale-simulator
+      telltale-viewer
+      telltale-ui
+      telltale-web
+      telltale-lints
+    )
+    for pkg in "${packages[@]}"; do
+      echo "==> cargo test -p ${pkg} --all-targets --all-features"
+      TMPDIR="${TMPDIR:-/tmp}" cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+    done
 
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
