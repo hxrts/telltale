@@ -2303,15 +2303,3 @@ fn sample_result() -> ScenarioResult {
         },
     }
 }
-::Canonical,
-            scheduler_concurrency: 1,
-            worker_threads: 1,
-            rounds_executed: 3,
-            final_tick: 3,
-            total_obs_events: 0,
-            total_invoked_events: 0,
-            checkpoint_writes: 0,
-            checkpoint_error: None,
-        },
-    }
-}
