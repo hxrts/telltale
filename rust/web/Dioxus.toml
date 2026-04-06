@@ -15,10 +15,10 @@ watch_path = ["src", "../ui/src", "styles", "public"]
 
 [web.resource]
 style = ["./assets/tailwind.css"]
-script = []
+script = ["./cytoscape-bridge.js"]
 
 [web.resource.dev]
-script = []
+script = ["./cytoscape-bridge.js"]
 
 [web.wasm_opt]
 level = "0"

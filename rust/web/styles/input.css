@@ -564,45 +564,23 @@ textarea {
 }
 
 /* =============================================================================
-   Graph
+   Cytoscape Graph
    ============================================================================= */
 
-.tt-graph-shell {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-}
-
-.tt-graph {
+.tt-cytoscape {
     width: 100%;
-    height: auto;
+    height: 480px;
     background: var(--background);
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
 
-.tt-graph__edge {
-    stroke: var(--muted-foreground);
-    stroke-width: 1;
-    opacity: 0.5;
-}
+/* Legacy SVG graph classes kept for non-WASM fallback */
 
-.tt-graph__edge-label {
-    font-family: var(--font-mono);
-    font-size: 8px;
-    fill: var(--muted-foreground);
-}
-
-.tt-graph__node {
-    fill: var(--primary);
-    stroke: var(--border);
-    stroke-width: 1;
-}
-
-.tt-graph__node--active {
-    fill: var(--accent-foreground);
-    stroke: var(--foreground);
-    stroke-width: 1.5;
+.tt-graph-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .tt-graph__node-label {

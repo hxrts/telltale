@@ -1485,59 +1485,63 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+fn call_js(fn_name: &str, args: &[&str]) {
+    use wasm_bindgen::{JsCast, JsValue};
+    if let Some(window) = web_sys::window() {
+        if let Ok(val) = js_sys::Reflect::get(&window, &JsValue::from_str(fn_name)) {
+            if let Ok(func) = val.dyn_into::<js_sys::Function>() {
+                let js_args = js_sys::Array::new();
+                for arg in args {
+                    js_args.push(&JsValue::from_str(arg));
+                }
+                let _ = func.apply(&JsValue::NULL, &js_args);
+            }
+        }
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn call_js(_fn_name: &str, _args: &[&str]) {}
+
 #[component]
 fn GraphCanvas(projection: GraphProjection, active_step: u64, layout: GraphLayoutState) -> Element {
-    let visible_nodes = projection
-        .nodes
-        .iter()
-        .filter(|node| node.step.map_or(true, |step| step <= active_step))
-        .cloned()
-        .collect::<Vec<_>>();
-    let visible_edges = projection
-        .edges
-        .iter()
-        .filter(|edge| edge.step.map_or(true, |step| step <= active_step))
-        .cloned()
-        .collect::<Vec<_>>();
-    let total = usize_to_i32(visible_nodes.len().max(1));
+    let container_id = "tt-cytoscape-container";
+
+    use_effect({
+        let projection = projection.clone();
+        move || {
+            call_js("__tt_init_graph", &[container_id]);
+
+            #[derive(serde::Serialize)]
+            struct JsNode { id: String, label: String, category: String, step: Option<u64> }
+            #[derive(serde::Serialize)]
+            struct JsEdge { from: String, to: String, label: String, step: Option<u64> }
+
+            let nodes: Vec<JsNode> = projection.nodes.iter().map(|n| JsNode {
+                id: n.id.clone(), label: n.label.clone(), category: n.category.clone(), step: n.step,
+            }).collect();
+            let edges: Vec<JsEdge> = projection.edges.iter().map(|e| JsEdge {
+                from: e.from.clone(), to: e.to.clone(), label: e.label.clone(), step: e.step,
+            }).collect();
+
+            let nodes_json = serde_json::to_string(&nodes).unwrap_or_default();
+            let edges_json = serde_json::to_string(&edges).unwrap_or_default();
+            call_js("__tt_update_graph", &[&nodes_json, &edges_json]);
+        }
+    });
+
+    use_effect({
+        let step_str = active_step.to_string();
+        move || {
+            call_js("__tt_filter_graph_step", &[&step_str]);
+        }
+    });
+
     rsx! {
         div {
-            class: "tt-graph-shell",
-            svg {
-                class: "tt-graph",
-                view_box: "0 0 640 320",
-                for (index, edge) in visible_edges.iter().enumerate().map(|(index, edge)| (usize_to_i32(index), edge)) {
-                    line {
-                        key: "{index}",
-                        x1: "{layout.positions.get(&edge.from).map(|point| point.x).unwrap_or(60 + (index * 90) % 520)}",
-                        y1: "{layout.positions.get(&edge.from).map(|point| point.y).unwrap_or(60 + (index * 40) % 180)}",
-                        x2: "{layout.positions.get(&edge.to).map(|point| point.x).unwrap_or(150 + (index * 90) % 520)}",
-                        y2: "{layout.positions.get(&edge.to).map(|point| point.y).unwrap_or(120 + (index * 40) % 180)}",
-                        class: "tt-graph__edge",
-                    }
-                    text {
-                        x: "{100 + (index * 90) % 520}",
-                        y: "{82 + (index * 40) % 180}",
-                        class: "tt-graph__edge-label",
-                        "{edge.label}"
-                    }
-                }
-                for (index, node) in visible_nodes.iter().enumerate().map(|(index, node)| (usize_to_i32(index), node)) {
-                    circle {
-                        key: "{node.id}",
-                        cx: "{layout.positions.get(&node.id).map(|point| point.x).unwrap_or(80 + (index * 520 / total))}",
-                        cy: "{layout.positions.get(&node.id).map(|point| point.y).unwrap_or(110 + ((index % 2) * 90))}",
-                        r: "24",
-                        class: "tt-graph__node"
-                    }
-                    text {
-                        x: "{layout.positions.get(&node.id).map(|point| point.x - 28).unwrap_or(52 + (index * 520 / total))}",
-                        y: "{layout.positions.get(&node.id).map(|point| point.y + 4).unwrap_or(114 + ((index % 2) * 90))}",
-                        class: "tt-graph__node-label",
-                        "{node.label}"
-                    }
-                }
-            }
+            id: "{container_id}",
+            class: "tt-cytoscape",
         }
     }
 }
