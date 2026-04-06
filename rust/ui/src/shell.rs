@@ -227,22 +227,12 @@ pub(crate) fn SidebarControls(
     publication: ViewerPublicationDiagnostics,
     on_select_artifact: EventHandler<String>,
 ) -> Element {
-    let active_artifact = publication
-        .active_artifact
-        .clone()
-        .unwrap_or_else(|| "none".to_string());
     rsx! {
         div {
             class: "mb-4",
             StatusBadge {
                 tone: publication.status_tone(),
                 label: format!("{} artifacts / {} scenarios", publication.artifact_count, publication.scenario_count)
-            }
-        }
-        SidebarSection {
-            title: "Selection",
-            children: rsx! {
-                KeyValueLine { label: "Artifact".to_string(), value: active_artifact.clone() }
             }
         }
         SidebarSection {
