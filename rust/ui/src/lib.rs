@@ -1250,28 +1250,22 @@ fn SidebarControls(
         .clone()
         .unwrap_or_else(|| "none".to_string());
     rsx! {
-        Panel {
-            title: "Viewer",
-            subtitle: "Reusable simulator shell",
+        StatusBadge {
+            tone: publication.status_tone(),
+            label: format!("{} / {} scenarios", publication.artifact_count, publication.scenario_count)
+        }
+        InspectorSection {
+            title: "Selection".to_string(),
             children: rsx! {
-                StatusBadge {
-                    tone: publication.status_tone(),
-                    label: format!("{} / {} scenarios", publication.artifact_count, publication.scenario_count)
-                }
-                InspectorSection {
-                    title: "Selection".to_string(),
-                    children: rsx! {
-                        KeyValueLine { label: "Page".to_string(), value: publication.active_page.label().to_string() }
-                        KeyValueLine { label: "Artifact".to_string(), value: active_artifact }
-                    }
-                }
-                InspectorSection {
-                    title: "Artifacts".to_string(),
-                    children: rsx! {
-                        for artifact in workspace.report.artifacts.iter().take(5) {
-                            div { class: "tt-list-row", "{artifact.label}" }
-                        }
-                    }
+                KeyValueLine { label: "Page".to_string(), value: publication.active_page.label().to_string() }
+                KeyValueLine { label: "Artifact".to_string(), value: active_artifact }
+            }
+        }
+        InspectorSection {
+            title: "Artifacts".to_string(),
+            children: rsx! {
+                for artifact in workspace.report.artifacts.iter().take(5) {
+                    div { class: "tt-list-row", "{artifact.label}" }
                 }
             }
         }
@@ -1288,16 +1282,11 @@ fn TopNav(
         nav {
             id: "tt-top-nav",
             class: "tt-top-nav",
-            Toolbar {
-                label: "Navigation",
-                children: rsx! {
-                    for page in pages {
-                        button {
-                            class: if page == active_page { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
-                            onclick: move |_| on_navigate.call(page),
-                            "{page.label()}"
-                        }
-                    }
+            for page in pages {
+                button {
+                    class: if page == active_page { "tt-nav-btn tt-nav-btn--active" } else { "tt-nav-btn" },
+                    onclick: move |_| on_navigate.call(page),
+                    "{page.label()}"
                 }
             }
         }
@@ -2303,6 +2292,18 @@ fn sample_result() -> ScenarioResult {
             assumption_diagnostics: Vec::new(),
             durable_recovery: None,
             backend: ResolvedExecutionBackend::Canonical,
+            scheduler_concurrency: 1,
+            worker_threads: 1,
+            rounds_executed: 3,
+            final_tick: 3,
+            total_obs_events: 0,
+            total_invoked_events: 0,
+            checkpoint_writes: 0,
+            checkpoint_error: None,
+        },
+    }
+}
+::Canonical,
             scheduler_concurrency: 1,
             worker_threads: 1,
             rounds_executed: 3,
