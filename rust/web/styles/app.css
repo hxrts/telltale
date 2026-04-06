@@ -291,7 +291,7 @@ textarea {
 }
 
 .tt-shell__sidebar {
-    width: 280px;
+    width: 320px;
     flex-shrink: 0;
     border-right: 1px solid var(--border);
     padding: 1rem;
