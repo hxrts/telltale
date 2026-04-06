@@ -28,8 +28,8 @@ window.__tt_init_graph = function (containerId) {
         selector: "node",
         style: {
           "label": "data(label)",
-          "background-color": "#808080",
-          "color": "#c2c2c2",
+          "background-color": "#1a1a1a",
+          "color": "#1a1a1a",
           "text-valign": "bottom",
           "text-halign": "center",
           "font-size": "9px",
@@ -40,7 +40,7 @@ window.__tt_init_graph = function (containerId) {
           "width": 20,
           "height": 20,
           "border-width": 1,
-          "border-color": "#a3a3a3",
+          "border-color": "#1a1a1a",
           "transition-property": "background-color, border-color, opacity",
           "transition-duration": "150ms"
         }
@@ -73,15 +73,15 @@ window.__tt_init_graph = function (containerId) {
         selector: "edge",
         style: {
           "width": 1,
-          "line-color": "#808080",
-          "target-arrow-color": "#808080",
+          "line-color": "#1a1a1a",
+          "target-arrow-color": "#1a1a1a",
           "target-arrow-shape": "triangle",
           "arrow-scale": 0.6,
           "curve-style": "bezier",
           "label": "data(label)",
           "font-size": "7px",
           "font-family": "'JetBrains Mono', monospace",
-          "color": "#a3a3a3",
+          "color": "#1a1a1a",
           "text-rotation": "autorotate",
           "text-margin-y": -6,
           "text-background-color": "#474747",
