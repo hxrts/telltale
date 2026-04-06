@@ -364,7 +364,7 @@ check-workspace-tests-split:
     for pkg in "${packages[@]}"; do
       echo "==> cargo test -p ${pkg} --all-targets --all-features"
       if [[ "$pkg" == "telltale-bridge" ]]; then
-        TMPDIR="$tmpdir" CARGO_BUILD_JOBS=1 cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+        TMPDIR="$tmpdir" CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 cargo test -p "$pkg" --all-targets --all-features -- --nocapture
       else
         TMPDIR="$tmpdir" cargo test -p "$pkg" --all-targets --all-features -- --nocapture
       fi
