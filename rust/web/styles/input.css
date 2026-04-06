@@ -231,10 +231,10 @@
     border-bottom: 0 !important;
 }
 
-/* Compact vertical padding on shadcn Card slots */
+/* Remove default shadcn Card padding so tt-panel controls spacing */
 [data-slot="card"] {
-    padding-top: 0.25rem !important;
-    padding-bottom: 0.25rem !important;
+    padding: 0 !important;
+    gap: 0 !important;
 }
 
 /* =============================================================================
