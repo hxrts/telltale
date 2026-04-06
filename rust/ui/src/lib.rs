@@ -1010,6 +1010,7 @@ impl InteractiveViewerState {
             self.workspace.graph.active_branch = "root".to_string();
             self.workspace.insights.run_diff.candidate_branch = "root".to_string();
         }
+        self.set_page(ViewerPage::Overview);
     }
 
     pub fn request_mocked_rerun(&mut self) {
@@ -1696,8 +1697,19 @@ fn SweepsPage(workspace: ViewerWorkspace) -> Element {
                     KeyValueLine { label: "Sweep".to_string(), value: workspace.sweeps.explorer.sweep_id.clone() }
                     KeyValueLine { label: "Visible cases".to_string(), value: workspace.sweeps.explorer.visible_cases.len().to_string() }
                     KeyValueLine { label: "Outliers".to_string(), value: workspace.sweeps.explorer.outlier_case_ids.len().to_string() }
+                    if let Some(selected) = &workspace.sweeps.selected_case {
+                        KeyValueLine { label: "Selected".to_string(), value: selected.clone() }
+                    }
                     for case in &workspace.sweeps.explorer.visible_cases {
-                        div { class: "tt-note", "{case.case_id} [{case.artifact_id}]" }
+                        Card {
+                            title: case.case_id.clone(),
+                            subtitle: case.artifact_id.clone(),
+                            children: rsx! {
+                                for (key, value) in &case.parameters {
+                                    KeyValueLine { label: key.clone(), value: value.clone() }
+                                }
+                            }
+                        }
                     }
                 }
             }
