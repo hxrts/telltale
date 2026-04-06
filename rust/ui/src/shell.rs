@@ -228,12 +228,9 @@ pub(crate) fn SidebarControls(
     on_select_artifact: EventHandler<String>,
 ) -> Element {
     rsx! {
-        div {
-            class: "mb-4",
-            StatusBadge {
-                tone: publication.status_tone(),
-                label: format!("{} artifacts / {} scenarios", publication.artifact_count, publication.scenario_count)
-            }
+        p {
+            class: "text-[0.6875rem] font-mono text-muted-foreground mb-4",
+            "{publication.artifact_count} artifacts / {publication.scenario_count} scenarios"
         }
         SidebarSection {
             title: "Artifacts",
