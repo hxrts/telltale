@@ -5,9 +5,7 @@ use crate::types::*;
 use serde::Serialize;
 use std::collections::BTreeMap;
 use telltale_macros::authoritative_source;
-use telltale_simulator::analysis::{
-    compare_observability, ObservabilityRelation,
-};
+use telltale_simulator::analysis::{compare_observability, ObservabilityRelation};
 use telltale_simulator::decision::{
     decide_theorem_eligibility, DecisionCounterexample, DecisionKind, DecisionOutcome,
     DecisionReport,
@@ -1279,4 +1277,3 @@ impl ScenarioBundleArtifact {
         roles
     }
 }
-

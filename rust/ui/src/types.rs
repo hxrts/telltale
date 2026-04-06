@@ -617,4 +617,3 @@ impl InteractiveViewerState {
             .push(format!("{command:?}"));
     }
 }
-

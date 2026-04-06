@@ -182,7 +182,11 @@ pub(crate) fn GraphPage(workspace: ViewerWorkspace) -> Element {
 }
 
 #[component]
-pub(crate) fn GraphCanvas(projection: GraphProjection, active_step: u64, layout: GraphLayoutState) -> Element {
+pub(crate) fn GraphCanvas(
+    projection: GraphProjection,
+    active_step: u64,
+    layout: GraphLayoutState,
+) -> Element {
     let container_id = "tt-cytoscape-container";
 
     use_effect({
@@ -191,16 +195,40 @@ pub(crate) fn GraphCanvas(projection: GraphProjection, active_step: u64, layout:
             call_js("__tt_init_graph", &[container_id]);
 
             #[derive(serde::Serialize)]
-            struct JsNode { id: String, label: String, category: String, step: Option<u64> }
+            struct JsNode {
+                id: String,
+                label: String,
+                category: String,
+                step: Option<u64>,
+            }
             #[derive(serde::Serialize)]
-            struct JsEdge { from: String, to: String, label: String, step: Option<u64> }
+            struct JsEdge {
+                from: String,
+                to: String,
+                label: String,
+                step: Option<u64>,
+            }
 
-            let nodes: Vec<JsNode> = projection.nodes.iter().map(|n| JsNode {
-                id: n.id.clone(), label: n.label.clone(), category: n.category.clone(), step: n.step,
-            }).collect();
-            let edges: Vec<JsEdge> = projection.edges.iter().map(|e| JsEdge {
-                from: e.from.clone(), to: e.to.clone(), label: e.label.clone(), step: e.step,
-            }).collect();
+            let nodes: Vec<JsNode> = projection
+                .nodes
+                .iter()
+                .map(|n| JsNode {
+                    id: n.id.clone(),
+                    label: n.label.clone(),
+                    category: n.category.clone(),
+                    step: n.step,
+                })
+                .collect();
+            let edges: Vec<JsEdge> = projection
+                .edges
+                .iter()
+                .map(|e| JsEdge {
+                    from: e.from.clone(),
+                    to: e.to.clone(),
+                    label: e.label.clone(),
+                    step: e.step,
+                })
+                .collect();
 
             let nodes_json = serde_json::to_string(&nodes).unwrap_or_default();
             let edges_json = serde_json::to_string(&edges).unwrap_or_default();

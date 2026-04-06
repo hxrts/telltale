@@ -5,10 +5,10 @@ use std::collections::BTreeMap;
 use telltale_macros::observed_only;
 use telltale_simulator::scenario::{ExecutionRegime, ResolvedExecutionBackend};
 use telltale_viewer::{
-    GraphProjection, GraphProjectionKind, GraphProjectionRequest,
-    SemanticComparisonRequest, SemanticComparisonResult,
-    SweepExplorerRequest, ViewerApplicationService, ViewerExtensionManifest,
-    MinimizationResult, TheoremAwareCounterexample, ViewerModelError, ViewerQuery, ViewerQueryResult, ViewerReport,
+    GraphProjection, GraphProjectionKind, GraphProjectionRequest, MinimizationResult,
+    SemanticComparisonRequest, SemanticComparisonResult, SweepExplorerRequest,
+    TheoremAwareCounterexample, ViewerApplicationService, ViewerExtensionManifest,
+    ViewerModelError, ViewerQuery, ViewerQueryResult, ViewerReport,
 };
 
 #[observed_only]
@@ -403,4 +403,3 @@ fn causality_from_projection(projection: &GraphProjection) -> Vec<CausalityEvent
         })
         .collect()
 }
-

@@ -11,10 +11,7 @@ use telltale_simulator::decision::DecisionReport;
 use telltale_simulator::durability::DurableInspectionReport;
 use telltale_simulator::environment::EnvironmentTrace;
 use telltale_simulator::reconfiguration::ReconfigurationRecord;
-use telltale_simulator::runner::{
-    ScenarioResult,
-    SchedulerComparison,
-};
+use telltale_simulator::runner::{ScenarioResult, SchedulerComparison};
 use telltale_simulator::scenario::{
     ExecutionBackend, ReconfigurationSpec, ResolvedExecutionBackend, ResolvedTheoremProfile,
     Scenario, SchedulerPolicySpec, TheoremProfileSpec,
@@ -973,4 +970,3 @@ pub struct ViewerExtensionDescriptor {
 pub struct ViewerExtensionManifest {
     pub descriptors: Vec<ViewerExtensionDescriptor>,
 }
-

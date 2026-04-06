@@ -11,7 +11,8 @@ fn RenderHarness(page: ViewerPage) -> Element {
         ViewerFrame {
             workspace,
             active_page: page,
-            on_navigate: move |_| {}
+            on_navigate: move |_| {},
+            sidebar_overlay: rsx! {}
         }
     }
 }

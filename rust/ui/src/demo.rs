@@ -3,8 +3,8 @@
 use crate::loading::load_workspace_from_service;
 use crate::types::*;
 use std::collections::BTreeMap;
-use telltale_macros::authoritative_source;
 use telltale_machine::ProtocolMachineSemanticObjects;
+use telltale_macros::authoritative_source;
 use telltale_simulator::analysis::NormalizedObservability;
 use telltale_simulator::contracts::ContractCheckReport;
 use telltale_simulator::decision::{
@@ -26,11 +26,10 @@ use telltale_simulator::scenario::{
 };
 use telltale_simulator::trace::Trace;
 use telltale_viewer::{
-    mocked_rerun_command, ExperimentSuiteCase,
-    ExperimentSuiteDefinition, InMemoryViewerService,
+    mocked_rerun_command, ExperimentSuiteCase, ExperimentSuiteDefinition, InMemoryViewerService,
     RegressionThreshold, ScenarioBundleArtifact, SweepCaseSpec, ViewerApplicationService,
-    ViewerArtifact, ViewerArtifactFile, ViewerCommand,
-    ViewerExtensionDescriptor, ViewerExtensionManifest, ViewerExtensionSlot,
+    ViewerArtifact, ViewerArtifactFile, ViewerCommand, ViewerExtensionDescriptor,
+    ViewerExtensionManifest, ViewerExtensionSlot,
 };
 
 #[authoritative_source("viewer_demo_workspace")]
