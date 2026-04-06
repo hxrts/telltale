@@ -1427,6 +1427,15 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                     projection.kind, workspace.graph.active_branch, workspace.graph.active_step
                 ),
                 children: rsx! {
+                    div {
+                        class: "flex justify-end mb-2",
+                        button {
+                            r#type: "button",
+                            class: "inline-flex h-7 items-center justify-center whitespace-nowrap rounded-sm border border-border bg-background px-3 text-xs font-sans font-medium leading-none text-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
+                            onclick: move |_| call_js("__tt_fit_graph", &[]),
+                            "Re-center"
+                        }
+                    }
                     GraphCanvas {
                         projection: projection.clone(),
                         active_step: workspace.graph.active_step,

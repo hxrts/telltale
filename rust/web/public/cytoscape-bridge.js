@@ -166,6 +166,13 @@ window.__tt_update_graph = function (nodesJson, edgesJson) {
   }).run();
 };
 
+window.__tt_fit_graph = function () {
+  var cy = window.__tt_cytoscape;
+  if (!cy) return;
+  cy.fit(undefined, 30);
+  cy.center();
+};
+
 window.__tt_filter_graph_step = function (maxStepStr) {
   var cy = window.__tt_cytoscape;
   if (!cy) return;
