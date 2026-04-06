@@ -49,9 +49,12 @@ pub(crate) fn GraphControlsOverlay(
                         div {
                             class: "space-y-0.5",
                             for (index, projection) in state.workspace.graph.projections.iter().enumerate() {
-                                SidebarListItem {
-                                    label: format!("{:?}", projection.kind),
-                                    active: index == state.workspace.graph.active_projection,
+                                div {
+                                    onclick: move |_| on_select_projection.call(index),
+                                    SidebarListItem {
+                                        label: format!("{:?}", projection.kind),
+                                        active: index == state.workspace.graph.active_projection,
+                                    }
                                 }
                             }
                         }
