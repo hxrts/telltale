@@ -1300,7 +1300,7 @@ fn TopNav(
     rsx! {
         nav {
             id: "tt-top-nav",
-            class: "flex items-center border-b border-border bg-background/95 backdrop-blur px-6 py-2 shrink-0",
+            class: "flex items-center border-b border-border bg-background/95 backdrop-blur px-6 pt-4 pb-2 shrink-0",
             div {
                 class: "flex items-center gap-3 mr-auto",
                 span {
