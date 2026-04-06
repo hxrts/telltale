@@ -227,7 +227,7 @@
 
 /* Remove default shadcn Card padding so tt-panel controls spacing */
 [data-slot="card"] {
-    padding: 0 !important;
+    padding: 0.375rem !important;
     gap: 0 !important;
 }
 
