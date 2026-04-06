@@ -6,6 +6,13 @@ lean_threads := "3"
 # Default task
 default: book
 
+# Enter the development shell with stale temp variables cleared first.
+develop:
+    env -u TMPDIR -u TMP -u TEMP nix develop
+
+# Run the full workspace test surface using the CI-safe split test lane.
+test-workspace: check-workspace-tests-split
+
 # Run release validation and publish crates.
 # Usage:
 #   just release <version> [dry_run] [skip_ci] [no_tag] [push] [allow_dirty] [no_require_main]
