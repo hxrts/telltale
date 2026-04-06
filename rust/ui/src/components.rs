@@ -1,7 +1,7 @@
 //! Primitive UI components for the Telltale viewer.
 
-use dioxus::prelude::*;
 use dioxus::document::eval;
+use dioxus::prelude::*;
 use dioxus_shadcn::components::badge::{Badge as ShadBadge, BadgeVariant};
 use dioxus_shadcn::components::card::Card as ShadCard;
 use dioxus_shadcn::components::empty::{Empty, EmptyDescription, EmptyHeader};
@@ -112,6 +112,23 @@ pub(crate) fn SidebarButton(label: &'static str, onclick: EventHandler<MouseEven
             class: "inline-flex h-7 w-full items-center justify-center whitespace-nowrap rounded-sm border border-border bg-background px-3 text-xs font-sans font-medium leading-none text-foreground transition-colors hover:bg-accent hover:text-accent-foreground",
             onclick: move |event| onclick.call(event),
             "{label}"
+        }
+    }
+}
+
+/// Format a JSON string with indentation for display.
+pub(crate) fn pretty_json(raw: &str) -> String {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .and_then(|v| serde_json::to_string_pretty(&v))
+        .unwrap_or_else(|_| raw.to_string())
+}
+
+#[component]
+pub(crate) fn CodeBlock(content: String) -> Element {
+    rsx! {
+        pre {
+            class: "font-mono text-[0.6875rem] leading-relaxed text-muted-foreground bg-background rounded-sm px-3 py-2 overflow-x-auto whitespace-pre-wrap break-all",
+            "{content}"
         }
     }
 }

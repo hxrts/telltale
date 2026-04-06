@@ -462,7 +462,13 @@ pub(crate) fn EffectsPage(workspace: ViewerWorkspace) -> Element {
                         EmptyState { message: "No effect trace entries." }
                     }
                     for entry in &workspace.effects.effect_trace.entries {
-                        KeyValueLine { label: format!("Step {}: {}", entry.step, entry.kind), value: entry.detail.clone() }
+                        Card {
+                            title: format!("Step {}: {}", entry.step, entry.kind),
+                            subtitle: String::new(),
+                            children: rsx! {
+                                CodeBlock { content: pretty_json(&entry.detail) }
+                            }
+                        }
                     }
                 }
             }
@@ -474,10 +480,20 @@ pub(crate) fn EffectsPage(workspace: ViewerWorkspace) -> Element {
                         EmptyState { message: "No overrides." }
                     }
                     for override_spec in &workspace.effects.effect_trace.overrides {
-                        KeyValueLine { label: override_spec.operation.clone(), value: format!("{:?}", override_spec.mode) }
+                        Card {
+                            title: override_spec.operation.clone(),
+                            subtitle: format!("{:?}", override_spec.mode),
+                            children: rsx! {}
+                        }
                     }
                     for command in &workspace.effects.mock_command_log {
-                        KeyValueLine { label: "Command".to_string(), value: command.clone() }
+                        Card {
+                            title: "Command".to_string(),
+                            subtitle: String::new(),
+                            children: rsx! {
+                                CodeBlock { content: pretty_json(command) }
+                            }
+                        }
                     }
                 }
             }
