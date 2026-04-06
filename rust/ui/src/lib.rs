@@ -10,7 +10,9 @@
 use dioxus::prelude::*;
 use dioxus_shadcn::components::badge::{Badge as ShadBadge, BadgeVariant};
 use dioxus_shadcn::components::card::Card as ShadCard;
+use dioxus_shadcn::components::empty::{Empty, EmptyDescription, EmptyHeader};
 use dioxus_shadcn::components::scroll_area::{ScrollArea, ScrollAreaViewport};
+use dioxus_shadcn::components::separator::Separator;
 use std::collections::BTreeMap;
 use std::future::Future;
 use std::pin::Pin;
@@ -1347,11 +1349,16 @@ fn OverviewPage(workspace: ViewerWorkspace) -> Element {
                 title: "Artifact Inventory",
                 subtitle: "Typed query surface summaries",
                 children: rsx! {
+                    if workspace.report.artifacts.is_empty() {
+                        EmptyState { message: "No artifacts loaded." }
+                    }
                     for artifact in &workspace.report.artifacts {
                         Card {
                             title: artifact.label.clone(),
                             subtitle: format!("{:?}", artifact.kind),
-                            children: rsx! {}
+                            children: rsx! {
+                                KeyValueLine { label: "Kind".to_string(), value: format!("{:?}", artifact.kind) }
+                            }
                         }
                     }
                 }
@@ -1371,7 +1378,7 @@ fn OverviewPage(workspace: ViewerWorkspace) -> Element {
                     subtitle: "Portable overlay slots for downstream consumers",
                     children: rsx! {
                         for descriptor in overview_extensions {
-                            div { class: "tt-note", "{descriptor.title}: {descriptor.summary}" }
+                            KeyValueLine { label: descriptor.title.clone(), value: descriptor.summary.clone() }
                         }
                     }
                 }
@@ -1387,9 +1394,9 @@ fn ScenarioSummaryCard(scenario: ScenarioBundleSummary) -> Element {
             title: scenario.scenario_name.clone(),
             subtitle: format!("{:?}", scenario.execution_backend),
             children: rsx! {
-                div { class: "tt-card__metric", "Steps sampled: {scenario.total_steps_sampled}" }
-                div { class: "tt-card__metric", "Obs events: {scenario.total_obs_events}" }
-                div { class: "tt-card__metric", "Effect events: {scenario.total_effect_events}" }
+                KeyValueLine { label: "Steps sampled".to_string(), value: scenario.total_steps_sampled.to_string() }
+                KeyValueLine { label: "Obs events".to_string(), value: scenario.total_obs_events.to_string() }
+                KeyValueLine { label: "Effect events".to_string(), value: scenario.total_effect_events.to_string() }
             }
         }
     }
@@ -1442,13 +1449,13 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                         layout: workspace.graph.layout.clone(),
                     }
                     if !workspace.graph.search_query.is_empty() {
-                        InspectorSection {
-                            title: format!("Search: {}", workspace.graph.search_query),
-                            children: rsx! {
-                                for hit in &workspace.graph.search_results {
-                                    div { class: "tt-list-row", "{hit.label} [{hit.detail}]" }
-                                }
-                            }
+                        Separator {}
+                        h3 {
+                            class: "text-[0.625rem] font-sans font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2",
+                            "Search: {workspace.graph.search_query}"
+                        }
+                        for hit in &workspace.graph.search_results {
+                            KeyValueLine { label: hit.label.clone(), value: hit.detail.clone() }
                         }
                     }
                 }
@@ -1462,9 +1469,9 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                             title: format!("{:?}", item.kind),
                             subtitle: format!("{} nodes / {} edges", item.nodes.len(), item.edges.len()),
                             children: rsx! {
-                                div { class: "tt-card__metric", "run: {item.run_id}" }
-                                div { class: "tt-card__metric", "branch: {item.branch_id}" }
-                                div { class: "tt-card__metric", "step cap: {item.nodes.iter().filter_map(|node| node.step).max().unwrap_or(0)}" }
+                                KeyValueLine { label: "Run".to_string(), value: item.run_id.clone() }
+                                KeyValueLine { label: "Branch".to_string(), value: item.branch_id.clone() }
+                                KeyValueLine { label: "Step cap".to_string(), value: item.nodes.iter().filter_map(|node| node.step).max().unwrap_or(0).to_string() }
                             }
                         }
                     }
@@ -1474,8 +1481,11 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                 title: "Command Log",
                 subtitle: "Typed branch commands emitted by the graph workspace",
                 children: rsx! {
-                    for command in &workspace.graph.command_log {
-                        div { class: "tt-list-row", "{command:?}" }
+                    if workspace.graph.command_log.is_empty() {
+                        EmptyState { message: "No commands emitted." }
+                    }
+                    for (index, command) in workspace.graph.command_log.iter().enumerate() {
+                        KeyValueLine { label: format!("#{index}"), value: format!("{command:?}") }
                     }
                 }
             }
@@ -1485,7 +1495,7 @@ fn GraphPage(workspace: ViewerWorkspace) -> Element {
                     subtitle: "Downstream graph annotations and badges",
                     children: rsx! {
                         for descriptor in graph_extensions {
-                            div { class: "tt-note", "{descriptor.title}: {descriptor.summary}" }
+                            KeyValueLine { label: descriptor.title.clone(), value: descriptor.summary.clone() }
                         }
                     }
                 }
@@ -1635,8 +1645,11 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                 title: "Causality",
                 subtitle: "Visible outcome explanation chain",
                 children: rsx! {
+                    if workspace.insights.causality.is_empty() {
+                        EmptyState { message: "No causality events." }
+                    }
                     for event in &workspace.insights.causality {
-                        div { class: "tt-note", "{event.step}: {event.label} [{event.detail}]" }
+                        KeyValueLine { label: format!("Step {}", event.step), value: event.label.clone() }
                     }
                 }
             }
@@ -1644,8 +1657,11 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                 title: "Bookmarks",
                 subtitle: "Pinned branches and historical steps",
                 children: rsx! {
+                    if workspace.insights.bookmarks.is_empty() {
+                        EmptyState { message: "No bookmarks." }
+                    }
                     for bookmark in &workspace.insights.bookmarks {
-                        div { class: "tt-note", "{bookmark.label}" }
+                        KeyValueLine { label: format!("Step {}", bookmark.step), value: bookmark.label.clone() }
                     }
                 }
             }
@@ -1663,10 +1679,10 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                                 .unwrap_or_else(|| "none".to_string())
                         }
                         if let Some(divergence) = &counterexample.divergence {
-                            div { class: "tt-note", "{divergence.label}: {divergence.baseline_detail} -> {divergence.candidate_detail}" }
+                            KeyValueLine { label: divergence.label.clone(), value: format!("{} -> {}", divergence.baseline_detail, divergence.candidate_detail) }
                         }
                     } else {
-                        div { class: "tt-note", "No counterexample loaded." }
+                        EmptyState { message: "No counterexample loaded." }
                     }
                 }
             }
@@ -1678,7 +1694,7 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                         KeyValueLine { label: "Summary".to_string(), value: minimization.summary.clone() }
                         KeyValueLine { label: "Minimized steps".to_string(), value: minimization.minimized_steps.to_string() }
                     } else {
-                        div { class: "tt-note", "No minimization request loaded." }
+                        EmptyState { message: "No minimization request." }
                     }
                 }
             }
@@ -1688,7 +1704,7 @@ fn InsightPage(workspace: ViewerWorkspace) -> Element {
                     subtitle: "Downstream overlays without shell forks",
                     children: rsx! {
                         for descriptor in insight_extensions {
-                            div { class: "tt-note", "{descriptor.title}: {descriptor.summary}" }
+                            KeyValueLine { label: descriptor.title.clone(), value: descriptor.summary.clone() }
                         }
                     }
                 }
@@ -1732,7 +1748,10 @@ fn SweepsPage(workspace: ViewerWorkspace) -> Element {
                 children: rsx! {
                     KeyValueLine { label: "Suite".to_string(), value: workspace.sweeps.suite.definition.suite_id.clone() }
                     for case in &workspace.sweeps.suite.cases {
-                        div { class: "tt-note", "{case.case_id}: {case.threshold_passed}" }
+                        KeyValueLine {
+                            label: case.case_id.clone(),
+                            value: (if case.threshold_passed { "passed" } else { "failed" }).to_string()
+                        }
                     }
                 }
             }
@@ -1752,8 +1771,12 @@ fn EffectsPage(workspace: ViewerWorkspace) -> Element {
                 children: rsx! {
                     KeyValueLine { label: "Artifact".to_string(), value: workspace.effects.effect_trace.artifact_id.clone() }
                     KeyValueLine { label: "Branch".to_string(), value: workspace.effects.effect_trace.branch_id.clone() }
+                    Separator {}
+                    if workspace.effects.effect_trace.entries.is_empty() {
+                        EmptyState { message: "No effect trace entries." }
+                    }
                     for entry in &workspace.effects.effect_trace.entries {
-                        div { class: "tt-note", "{entry.step}: {entry.kind} [{entry.detail}]" }
+                        KeyValueLine { label: format!("Step {}: {}", entry.step, entry.kind), value: entry.detail.clone() }
                     }
                 }
             }
@@ -1761,11 +1784,14 @@ fn EffectsPage(workspace: ViewerWorkspace) -> Element {
                 title: "Effect Overrides",
                 subtitle: "Mocked rerun commands attached to this branch",
                 children: rsx! {
+                    if workspace.effects.effect_trace.overrides.is_empty() && workspace.effects.mock_command_log.is_empty() {
+                        EmptyState { message: "No overrides." }
+                    }
                     for override_spec in &workspace.effects.effect_trace.overrides {
-                        div { class: "tt-note", "{override_spec.operation}: {override_spec.mode:?}" }
+                        KeyValueLine { label: override_spec.operation.clone(), value: format!("{:?}", override_spec.mode) }
                     }
                     for command in &workspace.effects.mock_command_log {
-                        div { class: "tt-note", "{command}" }
+                        KeyValueLine { label: "Command".to_string(), value: command.clone() }
                     }
                 }
             }
@@ -1974,23 +2000,13 @@ fn Card(title: String, subtitle: String, children: Element) -> Element {
 }
 
 #[component]
-fn Toolbar(label: &'static str, children: Element) -> Element {
+fn EmptyState(message: &'static str) -> Element {
     rsx! {
-        div {
-            class: "tt-toolbar",
-            span { class: "tt-toolbar__label", "{label}" }
-            div { class: "tt-toolbar__controls", {children} }
-        }
-    }
-}
-
-#[component]
-fn InspectorSection(title: String, children: Element) -> Element {
-    rsx! {
-        section {
-            class: "tt-inspector",
-            h3 { class: "tt-inspector__title", "{title}" }
-            div { class: "tt-inspector__body", {children} }
+        Empty {
+            class: Some("border-0 bg-transparent py-4".to_string()),
+            EmptyHeader {
+                EmptyDescription { "{message}" }
+            }
         }
     }
 }
