@@ -3,14 +3,13 @@
 //
 // Cytoscape renders to <canvas>, not CSS, so oklch() is not supported.
 // Colors are hex equivalents of the app design tokens:
-//   --background:       #2b2b2b
-//   --foreground:       #f5f5f5
-//   --primary:          #bfbfbf
-//   --secondary:        #474747
-//   --muted-foreground: #a3a3a3
-//   --border:           #545454
-//   --accent:           #474747
-//   --ring:             #808080
+//   --background:       #1a1a1a  (oklch 0.18)
+//   --foreground:       #f5f5f5  (oklch 0.97)
+//   --primary:          #c2c2c2  (oklch 0.78)
+//   --secondary:        #474747  (oklch 0.30)
+//   --muted-foreground: #a3a3a3  (oklch 0.68)
+//   --border:           #545454  (oklch 0.35)
+//   --ring:             #808080  (oklch 0.55)
 
 window.__tt_cytoscape = null;
 
@@ -29,8 +28,8 @@ window.__tt_init_graph = function (containerId) {
         selector: "node",
         style: {
           "label": "data(label)",
-          "background-color": "#474747",
-          "color": "#a3a3a3",
+          "background-color": "#808080",
+          "color": "#c2c2c2",
           "text-valign": "bottom",
           "text-halign": "center",
           "font-size": "9px",
@@ -41,7 +40,7 @@ window.__tt_init_graph = function (containerId) {
           "width": 20,
           "height": 20,
           "border-width": 1,
-          "border-color": "#545454",
+          "border-color": "#a3a3a3",
           "transition-property": "background-color, border-color, opacity",
           "transition-duration": "150ms"
         }
@@ -49,8 +48,8 @@ window.__tt_init_graph = function (containerId) {
       {
         selector: "node:selected",
         style: {
-          "background-color": "#bfbfbf",
-          "border-color": "#808080",
+          "background-color": "#f5f5f5",
+          "border-color": "#c2c2c2",
           "border-width": 2,
           "color": "#f5f5f5"
         }
@@ -58,8 +57,8 @@ window.__tt_init_graph = function (containerId) {
       {
         selector: "node.active-step",
         style: {
-          "background-color": "#bfbfbf",
-          "border-color": "#808080",
+          "background-color": "#f5f5f5",
+          "border-color": "#c2c2c2",
           "border-width": 1.5,
           "color": "#f5f5f5"
         }
@@ -74,18 +73,18 @@ window.__tt_init_graph = function (containerId) {
         selector: "edge",
         style: {
           "width": 1,
-          "line-color": "#545454",
-          "target-arrow-color": "#545454",
+          "line-color": "#808080",
+          "target-arrow-color": "#808080",
           "target-arrow-shape": "triangle",
           "arrow-scale": 0.6,
           "curve-style": "bezier",
           "label": "data(label)",
           "font-size": "7px",
           "font-family": "'JetBrains Mono', monospace",
-          "color": "#777777",
+          "color": "#a3a3a3",
           "text-rotation": "autorotate",
           "text-margin-y": -6,
-          "text-background-color": "#2b2b2b",
+          "text-background-color": "#1a1a1a",
           "text-background-opacity": 0.8,
           "text-background-padding": "2px",
           "transition-property": "line-color, opacity",
@@ -95,10 +94,10 @@ window.__tt_init_graph = function (containerId) {
       {
         selector: "edge:selected",
         style: {
-          "line-color": "#808080",
-          "target-arrow-color": "#808080",
+          "line-color": "#c2c2c2",
+          "target-arrow-color": "#c2c2c2",
           "width": 1.5,
-          "color": "#a3a3a3"
+          "color": "#f5f5f5"
         }
       },
       {
