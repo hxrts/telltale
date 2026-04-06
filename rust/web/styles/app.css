@@ -244,6 +244,18 @@ button {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Suppress browser-native button focus rings. Component-specific focus styles
+   still win because their class selectors are more specific than this base rule. */
+button:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+button:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+}
+
 code,
 kbd,
 pre {

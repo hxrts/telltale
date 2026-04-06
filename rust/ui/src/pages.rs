@@ -11,7 +11,10 @@ use telltale_viewer::{
 };
 
 #[component]
-pub(crate) fn OverviewPage(workspace: ViewerWorkspace, on_select_artifact: EventHandler<String>) -> Element {
+pub(crate) fn OverviewPage(
+    workspace: ViewerWorkspace,
+    on_select_artifact: EventHandler<String>,
+) -> Element {
     let overview_extensions = workspace
         .extensions
         .descriptors
