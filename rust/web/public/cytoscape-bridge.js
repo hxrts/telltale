@@ -84,7 +84,7 @@ window.__tt_init_graph = function (containerId) {
           "color": "#a3a3a3",
           "text-rotation": "autorotate",
           "text-margin-y": -6,
-          "text-background-color": "#1a1a1a",
+          "text-background-color": "#474747",
           "text-background-opacity": 0.8,
           "text-background-padding": "2px",
           "transition-property": "line-color, opacity",

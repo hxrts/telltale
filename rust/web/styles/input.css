@@ -570,7 +570,7 @@ textarea {
 .tt-cytoscape {
     width: 100%;
     height: 480px;
-    background: var(--background);
+    background: var(--secondary);
     border: 1px solid var(--border);
     border-radius: var(--radius);
 }
