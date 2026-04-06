@@ -805,7 +805,7 @@ viewer-css:
     cd rust/web
     npm install --prefer-offline 2>/dev/null
     mkdir -p ./public/assets
-    npx tailwindcss -c tailwind.config.cjs -i ./styles/input.css -o ./styles/tailwind.css --minify
+    npx tailwindcss -c tailwind.config.cjs -i ./styles/app.css -o ./styles/tailwind.css --minify
     cp ./styles/tailwind.css ./public/assets/tailwind.css
 
 # Serve the simulator viewer webapp
