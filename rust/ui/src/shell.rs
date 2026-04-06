@@ -232,11 +232,7 @@ pub(crate) fn SidebarControls(
             class: "mb-4",
             h3 {
                 class: "text-[0.625rem] font-sans font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2 pb-1.5 border-b border-border",
-                "ARTIFACTS"
-                span {
-                    class: "font-mono font-normal normal-case tracking-normal ml-2",
-                    "({publication.artifact_count} artifacts / {publication.scenario_count} scenarios)"
-                }
+                "{publication.artifact_count} ARTIFACTS / {publication.scenario_count} SCENARIOS"
             }
                 div {
                     class: "space-y-0.5",
