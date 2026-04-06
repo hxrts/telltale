@@ -284,13 +284,13 @@ textarea {
     border-right: 1px solid var(--border);
     padding: 1rem;
     background: var(--card);
-    overflow-y: auto;
+    overflow-y: scroll;
 }
 
 .tt-shell__content {
     flex: 1;
     padding: 1.5rem;
-    overflow-y: auto;
+    overflow-y: scroll;
     min-width: 0;
 }
 
