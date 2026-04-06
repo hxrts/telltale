@@ -53,6 +53,9 @@ pub(crate) fn OverviewPage(workspace: ViewerWorkspace, on_select_artifact: Event
                 title: "Scenario Summaries",
                 subtitle: "Canonical report model",
                 children: rsx! {
+                    if workspace.report.scenario_summaries.is_empty() {
+                        EmptyState { message: "No scenarios loaded." }
+                    }
                     for scenario in &workspace.report.scenario_summaries {
                         ScenarioSummaryCard { scenario: scenario.summary.clone() }
                     }
@@ -139,6 +142,9 @@ pub(crate) fn GraphPage(workspace: ViewerWorkspace) -> Element {
                         h3 {
                             class: "text-[0.625rem] font-sans font-semibold uppercase tracking-[0.08em] text-muted-foreground mb-2",
                             "Search: {workspace.graph.search_query}"
+                        }
+                        if workspace.graph.search_results.is_empty() {
+                            EmptyState { message: "No results." }
                         }
                         for hit in &workspace.graph.search_results {
                             KeyValueLine { label: hit.label.clone(), value: hit.detail.clone() }
@@ -311,6 +317,9 @@ pub(crate) fn InsightPage(workspace: ViewerWorkspace) -> Element {
                 title: "Watch Expressions",
                 subtitle: "Pinned semantic facts",
                 children: rsx! {
+                    if workspace.insights.watch_expressions.is_empty() {
+                        EmptyState { message: "No watch expressions." }
+                    }
                     for watch in &workspace.insights.watch_expressions {
                         KeyValueLine { label: watch.label.clone(), value: watch.value.clone() }
                     }
@@ -323,6 +332,9 @@ pub(crate) fn InsightPage(workspace: ViewerWorkspace) -> Element {
                     KeyValueLine { label: "Run".to_string(), value: workspace.insights.provenance.run_id.clone() }
                     KeyValueLine { label: "Patches".to_string(), value: workspace.insights.provenance.patch_count.to_string() }
                     KeyValueLine { label: "Archive".to_string(), value: workspace.insights.archive_status.clone() }
+                    if workspace.insights.annotations.is_empty() {
+                        EmptyState { message: "No annotations." }
+                    }
                     for annotation in &workspace.insights.annotations {
                         p { class: "text-xs text-muted-foreground py-0.5", "{annotation.text}" }
                     }
@@ -436,6 +448,9 @@ pub(crate) fn SweepsPage(workspace: ViewerWorkspace) -> Element {
                     if let Some(selected) = &workspace.sweeps.selected_case {
                         KeyValueLine { label: "Selected".to_string(), value: selected.clone() }
                     }
+                    if workspace.sweeps.explorer.visible_cases.is_empty() {
+                        EmptyState { message: "No visible cases." }
+                    }
                     for case in &workspace.sweeps.explorer.visible_cases {
                         Card {
                             title: case.case_id.clone(),
@@ -454,6 +469,9 @@ pub(crate) fn SweepsPage(workspace: ViewerWorkspace) -> Element {
                 subtitle: "Baseline-vs-candidate regression reporting",
                 children: rsx! {
                     KeyValueLine { label: "Suite".to_string(), value: workspace.sweeps.suite.definition.suite_id.clone() }
+                    if workspace.sweeps.suite.cases.is_empty() {
+                        EmptyState { message: "No suite cases." }
+                    }
                     for case in &workspace.sweeps.suite.cases {
                         KeyValueLine {
                             label: case.case_id.clone(),
