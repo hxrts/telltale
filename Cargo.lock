@@ -1069,9 +1069,9 @@ dependencies = [
 
 [[package]]
 name = "dioxus-fullstack"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5940c870751b6273a23b7c0e16d80039f45604d68d9b86c91e27b09edeabeb9e"
+checksum = "e90a04f9bfbdb42801efbb329f7d0a5be79530a856302a2090cefb2db99185b0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -1194,9 +1194,9 @@ dependencies = [
 
 [[package]]
 name = "dioxus-html"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0715e38cc6537aef5b79d0ddc1f4d7a56c2f4debe46b127eee24d8aa5dafd2d"
+checksum = "6edc3f7b6cc88092fdf0181ee372ed0f8d0ea507c648a6d44abae341b79b1dee"
 dependencies = [
  "async-trait",
  "bytes",
@@ -1399,9 +1399,9 @@ dependencies = [
 
 [[package]]
 name = "dioxus-web"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eac92ef863bc5333440021e8ec3e538a39598c9c960daeaab66ab10ba940b5e0"
+checksum = "2506d4bf5edbefb886105f7126695be048f8b5c12fc8529a71e77764906b054a"
 dependencies = [
  "dioxus-cli-config",
  "dioxus-core",
@@ -1519,9 +1519,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "2.3.0"
+version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
+checksum = "9f1f227452a390804cdb637b74a86990f2a7d7ba4b7d5693aac9b4dd6defd8d6"
 
 [[package]]
 name = "find-msvc-tools"
@@ -2324,9 +2324,9 @@ dependencies = [
 
 [[package]]
 name = "manganis"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "492da8d77990281eabe6ded633e7b0cf805c5cf7a023a99abed8811edc872d6f"
+checksum = "3271e4d23afe07537293d1d44cf4a1793102c35713bdd04a547fa5c0f6eef373"
 dependencies = [
  "const-serialize 0.7.2",
  "const-serialize 0.8.0-alpha.0",
@@ -3631,7 +3631,7 @@ checksum = "591ef38edfb78ca4771ee32cf494cb8771944bee237a9b91fc9c1424ac4b777b"
 
 [[package]]
 name = "telltale"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3668,7 +3668,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-bridge"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -3689,7 +3689,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -3716,7 +3716,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -3741,7 +3741,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "futures",
  "proc-macro2",
@@ -3754,7 +3754,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-runtime"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3797,7 +3797,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-simulator"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "assert_matches",
  "getrandom 0.2.17",
@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "assert_matches",
  "criterion",
@@ -3829,7 +3829,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-transport"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "async-trait",
  "telltale-runtime",
@@ -3842,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -3857,7 +3857,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-ui"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "dioxus",
  "dioxus-document",
@@ -3874,7 +3874,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-viewer"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3887,7 +3887,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-web"
-version = "11.1.0"
+version = "11.2.0"
 dependencies = [
  "dioxus",
  "telltale-ui",
