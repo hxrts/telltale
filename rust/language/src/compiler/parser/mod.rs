@@ -1189,6 +1189,7 @@ pub fn parse_dsl(input: &str) -> std::result::Result<Choreography, ParseError> {
 /// Example of how the macro entry point works.
 #[must_use]
 pub fn choreography_macro(input: TokenStream) -> TokenStream {
+    let source = input.to_string();
     let choreography = match parse_choreography(input) {
         Ok(c) => c,
         Err(e) => return e.to_compile_error(),
@@ -1199,17 +1200,10 @@ pub fn choreography_macro(input: TokenStream) -> TokenStream {
         return syn::Error::new(Span::call_site(), e.to_string()).to_compile_error();
     }
 
-    // Project to local types
-    let mut local_types = Vec::new();
-    for role in &choreography.roles {
-        match super::projection::project(&choreography, role) {
-            Ok(local_type) => local_types.push((role.clone(), local_type)),
-            Err(e) => return syn::Error::new(Span::call_site(), e.to_string()).to_compile_error(),
-        }
+    match crate::generate_protocol_module(&choreography, &source) {
+        Ok(tokens) => tokens,
+        Err(err) => err.to_compile_error(),
     }
-
-    // Generate code with namespace support
-    super::codegen::generate_choreography_code_with_namespacing(&choreography, &local_types)
 }
 
 #[cfg(test)]

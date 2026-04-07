@@ -14,14 +14,14 @@ tell! {
     protocol Adder =
       roles A, B, C
       -- // A and B share their local addends with each other.
-      A -> B : Add(i32)
-      B -> A : Add(i32)
+      A -> B : Add of i32
+      B -> A : Add of i32
       -- // Both addends are delivered to C for computation.
-      A -> C : Add(i32)
-      B -> C : Add(i32)
+      A -> C : Add of i32
+      B -> C : Add of i32
       -- // C sends the resulting sum back to both participants.
-      C -> A : Sum(i32)
-      C -> B : Sum(i32)
+      C -> A : Sum of i32
+      C -> B : Sum of i32
 }
 
 use Adder::sessions::*;

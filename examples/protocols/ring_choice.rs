@@ -28,9 +28,9 @@ tell! {
         choice A at
           -- // Send one value around the ring and continue with the next round.
           | Add =>
-            A -> B : Add(i32)
-            B -> C : Add(i32)
-            C -> A : Add(i32)
+            A -> B : Add of i32
+            B -> C : Add of i32
+            C -> A : Add of i32
             continue ring_loop
           -- // Propagate the stop signal to terminate the ring.
           | Stop =>

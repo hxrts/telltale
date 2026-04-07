@@ -231,7 +231,7 @@ checksum = "c566da967934c6c7ee0458a9773de9b2a685bd2ce26a3b28ddfc740e640182f5"
 dependencies = [
  "az",
  "bytemuck",
- "half",
+ "half 2.7.1",
  "typenum",
 ]
 
@@ -358,6 +358,12 @@ dependencies = [
  "r-efi",
  "wasip2",
 ]
+
+[[package]]
+name = "half"
+version = "1.8.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b43ede17f21864e81be2fa654110bf1e793774238d86ef8555c37e6519c0403"
 
 [[package]]
 name = "half"
@@ -670,6 +676,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_cbor"
+version = "0.11.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2bef2ebfde456fb76bbcf9f59315333decc4fda0b2b44b420243c11e0f5ec1f5"
+dependencies = [
+ "half 1.8.3",
+ "serde",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -785,7 +801,7 @@ dependencies = [
 
 [[package]]
 name = "telltale"
-version = "10.0.0"
+version = "11.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -815,7 +831,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "10.0.0"
+version = "11.2.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -832,12 +848,14 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "10.0.0"
+version = "11.2.0"
 dependencies = [
  "bincode",
  "cfg-if",
  "getrandom 0.2.16",
+ "parking_lot 0.12.5",
  "serde",
+ "serde_cbor",
  "serde_json",
  "serde_yaml",
  "telltale-theory",
@@ -848,7 +866,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "10.0.0"
+version = "11.2.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -858,7 +876,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "10.0.0"
+version = "11.2.0"
 dependencies = [
  "telltale-types",
  "thiserror",
@@ -866,7 +884,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "10.0.0"
+version = "11.2.0"
 dependencies = [
  "blake3",
  "fixed",

@@ -51,22 +51,22 @@ tell! {
     -- // Sender transmits frame 0, then the receiver decides whether to continue.
     protocol AlternatingBit =
       roles S, R
-      S -> R : D0(i32)
+      S -> R : D0 of i32
       choice R at
         -- // Acknowledge frame 0, exchange frame 1, then decide again.
         | Ack0 =>
-          R -> S : Ack(i32)
-          S -> R : D1(i32)
+          R -> S : Ack of i32
+          S -> R : D1 of i32
           choice R at
             -- // Accept the second frame and complete the transfer.
             | Ack1 =>
-              R -> S : Ack(i32)
+              R -> S : Ack of i32
             -- // Reject the second frame while still ending the session cleanly.
             | Nack1 =>
-              R -> S : Nack(i32)
+              R -> S : Nack of i32
         -- // Reject the first frame immediately.
         | Nack0 =>
-          R -> S : Nack(i32)
+          R -> S : Nack of i32
 }
 
 use AlternatingBit::sessions::*;

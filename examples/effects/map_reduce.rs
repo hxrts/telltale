@@ -49,15 +49,15 @@ tell! {
     protocol MapReduce uses CoordinatorPlan, WorkerCompute under Replay =
       roles Coordinator, W1, W2, W3, W4
       -- // Fan-out stage distributes one work item per worker.
-      Coordinator -> W1 : Work(i32)
-      Coordinator -> W2 : Work(i32)
-      Coordinator -> W3 : Work(i32)
-      Coordinator -> W4 : Work(i32)
+      Coordinator -> W1 : Work of i32
+      Coordinator -> W2 : Work of i32
+      Coordinator -> W3 : Work of i32
+      Coordinator -> W4 : Work of i32
       -- // Fan-in stage gathers the computed partial results.
-      W1 -> Coordinator : PartialResult(i32)
-      W2 -> Coordinator : PartialResult(i32)
-      W3 -> Coordinator : PartialResult(i32)
-      W4 -> Coordinator : PartialResult(i32)
+      W1 -> Coordinator : PartialResult of i32
+      W2 -> Coordinator : PartialResult of i32
+      W3 -> Coordinator : PartialResult of i32
+      W4 -> Coordinator : PartialResult of i32
 }
 
 use MapReduce::effects;

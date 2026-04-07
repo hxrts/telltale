@@ -17,6 +17,7 @@ pub mod compiler;
 pub mod effect_spec;
 pub mod extensions;
 pub mod integration;
+mod module_codegen;
 
 pub use ast::{
     AgreementProfileDeclaration, Choreography, Condition, DslAnnotationEntry,
@@ -52,3 +53,4 @@ pub use integration::{
     compile_choreography, compile_choreography_ast, AnnotationScope, CompileArtifactsError,
     CompiledChoreography, ProtocolAnnotationRecord,
 };
+pub use module_codegen::generate_protocol_module;

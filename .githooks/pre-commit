@@ -15,6 +15,15 @@ NC='\033[0m'
 
 echo "Running pre-commit checks..."
 
+if [[ -n "${TMPDIR:-}" && ! -d "$TMPDIR" ]]; then
+    export TMPDIR=/tmp
+fi
+
+workspace_package_names() {
+    cargo metadata --no-deps --format-version 1 2>/dev/null |
+        python -c 'import json,sys; data=json.load(sys.stdin); [print(pkg["name"]) for pkg in data.get("packages", [])]'
+}
+
 # 0. Prevent committing gitignored files
 echo -n "Checking for gitignored files... "
 ignored_staged=$(git diff --cached --name-only --diff-filter=d | while read -r file; do
@@ -66,32 +75,49 @@ staged_rs=$(git diff --cached --name-only --diff-filter=d | grep '\.rs$' || true
 if [[ -z "$staged_rs" ]]; then
     echo -e "${GREEN}OK${NC} (no Rust files staged)"
 else
-    # Derive affected crate names so cargo fmt picks up the right edition
-    fmt_crates=""
+    workspace_packages="$(workspace_package_names)"
+    fmt_targets=()
     seen_fmt=""
     while IFS= read -r rs_file; do
+        [[ -z "$rs_file" ]] && continue
         crate_dir="$rs_file"
         while [[ "$crate_dir" != "." ]]; do
             crate_dir="$(dirname "$crate_dir")"
             if [[ -f "$crate_dir/Cargo.toml" ]]; then
                 crate_name=$(grep -m1 '^name' "$crate_dir/Cargo.toml" | sed 's/.*= *"//;s/".*//')
-                if [[ -n "$crate_name" && ! " $seen_fmt " =~ " $crate_name " ]]; then
-                    fmt_crates="$fmt_crates -p $crate_name"
-                    seen_fmt="$seen_fmt $crate_name"
+                target_key="$crate_dir/Cargo.toml"
+                if [[ -n "$crate_name" && "\n$workspace_packages\n" == *$'\n'"$crate_name"$'\n'* ]]; then
+                    target_key="workspace:$crate_name"
+                    target_cmd=(cargo fmt -p "$crate_name" -- --check)
+                else
+                    target_cmd=(cargo fmt --manifest-path "$crate_dir/Cargo.toml" -- --check)
+                fi
+                if [[ ! " $seen_fmt " =~ " $target_key " ]]; then
+                    fmt_targets+=("${target_cmd[*]}")
+                    seen_fmt="$seen_fmt $target_key"
                 fi
                 break
             fi
         done
     done <<< "$staged_rs"
 
-    if [[ -z "$fmt_crates" ]]; then
+    if [[ ${#fmt_targets[@]} -eq 0 ]]; then
         echo -e "${GREEN}OK${NC} (no crates affected)"
-    elif eval cargo fmt $fmt_crates -- --check 2>/dev/null; then
-        echo -e "${GREEN}OK${NC}"
     else
-        echo -e "${RED}FAILED${NC}"
-        echo "Run 'cargo fmt --all' to fix formatting"
-        exit 1
+        fmt_failed=0
+        for fmt_cmd in "${fmt_targets[@]}"; do
+            if ! eval "$fmt_cmd" >/dev/null 2>&1; then
+                fmt_failed=1
+                break
+            fi
+        done
+        if [[ $fmt_failed -eq 0 ]]; then
+            echo -e "${GREEN}OK${NC}"
+        else
+            echo -e "${RED}FAILED${NC}"
+            echo "Run 'cargo fmt --all' to fix formatting"
+            exit 1
+        fi
     fi
 fi
 
@@ -100,31 +126,48 @@ echo -n "Checking compilation... "
 if [[ -z "$staged_rs" ]]; then
     echo -e "${GREEN}OK${NC} (no Rust files staged)"
 else
-    # Derive the set of crates that contain staged .rs files
-    check_args=()
+    workspace_packages="$(workspace_package_names)"
+    check_targets=()
     seen_crates=""
     while IFS= read -r rs_file; do
+        [[ -z "$rs_file" ]] && continue
         crate_dir="$rs_file"
         while [[ "$crate_dir" != "." ]]; do
             crate_dir="$(dirname "$crate_dir")"
             if [[ -f "$crate_dir/Cargo.toml" ]]; then
                 crate_name=$(grep -m1 '^name' "$crate_dir/Cargo.toml" | sed 's/.*= *"//;s/".*//')
-                if [[ -n "$crate_name" && ! " $seen_crates " =~ " $crate_name " ]]; then
-                    check_args+=(-p "$crate_name")
-                    seen_crates="$seen_crates $crate_name"
+                target_key="$crate_dir/Cargo.toml"
+                if [[ -n "$crate_name" && "\n$workspace_packages\n" == *$'\n'"$crate_name"$'\n'* ]]; then
+                    target_key="workspace:$crate_name"
+                    target_cmd=(cargo check -p "$crate_name" --all-targets --all-features)
+                else
+                    target_cmd=(cargo check --manifest-path "$crate_dir/Cargo.toml" --all-targets --all-features)
+                fi
+                if [[ ! " $seen_crates " =~ " $target_key " ]]; then
+                    check_targets+=("${target_cmd[*]}")
+                    seen_crates="$seen_crates $target_key"
                 fi
                 break
             fi
         done
     done <<< "$staged_rs"
 
-    if [[ ${#check_args[@]} -eq 0 ]]; then
+    if [[ ${#check_targets[@]} -eq 0 ]]; then
         echo -e "${GREEN}OK${NC} (no crates affected)"
-    elif cargo check "${check_args[@]}" --all-targets --all-features 2>/dev/null; then
-        echo -e "${GREEN}OK${NC}"
     else
-        echo -e "${RED}FAILED${NC}"
-        exit 1
+        check_failed=0
+        for check_cmd in "${check_targets[@]}"; do
+            if ! eval "$check_cmd" >/dev/null 2>&1; then
+                check_failed=1
+                break
+            fi
+        done
+        if [[ $check_failed -eq 0 ]]; then
+            echo -e "${GREEN}OK${NC}"
+        else
+            echo -e "${RED}FAILED${NC}"
+            exit 1
+        fi
     fi
 fi
 
