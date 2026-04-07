@@ -29,7 +29,8 @@ fn shell_renders_sidebar_nav_and_summary_cards() {
     let html = render_page(ViewerPage::Overview);
     assert!(html.contains("tt-app-shell"));
     assert!(html.contains("tt-top-nav"));
-    assert!(html.contains("Artifact Inventory"));
+    assert!(html.contains("Scenarios"));
+    assert!(html.contains("Loaded simulation results"));
     assert!(html.contains("demo_mesh"));
     assert!(html.contains("Downstream Extensions"));
 }
