@@ -7,7 +7,7 @@ For most application code using the compile-time DSL, start with the facade crat
 
 ```toml
 [dependencies]
-telltale = "11.1.0"
+telltale = "11.2.0"
 ```
 
 This gives you the root session-type surface and the `tell!` macro.
@@ -102,7 +102,7 @@ The root crate keeps its default surface small.
 ### Minimal Root Dependency
 
 ```toml
-telltale = { version = "11.1.0", default-features = false }
+telltale = { version = "11.2.0", default-features = false }
 ```
 
 This keeps the dependency surface small while preserving the core facade crate.
@@ -110,7 +110,7 @@ This keeps the dependency surface small while preserving the core facade crate.
 ### Root Crate With Theory Support
 
 ```toml
-telltale = { version = "11.1.0", features = ["theory"] }
+telltale = { version = "11.2.0", features = ["theory"] }
 ```
 
 This adds the theory re-exports to the facade crate.
@@ -118,7 +118,7 @@ This adds the theory re-exports to the facade crate.
 ### Runtime CLI Tooling
 
 ```toml
-telltale-runtime = { version = "11.1.0", features = ["native-cli"] }
+telltale-runtime = { version = "11.2.0", features = ["native-cli"] }
 ```
 
 Enable this when you want binaries such as `choreo-fmt` or `effect-scaffold`.
