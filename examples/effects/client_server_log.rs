@@ -44,7 +44,7 @@ tell! {
     -- // Client submits one request and the server decides the outcome.
     protocol ClientServerLog uses ServerRuntime, Audit under Replay =
       roles C, S, L
-      C -> S : Request(i32)
+      C -> S : Request of i32
       choice S at
         -- // Fatal failure is broadcast to both client and logger.
         | Fault =>
@@ -52,15 +52,15 @@ tell! {
           S -> L : Fault
         -- // Successful completion returns data and emits the log entry.
         | Success =>
-          S -> C : Success(i32)
-          S -> L : Success(i32)
+          S -> C : Success of i32
+          S -> L : Success of i32
         -- // Retry asks for one more request before completing successfully.
         | Retry =>
           S -> C : Retry
           S -> L : Retry
-          C -> S : Request(i32)
-          S -> C : Success(i32)
-          S -> L : Success(i32)
+          C -> S : Request of i32
+          S -> C : Success of i32
+          S -> L : Success of i32
 }
 
 use ClientServerLog::effects;

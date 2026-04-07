@@ -13,9 +13,9 @@ tell! {
     -- // Each participant forwards one value clockwise around the ring.
     protocol Ring =
       roles A, B, C
-      A -> B : Value(i32)
-      B -> C : Value(i32)
-      C -> A : Value(i32)
+      A -> B : Value of i32
+      B -> C : Value of i32
+      C -> A : Value of i32
 }
 
 use Ring::sessions::*;

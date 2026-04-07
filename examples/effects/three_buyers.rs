@@ -67,20 +67,20 @@ tell! {
     -- // Alice asks for a quote, then Bob decides whether the purchase proceeds.
     protocol ThreeBuyers uses AlicePlanner, SellerPricing, BobBudget under Replay =
       roles Alice, Bob, Seller
-      Alice -> Seller : Request(i32)
-      Seller -> Alice : Quote(i32)
-      Seller -> Bob : Quote(i32)
-      Alice -> Bob : Contribution(i32)
+      Alice -> Seller : Request of i32
+      Seller -> Alice : Quote of i32
+      Seller -> Bob : Quote of i32
+      Alice -> Bob : Contribution of i32
       choice Bob at
         -- // Confirm notifies Alice and Seller, then Seller returns a delivery date.
         | Confirm =>
-          Bob -> Alice : Confirm(i32)
-          Bob -> Seller : Confirm(i32)
-          Seller -> Bob : Date(i32)
+          Bob -> Alice : Confirm of i32
+          Bob -> Seller : Confirm of i32
+          Seller -> Bob : Date of i32
         -- // Quit notifies both other participants that the purchase is cancelled.
         | Quit =>
-          Bob -> Alice : Quit(i32)
-          Bob -> Seller : Quit(i32)
+          Bob -> Alice : Quit of i32
+          Bob -> Seller : Quit of i32
 }
 
 use ThreeBuyers::effects;

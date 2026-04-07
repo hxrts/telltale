@@ -50,30 +50,30 @@ tell! {
       choice S at
         -- // Login asks the client for credentials, then relays the auth result.
         | Login =>
-          S -> C : LoginReq(i32)
+          S -> C : LoginReq of i32
           choice C at
             -- // Client submits credentials and waits for the server's final relay.
             | Proceed =>
-              C -> A : Password(i32)
+              C -> A : Password of i32
               choice A at
                 -- // Authenticator grants access and the server notifies the client.
                 | Granted =>
-                  A -> S : Approved(i32)
+                  A -> S : Approved of i32
                   choice S at
                     | AuthOk =>
-                      S -> C : AuthNotice(i32)
+                      S -> C : AuthNotice of i32
                 -- // Authenticator denies access and the server forwards the failure.
                 | Denied =>
-                  A -> S : Rejected(i32)
+                  A -> S : Rejected of i32
                   choice S at
                     | AuthFail =>
-                      S -> C : FailNotice(i32)
+                      S -> C : FailNotice of i32
         -- // Cancel aborts before credentials are checked.
         | Cancel =>
-          S -> C : CancelReq(i32)
+          S -> C : CancelReq of i32
           choice C at
             | Abort =>
-              C -> A : Quit(i32)
+              C -> A : Quit of i32
 }
 
 use OAuth::effects;

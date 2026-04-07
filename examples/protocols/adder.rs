@@ -24,15 +24,15 @@ tell! {
     -- // Client opens the session, then loops through add-or-bye decisions.
     protocol Adder =
       roles C, S
-      C -> S : Hello(i32)
+      C -> S : Hello of i32
       -- // Recursive request loop for repeated additions.
       rec adder_loop
         choice C at
           -- // Send two addends and receive the computed running sum.
           | Add =>
-            C -> S : Add(i32)
-            C -> S : Add(i32)
-            S -> C : Sum(i32)
+            C -> S : Add of i32
+            C -> S : Add of i32
+            S -> C : Sum of i32
             continue adder_loop
           -- // Terminate the session cleanly once no more additions remain.
           | Bye =>
