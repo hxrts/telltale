@@ -24,6 +24,7 @@ pub mod checkpoint;
 pub mod contracts;
 pub mod decision;
 pub mod distributed;
+pub mod durability;
 pub mod environment;
 #[doc(hidden)]
 pub mod execution;
@@ -34,6 +35,7 @@ pub mod field_handlers;
 pub mod generated;
 pub mod harness;
 pub mod network;
+pub mod persistence;
 pub mod presets;
 pub mod property;
 pub mod reconfiguration;
@@ -64,8 +66,16 @@ pub use decision::{
     SyncSubtypeWitness, TheoremEligibilityCounterexample, WellFormednessViolation,
 };
 pub use distributed::{
-    DistributedExecutionRegime, DistributedRunManifest, DistributedSimBuilder,
-    DistributedSimulation, NestedExecutionContract,
+    DistributedExecutionRegime, DistributedRunManifest, DistributedRunResult,
+    DistributedSimBuilder, DistributedSimulation, DistributedSiteResult, NestedExecutionContract,
+};
+pub use durability::{
+    durable_property_report, inspect_durable_artifacts, monitor_evidence_consistency,
+    monitor_monotonic_wal_levels, monitor_recovery_equivalence, monitor_write_ahead,
+    run_durable_recovery_case, DurableFaultKind, DurableFaultOutcome, DurableFaultProgram,
+    DurableFaultRecord, DurableInspectionReport, DurablePropertyReport, DurableRecoveryRun,
+    DurableWalEntryKind, DurableWalEntryProjection, EvidenceCacheEntryProjection,
+    FaultInjectingAgreementWal, ScheduledDurableFault,
 };
 pub use environment::{
     EnvironmentArtifact, EnvironmentController, EnvironmentModels, EnvironmentSnapshot,
@@ -89,6 +99,7 @@ pub use harness::{
     HostAdapter, SimulationHarness,
 };
 pub use network::{NetworkConfig, NetworkModel};
+pub use persistence::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload};
 pub use property::{Property, PropertyMonitor};
 pub use reconfiguration::{
     ReconfigurationAction, ReconfigurationController, ReconfigurationEffect,
@@ -98,10 +109,11 @@ pub use reconfiguration::{
 pub use rng::SimRng;
 pub use runner::{
     canonical_replay_scenario, compare_scheduler_runs, remaining_rounds_from_checkpoint,
-    resume_with_checkpoint_artifact, resume_with_scenario_from_checkpoint, run_canonical_replay,
-    CheckpointArtifact, CriticalCapacityPhase, CriticalCapacitySummary, ScenarioAnalysisArtifact,
-    SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus, SchedulerFairnessRequirement,
-    SchedulerProfileSummary, TheoremProgressSummary,
+    resume_with_checkpoint_artifact, resume_with_durable_checkpoint_artifact,
+    resume_with_scenario_from_checkpoint, run_canonical_replay, CriticalCapacityPhase,
+    CriticalCapacitySummary, DurableResumeArtifacts, DurableResumeSummary,
+    ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus,
+    SchedulerFairnessRequirement, SchedulerProfileSummary, TheoremProgressSummary,
 };
 pub use sweep::{
     compare_sweep_results, run_sweep, SweepAxis, SweepBinding, SweepConfig, SweepDiffReport,

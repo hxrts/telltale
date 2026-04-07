@@ -1,0 +1,1145 @@
+//! Focused typed durability contract tests.
+
+use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
+
+use telltale_machine::coroutine::Value;
+use telltale_machine::instr::InvokeAction;
+use telltale_machine::model::durability::{
+    AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
+    DurableRecoveryAction, DurableRecoveryMetadata, DurableRecoveryPlan, EvidenceOutcomeCache,
+    EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+    FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+    PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest,
+};
+use telltale_machine::model::effects::{
+    EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResponse, EffectResult,
+    RecordingEffectHandler, ReplayEffectHandler,
+};
+use telltale_machine::model::output_condition::{OutputConditionHint, OutputConditionPolicy};
+use telltale_machine::model::semantic_objects::{
+    AgreementEvidence, AgreementEvidenceKind, AgreementLevel, AgreementState, FinalizationOutcome,
+    ProgressState,
+};
+use telltale_machine::runtime::loader::CodeImage;
+use telltale_machine::{Instr, ProtocolMachine, ProtocolMachineConfig, StepResult};
+use telltale_types::{GlobalType, LocalTypeR};
+use tempfile::tempdir;
+
+fn sample_wal_artifact() -> AgreementWalArtifact {
+    AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "evidence#1".to_string(),
+                    operation_id: "op#1".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::SoftSafe,
+                    kind: AgreementEvidenceKind::CommitFact,
+                    reference: "commit://1".to_string(),
+                    authoritative: true,
+                },
+                tick: 4,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#1".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("evidence#1".to_string()),
+                tick: 4,
+            },
+            AgreementWalEntry::Finalization {
+                operation_id: "op#1".to_string(),
+                outcome: FinalizationOutcome::Finalized,
+                materialization_proof_id: Some("proof#1".to_string()),
+                canonical_handle_id: Some("handle#1".to_string()),
+                tick: 6,
+            },
+            AgreementWalEntry::VisibilityGateCrossing {
+                operation_id: "op#1".to_string(),
+                downstream_coroutine_id: "coro#9".to_string(),
+                gate_level: AgreementLevel::Finalized,
+                tick: 7,
+            },
+        ],
+    }
+}
+
+fn recovery_fixture_wal() -> AgreementWalArtifact {
+    AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "prov#1".to_string(),
+                    operation_id: "op#provisional".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::Provisional,
+                    kind: AgreementEvidenceKind::Witness,
+                    reference: "witness://1".to_string(),
+                    authoritative: true,
+                },
+                tick: 2,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#provisional".to_string(),
+                previous_level: AgreementLevel::None,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: Some("prov#1".to_string()),
+                tick: 2,
+            },
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "soft#1".to_string(),
+                    operation_id: "op#softsafe".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::SoftSafe,
+                    kind: AgreementEvidenceKind::CommitFact,
+                    reference: "commit://1".to_string(),
+                    authoritative: true,
+                },
+                tick: 3,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#softsafe".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("soft#1".to_string()),
+                tick: 3,
+            },
+            AgreementWalEntry::Finalization {
+                operation_id: "op#finalized".to_string(),
+                outcome: FinalizationOutcome::Finalized,
+                materialization_proof_id: Some("proof#final".to_string()),
+                canonical_handle_id: Some("handle#final".to_string()),
+                tick: 4,
+            },
+            AgreementWalEntry::VisibilityGateCrossing {
+                operation_id: "op#finalized".to_string(),
+                downstream_coroutine_id: "coro#4".to_string(),
+                gate_level: AgreementLevel::Finalized,
+                tick: 4,
+            },
+            AgreementWalEntry::Finalization {
+                operation_id: "op#terminal".to_string(),
+                outcome: FinalizationOutcome::TimedOut,
+                materialization_proof_id: None,
+                canonical_handle_id: None,
+                tick: 5,
+            },
+        ],
+    }
+}
+
+fn sample_wal_sync_request() -> WalSyncRequest {
+    WalSyncRequest {
+        operation_id: "op#1".to_string(),
+        downstream_coroutine_id: "coro#9".to_string(),
+        gate_level: AgreementLevel::Finalized,
+        agreement_state: Some(AgreementState {
+            operation_id: "op#1".to_string(),
+            session: None,
+            owner_id: None,
+            contract_name: "agreement:op#1".to_string(),
+            level: AgreementLevel::Finalized,
+            finalization: Some(FinalizationOutcome::Finalized),
+            evidence_ids: vec!["evidence#1".to_string(), "proof#1".to_string()],
+            last_updated_tick: Some(7),
+            reason: None,
+        }),
+        agreement_evidence: vec![AgreementEvidence {
+            evidence_id: "evidence#1".to_string(),
+            operation_id: "op#1".to_string(),
+            session: None,
+            owner_id: None,
+            level: AgreementLevel::Finalized,
+            kind: AgreementEvidenceKind::Materialization,
+            reference: "proof://1".to_string(),
+            authoritative: true,
+        }],
+        tick: 7,
+    }
+}
+
+fn single_role_end_image(program: Vec<Instr>) -> CodeImage {
+    CodeImage {
+        programs: {
+            let mut programs = BTreeMap::new();
+            programs.insert("A".to_string(), program);
+            programs
+        },
+        global_type: GlobalType::End,
+        local_types: {
+            let mut local_types = BTreeMap::new();
+            local_types.insert("A".to_string(), LocalTypeR::End);
+            local_types
+        },
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct HintedInvokeHandler;
+
+impl EffectHandler for HintedInvokeHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Unit)
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> EffectResult<String> {
+        EffectResult::success(labels.first().cloned().unwrap_or_default())
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn output_condition_hint(
+        &self,
+        sid: usize,
+        role: &str,
+        _state: &[Value],
+    ) -> Option<OutputConditionHint> {
+        Some(OutputConditionHint {
+            predicate_ref: "machine.custom.observable".to_string(),
+            witness_ref: Some(format!("sid:{sid}:role:{role}")),
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+struct CountingHandler {
+    acquire_calls: Arc<AtomicUsize>,
+    step_calls: Arc<AtomicUsize>,
+}
+
+#[derive(Debug, Default)]
+struct FakeRemoteAgreementWal {
+    entries: Vec<AgreementWalEntry>,
+    load_calls: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FailingWalMode {
+    Append,
+    Load,
+    Read,
+}
+
+#[derive(Debug)]
+struct FailingAgreementWal {
+    mode: FailingWalMode,
+}
+
+impl FailingAgreementWal {
+    fn new(mode: FailingWalMode) -> Self {
+        Self { mode }
+    }
+}
+
+impl AgreementWal for FakeRemoteAgreementWal {
+    fn append(&mut self, entry: AgreementWalEntry) -> Result<(), String> {
+        self.entries.push(entry);
+        AgreementWalArtifact {
+            entries: self.entries.clone(),
+        }
+        .validate_monotonic_escalations()
+    }
+
+    fn read_since(&self, tick: u64) -> Result<Vec<AgreementWalEntry>, String> {
+        Ok(self
+            .entries
+            .iter()
+            .filter(|entry| entry.tick() > tick)
+            .cloned()
+            .collect())
+    }
+
+    fn load(&self) -> Result<AgreementWalArtifact, String> {
+        let _ = self.load_calls;
+        Ok(AgreementWalArtifact {
+            entries: self.entries.clone(),
+        })
+    }
+}
+
+impl AgreementWal for FailingAgreementWal {
+    fn append(&mut self, _entry: AgreementWalEntry) -> Result<(), String> {
+        match self.mode {
+            FailingWalMode::Append => Err("append backend down".to_string()),
+            FailingWalMode::Load | FailingWalMode::Read => Ok(()),
+        }
+    }
+
+    fn read_since(&self, _tick: u64) -> Result<Vec<AgreementWalEntry>, String> {
+        match self.mode {
+            FailingWalMode::Read => Err("read backend down".to_string()),
+            FailingWalMode::Append | FailingWalMode::Load => Ok(Vec::new()),
+        }
+    }
+
+    fn load(&self) -> Result<AgreementWalArtifact, String> {
+        match self.mode {
+            FailingWalMode::Load => Err("load backend down".to_string()),
+            FailingWalMode::Append | FailingWalMode::Read => Ok(AgreementWalArtifact::default()),
+        }
+    }
+}
+
+impl EffectHandler for CountingHandler {
+    fn handler_identity(&self) -> String {
+        "counting_handler".to_string()
+    }
+
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> telltale_machine::model::effects::EffectResult<Value> {
+        telltale_machine::model::effects::EffectResult::success(Value::Unit)
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        telltale_machine::model::effects::EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> telltale_machine::model::effects::EffectResult<String> {
+        telltale_machine::model::effects::EffectResult::success(
+            labels.first().cloned().unwrap_or_default(),
+        )
+    }
+
+    fn step(
+        &self,
+        _role: &str,
+        _state: &mut Vec<Value>,
+    ) -> telltale_machine::model::effects::EffectResult<()> {
+        self.step_calls.fetch_add(1, Ordering::Relaxed);
+        telltale_machine::model::effects::EffectResult::success(())
+    }
+
+    fn handle_acquire(
+        &self,
+        _sid: usize,
+        _role: &str,
+        _layer: &str,
+        _state: &[Value],
+    ) -> telltale_machine::model::effects::EffectResult<Value> {
+        let call = self.acquire_calls.fetch_add(1, Ordering::Relaxed) + 1;
+        telltale_machine::model::effects::EffectResult::success(Value::Str(format!(
+            "evidence-value-{call}"
+        )))
+    }
+}
+
+fn acquire_request(operation_id: &str) -> EffectRequest {
+    EffectRequest::acquire(
+        1,
+        7,
+        Some(operation_id.to_string()),
+        "Coordinator",
+        "Storage",
+        &[],
+    )
+}
+
+fn step_request(operation_id: &str) -> EffectRequest {
+    EffectRequest::invoke_step(
+        2,
+        Some(7),
+        Some(operation_id.to_string()),
+        "Coordinator",
+        &[],
+    )
+}
+
+#[test]
+fn persisted_durability_artifact_round_trips_wal_entries() {
+    let artifact = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact());
+
+    let bytes = artifact.to_cbor().expect("encode durability artifact");
+    let decoded =
+        PersistedDurabilityArtifact::from_slice(&bytes).expect("decode durability artifact");
+    assert_eq!(decoded, artifact);
+}
+
+#[test]
+fn agreement_wal_handler_records_and_replays_wal_sync() {
+    let base = CountingHandler::default();
+    let wal_handler = AgreementWalHandler::new(&base, InMemoryAgreementWal::new());
+    let recorder = RecordingEffectHandler::new(&wal_handler);
+    let sync = sample_wal_sync_request();
+
+    assert!(matches!(
+        recorder.wal_sync(&sync),
+        EffectResult::Success(())
+    ));
+
+    let exchanges = recorder.effect_exchanges();
+    let last = exchanges.last().expect("recorded wal_sync exchange");
+    assert!(matches!(
+        last.request.body,
+        EffectRequestBody::WalSync { .. }
+    ));
+    assert!(matches!(
+        last.outcome.response,
+        Some(EffectResponse::WalSync)
+    ));
+
+    let replay = ReplayEffectHandler::new(recorder.effect_trace());
+    assert!(matches!(replay.wal_sync(&sync), EffectResult::Success(())));
+}
+
+#[test]
+fn custom_agreement_wal_backend_integrates_without_storage_specific_assumptions() {
+    let backend = FakeRemoteAgreementWal::default();
+    let base = CountingHandler::default();
+    let handler = AgreementWalHandler::new(&base, backend);
+    let sync = sample_wal_sync_request();
+
+    assert!(matches!(handler.wal_sync(&sync), EffectResult::Success(())));
+
+    let snapshot = handler.wal_snapshot().expect("load fake backend snapshot");
+    assert!(snapshot.entries.iter().any(|entry| {
+        matches!(
+            entry,
+            AgreementWalEntry::VisibilityGateCrossing { operation_id, .. }
+                if operation_id == &sync.operation_id
+        )
+    }));
+}
+
+#[test]
+fn agreement_wal_backends_preserve_order_and_filter_by_tick() {
+    fn exercise_backend(
+        wal: &mut dyn AgreementWal,
+        expected: &AgreementWalArtifact,
+    ) -> Result<(), String> {
+        for entry in &expected.entries {
+            wal.append(entry.clone())?;
+        }
+        let loaded = wal.load()?;
+        assert_eq!(loaded.entries, expected.entries);
+        let suffix = wal.read_since(4)?;
+        assert_eq!(suffix, expected.entries[2..].to_vec());
+        Ok(())
+    }
+
+    let expected = sample_wal_artifact();
+    exercise_backend(&mut InMemoryAgreementWal::new(), &expected).expect("exercise in-memory wal");
+
+    let dir = tempdir().expect("create temp dir");
+    let path = dir.path().join("wal.cbor");
+    exercise_backend(&mut FileAgreementWal::new(path), &expected).expect("exercise file wal");
+}
+
+#[test]
+fn interleaved_multi_operation_wal_preserves_order_identities_and_read_boundaries() {
+    let interleaved = AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "a#e1".to_string(),
+                    operation_id: "op#a".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::Provisional,
+                    kind: AgreementEvidenceKind::Witness,
+                    reference: "witness://a#e1".to_string(),
+                    authoritative: true,
+                },
+                tick: 1,
+            },
+            AgreementWalEntry::EvidenceProduced {
+                evidence: AgreementEvidence {
+                    evidence_id: "b#e1".to_string(),
+                    operation_id: "op#b".to_string(),
+                    session: None,
+                    owner_id: None,
+                    level: AgreementLevel::Provisional,
+                    kind: AgreementEvidenceKind::Witness,
+                    reference: "witness://b#e1".to_string(),
+                    authoritative: true,
+                },
+                tick: 2,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#a".to_string(),
+                previous_level: AgreementLevel::None,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: Some("a#e1".to_string()),
+                tick: 3,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#b".to_string(),
+                previous_level: AgreementLevel::None,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: Some("b#e1".to_string()),
+                tick: 4,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#a".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("a#e1".to_string()),
+                tick: 5,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#b".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: Some("b#e1".to_string()),
+                tick: 6,
+            },
+        ],
+    };
+    interleaved
+        .validate_monotonic_escalations()
+        .expect("interleaved wal remains monotonic per operation");
+
+    let identities = interleaved
+        .entries
+        .iter()
+        .map(AgreementWalEntry::stable_identity)
+        .collect::<Vec<_>>();
+    let unique_identities = identities
+        .iter()
+        .cloned()
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(unique_identities.len(), identities.len());
+
+    let mut in_memory = InMemoryAgreementWal::new();
+    for entry in &interleaved.entries {
+        in_memory
+            .append(entry.clone())
+            .expect("append interleaved entry");
+    }
+    assert_eq!(in_memory.load().expect("load wal"), interleaved);
+    assert_eq!(
+        in_memory.read_since(3).expect("read suffix"),
+        interleaved.entries[3..].to_vec()
+    );
+
+    let dir = tempdir().expect("create temp dir");
+    let path = dir.path().join("interleaved-wal.cbor");
+    let mut file_wal = FileAgreementWal::new(path);
+    for entry in &interleaved.entries {
+        file_wal
+            .append(entry.clone())
+            .expect("append file interleaved entry");
+    }
+    assert_eq!(file_wal.load().expect("load file wal"), interleaved);
+    assert_eq!(
+        file_wal.read_since(3).expect("read file suffix"),
+        interleaved.entries[3..].to_vec()
+    );
+}
+
+#[test]
+fn file_backed_durability_surfaces_fail_closed_on_corruption_truncation_and_payload_mismatch() {
+    let garbled = PersistedDurabilityArtifact::from_slice(b"not cbor")
+        .expect_err("garbled bytes should fail decode");
+    assert!(garbled.contains("decode persisted durability artifact"));
+
+    let valid_bytes = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
+        .to_cbor()
+        .expect("encode wal");
+    let truncated = PersistedDurabilityArtifact::from_slice(&valid_bytes[..valid_bytes.len() / 2])
+        .expect_err("truncated bytes should fail decode");
+    assert!(truncated.contains("decode persisted durability artifact"));
+
+    let dir = tempdir().expect("create temp dir");
+    let wal_path = dir.path().join("wal.cbor");
+    std::fs::write(&wal_path, &valid_bytes[..valid_bytes.len() / 2]).expect("write truncated wal");
+    let wal_error = FileAgreementWal::new(&wal_path)
+        .load()
+        .expect_err("truncated wal file should fail");
+    assert!(wal_error.contains("decode persisted durability artifact"));
+
+    let cache_path = dir.path().join("cache.cbor");
+    PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
+        .write_to_path(&cache_path)
+        .expect("write mismatched cache payload");
+    let cache_error = FileEvidenceOutcomeCache::new(&cache_path)
+        .load()
+        .expect_err("mismatched cache payload should fail");
+    assert!(cache_error.contains("agreement WAL payload"));
+
+    let wrong_wal_path = dir.path().join("wrong-wal.cbor");
+    PersistedDurabilityArtifact::evidence_outcome_cache(EvidenceOutcomeCacheArtifact::default())
+        .write_to_path(&wrong_wal_path)
+        .expect("write mismatched wal payload");
+    let wrong_wal_error = FileAgreementWal::new(&wrong_wal_path)
+        .load()
+        .expect_err("mismatched wal payload should fail");
+    assert!(wrong_wal_error.contains("evidence outcome cache payload"));
+}
+
+#[test]
+fn downstream_wal_backend_failures_block_visibility_and_surface_precise_errors() {
+    let base = CountingHandler::default();
+    let sync = sample_wal_sync_request();
+
+    let append_handler =
+        AgreementWalHandler::new(&base, FailingAgreementWal::new(FailingWalMode::Append));
+    match append_handler.wal_sync(&sync) {
+        EffectResult::Failure(failure) => {
+            assert_eq!(
+                failure.kind,
+                telltale_machine::model::effects::EffectFailureKind::Unavailable
+            );
+            assert!(failure.message.contains("persist agreement WAL"));
+            assert!(failure.message.contains("append backend down"));
+        }
+        other => panic!("append failure should block visibility, got {other:?}"),
+    }
+
+    let load_handler =
+        AgreementWalHandler::new(&base, FailingAgreementWal::new(FailingWalMode::Load));
+    match load_handler.wal_sync(&sync) {
+        EffectResult::Failure(failure) => {
+            assert_eq!(
+                failure.kind,
+                telltale_machine::model::effects::EffectFailureKind::Unavailable
+            );
+            assert!(failure.message.contains("load agreement WAL"));
+            assert!(failure.message.contains("load backend down"));
+        }
+        other => panic!("load failure should block visibility, got {other:?}"),
+    }
+
+    let read_backend = FailingAgreementWal::new(FailingWalMode::Read);
+    let read_error = read_backend
+        .read_since(0)
+        .expect_err("read failure should surface");
+    assert!(read_error.contains("read backend down"));
+}
+
+#[test]
+fn agreement_wal_artifact_validates_monotonic_escalation_order() {
+    let artifact = AgreementWalArtifact {
+        entries: vec![
+            AgreementWalEntry::Escalation {
+                operation_id: "op#regress".to_string(),
+                previous_level: AgreementLevel::SoftSafe,
+                new_level: AgreementLevel::Provisional,
+                evidence_id: None,
+                tick: 5,
+            },
+            AgreementWalEntry::Escalation {
+                operation_id: "op#regress".to_string(),
+                previous_level: AgreementLevel::Provisional,
+                new_level: AgreementLevel::SoftSafe,
+                evidence_id: None,
+                tick: 6,
+            },
+        ],
+    };
+
+    let error = artifact
+        .validate_monotonic_escalations()
+        .expect_err("regression should fail validation");
+    assert!(error.contains("regression"));
+}
+
+#[test]
+fn agreement_wal_serialization_is_byte_stable_for_identical_entries() {
+    let first = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
+        .to_cbor()
+        .expect("encode first wal");
+    let second = PersistedDurabilityArtifact::agreement_wal(sample_wal_artifact())
+        .to_cbor()
+        .expect("encode second wal");
+    assert_eq!(first, second);
+
+    let identities: Vec<_> = sample_wal_artifact()
+        .entries
+        .into_iter()
+        .map(|entry| entry.stable_identity())
+        .collect();
+    assert_eq!(
+        identities,
+        vec![
+            "evidence:op#1:evidence#1:SoftSafe:4".to_string(),
+            "escalation:op#1:Provisional:SoftSafe:evidence#1:4".to_string(),
+            "finalization:op#1:Finalized:proof#1:handle#1:6".to_string(),
+            "gate:op#1:coro#9:Finalized:7".to_string()
+        ]
+    );
+}
+
+#[test]
+fn persisted_durability_artifact_round_trips_cache_and_recovery_metadata() {
+    let cache = PersistedDurabilityArtifact::evidence_outcome_cache(EvidenceOutcomeCacheArtifact {
+        entries: vec![EvidenceOutcomeCacheEntry {
+            evidence_id: "evidence#2".to_string(),
+            interface_name: "Storage".to_string(),
+            operation_name: "write".to_string(),
+            outcome: EffectOutcome::blocked(),
+        }],
+    });
+    let recovery = PersistedDurabilityArtifact::recovery_metadata(DurableRecoveryMetadata {
+        checkpoint_tick: 10,
+        wal_tail_start_tick: Some(11),
+        highest_recovered_tick: Some(13),
+        resumed_operation_ids: vec!["op#2".to_string()],
+        terminal_operation_ids: vec!["op#1".to_string()],
+        cached_evidence_ids: vec!["evidence#2".to_string()],
+    });
+
+    let dir = tempdir().expect("create temp dir");
+    let cache_path = dir.path().join("cache.cbor");
+    let recovery_path = dir.path().join("recovery.cbor");
+    cache
+        .write_to_path(&cache_path)
+        .expect("write cache artifact");
+    recovery
+        .write_to_path(&recovery_path)
+        .expect("write recovery artifact");
+
+    let loaded_cache =
+        PersistedDurabilityArtifact::from_path(&cache_path).expect("load cache artifact");
+    let loaded_recovery =
+        PersistedDurabilityArtifact::from_path(&recovery_path).expect("load recovery artifact");
+    assert_eq!(loaded_cache, cache);
+    assert_eq!(loaded_recovery, recovery);
+    assert!(matches!(
+        loaded_cache.payload,
+        PersistedDurabilityPayload::EvidenceOutcomeCache(_)
+    ));
+    assert!(matches!(
+        loaded_recovery.payload,
+        PersistedDurabilityPayload::RecoveryMetadata(_)
+    ));
+}
+
+#[test]
+fn evidence_persistence_handler_reuses_cached_outcomes_across_recovery() {
+    let handler = CountingHandler::default();
+    let dir = tempdir().expect("create temp dir");
+    let path = dir.path().join("evidence-cache.cbor");
+
+    let first_wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        FileEvidenceOutcomeCache::new(&path),
+        |request: &EffectRequest| {
+            request
+                .operation_id
+                .as_ref()
+                .map(|operation_id| format!("evidence::{operation_id}"))
+        },
+    );
+    let first = first_wrapper.handle_effect(acquire_request("op#recover"));
+    assert!(matches!(
+        first.response,
+        Some(EffectResponse::Acquire { .. })
+    ));
+    assert_eq!(handler.acquire_calls.load(Ordering::Relaxed), 1);
+
+    let second_wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        FileEvidenceOutcomeCache::new(&path),
+        |request: &EffectRequest| {
+            request
+                .operation_id
+                .as_ref()
+                .map(|operation_id| format!("evidence::{operation_id}"))
+        },
+    );
+    let second = second_wrapper.handle_effect(acquire_request("op#recover"));
+    assert_eq!(handler.acquire_calls.load(Ordering::Relaxed), 1);
+    assert_eq!(first, second);
+    assert!(second_wrapper
+        .cached_outcome("evidence::op#recover")
+        .expect("load cached outcome")
+        .is_some());
+}
+
+#[test]
+fn evidence_persistence_handler_ignores_non_agreement_requests() {
+    let handler = CountingHandler::default();
+    let wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        InMemoryEvidenceOutcomeCache::new(),
+        |_request: &EffectRequest| None,
+    );
+
+    let first = wrapper.handle_effect(step_request("op#step"));
+    let second = wrapper.handle_effect(step_request("op#step"));
+    assert_eq!(handler.step_calls.load(Ordering::Relaxed), 2);
+    assert_eq!(first, second);
+    assert_eq!(
+        wrapper
+            .cache_snapshot()
+            .expect("load cache snapshot")
+            .entries
+            .len(),
+        0
+    );
+}
+
+#[test]
+fn evidence_persistence_handler_composes_with_recording_and_replay() {
+    let handler = CountingHandler::default();
+    let wrapper = EvidencePersistenceHandler::new(
+        &handler,
+        InMemoryEvidenceOutcomeCache::new(),
+        |request: &EffectRequest| {
+            request
+                .operation_id
+                .as_ref()
+                .map(|operation_id| format!("evidence::{operation_id}"))
+        },
+    );
+    let recording = RecordingEffectHandler::new(&wrapper);
+
+    let first = recording.handle_effect(acquire_request("op#trace"));
+    let second = recording.handle_effect(acquire_request("op#trace"));
+    assert_eq!(handler.acquire_calls.load(Ordering::Relaxed), 1);
+    assert_eq!(first, second);
+    assert_eq!(recording.effect_trace().len(), 2);
+
+    let replay = ReplayEffectHandler::new(recording.effect_trace());
+    let replay_first = replay.handle_effect(acquire_request("op#trace"));
+    let replay_second = replay.handle_effect(acquire_request("op#trace"));
+    assert_eq!(replay_first, first);
+    assert_eq!(replay_second, second);
+    assert_eq!(replay.remaining(), 0);
+}
+
+#[test]
+fn protocol_machine_requires_successful_wal_sync_before_visibility_gate_crossing() {
+    let image = single_role_end_image(vec![
+        Instr::Invoke {
+            action: InvokeAction::Reg(0),
+        },
+        Instr::Halt,
+    ]);
+    let cfg = ProtocolMachineConfig {
+        output_condition_policy: OutputConditionPolicy::AllowAll,
+        ..ProtocolMachineConfig::default()
+    };
+
+    let mut success_machine = ProtocolMachine::new(cfg.clone());
+    success_machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    let hinted = HintedInvokeHandler;
+    let success_handler = AgreementWalHandler::new(&hinted, InMemoryAgreementWal::new());
+    let step = success_machine
+        .step_round(&success_handler, 1)
+        .expect("successful wal_sync step");
+    assert!(matches!(step, StepResult::Continue));
+    assert_eq!(success_machine.output_condition_checks().len(), 1);
+    assert!(success_machine
+        .effect_exchanges()
+        .iter()
+        .any(
+            |exchange| matches!(exchange.request.body, EffectRequestBody::WalSync { .. })
+                && exchange.outcome.status.is_success()
+        ));
+    let wal_snapshot = success_handler
+        .wal_snapshot()
+        .expect("load successful wal snapshot");
+    assert!(
+        wal_snapshot
+            .entries
+            .iter()
+            .any(|entry| matches!(entry, AgreementWalEntry::VisibilityGateCrossing { .. })),
+        "successful wal_sync should persist a gate crossing before commit"
+    );
+
+    let mut blocked_machine = ProtocolMachine::new(cfg);
+    blocked_machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    let blocked_handler = AgreementWalHandler::with_sync_mode(
+        &hinted,
+        InMemoryAgreementWal::new(),
+        WalSyncMode::Blocked,
+    );
+    let blocked_step = blocked_machine
+        .step_round(&blocked_handler, 1)
+        .expect("blocked wal_sync step");
+    assert!(matches!(blocked_step, StepResult::Continue));
+    assert!(blocked_machine.output_condition_checks().is_empty());
+    assert!(
+        !blocked_machine
+            .trace()
+            .iter()
+            .any(|event| matches!(event, telltale_machine::ObsEvent::Invoked { .. })),
+        "gate crossing must not commit observable output when wal_sync blocks"
+    );
+    assert!(blocked_machine
+        .effect_exchanges()
+        .iter()
+        .any(
+            |exchange| matches!(exchange.request.body, EffectRequestBody::WalSync { .. })
+                && matches!(
+                    exchange.outcome.status,
+                    telltale_machine::model::effects::EffectOutcomeStatus::Blocked
+                )
+        ));
+}
+
+#[test]
+fn blocked_wal_sync_escalates_through_progress_contract_states() {
+    let image = single_role_end_image(vec![
+        Instr::Invoke {
+            action: InvokeAction::Reg(0),
+        },
+        Instr::Halt,
+    ]);
+    let cfg = ProtocolMachineConfig {
+        output_condition_policy: OutputConditionPolicy::AllowAll,
+        ..ProtocolMachineConfig::default()
+    };
+    let mut machine = ProtocolMachine::new(cfg);
+    machine
+        .load_choreography(&image)
+        .expect("load choreography");
+    let hinted = HintedInvokeHandler;
+    let handler = AgreementWalHandler::with_sync_mode(
+        &hinted,
+        InMemoryAgreementWal::new(),
+        WalSyncMode::Blocked,
+    );
+
+    machine
+        .step_round(&handler, 1)
+        .expect("initial blocked wal_sync round");
+    let operation_id = machine
+        .effect_exchanges()
+        .iter()
+        .rev()
+        .find_map(|exchange| match &exchange.request.body {
+            EffectRequestBody::WalSync { .. } => exchange.request.operation_id.clone(),
+            _ => None,
+        })
+        .expect("blocked wal_sync operation id");
+
+    for _ in 0..4 {
+        let _ = machine
+            .step_round(&handler, 1)
+            .expect("progress-escalation round should remain deterministic");
+    }
+
+    let objects = machine.semantic_objects();
+    let contract = objects
+        .progress_contracts
+        .iter()
+        .find(|contract| contract.operation_id == operation_id)
+        .expect("wal_sync progress contract");
+    assert_eq!(contract.state, ProgressState::TimedOut);
+
+    let transitions: Vec<_> = objects
+        .progress_transitions
+        .iter()
+        .filter(|transition| transition.operation_id == operation_id)
+        .map(|transition| transition.to_state)
+        .collect();
+    assert_eq!(
+        transitions,
+        vec![
+            ProgressState::Blocked,
+            ProgressState::NoProgress,
+            ProgressState::Degraded,
+            ProgressState::TimedOut,
+        ]
+    );
+}
+
+#[test]
+fn durable_recovery_plan_classifies_levels_and_terminal_outcomes() {
+    let machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let evidence_cache = EvidenceOutcomeCacheArtifact {
+        entries: vec![
+            EvidenceOutcomeCacheEntry {
+                evidence_id: "prov#1".to_string(),
+                interface_name: "Storage".to_string(),
+                operation_name: "write".to_string(),
+                outcome: EffectOutcome::success(EffectResponse::Release),
+            },
+            EvidenceOutcomeCacheEntry {
+                evidence_id: "soft#1".to_string(),
+                interface_name: "Storage".to_string(),
+                operation_name: "write".to_string(),
+                outcome: EffectOutcome::success(EffectResponse::Release),
+            },
+        ],
+    };
+    let plan =
+        DurableRecoveryPlan::from_checkpoint(1, machine, &recovery_fixture_wal(), evidence_cache)
+            .expect("build recovery plan");
+
+    let provisional = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#provisional")
+        .expect("provisional decision");
+    assert_eq!(
+        provisional.action,
+        DurableRecoveryAction::ReexecuteFromScratch
+    );
+
+    let softsafe = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#softsafe")
+        .expect("soft-safe decision");
+    assert_eq!(
+        softsafe.action,
+        DurableRecoveryAction::ResumeFromEvidenceBoundary
+    );
+    assert_eq!(softsafe.cached_evidence_ids, vec!["soft#1".to_string()]);
+
+    let finalized = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#finalized")
+        .expect("finalized decision");
+    assert_eq!(finalized.action, DurableRecoveryAction::ReuseFinalized);
+    assert!(finalized.gate_crossed);
+
+    let terminal = plan
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#terminal")
+        .expect("terminal decision");
+    assert_eq!(terminal.action, DurableRecoveryAction::PreserveTerminal);
+}
+
+#[test]
+fn durable_recovery_plan_covers_crash_positions() {
+    let wal = recovery_fixture_wal();
+
+    let before_transition = DurableRecoveryPlan::from_checkpoint(
+        10,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &AgreementWalArtifact::default(),
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("empty recovery plan");
+    assert!(before_transition.decisions.is_empty());
+
+    let between_wal_and_gate = DurableRecoveryPlan::from_checkpoint(
+        2,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("between wal and gate plan");
+    let softsafe = between_wal_and_gate
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#softsafe")
+        .expect("soft-safe decision");
+    assert!(!softsafe.gate_crossed);
+    assert_eq!(
+        softsafe.action,
+        DurableRecoveryAction::ResumeFromEvidenceBoundary
+    );
+
+    let during_wal_sync = DurableRecoveryPlan::from_checkpoint(
+        3,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("during wal_sync plan");
+    let finalized = during_wal_sync
+        .decisions
+        .iter()
+        .find(|decision| decision.operation_id == "op#finalized")
+        .expect("finalized decision");
+    assert_eq!(finalized.action, DurableRecoveryAction::ReuseFinalized);
+
+    let after_finalization_before_checkpoint = DurableRecoveryPlan::from_checkpoint(
+        3,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &AgreementWalArtifact {
+            entries: wal
+                .entries
+                .iter()
+                .filter(|entry| entry.tick() >= 4)
+                .cloned()
+                .collect(),
+        },
+        EvidenceOutcomeCacheArtifact::default(),
+    )
+    .expect("post-finalization plan");
+    assert!(after_finalization_before_checkpoint
+        .decisions
+        .iter()
+        .any(|decision| decision.operation_id == "op#finalized"
+            && decision.action == DurableRecoveryAction::ReuseFinalized));
+}
+
+#[test]
+fn durable_recovery_plan_is_deterministic_for_checkpoint_plus_wal_equivalence() {
+    let wal = recovery_fixture_wal();
+    let cache = EvidenceOutcomeCacheArtifact {
+        entries: vec![EvidenceOutcomeCacheEntry {
+            evidence_id: "soft#1".to_string(),
+            interface_name: "Storage".to_string(),
+            operation_name: "write".to_string(),
+            outcome: EffectOutcome::success(EffectResponse::Release),
+        }],
+    };
+    let first = DurableRecoveryPlan::from_checkpoint(
+        1,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        cache.clone(),
+    )
+    .expect("first recovery plan");
+    let second = DurableRecoveryPlan::from_checkpoint(
+        1,
+        ProtocolMachine::new(ProtocolMachineConfig::default()),
+        &wal,
+        cache,
+    )
+    .expect("second recovery plan");
+    assert_eq!(first.metadata, second.metadata);
+    assert_eq!(first.decisions, second.decisions);
+}

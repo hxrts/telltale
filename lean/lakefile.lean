@@ -108,6 +108,11 @@ lean_exe heap_parity_runner where
   root := `Runtime.Tests.HeapParityRunner
   moreLinkArgs := macosLinkArgs
 
+/-- Reduced semantic-effect parity runner for Rust/Lean alignment. -/
+lean_exe semantic_effect_parity_runner where
+  root := `Runtime.Tests.SemanticEffectParity
+  moreLinkArgs := macosLinkArgs
+
 /-- Projection validator (compares projected local types). -/
 @[default_target]
 lean_exe telltale_validator where

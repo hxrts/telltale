@@ -137,6 +137,7 @@ fn scenario() -> Scenario {
         properties: None,
         checkpoint_interval: None,
         theorem: telltale_simulator::scenario::TheoremProfileSpec::default(),
+        durability: telltale_simulator::scenario::DurabilitySpec::default(),
         extensions: BTreeMap::new(),
     }
 }

@@ -143,13 +143,13 @@ pub struct AdversarySummary {
     pub assumption_failures: Vec<AssumptionFailureClass>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ScheduledAdversaryState {
     adversary: ScheduledAdversary,
     activated: bool,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct BudgetState {
     total_consumed: u64,
     current_window: Option<u64>,
@@ -163,7 +163,7 @@ impl BudgetState {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ActiveTransportAdversary {
     adversary_id: String,
     action: AdversaryAction,
@@ -171,13 +171,13 @@ struct ActiveTransportAdversary {
     budget_state: BudgetState,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct ActiveCrash {
     role: String,
     expires_at: Option<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct InFlightMessage {
     delivery_tick: u64,
     sid: SessionId,
@@ -186,7 +186,7 @@ struct InFlightMessage {
     value: Value,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct AdversaryState {
     scheduled: Vec<ScheduledAdversaryState>,
     active_transport: Vec<ActiveTransportAdversary>,
@@ -220,7 +220,7 @@ pub struct AdversaryInjector<H: EffectHandler> {
     state: Mutex<AdversaryState>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct AdversaryCheckpointState {
     state: AdversaryState,
 }
@@ -458,6 +458,10 @@ impl<H: EffectHandler> AdversaryInjector<H> {
 }
 
 impl<H: EffectHandler> EffectHandler for AdversaryInjector<H> {
+    fn handler_identity(&self) -> String {
+        self.inner.handler_identity()
+    }
+
     fn handle_send(
         &self,
         role: &str,
@@ -587,6 +591,51 @@ impl<H: EffectHandler> EffectHandler for AdversaryInjector<H> {
             Err(err) => return EffectResult::failure(EffectFailure::contract_violation(err)),
         }
         self.inner.step(role, state)
+    }
+
+    fn handle_acquire(
+        &self,
+        sid: telltale_machine::SessionId,
+        role: &str,
+        layer: &str,
+        state: &[Value],
+    ) -> EffectResult<Value> {
+        self.inner.handle_acquire(sid, role, layer, state)
+    }
+
+    fn handle_release(
+        &self,
+        sid: telltale_machine::SessionId,
+        role: &str,
+        layer: &str,
+        evidence: &Value,
+        state: &[Value],
+    ) -> EffectResult<()> {
+        self.inner.handle_release(sid, role, layer, evidence, state)
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        self.inner.supports_wal_sync()
+    }
+
+    fn wal_sync(&self, sync: &telltale_machine::durable::WalSyncRequest) -> EffectResult<()> {
+        self.inner.wal_sync(sync)
+    }
+
+    fn topology_events(
+        &self,
+        tick: u64,
+    ) -> EffectResult<Vec<telltale_machine::model::effects::TopologyPerturbation>> {
+        self.inner.topology_events(tick)
+    }
+
+    fn output_condition_hint(
+        &self,
+        sid: telltale_machine::SessionId,
+        role: &str,
+        state: &[Value],
+    ) -> Option<telltale_machine::model::output_condition::OutputConditionHint> {
+        self.inner.output_condition_hint(sid, role, state)
     }
 }
 

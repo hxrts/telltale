@@ -17,6 +17,7 @@ bench = false
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+telltale-macros = { path = "../macros", version = "11.1.0" }
 toml = { workspace = true }
 telltale-simulator = { path = "../simulator", version = "11.1.0" }
 telltale-machine = { path = "../machine", version = "11.1.0" }

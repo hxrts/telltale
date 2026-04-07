@@ -398,6 +398,43 @@ impl ThreadedProtocolMachine {
         Ok(())
     }
 
+    fn try_unblock_senders(&mut self) {
+        let blocked_ids = self.scheduler.blocked_ids();
+        for coro_id in blocked_ids {
+            let should_skip = self.coroutines.get(coro_id).is_some_and(|coro| {
+                let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
+                self.crashed_sites.contains(&guard.role)
+                    || self.timed_out_sites.contains_key(&guard.role)
+            });
+            if should_skip {
+                continue;
+            }
+            let reason = self.scheduler.block_reason(coro_id).cloned();
+            if let Some(BlockReason::Send { edge }) = reason {
+                if self.crashed_sites.contains(&edge.sender)
+                    || self.crashed_sites.contains(&edge.receiver)
+                    || self.timed_out_sites.contains_key(&edge.sender)
+                    || self.timed_out_sites.contains_key(&edge.receiver)
+                    || self
+                        .partitioned_edges
+                        .contains(&(edge.sender.clone(), edge.receiver.clone()))
+                {
+                    continue;
+                }
+                let can_send = self.sessions.get(edge.sid).is_some_and(|session| {
+                    let session = session.lock().expect("threaded ProtocolMachine lock poisoned");
+                    session
+                        .buffers
+                        .get(&edge)
+                        .is_some_and(|buffer| !buffer.is_full())
+                });
+                if can_send {
+                    self.scheduler.unblock(coro_id);
+                }
+            }
+        }
+    }
+
     fn try_unblock_receivers(&mut self) {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {

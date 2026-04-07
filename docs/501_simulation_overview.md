@@ -9,7 +9,8 @@ Detailed behavior lives in the focused pages linked below.
 The simulator runs projected local types on `telltale-machine`.
 It adds deterministic middleware for budgeted adversaries, network behavior, property monitoring, checkpointing, and replay artifacts.
 It also provides a harness API for external integration testing.
-The authoritative replay lane is explicit: fresh exact runs use `run_with_scenario(...)`, canonical exact reproduction uses `run_canonical_replay(...)`, and exact checkpoint resume uses `resume_with_checkpoint_artifact(...)`.
+The authoritative replay lane is explicit: fresh exact runs use `run_with_scenario(...)`, canonical exact reproduction uses `run_canonical_replay(...)`, exact non-durable checkpoint resume uses `resume_with_checkpoint_artifact(...)`, and durable scenarios resume through `resume_with_durable_checkpoint_artifact(...)` with typed WAL and evidence artifacts. The simulator also exposes a dedicated durability assurance surface for fault-injecting WAL backends, deterministic crash/recovery comparisons, and durable property monitoring.
+On-disk checkpoint and replay bundles now use the typed `PersistedReplayArtifact` contract rather than ad hoc raw CBOR machine dumps.
 
 ## Key Concepts
 
@@ -17,6 +18,8 @@ The simulator wraps the protocol machine defined in `telltale-machine`.
 The protocol machine owns scheduling and session-type enforcement.
 The simulator adds middleware layers (adversaries, network, properties, checkpoints) and environment dynamics (fields) around that core.
 See [Protocol Machine Architecture](401_protocol_machine_architecture.md) for the underlying execution model.
+Durable agreement WALs and evidence-scoped recovery metadata remain authoritative machine/runtime artifacts.
+Simulator reports and viewer projections should consume typed durable artifacts rather than minting a parallel simulator-local durability state model.
 
 `ObsEvent` is the protocol machine's trace of communication actions such as sends, receives, choices, and offers.
 Scenario execution order, property monitoring, and replay artifacts all operate over this event stream.
@@ -60,6 +63,11 @@ That viewer now exposes:
 - deterministic step-forward, step-backward, and jump-to-step time travel
 - typed branch create/update/delete flows
 - an insight workspace for regime display, watch expressions, run diff, causality, provenance, bookmarks, and archive reload
+- semantic comparison and first-divergence analysis over generic simulator artifacts
+- theorem-aware counterexamples for comparison and theorem-eligibility failures
+- deterministic sweep and suite exploration with drill-down into runs and branches
+- typed effect inspection and mocked rerun requests
+- deterministic minimization summaries and downstream extension slots
 
 ### Decision and Approximation Modules
 
@@ -67,6 +75,7 @@ The `decision` module provides offline theorem-facing checks that return structu
 The `approximation` module provides non-authoritative analysis runs for `batched_stochastic`, `mean_field`, and `continuum_field` families.
 Approximation artifacts declare an approximation family, theorem-side scope, and explicit non-goals.
 Nested distributed simulation now publishes its own explicit observed-only manifest classification rather than remaining unclassified.
+That observed-only classification now travels through `DistributedRunResult`, not a manifest-only side accessor.
 
 ## Quick Start
 
@@ -90,7 +99,7 @@ See [Simulation Fields](504_simulation_fields.md) for custom `FieldModel` integr
 
 The simulator exposes generated effect-family helper types under `telltale_simulator::generated`, such as `GeneratedEffectScenario`.
 Callers obtain a builder via `GeneratedEffectScenario::builder()` and chain outcome declarations before running.
-These APIs currently sit beside the harness API rather than inside it.
+These helper APIs sit beside the harness API rather than inside it, and their helper reports intentionally do not expose theorem profiles, checkpoints, normalized observability, or other authoritative simulator-only fields.
 
 ## Document Map
 

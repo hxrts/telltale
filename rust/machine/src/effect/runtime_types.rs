@@ -110,6 +110,7 @@ impl EffectTraceTape {
             EffectRequestBody::Acquire { .. } => "handle_acquire",
             EffectRequestBody::Release { .. } => "handle_release",
             EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            EffectRequestBody::WalSync { .. } => "wal_sync",
             EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
         };
         let request_json =
@@ -249,6 +250,22 @@ impl<'a> ReplayEffectHandler<'a> {
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         self.entries.len().saturating_sub(cursor)
+    }
+
+    fn trace_contains_kind(&self, kind: &str) -> bool {
+        self.entries.iter().any(|entry| entry.effect_kind == kind)
+    }
+
+    fn peek_handler_identity(&self) -> Option<String> {
+        let cursor = *self
+            .cursor
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.entries.get(cursor).map(|entry| entry.handler_identity.clone())
+    }
+
+    fn recorded_handler_identity(&self) -> Option<String> {
+        self.entries.first().map(|entry| entry.handler_identity.clone())
     }
 
     fn next_entry(&self, expected_kind: &str) -> Result<EffectTraceEntry, String> {

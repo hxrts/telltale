@@ -5,12 +5,11 @@ use std::path::PathBuf;
 
 use telltale_machine::ProtocolMachine;
 
-/// Serialized ProtocolMachine state blob.
-pub type SerializedState = Vec<u8>;
+use crate::persistence::{CheckpointArtifact, PersistedReplayArtifact};
 
 /// Periodic ProtocolMachine state snapshots for replay and debugging.
 pub struct CheckpointStore {
-    checkpoints: BTreeMap<u64, SerializedState>,
+    checkpoints: BTreeMap<u64, CheckpointArtifact>,
     interval: u64,
     dir: Option<PathBuf>,
     last_persist_error: Option<String>,
@@ -39,22 +38,15 @@ impl CheckpointStore {
         }
     }
 
-    /// Record a checkpoint if `tick` hits the interval.
-    pub fn maybe_checkpoint(&mut self, tick: u64, machine: &ProtocolMachine) {
+    /// Record a checkpoint artifact if `tick` hits the interval.
+    pub fn maybe_checkpoint(&mut self, checkpoint: CheckpointArtifact) {
+        let tick = checkpoint.tick;
         if self.interval == 0 || tick % self.interval != 0 {
             return;
         }
         self.last_persist_error = None;
-        let data = match serde_cbor::to_vec(machine) {
-            Ok(data) => data,
-            Err(err) => {
-                self.last_persist_error =
-                    Some(format!("failed to serialize checkpoint {tick}: {err}"));
-                return;
-            }
-        };
 
-        self.checkpoints.insert(tick, data);
+        self.checkpoints.insert(tick, checkpoint.clone());
         if let Some(dir) = &self.dir {
             if let Err(err) = std::fs::create_dir_all(dir) {
                 self.last_persist_error = Some(format!(
@@ -63,10 +55,17 @@ impl CheckpointStore {
                 return;
             }
             let path = dir.join(format!("checkpoint_{tick}.cbor"));
-            if let Some(bytes) = self.checkpoints.get(&tick) {
-                if let Err(err) = std::fs::write(&path, bytes) {
+            let persisted = PersistedReplayArtifact::checkpoint(checkpoint);
+            match persisted.to_cbor() {
+                Ok(bytes) => {
+                    if let Err(err) = std::fs::write(&path, bytes) {
+                        self.last_persist_error =
+                            Some(format!("failed to persist checkpoint {path:?}: {err}"));
+                    }
+                }
+                Err(err) => {
                     self.last_persist_error =
-                        Some(format!("failed to persist checkpoint {path:?}: {err}"));
+                        Some(format!("failed to encode checkpoint {path:?}: {err}"));
                 }
             }
         }
@@ -77,18 +76,18 @@ impl CheckpointStore {
     pub fn restore(&self, tick: u64) -> Option<ProtocolMachine> {
         self.checkpoints
             .get(&tick)
-            .and_then(|data| serde_cbor::from_slice(data).ok())
+            .and_then(|data| data.decode_machine().ok())
     }
 
-    /// Access the serialized checkpoint map captured during this run.
+    /// Access the captured checkpoint artifacts for this run.
     #[must_use]
-    pub fn checkpoints(&self) -> &BTreeMap<u64, SerializedState> {
+    pub fn checkpoints(&self) -> &BTreeMap<u64, CheckpointArtifact> {
         &self.checkpoints
     }
 
     /// Find the nearest checkpoint at or before the given tick.
     #[must_use]
-    pub fn nearest_before(&self, tick: u64) -> Option<(u64, &SerializedState)> {
+    pub fn nearest_before(&self, tick: u64) -> Option<(u64, &CheckpointArtifact)> {
         self.checkpoints
             .range(..=tick)
             .next_back()

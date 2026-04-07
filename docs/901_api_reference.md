@@ -129,7 +129,14 @@ Module access (not re-exported at crate root):
   `EffectInterfaceMetadata`, `EffectExchangeRecord`, `EffectCompositionPolicy`
   `EffectSemanticClass`, `EffectRetryShape`, `EffectResponsibilityDomain`,
   `SendDecision`, `SendDecisionInput`
+  The typed internal durability request is `EffectRequestBody::WalSync`.
 - Effect trace: `telltale_machine::model::effects::RecordingEffectHandler`, `ReplayEffectHandler`
+- Durability:
+  `telltale_machine::model::durability::{AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler, EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata, DurableRecoveryPlan, FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest}`
+  These are the authoritative typed contracts for durable agreement WALs, evidence outcome caches, recovery metadata, typed recovery planning, and the internal `wal_sync` durability boundary.
+  Helper/generated/viewer surfaces should consume projections of these artifacts rather than defining peer durable state.
+  Downstream integrations should implement `AgreementWal` and/or `EvidenceOutcomeCache` directly rather than introducing backend-branded wrapper APIs.
+  The supported contract is append/read/load plus fail-closed error returns. Storage-specific retries, replication, or transport details must remain behind that trait boundary.
 - Child-effect aggregation: `EffectCompositionPolicy` is a secondary sibling-effect algebra used beneath parent agreement contracts, not the top-level agreement model
 - Loader: `telltale_machine::runtime::loader::CodeImage`
 - Runtime contracts:
@@ -156,8 +163,24 @@ Key exports:
 Module access (not re-exported at crate root):
 - `telltale_simulator::trace::Trace`, `StepRecord`
 - `telltale_simulator::runner::run`, `run_concurrent`, `run_with_scenario`, `ChoreographySpec`
-- `telltale_simulator::scenario::{Scenario, ExecutionSpec, ExecutionBackend, ResolvedExecution, ResolvedExecutionBackend}`
+- `telltale_simulator::scenario::{Scenario, ExecutionSpec, ExecutionBackend, ResolvedExecution, ResolvedExecutionBackend, DurabilitySpec, DurabilityMode}`
+- `telltale_simulator::runner::{resume_with_checkpoint_artifact, resume_with_durable_checkpoint_artifact, DurableResumeArtifacts, DurableResumeSummary}`
+  `resume_with_checkpoint_artifact(...)` is the exact non-durable checkpoint lane.
+  Scenarios that declare `DurabilityMode::Wal` must resume through `resume_with_durable_checkpoint_artifact(...)` so the simulator cannot bypass the typed WAL/evidence contract.
+- `telltale_simulator::durability::{FaultInjectingAgreementWal, DurableFaultProgram, ScheduledDurableFault, DurableFaultKind, DurableFaultRecord, DurableRecoveryRun, DurablePropertyReport, run_durable_recovery_case, durable_property_report}`
+  This is the reusable simulator-side durability assurance surface for deterministic fault injection, crash/recovery comparison, and durable property monitoring.
+- `telltale_simulator::durability::{DurableInspectionReport, DurableWalEntryProjection, EvidenceCacheEntryProjection, inspect_durable_artifacts}`
+  These are observed-only tooling projections of authoritative durable artifacts for viewer and CLI inspection.
+- CLI surface:
+  `cargo run -p telltale-simulator --bin durable -- --wal <wal.cbor> --cache <cache.cbor> [--checkpoint <checkpoint.cbor> --scenario <scenario.toml>] [--json]`
+  This inspection-only lane projects typed WAL/cache/recovery artifacts without exposing backend-specific storage details.
 - `telltale_simulator::generated::{GeneratedEffectScenario, GeneratedEffectScenarioBuilder, GeneratedEffectSimulationReport, ScenarioEffectDisposition, ScenarioEffectResult, ScenarioEffectStep}`
+  Helper-only generated-effect support. `GeneratedEffectSimulationReport` exposes helper accessors, not authoritative replay or theorem-classification fields.
+- `telltale_simulator::{CheckpointArtifact, PersistedReplayArtifact, PersistedReplayPayload}`
+  Typed persisted replay/checkpoint wrappers for on-disk simulator artifacts.
+  Durable agreement WALs and recovery metadata intentionally remain machine-level typed contracts instead of simulator helper exports.
+- `telltale_viewer::{SemanticComparisonResult, TheoremAwareCounterexample, DeterministicSweepReport, ExperimentSuiteReport, EffectTraceArtifact, MinimizationResult, ViewerExtensionManifest}`
+  Shared viewer/webapp tooling surfaces for comparison, counterexamples, sweeps, effects, minimization, and downstream overlays.
 - Contract checks in `rust/simulator/src/contracts.rs`:
   `ContractCheckConfig`, `ContractCheckReport`, `evaluate_contracts`, `assert_contracts`
 - Preset helpers in `rust/simulator/src/presets.rs`

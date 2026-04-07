@@ -6,6 +6,13 @@ lean_threads := "3"
 # Default task
 default: book
 
+# Enter the development shell with stale temp variables cleared first.
+develop:
+    env -u TMPDIR -u TMP -u TEMP nix develop
+
+# Run the full workspace test surface using the CI-safe split test lane.
+test-workspace: check-workspace-tests-split
+
 # Run release validation and publish crates.
 # Usage:
 #   just release <version> [dry_run] [skip_ci] [no_tag] [push] [allow_dirty] [no_require_main]
@@ -56,13 +63,17 @@ ci-dry-run lane="fast":
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
     fi
+    # Fail fast on doc/index/link drift and other cheap metadata checks before
+    # any broader build/test work.
+    just check-doc-fast-fail
     cargo fmt --all -- --check
-    # Fail fast on the canonical PR-critical verification surface before the broader build/test lanes.
-    just check-pr-critical
+    # Then run the remaining canonical PR-critical verification surface before
+    # the broader build/test lanes.
+    just check-pr-critical-core
     cargo build --workspace --all-targets --all-features
     # Use RUSTFLAGS to catch rustc warnings (not just clippy lints) as errors
     RUSTFLAGS="-D warnings" cargo clippy --workspace --all-targets --all-features -- -D warnings
-    cargo test --workspace --all-targets --all-features
+    just check-workspace-tests-split
     just check-arch
     just check-telltale-style
     just check-semantic-name-parity
@@ -86,8 +97,28 @@ ci-dry-run lane="fast":
       just check-deep-assurance
     fi
 
+# Canonical doc/metadata fast-fail lane used by CI and local dry runs.
+check-doc-fast-fail:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    just check-doc-links-ci
+    just check-docs-as-contract
+    just check-docs-semantic-drift
+    just check-docs-index
+    just check-verification-inventory
+
 # Canonical PR-critical verification lane used by fast CI and local dry runs.
 check-pr-critical:
+    just check-doc-fast-fail
+    just check-pr-critical-core
+
+# Canonical PR-critical verification lane minus the cheap doc/metadata fast-fail
+# checks, so local wrappers can run those first without duplication.
+check-pr-critical-core:
     #!/usr/bin/env bash
     set -euo pipefail
     tmp_root="${TMPDIR:-/tmp}"
@@ -102,7 +133,6 @@ check-pr-critical:
     just check-parity
     just check-ownership-contracts
     just check-aura-borrowed-lints
-    just check-doc-links-ci
     just check-capability-gates
     just check-release-conformance
     just verify-lean-protocol-machine-targets
@@ -247,6 +277,14 @@ check-tooling-convergence:
 check-source-doc-snippets:
     ./scripts/check/source-doc-snippets.sh
 
+# Narrow subsystem-safe simulator verification path for staged simulator-only changes.
+check-simulator-subsystem-staged:
+    ./scripts/check/simulator-subsystem.sh
+
+# Self-test the staged simulator subsystem classification logic.
+check-simulator-subsystem-self-test:
+    ./scripts/check/simulator-subsystem.sh --self-test
+
 # Check that key public verification/capability docs stay aligned with
 # source-derived rows and trusted ledgers.
 check-docs-as-contract:
@@ -306,6 +344,38 @@ sim-run-out config output:
 
 # Backward-compatible alias used by CI dry-run pipeline
 check-arch: check-arch-rust
+
+# Run full workspace tests in smaller package groups to keep CI memory pressure
+# lower than one monolithic `cargo test --workspace`.
+check-workspace-tests-split:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmpdir="${TMPDIR:-/tmp}"
+    mkdir -p "$tmpdir"
+    packages=(
+      telltale
+      telltale-types
+      telltale-theory
+      telltale-language
+      telltale-macros
+      telltale-machine
+      telltale-runtime
+      telltale-transport
+      telltale-bridge
+      telltale-simulator
+      telltale-viewer
+      telltale-ui
+      telltale-web
+      telltale-lints
+    )
+    for pkg in "${packages[@]}"; do
+      echo "==> cargo test -p ${pkg} --all-targets --all-features"
+      if [[ "$pkg" == "telltale-bridge" ]]; then
+        TMPDIR="$tmpdir" CARGO_BUILD_JOBS=1 CARGO_PROFILE_TEST_DEBUG=0 cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+      else
+        TMPDIR="$tmpdir" cargo test -p "$pkg" --all-targets --all-features -- --nocapture
+      fi
+    done
 
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
@@ -466,7 +536,19 @@ check-aura-borrowed-lints:
     just check-viewer-tooling-boundaries
     just check-docs-semantic-drift
     just check-verification-inventory
+    just check-durable-boundaries
+    just check-durable-assurance
     just check-macro-boundaries
+
+# Keep typed durability artifacts on the authoritative machine/runtime side.
+check-durable-boundaries:
+    ./scripts/check/durable-boundaries.sh
+
+# Focused durability verification split: machine contracts, simulator assurance, and boundaries.
+check-durable-assurance:
+    TMPDIR=/tmp cargo test -p telltale-machine --test durable_contracts -- --nocapture
+    TMPDIR=/tmp cargo test -p telltale-simulator --test durable_assurance -- --nocapture
+    just check-durable-boundaries
 
 # Enforce the shared viewer/webapp boundary and docs alignment.
 check-viewer-tooling-boundaries:
@@ -475,7 +557,7 @@ check-viewer-tooling-boundaries:
 # Focused shared webapp verification split: pure model, ownership/lints, and UI integration.
 check-viewer-tooling:
     cargo test -p telltale-viewer --lib
-    cargo test -p telltale-ui --test shell_rendering -- --nocapture
+    cargo test -p telltale-ui --test shell_rendering --test interactive_workspace -- --nocapture
     cargo check -p telltale-web
     just check-viewer-tooling-boundaries
 
@@ -716,7 +798,24 @@ paper:
 paper-clean:
     rm -rf papers/build
 
-# Serve locally with live reload
+# Build viewer tailwind CSS (static copy + runtime asset)
+viewer-css:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd rust/web
+    npm install --prefer-offline 2>/dev/null
+    mkdir -p ./public/assets
+    npx tailwindcss -c tailwind.config.cjs -i ./styles/app.css -o ./styles/tailwind.css --minify
+    cp ./styles/tailwind.css ./public/assets/tailwind.css
+
+# Serve the simulator viewer webapp
+serve-viewer: viewer-css
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd rust/web
+    dx serve
+
+# Serve docs locally with live reload
 serve: summary _gen-assets
     #!/usr/bin/env bash
     trap 'just _clean-assets' EXIT

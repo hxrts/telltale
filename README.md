@@ -40,8 +40,11 @@ The claim covers the Lean semantics and theorems, the theorem-defined Rust↔Lea
 ## Quick Start
 
 ```bash
+# Development shell
+just develop
+
 # Rust library health
-cargo test --workspace --all-targets --all-features
+just test-workspace
 
 # Lean/proof-facing protocol verification lane
 just verify-protocols
@@ -49,8 +52,6 @@ just verify-protocols
 # Paper supplement reproducibility + paper build + manifest
 just artifact-check
 ```
-
-This command set validates the Rust library, proof-facing protocol checks, and paper supplement workflow.
 
 ## Repository Layout
 

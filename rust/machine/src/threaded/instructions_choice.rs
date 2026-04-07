@@ -142,56 +142,62 @@ fn step_choose(
     chan: u16,
     table: &[(String, PC)],
     ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
-    let ep = endpoint_from_reg(coro, chan)?;
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
+    let ep = endpoint_from_reg(coro, chan).map_err(ThreadedExecFault::new)?;
     if !coro.owned_endpoints.contains(&ep) {
-        return Err(Fault::ChannelClosed {
+        return Err(ThreadedExecFault::new(Fault::ChannelClosed {
             endpoint: ep.clone(),
-        });
+        }));
     }
     let sid = ep.sid;
 
     let partner = match &session
         .local_types
         .get(&ep)
-        .ok_or_else(|| Fault::TypeViolation {
+        .ok_or_else(|| ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: no type registered"),
-        })?
+        }))?
         .current
     {
         LocalTypeR::Recv { partner, .. } => partner.clone(),
         other => {
-            return Err(Fault::TypeViolation {
+            return Err(ThreadedExecFault::new(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
                 actual: telltale_types::ValType::Unit,
                 message: format!("{role}: Choose expects Recv, got {other:?}"),
-            })
+            }))
         }
     };
 
     if !session.has_message(&partner, role) {
-        return Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::Recv {
-                edge: Edge::new(sid, partner.clone(), role.to_string()),
-                token: ProgressToken::for_endpoint(ep.clone()),
-            }),
-            type_update: None,
-            events: vec![],
-        });
+        return Ok((
+            StepPack {
+                coro_update: CoroUpdate::Block(BlockReason::Recv {
+                    edge: Edge::new(sid, partner.clone(), role.to_string()),
+                    token: ProgressToken::for_endpoint(ep.clone()),
+                }),
+                type_update: None,
+                events: vec![],
+            },
+            Vec::new(),
+        ));
     }
 
     let edge = Edge::new(sid, partner.clone(), role.to_string());
     let val = session
         .recv_verified(&partner, role)
-        .map_err(|message| Fault::VerificationFailed {
-            edge: edge.clone(),
-            message,
+        .map_err(|message| {
+            ThreadedExecFault::new(Fault::VerificationFailed {
+                edge: edge.clone(),
+                message,
+            })
         })?
         .ok_or_else(|| Fault::ChannelClosed {
             endpoint: ep.clone(),
-        })?;
+        })
+        .map_err(ThreadedExecFault::new)?;
     validate_payload(
         ctx.config,
         role,
@@ -200,47 +206,48 @@ fn step_choose(
         Some(&ValType::String),
         &val,
         false,
-    )?;
-    let label = decode_branch_label_payload(role, &val)?;
+    )
+    .map_err(ThreadedExecFault::new)?;
+    let label = decode_branch_label_payload(role, &val).map_err(ThreadedExecFault::new)?;
 
     let current_type = &session
         .local_types
         .get(&ep)
-        .ok_or_else(|| Fault::TypeViolation {
+        .ok_or_else(|| ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: no type registered"),
-        })?
+        }))?
         .current;
     if !matches!(current_type, LocalTypeR::Recv { .. }) {
-        return Err(Fault::TypeViolation {
+        return Err(ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: Choose expects Recv, got {current_type:?}"),
-        });
+        }));
     }
     let cached = session
         .lookup_branch_resolution(&ep, &label)
-        .ok_or_else(|| Fault::UnknownLabel {
+        .ok_or_else(|| ThreadedExecFault::new(Fault::UnknownLabel {
             label: label.clone(),
-        })?;
+        }))?;
     if cached.direction != crate::session::BranchDirection::Recv {
-        return Err(Fault::TypeViolation {
+        return Err(ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: Choose expects Recv, got {current_type:?}"),
-        });
+        }));
     }
 
     let target_pc = table
         .iter()
         .find(|(l, _)| *l == label)
         .map(|(_, pc)| *pc)
-        .ok_or_else(|| Fault::UnknownLabel {
+        .ok_or_else(|| ThreadedExecFault::new(Fault::UnknownLabel {
             label: label.clone(),
-        })?;
+        }))?;
 
-    let recv_outcome = ctx.handler.handle_effect(EffectRequest::receive(
+    let request = EffectRequest::receive(
         ctx.tick,
         Some(sid),
         None,
@@ -249,15 +256,21 @@ fn step_choose(
         &label,
         &coro.regs,
         val.clone(),
-    ));
+    );
+    let recv_outcome = ctx.handler.handle_effect(request.clone());
+    let observation = EffectObservation {
+        request,
+        outcome: recv_outcome.clone(),
+    };
     if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
         coro.regs = state;
     }
     recv_outcome
+        .clone()
         .into_unit("handle_recv")
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
-        .map_err(|failure| Fault::Invoke { failure })?;
+        .map_err(|failure| ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone()))?;
 
     let original = session
         .local_types
@@ -266,25 +279,28 @@ fn step_choose(
         .unwrap_or(&LocalTypeR::End);
     let (_resolved, type_update) = resolve_type_update(&cached.continuation, original, &ep);
 
-    Ok(StepPack {
-        coro_update: CoroUpdate::SetPc(target_pc),
-        type_update,
-        events: vec![
-            ObsEvent::Received {
-                tick: ctx.tick,
-                edge,
-                session: sid,
-                from: partner.clone(),
-                to: role.to_string(),
-                label: label.clone(),
-            },
-            ObsEvent::Chose {
-                tick: ctx.tick,
-                edge: Edge::new(sid, partner, role.to_string()),
-                label,
-            },
-        ],
-    })
+    Ok((
+        StepPack {
+            coro_update: CoroUpdate::SetPc(target_pc),
+            type_update,
+            events: vec![
+                ObsEvent::Received {
+                    tick: ctx.tick,
+                    edge,
+                    session: sid,
+                    from: partner.clone(),
+                    to: role.to_string(),
+                    label: label.clone(),
+                },
+                ObsEvent::Chose {
+                    tick: ctx.tick,
+                    edge: Edge::new(sid, partner, role.to_string()),
+                    label,
+                },
+            ],
+        },
+        vec![observation],
+    ))
 }
 
 #[allow(clippy::too_many_lines)]
@@ -295,61 +311,66 @@ fn step_offer(
     chan: u16,
     label: &str,
     ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
-    let ep = endpoint_from_reg(coro, chan)?;
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
+    let ep = endpoint_from_reg(coro, chan).map_err(ThreadedExecFault::new)?;
     if !coro.owned_endpoints.contains(&ep) {
-        return Err(Fault::ChannelClosed {
+        return Err(ThreadedExecFault::new(Fault::ChannelClosed {
             endpoint: ep.clone(),
-        });
+        }));
     }
     let sid = ep.sid;
 
     match &session
         .local_types
         .get(&ep)
-        .ok_or_else(|| Fault::TypeViolation {
+        .ok_or_else(|| ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: no type registered"),
-        })?
+        }))?
         .current
     {
         LocalTypeR::Send { partner, .. } => {
             let partner = partner.clone();
             let cached = session
                 .lookup_branch_resolution(&ep, label)
-                .ok_or_else(|| Fault::UnknownLabel {
+                .ok_or_else(|| ThreadedExecFault::new(Fault::UnknownLabel {
                     label: label.to_string(),
-                })?;
+                }))?;
             if cached.direction != crate::session::BranchDirection::Send {
-                return Err(Fault::TypeViolation {
+                return Err(ThreadedExecFault::new(Fault::TypeViolation {
                     expected: telltale_types::ValType::Unit,
                     actual: telltale_types::ValType::Unit,
                     message: format!("{role}: Offer expects Send, got {:?}", session.local_types.get(&ep).expect("endpoint type exists").current),
-                });
+                }));
             }
             let expected_type = cached.expected_type.clone();
             let continuation = cached.continuation.clone();
 
             let offer_payload = Value::Str(label.to_string());
-            let decision = ctx
-                .handler
-                .handle_effect(EffectRequest::send_decision(
-                    ctx.tick,
-                    sid,
-                    None,
-                    role,
-                    &partner,
-                    label,
-                    &coro.regs,
-                    Some(offer_payload),
-                ))
+            let request = EffectRequest::send_decision(
+                ctx.tick,
+                sid,
+                None,
+                role,
+                &partner,
+                label,
+                &coro.regs,
+                Some(offer_payload),
+            );
+            let outcome = ctx.handler.handle_effect(request.clone());
+            let observation = EffectObservation {
+                request,
+                outcome: outcome.clone(),
+            };
+            let decision = outcome
+                .clone()
                 .into_send_decision()
                 .unwrap_or_else(EffectResult::failure)
                 .expect_success(|| {
                     EffectFailure::contract_violation("send_decision returned blocked")
                 })
-                .map_err(|failure| Fault::Invoke { failure })?;
+                .map_err(|failure| ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone()))?;
             if let SendDecision::Deliver(payload) = &decision {
                 validate_payload(
                     ctx.config,
@@ -359,31 +380,43 @@ fn step_offer(
                     expected_type.as_ref(),
                     payload,
                     false,
-                )?;
+                )
+                .map_err(|fault| ThreadedExecFault::with_observation(fault, observation.clone()))?;
             }
             let enqueue = match decision {
                 SendDecision::Deliver(payload) => session
                     .send(role, &partner, payload)
-                    .map_err(|e| Fault::Invoke {
-                        failure: EffectFailure::invalid_input(e),
+                    .map_err(|e| {
+                        ThreadedExecFault::with_observation(
+                            Fault::Invoke {
+                                failure: EffectFailure::invalid_input(e),
+                            },
+                            observation.clone(),
+                        )
                     })?,
                 SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
             };
             match enqueue {
                 EnqueueResult::Ok => {}
                 EnqueueResult::WouldBlock => {
-                    return Ok(StepPack {
-                        coro_update: CoroUpdate::Block(BlockReason::Send {
-                            edge: Edge::new(sid, role.to_string(), partner.clone()),
-                        }),
-                        type_update: None,
-                        events: vec![],
-                    });
+                    return Ok((
+                        StepPack {
+                            coro_update: CoroUpdate::Block(BlockReason::Send {
+                                edge: Edge::new(sid, role.to_string(), partner.clone()),
+                            }),
+                            type_update: None,
+                            events: vec![],
+                        },
+                        vec![observation],
+                    ));
                 }
                 EnqueueResult::Full => {
-                    return Err(Fault::BufferFull {
-                        endpoint: ep.clone(),
-                    });
+                    return Err(ThreadedExecFault::with_observation(
+                        Fault::BufferFull {
+                            endpoint: ep.clone(),
+                        },
+                        observation,
+                    ));
                 }
                 EnqueueResult::Dropped => {}
             }
@@ -395,31 +428,34 @@ fn step_offer(
                 .unwrap_or(&LocalTypeR::End);
             let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);
 
-            Ok(StepPack {
-                coro_update: CoroUpdate::AdvancePc,
-                type_update,
-                events: vec![
-                    ObsEvent::Sent {
-                        tick: ctx.tick,
-                        edge: Edge::new(sid, role.to_string(), partner.clone()),
-                        session: sid,
-                        from: role.to_string(),
-                        to: partner.clone(),
-                        label: label.to_string(),
-                    },
-                    ObsEvent::Offered {
-                        tick: ctx.tick,
-                        edge: Edge::new(sid, role.to_string(), partner),
-                        label: label.to_string(),
-                    },
-                ],
-            })
+            Ok((
+                StepPack {
+                    coro_update: CoroUpdate::AdvancePc,
+                    type_update,
+                    events: vec![
+                        ObsEvent::Sent {
+                            tick: ctx.tick,
+                            edge: Edge::new(sid, role.to_string(), partner.clone()),
+                            session: sid,
+                            from: role.to_string(),
+                            to: partner.clone(),
+                            label: label.to_string(),
+                        },
+                        ObsEvent::Offered {
+                            tick: ctx.tick,
+                            edge: Edge::new(sid, role.to_string(), partner),
+                            label: label.to_string(),
+                        },
+                    ],
+                },
+                vec![observation],
+            ))
         }
-        other => Err(Fault::TypeViolation {
+        other => Err(ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
             actual: telltale_types::ValType::Unit,
             message: format!("{role}: Offer expects Send, got {other:?}"),
-        }),
+        })),
     }
 }
 

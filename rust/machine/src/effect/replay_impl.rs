@@ -1,7 +1,12 @@
 // Replay effect handler that replays recorded effect exchanges.
 impl EffectHandler for ReplayEffectHandler<'_> {
     fn handler_identity(&self) -> String {
-        "replay_handler".to_string()
+        self.peek_handler_identity()
+            .or_else(|| self.recorded_handler_identity())
+            .unwrap_or_else(|| {
+                self.fallback
+                    .map_or_else(|| "replay_handler".to_string(), EffectHandler::handler_identity)
+            })
     }
 
     #[allow(clippy::too_many_lines)]
@@ -14,6 +19,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
             EffectRequestBody::Acquire { .. } => "handle_acquire",
             EffectRequestBody::Release { .. } => "handle_release",
             EffectRequestBody::TopologyEvents { .. } => "topology_events",
+            EffectRequestBody::WalSync { .. } => "wal_sync",
             EffectRequestBody::OutputConditionHint { .. } => "output_condition_hint",
         };
         let entry = match self.next_entry(expected_kind) {
@@ -40,7 +46,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
                     };
                 }
             }
-            "handle_recv" | "invoke_step" | "handle_release" => {
+            "handle_recv" | "invoke_step" | "handle_release" | "wal_sync" => {
                 if let Some(outcome) = decode_effect_result::<()>(&entry.outputs) {
                     return match outcome {
                         EffectResult::Success(()) => match request.body {
@@ -49,6 +55,9 @@ impl EffectHandler for ReplayEffectHandler<'_> {
                             }
                             EffectRequestBody::InvokeStep { state, .. } => {
                                 EffectOutcome::success(EffectResponse::InvokeStep { state })
+                            }
+                            EffectRequestBody::WalSync { .. } => {
+                                EffectOutcome::success(EffectResponse::WalSync)
                             }
                             _ => EffectOutcome::success(EffectResponse::Release),
                         },
@@ -238,6 +247,23 @@ impl EffectHandler for ReplayEffectHandler<'_> {
             .into_output_condition_hint()
             .ok()
             .flatten()
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        self.trace_contains_kind("wal_sync")
+            || self
+                .fallback
+                .is_some_and(crate::effect::EffectHandler::supports_wal_sync)
+    }
+
+    fn wal_sync(&self, sync: &crate::durable::WalSyncRequest) -> EffectResult<()> {
+        self.handle_effect(EffectRequest::wal_sync(
+            sync.tick,
+            sync.operation_id.clone(),
+            sync.clone(),
+        ))
+        .into_unit("wal_sync")
+        .unwrap_or_else(EffectResult::failure)
     }
 }
 

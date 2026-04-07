@@ -150,4 +150,18 @@ impl EffectHandler for RecordingEffectHandler<'_> {
             .ok()
             .flatten()
     }
+
+    fn supports_wal_sync(&self) -> bool {
+        self.inner.supports_wal_sync()
+    }
+
+    fn wal_sync(&self, sync: &crate::durable::WalSyncRequest) -> EffectResult<()> {
+        self.handle_effect(EffectRequest::wal_sync(
+            sync.tick,
+            sync.operation_id.clone(),
+            sync.clone(),
+        ))
+        .into_unit("wal_sync")
+        .unwrap_or_else(EffectResult::failure)
+    }
 }

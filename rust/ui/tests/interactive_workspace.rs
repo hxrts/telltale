@@ -73,3 +73,36 @@ fn deterministic_layout_and_provenance_snapshots_are_stable() {
     assert_eq!(first.insights.run_diff.baseline_branch, "root");
     assert_eq!(first.insights.watch_expressions.len(), 2);
 }
+
+#[test]
+fn sweep_filter_and_drilldown_are_deterministic() {
+    let workspace = demo_workspace();
+    let mut state = InteractiveViewerState::from_workspace(workspace);
+    state.set_page(ViewerPage::Sweeps);
+    state.filter_sweeps("observed");
+
+    assert_eq!(state.workspace.sweeps.explorer.visible_cases.len(), 1);
+    let case_id = state.workspace.sweeps.explorer.visible_cases[0]
+        .case_id
+        .clone();
+    state.drill_into_sweep_case(&case_id);
+
+    assert_eq!(
+        state.workspace.sweeps.selected_case.as_deref(),
+        Some(case_id.as_str())
+    );
+    assert!(state.workspace.diagnostics.active_artifact.is_some());
+}
+
+#[test]
+fn mocked_rerun_and_minimization_commands_append_effect_logs() {
+    let workspace = demo_workspace();
+    let mut state = InteractiveViewerState::from_workspace(workspace);
+    state.set_page(ViewerPage::Effects);
+    state.request_mocked_rerun();
+    state.request_minimization();
+
+    assert_eq!(state.workspace.effects.mock_command_log.len(), 2);
+    assert!(state.workspace.effects.mock_command_log[0].contains("RequestMockedRerun"));
+    assert!(state.workspace.effects.mock_command_log[1].contains("RequestMinimization"));
+}

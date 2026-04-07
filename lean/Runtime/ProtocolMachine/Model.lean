@@ -9,6 +9,7 @@ import Runtime.ProtocolMachine.Model.Config
 import Runtime.ProtocolMachine.Model.CompileLocalTypeR
 import Runtime.ProtocolMachine.Model.Program
 import Runtime.ProtocolMachine.Model.Effects
+import Runtime.ProtocolMachine.Model.Durability
 import Runtime.ProtocolMachine.Model.EffectAlgebra
 import Runtime.ProtocolMachine.Model.SemanticObjects
 import Runtime.ProtocolMachine.Model.State

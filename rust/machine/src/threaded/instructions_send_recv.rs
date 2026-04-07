@@ -76,17 +76,17 @@ fn step_send(
     chan: u16,
     val_reg: u16,
     ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
     let prepared = {
         let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
-        step_send_prepare(coro, &session_guard, role, chan)?
+        step_send_prepare(coro, &session_guard, role, chan).map_err(ThreadedExecFault::new)?
     };
 
     let send_payload = coro
         .regs
         .get(usize::from(val_reg))
         .cloned()
-        .ok_or(Fault::OutOfRegisters)?;
+        .ok_or_else(|| ThreadedExecFault::new(Fault::OutOfRegisters))?;
     let request = EffectRequest::send_decision(
         ctx.tick,
         prepared.sid,
@@ -98,11 +98,18 @@ fn step_send(
         Some(send_payload),
     );
     let outcome = ctx.handler.handle_effect(request.clone());
+    let observation = EffectObservation {
+        request,
+        outcome: outcome.clone(),
+    };
     let decision = outcome
+        .clone()
         .into_send_decision()
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("send_decision returned blocked"))
-        .map_err(|failure| Fault::Invoke { failure })?;
+        .map_err(|failure| {
+            ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone())
+        })?;
 
     if ctx.crashed_sites.contains(role)
         || ctx.crashed_sites.contains(&prepared.partner)
@@ -112,13 +119,16 @@ fn step_send(
             .partitioned_edges
             .contains(&(role.to_string(), prepared.partner.clone()))
     {
-        return Ok(StepPack {
-            coro_update: CoroUpdate::Block(BlockReason::Send {
-                edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
-            }),
-            type_update: None,
-            events: vec![],
-        });
+        return Ok((
+            StepPack {
+                coro_update: CoroUpdate::Block(BlockReason::Send {
+                    edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
+                }),
+                type_update: None,
+                events: vec![],
+            },
+            vec![observation],
+        ));
     }
 
     let maybe_corruption = ctx
@@ -134,7 +144,8 @@ fn step_send(
             prepared.expected_type.as_ref(),
             payload,
             true,
-        )?;
+        )
+        .map_err(|fault| ThreadedExecFault::with_observation(fault, observation.clone()))?;
     }
     let enqueue = match decision {
         SendDecision::Deliver(payload) => {
@@ -155,8 +166,13 @@ fn step_send(
             let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
             session_guard
                 .send_with_sequence(role, &prepared.partner, payload, sequence_no)
-                .map_err(|e| Fault::Invoke {
-                    failure: EffectFailure::invalid_input(e),
+                .map_err(|e| {
+                    ThreadedExecFault::with_observation(
+                        Fault::Invoke {
+                            failure: EffectFailure::invalid_input(e),
+                        },
+                        observation.clone(),
+                    )
                 })?
         }
         SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
@@ -165,18 +181,24 @@ fn step_send(
     match enqueue {
         EnqueueResult::Ok => {}
         EnqueueResult::WouldBlock => {
-            return Ok(StepPack {
-                coro_update: CoroUpdate::Block(BlockReason::Send {
-                    edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
-                }),
-                type_update: None,
-                events: vec![],
-            });
+            return Ok((
+                StepPack {
+                    coro_update: CoroUpdate::Block(BlockReason::Send {
+                        edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
+                    }),
+                    type_update: None,
+                    events: vec![],
+                },
+                vec![observation],
+            ));
         }
         EnqueueResult::Full => {
-            return Err(Fault::BufferFull {
-                endpoint: prepared.ep.clone(),
-            });
+            return Err(ThreadedExecFault::with_observation(
+                Fault::BufferFull {
+                    endpoint: prepared.ep.clone(),
+                },
+                observation,
+            ));
         }
         EnqueueResult::Dropped => {}
     }
@@ -184,18 +206,21 @@ fn step_send(
     let (_resolved, type_update) =
         resolve_type_update(&prepared.continuation, &prepared.original, &prepared.ep);
 
-    Ok(StepPack {
-        coro_update: CoroUpdate::AdvancePc,
-        type_update,
-        events: vec![ObsEvent::Sent {
-            tick: ctx.tick,
-            edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
-            session: prepared.sid,
-            from: role.to_string(),
-            to: prepared.partner,
-            label: prepared.label,
-        }],
-    })
+    Ok((
+        StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update,
+            events: vec![ObsEvent::Sent {
+                tick: ctx.tick,
+                edge: Edge::new(prepared.sid, role.to_string(), prepared.partner.clone()),
+                session: prepared.sid,
+                from: role.to_string(),
+                to: prepared.partner,
+                label: prepared.label,
+            }],
+        },
+        vec![observation],
+    ))
 }
 
 struct RecvPrepared {
@@ -337,29 +362,34 @@ fn step_recv(
     chan: u16,
     dst_reg: u16,
     ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
     let (prepared, edge, val, sequence_no) = {
         let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
-        let prepared = step_recv_prepare(coro, &session_guard, role, chan)?;
+        let prepared =
+            step_recv_prepare(coro, &session_guard, role, chan).map_err(ThreadedExecFault::new)?;
         if !session_guard.has_message(&prepared.partner, role) {
-            return Ok(blocked_recv_pack(&prepared, role));
+            return Ok((blocked_recv_pack(&prepared, role), Vec::new()));
         }
 
         let edge = Edge::new(prepared.sid, prepared.partner.clone(), role.to_string());
         let signed = session_guard
             .recv_verified_signed(&prepared.partner, role)
-            .map_err(|message| Fault::VerificationFailed {
-                edge: edge.clone(),
-                message,
+            .map_err(|message| {
+                ThreadedExecFault::new(Fault::VerificationFailed {
+                    edge: edge.clone(),
+                    message,
+                })
             })?
             .ok_or_else(|| Fault::ChannelClosed {
                 endpoint: prepared.ep.clone(),
-            })?;
+            })
+            .map_err(ThreadedExecFault::new)?;
         (prepared, edge, signed.payload, signed.sequence_no)
     };
 
     // Deterministic ordering: signature verification (above), then replay-consumption.
-    consume_receive_replay_identity(&edge, &prepared, &val, sequence_no, ctx)?;
+    consume_receive_replay_identity(&edge, &prepared, &val, sequence_no, ctx)
+        .map_err(ThreadedExecFault::new)?;
 
     validate_payload(
         ctx.config,
@@ -369,7 +399,8 @@ fn step_recv(
         prepared.expected_type.as_ref(),
         &val,
         true,
-    )?;
+    )
+    .map_err(ThreadedExecFault::new)?;
 
     let request = EffectRequest::receive(
         ctx.tick,
@@ -382,30 +413,40 @@ fn step_recv(
         val.clone(),
     );
     let recv_outcome = ctx.handler.handle_effect(request.clone());
+    let observation = EffectObservation {
+        request,
+        outcome: recv_outcome.clone(),
+    };
     if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
         coro.regs = state;
     }
     recv_outcome
+        .clone()
         .into_unit("handle_recv")
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
-        .map_err(|failure| Fault::Invoke { failure })?;
+        .map_err(|failure| {
+            ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone())
+        })?;
 
     let (_resolved, type_update) =
         resolve_type_update(&prepared.continuation, &prepared.original, &prepared.ep);
 
-    Ok(StepPack {
-        coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst_reg, val },
-        type_update,
-        events: vec![ObsEvent::Received {
-            tick: ctx.tick,
-            edge,
-            session: prepared.sid,
-            from: prepared.partner,
-            to: role.to_string(),
-            label: prepared.label,
-        }],
-    })
+    Ok((
+        StepPack {
+            coro_update: CoroUpdate::AdvancePcWriteReg { reg: dst_reg, val },
+            type_update,
+            events: vec![ObsEvent::Received {
+                tick: ctx.tick,
+                edge,
+                session: prepared.sid,
+                from: prepared.partner,
+                to: role.to_string(),
+                label: prepared.label,
+            }],
+        },
+        vec![observation],
+    ))
 }
 
 fn step_halt(session: &mut SessionState, ep: &Endpoint, _tick: u64) -> Result<StepPack, Fault> {
@@ -439,7 +480,7 @@ fn step_invoke(
     action: InvokeAction,
     handler: &dyn EffectHandler,
     tick: u64,
-) -> Result<StepPack, Fault> {
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
     let _action_repr = match action {
         InvokeAction::Named(name) => name,
         InvokeAction::Reg(reg) => format!(
@@ -447,13 +488,13 @@ fn step_invoke(
             coro.regs
                 .get(usize::from(reg))
                 .cloned()
-                .ok_or(Fault::OutOfRegisters)?
+                .ok_or_else(|| ThreadedExecFault::new(Fault::OutOfRegisters))?
         ),
     };
     if !session.has_bound_handler() {
-        return Err(Fault::Invoke {
+        return Err(ThreadedExecFault::new(Fault::Invoke {
             failure: EffectFailure::contract_violation("no handler bound"),
-        });
+        }));
     }
     let coro_id = coro.id;
     let request = EffectRequest::invoke_step(
@@ -464,23 +505,33 @@ fn step_invoke(
         &coro.regs,
     );
     // Threaded step paths share the same canonical request admissibility rules.
-    let step_outcome = handler.handle_effect(request);
+    let step_outcome = handler.handle_effect(request.clone());
+    let observation = EffectObservation {
+        request,
+        outcome: step_outcome.clone(),
+    };
     if let Some(EffectResponse::InvokeStep { state }) = step_outcome.response.clone() {
         coro.regs = state;
     }
     step_outcome
+        .clone()
         .into_unit("invoke_step")
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("step returned blocked"))
-        .map_err(|failure| Fault::Invoke { failure })?;
+        .map_err(|failure| {
+            ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone())
+        })?;
 
-    Ok(StepPack {
-        coro_update: CoroUpdate::AdvancePc,
-        type_update: None,
-        events: vec![ObsEvent::Invoked {
-            tick,
-            coro_id,
-            role: role.to_string(),
-        }],
-    })
+    Ok((
+        StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Invoked {
+                tick,
+                coro_id,
+                role: role.to_string(),
+            }],
+        },
+        vec![observation],
+    ))
 }

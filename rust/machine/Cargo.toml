@@ -25,11 +25,13 @@ telltale-types = { path = "../types", version = "=11.1.0" }
 telltale-theory = { path = "../theory", version = "=11.1.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+serde_cbor = { workspace = true }
 bincode = { workspace = true }
 thiserror = { workspace = true }
 rayon = { version = "1", optional = true }
 serde_yaml = { workspace = true }
 cfg-if = { workspace = true }
+parking_lot = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { workspace = true, features = ["js"] }
@@ -41,6 +43,7 @@ assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
 criterion = { workspace = true }
 telltale-bridge = { path = "../bridge" }
+tempfile = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 proptest = { workspace = true }

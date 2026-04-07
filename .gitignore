@@ -47,6 +47,11 @@ iris-lean/
 /docs/book/
 /docs/SUMMARY.md
 
+# Webapp build output
+rust/web/public/assets/
+rust/web/dist/
+node_modules/
+
 # Simulator artifacts
 artifacts
 

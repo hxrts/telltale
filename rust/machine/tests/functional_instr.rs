@@ -214,16 +214,37 @@ fn test_send_buffer_full_block() {
     let _ = session.send("A", "B", Value::Nat(99));
 
     let handler = PassthroughHandler;
-    // Step: A should try to send and block.
-    // Step scheduler until A runs.
+    // Step until A attempts the send and records a blocked send_decision.
+    let mut saw_blocked_send = false;
     for _ in 0..10 {
         match machine.step(&handler) {
-            Ok(StepResult::Continue) => {}
+            Ok(StepResult::Continue) => {
+                saw_blocked_send =
+                    machine
+                        .semantic_objects()
+                        .outstanding_effects
+                        .iter()
+                        .any(|effect| {
+                            effect.effect_kind == "send_decision"
+                                && matches!(
+                                effect.status,
+                                telltale_machine::semantic_objects::OutstandingEffectStatus::Blocked
+                            )
+                        });
+                if saw_blocked_send {
+                    break;
+                }
+            }
             Ok(StepResult::Stuck) => break,
             Ok(StepResult::AllDone) => break,
             Err(_) => break,
         }
     }
+
+    assert!(
+        saw_blocked_send,
+        "expected blocked send_decision effect to be recorded"
+    );
 
     // A should be blocked, type unchanged.
     let ep_a = Endpoint {

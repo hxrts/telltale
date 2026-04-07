@@ -326,7 +326,7 @@
             Ok(_) => panic!("tampered signature must fault"),
             Err(err) => err,
         };
-        assert!(matches!(err, Fault::VerificationFailed { .. }));
+        assert!(matches!(err.fault, Fault::VerificationFailed { .. }));
     }
 
     #[test]

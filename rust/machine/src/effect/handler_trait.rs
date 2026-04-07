@@ -139,6 +139,11 @@ pub trait EffectHandler: Send + Sync {
                 EffectResult::Blocked => EffectOutcome::blocked(),
                 EffectResult::Failure(failure) => EffectOutcome::failure(failure),
             },
+            EffectRequestBody::WalSync { sync } => match self.wal_sync(&sync) {
+                EffectResult::Success(()) => EffectOutcome::success(EffectResponse::WalSync),
+                EffectResult::Blocked => EffectOutcome::blocked(),
+                EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+            },
             EffectRequestBody::OutputConditionHint { role, state } => {
                 let Some(sid) = request.session else {
                     return EffectOutcome::failure(EffectFailure::contract_violation(
@@ -260,6 +265,18 @@ pub trait EffectHandler: Send + Sync {
         EffectResult::success(())
     }
 
+    /// Whether this handler can service the internal `wal_sync` effect.
+    fn supports_wal_sync(&self) -> bool {
+        false
+    }
+
+    /// Confirm that the agreement WAL has been durably synchronized.
+    fn wal_sync(&self, _sync: &crate::durable::WalSyncRequest) -> EffectResult<()> {
+        EffectResult::failure(EffectFailure::contract_violation(
+            "wal_sync requires an AgreementWalHandler wrapper",
+        ))
+    }
+
     /// Topology perturbations injected by the environment for this scheduler tick.
     ///
     /// The ProtocolMachine ingests these before selecting coroutines for the round. This is
@@ -366,5 +383,13 @@ impl<T: EffectHandler + ?Sized> EffectHandler for &T {
         state: &[Value],
     ) -> Option<OutputConditionHint> {
         (**self).output_condition_hint(sid, role, state)
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        (**self).supports_wal_sync()
+    }
+
+    fn wal_sync(&self, sync: &crate::durable::WalSyncRequest) -> EffectResult<()> {
+        (**self).wal_sync(sync)
     }
 }

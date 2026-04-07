@@ -13,10 +13,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use telltale_machine::coroutine::Fault;
 use telltale_machine::coroutine::Value;
 use telltale_machine::determinism::{replay_consistent, DeterminismMode};
+use telltale_machine::durable::WalSyncRequest;
+use telltale_machine::instr::{ImmValue, Instr, InvokeAction};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectResult, RecordingEffectHandler, SendDecision,
     SendDecisionInput,
 };
+use telltale_machine::model::output_condition::OutputConditionHint;
+use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::OutputConditionPolicy;
 use telltale_machine::ProgressState;
 use telltale_machine::ThreadedProtocolMachine;
@@ -29,6 +33,161 @@ use test_support::{
 };
 
 type Normalized = (String, String, String, String);
+
+#[derive(Debug)]
+struct SemanticParityHandler;
+
+impl EffectHandler for SemanticParityHandler {
+    fn handle_send(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &[Value],
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Nat(7))
+    }
+
+    fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+        EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+    }
+
+    fn handle_recv(
+        &self,
+        _role: &str,
+        _partner: &str,
+        _label: &str,
+        _state: &mut Vec<Value>,
+        _payload: &Value,
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_choose(
+        &self,
+        _role: &str,
+        _partner: &str,
+        labels: &[String],
+        _state: &[Value],
+    ) -> EffectResult<String> {
+        EffectResult::success(labels.first().cloned().expect("choice label"))
+    }
+
+    fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn handle_acquire(
+        &self,
+        _sid: usize,
+        _role: &str,
+        layer: &str,
+        _state: &[Value],
+    ) -> EffectResult<Value> {
+        EffectResult::success(Value::Str(format!("evidence:{layer}")))
+    }
+
+    fn handle_release(
+        &self,
+        _sid: usize,
+        _role: &str,
+        _layer: &str,
+        _evidence: &Value,
+        _state: &[Value],
+    ) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+
+    fn output_condition_hint(
+        &self,
+        sid: usize,
+        role: &str,
+        _state: &[Value],
+    ) -> Option<OutputConditionHint> {
+        Some(OutputConditionHint {
+            predicate_ref: "machine.semantic.matrix".to_string(),
+            witness_ref: Some(format!("sid:{sid}:role:{role}")),
+        })
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+
+    fn wal_sync(&self, _sync: &WalSyncRequest) -> EffectResult<()> {
+        EffectResult::success(())
+    }
+}
+
+fn single_role_end_image(program: Vec<Instr>) -> CodeImage {
+    CodeImage {
+        programs: {
+            let mut programs = BTreeMap::new();
+            programs.insert("A".to_string(), program);
+            programs
+        },
+        global_type: telltale_types::GlobalType::End,
+        local_types: {
+            let mut local_types = BTreeMap::new();
+            local_types.insert("A".to_string(), telltale_types::LocalTypeR::End);
+            local_types
+        },
+    }
+}
+
+#[derive(Debug)]
+struct SemanticParitySnapshot {
+    effect_exchanges: Vec<telltale_machine::model::effects::EffectExchangeRecord>,
+    outstanding_effects: Vec<telltale_machine::semantic_objects::OutstandingEffect>,
+    operation_instances: Vec<telltale_machine::semantic_objects::OperationInstance>,
+    semantic_objects: ProtocolMachineSemanticObjects,
+}
+
+#[derive(Debug)]
+struct SemanticParityFixture {
+    name: &'static str,
+    image: CodeImage,
+    config: ProtocolMachineConfig,
+    max_steps: usize,
+}
+
+fn run_semantic_parity_fixture_cooperative(
+    fixture: &SemanticParityFixture,
+    handler: &dyn EffectHandler,
+) -> SemanticParitySnapshot {
+    let mut machine = ProtocolMachine::new(fixture.config.clone());
+    machine
+        .load_choreography(&fixture.image)
+        .expect("load cooperative fixture");
+    machine
+        .run(handler, fixture.max_steps)
+        .expect("run cooperative fixture");
+    SemanticParitySnapshot {
+        effect_exchanges: machine.effect_exchanges().to_vec(),
+        outstanding_effects: machine.outstanding_effects().to_vec(),
+        operation_instances: machine.operation_instances().to_vec(),
+        semantic_objects: machine.semantic_objects(),
+    }
+}
+
+fn run_semantic_parity_fixture_threaded(
+    fixture: &SemanticParityFixture,
+    handler: &dyn EffectHandler,
+) -> SemanticParitySnapshot {
+    let mut machine = ThreadedProtocolMachine::with_workers(fixture.config.clone(), 2);
+    machine
+        .load_choreography(&fixture.image)
+        .expect("load threaded fixture");
+    machine
+        .run(handler, fixture.max_steps)
+        .expect("run threaded fixture");
+    SemanticParitySnapshot {
+        effect_exchanges: machine.effect_exchanges().to_vec(),
+        outstanding_effects: machine.outstanding_effects().to_vec(),
+        operation_instances: machine.operation_instances().to_vec(),
+        semantic_objects: machine.semantic_objects(),
+    }
+}
 
 fn normalize_event(ev: &ObsEvent) -> Option<(usize, Normalized)> {
     match ev {
@@ -387,6 +546,81 @@ fn test_semantic_object_exports_match_across_drivers() {
     let image = simple_send_recv_image("A", "B", "msg");
     let (coop_semantic_objects, threaded_semantic_objects) = run_semantic_objects(&image);
     assert_eq!(coop_semantic_objects, threaded_semantic_objects);
+}
+
+#[test]
+fn test_instruction_owned_effect_semantics_match_across_drivers() {
+    let allow_output = ProtocolMachineConfig {
+        output_condition_policy: OutputConditionPolicy::PredicateAllowList(vec![
+            "machine.semantic.matrix".to_string(),
+        ]),
+        ..ProtocolMachineConfig::default()
+    };
+    let fixtures = vec![
+        SemanticParityFixture {
+            name: "send_recv",
+            image: simple_send_recv_image("A", "B", "msg"),
+            config: ProtocolMachineConfig::default(),
+            max_steps: 32,
+        },
+        SemanticParityFixture {
+            name: "invoke_output_condition_and_wal",
+            image: single_role_end_image(vec![
+                Instr::Set {
+                    dst: 1,
+                    val: ImmValue::Nat(1),
+                },
+                Instr::Invoke {
+                    action: InvokeAction::Reg(1),
+                },
+                Instr::Halt,
+            ]),
+            config: allow_output,
+            max_steps: 32,
+        },
+        SemanticParityFixture {
+            name: "acquire_release",
+            image: single_role_end_image(vec![
+                Instr::Acquire {
+                    layer: "auth".to_string(),
+                    dst: 2,
+                },
+                Instr::Release {
+                    layer: "auth".to_string(),
+                    evidence: 2,
+                },
+                Instr::Halt,
+            ]),
+            config: ProtocolMachineConfig::default(),
+            max_steps: 32,
+        },
+    ];
+    let handler = SemanticParityHandler;
+
+    for fixture in &fixtures {
+        let cooperative = run_semantic_parity_fixture_cooperative(fixture, &handler);
+        let threaded = run_semantic_parity_fixture_threaded(fixture, &handler);
+        assert_eq!(
+            cooperative.effect_exchanges, threaded.effect_exchanges,
+            "effect exchanges diverged for fixture {}",
+            fixture.name
+        );
+        assert_eq!(
+            cooperative.outstanding_effects, threaded.outstanding_effects,
+            "outstanding effects diverged for fixture {}",
+            fixture.name
+        );
+        assert_eq!(
+            cooperative.operation_instances, threaded.operation_instances,
+            "operation instances diverged for fixture {}",
+            fixture.name
+        );
+        assert_eq!(
+            cooperative.semantic_objects, threaded.semantic_objects,
+            "semantic objects diverged for fixture {}",
+            fixture.name
+        );
+    }
 }
 
 #[test]

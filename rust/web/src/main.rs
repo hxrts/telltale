@@ -1,4 +1,4 @@
-//! Thin browser shell for the shared Telltale viewer UI.
+//! Thin browser shell for the shared Telltale simulator viewer.
 
 use dioxus::prelude::*;
 use telltale_ui::{demo_workspace, TelltaleUiRoot};

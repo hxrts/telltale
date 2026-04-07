@@ -1,5 +1,6 @@
 //! Network simulation middleware.
 
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
@@ -46,7 +47,7 @@ impl Default for NetworkConfig {
 }
 
 /// Per-link policy override for role-to-role traffic.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LinkPolicy {
     /// Source role.
     pub from: String,
@@ -62,7 +63,7 @@ pub struct LinkPolicy {
     pub loss_probability: Option<FixedQ32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 struct InFlightMessage {
     delivery_tick: u64,
     sid: SessionId,
@@ -71,7 +72,7 @@ struct InFlightMessage {
     value: Value,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 struct DynamicNetworkState {
     link_overrides: BTreeMap<(String, String), LinkPolicy>,
     federations: BTreeMap<String, Vec<Vec<String>>>,
@@ -89,7 +90,7 @@ pub struct NetworkModel<H: EffectHandler> {
     tick_duration: Duration,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct NetworkCheckpointState {
     rng: SimRng,
     in_flight: Vec<InFlightMessage>,
@@ -413,6 +414,10 @@ impl<H: EffectHandler> NetworkModel<H> {
 }
 
 impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
+    fn handler_identity(&self) -> String {
+        self.inner.handler_identity()
+    }
+
     fn handle_send(
         &self,
         role: &str,
@@ -477,6 +482,51 @@ impl<H: EffectHandler> EffectHandler for NetworkModel<H> {
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
         self.inner.step(role, state)
+    }
+
+    fn handle_acquire(
+        &self,
+        sid: telltale_machine::SessionId,
+        role: &str,
+        layer: &str,
+        state: &[Value],
+    ) -> EffectResult<Value> {
+        self.inner.handle_acquire(sid, role, layer, state)
+    }
+
+    fn handle_release(
+        &self,
+        sid: telltale_machine::SessionId,
+        role: &str,
+        layer: &str,
+        evidence: &Value,
+        state: &[Value],
+    ) -> EffectResult<()> {
+        self.inner.handle_release(sid, role, layer, evidence, state)
+    }
+
+    fn supports_wal_sync(&self) -> bool {
+        self.inner.supports_wal_sync()
+    }
+
+    fn wal_sync(&self, sync: &telltale_machine::durable::WalSyncRequest) -> EffectResult<()> {
+        self.inner.wal_sync(sync)
+    }
+
+    fn topology_events(
+        &self,
+        tick: u64,
+    ) -> EffectResult<Vec<telltale_machine::model::effects::TopologyPerturbation>> {
+        self.inner.topology_events(tick)
+    }
+
+    fn output_condition_hint(
+        &self,
+        sid: telltale_machine::SessionId,
+        role: &str,
+        state: &[Value],
+    ) -> Option<telltale_machine::model::output_condition::OutputConditionHint> {
+        self.inner.output_condition_hint(sid, role, state)
     }
 }
 

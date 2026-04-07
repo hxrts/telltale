@@ -151,8 +151,45 @@ impl ProtocolMachine {
         coro_idx: usize,
         pack: StepPack,
         output_hint: Option<crate::output_condition::OutputConditionHint>,
+        handler: &dyn EffectHandler,
         handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
+        let coro_id = self.coroutines[coro_idx].id;
+        let sid = self.coroutines[coro_idx].session_id;
+
+        if !pack.events.is_empty()
+            && !matches!(
+                self.config.output_condition_policy,
+                crate::output_condition::OutputConditionPolicy::Disabled
+            )
+            && handler.supports_wal_sync()
+        {
+            let sync = self.current_wal_sync_request(Some(sid), coro_id);
+            let request = EffectRequest::wal_sync(
+                self.clock.tick,
+                sync.operation_id.clone(),
+                sync,
+            );
+            self.ensure_effect_request_allowed(&request)
+                .map_err(|failure| Fault::Invoke { failure })?;
+            let predicted_effect_id = self.next_effect_id;
+            let outcome = handler.handle_effect(request.clone());
+            self.record_effect_exchange(&request, &outcome, handler_identity, predicted_effect_id);
+            match outcome.into_unit("wal_sync") {
+                Ok(EffectResult::Success(())) => {}
+                Ok(EffectResult::Blocked) => {
+                    let reason = BlockReason::Invoke {
+                        handler: handler_identity.to_string(),
+                    };
+                    self.coroutines[coro_idx].status = CoroStatus::Blocked(reason.clone());
+                    return Ok(ExecOutcome::Blocked(reason));
+                }
+                Ok(EffectResult::Failure(failure)) | Err(failure) => {
+                    return Err(Fault::Invoke { failure });
+                }
+            }
+        }
+
         // Output-condition gate: any observable output must pass the configured verifier.
         if !pack.events.is_empty() {
             if let Err(fault) = apply_output_condition_gate(

@@ -80,7 +80,6 @@
           pkg-config
           gnuplot
           wasmPack
-          wasm-bindgen-cli
           samply
           mdbook
           mdbook-mermaid
@@ -110,6 +109,17 @@
 
           shellHook = ''
             [[ -r "$HOME/.local/state/secrets/cargo-registry-token" ]] && export CARGO_REGISTRY_TOKEN="$(cat "$HOME/.local/state/secrets/cargo-registry-token")"
+
+            # Install cargo-based dev tools if missing or outdated
+            if ! command -v dx >/dev/null 2>&1; then
+              echo "Installing dioxus-cli..."
+              cargo install dioxus-cli 2>/dev/null
+            fi
+            if ! command -v wasm-bindgen >/dev/null 2>&1 || ! wasm-bindgen --version 2>/dev/null | grep -q "0.2.117"; then
+              echo "Installing wasm-bindgen-cli 0.2.117..."
+              cargo install wasm-bindgen-cli --version 0.2.117 2>/dev/null
+            fi
+
             echo "Telltale development environment"
             echo "Rust: $(rustc --version)"
             echo "Lean: $(elan show 2>/dev/null | head -1 || echo 'run: elan default leanprover/lean4:v4.25.0')"

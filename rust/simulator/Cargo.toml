@@ -39,6 +39,8 @@ getrandom = { workspace = true }
 [dev-dependencies]
 assert_matches = { workspace = true }
 telltale-bridge = { path = "../bridge" }
+tempfile = { workspace = true }
+trybuild = "1.0"
 
 [lints]
 workspace = true

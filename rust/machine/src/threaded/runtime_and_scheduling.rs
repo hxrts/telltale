@@ -242,6 +242,7 @@ impl ThreadedProtocolMachine {
         // before unblocking and scheduler selection.
         self.ingest_topology_events(handler)?;
         self.prune_expired_timeouts();
+        self.try_unblock_senders();
         self.try_unblock_receivers();
         self.evaluate_progress_contracts()?;
 
@@ -353,10 +354,10 @@ impl ThreadedProtocolMachine {
                 return Ok(false);
             };
             let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
-            return self.commit_pick_result(&pick, result, tick, &handler_identity);
+            return self.commit_pick_result(&pick, result, tick, handler, &handler_identity);
         }
 
-        let results: Vec<Result<(StepPack, Option<OutputConditionHint>), Fault>> =
+        let results: Vec<Result<ThreadedExecSuccess, ThreadedExecFault>> =
             self.pool.install(|| {
                 picks
                     .par_iter()
@@ -366,7 +367,7 @@ impl ThreadedProtocolMachine {
 
         let mut progressed = false;
         for (pick, result) in picks.into_iter().zip(results.into_iter()) {
-            progressed |= self.commit_pick_result(&pick, result, tick, &handler_identity)?;
+            progressed |= self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
         }
         Ok(progressed)
     }
@@ -374,17 +375,24 @@ impl ThreadedProtocolMachine {
     fn commit_pick_result(
         &mut self,
         pick: &Picked,
-        result: Result<(StepPack, Option<OutputConditionHint>), Fault>,
+        result: Result<ThreadedExecSuccess, ThreadedExecFault>,
         tick: u64,
+        handler: &dyn EffectHandler,
         handler_identity: &str,
     ) -> Result<bool, ProtocolMachineError> {
         match result {
-            Ok((pack, output_hint)) => {
+            Ok(ThreadedExecSuccess {
+                pack,
+                effect_observations,
+                output_observation,
+            }) => {
                 match self.commit_pack(
                     &pick.coro,
                     &pick.session,
                     pack,
-                    output_hint,
+                    effect_observations,
+                    output_observation,
+                    handler,
                     handler_identity,
                 ) {
                     Ok(outcome) => match outcome {
@@ -421,7 +429,11 @@ impl ThreadedProtocolMachine {
                 }
                 Ok(true)
             }
-            Err(fault) => {
+            Err(ThreadedExecFault {
+                fault,
+                effect_observations,
+            }) => {
+                self.record_effect_observations(effect_observations, handler_identity);
                 self.trace.push(ObsEvent::Faulted {
                     tick,
                     coro_id: pick.coro_id,

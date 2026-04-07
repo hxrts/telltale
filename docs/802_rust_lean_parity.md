@@ -174,6 +174,7 @@ Their intended justification remains the existing protocol-machine `invoke` boun
 
 Typed effect requests and outcomes are part of the parity surface directly.
 Rust and Lean must agree on effect-interface metadata, request bodies, outcome statuses, and replay-visible effect exchanges.
+That now includes the internal `wal_sync` effect metadata and the shared durable recovery vocabulary used to classify checkpoint-plus-WAL resume decisions.
 
 ## Effect Interface Justification
 
@@ -194,6 +195,18 @@ This is why the current language design is nominal-first:
 - lowering stays centered on the existing protocol-machine `invoke` and `EffectSpec` story
 - generalized effect polymorphism waits until the nominal surface,
   lowering, and parity/audit semantics are stable
+
+### Durability Alignment
+
+The durability layer is now part of the documented Rust↔Lean correspondence boundary for runtime effects.
+
+- Rust `EffectRequestBody::WalSync` corresponds to Lean `walSyncMetadata` plus the shared `EffectRequestBody` / `EffectResponse` effect model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`
+- Rust `DurableRecoveryAction` / `DurableRecoveryDecision` correspond to Lean `Runtime.ProtocolMachine.Model.DurableRecoveryAction` / `DurableRecoveryDecision`
+- The current Lean theorem surface for this layer is intentionally narrow:
+  `walSyncMetadata_legal`, internal-handler admissibility, recovery-rank monotonicity from `AgreementEscalation`, and gate-crossing / terminal-truth consequences from `DurableRecoveryDecision.sound`
+
+The simulator-side WAL backend wrappers and fault-injection helpers remain Rust assurance surfaces.
+They consume the typed durability vocabulary above but are not themselves part of the current mechanized claim.
 
 ## Choreography Projection Parity
 
@@ -428,6 +441,34 @@ Parity fixtures are enforced by:
 
 - `rust/simulator/tests/field_handler_parity.rs`
 - `lean/Runtime/Tests/SimulatorParity.lean` (built as `simulator_parity_tests`)
+
+## Reduced Semantic-Effect Parity
+
+Lean also publishes a reduced semantic-effect fixture surface for the protocol-machine/runtime boundary.
+This lane is narrower than full executable protocol-machine equivalence: it checks the semantic classification we rely on for effect-facing debugging and replay exactness without claiming that Lean executes the full Rust effect handler stack.
+
+The reduced surface covers:
+
+- effect kind
+- lifecycle classification (`blocked` / `succeeded`)
+- interface and operation naming
+- output-condition predicate material visible to publications
+- whether the successful send path materializes an authoritative publication handle
+
+Parity fixtures are enforced by:
+
+- `lean/Runtime/Tests/SemanticEffectParity.lean` (built as `semantic_effect_parity_runner`)
+- `rust/machine/tests/semantic_effect_lean.rs`
+- `rust/simulator/tests/semantic_effect_lean.rs`
+
+The machine and simulator tests compare canonical Rust outputs against the Lean fixture bundle for:
+
+- one blocked-send fixture
+- one successful send/publication fixture
+- one `output_condition_hint` fixture
+- one `wal_sync` fixture
+
+This lane is intended to keep Lean, Rust machine semantics, replay/runtime behavior, and simulator artifact extraction aligned on the effect-visible semantic slice that matters for time-travel debugging and exact replay.
 
 ## Lean Module Boundaries
 

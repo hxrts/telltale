@@ -20,8 +20,8 @@ fn step_acquire(
     coro: &mut Coroutine,
     input: GuardAcquireStep<'_>,
     ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
-    guard_active(ctx.config, input.layer)?;
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
+    guard_active(ctx.config, input.layer).map_err(ThreadedExecFault::new)?;
     {
         let mut resources = ctx
             .guard_resources
@@ -31,22 +31,32 @@ fn step_acquire(
             .entry(input.layer.to_string())
             .or_insert(Value::Unit);
     }
-    let decision = ctx
-        .handler
-        .handle_effect(EffectRequest::acquire(
-            ctx.tick,
-            input.sid,
-            None,
-            input.role,
-            input.layer,
-            &coro.regs,
-        ))
+    let request = EffectRequest::acquire(
+        ctx.tick,
+        input.sid,
+        None,
+        input.role,
+        input.layer,
+        &coro.regs,
+    );
+    let outcome = ctx.handler.handle_effect(request.clone());
+    let observation = EffectObservation {
+        request,
+        outcome: outcome.clone(),
+    };
+    let decision = outcome
+        .clone()
         .into_value("acquire")
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_acquire returned blocked"))
-        .map_err(|failure| Fault::Acquire {
-            layer: input.layer.to_string(),
-            failure,
+        .map_err(|failure| {
+            ThreadedExecFault::with_observation(
+                Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure,
+                },
+                observation.clone(),
+            )
         })?;
     match decision {
         Value::Unit => {
@@ -63,19 +73,22 @@ fn step_acquire(
                 .expect("threaded ProtocolMachine lock poisoned");
             let state = scoped_states.entry(input.sid).or_default();
             let _commitment = state.commit(&Value::Unit);
-            Ok(StepPack {
-                coro_update: CoroUpdate::AdvancePcWriteReg {
-                    reg: input.dst,
-                    val: Value::Unit,
+            Ok((
+                StepPack {
+                    coro_update: CoroUpdate::AdvancePcWriteReg {
+                        reg: input.dst,
+                        val: Value::Unit,
+                    },
+                    type_update: None,
+                    events: vec![ObsEvent::Acquired {
+                        tick: ctx.tick,
+                        session: input.ep.sid,
+                        role: input.role.to_string(),
+                        layer: input.layer.to_string(),
+                    }],
                 },
-                type_update: None,
-                events: vec![ObsEvent::Acquired {
-                    tick: ctx.tick,
-                    session: input.ep.sid,
-                    role: input.role.to_string(),
-                    layer: input.layer.to_string(),
-                }],
-            })
+                vec![observation],
+            ))
         }
         evidence => {
             let mut resources = ctx
@@ -91,19 +104,22 @@ fn step_acquire(
                 .expect("threaded ProtocolMachine lock poisoned");
             let state = scoped_states.entry(input.sid).or_default();
             let _commitment = state.commit(&evidence);
-            Ok(StepPack {
-                coro_update: CoroUpdate::AdvancePcWriteReg {
-                    reg: input.dst,
-                    val: evidence,
+            Ok((
+                StepPack {
+                    coro_update: CoroUpdate::AdvancePcWriteReg {
+                        reg: input.dst,
+                        val: evidence,
+                    },
+                    type_update: None,
+                    events: vec![ObsEvent::Acquired {
+                        tick: ctx.tick,
+                        session: input.ep.sid,
+                        role: input.role.to_string(),
+                        layer: input.layer.to_string(),
+                    }],
                 },
-                type_update: None,
-                events: vec![ObsEvent::Acquired {
-                    tick: ctx.tick,
-                    session: input.ep.sid,
-                    role: input.role.to_string(),
-                    layer: input.layer.to_string(),
-                }],
-            })
+                vec![observation],
+            ))
         }
     }
 }
@@ -112,8 +128,8 @@ fn step_release(
     coro: &mut Coroutine,
     input: GuardReleaseStep<'_>,
     ctx: &ThreadedStepCtx<'_>,
-) -> Result<StepPack, Fault> {
-    guard_active(ctx.config, input.layer)?;
+) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
+    guard_active(ctx.config, input.layer).map_err(ThreadedExecFault::new)?;
     {
         let mut resources = ctx
             .guard_resources
@@ -126,24 +142,35 @@ fn step_release(
     let ev = coro
         .regs
         .get(usize::from(input.evidence))
-        .ok_or(Fault::OutOfRegisters)?
+        .ok_or_else(|| ThreadedExecFault::new(Fault::OutOfRegisters))?
         .clone();
-    ctx.handler
-        .handle_effect(EffectRequest::release(
-            ctx.tick,
-            input.sid,
-            None,
-            input.role,
-            input.layer,
-            &ev,
-            &coro.regs,
-        ))
+    let request = EffectRequest::release(
+        ctx.tick,
+        input.sid,
+        None,
+        input.role,
+        input.layer,
+        &ev,
+        &coro.regs,
+    );
+    let outcome = ctx.handler.handle_effect(request.clone());
+    let observation = EffectObservation {
+        request,
+        outcome: outcome.clone(),
+    };
+    outcome
+        .clone()
         .into_unit("handle_release")
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_release returned blocked"))
-        .map_err(|failure| Fault::Acquire {
-            layer: input.layer.to_string(),
-            failure,
+        .map_err(|failure| {
+            ThreadedExecFault::with_observation(
+                Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure,
+                },
+                observation.clone(),
+            )
         })?;
     {
         let mut resources = ctx
@@ -159,21 +186,29 @@ fn step_release(
         .expect("threaded ProtocolMachine lock poisoned")
         .get_mut(&input.sid)
     {
-        state.consume(&ev).map_err(|message| Fault::Acquire {
-            layer: input.layer.to_string(),
-            failure: EffectFailure::invalid_evidence(message),
+        state.consume(&ev).map_err(|message| {
+            ThreadedExecFault::with_observation(
+                Fault::Acquire {
+                    layer: input.layer.to_string(),
+                    failure: EffectFailure::invalid_evidence(message),
+                },
+                observation.clone(),
+            )
         })?;
     }
-    Ok(StepPack {
-        coro_update: CoroUpdate::AdvancePc,
-        type_update: None,
-        events: vec![ObsEvent::Released {
-            tick: ctx.tick,
-            session: input.ep.sid,
-            role: input.role.to_string(),
-            layer: input.layer.to_string(),
-        }],
-    })
+    Ok((
+        StepPack {
+            coro_update: CoroUpdate::AdvancePc,
+            type_update: None,
+            events: vec![ObsEvent::Released {
+                tick: ctx.tick,
+                session: input.ep.sid,
+                role: input.role.to_string(),
+                layer: input.layer.to_string(),
+            }],
+        },
+        vec![observation],
+    ))
 }
 
 fn step_fork(

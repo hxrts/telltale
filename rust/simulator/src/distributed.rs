@@ -2,6 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::analysis::{normalized_observability, NormalizedObservability};
 use crate::scenario::{
     ResolvedTheoremProfile, TheoremAssumptionBundle, TheoremEligibility, TheoremEnvelopeProfile,
     TheoremSchedulerProfile,
@@ -11,7 +12,8 @@ use telltale_machine::coroutine::Value;
 use telltale_machine::model::effects::{EffectFailure, EffectHandler, EffectResult};
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::runtime::runner::NestedProtocolMachineHandler;
-use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
+use telltale_machine::semantic_objects::ProtocolMachineSemanticObjects;
+use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
 
 /// Explicit outer/inner execution contract for nested VM simulation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -41,6 +43,32 @@ pub struct DistributedRunManifest {
     pub execution_regime: DistributedExecutionRegime,
     /// Theorem/profile classification exported for manifest consistency.
     pub theorem_profile: ResolvedTheoremProfile,
+}
+
+/// One nested site result aligned with the main simulator observability vocabulary.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DistributedSiteResult {
+    /// Stable site name for this nested VM.
+    pub site: String,
+    /// Raw observable trace emitted by the nested site VM.
+    pub obs_trace: Vec<ObsEvent>,
+    /// Envelope-normalized observability class for the site trace.
+    pub normalized_observability: NormalizedObservability,
+    /// Canonical semantic objects emitted by the nested site VM.
+    pub semantic_objects: ProtocolMachineSemanticObjects,
+}
+
+/// Structured distributed run result aligned with the direct simulator classification model.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DistributedRunResult {
+    /// Classification manifest for this nested run.
+    pub manifest: DistributedRunManifest,
+    /// Raw outer-VM observable trace for this nested run.
+    pub outer_obs_trace: Vec<ObsEvent>,
+    /// Canonical semantic objects for the outer VM.
+    pub outer_semantic_objects: ProtocolMachineSemanticObjects,
+    /// Per-site nested results in stable site-name order.
+    pub sites: Vec<DistributedSiteResult>,
 }
 
 fn distributed_theorem_profile(contract: NestedExecutionContract) -> ResolvedTheoremProfile {
@@ -197,14 +225,14 @@ impl DistributedSimulation {
     /// # Errors
     ///
     /// Returns a `ProtocolMachineError` if the outer ProtocolMachine faults.
-    pub fn run(&mut self, max_rounds: usize) -> Result<(), ProtocolMachineError> {
+    pub fn run(&mut self, max_rounds: usize) -> Result<DistributedRunResult, ProtocolMachineError> {
         self.outer_vm
             .run_concurrent(
                 &self.handler,
                 max_rounds,
                 self.execution_contract.outer_scheduler_concurrency,
             )
-            .map(|_| ())
+            .map(|_| self.report())
     }
 
     /// Access the outer ProtocolMachine.
@@ -225,16 +253,35 @@ impl DistributedSimulation {
         self.execution_contract
     }
 
-    /// Stable manifest describing the distributed execution lane and classification.
+    /// Structured report describing the distributed execution lane and current nested results.
     #[must_use]
-    pub fn manifest(&self) -> DistributedRunManifest {
+    pub fn report(&self) -> DistributedRunResult {
         let mut sites = self.site_names.clone();
         sites.sort();
-        DistributedRunManifest {
+        let manifest = DistributedRunManifest {
             sites,
             execution_contract: self.execution_contract,
             execution_regime: DistributedExecutionRegime::NestedObserved,
             theorem_profile: distributed_theorem_profile(self.execution_contract),
+        };
+        let sites = manifest
+            .sites
+            .iter()
+            .map(|site| {
+                let obs_trace = self.handler.site_trace(site).unwrap_or_default();
+                DistributedSiteResult {
+                    site: site.clone(),
+                    normalized_observability: normalized_observability(&obs_trace, &[]),
+                    semantic_objects: self.handler.site_semantic_objects(site).unwrap_or_default(),
+                    obs_trace,
+                }
+            })
+            .collect();
+        DistributedRunResult {
+            manifest,
+            outer_obs_trace: self.outer_vm.trace().to_vec(),
+            outer_semantic_objects: self.outer_vm.semantic_objects(),
+            sites,
         }
     }
 }

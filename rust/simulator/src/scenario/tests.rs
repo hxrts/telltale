@@ -81,6 +81,23 @@ fn test_default_seed_when_missing() {
 }
 
 #[test]
+fn test_parse_durable_wal_scenario() {
+    let toml = r#"
+            name = "durable_wal"
+            roles = ["A", "B"]
+            steps = 4
+            checkpoint_interval = 2
+
+            [durability]
+            mode = "wal"
+        "#;
+
+    let scenario = Scenario::parse(toml).expect("parse durable wal scenario");
+    assert!(scenario.requires_durable_resume());
+    assert_eq!(scenario.durability.mode, DurabilityMode::Wal);
+}
+
+#[test]
 fn test_parse_generic_scenario_without_field() {
     let toml = r#"
             name = "generic"

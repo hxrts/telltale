@@ -93,9 +93,13 @@ pub fn run_loaded_protocol_machine_record_replay_conformance(
 mod tests {
     use super::*;
     use crate::coroutine::Value;
-    use crate::effect::{EffectFailure, EffectResult, SendDecision, SendDecisionInput};
+    use crate::durable::WalSyncRequest;
+    use crate::effect::{
+        EffectFailure, EffectResult, SendDecision, SendDecisionInput, TopologyPerturbation,
+    };
     use crate::engine::ProtocolMachineConfig;
     use crate::loader::CodeImage;
+    use crate::output_condition::OutputConditionHint;
     use std::collections::BTreeMap;
     use telltale_types::{GlobalType, Label, LocalTypeR};
 
@@ -145,6 +149,87 @@ mod tests {
         }
     }
 
+    struct DeterministicInternalEffectHandler;
+
+    impl EffectHandler for DeterministicInternalEffectHandler {
+        fn handle_send(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &[Value],
+        ) -> EffectResult<Value> {
+            EffectResult::success(Value::Nat(1))
+        }
+
+        fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
+            EffectResult::success(SendDecision::Deliver(input.payload.unwrap_or(Value::Unit)))
+        }
+
+        fn handle_recv(
+            &self,
+            _role: &str,
+            _partner: &str,
+            _label: &str,
+            _state: &mut Vec<Value>,
+            _payload: &Value,
+        ) -> EffectResult<()> {
+            EffectResult::success(())
+        }
+
+        fn handle_choose(
+            &self,
+            _role: &str,
+            _partner: &str,
+            labels: &[String],
+            _state: &[Value],
+        ) -> EffectResult<String> {
+            match labels.first().cloned() {
+                Some(label) => EffectResult::success(label),
+                None => EffectResult::failure(EffectFailure::invalid_input("no labels available")),
+            }
+        }
+
+        fn step(&self, _role: &str, _state: &mut Vec<Value>) -> EffectResult<()> {
+            EffectResult::success(())
+        }
+
+        fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
+            let events = match tick {
+                1 => vec![TopologyPerturbation::Partition {
+                    from: "A".to_string(),
+                    to: "B".to_string(),
+                }],
+                2 => vec![TopologyPerturbation::Heal {
+                    from: "A".to_string(),
+                    to: "B".to_string(),
+                }],
+                _ => Vec::new(),
+            };
+            EffectResult::success(events)
+        }
+
+        fn output_condition_hint(
+            &self,
+            sid: usize,
+            role: &str,
+            _state: &[Value],
+        ) -> Option<OutputConditionHint> {
+            Some(OutputConditionHint {
+                predicate_ref: "machine.integration.internal_effects".to_string(),
+                witness_ref: Some(format!("sid:{sid}:role:{role}")),
+            })
+        }
+
+        fn supports_wal_sync(&self) -> bool {
+            true
+        }
+
+        fn wal_sync(&self, _sync: &WalSyncRequest) -> EffectResult<()> {
+            EffectResult::success(())
+        }
+    }
+
     fn simple_send_recv_image() -> CodeImage {
         let mut local_types = BTreeMap::new();
         local_types.insert(
@@ -182,10 +267,32 @@ mod tests {
         .expect("harness run should succeed");
 
         assert!(report.replay_consistent);
-        assert!(!report.config_mode_consistent);
+        assert!(report.config_mode_consistent);
         assert!(report.exact_trace_match);
-        assert!(!report.exact_effect_trace_match);
+        assert!(report.exact_effect_trace_match);
         assert!(report.recorded_effect_count > 0);
         assert!(report.baseline_event_count > 0);
+    }
+
+    #[test]
+    fn loaded_protocol_machine_harness_preserves_internal_effect_replay_exactness() {
+        let image = simple_send_recv_image();
+        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+        machine
+            .load_choreography(&image)
+            .expect("load choreography");
+
+        let report = run_loaded_protocol_machine_record_replay_conformance(
+            &mut machine,
+            &DeterministicInternalEffectHandler,
+            100,
+        )
+        .expect("harness run should succeed");
+
+        assert!(report.replay_consistent);
+        assert!(report.config_mode_consistent);
+        assert!(report.exact_trace_match);
+        assert!(report.exact_effect_trace_match);
+        assert!(report.recorded_effect_count > 0);
     }
 }

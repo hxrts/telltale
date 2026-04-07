@@ -26,11 +26,12 @@ pub struct Scenario {
     pub properties: Option<PropertiesSpec>,
     pub checkpoint_interval: Option<u64>,
     pub theorem: TheoremProfileSpec,
+    pub durability: DurabilitySpec,
     pub extensions: BTreeMap<String, toml::Value>,
 }
 ```
 
-`network`, `field`, `reconfigurations`, `adversaries`, `properties`, `checkpoint_interval`, and `extensions` are optional.
+`network`, `field`, `reconfigurations`, `adversaries`, `properties`, `checkpoint_interval`, `durability`, and `extensions` are optional.
 
 ```rust
 pub struct ExecutionSpec {
@@ -59,6 +60,15 @@ The theorem block does not change runtime execution.
 It declares which theorem-side contract the caller wants the run to be interpreted under.
 The simulator resolves that declaration against the actual execution regime and reports eligibility in `ScenarioStats.theorem_profile` and `ScenarioReplayArtifact.theorem_profile`.
 
+```rust
+pub struct DurabilitySpec {
+    pub mode: DurabilityMode,
+}
+```
+
+`durability.mode = "wal"` declares that checkpoint resume is only valid when the caller also supplies typed durable WAL and evidence-cache artifacts through `resume_with_durable_checkpoint_artifact(...)`.
+Generic checkpoint resume fails closed for those scenarios so the simulator cannot silently ignore the durable contract.
+
 For recursion-free scenarios, the simulator also derives theorem-native progress quantities in `ScenarioStats.theorem_progress`.
 See [Simulation Runner](502_simulation_runner.md) for definitions of the weighted measure, depth, buffer, and critical-capacity phase.
 
@@ -70,6 +80,9 @@ roles = ["A", "B"]
 steps = 200
 seed = 42
 checkpoint_interval = 25
+
+[durability]
+mode = "wal"
 
 [execution]
 backend = "threaded"
@@ -209,9 +222,9 @@ Predicate strings are parsed by `parse_predicate`.
 
 ## Checkpointing and Replay
 
-`CheckpointStore` snapshots protocol-machine state as CBOR bytes at configured intervals.
-When `checkpoint_interval` is set, `run_with_scenario(...)` writes checkpoint files under `artifacts/<scenario.name>/`.
-Replay loads a checkpoint and re-executes the same shared middleware loop used by fresh scenario runs.
+`CheckpointStore` snapshots protocol-machine state through the typed persisted replay contract at configured intervals.
+When `checkpoint_interval` is set, `run_with_scenario(...)` writes `PersistedReplayArtifact` checkpoint files under `artifacts/<scenario.name>/`.
+Replay loads one of those persisted artifacts and re-executes the same shared middleware loop used by fresh scenario runs.
 `resume_with_checkpoint_artifact(...)` is the exact resume path because it restores both protocol-machine state and simulator middleware state from the captured artifact.
 
 Scenario replay artifacts also retain the resolved adversary schedule, budget-consumption history, assumption diagnostics, and the canonical reconfiguration trace.

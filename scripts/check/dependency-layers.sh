@@ -39,6 +39,10 @@ declare -A layer_of=(
   ["telltale"]=4
   # Internal support utility
   ["telltale-lints"]=4
+  # Viewer and webapp tooling
+  ["telltale-viewer"]=5
+  ["telltale-ui"]=5
+  ["telltale-web"]=5
 )
 
 # ── Cargo Metadata ────────────────────────────────────────────────────

@@ -69,6 +69,7 @@ pub mod composition;
 pub mod coroutine;
 pub mod determinism;
 pub mod driver;
+pub mod durable;
 mod effect;
 mod engine;
 pub mod envelope_diff;
@@ -145,6 +146,19 @@ pub mod model {
             EffectRetryShape, EffectSemanticClass, EffectTimeoutPolicy, EffectTotality,
             EffectTraceEntry, EffectTraceTape, RecordingEffectHandler, ReplayEffectHandler,
             SendDecision, SendDecisionInput, TopologyPerturbation,
+        };
+    }
+
+    /// Durable execution artifact contracts.
+    pub mod durability {
+        pub use crate::durable::{
+            AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
+            DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata,
+            DurableRecoveryPlan, EvidenceIdResolver, EvidenceOutcomeCache,
+            EvidenceOutcomeCacheArtifact, EvidenceOutcomeCacheEntry, EvidencePersistenceHandler,
+            FileAgreementWal, FileEvidenceOutcomeCache, InMemoryAgreementWal,
+            InMemoryEvidenceOutcomeCache, PersistedDurabilityArtifact, PersistedDurabilityPayload,
+            WalSyncMode, WalSyncRequest, PERSISTED_DURABILITY_SCHEMA_VERSION,
         };
     }
 
@@ -312,6 +326,15 @@ pub use composition::{
 pub use coroutine::{CoroStatus, Coroutine, CoroutineState, KnowledgeSet, Value};
 pub use determinism::{DeterminismMode, EffectDeterminismTier};
 pub use driver::NativeSingleThreadDriver as GuestRuntime;
+pub use durable::{
+    AgreementWal, AgreementWalArtifact, AgreementWalEntry, AgreementWalHandler,
+    DurableRecoveryAction, DurableRecoveryDecision, DurableRecoveryMetadata, DurableRecoveryPlan,
+    EvidenceIdResolver, EvidenceOutcomeCache, EvidenceOutcomeCacheArtifact,
+    EvidenceOutcomeCacheEntry, EvidencePersistenceHandler, FileAgreementWal,
+    FileEvidenceOutcomeCache, InMemoryAgreementWal, InMemoryEvidenceOutcomeCache,
+    PersistedDurabilityArtifact, PersistedDurabilityPayload, WalSyncMode, WalSyncRequest,
+    PERSISTED_DURABILITY_SCHEMA_VERSION,
+};
 pub use effect::{
     CorruptionType, EffectAdmissibility, EffectAgreementUse, EffectAuthorityClass,
     EffectCompositionPolicy, EffectExchangeRecord, EffectFailure, EffectFailureKind,

@@ -1,5 +1,21 @@
 // Commit finalization and endpoint delegation for threaded mode.
 impl ThreadedProtocolMachine {
+    fn record_effect_observations(
+        &mut self,
+        observations: Vec<EffectObservation>,
+        handler_identity: &str,
+    ) {
+        for observation in observations {
+            let predicted_effect_id = self.next_effect_id;
+            self.record_effect_exchange(
+                &observation.request,
+                &observation.outcome,
+                handler_identity,
+                predicted_effect_id,
+            );
+        }
+    }
+
     fn issue_delegation_receipt(
         &mut self,
         endpoint: Endpoint,
@@ -65,9 +81,65 @@ impl ThreadedProtocolMachine {
         coro: &Arc<Mutex<Coroutine>>,
         session: &Arc<Mutex<SessionState>>,
         pack: StepPack,
-        output_hint: Option<OutputConditionHint>,
+        effect_observations: Vec<EffectObservation>,
+        output_observation: Option<OutputHintObservation>,
+        handler: &dyn EffectHandler,
         handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
+        let coro_id = coro.lock().expect("threaded ProtocolMachine lock poisoned").id;
+        let sid = session
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned")
+            .sid;
+
+        self.record_effect_observations(effect_observations, handler_identity);
+
+        let output_hint = if let Some(observation) = output_observation {
+            self.ensure_effect_request_allowed(&observation.request)
+                .map_err(|failure| Fault::Invoke { failure })?;
+            let predicted_effect_id = self.next_effect_id;
+            self.record_effect_exchange(
+                &observation.request,
+                &observation.outcome,
+                handler_identity,
+                predicted_effect_id,
+            );
+            observation.hint
+        } else {
+            None
+        };
+
+        if !pack.events.is_empty()
+            && !matches!(
+                self.config.output_condition_policy,
+                crate::output_condition::OutputConditionPolicy::Disabled
+            )
+            && handler.supports_wal_sync()
+        {
+            let sync = self.current_wal_sync_request(Some(sid), coro_id);
+            let request = EffectRequest::wal_sync(
+                self.clock.tick,
+                sync.operation_id.clone(),
+                sync,
+            );
+            self.ensure_effect_request_allowed(&request)
+                .map_err(|failure| Fault::Invoke { failure })?;
+            let predicted_effect_id = self.next_effect_id;
+            let outcome = handler.handle_effect(request.clone());
+            self.record_effect_exchange(&request, &outcome, handler_identity, predicted_effect_id);
+            match outcome.into_unit("wal_sync") {
+                Ok(EffectResult::Success(())) => {}
+                Ok(EffectResult::Blocked) => {
+                    return Ok(ExecOutcome::Blocked(BlockReason::Invoke {
+                        handler: handler_identity.to_string(),
+                    }));
+                }
+                Ok(EffectResult::Failure(failure)) | Err(failure) => {
+                    return Err(Fault::Invoke { failure });
+                }
+            }
+        }
+
         if !pack.events.is_empty() {
             apply_output_condition_gate(
                 &self.config.output_condition_policy,

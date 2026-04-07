@@ -16,6 +16,10 @@ use crate::fault::{
     ScheduledAdversary,
 };
 use crate::field::FieldModel;
+use telltale_machine::model::durability::{
+    AgreementWalArtifact, DurableRecoveryDecision, DurableRecoveryMetadata, DurableRecoveryPlan,
+    EvidenceOutcomeCacheArtifact,
+};
 use telltale_machine::model::effects::{EffectHandler, EffectTraceEntry};
 use telltale_machine::model::output_condition::OutputConditionCheck;
 use telltale_machine::model::scheduler_types::{PriorityPolicy, SchedPolicy};
@@ -30,6 +34,7 @@ use telltale_types::{GlobalType, LocalTypeR};
 use crate::checkpoint::CheckpointStore;
 use crate::execution::{execute_scenario_rounds, ScenarioMiddleware, ScenarioMiddlewareCheckpoint};
 use crate::harness::derive_initial_states;
+use crate::persistence::CheckpointArtifact;
 use crate::property::{PropertyContext, PropertyMonitor, PropertyViolation};
 use crate::reconfiguration::{ReconfigurationRecord, ReconfigurationSummary};
 use crate::scenario::{
@@ -393,26 +398,6 @@ pub struct ScenarioReplayArtifact {
     pub checkpoints: Vec<CheckpointArtifact>,
 }
 
-/// One serialized canonical checkpoint emitted during scenario execution.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct CheckpointArtifact {
-    /// Tick at which the checkpoint was captured.
-    pub tick: u64,
-    /// Serialized protocol-machine state payload.
-    pub machine_state: Vec<u8>,
-    /// Exact middleware state needed for semantics-preserving resume.
-    #[serde(skip_serializing, skip_deserializing, default)]
-    middleware_state: Option<ScenarioMiddlewareCheckpoint>,
-}
-
-impl PartialEq for CheckpointArtifact {
-    fn eq(&self, other: &Self) -> bool {
-        self.tick == other.tick && self.machine_state == other.machine_state
-    }
-}
-
-impl Eq for CheckpointArtifact {}
-
 /// Structured statistics emitted by scenario execution.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
 pub struct ScenarioStats {
@@ -434,6 +419,9 @@ pub struct ScenarioStats {
     pub adversary_summary: AdversarySummary,
     /// Assumption-bundle diagnostics derived from adversary budgets and theorem regime checks.
     pub assumption_diagnostics: Vec<AssumptionDiagnostic>,
+    /// Typed durable recovery summary when the run resumed from checkpoint plus WAL.
+    #[serde(default)]
+    pub durable_recovery: Option<DurableResumeSummary>,
     /// Resolved execution backend.
     pub backend: ResolvedExecutionBackend,
     /// Resolved scheduler concurrency value.
@@ -452,6 +440,28 @@ pub struct ScenarioStats {
     pub checkpoint_writes: usize,
     /// Last non-fatal checkpoint capture error observed during the run.
     pub checkpoint_error: Option<String>,
+}
+
+/// Typed durable resume artifacts supplied alongside one checkpoint artifact.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq)]
+pub struct DurableResumeArtifacts {
+    /// Agreement WAL suffix source for the checkpointed machine.
+    pub wal: AgreementWalArtifact,
+    /// Evidence outcome cache available during recovery.
+    pub evidence_cache: EvidenceOutcomeCacheArtifact,
+}
+
+/// Durable recovery summary emitted in the same reporting lane as normal scenario stats.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct DurableResumeSummary {
+    /// Proof-side execution regime preserved for the resumed run.
+    pub execution_regime: ExecutionRegime,
+    /// Resolved theorem profile preserved for the resumed run.
+    pub theorem_profile: ResolvedTheoremProfile,
+    /// Typed durable recovery metadata.
+    pub metadata: DurableRecoveryMetadata,
+    /// Per-operation durable recovery decisions.
+    pub decisions: Vec<DurableRecoveryDecision>,
 }
 
 /// Theorem-native progress summary for one scenario run.
@@ -745,6 +755,31 @@ fn assumption_diagnostics_with_regime(
     diagnostics
 }
 
+fn validate_checkpoint_machine_matches_scenario(
+    scenario: &Scenario,
+    machine: &ProtocolMachine,
+) -> Result<(), String> {
+    let mut checkpoint_roles: Vec<_> = machine
+        .coroutines()
+        .iter()
+        .map(|coro| coro.role.clone())
+        .collect();
+    checkpoint_roles.sort();
+    checkpoint_roles.dedup();
+
+    let mut scenario_roles = scenario.roles.clone();
+    scenario_roles.sort();
+    scenario_roles.dedup();
+
+    if checkpoint_roles != scenario_roles {
+        return Err(format!(
+            "checkpoint roles {:?} do not match scenario roles {:?}",
+            checkpoint_roles, scenario_roles
+        ));
+    }
+    Ok(())
+}
+
 /// Run a choreography with scenario-defined middleware (adversaries/network/properties).
 ///
 /// # Errors
@@ -814,6 +849,7 @@ fn execute_loaded_scenario_machine(
     theorem_profile: ResolvedTheoremProfile,
     rounds_to_run: u64,
     middleware_checkpoint: Option<&ScenarioMiddlewareCheckpoint>,
+    durable_recovery: Option<DurableResumeSummary>,
 ) -> Result<ScenarioResult, String> {
     let initial_session_snapshots = machine.session_snapshots();
     let initial_role_state = current_role_state(&machine, coro_info);
@@ -829,8 +865,6 @@ fn execute_loaded_scenario_machine(
     })?;
     let mut step_idx: usize = 0;
     let mut checkpoint_writes: usize = 0;
-    let mut checkpoint_states: Vec<(u64, ScenarioMiddlewareCheckpoint)> = Vec::new();
-
     if steps_limit > 0 {
         record_all_roles(&machine, coro_info, 0, &mut trace);
         step_idx = 1;
@@ -901,12 +935,15 @@ fn execute_loaded_scenario_machine(
                 if let Some(interval) = scenario.checkpoint_interval {
                     if interval != 0 && machine.clock().tick % interval == 0 {
                         checkpoint_writes = checkpoint_writes.saturating_add(1);
-                        checkpoint_states
-                            .push((machine.clock().tick, middleware.checkpoint_state()?));
+                        if let SimulationMachine::Canonical(inner) = machine {
+                            let checkpoint = CheckpointArtifact::capture(
+                                inner.clock().tick,
+                                inner,
+                                Some(middleware.checkpoint_state()?),
+                            )?;
+                            store.maybe_checkpoint(checkpoint);
+                        }
                     }
-                }
-                if let SimulationMachine::Canonical(inner) = machine {
-                    store.maybe_checkpoint(inner.clock().tick, inner);
                 }
             }
             Ok(())
@@ -941,20 +978,7 @@ fn execute_loaded_scenario_machine(
         crate::analysis::normalized_observability(&obs_trace, &reconfiguration_trace);
     let checkpoint_artifacts = checkpoints
         .as_ref()
-        .map(|store| {
-            store
-                .checkpoints()
-                .iter()
-                .map(|(tick, machine_state)| CheckpointArtifact {
-                    tick: *tick,
-                    machine_state: machine_state.clone(),
-                    middleware_state: checkpoint_states
-                        .iter()
-                        .find(|(checkpoint_tick, _)| checkpoint_tick == tick)
-                        .map(|(_, state)| state.clone()),
-                })
-                .collect::<Vec<_>>()
-        })
+        .map(|store| store.checkpoints().values().cloned().collect::<Vec<_>>())
         .unwrap_or_default();
     let checkpoint_error = checkpoints
         .as_ref()
@@ -1008,6 +1032,7 @@ fn execute_loaded_scenario_machine(
             environment_trace,
             adversary_summary,
             assumption_diagnostics,
+            durable_recovery,
             backend: resolved_execution.backend,
             scheduler_concurrency: resolved_execution.scheduler_concurrency,
             worker_threads: resolved_execution.worker_threads,
@@ -1046,12 +1071,19 @@ pub fn resume_with_scenario_from_checkpoint(
     environment_models: Option<EnvironmentModels<'_>>,
     rounds: Option<u64>,
 ) -> Result<ScenarioResult, String> {
+    if scenario.requires_durable_resume() {
+        return Err(
+            "durable scenarios must resume with checkpoint plus WAL artifacts via resume_with_durable_checkpoint_artifact"
+                .to_string(),
+        );
+    }
     let resolved_execution = scenario.resolved_execution()?;
     if resolved_execution.backend != ResolvedExecutionBackend::Canonical {
         return Err(
             "checkpoint replay currently requires the canonical simulator backend".to_string(),
         );
     }
+    validate_checkpoint_machine_matches_scenario(scenario, &machine)?;
     let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
     let rounds_to_run =
         rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &machine));
@@ -1069,6 +1101,7 @@ pub fn resume_with_scenario_from_checkpoint(
         &resolved_execution,
         theorem_profile,
         rounds_to_run,
+        None,
         None,
     )
 }
@@ -1089,14 +1122,26 @@ pub fn resume_with_checkpoint_artifact(
     environment_models: Option<EnvironmentModels<'_>>,
     rounds: Option<u64>,
 ) -> Result<ScenarioResult, String> {
-    let machine: ProtocolMachine = serde_cbor::from_slice(&checkpoint.machine_state)
-        .map_err(|e| format!("decode checkpoint artifact: {e}"))?;
+    if scenario.requires_durable_resume() {
+        return Err(
+            "durable scenarios must resume with checkpoint plus WAL artifacts via resume_with_durable_checkpoint_artifact"
+                .to_string(),
+        );
+    }
+    if checkpoint.middleware_state.is_none() {
+        return Err(
+            "checkpoint artifact is missing exact middleware state required for semantics-preserving resume"
+                .to_string(),
+        );
+    }
+    let machine = checkpoint.decode_machine()?;
     let resolved_execution = scenario.resolved_execution()?;
     if resolved_execution.backend != ResolvedExecutionBackend::Canonical {
         return Err(
             "checkpoint replay currently requires the canonical simulator backend".to_string(),
         );
     }
+    validate_checkpoint_machine_matches_scenario(scenario, &machine)?;
     let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
     let rounds_to_run =
         rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &machine));
@@ -1115,6 +1160,69 @@ pub fn resume_with_checkpoint_artifact(
         theorem_profile,
         rounds_to_run,
         checkpoint.middleware_state.as_ref(),
+        None,
+    )
+}
+
+/// Resume a canonical simulator run from checkpoint plus explicit durable WAL and evidence artifacts.
+///
+/// # Errors
+///
+/// Returns an error if checkpoint decoding, durable-plan derivation, or canonical resume fails.
+pub fn resume_with_durable_checkpoint_artifact(
+    scenario: &Scenario,
+    checkpoint: &CheckpointArtifact,
+    durable: &DurableResumeArtifacts,
+    handler: &dyn EffectHandler,
+    environment_models: Option<EnvironmentModels<'_>>,
+    rounds: Option<u64>,
+) -> Result<ScenarioResult, String> {
+    if checkpoint.middleware_state.is_none() {
+        return Err(
+            "checkpoint artifact is missing exact middleware state required for semantics-preserving resume"
+                .to_string(),
+        );
+    }
+    let machine = checkpoint.decode_machine()?;
+    let resolved_execution = scenario.resolved_execution()?;
+    if resolved_execution.backend != ResolvedExecutionBackend::Canonical {
+        return Err(
+            "checkpoint replay currently requires the canonical simulator backend".to_string(),
+        );
+    }
+    validate_checkpoint_machine_matches_scenario(scenario, &machine)?;
+    let theorem_profile = scenario.resolve_theorem_profile_for(&resolved_execution);
+    let plan = DurableRecoveryPlan::from_checkpoint(
+        checkpoint.tick,
+        machine,
+        &durable.wal,
+        durable.evidence_cache.clone(),
+    )?;
+    let rounds_to_run =
+        rounds.unwrap_or_else(|| remaining_rounds_from_checkpoint(scenario, &plan.machine));
+    let coro_info: CoroInfo = plan
+        .machine
+        .coroutines()
+        .iter()
+        .map(|coro| (coro.id, coro.role.clone()))
+        .collect();
+    let durable_summary = DurableResumeSummary {
+        execution_regime: resolved_execution.regime(),
+        theorem_profile: theorem_profile.clone(),
+        metadata: plan.metadata.clone(),
+        decisions: plan.decisions.clone(),
+    };
+    execute_loaded_scenario_machine(
+        scenario,
+        handler,
+        environment_models,
+        SimulationMachine::Canonical(plan.machine),
+        &coro_info,
+        &resolved_execution,
+        theorem_profile,
+        rounds_to_run,
+        checkpoint.middleware_state.as_ref(),
+        Some(durable_summary),
     )
 }
 
@@ -1171,6 +1279,7 @@ pub fn run_with_scenario_and_environment(
         &resolved_execution,
         theorem_profile,
         scenario.steps.saturating_sub(1),
+        None,
         None,
     )
 }

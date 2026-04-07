@@ -78,9 +78,12 @@ It currently renders:
 - watch expressions over sampled semantic facts
 - branch provenance and narrative annotations
 - a run-diff summary for the active branch
+- semantic comparison classification and the first divergence summary
+- theorem-aware counterexamples
 - causality/explanation rows derived from the execution timeline projection
 - bookmarks for historical steps and branches
 - archive reload status for exact artifact-set re-entry
+- deterministic minimization summaries for reduced witnesses
 
 This gives the viewer a first serious run-analysis lane instead of only a
 graph browser.
@@ -90,6 +93,23 @@ than a separate browser-owned workflow.
 Reloading an archived artifact set preserves the deterministic viewer state,
 and any subsequent branch fork still goes back through the typed command path
 instead of mutating the archived run in place.
+
+## Sweep and Effect Workspaces
+
+The shared webapp now also exposes:
+
+- a sweep explorer page with filtering, outlier highlighting, and drill-down
+  into the selected case
+- a suite page section for baseline-vs-candidate regression thresholds and
+  counterexample presence
+- an effect page that renders typed effect traces and queued mocked rerun
+  overrides
+
+These pages still consume the same pure `telltale-viewer` query/command
+surface.
+The browser shell does not own sweep execution, suite comparison, effect
+mocking, or minimization semantics.
+It only drives the typed requests and renders the returned artifacts.
 
 ## Downstream Handoff
 
@@ -111,6 +131,8 @@ The intended downstream extension points are:
   authoritative projection contract
 - downstream application-service implementations that feed the same
   query/command surface
+- extension manifests that target overview panels, graph annotations,
+  time-travel panels, and insight panels without requiring a shell fork
 
 Downstreams should not fork the core shell just to add overlays.
 The shared Telltale crates now provide the minimum handoff surface Aura needs.
@@ -149,6 +171,8 @@ The Dioxus watcher is configured to watch:
 The browser shell currently loads the demo workspace through the typed
 application-service path so the shared shell, graph, and insight surfaces are
 all exercised from one entrypoint.
+That same demo path now also exercises sweep exploration, effect inspection,
+mocked rerun commands, minimization summaries, and downstream extension slots.
 
 ## Simulator CLI Note
 
