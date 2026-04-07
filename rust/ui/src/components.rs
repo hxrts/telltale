@@ -2,7 +2,6 @@
 
 use dioxus::document::eval;
 use dioxus::prelude::*;
-use dioxus_shadcn::components::badge::{Badge as ShadBadge, BadgeVariant};
 use dioxus_shadcn::components::card::Card as ShadCard;
 use dioxus_shadcn::components::empty::{Empty, EmptyDescription, EmptyHeader};
 
@@ -41,25 +40,6 @@ pub(crate) fn EmptyState(message: &'static str) -> Element {
             EmptyHeader {
                 EmptyDescription { "{message}" }
             }
-        }
-    }
-}
-
-pub(crate) fn badge_variant(tone: &str) -> BadgeVariant {
-    match tone {
-        "success" => BadgeVariant::Default,
-        "warning" => BadgeVariant::Outline,
-        _ => BadgeVariant::Secondary,
-    }
-}
-
-#[component]
-pub(crate) fn StatusBadge(tone: &'static str, label: String) -> Element {
-    rsx! {
-        ShadBadge {
-            variant: badge_variant(tone),
-            class: Some("font-mono text-[0.6875rem]".to_string()),
-            "{label}"
         }
     }
 }

@@ -78,16 +78,6 @@ pub struct ViewerPublicationDiagnostics {
     pub active_artifact: Option<SelectedArtifactId>,
 }
 
-impl ViewerPublicationDiagnostics {
-    pub(crate) fn status_tone(&self) -> &'static str {
-        match self.readiness {
-            ViewerReadinessState::Ready => "success",
-            ViewerReadinessState::Loading => "muted",
-            ViewerReadinessState::Degraded => "warning",
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ViewerGraphWorkspace {
     pub projections: Vec<GraphProjection>,
