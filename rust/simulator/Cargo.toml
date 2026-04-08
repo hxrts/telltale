@@ -20,6 +20,7 @@ wasm = ["getrandom/js", "telltale-machine/wasm"]
 multi-thread = ["telltale-machine/multi-thread"]
 
 [dependencies]
+telltale-search = { path = "../search", version = "11.3.0" }
 telltale-types = { path = "../types", version = "11.3.0" }
 telltale-machine = { path = "../machine", version = "11.3.0" }
 telltale-theory = { path = "../theory", version = "11.3.0" }

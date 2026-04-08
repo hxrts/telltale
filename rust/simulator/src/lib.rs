@@ -42,6 +42,7 @@ pub mod reconfiguration;
 pub mod rng;
 pub mod runner;
 pub mod scenario;
+pub mod search;
 pub mod sweep;
 pub mod trace;
 mod value_conv;
@@ -115,6 +116,7 @@ pub use runner::{
     ScenarioAnalysisArtifact, SchedulerBoundMode, SchedulerComparison, SchedulerEnvelopeStatus,
     SchedulerFairnessRequirement, SchedulerProfileSummary, TheoremProgressSummary,
 };
+pub use search::{project_search_run, SearchSimulationArtifact};
 pub use sweep::{
     compare_sweep_results, run_sweep, SweepAxis, SweepBinding, SweepConfig, SweepDiffReport,
     SweepManifest, SweepManifestEntry, SweepRunDiff, SweepRunResult,

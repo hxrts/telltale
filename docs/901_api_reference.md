@@ -165,6 +165,20 @@ Current serial-core exports include:
   `SearchObservationArtifact`, `NormalizedCommitRecord`,
   `ObservationComparison`, `ObservationRelation`,
   `compare_observations(...)`
+- runtime/replay types:
+  `ProposalExecutor`, `SerialProposalExecutor`,
+  `NativeParallelExecutor`, `AuthorityReadSet`, `AuthorityWriteSet`,
+  `AuthoritySurface`, `SchedulerArtifact`, `SchedulerArtifactClass`,
+  `ProgressSummary`, `TotalStepMode`, `SearchExecutionReport`,
+  `SearchReplayArtifact`, `ReplayRoundRecord`, `ReplayExpectation`,
+  `ReplayError`, `run_with_executor(...)`, `replay_observation(...)`,
+  `EpochReconfigurationRequest`, `commit_epoch_reconfiguration(...)`,
+  `proposals_independent(...)`
+
+Optional layers above the core crate:
+
+- `telltale_simulator::project_search_run(...)`
+- `telltale_viewer::project_search_artifacts(...)`
 
 Module access (not re-exported at crate root):
 - Effect boundary:

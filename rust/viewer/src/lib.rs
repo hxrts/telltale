@@ -8,10 +8,12 @@
 #![allow(missing_docs)]
 
 pub mod error;
+pub mod search;
 pub mod service;
 pub mod types;
 
 pub use error::ViewerModelError;
+pub use search::{project_search_artifacts, SearchViewerArtifact};
 pub use service::{InMemoryViewerService, ViewerApplicationService};
 pub use types::*;
 

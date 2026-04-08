@@ -36,3 +36,30 @@ The current serial-core surface includes:
 - determinism, scheduler, fairness, and observable capability vocabulary
 - `SearchObservationArtifact` and `compare_observations(...)` for profile-aware
   artifact comparison
+
+The current runtime surface adds:
+
+- `ProposalExecutor`, `SerialProposalExecutor`, and `NativeParallelExecutor`
+- authority read/write summaries for speculative proposals
+- `run_with_executor(...)` for canonical host execution over speculative work
+- `SchedulerArtifact`, `SchedulerArtifactClass`, and `ProgressSummary`
+- `SearchReplayArtifact`, `ReplayExpectation`, and `replay_observation(...)`
+- `EpochReconfigurationRequest` and `commit_epoch_reconfiguration(...)`
+
+Target support:
+
+- the core serial machine is target-agnostic
+- the optional `multi-thread` feature enables the native parallel executor
+- WASM builds use the same canonical serial and replay surface without `rayon`
+
+Optional integration layers now exist above the crate boundary:
+
+- `telltale-simulator` can project search runs through `project_search_run(...)`
+- `telltale-viewer` can project search artifacts through `project_search_artifacts(...)`
+
+Reduced Lean/Rust parity currently covers:
+
+- canonical batch-window extraction
+- proposal independence over declared authority surfaces
+- replay epoch and phase contracts
+- epoch-barrier semantics and fairness-bundle fixtures

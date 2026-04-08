@@ -130,11 +130,13 @@ The goal is to keep artifact loading, branch mutation requests, and historical i
 
 ### telltale-search
 
-`telltale-search` is the generic weighted-graph search substrate planned for the
+`telltale-search` is the generic weighted-graph search substrate for the
 workspace.
-It is intended to own canonical search-machine semantics, replay artifacts,
-determinism and fairness capability vocabulary, and explicit graph-epoch
-boundaries for weighted graph search.
+It owns canonical search-machine semantics, replay artifacts, determinism and
+fairness capability vocabulary, explicit graph-epoch boundaries, and
+fairness-aware scheduler artifacts for weighted graph search. The crate is
+target-agnostic; the optional `multi-thread` feature only enables native
+speculative proposal execution.
 
 This crate is intentionally downstream-oriented and domain-generic.
 Application-specific routing, RF, mesh, or topology policies should live in
