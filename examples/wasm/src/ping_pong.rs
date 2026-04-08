@@ -27,8 +27,8 @@ tell! {
     -- // Alice sends a ping and Bob replies with a pong.
     protocol PingPong uses BrowserRuntime under Replay =
       roles Alice, Bob
-      Alice -> Bob : Ping(String)
-      Bob -> Alice : Pong(String)
+      Alice -> Bob : Ping of String
+      Bob -> Alice : Pong of String
 }
 
 use PingPong::effects;
@@ -86,8 +86,10 @@ pub async fn run_ping_pong(message: String) -> Result<JsValue, JsValue> {
     let sent_ping = message.clone();
     let mut browser_host = BrowserHost;
 
-    let (received_pong, (received_ping, sent_pong)) =
-        try_join!(alice(&mut alice_role, message), bob(&mut bob_role, &mut browser_host))?;
+    let (received_pong, (received_ping, sent_pong)) = try_join!(
+        alice(&mut alice_role, message),
+        bob(&mut bob_role, &mut browser_host)
+    )?;
 
     serde_wasm_bindgen::to_value(&PingPongResult {
         sent_ping,

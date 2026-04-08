@@ -18,12 +18,12 @@ tell! {
     -- // to all participants.
     protocol RingMax =
       roles A, B, C, D, E
-      A -> B : Value(i32)
-      B -> C : Value(i32)
-      C -> D : Value(i32)
-      D -> E : Value(i32)
-      E -> A : Value(i32)
-      A ->* : Winner(i32)
+      A -> B : Value of i32
+      B -> C : Value of i32
+      C -> D : Value of i32
+      D -> E : Value of i32
+      E -> A : Value of i32
+      A ->* : Winner of i32
 }
 
 use RingMax::sessions::*;

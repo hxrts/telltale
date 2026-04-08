@@ -302,6 +302,17 @@ check-fail-closed-mutations:
     cargo test -p telltale-machine transported_theorem_boundary_fail_closes_ -- --nocapture
     ./scripts/check/fail-closed-mutations.sh
 
+# Reclaim build space when the local volume is close to exhaustion.
+reclaim-build-space-if-needed min_free_mb="2048":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
+    if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
+      echo "Low disk space (${free_mb}MB free); reclaiming Cargo build artifacts"
+      rm -rf .tmp target/capability-gates
+      cargo clean
+    fi
+
 # Run the deterministic extension statement parsing/dispatch regression suites.
 check-extension-dispatch:
     cargo test -p telltale-runtime --test extension_integration -- --nocapture
@@ -309,9 +320,11 @@ check-extension-dispatch:
 
 # Run the machine-checkable first-party handler/transport contract boundary suites.
 check-handler-contracts:
+    just reclaim-build-space-if-needed
     mkdir -p .tmp
     TMPDIR=$PWD/.tmp cargo test -p telltale-runtime --test handler_contracts -- --nocapture
     TMPDIR=$PWD/.tmp cargo test -p telltale-runtime --test transport_contracts -- --nocapture
+    just reclaim-build-space-if-needed
     TMPDIR=$PWD/.tmp cargo test -p telltale-transport --test transport_contract_profiles -- --nocapture
 
 # Run the Lean-backed regular-fragment deadlock automation suites.

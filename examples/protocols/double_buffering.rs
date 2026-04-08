@@ -19,14 +19,14 @@ tell! {
       roles S, K, T
       -- // First buffer transfer from source through kernel to sink.
       K -> S : Ready
-      S -> K : Copy(i32)
+      S -> K : Copy of i32
       T -> K : Ready
-      K -> T : Copy(i32)
+      K -> T : Copy of i32
       -- // Second buffer transfer repeats the same pipeline.
       K -> S : Ready
-      S -> K : Copy(i32)
+      S -> K : Copy of i32
       T -> K : Ready
-      K -> T : Copy(i32)
+      K -> T : Copy of i32
 }
 
 use DoubleBuffering::sessions::*;

@@ -14,7 +14,7 @@ use futures::{
 };
 use std::{error::Error, result};
 use telltale::{
-    channel::Bidirectional, session, try_session, End, Message, Receive, Role, Roles, Send,
+    channel::Bidirectional, session, tell, try_session, End, Message, Receive, Role, Roles, Send,
 };
 
 type Result<T> = result::Result<T, Box<dyn Error>>;
@@ -43,6 +43,22 @@ struct Request(String);
 
 #[derive(Debug)]
 struct Response(i32);
+
+tell! {
+    protocol PairExchange =
+      roles A, B
+      A -> B : PairMsg(i32, i32)
+      B -> A : Ack
+}
+
+tell! {
+    protocol RecordExchange =
+      roles A, B
+      A -> B : Offer { routeId : String, epoch : Int }
+      B -> A : Accepted { routeId : String }
+}
+
+use PairExchange::sessions::*;
 
 // ============================================================================
 // Basic Session Type Tests
@@ -134,6 +150,46 @@ fn test_session_multi_message() {
                 assert_eq!(m3, "3");
                 Ok(((), s))
             })
+        )
+    });
+
+    assert!(result.is_ok());
+}
+
+#[test]
+fn tell_macro_record_payload_messages_are_public() {
+    let RecordExchange::sessions::Roles(mut a, mut b) = RecordExchange::sessions::Roles::default();
+
+    let result: Result<_> = executor::block_on(async {
+        try_join!(
+            try_session(
+                &mut a,
+                |s: RecordExchange::sessions::ASession<'_, _>| async {
+                    let s = s
+                        .send(RecordExchange::sessions::Offer {
+                            route_id: "route-7".to_string(),
+                            epoch: 11,
+                        })
+                        .await?;
+                    let (RecordExchange::sessions::Accepted { route_id }, end) =
+                        s.receive().await?;
+                    assert_eq!(route_id, "route-7");
+                    Ok(((), end))
+                }
+            ),
+            try_session(
+                &mut b,
+                |s: RecordExchange::sessions::BSession<'_, _>| async {
+                    let (RecordExchange::sessions::Offer { route_id, epoch }, s) =
+                        s.receive().await?;
+                    assert_eq!(route_id, "route-7");
+                    assert_eq!(epoch, 11);
+                    let end = s
+                        .send(RecordExchange::sessions::Accepted { route_id })
+                        .await?;
+                    Ok(((), end))
+                }
+            )
         )
     });
 
@@ -247,6 +303,29 @@ fn test_session_deeply_nested() {
                 assert_eq!(m2, "req2");
                 let s = s.send(Response(2)).await?;
                 Ok(((), s))
+            })
+        )
+    });
+
+    assert!(result.is_ok());
+}
+
+#[test]
+fn tell_macro_multi_field_tuple_messages_are_public() {
+    let Roles(mut a, mut b) = Roles::default();
+
+    let result: Result<_> = executor::block_on(async {
+        try_join!(
+            try_session(&mut a, |s: ASession<'_, _>| async {
+                let s = s.send(PairMsg(7, 11)).await?;
+                let (Ack, end) = s.receive().await?;
+                Ok(((), end))
+            }),
+            try_session(&mut b, |s: BSession<'_, _>| async {
+                let (PairMsg(left, right), s) = s.receive().await?;
+                assert_eq!((left, right), (7, 11));
+                let end = s.send(Ack).await?;
+                Ok(((), end))
             })
         )
     });
