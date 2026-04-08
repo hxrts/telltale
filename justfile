@@ -571,6 +571,13 @@ check-search-tooling:
       export TMPDIR="/tmp"
     fi
     cargo test -p telltale-search -- --nocapture
+    cargo test -p telltale-simulator --test search_integration -- --nocapture
+    cargo test -p telltale-viewer --test search_adapter -- --nocapture
+    cargo test -p telltale-search --example basic_search --no-run
+    if rustup target list --installed | grep -q '^wasm32-unknown-unknown$'; then
+      cargo check -p telltale-search --target wasm32-unknown-unknown --tests
+    fi
+    lake --dir lean build search_parity_runner
     just check-search-boundaries
 
 # Focused durability verification split: machine contracts, simulator assurance, and boundaries.
