@@ -89,7 +89,7 @@ pub struct SearchDUser {
     /// Required commutativity region.
     pub required_commutativity_region: CommutativityRegionClass,
     /// Maximum admitted batch width.
-    pub max_batch_width: usize,
+    pub max_batch_width: u64,
     /// Whether replay must preserve frozen epoch identity.
     pub require_frozen_epoch_replay: bool,
     /// Whether replay support is mandatory.
@@ -110,7 +110,7 @@ pub struct SearchCertifiedCapability {
     /// Supported commutativity region.
     pub supported_commutativity_region: CommutativityRegionClass,
     /// Maximum certified batch width.
-    pub max_certified_batch_width: usize,
+    pub max_certified_batch_width: u64,
     /// Whether frozen-epoch replay is supported.
     pub supports_frozen_epoch_replay: bool,
     /// Whether replay support is available at all.
@@ -133,9 +133,9 @@ pub enum AdmissionRejectionReason {
     /// Requested batch width exceeds certification.
     BatchWidthTooLarge {
         /// Requested maximum width.
-        requested: usize,
+        requested: u64,
         /// Certified maximum width.
-        certified: usize,
+        certified: u64,
     },
     /// Frozen-epoch replay was requested but not supported.
     MissingFrozenEpochReplay,

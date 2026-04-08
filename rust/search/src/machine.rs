@@ -8,6 +8,24 @@ use crate::domain::SearchDomain;
 use crate::observe::{NormalizedCommitRecord, SearchObservationArtifact};
 use crate::runtime::{AuthorityReadSet, AuthorityWriteSet};
 
+type MachineState<D> = SearchState<
+    <D as SearchDomain>::Node,
+    <D as SearchDomain>::EdgeMeta,
+    <D as SearchDomain>::GraphEpoch,
+    <D as SearchDomain>::SnapshotId,
+    <D as SearchDomain>::Cost,
+>;
+
+type MachineBatch<D> = CanonicalBatch<
+    <D as SearchDomain>::Node,
+    <D as SearchDomain>::GraphEpoch,
+    <D as SearchDomain>::SnapshotId,
+    <D as SearchDomain>::Cost,
+>;
+
+type MachineProposal<D> =
+    Proposal<<D as SearchDomain>::Node, <D as SearchDomain>::EdgeMeta, <D as SearchDomain>::Cost>;
+
 /// Stable ordering key for one frontier entry.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct FrontierScore {
@@ -176,7 +194,7 @@ pub struct SearchMachine<D: SearchDomain> {
     pub(crate) domain: D,
     pub(crate) start: D::Node,
     pub(crate) goal: D::Node,
-    pub(crate) state: SearchState<D::Node, D::EdgeMeta, D::GraphEpoch, D::SnapshotId, D::Cost>,
+    pub(crate) state: MachineState<D>,
 }
 
 impl<D: SearchDomain> SearchMachine<D> {
@@ -228,17 +246,13 @@ impl<D: SearchDomain> SearchMachine<D> {
 
     /// Borrow the canonical state.
     #[must_use]
-    pub fn state(
-        &self,
-    ) -> &SearchState<D::Node, D::EdgeMeta, D::GraphEpoch, D::SnapshotId, D::Cost> {
+    pub fn state(&self) -> &MachineState<D> {
         &self.state
     }
 
     /// Extract the next legal min-key batch from `OPEN`.
     #[must_use]
-    pub fn next_batch(
-        &mut self,
-    ) -> Option<CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>> {
+    pub fn next_batch(&mut self) -> Option<MachineBatch<D>> {
         let sorted = self.sorted_open_entries();
         let min_score = sorted.first()?.frontier_score;
         let batch_entries = sorted
@@ -270,7 +284,7 @@ impl<D: SearchDomain> SearchMachine<D> {
     pub fn expand_batch(
         &self,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
-    ) -> Result<Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>, SearchError<D::Error>> {
+    ) -> Result<Vec<MachineProposal<D>>, SearchError<D::Error>> {
         let mut proposals = Vec::new();
         for (batch_index, entry) in batch.entries.iter().enumerate() {
             let mut successors = Vec::new();
@@ -331,6 +345,10 @@ impl<D: SearchDomain> SearchMachine<D> {
     ///
     /// Returns an error if domain evaluation fails or if one canonical
     /// invariant is violated after the step.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the extracted batch entry count does not fit in `u64`.
     pub fn step_once(&mut self) -> Result<bool, SearchError<D::Error>> {
         let Some(batch) = self.next_batch() else {
             return Ok(false);
@@ -341,7 +359,8 @@ impl<D: SearchDomain> SearchMachine<D> {
         self.normalize_proposals(&mut proposals);
         let changed = self.commit_proposals(&proposals);
 
-        self.state.budget_state.expansions += batch.entries.len() as u64;
+        self.state.budget_state.expansions +=
+            u64::try_from(batch.entries.len()).expect("batch entry count must fit in u64");
         self.state.budget_state.batches += 1;
         if changed {
             self.state.trace_state.productive_steps += 1;

@@ -8,6 +8,11 @@ use telltale_search::{
     SearchFairnessAssumption, SearchMachine, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
+type CanonicalRun = (
+    telltale_search::SearchExecutionReport<u8, u64, u64>,
+    telltale_search::SearchReplayArtifact<u8, u64, &'static str, u64>,
+);
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -65,10 +70,7 @@ fn make_domain() -> TestDomain {
     domain
 }
 
-fn canonical_run() -> (
-    telltale_search::SearchExecutionReport<u8, u64, u64>,
-    telltale_search::SearchReplayArtifact<u8, u64, &'static str, u64>,
-) {
+fn canonical_run() -> CanonicalRun {
     let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
     run_with_executor(
         &mut machine,

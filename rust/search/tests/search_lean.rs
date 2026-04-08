@@ -113,12 +113,7 @@ fn make_domain() -> TestDomain {
     domain
 }
 
-#[test]
-fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
-    let fixture = search_fixture();
-    assert_eq!(fixture.schema_version, "search_parity_v1");
-
-    let domain = make_domain();
+fn assert_batch_and_independence_contracts(fixture: &SearchParityFixture, domain: &TestDomain) {
     let mut machine = SearchMachine::new(domain.clone(), 1, 0, 5, EpsilonMilli::one());
     machine.step_once().expect("first canonical step");
     let batch = machine.next_batch().expect("second batch");
@@ -178,7 +173,9 @@ fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
         },
     };
     assert!(proposals_independent(&left, &right));
+}
 
+fn assert_replay_contracts(fixture: &SearchParityFixture, domain: TestDomain) {
     let mut replay_machine = SearchMachine::new(domain, 1, 0, 5, EpsilonMilli::one());
     let (report, replay) = run_with_executor(
         &mut replay_machine,
@@ -198,7 +195,9 @@ fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
     )
     .expect("replay fixture");
     assert_eq!(replayed, report.observation);
+}
 
+fn assert_barrier_contracts(fixture: &SearchParityFixture) {
     let mut barrier_machine = SearchMachine::new(
         make_domain(),
         fixture.barrier_before_epoch,
@@ -222,4 +221,15 @@ fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
         fixture.barrier_phase_delta
     );
     assert_eq!(fixture.fairness_bundle, vec!["EventualLiveBatchService"]);
+}
+
+#[test]
+fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
+    let fixture = search_fixture();
+    assert_eq!(fixture.schema_version, "search_parity_v1");
+
+    let domain = make_domain();
+    assert_batch_and_independence_contracts(&fixture, &domain);
+    assert_replay_contracts(&fixture, domain);
+    assert_barrier_contracts(&fixture);
 }

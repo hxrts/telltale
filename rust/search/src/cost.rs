@@ -43,20 +43,6 @@ impl SearchCost for u64 {
     }
 }
 
-impl SearchCost for usize {
-    fn zero() -> Self {
-        0
-    }
-
-    fn saturating_add(self, rhs: Self) -> Self {
-        self.saturating_add(rhs)
-    }
-
-    fn order_key(self) -> u128 {
-        self as u128
-    }
-}
-
 /// Fixed-point epsilon with milli precision.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub struct EpsilonMilli(pub u32);

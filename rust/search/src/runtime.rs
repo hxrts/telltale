@@ -15,6 +15,35 @@ use crate::machine::{
 };
 use crate::observe::{NormalizedCommitRecord, SearchObservationArtifact};
 
+type RuntimeProposalVec<D> = Vec<
+    Proposal<<D as SearchDomain>::Node, <D as SearchDomain>::EdgeMeta, <D as SearchDomain>::Cost>,
+>;
+
+type RuntimeExecutionResult<D> = Result<
+    (
+        SearchExecutionReport<
+            <D as SearchDomain>::Node,
+            <D as SearchDomain>::GraphEpoch,
+            <D as SearchDomain>::Cost,
+        >,
+        SearchReplayArtifact<
+            <D as SearchDomain>::Node,
+            <D as SearchDomain>::GraphEpoch,
+            <D as SearchDomain>::SnapshotId,
+            <D as SearchDomain>::Cost,
+        >,
+    ),
+    SearchError<<D as SearchDomain>::Error>,
+>;
+
+type RuntimeState<D> = SearchState<
+    <D as SearchDomain>::Node,
+    <D as SearchDomain>::EdgeMeta,
+    <D as SearchDomain>::GraphEpoch,
+    <D as SearchDomain>::SnapshotId,
+    <D as SearchDomain>::Cost,
+>;
+
 /// Machine authority surface touched by speculative proposals.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum AuthoritySurface {
@@ -109,7 +138,7 @@ pub struct SchedulerArtifact {
     /// Whether the scheduler artifact is exact, normalized, or only diagnostic.
     pub authority_class: SchedulerArtifactClass,
     /// Configured batch width.
-    pub batch_width: usize,
+    pub batch_width: u64,
     /// Declared fairness assumptions.
     pub fairness_assumptions: Vec<SearchFairnessAssumption>,
 }
@@ -202,12 +231,12 @@ pub struct EpochReconfigurationRequest<G> {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ReplayError {
     /// The replay artifact epoch schedule does not match the requested schedule.
-    EpochMismatch,
+    EpochSchedule,
     /// The replay artifact phase schedule does not match the requested schedule.
-    PhaseMismatch,
+    PhaseSchedule,
     /// The replay artifact fairness bundle does not satisfy the requested
     /// theorem-style premise bundle.
-    FairnessMismatch,
+    FairnessBundle,
 }
 
 /// Runtime executor for speculative proposal generation.
@@ -222,7 +251,7 @@ pub trait ProposalExecutor<D: SearchDomain> {
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
         goal: &D::Node,
-    ) -> Result<Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>, D::Error>;
+    ) -> Result<RuntimeProposalVec<D>, D::Error>;
 }
 
 /// Serial executor over a canonical batch.
@@ -235,7 +264,7 @@ impl<D: SearchDomain> ProposalExecutor<D> for SerialProposalExecutor {
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
         goal: &D::Node,
-    ) -> Result<Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>, D::Error> {
+    ) -> Result<RuntimeProposalVec<D>, D::Error> {
         let mut proposals = Vec::new();
         for (batch_index, entry) in batch.entries.iter().enumerate() {
             let mut successors = Vec::new();
@@ -264,7 +293,7 @@ impl<D: SearchDomain> ProposalExecutor<D> for SerialProposalExecutor {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct NativeParallelExecutor {
     /// Maximum batch width to execute.
-    pub batch_width: usize,
+    pub batch_width: u64,
 }
 
 #[cfg(feature = "multi-thread")]
@@ -281,12 +310,13 @@ where
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
         goal: &D::Node,
-    ) -> Result<Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>, D::Error> {
+    ) -> Result<RuntimeProposalVec<D>, D::Error> {
         let _ = goal;
+        let batch_limit = usize::try_from(self.batch_width).unwrap_or(usize::MAX);
         let mut per_entry = batch
             .entries
             .iter()
-            .take(self.batch_width.max(1))
+            .take(batch_limit.max(1))
             .cloned()
             .enumerate()
             .collect::<Vec<_>>();
@@ -330,7 +360,7 @@ impl<D: SearchDomain> ProposalExecutor<D> for NativeParallelExecutor {
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
         goal: &D::Node,
-    ) -> Result<Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>, D::Error> {
+    ) -> Result<RuntimeProposalVec<D>, D::Error> {
         let serial = SerialProposalExecutor;
         let _ = self.batch_width;
         serial.generate(domain, batch, goal)
@@ -338,19 +368,22 @@ impl<D: SearchDomain> ProposalExecutor<D> for NativeParallelExecutor {
 }
 
 /// Execute one machine to completion through one proposal executor.
+///
+/// # Errors
+///
+/// Returns an error if successor enumeration fails in the domain or if the
+/// authoritative machine detects an invariant violation during commit.
+///
+/// # Panics
+///
+/// Panics if one extracted batch entry count does not fit in `u64`.
 pub fn run_with_executor<D, X>(
     machine: &mut SearchMachine<D>,
     executor: &X,
     scheduler_profile: SearchSchedulerProfile,
-    batch_width: usize,
+    batch_width: u64,
     fairness_assumptions: Vec<SearchFairnessAssumption>,
-) -> Result<
-    (
-        SearchExecutionReport<D::Node, D::GraphEpoch, D::Cost>,
-        SearchReplayArtifact<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
-    ),
-    SearchError<D::Error>,
->
+) -> RuntimeExecutionResult<D>
 where
     D: SearchDomain,
     X: ProposalExecutor<D>,
@@ -364,7 +397,8 @@ where
             .map_err(SearchError::Domain)?;
         machine.normalize_proposals(&mut proposals);
         let changed = machine.commit_proposals(&proposals);
-        machine.state_mut().budget_state.expansions += batch.entries.len() as u64;
+        machine.state_mut().budget_state.expansions +=
+            u64::try_from(batch.entries.len()).expect("batch entry count must fit in u64");
         machine.state_mut().budget_state.batches += 1;
         if changed {
             machine.state_mut().trace_state.productive_steps += 1;
@@ -489,6 +523,11 @@ pub fn commit_epoch_reconfiguration<D: SearchDomain>(
 }
 
 /// Replay one canonical observation artifact under an expected epoch schedule.
+///
+/// # Errors
+///
+/// Returns an error if the replay artifact does not match the requested epoch
+/// schedule, phase schedule, or fairness bundle.
 pub fn replay_observation<N, G, S, C>(
     replay: &SearchReplayArtifact<N, G, S, C>,
     expectation: &ReplayExpectation<G>,
@@ -500,7 +539,7 @@ where
     C: SearchCost,
 {
     if replay.epoch_trace != expectation.expected_epochs {
-        return Err(ReplayError::EpochMismatch);
+        return Err(ReplayError::EpochSchedule);
     }
     let replay_phases = replay
         .rounds
@@ -508,14 +547,14 @@ where
         .map(|round| round.phase)
         .collect::<Vec<_>>();
     if replay_phases != expectation.expected_phases {
-        return Err(ReplayError::PhaseMismatch);
+        return Err(ReplayError::PhaseSchedule);
     }
     if !expectation
         .required_fairness
         .iter()
         .all(|assumption| replay.fairness_assumptions.contains(assumption))
     {
-        return Err(ReplayError::FairnessMismatch);
+        return Err(ReplayError::FairnessBundle);
     }
     Ok(replay.final_observation.clone())
 }
@@ -570,9 +609,7 @@ where
 
 impl<D: SearchDomain> SearchMachine<D> {
     /// Internal mutable state access for runtime orchestration.
-    pub(crate) fn state_mut(
-        &mut self,
-    ) -> &mut SearchState<D::Node, D::EdgeMeta, D::GraphEpoch, D::SnapshotId, D::Cost> {
+    pub(crate) fn state_mut(&mut self) -> &mut RuntimeState<D> {
         &mut self.state
     }
 
@@ -824,7 +861,7 @@ mod tests {
             },
         )
         .expect_err("mismatched epochs");
-        assert_eq!(err, ReplayError::EpochMismatch);
+        assert_eq!(err, ReplayError::EpochSchedule);
     }
 
     #[test]
@@ -849,7 +886,7 @@ mod tests {
             },
         )
         .expect_err("mismatched phases");
-        assert_eq!(phase_err, ReplayError::PhaseMismatch);
+        assert_eq!(phase_err, ReplayError::PhaseSchedule);
 
         let fairness_err = replay_observation(
             &replay,
@@ -860,6 +897,6 @@ mod tests {
             },
         )
         .expect_err("mismatched fairness bundle");
-        assert_eq!(fairness_err, ReplayError::FairnessMismatch);
+        assert_eq!(fairness_err, ReplayError::FairnessBundle);
     }
 }

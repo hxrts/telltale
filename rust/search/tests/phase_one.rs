@@ -6,10 +6,17 @@ use telltale_search::{
     SearchObservableClass, SearchSchedulerProfile, SearchTraceState, CRATE_SCOPE,
 };
 
+type CompareFn = fn(
+    &telltale_search::SearchObservationArtifact<u8, u64, u64>,
+    &telltale_search::SearchObservationArtifact<u8, u64, u64>,
+    SearchDeterminismMode,
+    &[SearchObservableClass],
+) -> ObservationComparison;
+
 #[test]
 fn phase_one_scaffold_exports_compile() {
-    let _ = SearchRuntimeMarker::default();
-    let _ = EpsilonMilli::one();
+    let _ = SearchRuntimeMarker;
+    assert_eq!(EpsilonMilli::one().0, 1_000);
     let _ = SearchBudgetState::default();
     let _ = SearchTraceState::default();
     let _ = SearchDUser {
@@ -22,11 +29,6 @@ fn phase_one_scaffold_exports_compile() {
         require_frozen_epoch_replay: false,
         replay_required: false,
     };
-    let _: fn(
-        &telltale_search::SearchObservationArtifact<u8, u64, u64>,
-        &telltale_search::SearchObservationArtifact<u8, u64, u64>,
-        SearchDeterminismMode,
-        &[SearchObservableClass],
-    ) -> ObservationComparison = compare_observations;
+    let _: CompareFn = compare_observations;
     assert!(CRATE_SCOPE.contains("weighted-graph-plus-epoch"));
 }
