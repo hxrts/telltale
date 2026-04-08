@@ -155,6 +155,16 @@ Current serial-core exports include:
 - `CanonicalBatch`, `Proposal`, `ProposalKind`
 - `SearchBudgetState`, `SearchTraceState`
 - `SearchError`, `SearchInvariantViolation`
+- profile/admission types:
+  `SearchDeterminismMode`, `SearchSchedulerProfile`,
+  `SearchFairnessAssumption`, `SearchObservableClass`,
+  `CommutativityRegionClass`, `SearchDUser`,
+  `SearchCertifiedCapability`, `AdmissionRejectionReason`,
+  `check_capability_containment(...)`
+- observation/comparison types:
+  `SearchObservationArtifact`, `NormalizedCommitRecord`,
+  `ObservationComparison`, `ObservationRelation`,
+  `compare_observations(...)`
 
 Module access (not re-exported at crate root):
 - Effect boundary:

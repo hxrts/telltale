@@ -2,8 +2,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use crate::admission::{SearchFairnessAssumption, SearchSchedulerProfile};
 use crate::cost::{EpsilonMilli, SearchCost};
 use crate::domain::SearchDomain;
+use crate::observe::{NormalizedCommitRecord, SearchObservationArtifact};
 
 /// Stable ordering key for one frontier entry.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -133,6 +135,10 @@ pub struct SearchState<N, E, G, S, C> {
     pub graph_snapshot_id: S,
     /// Last extracted canonical batch.
     pub last_batch: Option<CanonicalBatch<N, G, S, C>>,
+    /// Canonical normalized commit trace for the current run.
+    pub normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
+    /// Graph epoch trace for the current run.
+    pub graph_epoch_trace: Vec<G>,
 }
 
 /// Invariant violation raised by the canonical machine.
@@ -193,7 +199,10 @@ impl<D: SearchDomain> SearchMachine<D> {
             graph_epoch: epoch,
             graph_snapshot_id: snapshot_id,
             last_batch: None,
+            normalized_commit_trace: Vec::new(),
+            graph_epoch_trace: Vec::new(),
         };
+        state.graph_epoch_trace.push(state.graph_epoch.clone());
         let start_score = Self::frontier_entry_for(
             &domain,
             &state.graph_epoch,
@@ -316,10 +325,10 @@ impl<D: SearchDomain> SearchMachine<D> {
     /// Returns an error if domain evaluation fails or if one canonical
     /// invariant is violated after the step.
     pub fn step_once(&mut self) -> Result<bool, SearchError<D::Error>> {
-        self.state.trace_state.total_scheduler_steps += 1;
         let Some(batch) = self.next_batch() else {
             return Ok(false);
         };
+        self.state.trace_state.total_scheduler_steps += 1;
 
         let mut proposals = self.expand_batch(&batch)?;
         self.normalize_proposals(&mut proposals);
@@ -345,6 +354,35 @@ impl<D: SearchDomain> SearchMachine<D> {
     pub fn run_to_completion(&mut self) -> Result<(), SearchError<D::Error>> {
         while self.step_once()? {}
         Ok(())
+    }
+
+    /// Derive one observation artifact from the current canonical machine
+    /// state.
+    #[must_use]
+    pub fn observation_artifact(
+        &self,
+        scheduler_profile: SearchSchedulerProfile,
+        fairness_assumptions: Vec<SearchFairnessAssumption>,
+    ) -> SearchObservationArtifact<D::Node, D::GraphEpoch, D::Cost> {
+        SearchObservationArtifact {
+            incumbent_cost: self
+                .state
+                .incumbent
+                .as_ref()
+                .map(|incumbent| incumbent.cost),
+            incumbent_path: self
+                .state
+                .incumbent
+                .as_ref()
+                .map(|incumbent| incumbent.path.clone()),
+            normalized_commit_trace: self.state.normalized_commit_trace.clone(),
+            replay_checkpoints: Vec::new(),
+            graph_epoch_trace: self.state.graph_epoch_trace.clone(),
+            scheduler_profile,
+            fairness_assumptions,
+            productive_steps: self.state.trace_state.productive_steps,
+            total_scheduler_steps: self.state.trace_state.total_scheduler_steps,
+        }
     }
 
     /// Reconstruct one canonical path from the start node to the target node.
@@ -505,6 +543,12 @@ impl<D: SearchDomain> SearchMachine<D> {
             );
             self.state.open.insert(proposal.to.clone(), entry);
         }
+        self.state
+            .normalized_commit_trace
+            .push(NormalizedCommitRecord {
+                node: proposal.to.clone(),
+                g_score: proposal.tentative_g,
+            });
     }
 
     fn refresh_incumbent(&mut self) {
@@ -664,5 +708,21 @@ mod tests {
         while machine.step_once().expect("serial step") {
             machine.check_invariants().expect("invariants hold");
         }
+    }
+
+    #[test]
+    fn observation_artifact_reflects_canonical_state() {
+        let domain = make_domain(&[(0, 1, "0-1", 1), (1, 2, "1-2", 1)], &[]);
+        let mut machine = SearchMachine::new(domain, 7, 0, 2, EpsilonMilli::one());
+        machine.run_to_completion().expect("run to completion");
+        let artifact = machine.observation_artifact(
+            SearchSchedulerProfile::CanonicalSerial,
+            vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        );
+        assert_eq!(artifact.incumbent_cost, Some(2));
+        assert_eq!(artifact.incumbent_path, Some(vec![0, 1, 2]));
+        assert_eq!(artifact.graph_epoch_trace, vec![7]);
+        assert_eq!(artifact.productive_steps, 2);
+        assert_eq!(artifact.total_scheduler_steps, 3);
     }
 }

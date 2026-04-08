@@ -18,12 +18,21 @@ pub mod machine;
 pub mod observe;
 pub mod runtime;
 
+pub use admission::{
+    check_capability_containment, AdmissionRejectionReason, CommutativityRegionClass,
+    SearchCertifiedCapability, SearchDUser, SearchDeterminismMode, SearchFairnessAssumption,
+    SearchObservableClass, SearchSchedulerProfile,
+};
 pub use cost::{EpsilonMilli, SearchCost};
 pub use domain::SearchDomain;
 pub use machine::{
     CanonicalBatch, FrontierEntry, FrontierScore, Incumbent, ParentRecord, Proposal, ProposalKind,
     SearchBudgetState, SearchError, SearchInvariantViolation, SearchMachine, SearchState,
     SearchTraceState,
+};
+pub use observe::{
+    compare_observations, NormalizedCommitRecord, ObservationComparison, ObservationRelation,
+    SearchObservationArtifact,
 };
 
 /// Current crate scope statement used by smoke tests and boundary checks.

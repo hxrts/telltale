@@ -33,3 +33,6 @@ The current serial-core surface includes:
 - `CanonicalBatch`, `Proposal`, and canonical path reconstruction
 - explicit invariant checks for partition discipline, parent-score coherence,
   incumbent coherence, and batch legality
+- determinism, scheduler, fairness, and observable capability vocabulary
+- `SearchObservationArtifact` and `compare_observations(...)` for profile-aware
+  artifact comparison
