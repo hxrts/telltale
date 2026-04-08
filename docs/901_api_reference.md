@@ -139,12 +139,22 @@ Planned module structure:
 The supported boundary is intentionally generic:
 
 - canonical search-machine semantics
+- serial min-key batch extraction and deterministic commit
 - search replay and comparison artifacts
 - scheduler and fairness capability vocabulary
 - explicit graph-epoch and snapshot inputs
 
 Downstream consumers are expected to provide application-specific node, edge,
 heuristic, and epoch semantics through typed domain traits.
+
+Current serial-core exports include:
+
+- `SearchCost`, `EpsilonMilli`
+- `SearchDomain`
+- `SearchMachine`, `SearchState`
+- `CanonicalBatch`, `Proposal`, `ProposalKind`
+- `SearchBudgetState`, `SearchTraceState`
+- `SearchError`, `SearchInvariantViolation`
 
 Module access (not re-exported at crate root):
 - Effect boundary:

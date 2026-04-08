@@ -570,7 +570,7 @@ check-search-tooling:
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
     fi
-    cargo test -p telltale-search --test phase_one -- --nocapture
+    cargo test -p telltale-search -- --nocapture
     just check-search-boundaries
 
 # Focused durability verification split: machine contracts, simulator assurance, and boundaries.

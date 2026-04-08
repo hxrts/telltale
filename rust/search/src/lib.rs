@@ -1,8 +1,8 @@
 //! Generic deterministic weighted-graph search substrate for Telltale.
 //!
-//! `telltale-search` is intended to hold a reusable search machine,
-//! determinism/admission vocabulary, replay artifacts, and runtime traits for
-//! weighted graph search over explicit graph epochs.
+//! `telltale-search` holds reusable search-machine semantics, replay-ready
+//! artifacts, and runtime/admission vocabulary for weighted graph search over
+//! explicit graph epochs.
 //!
 //! The crate is intentionally generic:
 //!
@@ -18,5 +18,13 @@ pub mod machine;
 pub mod observe;
 pub mod runtime;
 
-/// Phase-1 crate scope statement used by smoke tests and boundary checks.
+pub use cost::{EpsilonMilli, SearchCost};
+pub use domain::SearchDomain;
+pub use machine::{
+    CanonicalBatch, FrontierEntry, FrontierScore, Incumbent, ParentRecord, Proposal, ProposalKind,
+    SearchBudgetState, SearchError, SearchInvariantViolation, SearchMachine, SearchState,
+    SearchTraceState,
+};
+
+/// Current crate scope statement used by smoke tests and boundary checks.
 pub const CRATE_SCOPE: &str = "generic weighted-graph-plus-epoch search";
