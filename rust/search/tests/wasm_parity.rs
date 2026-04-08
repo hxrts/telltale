@@ -1,11 +1,15 @@
-#![allow(clippy::expect_used)]
+#![allow(clippy::expect_used, missing_docs)]
 //! Cross-target parity checks for the canonical search machine.
 
-use std::collections::BTreeMap;
+mod support;
 
+use std::collections::BTreeSet;
+
+use support::FixtureDomain;
 use telltale_search::{
-    replay_observation, run_with_executor, EpsilonMilli, ReplayExpectation, SearchDomain,
-    SearchFairnessAssumption, SearchMachine, SearchSchedulerProfile, SerialProposalExecutor,
+    replay_observation, run_with_executor, EpsilonMilli, ReplayExpectation,
+    SearchFairnessAssumption, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
+    SerialProposalExecutor,
 };
 
 type CanonicalRun = (
@@ -16,57 +20,14 @@ type CanonicalRun = (
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen_test::wasm_bindgen_test;
 
-#[derive(Clone, Debug, Default)]
-struct TestDomain {
-    edges: BTreeMap<u8, Vec<(u8, &'static str, u64)>>,
-    heuristics: BTreeMap<(u64, u8), u64>,
-}
-
-impl SearchDomain for TestDomain {
-    type Node = u8;
-    type EdgeMeta = &'static str;
-    type Cost = u64;
-    type GraphEpoch = u64;
-    type SnapshotId = &'static str;
-    type Error = &'static str;
-
-    fn successors(
-        &self,
-        _epoch: &Self::GraphEpoch,
-        node: &Self::Node,
-        out: &mut Vec<(Self::Node, Self::EdgeMeta, Self::Cost)>,
-    ) -> Result<(), Self::Error> {
-        if let Some(edges) = self.edges.get(node) {
-            out.extend(edges.iter().cloned());
-        }
-        Ok(())
-    }
-
-    fn heuristic(
-        &self,
-        epoch: &Self::GraphEpoch,
-        node: &Self::Node,
-        _goal: &Self::Node,
-    ) -> Self::Cost {
-        *self.heuristics.get(&(*epoch, *node)).unwrap_or(&0)
-    }
-
-    fn snapshot_id(&self, epoch: &Self::GraphEpoch) -> Self::SnapshotId {
-        if *epoch == 1 {
-            "epoch-1"
-        } else {
-            "epoch-2"
-        }
-    }
-}
-
-fn make_domain() -> TestDomain {
-    let mut domain = TestDomain::default();
-    domain.edges.insert(0, vec![(1, "0-1", 1), (2, "0-2", 1)]);
-    domain.edges.insert(1, vec![(3, "1-3", 1)]);
-    domain.edges.insert(2, vec![(3, "2-3", 1)]);
-    domain.heuristics.insert((1, 1), 0);
-    domain.heuristics.insert((1, 2), 0);
+fn make_domain() -> FixtureDomain {
+    let mut domain = FixtureDomain::default();
+    domain.edge(0, 1, "0-1", 1);
+    domain.edge(0, 2, "0-2", 1);
+    domain.edge(1, 3, "1-3", 1);
+    domain.edge(2, 3, "2-3", 1);
+    domain.heuristic_value(1, 1, 0);
+    domain.heuristic_value(1, 2, 0);
     domain
 }
 
@@ -75,9 +36,13 @@ fn canonical_run() -> CanonicalRun {
     run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchSchedulerProfile::CanonicalSerial,
-        1,
-        vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        SearchRunConfig {
+            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
+            batch_width: 1,
+            fairness_assumptions: BTreeSet::from([
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+            ]),
+        },
     )
     .expect("canonical run")
 }
@@ -91,7 +56,9 @@ fn assert_serial_and_replay_contracts() {
         &ReplayExpectation {
             expected_epochs: vec![1],
             expected_phases: replay.rounds.iter().map(|round| round.phase).collect(),
-            required_fairness: vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+            required_fairness: BTreeSet::from([
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+            ]),
         },
     )
     .expect("replay must succeed");

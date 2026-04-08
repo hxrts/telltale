@@ -127,7 +127,7 @@ and simulators.
 
 Generic weighted-graph search substrate for the Telltale workspace.
 
-Planned module structure:
+Module structure:
 
 - `telltale_search::cost`
 - `telltale_search::domain`
@@ -140,6 +140,7 @@ The supported boundary is intentionally generic:
 
 - canonical search-machine semantics
 - serial min-key batch extraction and deterministic commit
+- full legal batch execution even under chunked parallel schedulers
 - search replay and comparison artifacts
 - scheduler and fairness capability vocabulary
 - explicit graph-epoch and snapshot inputs
@@ -151,7 +152,7 @@ Current serial-core exports include:
 
 - `SearchCost`, `EpsilonMilli`
 - `SearchDomain`
-- `SearchMachine`, `SearchState`
+- `SearchMachine`
 - `CanonicalBatch`, `Proposal`, `ProposalKind`
 - `SearchBudgetState`, `SearchTraceState`
 - `SearchError`, `SearchInvariantViolation`
@@ -163,17 +164,28 @@ Current serial-core exports include:
   `check_capability_containment(...)`
 - observation/comparison types:
   `SearchObservationArtifact`, `NormalizedCommitRecord`,
+  `IncumbentPublicationRecord`,
   `ObservationComparison`, `ObservationRelation`,
   `compare_observations(...)`
 - runtime/replay types:
   `ProposalExecutor`, `SerialProposalExecutor`,
-  `NativeParallelExecutor`, `AuthorityReadSet`, `AuthorityWriteSet`,
+  `NativeParallelExecutor`, `NativeParallelExecutorError`,
+  `AuthorityReadSet`, `AuthorityWriteSet`,
   `AuthoritySurface`, `SchedulerArtifact`, `SchedulerArtifactClass`,
   `ProgressSummary`, `TotalStepMode`, `SearchExecutionReport`,
   `SearchReplayArtifact`, `ReplayRoundRecord`, `ReplayExpectation`,
-  `ReplayError`, `run_with_executor(...)`, `replay_observation(...)`,
+  `ReplayError`, `SearchRunConfig`, `run_with_executor(...)`,
+  `replay_observation(...)`,
   `EpochReconfigurationRequest`, `commit_epoch_reconfiguration(...)`,
   `proposals_independent(...)`
+
+Replay validation is derived from canonical round commits rather than trusting
+stored summary fields. Epoch reconfiguration is barriered and resets
+frontier/parent/incumbent state before reseeding the new epoch from the start
+node. Fairness bundles are explicit observation and admission surfaces.
+Observation artifacts also carry canonical parent identity and incumbent
+publication traces, while fairness and capability bundles use set semantics
+rather than order-sensitive vectors.
 
 Optional layers above the core crate:
 

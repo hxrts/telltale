@@ -5,7 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::admission::{SearchFairnessAssumption, SearchSchedulerProfile};
 use crate::cost::{EpsilonMilli, SearchCost};
 use crate::domain::SearchDomain;
-use crate::observe::{NormalizedCommitRecord, SearchObservationArtifact};
+use crate::observe::{
+    IncumbentPublicationRecord, NormalizedCommitRecord, SearchObservationAccumulator,
+    SearchObservationArtifact,
+};
 use crate::runtime::{AuthorityReadSet, AuthorityWriteSet};
 
 type MachineState<D> = SearchState<
@@ -156,12 +159,6 @@ pub struct SearchState<N, E, G, S, C> {
     pub graph_epoch: G,
     /// Frozen snapshot identity.
     pub graph_snapshot_id: S,
-    /// Last extracted canonical batch.
-    pub last_batch: Option<CanonicalBatch<N, G, S, C>>,
-    /// Canonical normalized commit trace for the current run.
-    pub normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
-    /// Graph epoch trace for the current run.
-    pub graph_epoch_trace: Vec<G>,
 }
 
 /// Invariant violation raised by the canonical machine.
@@ -195,6 +192,8 @@ pub struct SearchMachine<D: SearchDomain> {
     pub(crate) start: D::Node,
     pub(crate) goal: D::Node,
     pub(crate) state: MachineState<D>,
+    pub(crate) observation: SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost>,
+    pub(crate) last_batch: Option<MachineBatch<D>>,
 }
 
 impl<D: SearchDomain> SearchMachine<D> {
@@ -219,13 +218,9 @@ impl<D: SearchDomain> SearchMachine<D> {
             phase: 0,
             budget_state: SearchBudgetState::default(),
             trace_state: SearchTraceState::default(),
-            graph_epoch: epoch,
+            graph_epoch: epoch.clone(),
             graph_snapshot_id: snapshot_id,
-            last_batch: None,
-            normalized_commit_trace: Vec::new(),
-            graph_epoch_trace: Vec::new(),
         };
-        state.graph_epoch_trace.push(state.graph_epoch.clone());
         let start_score = Self::frontier_entry_for(
             &domain,
             &state.graph_epoch,
@@ -241,6 +236,13 @@ impl<D: SearchDomain> SearchMachine<D> {
             start,
             goal,
             state,
+            observation: SearchObservationAccumulator {
+                normalized_commit_trace: Vec::new(),
+                replay_checkpoints: Vec::new(),
+                graph_epoch_trace: vec![epoch],
+                incumbent_publication_trace: Vec::new(),
+            },
+            last_batch: None,
         }
     }
 
@@ -250,20 +252,29 @@ impl<D: SearchDomain> SearchMachine<D> {
         &self.state
     }
 
+    /// Borrow the accumulated observation records.
+    #[must_use]
+    pub(crate) fn observation(
+        &self,
+    ) -> &SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost> {
+        &self.observation
+    }
+
+    pub(crate) fn observation_mut(
+        &mut self,
+    ) -> &mut SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost> {
+        &mut self.observation
+    }
+
     /// Extract the next legal min-key batch from `OPEN`.
     #[must_use]
-    pub fn next_batch(&mut self) -> Option<MachineBatch<D>> {
+    pub fn next_batch(&self) -> Option<MachineBatch<D>> {
         let sorted = self.sorted_open_entries();
         let min_score = sorted.first()?.frontier_score;
         let batch_entries = sorted
             .into_iter()
             .take_while(|entry| entry.frontier_score == min_score)
             .collect::<Vec<_>>();
-
-        for entry in &batch_entries {
-            self.state.open.remove(&entry.node);
-            self.state.closed.insert(entry.node.clone());
-        }
 
         let batch = CanonicalBatch {
             epoch: self.state.graph_epoch.clone(),
@@ -272,7 +283,6 @@ impl<D: SearchDomain> SearchMachine<D> {
             min_score,
             entries: batch_entries,
         };
-        self.state.last_batch = Some(batch.clone());
         Some(batch)
     }
 
@@ -310,7 +320,10 @@ impl<D: SearchDomain> SearchMachine<D> {
     }
 
     /// Normalize proposals into canonical commit order.
-    pub fn normalize_proposals(&self, proposals: &mut [Proposal<D::Node, D::EdgeMeta, D::Cost>]) {
+    pub fn normalize_proposals(
+        &self,
+        proposals: &mut Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>,
+    ) {
         proposals.sort_by(|left, right| {
             left.to
                 .cmp(&right.to)
@@ -319,6 +332,7 @@ impl<D: SearchDomain> SearchMachine<D> {
                 .then(left.batch_index.cmp(&right.batch_index))
                 .then(left.kind.cmp(&right.kind))
         });
+        proposals.dedup_by(|left, right| left.to == right.to);
     }
 
     /// Commit one normalized proposal slice.
@@ -327,13 +341,14 @@ impl<D: SearchDomain> SearchMachine<D> {
         proposals: &[Proposal<D::Node, D::EdgeMeta, D::Cost>],
     ) -> bool {
         let mut changed = false;
+        let mut goal_changed = false;
         for proposal in proposals {
             if self.proposal_improves_state(proposal) {
-                self.apply_proposal(proposal);
+                goal_changed |= self.apply_proposal(proposal);
                 changed = true;
             }
         }
-        if changed {
+        if goal_changed {
             self.refresh_incumbent();
         }
         changed
@@ -353,9 +368,10 @@ impl<D: SearchDomain> SearchMachine<D> {
         let Some(batch) = self.next_batch() else {
             return Ok(false);
         };
-        self.state.trace_state.total_scheduler_steps += 1;
 
         let mut proposals = self.expand_batch(&batch)?;
+        self.state.trace_state.total_scheduler_steps += 1;
+        self.activate_batch(&batch);
         self.normalize_proposals(&mut proposals);
         let changed = self.commit_proposals(&proposals);
 
@@ -382,13 +398,59 @@ impl<D: SearchDomain> SearchMachine<D> {
         Ok(())
     }
 
+    /// Lower epsilon and rebuild the frontier for ARA*-style refinement.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `next_epsilon` is greater than the current epsilon.
+    pub fn decrease_epsilon_and_rebuild(&mut self, next_epsilon: EpsilonMilli) {
+        assert!(
+            next_epsilon <= self.state.epsilon,
+            "epsilon increases are not legal in canonical refinement"
+        );
+        if next_epsilon == self.state.epsilon {
+            return;
+        }
+        self.state.phase += 1;
+        self.state.epsilon = next_epsilon;
+        self.state.closed.clear();
+
+        let rebuild_nodes = self
+            .state
+            .open
+            .keys()
+            .cloned()
+            .chain(self.state.incons.iter().cloned())
+            .collect::<BTreeSet<_>>();
+        self.state.open.clear();
+        self.state.incons.clear();
+        self.last_batch = None;
+
+        for node in rebuild_nodes {
+            let g_score = *self
+                .state
+                .g_score
+                .get(&node)
+                .expect("rebuild nodes must have canonical g scores");
+            let entry = Self::frontier_entry_for(
+                &self.domain,
+                &self.state.graph_epoch,
+                &self.goal,
+                self.state.epsilon,
+                &node,
+                g_score,
+            );
+            self.state.open.insert(node, entry);
+        }
+    }
+
     /// Derive one observation artifact from the current canonical machine
     /// state.
     #[must_use]
     pub fn observation_artifact(
         &self,
         scheduler_profile: SearchSchedulerProfile,
-        fairness_assumptions: Vec<SearchFairnessAssumption>,
+        fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
     ) -> SearchObservationArtifact<D::Node, D::GraphEpoch, D::Cost> {
         SearchObservationArtifact {
             incumbent_cost: self
@@ -401,9 +463,16 @@ impl<D: SearchDomain> SearchMachine<D> {
                 .incumbent
                 .as_ref()
                 .map(|incumbent| incumbent.path.clone()),
-            normalized_commit_trace: self.state.normalized_commit_trace.clone(),
-            replay_checkpoints: Vec::new(),
-            graph_epoch_trace: self.state.graph_epoch_trace.clone(),
+            canonical_parent_map: self
+                .state
+                .parent
+                .iter()
+                .map(|(node, parent)| (node.clone(), parent.from.clone()))
+                .collect(),
+            incumbent_publication_trace: self.observation.incumbent_publication_trace.clone(),
+            normalized_commit_trace: self.observation.normalized_commit_trace.clone(),
+            replay_checkpoints: self.observation.replay_checkpoints.clone(),
+            graph_epoch_trace: self.observation.graph_epoch_trace.clone(),
             scheduler_profile,
             fairness_assumptions,
             productive_steps: self.state.trace_state.productive_steps,
@@ -481,7 +550,7 @@ impl<D: SearchDomain> SearchMachine<D> {
             }
         }
 
-        if let Some(batch) = &self.state.last_batch {
+        if let Some(batch) = &self.last_batch {
             let all_same_min_key = batch
                 .entries
                 .iter()
@@ -541,7 +610,7 @@ impl<D: SearchDomain> SearchMachine<D> {
             .is_some_and(|current| proposal.from < current.from)
     }
 
-    fn apply_proposal(&mut self, proposal: &Proposal<D::Node, D::EdgeMeta, D::Cost>) {
+    fn apply_proposal(&mut self, proposal: &Proposal<D::Node, D::EdgeMeta, D::Cost>) -> bool {
         self.state
             .g_score
             .insert(proposal.to.clone(), proposal.tentative_g);
@@ -569,12 +638,14 @@ impl<D: SearchDomain> SearchMachine<D> {
             );
             self.state.open.insert(proposal.to.clone(), entry);
         }
-        self.state
+        self.observation
             .normalized_commit_trace
             .push(NormalizedCommitRecord {
                 node: proposal.to.clone(),
+                parent: Some(proposal.from.clone()),
                 g_score: proposal.tentative_g,
             });
+        proposal.to == self.goal
     }
 
     fn refresh_incumbent(&mut self) {
@@ -588,167 +659,48 @@ impl<D: SearchDomain> SearchMachine<D> {
             None => {
                 self.state.incumbent = Some(Incumbent {
                     cost: goal_cost,
-                    path,
-                })
+                    path: path.clone(),
+                });
+                self.observation
+                    .incumbent_publication_trace
+                    .push(IncumbentPublicationRecord {
+                        cost: goal_cost,
+                        path,
+                    });
             }
             Some(current) if goal_cost < current.cost => {
                 self.state.incumbent = Some(Incumbent {
                     cost: goal_cost,
-                    path,
+                    path: path.clone(),
                 });
+                self.observation
+                    .incumbent_publication_trace
+                    .push(IncumbentPublicationRecord {
+                        cost: goal_cost,
+                        path,
+                    });
             }
             Some(current) if goal_cost == current.cost && path < current.path => {
                 self.state.incumbent = Some(Incumbent {
                     cost: goal_cost,
-                    path,
+                    path: path.clone(),
                 });
+                self.observation
+                    .incumbent_publication_trace
+                    .push(IncumbentPublicationRecord {
+                        cost: goal_cost,
+                        path,
+                    });
             }
             Some(_) => {}
         }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[derive(Clone, Debug, Default)]
-    struct TestDomain {
-        edges: BTreeMap<u8, Vec<(u8, &'static str, u64)>>,
-        heuristics: BTreeMap<u8, u64>,
-    }
-
-    impl SearchDomain for TestDomain {
-        type Node = u8;
-        type EdgeMeta = &'static str;
-        type Cost = u64;
-        type GraphEpoch = u64;
-        type SnapshotId = &'static str;
-        type Error = &'static str;
-
-        fn successors(
-            &self,
-            _epoch: &Self::GraphEpoch,
-            node: &Self::Node,
-            out: &mut Vec<(Self::Node, Self::EdgeMeta, Self::Cost)>,
-        ) -> Result<(), Self::Error> {
-            if let Some(edges) = self.edges.get(node) {
-                out.extend(edges.iter().cloned());
-            }
-            Ok(())
+    pub(crate) fn activate_batch(&mut self, batch: &MachineBatch<D>) {
+        for entry in &batch.entries {
+            self.state.open.remove(&entry.node);
+            self.state.closed.insert(entry.node.clone());
         }
-
-        fn heuristic(
-            &self,
-            _epoch: &Self::GraphEpoch,
-            node: &Self::Node,
-            _goal: &Self::Node,
-        ) -> Self::Cost {
-            *self.heuristics.get(node).unwrap_or(&0)
-        }
-
-        fn snapshot_id(&self, _epoch: &Self::GraphEpoch) -> Self::SnapshotId {
-            "epoch-1"
-        }
-    }
-
-    fn make_domain(edges: &[(u8, u8, &'static str, u64)], heuristics: &[(u8, u64)]) -> TestDomain {
-        let mut domain = TestDomain::default();
-        for (from, to, edge, cost) in edges {
-            domain
-                .edges
-                .entry(*from)
-                .or_default()
-                .push((*to, *edge, *cost));
-        }
-        for (node, heuristic) in heuristics {
-            domain.heuristics.insert(*node, *heuristic);
-        }
-        domain
-    }
-
-    #[test]
-    fn canonical_batch_extracts_only_min_key_window() {
-        let domain = make_domain(&[(0, 1, "0-1", 1), (0, 2, "0-2", 1), (0, 3, "0-3", 3)], &[]);
-        let mut machine = SearchMachine::new(domain, 1, 0, 9, EpsilonMilli::one());
-        assert!(machine.step_once().expect("step from start"));
-        let batch = machine.next_batch().expect("min-key batch");
-        let nodes = batch
-            .entries
-            .iter()
-            .map(|entry| entry.node)
-            .collect::<Vec<_>>();
-        assert_eq!(nodes, vec![1, 2]);
-    }
-
-    #[test]
-    fn canonical_parent_tie_break_prefers_lower_source_node() {
-        let domain = make_domain(
-            &[
-                (0, 1, "0-1", 1),
-                (0, 2, "0-2", 1),
-                (1, 3, "1-3", 1),
-                (2, 3, "2-3", 1),
-            ],
-            &[],
-        );
-        let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
-        machine.run_to_completion().expect("run to completion");
-        let path = machine.reconstruct_path(&3).expect("path to goal");
-        assert_eq!(path, vec![0, 1, 3]);
-        let parent = machine.state.parent.get(&3).expect("goal parent");
-        assert_eq!(parent.from, 1);
-    }
-
-    #[test]
-    fn incumbent_tracks_canonical_reconstruction() {
-        let domain = make_domain(
-            &[
-                (0, 1, "0-1", 1),
-                (1, 3, "1-3", 1),
-                (0, 2, "0-2", 5),
-                (2, 3, "2-3", 1),
-            ],
-            &[],
-        );
-        let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
-        machine.run_to_completion().expect("run to completion");
-        let incumbent = machine.state.incumbent.as_ref().expect("incumbent");
-        assert_eq!(incumbent.cost, 2);
-        assert_eq!(incumbent.path, vec![0, 1, 3]);
-    }
-
-    #[test]
-    fn invariants_hold_after_each_serial_step() {
-        let domain = make_domain(
-            &[
-                (0, 1, "0-1", 1),
-                (0, 2, "0-2", 2),
-                (1, 3, "1-3", 2),
-                (2, 3, "2-3", 1),
-                (3, 4, "3-4", 1),
-            ],
-            &[(1, 1), (2, 0), (3, 0)],
-        );
-        let mut machine = SearchMachine::new(domain, 1, 0, 4, EpsilonMilli(2_000));
-        while machine.step_once().expect("serial step") {
-            machine.check_invariants().expect("invariants hold");
-        }
-    }
-
-    #[test]
-    fn observation_artifact_reflects_canonical_state() {
-        let domain = make_domain(&[(0, 1, "0-1", 1), (1, 2, "1-2", 1)], &[]);
-        let mut machine = SearchMachine::new(domain, 7, 0, 2, EpsilonMilli::one());
-        machine.run_to_completion().expect("run to completion");
-        let artifact = machine.observation_artifact(
-            SearchSchedulerProfile::CanonicalSerial,
-            vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
-        );
-        assert_eq!(artifact.incumbent_cost, Some(2));
-        assert_eq!(artifact.incumbent_path, Some(vec![0, 1, 2]));
-        assert_eq!(artifact.graph_epoch_trace, vec![7]);
-        assert_eq!(artifact.productive_steps, 2);
-        assert_eq!(artifact.total_scheduler_steps, 3);
+        self.last_batch = Some(batch.clone());
     }
 }

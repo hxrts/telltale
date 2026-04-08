@@ -1,11 +1,11 @@
 #![allow(clippy::expect_used)]
 //! Integration checks for the optional `telltale-search` simulator adapter.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use telltale_search::{
     run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,
-    SearchSchedulerProfile, SerialProposalExecutor,
+    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 use telltale_simulator::project_search_run;
 
@@ -57,9 +57,13 @@ fn simulator_adapter_projects_search_artifacts() {
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchSchedulerProfile::CanonicalSerial,
-        1,
-        vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        SearchRunConfig {
+            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
+            batch_width: 1,
+            fairness_assumptions: BTreeSet::from([
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+            ]),
+        },
     )
     .expect("search run");
 

@@ -29,27 +29,44 @@ The current serial-core surface includes:
 
 - `SearchCost` and `EpsilonMilli`
 - `SearchDomain`
-- `SearchMachine` and `SearchState`
+- `SearchMachine`
 - `CanonicalBatch`, `Proposal`, and canonical path reconstruction
 - explicit invariant checks for partition discipline, parent-score coherence,
   incumbent coherence, and batch legality
 - determinism, scheduler, fairness, and observable capability vocabulary
 - `SearchObservationArtifact` and `compare_observations(...)` for profile-aware
-  artifact comparison
+  artifact comparison, including canonical parent identity and incumbent
+  publication traces
 
 The current runtime surface adds:
 
 - `ProposalExecutor`, `SerialProposalExecutor`, and `NativeParallelExecutor`
+- `SearchRunConfig` for typed runtime configuration instead of positional
+  scheduler/fairness arguments
+- full legal min-key batch execution, with `batch_width` controlling worker
+  chunking rather than canonical batch membership
 - authority read/write summaries for speculative proposals
 - `run_with_executor(...)` for canonical host execution over speculative work
 - `SchedulerArtifact`, `SchedulerArtifactClass`, and `ProgressSummary`
 - `SearchReplayArtifact`, `ReplayExpectation`, and `replay_observation(...)`
 - `EpochReconfigurationRequest` and `commit_epoch_reconfiguration(...)`
 
+Replay and reconfiguration semantics are fail-closed:
+
+- runtime failures during proposal generation do not consume the canonical batch
+- replay derives the final observation from canonical round commits and rejects
+  drift against the stored artifact
+- epoch reconfiguration resets canonical frontier, parent, and incumbent state,
+  then re-seeds the new epoch from the start node
+- fairness assumptions are first-class observable artifacts and comparison
+  inputs
+
 Target support:
 
 - the core serial machine is target-agnostic
-- the optional `multi-thread` feature enables the native parallel executor
+- the optional `multi-thread` feature enables the native parallel executor;
+  constructing `NativeParallelExecutor` without it fails explicitly rather than
+  silently degrading to serial execution
 - WASM builds use the same canonical serial and replay surface without `rayon`
 
 Optional integration layers now exist above the crate boundary:

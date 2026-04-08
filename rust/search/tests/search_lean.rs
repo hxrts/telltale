@@ -1,17 +1,20 @@
 //! Reduced Rust/Lean parity checks for `telltale-search`.
 #![cfg(not(target_arch = "wasm32"))]
-#![allow(clippy::expect_used)]
+#![allow(clippy::expect_used, missing_docs)]
 
-use std::collections::BTreeMap;
+mod support;
+
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde::Deserialize;
+use support::FixtureDomain;
 use telltale_search::{
     commit_epoch_reconfiguration, proposals_independent, replay_observation, run_with_executor,
     AuthorityReadSet, AuthoritySurface, AuthorityWriteSet, EpochReconfigurationRequest,
-    EpsilonMilli, Proposal, ProposalKind, ReplayExpectation, SearchDomain,
-    SearchFairnessAssumption, SearchMachine, SearchSchedulerProfile, SerialProposalExecutor,
+    EpsilonMilli, Proposal, ProposalKind, ReplayExpectation, SearchFairnessAssumption,
+    SearchMachine, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 #[derive(Debug, Deserialize)]
@@ -25,49 +28,6 @@ struct SearchParityFixture {
     barrier_after_epoch: u64,
     barrier_phase_delta: u64,
     fairness_bundle: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default)]
-struct TestDomain {
-    edges: BTreeMap<u8, Vec<(u8, &'static str, u64)>>,
-}
-
-impl SearchDomain for TestDomain {
-    type Node = u8;
-    type EdgeMeta = &'static str;
-    type Cost = u64;
-    type GraphEpoch = u64;
-    type SnapshotId = &'static str;
-    type Error = &'static str;
-
-    fn successors(
-        &self,
-        _epoch: &Self::GraphEpoch,
-        node: &Self::Node,
-        out: &mut Vec<(Self::Node, Self::EdgeMeta, Self::Cost)>,
-    ) -> Result<(), Self::Error> {
-        if let Some(edges) = self.edges.get(node) {
-            out.extend(edges.iter().cloned());
-        }
-        Ok(())
-    }
-
-    fn heuristic(
-        &self,
-        _epoch: &Self::GraphEpoch,
-        _node: &Self::Node,
-        _goal: &Self::Node,
-    ) -> Self::Cost {
-        0
-    }
-
-    fn snapshot_id(&self, epoch: &Self::GraphEpoch) -> Self::SnapshotId {
-        if *epoch == 1 {
-            "epoch-1"
-        } else {
-            "epoch-2"
-        }
-    }
 }
 
 fn repo_root() -> PathBuf {
@@ -105,15 +65,16 @@ fn search_fixture() -> SearchParityFixture {
     serde_json::from_slice(&run.stdout).expect("parse search parity fixture")
 }
 
-fn make_domain() -> TestDomain {
-    let mut domain = TestDomain::default();
-    domain.edges.insert(0, vec![(1, "0-1", 1), (2, "0-2", 1)]);
-    domain.edges.insert(1, vec![(4, "1-4", 1)]);
-    domain.edges.insert(2, vec![(5, "2-5", 1)]);
+fn make_domain() -> FixtureDomain {
+    let mut domain = FixtureDomain::default();
+    domain.edge(0, 1, "0-1", 1);
+    domain.edge(0, 2, "0-2", 1);
+    domain.edge(1, 4, "1-4", 1);
+    domain.edge(2, 5, "2-5", 1);
     domain
 }
 
-fn assert_batch_and_independence_contracts(fixture: &SearchParityFixture, domain: &TestDomain) {
+fn assert_batch_and_independence_contracts(fixture: &SearchParityFixture, domain: &FixtureDomain) {
     let mut machine = SearchMachine::new(domain.clone(), 1, 0, 5, EpsilonMilli::one());
     machine.step_once().expect("first canonical step");
     let batch = machine.next_batch().expect("second batch");
@@ -175,14 +136,18 @@ fn assert_batch_and_independence_contracts(fixture: &SearchParityFixture, domain
     assert!(proposals_independent(&left, &right));
 }
 
-fn assert_replay_contracts(fixture: &SearchParityFixture, domain: TestDomain) {
+fn assert_replay_contracts(fixture: &SearchParityFixture, domain: FixtureDomain) {
     let mut replay_machine = SearchMachine::new(domain, 1, 0, 5, EpsilonMilli::one());
     let (report, replay) = run_with_executor(
         &mut replay_machine,
         &SerialProposalExecutor,
-        SearchSchedulerProfile::CanonicalSerial,
-        1,
-        vec![SearchFairnessAssumption::EventualLiveBatchService],
+        SearchRunConfig {
+            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
+            batch_width: 1,
+            fairness_assumptions: BTreeSet::from([
+                SearchFairnessAssumption::EventualLiveBatchService,
+            ]),
+        },
     )
     .expect("canonical run");
     let replayed = replay_observation(
@@ -190,7 +155,7 @@ fn assert_replay_contracts(fixture: &SearchParityFixture, domain: TestDomain) {
         &ReplayExpectation {
             expected_epochs: fixture.replay_epoch_trace.clone(),
             expected_phases: fixture.replay_phase_trace.clone(),
-            required_fairness: vec![SearchFairnessAssumption::EventualLiveBatchService],
+            required_fairness: BTreeSet::from([SearchFairnessAssumption::EventualLiveBatchService]),
         },
     )
     .expect("replay fixture");

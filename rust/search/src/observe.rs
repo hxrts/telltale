@@ -1,5 +1,7 @@
 //! Observation, replay-artifact, and comparison boundary for `telltale-search`.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 use crate::admission::{
@@ -7,13 +9,37 @@ use crate::admission::{
 };
 use crate::cost::SearchCost;
 
+/// Accumulated replay- and observation-visible records collected during one run.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct SearchObservationAccumulator<N, G, C> {
+    /// Canonical normalized commit trace.
+    pub(crate) normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
+    /// Replay checkpoint markers.
+    pub(crate) replay_checkpoints: Vec<String>,
+    /// Graph epoch trace.
+    pub(crate) graph_epoch_trace: Vec<G>,
+    /// Incumbent publication trace.
+    pub(crate) incumbent_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
+}
+
 /// One normalized canonical commit record.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NormalizedCommitRecord<N, C> {
     /// Target node updated by the commit.
     pub node: N,
+    /// Canonical parent chosen for the committed node.
+    pub parent: Option<N>,
     /// Canonical resulting `g` score.
     pub g_score: C,
+}
+
+/// One incumbent publication derived from canonical commit state.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct IncumbentPublicationRecord<N, C> {
+    /// Published incumbent cost.
+    pub cost: C,
+    /// Published incumbent path.
+    pub path: Vec<N>,
 }
 
 /// One observed search artifact derived from a canonical machine run.
@@ -23,6 +49,10 @@ pub struct SearchObservationArtifact<N, G, C> {
     pub incumbent_cost: Option<C>,
     /// Current incumbent path.
     pub incumbent_path: Option<Vec<N>>,
+    /// Canonical parent identities derived from the authoritative machine state.
+    pub canonical_parent_map: Vec<(N, N)>,
+    /// Incumbent publication trace.
+    pub incumbent_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
     /// Canonical normalized commit trace.
     pub normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
     /// Replay checkpoint markers.
@@ -32,7 +62,7 @@ pub struct SearchObservationArtifact<N, G, C> {
     /// Declared scheduler profile.
     pub scheduler_profile: SearchSchedulerProfile,
     /// Declared fairness assumptions.
-    pub fairness_assumptions: Vec<SearchFairnessAssumption>,
+    pub fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
     /// Exact productive-step count.
     pub productive_steps: u64,
     /// Total scheduler-step count.
@@ -85,6 +115,16 @@ where
                     mismatches.push(*observable);
                 }
             }
+            SearchObservableClass::CanonicalParentIdentity => {
+                if left.canonical_parent_map != right.canonical_parent_map {
+                    mismatches.push(*observable);
+                }
+            }
+            SearchObservableClass::IncumbentPublicationTrace => {
+                if left.incumbent_publication_trace != right.incumbent_publication_trace {
+                    mismatches.push(*observable);
+                }
+            }
             SearchObservableClass::NormalizedCommitTrace => {
                 let equal = match mode {
                     SearchDeterminismMode::ModuloCommutativity => {
@@ -107,6 +147,11 @@ where
                     mismatches.push(*observable);
                 }
             }
+            SearchObservableClass::FairnessPremiseTrace => {
+                if left.fairness_assumptions != right.fairness_assumptions {
+                    mismatches.push(*observable);
+                }
+            }
             SearchObservableClass::ProgressAccounting => {
                 if left.productive_steps != right.productive_steps
                     || left.total_scheduler_steps != right.total_scheduler_steps
@@ -119,8 +164,6 @@ where
                     mismatches.push(*observable);
                 }
             }
-            SearchObservableClass::CanonicalParentIdentity
-            | SearchObservableClass::IncumbentPublicationTrace => {}
         }
     }
 
@@ -143,14 +186,22 @@ where
     }
 }
 
-fn normalized_commit_multiset<N, C>(records: &[NormalizedCommitRecord<N, C>]) -> Vec<(N, u128)>
+fn normalized_commit_multiset<N, C>(
+    records: &[NormalizedCommitRecord<N, C>],
+) -> Vec<(N, Option<N>, u128)>
 where
     N: Clone + Ord,
     C: SearchCost,
 {
     let mut normalized = records
         .iter()
-        .map(|record| (record.node.clone(), record.g_score.order_key()))
+        .map(|record| {
+            (
+                record.node.clone(),
+                record.parent.clone(),
+                record.g_score.order_key(),
+            )
+        })
         .collect::<Vec<_>>();
     normalized.sort();
     normalized
@@ -167,14 +218,25 @@ mod tests {
         SearchObservationArtifact {
             incumbent_cost: Some(3),
             incumbent_path: Some(vec![0, 1, 3]),
+            canonical_parent_map: vec![(1, 0), (3, 1)],
+            incumbent_publication_trace: vec![IncumbentPublicationRecord {
+                cost: 3,
+                path: vec![0, 1, 3],
+            }],
             normalized_commit_trace: trace
                 .into_iter()
-                .map(|(node, g_score)| NormalizedCommitRecord { node, g_score })
+                .map(|(node, g_score)| NormalizedCommitRecord {
+                    node,
+                    parent: Some(0),
+                    g_score,
+                })
                 .collect(),
             replay_checkpoints: vec!["cp0".to_string()],
             graph_epoch_trace: vec![1],
             scheduler_profile,
-            fairness_assumptions: vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+            fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+                .into_iter()
+                .collect(),
             productive_steps: 2,
             total_scheduler_steps: 3,
         }
@@ -216,6 +278,54 @@ mod tests {
         assert_eq!(
             comparison.mismatches,
             vec![SearchObservableClass::SchedulerProfileTrace]
+        );
+    }
+
+    #[test]
+    fn fairness_premise_trace_mismatch_is_observable() {
+        let left = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
+        let mut right = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
+        right.fairness_assumptions = [SearchFairnessAssumption::EventualLiveBatchService]
+            .into_iter()
+            .collect();
+        let comparison = compare_observations(
+            &left,
+            &right,
+            SearchDeterminismMode::Full,
+            &[SearchObservableClass::FairnessPremiseTrace],
+        );
+        assert_eq!(comparison.relation, ObservationRelation::Mismatch);
+        assert_eq!(
+            comparison.mismatches,
+            vec![SearchObservableClass::FairnessPremiseTrace]
+        );
+    }
+
+    #[test]
+    fn canonical_parent_identity_and_incumbent_publication_are_observable() {
+        let left = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
+        let mut right = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
+        right.canonical_parent_map = vec![(1, 0), (3, 2)];
+        right.incumbent_publication_trace = vec![IncumbentPublicationRecord {
+            cost: 4,
+            path: vec![0, 2, 3],
+        }];
+        let comparison = compare_observations(
+            &left,
+            &right,
+            SearchDeterminismMode::Full,
+            &[
+                SearchObservableClass::CanonicalParentIdentity,
+                SearchObservableClass::IncumbentPublicationTrace,
+            ],
+        );
+        assert_eq!(comparison.relation, ObservationRelation::Mismatch);
+        assert_eq!(
+            comparison.mismatches,
+            vec![
+                SearchObservableClass::CanonicalParentIdentity,
+                SearchObservableClass::IncumbentPublicationTrace,
+            ]
         );
     }
 }

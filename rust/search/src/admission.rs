@@ -1,5 +1,7 @@
 //! Admission and capability vocabulary for `telltale-search`.
 
+use std::collections::BTreeSet;
+
 use serde::{Deserialize, Serialize};
 
 /// Declared determinism profile for one search run.
@@ -60,6 +62,8 @@ pub enum SearchObservableClass {
     GraphEpochTrace,
     /// Scheduler profile and lane trace.
     SchedulerProfileTrace,
+    /// Fairness premise bundle for theorem-shaped comparisons.
+    FairnessPremiseTrace,
     /// Productive and total-step accounting.
     ProgressAccounting,
 }
@@ -79,13 +83,13 @@ pub enum CommutativityRegionClass {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchDUser {
     /// Required observable classes.
-    pub required_observables: Vec<SearchObservableClass>,
+    pub required_observables: BTreeSet<SearchObservableClass>,
     /// Required determinism profiles.
-    pub required_profiles: Vec<SearchDeterminismMode>,
+    pub required_profiles: BTreeSet<SearchDeterminismMode>,
     /// Required scheduler-profile support.
-    pub required_scheduler_profiles: Vec<SearchSchedulerProfile>,
+    pub required_scheduler_profiles: BTreeSet<SearchSchedulerProfile>,
     /// Required fairness-premise support.
-    pub required_fairness: Vec<SearchFairnessAssumption>,
+    pub required_fairness: BTreeSet<SearchFairnessAssumption>,
     /// Required commutativity region.
     pub required_commutativity_region: CommutativityRegionClass,
     /// Maximum admitted batch width.
@@ -100,13 +104,13 @@ pub struct SearchDUser {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchCertifiedCapability {
     /// Supported observable classes.
-    pub supported_observables: Vec<SearchObservableClass>,
+    pub supported_observables: BTreeSet<SearchObservableClass>,
     /// Supported determinism profiles.
-    pub supported_profiles: Vec<SearchDeterminismMode>,
+    pub supported_profiles: BTreeSet<SearchDeterminismMode>,
     /// Supported scheduler-profile classes.
-    pub supported_scheduler_profiles: Vec<SearchSchedulerProfile>,
+    pub supported_scheduler_profiles: BTreeSet<SearchSchedulerProfile>,
     /// Supported fairness bundles.
-    pub supported_fairness: Vec<SearchFairnessAssumption>,
+    pub supported_fairness: BTreeSet<SearchFairnessAssumption>,
     /// Supported commutativity region.
     pub supported_commutativity_region: CommutativityRegionClass,
     /// Maximum certified batch width.
@@ -151,31 +155,33 @@ pub fn check_capability_containment(
 ) -> Vec<AdmissionRejectionReason> {
     let mut reasons = Vec::new();
 
-    for observable in &user.required_observables {
-        if !certified.supported_observables.contains(observable) {
-            reasons.push(AdmissionRejectionReason::MissingObservable(*observable));
-        }
-    }
+    reasons.extend(
+        user.required_observables
+            .difference(&certified.supported_observables)
+            .copied()
+            .map(AdmissionRejectionReason::MissingObservable),
+    );
 
-    for profile in &user.required_profiles {
-        if !certified.supported_profiles.contains(profile) {
-            reasons.push(AdmissionRejectionReason::MissingProfile(*profile));
-        }
-    }
+    reasons.extend(
+        user.required_profiles
+            .difference(&certified.supported_profiles)
+            .copied()
+            .map(AdmissionRejectionReason::MissingProfile),
+    );
 
-    for scheduler in &user.required_scheduler_profiles {
-        if !certified.supported_scheduler_profiles.contains(scheduler) {
-            reasons.push(AdmissionRejectionReason::MissingSchedulerProfile(
-                *scheduler,
-            ));
-        }
-    }
+    reasons.extend(
+        user.required_scheduler_profiles
+            .difference(&certified.supported_scheduler_profiles)
+            .copied()
+            .map(AdmissionRejectionReason::MissingSchedulerProfile),
+    );
 
-    for fairness in &user.required_fairness {
-        if !certified.supported_fairness.contains(fairness) {
-            reasons.push(AdmissionRejectionReason::MissingFairness(*fairness));
-        }
-    }
+    reasons.extend(
+        user.required_fairness
+            .difference(&certified.supported_fairness)
+            .copied()
+            .map(AdmissionRejectionReason::MissingFairness),
+    );
 
     if user.required_commutativity_region > certified.supported_commutativity_region {
         reasons.push(AdmissionRejectionReason::UnsupportedCommutativityRegion(
@@ -208,23 +214,33 @@ mod tests {
     #[test]
     fn containment_rejects_missing_profile_scheduler_and_fairness() {
         let user = SearchDUser {
-            required_observables: vec![
+            required_observables: [
                 SearchObservableClass::IncumbentCost,
                 SearchObservableClass::SchedulerProfileTrace,
-            ],
-            required_profiles: vec![SearchDeterminismMode::Replay],
-            required_scheduler_profiles: vec![SearchSchedulerProfile::BatchedParallelExact],
-            required_fairness: vec![SearchFairnessAssumption::EventualBarrierService],
+            ]
+            .into_iter()
+            .collect(),
+            required_profiles: [SearchDeterminismMode::Replay].into_iter().collect(),
+            required_scheduler_profiles: [SearchSchedulerProfile::BatchedParallelExact]
+                .into_iter()
+                .collect(),
+            required_fairness: [SearchFairnessAssumption::EventualBarrierService]
+                .into_iter()
+                .collect(),
             required_commutativity_region: CommutativityRegionClass::CertifiedFrontierWindow,
             max_batch_width: 4,
             require_frozen_epoch_replay: true,
             replay_required: true,
         };
         let certified = SearchCertifiedCapability {
-            supported_observables: vec![SearchObservableClass::IncumbentCost],
-            supported_profiles: vec![SearchDeterminismMode::Full],
-            supported_scheduler_profiles: vec![SearchSchedulerProfile::CanonicalSerial],
-            supported_fairness: vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+            supported_observables: [SearchObservableClass::IncumbentCost].into_iter().collect(),
+            supported_profiles: [SearchDeterminismMode::Full].into_iter().collect(),
+            supported_scheduler_profiles: [SearchSchedulerProfile::CanonicalSerial]
+                .into_iter()
+                .collect(),
+            supported_fairness: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+                .into_iter()
+                .collect(),
             supported_commutativity_region: CommutativityRegionClass::SameBatchMinKeyRegion,
             max_certified_batch_width: 1,
             supports_frozen_epoch_replay: false,

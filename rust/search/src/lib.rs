@@ -26,21 +26,20 @@ pub use admission::{
 pub use cost::{EpsilonMilli, SearchCost};
 pub use domain::SearchDomain;
 pub use machine::{
-    CanonicalBatch, FrontierEntry, FrontierScore, Incumbent, ParentRecord, Proposal, ProposalKind,
-    SearchBudgetState, SearchError, SearchInvariantViolation, SearchMachine, SearchState,
-    SearchTraceState,
+    CanonicalBatch, Incumbent, Proposal, ProposalKind, SearchBudgetState, SearchError,
+    SearchInvariantViolation, SearchMachine, SearchTraceState,
 };
 pub use observe::{
-    compare_observations, NormalizedCommitRecord, ObservationComparison, ObservationRelation,
-    SearchObservationArtifact,
+    compare_observations, IncumbentPublicationRecord, NormalizedCommitRecord,
+    ObservationComparison, ObservationRelation, SearchObservationArtifact,
 };
 pub use runtime::{
     classify_scheduler_artifact, commit_epoch_reconfiguration, proposals_independent,
     replay_observation, run_with_executor, AuthorityReadSet, AuthoritySurface, AuthorityWriteSet,
-    EpochReconfigurationRequest, NativeParallelExecutor, ProgressSummary, ProposalExecutor,
-    ReplayError, ReplayExpectation, ReplayRoundRecord, SchedulerArtifact, SchedulerArtifactClass,
-    SearchExecutionReport, SearchReplayArtifact, SearchRuntimeMarker, SerialProposalExecutor,
-    TotalStepMode,
+    EpochReconfigurationRequest, NativeParallelExecutor, NativeParallelExecutorError,
+    ProgressSummary, ProposalExecutor, ReplayError, ReplayExpectation, ReplayRoundRecord,
+    SchedulerArtifact, SchedulerArtifactClass, SearchExecutionReport, SearchReplayArtifact,
+    SearchRunConfig, SearchRuntimeMarker, SerialProposalExecutor, TotalStepMode,
 };
 
 /// Current crate scope statement used by smoke tests and boundary checks.

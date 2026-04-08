@@ -1,5 +1,7 @@
 //! Smoke tests for the initial `telltale-search` scaffold.
 
+use std::collections::BTreeSet;
+
 use telltale_search::{
     compare_observations, runtime::SearchRuntimeMarker, EpsilonMilli, ObservationComparison,
     SearchBudgetState, SearchDUser, SearchDeterminismMode, SearchFairnessAssumption,
@@ -20,10 +22,12 @@ fn phase_one_scaffold_exports_compile() {
     let _ = SearchBudgetState::default();
     let _ = SearchTraceState::default();
     let _ = SearchDUser {
-        required_observables: vec![SearchObservableClass::IncumbentCost],
-        required_profiles: vec![SearchDeterminismMode::Full],
-        required_scheduler_profiles: vec![SearchSchedulerProfile::CanonicalSerial],
-        required_fairness: vec![SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        required_observables: BTreeSet::from([SearchObservableClass::IncumbentCost]),
+        required_profiles: BTreeSet::from([SearchDeterminismMode::Full]),
+        required_scheduler_profiles: BTreeSet::from([SearchSchedulerProfile::CanonicalSerial]),
+        required_fairness: BTreeSet::from([
+            SearchFairnessAssumption::DeterministicSchedulerConfluence,
+        ]),
         required_commutativity_region: telltale_search::CommutativityRegionClass::None,
         max_batch_width: 1,
         require_frozen_epoch_replay: false,
