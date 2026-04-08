@@ -211,9 +211,8 @@ pub fn check_capability_containment(
 mod tests {
     use super::*;
 
-    #[test]
-    fn containment_rejects_missing_profile_scheduler_and_fairness() {
-        let user = SearchDUser {
+    fn full_user() -> SearchDUser {
+        SearchDUser {
             required_observables: [
                 SearchObservableClass::IncumbentCost,
                 SearchObservableClass::SchedulerProfileTrace,
@@ -231,7 +230,40 @@ mod tests {
             max_batch_width: 4,
             require_frozen_epoch_replay: true,
             replay_required: true,
-        };
+        }
+    }
+
+    fn full_certified() -> SearchCertifiedCapability {
+        SearchCertifiedCapability {
+            supported_observables: [
+                SearchObservableClass::IncumbentCost,
+                SearchObservableClass::SchedulerProfileTrace,
+            ]
+            .into_iter()
+            .collect(),
+            supported_profiles: [SearchDeterminismMode::Replay].into_iter().collect(),
+            supported_scheduler_profiles: [SearchSchedulerProfile::BatchedParallelExact]
+                .into_iter()
+                .collect(),
+            supported_fairness: [SearchFairnessAssumption::EventualBarrierService]
+                .into_iter()
+                .collect(),
+            supported_commutativity_region: CommutativityRegionClass::CertifiedFrontierWindow,
+            max_certified_batch_width: 4,
+            supports_frozen_epoch_replay: true,
+            supports_replay: true,
+        }
+    }
+
+    #[test]
+    fn containment_accepts_exact_match() {
+        let reasons = check_capability_containment(&full_user(), &full_certified());
+        assert!(reasons.is_empty());
+    }
+
+    #[test]
+    fn containment_rejects_missing_profile_scheduler_and_fairness() {
+        let user = full_user();
         let certified = SearchCertifiedCapability {
             supported_observables: [SearchObservableClass::IncumbentCost].into_iter().collect(),
             supported_profiles: [SearchDeterminismMode::Full].into_iter().collect(),
@@ -260,5 +292,39 @@ mod tests {
             SearchFairnessAssumption::EventualBarrierService
         )));
         assert!(reasons.contains(&AdmissionRejectionReason::MissingReplay));
+    }
+
+    #[test]
+    fn containment_rejects_missing_observable_and_batch_width_boundary() {
+        let mut certified = full_certified();
+        certified.supported_observables =
+            [SearchObservableClass::IncumbentCost].into_iter().collect();
+        certified.max_certified_batch_width = 3;
+        let reasons = check_capability_containment(&full_user(), &certified);
+        assert!(
+            reasons.contains(&AdmissionRejectionReason::MissingObservable(
+                SearchObservableClass::SchedulerProfileTrace
+            ))
+        );
+        assert!(
+            reasons.contains(&AdmissionRejectionReason::BatchWidthTooLarge {
+                requested: 4,
+                certified: 3,
+            })
+        );
+    }
+
+    #[test]
+    fn containment_rejects_commutativity_and_frozen_replay_support_gaps() {
+        let mut certified = full_certified();
+        certified.supported_commutativity_region = CommutativityRegionClass::SameBatchMinKeyRegion;
+        certified.supports_frozen_epoch_replay = false;
+        let reasons = check_capability_containment(&full_user(), &certified);
+        assert!(
+            reasons.contains(&AdmissionRejectionReason::UnsupportedCommutativityRegion(
+                CommutativityRegionClass::CertifiedFrontierWindow
+            ))
+        );
+        assert!(reasons.contains(&AdmissionRejectionReason::MissingFrozenEpochReplay));
     }
 }

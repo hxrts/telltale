@@ -10,7 +10,7 @@ use crate::observe::{
     IncumbentPublicationRecord, NormalizedCommitRecord, SearchObservationArtifact,
 };
 
-use super::executor::ProposalExecutor;
+use super::executor::{ProposalExecutor, ProposalExecutorKind};
 
 type RuntimeExecutionResult<D> = Result<
     (
@@ -26,7 +26,7 @@ type RuntimeExecutionResult<D> = Result<
             <D as SearchDomain>::Cost,
         >,
     ),
-    SearchError<<D as SearchDomain>::Error>,
+    SearchRunError<<D as SearchDomain>::Error>,
 >;
 
 type RuntimeState<D> = SearchState<
@@ -82,6 +82,37 @@ pub struct SearchRunConfig {
     pub batch_width: u64,
     /// Declared fairness assumptions.
     pub fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
+}
+
+/// Fail-closed runtime-config rejection.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SearchRunConfigError {
+    /// Batch width must be non-zero.
+    ZeroBatchWidth,
+    /// The selected scheduler profile requires the serial executor.
+    RequiresSerialExecutor(SearchSchedulerProfile),
+    /// The selected scheduler profile requires the native parallel executor.
+    RequiresNativeParallelExecutor(SearchSchedulerProfile),
+    /// The selected scheduler profile requires batch width one.
+    RequiresBatchWidthOne(SearchSchedulerProfile),
+    /// The selected scheduler profile requires a batch width greater than one.
+    RequiresBatchWidthGreaterThanOne(SearchSchedulerProfile),
+    /// The selected scheduler profile requires one fairness assumption.
+    MissingFairnessAssumption {
+        /// Profile being validated.
+        profile: SearchSchedulerProfile,
+        /// Missing assumption.
+        assumption: SearchFairnessAssumption,
+    },
+}
+
+/// Runtime execution error surface.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum SearchRunError<E> {
+    /// Invalid runtime configuration.
+    InvalidConfig(SearchRunConfigError),
+    /// Search-machine or domain error.
+    Search(SearchError<E>),
 }
 
 /// Authority classification for emitted scheduler artifacts.
@@ -156,11 +187,15 @@ where
 
 /// Replay-time contract expected by the caller.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct ReplayExpectation<G> {
+pub struct ReplayExpectation<N, G, S> {
     /// Expected graph epoch trace.
     pub expected_epochs: Vec<G>,
+    /// Expected per-round snapshot schedule.
+    pub expected_snapshots: Vec<S>,
     /// Expected per-round phase sequence.
     pub expected_phases: Vec<u64>,
+    /// Expected per-round batch nodes.
+    pub expected_batch_nodes: Vec<Vec<N>>,
     /// Required fairness assumptions for theorem-style comparisons.
     pub required_fairness: BTreeSet<SearchFairnessAssumption>,
 }
@@ -177,13 +212,126 @@ pub struct EpochReconfigurationRequest<G> {
 pub enum ReplayError {
     /// The replay artifact epoch schedule does not match the requested schedule.
     EpochSchedule,
+    /// The replay artifact snapshot schedule does not match the requested
+    /// schedule.
+    SnapshotSchedule,
     /// The replay artifact phase schedule does not match the requested schedule.
     PhaseSchedule,
+    /// The replay artifact batch-node schedule does not match the requested
+    /// schedule.
+    BatchSchedule,
     /// The replay artifact fairness bundle does not satisfy the requested
     /// theorem-style premise bundle.
     FairnessBundle,
     /// The stored final observation does not match the derived replay result.
     ObservationArtifact,
+}
+
+fn require_fairness(
+    config: &SearchRunConfig,
+    profile: SearchSchedulerProfile,
+    assumption: SearchFairnessAssumption,
+) -> Result<(), SearchRunConfigError> {
+    if config.fairness_assumptions.contains(&assumption) {
+        Ok(())
+    } else {
+        Err(SearchRunConfigError::MissingFairnessAssumption {
+            profile,
+            assumption,
+        })
+    }
+}
+
+/// Validate one runtime configuration against one executor kind.
+pub fn validate_run_config<D, X>(
+    executor: &X,
+    config: &SearchRunConfig,
+) -> Result<(), SearchRunConfigError>
+where
+    D: SearchDomain,
+    X: ProposalExecutor<D>,
+{
+    if config.batch_width == 0 {
+        return Err(SearchRunConfigError::ZeroBatchWidth);
+    }
+
+    match config.scheduler_profile {
+        SearchSchedulerProfile::CanonicalSerial => {
+            if executor.kind() != ProposalExecutorKind::Serial {
+                return Err(SearchRunConfigError::RequiresSerialExecutor(
+                    config.scheduler_profile,
+                ));
+            }
+            if config.batch_width != 1 {
+                return Err(SearchRunConfigError::RequiresBatchWidthOne(
+                    config.scheduler_profile,
+                ));
+            }
+            require_fairness(
+                config,
+                config.scheduler_profile,
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+            )?;
+        }
+        SearchSchedulerProfile::ThreadedExactSingleLane => {
+            if executor.kind() != ProposalExecutorKind::NativeParallel {
+                return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
+                    config.scheduler_profile,
+                ));
+            }
+            if config.batch_width != 1 {
+                return Err(SearchRunConfigError::RequiresBatchWidthOne(
+                    config.scheduler_profile,
+                ));
+            }
+            require_fairness(
+                config,
+                config.scheduler_profile,
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+            )?;
+        }
+        SearchSchedulerProfile::BatchedParallelExact => {
+            if executor.kind() != ProposalExecutorKind::NativeParallel {
+                return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
+                    config.scheduler_profile,
+                ));
+            }
+            if config.batch_width <= 1 {
+                return Err(SearchRunConfigError::RequiresBatchWidthGreaterThanOne(
+                    config.scheduler_profile,
+                ));
+            }
+            require_fairness(
+                config,
+                config.scheduler_profile,
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+            )?;
+        }
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
+            if executor.kind() != ProposalExecutorKind::NativeParallel {
+                return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
+                    config.scheduler_profile,
+                ));
+            }
+            if config.batch_width <= 1 {
+                return Err(SearchRunConfigError::RequiresBatchWidthGreaterThanOne(
+                    config.scheduler_profile,
+                ));
+            }
+            require_fairness(
+                config,
+                config.scheduler_profile,
+                SearchFairnessAssumption::EventualLiveBatchService,
+            )?;
+            require_fairness(
+                config,
+                config.scheduler_profile,
+                SearchFairnessAssumption::NoStarvationWithinLegalWindow,
+            )?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Execute one machine to completion through one proposal executor.
@@ -205,11 +353,13 @@ where
     D: SearchDomain,
     X: ProposalExecutor<D>,
 {
+    validate_run_config::<D, X>(executor, &config).map_err(SearchRunError::InvalidConfig)?;
     let mut rounds = Vec::new();
     while let Some(batch) = machine.next_batch() {
         let mut proposals = executor
             .generate(machine.domain(), &batch, machine.goal())
-            .map_err(SearchError::Domain)?;
+            .map_err(SearchError::Domain)
+            .map_err(SearchRunError::Search)?;
         machine.state_mut().trace_state.total_scheduler_steps += 1;
         let pre_commit_len = machine.observation().normalized_commit_trace.len();
         machine.activate_batch(&batch);
@@ -223,7 +373,8 @@ where
         }
         machine
             .check_invariants()
-            .map_err(SearchError::InvariantViolation)?;
+            .map_err(SearchError::InvariantViolation)
+            .map_err(SearchRunError::Search)?;
 
         let round_commits =
             machine.observation().normalized_commit_trace[pre_commit_len..].to_vec();
@@ -319,7 +470,7 @@ pub fn commit_epoch_reconfiguration<D: SearchDomain>(
 /// schedule, phase schedule, or fairness bundle.
 pub fn replay_observation<N, G, S, C>(
     replay: &SearchReplayArtifact<N, G, S, C>,
-    expectation: &ReplayExpectation<G>,
+    expectation: &ReplayExpectation<N, G, S>,
 ) -> Result<SearchObservationArtifact<N, G, C>, ReplayError>
 where
     N: Clone + Ord,
@@ -330,6 +481,14 @@ where
     if replay.epoch_trace != expectation.expected_epochs {
         return Err(ReplayError::EpochSchedule);
     }
+    let replay_snapshots = replay
+        .rounds
+        .iter()
+        .map(|round| round.snapshot_id.clone())
+        .collect::<Vec<_>>();
+    if replay_snapshots != expectation.expected_snapshots {
+        return Err(ReplayError::SnapshotSchedule);
+    }
     let replay_phases = replay
         .rounds
         .iter()
@@ -337,6 +496,14 @@ where
         .collect::<Vec<_>>();
     if replay_phases != expectation.expected_phases {
         return Err(ReplayError::PhaseSchedule);
+    }
+    let replay_batches = replay
+        .rounds
+        .iter()
+        .map(|round| round.batch_nodes.clone())
+        .collect::<Vec<_>>();
+    if replay_batches != expectation.expected_batch_nodes {
+        return Err(ReplayError::BatchSchedule);
     }
     if !expectation
         .required_fairness

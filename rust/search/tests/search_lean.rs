@@ -145,6 +145,7 @@ fn assert_replay_contracts(fixture: &SearchParityFixture, domain: FixtureDomain)
             scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
             batch_width: 1,
             fairness_assumptions: BTreeSet::from([
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
                 SearchFairnessAssumption::EventualLiveBatchService,
             ]),
         },
@@ -154,8 +155,21 @@ fn assert_replay_contracts(fixture: &SearchParityFixture, domain: FixtureDomain)
         &replay,
         &ReplayExpectation {
             expected_epochs: fixture.replay_epoch_trace.clone(),
+            expected_snapshots: replay
+                .rounds
+                .iter()
+                .map(|round| round.snapshot_id)
+                .collect(),
             expected_phases: fixture.replay_phase_trace.clone(),
-            required_fairness: BTreeSet::from([SearchFairnessAssumption::EventualLiveBatchService]),
+            expected_batch_nodes: replay
+                .rounds
+                .iter()
+                .map(|round| round.batch_nodes.clone())
+                .collect(),
+            required_fairness: BTreeSet::from([
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+                SearchFairnessAssumption::EventualLiveBatchService,
+            ]),
         },
     )
     .expect("replay fixture");

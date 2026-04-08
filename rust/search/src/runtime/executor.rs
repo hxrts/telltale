@@ -13,8 +13,20 @@ type RuntimeProposalVec<D> = Vec<
     Proposal<<D as SearchDomain>::Node, <D as SearchDomain>::EdgeMeta, <D as SearchDomain>::Cost>,
 >;
 
+/// Execution kind for one proposal executor.
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+pub enum ProposalExecutorKind {
+    /// Canonical serial proposal generation.
+    Serial,
+    /// Native multi-threaded proposal generation.
+    NativeParallel,
+}
+
 /// Runtime executor for speculative proposal generation.
 pub trait ProposalExecutor<D: SearchDomain> {
+    /// Report the execution kind of the executor.
+    fn kind(&self) -> ProposalExecutorKind;
+
     /// Generate speculative proposals for one frozen batch.
     ///
     /// # Errors
@@ -33,6 +45,10 @@ pub trait ProposalExecutor<D: SearchDomain> {
 pub struct SerialProposalExecutor;
 
 impl<D: SearchDomain> ProposalExecutor<D> for SerialProposalExecutor {
+    fn kind(&self) -> ProposalExecutorKind {
+        ProposalExecutorKind::Serial
+    }
+
     fn generate(
         &self,
         domain: &D,
@@ -128,6 +144,10 @@ where
     D::GraphEpoch: Sync,
     D::Error: Send,
 {
+    fn kind(&self) -> ProposalExecutorKind {
+        ProposalExecutorKind::NativeParallel
+    }
+
     fn generate(
         &self,
         domain: &D,
@@ -177,6 +197,10 @@ where
 
 #[cfg(not(feature = "multi-thread"))]
 impl<D: SearchDomain> ProposalExecutor<D> for NativeParallelExecutor {
+    fn kind(&self) -> ProposalExecutorKind {
+        ProposalExecutorKind::NativeParallel
+    }
+
     fn generate(
         &self,
         domain: &D,

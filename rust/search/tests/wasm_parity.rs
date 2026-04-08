@@ -55,7 +55,17 @@ fn assert_serial_and_replay_contracts() {
         &replay,
         &ReplayExpectation {
             expected_epochs: vec![1],
+            expected_snapshots: replay
+                .rounds
+                .iter()
+                .map(|round| round.snapshot_id)
+                .collect(),
             expected_phases: replay.rounds.iter().map(|round| round.phase).collect(),
+            expected_batch_nodes: replay
+                .rounds
+                .iter()
+                .map(|round| round.batch_nodes.clone())
+                .collect(),
             required_fairness: BTreeSet::from([
                 SearchFairnessAssumption::DeterministicSchedulerConfluence,
             ]),

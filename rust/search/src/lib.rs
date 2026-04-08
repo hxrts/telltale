@@ -35,11 +35,12 @@ pub use observe::{
 };
 pub use runtime::{
     classify_scheduler_artifact, commit_epoch_reconfiguration, proposals_independent,
-    replay_observation, run_with_executor, AuthorityReadSet, AuthoritySurface, AuthorityWriteSet,
-    EpochReconfigurationRequest, NativeParallelExecutor, NativeParallelExecutorError,
-    ProgressSummary, ProposalExecutor, ReplayError, ReplayExpectation, ReplayRoundRecord,
-    SchedulerArtifact, SchedulerArtifactClass, SearchExecutionReport, SearchReplayArtifact,
-    SearchRunConfig, SearchRuntimeMarker, SerialProposalExecutor, TotalStepMode,
+    replay_observation, run_with_executor, validate_run_config, AuthorityReadSet, AuthoritySurface,
+    AuthorityWriteSet, EpochReconfigurationRequest, NativeParallelExecutor,
+    NativeParallelExecutorError, ProgressSummary, ProposalExecutor, ProposalExecutorKind,
+    ReplayError, ReplayExpectation, ReplayRoundRecord, SchedulerArtifact, SchedulerArtifactClass,
+    SearchExecutionReport, SearchReplayArtifact, SearchRunConfig, SearchRunConfigError,
+    SearchRunError, SearchRuntimeMarker, SerialProposalExecutor, TotalStepMode,
 };
 
 /// Current crate scope statement used by smoke tests and boundary checks.

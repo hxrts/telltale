@@ -43,6 +43,8 @@ The current runtime surface adds:
 - `ProposalExecutor`, `SerialProposalExecutor`, and `NativeParallelExecutor`
 - `SearchRunConfig` for typed runtime configuration instead of positional
   scheduler/fairness arguments
+- fail-closed `validate_run_config(...)` / `SearchRunConfigError` checks for
+  scheduler-profile, executor-kind, fairness, and batch-width mismatches
 - full legal min-key batch execution, with `batch_width` controlling worker
   chunking rather than canonical batch membership
 - authority read/write summaries for speculative proposals
@@ -55,7 +57,8 @@ Replay and reconfiguration semantics are fail-closed:
 
 - runtime failures during proposal generation do not consume the canonical batch
 - replay derives the final observation from canonical round commits and rejects
-  drift against the stored artifact
+  drift against the stored artifact, epoch schedule, snapshot schedule, phase
+  schedule, and batch schedule
 - epoch reconfiguration resets canonical frontier, parent, and incumbent state,
   then re-seeds the new epoch from the start node
 - fairness assumptions are first-class observable artifacts and comparison
