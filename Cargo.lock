@@ -906,9 +906,9 @@ dependencies = [
 
 [[package]]
 name = "dioxus"
-version = "0.7.4"
+version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d5b0aec58753daee127a5fe2d1a40b0db8cebc0b8a7f97b34df2492cb90d78e"
+checksum = "a44c550c06b6785e16258ad620d5b559f5bbcbcc50e3c18c08aa6af2604a4c32"
 dependencies = [
  "dioxus-asset-resolver",
  "dioxus-cli-config",
@@ -2818,7 +2818,7 @@ version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e67ba7e9b2b56446f1d419b1d807906278ffa1a658a8a5d8a39dcb1f5a78614f"
 dependencies = [
- "toml_edit 0.25.10+spec-1.1.0",
+ "toml_edit 0.25.11+spec-1.1.0",
 ]
 
 [[package]]
@@ -3631,7 +3631,7 @@ checksum = "591ef38edfb78ca4771ee32cf494cb8771944bee237a9b91fc9c1424ac4b777b"
 
 [[package]]
 name = "telltale"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3668,7 +3668,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-bridge"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -3689,7 +3689,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -3716,7 +3716,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -3741,7 +3741,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "futures",
  "proc-macro2",
@@ -3754,7 +3754,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-runtime"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3797,7 +3797,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-simulator"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "assert_matches",
  "getrandom 0.2.17",
@@ -3817,7 +3817,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "assert_matches",
  "criterion",
@@ -3829,7 +3829,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-transport"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "async-trait",
  "telltale-runtime",
@@ -3842,7 +3842,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -3857,7 +3857,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-ui"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "dioxus",
  "dioxus-document",
@@ -3874,7 +3874,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-viewer"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3887,7 +3887,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-web"
-version = "11.2.0"
+version = "11.3.0"
 dependencies = [
  "dioxus",
  "telltale-ui",
@@ -4177,9 +4177,9 @@ dependencies = [
 
 [[package]]
 name = "toml_edit"
-version = "0.25.10+spec-1.1.0"
+version = "0.25.11+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a82418ca169e235e6c399a84e395ab6debeb3bc90edc959bf0f48647c6a32d1b"
+checksum = "0b59c4d22ed448339746c59b905d24568fcbb3ab65a500494f7b8c3e97739f2b"
 dependencies = [
  "indexmap",
  "toml_datetime 1.1.1+spec-1.1.0",
