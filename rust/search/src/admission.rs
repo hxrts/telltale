@@ -1,7 +1,9 @@
 //! Admission and capability vocabulary for `telltale-search`.
 
+use serde::{Deserialize, Serialize};
+
 /// Declared determinism profile for one search run.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SearchDeterminismMode {
     /// Exact search-visible trace equivalence.
     Full,
@@ -14,7 +16,7 @@ pub enum SearchDeterminismMode {
 }
 
 /// Declared scheduler class for one search run.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SearchSchedulerProfile {
     /// Canonical single-lane host loop.
     CanonicalSerial,
@@ -27,7 +29,7 @@ pub enum SearchSchedulerProfile {
 }
 
 /// Fairness premise bundle attached to one run or theorem claim.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SearchFairnessAssumption {
     /// Every legal live batch is eventually serviced.
     EventualLiveBatchService,
@@ -40,7 +42,7 @@ pub enum SearchFairnessAssumption {
 }
 
 /// Search-visible observable classes that can be requested or certified.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SearchObservableClass {
     /// Incumbent path cost.
     IncumbentCost,
@@ -63,7 +65,7 @@ pub enum SearchObservableClass {
 }
 
 /// Declared commutativity region class.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum CommutativityRegionClass {
     /// No commutative relaxation beyond exact order.
     None,
@@ -74,7 +76,7 @@ pub enum CommutativityRegionClass {
 }
 
 /// User-requested determinism and replay capability.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchDUser {
     /// Required observable classes.
     pub required_observables: Vec<SearchObservableClass>,
@@ -95,7 +97,7 @@ pub struct SearchDUser {
 }
 
 /// Runtime/artifact-certified search capability.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchCertifiedCapability {
     /// Supported observable classes.
     pub supported_observables: Vec<SearchObservableClass>,
@@ -116,7 +118,7 @@ pub struct SearchCertifiedCapability {
 }
 
 /// Structured admission rejection.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AdmissionRejectionReason {
     /// Requested observable class is unsupported.
     MissingObservable(SearchObservableClass),

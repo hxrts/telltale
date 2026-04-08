@@ -1,12 +1,14 @@
 //! Observation, replay-artifact, and comparison boundary for `telltale-search`.
 
+use serde::{Deserialize, Serialize};
+
 use crate::admission::{
     SearchDeterminismMode, SearchFairnessAssumption, SearchObservableClass, SearchSchedulerProfile,
 };
 use crate::cost::SearchCost;
 
 /// One normalized canonical commit record.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct NormalizedCommitRecord<N, C> {
     /// Target node updated by the commit.
     pub node: N,
@@ -15,7 +17,7 @@ pub struct NormalizedCommitRecord<N, C> {
 }
 
 /// One observed search artifact derived from a canonical machine run.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchObservationArtifact<N, G, C> {
     /// Current incumbent cost.
     pub incumbent_cost: Option<C>,
@@ -38,7 +40,7 @@ pub struct SearchObservationArtifact<N, G, C> {
 }
 
 /// Comparison relation between two observed artifacts.
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum ObservationRelation {
     /// Exact equality under the requested mode.
     Exact,
@@ -49,7 +51,7 @@ pub enum ObservationRelation {
 }
 
 /// Result of comparing two observed artifacts.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ObservationComparison {
     /// Overall relation under the requested mode.
     pub relation: ObservationRelation,

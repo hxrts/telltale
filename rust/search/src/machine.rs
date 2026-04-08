@@ -6,6 +6,7 @@ use crate::admission::{SearchFairnessAssumption, SearchSchedulerProfile};
 use crate::cost::{EpsilonMilli, SearchCost};
 use crate::domain::SearchDomain;
 use crate::observe::{NormalizedCommitRecord, SearchObservationArtifact};
+use crate::runtime::{AuthorityReadSet, AuthorityWriteSet};
 
 /// Stable ordering key for one frontier entry.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -89,7 +90,7 @@ pub enum ProposalKind {
 
 /// One speculative proposal normalized and committed by the canonical machine.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Proposal<N, E, C> {
+pub struct Proposal<N: Ord, E, C> {
     /// Index of the originating entry within the canonical batch.
     pub batch_index: usize,
     /// Source node.
@@ -104,6 +105,10 @@ pub struct Proposal<N, E, C> {
     pub tentative_g: C,
     /// Proposal class.
     pub kind: ProposalKind,
+    /// Authority surfaces read by the proposal.
+    pub read_set: AuthorityReadSet<N>,
+    /// Authority surfaces written by the proposal.
+    pub write_set: AuthorityWriteSet<N>,
 }
 
 /// Canonical state owned by the search machine.
@@ -168,10 +173,10 @@ pub enum SearchError<E> {
 
 /// Deterministic serial search machine over one frozen graph epoch.
 pub struct SearchMachine<D: SearchDomain> {
-    domain: D,
-    start: D::Node,
-    goal: D::Node,
-    state: SearchState<D::Node, D::EdgeMeta, D::GraphEpoch, D::SnapshotId, D::Cost>,
+    pub(crate) domain: D,
+    pub(crate) start: D::Node,
+    pub(crate) goal: D::Node,
+    pub(crate) state: SearchState<D::Node, D::EdgeMeta, D::GraphEpoch, D::SnapshotId, D::Cost>,
 }
 
 impl<D: SearchDomain> SearchMachine<D> {
@@ -282,6 +287,8 @@ impl<D: SearchDomain> SearchMachine<D> {
                     edge_cost,
                     tentative_g: entry.g_score.saturating_add(edge_cost),
                     kind: ProposalKind::Relax,
+                    read_set: AuthorityReadSet::default(),
+                    write_set: AuthorityWriteSet::default(),
                 });
             }
         }
@@ -468,7 +475,7 @@ impl<D: SearchDomain> SearchMachine<D> {
         Ok(())
     }
 
-    fn frontier_entry_for(
+    pub(crate) fn frontier_entry_for(
         domain: &D,
         epoch: &D::GraphEpoch,
         goal: &D::Node,

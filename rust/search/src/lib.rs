@@ -34,6 +34,14 @@ pub use observe::{
     compare_observations, NormalizedCommitRecord, ObservationComparison, ObservationRelation,
     SearchObservationArtifact,
 };
+pub use runtime::{
+    classify_scheduler_artifact, commit_epoch_reconfiguration, proposals_independent,
+    replay_observation, run_with_executor, AuthorityReadSet, AuthoritySurface, AuthorityWriteSet,
+    EpochReconfigurationRequest, NativeParallelExecutor, ProgressSummary, ProposalExecutor,
+    ReplayError, ReplayExpectation, ReplayRoundRecord, SchedulerArtifact, SchedulerArtifactClass,
+    SearchExecutionReport, SearchReplayArtifact, SearchRuntimeMarker, SerialProposalExecutor,
+    TotalStepMode,
+};
 
 /// Current crate scope statement used by smoke tests and boundary checks.
 pub const CRATE_SCOPE: &str = "generic weighted-graph-plus-epoch search";

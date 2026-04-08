@@ -3798,6 +3798,12 @@ dependencies = [
 [[package]]
 name = "telltale-search"
 version = "11.3.0"
+dependencies = [
+ "rayon",
+ "serde",
+ "serde_json",
+ "wasm-bindgen-test",
+]
 
 [[package]]
 name = "telltale-simulator"
@@ -3812,6 +3818,7 @@ dependencies = [
  "serde_json",
  "telltale-bridge",
  "telltale-machine",
+ "telltale-search",
  "telltale-theory",
  "telltale-types",
  "tempfile",
@@ -3884,6 +3891,7 @@ dependencies = [
  "serde_json",
  "telltale-machine",
  "telltale-macros",
+ "telltale-search",
  "telltale-simulator",
  "tempfile",
  "toml 0.8.23",
