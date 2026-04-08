@@ -3796,6 +3796,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "telltale-search"
+version = "11.3.0"
+
+[[package]]
 name = "telltale-simulator"
 version = "11.3.0"
 dependencies = [

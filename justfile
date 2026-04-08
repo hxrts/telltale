@@ -214,6 +214,7 @@ check-focused-assurance:
     just check-extension-dispatch
     just check-semantic-assurance
     just check-runtime-boundaries
+    just check-search-tooling
     just check-viewer-tooling
 
 # Verify that CI/workflow ownership flows through the canonical PR/deep lane recipes.
@@ -556,6 +557,21 @@ check-aura-borrowed-lints:
 # Keep typed durability artifacts on the authoritative machine/runtime side.
 check-durable-boundaries:
     ./scripts/check/durable-boundaries.sh
+
+# Enforce the generic search crate boundary and docs alignment.
+check-search-boundaries:
+    bash ./scripts/check/search-boundaries.sh
+
+# Focused telltale-search verification split: package compile and boundary checks.
+check-search-tooling:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
+    cargo test -p telltale-search --test phase_one -- --nocapture
+    just check-search-boundaries
 
 # Focused durability verification split: machine contracts, simulator assurance, and boundaries.
 check-durable-assurance:

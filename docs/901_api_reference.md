@@ -123,6 +123,29 @@ Key exports:
 machine. `EffectHandler` is the host-runtime boundary implemented by embedders
 and simulators.
 
+### `telltale-search`
+
+Generic weighted-graph search substrate for the Telltale workspace.
+
+Planned module structure:
+
+- `telltale_search::cost`
+- `telltale_search::domain`
+- `telltale_search::machine`
+- `telltale_search::admission`
+- `telltale_search::runtime`
+- `telltale_search::observe`
+
+The supported boundary is intentionally generic:
+
+- canonical search-machine semantics
+- search replay and comparison artifacts
+- scheduler and fairness capability vocabulary
+- explicit graph-epoch and snapshot inputs
+
+Downstream consumers are expected to provide application-specific node, edge,
+heuristic, and epoch semantics through typed domain traits.
+
 Module access (not re-exported at crate root):
 - Effect boundary:
   `telltale_machine::model::effects::EffectHandler`, `EffectRequest`, `EffectOutcome`,

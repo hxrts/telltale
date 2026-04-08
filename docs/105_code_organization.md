@@ -128,6 +128,19 @@ This crate is intentionally renderer-free.
 Browser APIs and Dioxus component concerns belong in the future `telltale-web` and `telltale-ui` layers, not here.
 The goal is to keep artifact loading, branch mutation requests, and historical inspection state deterministic and reusable across shells.
 
+### telltale-search
+
+`telltale-search` is the generic weighted-graph search substrate planned for the
+workspace.
+It is intended to own canonical search-machine semantics, replay artifacts,
+determinism and fairness capability vocabulary, and explicit graph-epoch
+boundaries for weighted graph search.
+
+This crate is intentionally downstream-oriented and domain-generic.
+Application-specific routing, RF, mesh, or topology policies should live in
+downstream crates that implement its domain traits rather than in
+`telltale-search` itself.
+
 ### telltale-ui
 
 `telltale-ui` is the portable Dioxus UI core for shared simulator tooling.

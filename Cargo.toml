@@ -205,7 +205,7 @@ debug = 2
 incremental = false
 
 [workspace]
-members = ["rust/language", "rust/macros", "rust/language", "rust/runtime", "rust/types", "rust/theory", "rust/bridge", "rust/machine", "rust/simulator", "rust/transport", "rust/lints", "rust/viewer", "rust/ui", "rust/web"]
+members = ["rust/language", "rust/macros", "rust/language", "rust/runtime", "rust/types", "rust/theory", "rust/bridge", "rust/machine", "rust/simulator", "rust/transport", "rust/search", "rust/lints", "rust/viewer", "rust/ui", "rust/web"]
 exclude = ["examples/wasm", "external-demo", "external-demo-macros"]
 
 # Shared dependencies across workspace members

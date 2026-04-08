@@ -1,0 +1,18 @@
+[package]
+name = "telltale-search"
+version = "11.3.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Deterministic weighted-graph search substrate for Telltale"
+readme = "../../README.md"
+repository = "https://github.com/hxrts/telltale"
+license = "MIT OR Apache-2.0"
+keywords = ["search", "deterministic", "graph", "replay"]
+categories = ["algorithms", "concurrency"]
+
+[lib]
+bench = false
+
+[lints]
+workspace = true
