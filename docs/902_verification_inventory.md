@@ -53,7 +53,7 @@ The numeric rows in this section are source-derived and checked by
 | Deadlock automation fragment assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Docs-as-contract assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
 | Deterministic scale and budget assurance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
+| Explicit unsupported or fail-closed property notes | 1 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
 
 ## Current Formal Verification Claim
 

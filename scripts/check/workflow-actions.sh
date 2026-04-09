@@ -7,11 +7,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 WORKFLOW_DIR="${WORKFLOW_ACTIONS_DIR:-.github/workflows}"
+refs_file="$(mktemp)"
+trap 'rm -f "$refs_file"' EXIT
 
 # ── Collect Action References ─────────────────────────────────────────
-
-declare -A action_locations
-errors=()
 
 for workflow in "$WORKFLOW_DIR"/*.yml; do
   [[ -f "$workflow" ]] || continue
@@ -27,12 +26,7 @@ for workflow in "$WORKFLOW_DIR"/*.yml; do
         echo "${workflow}:${lineno}: malformed action reference without @ref: ${spec}" >&2
         exit 1
       fi
-      loc="${workflow}:${lineno}"
-      if [[ -n "${action_locations[$spec]+x}" ]]; then
-        action_locations[$spec]="${action_locations[$spec]}, ${loc}"
-      else
-        action_locations[$spec]="$loc"
-      fi
+      printf '%s\t%s:%s\n' "$spec" "$workflow" "$lineno" >>"$refs_file"
     fi
   done < "$workflow"
 done
@@ -53,13 +47,18 @@ remote_ref_exists() {
 }
 
 # Verify every collected action spec resolves to a real tag or branch
-for spec in $(printf '%s\n' "${!action_locations[@]}" | sort); do
+errors=()
+while IFS= read -r spec; do
   ref="${spec##*@}"
   repo="${spec%@*}"
   if ! remote_ref_exists "$repo" "$ref"; then
-    errors+=("${action_locations[$spec]}: unresolved GitHub Action reference ${spec}")
+    locations="$(
+      awk -F '\t' -v target="$spec" '$1 == target { print $2 }' "$refs_file" \
+        | paste -sd ', ' -
+    )"
+    errors+=("${locations}: unresolved GitHub Action reference ${spec}")
   fi
-done
+done < <(cut -f1 "$refs_file" | sort -u)
 
 # ── Report ────────────────────────────────────────────────────────────
 
@@ -70,4 +69,5 @@ if [[ ${#errors[@]} -gt 0 ]]; then
   exit 1
 fi
 
-echo "workflow action check passed (${#action_locations[@]} remote action reference(s) resolved)"
+resolved_count="$(cut -f1 "$refs_file" | sort -u | wc -l | tr -d ' ')"
+echo "workflow action check passed (${resolved_count} remote action reference(s) resolved)"

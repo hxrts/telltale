@@ -25,8 +25,18 @@ fi
 cd "${LEAN_DIR}"
 
 # Step 1: generate or refresh lake-manifest.json.
+manifest_needs_refresh=0
 if [[ ! -f "lake-manifest.json" ]]; then
-  echo "== lake update (generating lake-manifest.json) =="
+  manifest_needs_refresh=1
+elif jq -e '
+  .packages[]
+  | select((.name == "mathlib" or .name == "iris") and .type == "path")
+' lake-manifest.json >/dev/null 2>&1; then
+  manifest_needs_refresh=1
+fi
+
+if [[ "${manifest_needs_refresh}" -eq 1 ]]; then
+  echo "== lake update (refreshing lake-manifest.json) =="
   lake update
 else
   echo "OK   lake-manifest.json present"

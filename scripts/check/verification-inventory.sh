@@ -344,7 +344,7 @@ actual_compiler_serialization_pipeline_suites=$(count_list "${compiler_serializa
 actual_deadlock_automation_fragment_suites=$(count_list "${deadlock_automation_fragment_suites[@]}")
 actual_docs_as_contract_assurance_suites=$(count_list "${docs_as_contract_assurance_suites[@]}")
 actual_deterministic_scale_budget_assurance_suites=$(count_list "${deterministic_scale_budget_assurance_suites[@]}")
-actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupported_fail_closed_notes[@]}")
+actual_explicit_unsupported_fail_closed_notes=$(count_list "${explicit_unsupported_fail_closed_notes[@]-}")
 
 actual_executable_property_buckets=$(
   (
