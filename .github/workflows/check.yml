@@ -33,6 +33,16 @@ jobs:
         run: cargo install just --locked
       - name: Install native tooling
         run: sudo apt-get update && sudo apt-get install -y ripgrep gnuplot
+      - name: Reclaim disk before assurance lane
+        run: |
+          set -euo pipefail
+          echo "=== Disk before assurance cleanup ==="
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /usr/share/swift /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean
+          echo "=== Disk after assurance cleanup ==="
+          df -h /
       - name: Run PR-critical assurance lane
         run: just check-pr-critical
       - name: Run cross-runtime parity gate
