@@ -1,100 +1,52 @@
 #!/usr/bin/env bash
-# Ensure repo-owned Lean entrypoints reuse pinned local dependency builds and
-# hydrated package caches instead of rebuilding dependency trees from source.
+# Ensure the Lean package has its Mathlib olean cache hydrated.
+#
+# Mathlib is referenced via a pinned git commit. lake exe cache get downloads
+# prebuilt .olean files from cache.leanprover.community keyed by that commit,
+# so Mathlib is never rebuilt from source.
+#
+# Iris and Paco are compiled once and cached in .lake/; they are much smaller
+# than Mathlib and have no public olean cache.
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
-PINS_FILE="${LEAN_DIR}/dependency_pins.json"
-DEPENDENCY_BOOTSTRAP="${ROOT_DIR}/scripts/bootstrap/dependency-checkouts.sh"
 
 if [[ ! -f "${LEAN_DIR}/lakefile.lean" ]]; then
-  echo "error: missing Lean package at ${LEAN_DIR}/lakefile.lean" >&2
+  echo "error: missing ${LEAN_DIR}/lakefile.lean" >&2
   exit 2
 fi
 
-if [[ ! -f "${PINS_FILE}" ]]; then
-  echo "error: missing dependency pins file: ${PINS_FILE}" >&2
+if ! command -v lake >/dev/null 2>&1; then
+  echo "error: lake not on PATH — run this script from inside 'nix develop'" >&2
   exit 2
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
-  echo "error: jq is required but not found on PATH" >&2
-  exit 2
-fi
+cd "${LEAN_DIR}"
 
-dependency_bootstrap_needed=0
-while IFS= read -r dep; do
-  name="$(jq -r '.name' <<< "${dep}")"
-  checkout="$(jq -r '.path' <<< "${dep}")"
-  revision="$(jq -r '.revision' <<< "${dep}")"
-
-  if [[ ! -d "${checkout}/.git" ]]; then
-    dependency_bootstrap_needed=1
-    break
-  fi
-
-  actual="$(git -C "${checkout}" rev-parse HEAD 2>/dev/null || true)"
-  if [[ "${actual}" != "${revision}" ]]; then
-    dependency_bootstrap_needed=1
-    break
-  fi
-done < <(jq -c '.dependencies[]' "${PINS_FILE}")
-
-mathlib_path="$(jq -r '.dependencies[] | select(.name == "mathlib4") | .path' "${PINS_FILE}")"
-mathlib_marker="${mathlib_path}/.lake/build/lib/lean/Mathlib.olean"
-if [[ ! -f "${mathlib_marker}" ]]; then
-  dependency_bootstrap_needed=1
-fi
-
-if (( dependency_bootstrap_needed )); then
-  "${DEPENDENCY_BOOTSTRAP}"
+# Step 1: generate or refresh lake-manifest.json.
+if [[ ! -f "lake-manifest.json" ]]; then
+  echo "== lake update (generating lake-manifest.json) =="
+  lake update
 else
-  echo "OK   pinned local Lean dependency checkouts already present"
-  echo "OK   mathlib4 cache present at ${mathlib_marker}"
+  echo "OK   lake-manifest.json present"
 fi
 
-iris_path="$(jq -r '.dependencies[] | select(.name == "iris-lean") | .path' "${PINS_FILE}")"
-if ! find "${iris_path}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
-  echo "sync iris-lean build artifacts: compiling pinned dependency with \`lake build Iris\`"
-  (
-    cd "${iris_path}"
-    lake build Iris
-  )
+# Step 2: fetch prebuilt Mathlib oleans from cache.leanprover.community.
+# The cache key is the exact mathlib commit pinned in lake-manifest.json.
+MATHLIB_MARKER=".lake/packages/mathlib/.lake/build/lib/lean/Mathlib.olean"
+if [[ ! -f "${MATHLIB_MARKER}" ]]; then
+  echo "== lake exe cache get (fetching prebuilt Mathlib oleans) =="
+  lake exe cache get
+else
+  echo "OK   Mathlib olean cache present"
 fi
 
-if ! find "${iris_path}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
-  echo "error: missing prebuilt iris-lean oleans under ${iris_path}/.lake/build/lib/lean" >&2
-  echo "hint: build the pinned local iris checkout once, then rerun this command" >&2
+if [[ ! -f "${MATHLIB_MARKER}" ]]; then
+  echo "error: Mathlib olean marker missing after cache fetch" >&2
+  echo "  expected: ${LEAN_DIR}/${MATHLIB_MARKER}" >&2
+  echo "hint: try 'lake exe cache get' manually inside lean/" >&2
   exit 1
 fi
-echo "OK   iris-lean local build artifacts present under ${iris_path}/.lake/build/lib/lean"
 
-package_cache_markers=(
-  "${LEAN_DIR}/.lake/packages/batteries/.lake/build/lib/lean/Batteries.olean"
-  "${LEAN_DIR}/.lake/packages/aesop/.lake/build/lib/lean/Aesop.olean"
-)
-
-package_cache_missing=0
-for marker in "${package_cache_markers[@]}"; do
-  if [[ ! -f "${marker}" ]]; then
-    package_cache_missing=1
-    break
-  fi
-done
-
-if (( package_cache_missing )); then
-  echo "sync Lean package caches: fetching prebuilt oleans with \`lake exe cache get\`"
-  (
-    cd "${LEAN_DIR}"
-    lake exe cache get
-  )
-fi
-
-for marker in "${package_cache_markers[@]}"; do
-  if [[ ! -f "${marker}" ]]; then
-    echo "error: expected Lean package cache marker missing after hydration: ${marker}" >&2
-    exit 1
-  fi
-done
-echo "OK   Lean package caches are ready under ${LEAN_DIR}/.lake/packages"
+echo "== Lean prebuilt cache ready — run 'lake build' to compile telltale =="
