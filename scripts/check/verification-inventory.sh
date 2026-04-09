@@ -287,9 +287,11 @@ fi
 # Extract files count (second bold value) and lines count (third bold value)
 actual_files=$(echo "$total_row" | sed 's/[*,]//g' | awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}')
 actual_lines=$(echo "$total_row" | sed 's/[*,]//g' | awk -F'|' '{gsub(/[^0-9]/, "", $4); print $4}')
+actual_search_fairness_inventory=$(grep -c '("search_' lean/Runtime/Proofs/Search/Inventory.lean || echo 0)
 
 check_metric "Lean core-library files" "$actual_files"
 check_metric "Lean core-library lines" "$actual_lines"
+check_metric "Lean-backed search fairness inventory entries" "$actual_search_fairness_inventory"
 
 # ── Justfile Recipe Command Counts ────────────────────────────────────
 

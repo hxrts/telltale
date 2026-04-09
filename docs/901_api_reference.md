@@ -123,6 +123,75 @@ Key exports:
 machine. `EffectHandler` is the host-runtime boundary implemented by embedders
 and simulators.
 
+### `telltale-search`
+
+Generic weighted-graph search substrate for the Telltale workspace.
+
+Module structure:
+
+- `telltale_search::cost`
+- `telltale_search::domain`
+- `telltale_search::machine`
+- `telltale_search::admission`
+- `telltale_search::runtime`
+- `telltale_search::observe`
+
+The supported boundary is intentionally generic:
+
+- canonical search-machine semantics
+- serial min-key batch extraction and deterministic commit
+- full legal batch execution even under chunked parallel schedulers
+- search replay and comparison artifacts
+- scheduler and fairness capability vocabulary
+- explicit graph-epoch and snapshot inputs
+
+Downstream consumers are expected to provide application-specific node, edge,
+heuristic, and epoch semantics through typed domain traits.
+
+Current serial-core exports include:
+
+- `SearchCost`, `EpsilonMilli`
+- `SearchDomain`
+- `SearchMachine`
+- `CanonicalBatch`, `Proposal`, `ProposalKind`
+- `SearchBudgetState`, `SearchTraceState`
+- `SearchError`, `SearchInvariantViolation`
+- profile/admission types:
+  `SearchDeterminismMode`, `SearchSchedulerProfile`,
+  `SearchFairnessAssumption`, `SearchObservableClass`,
+  `CommutativityRegionClass`, `SearchDUser`,
+  `SearchCertifiedCapability`, `AdmissionRejectionReason`,
+  `check_capability_containment(...)`
+- observation/comparison types:
+  `SearchObservationArtifact`, `NormalizedCommitRecord`,
+  `IncumbentPublicationRecord`,
+  `ObservationComparison`, `ObservationRelation`,
+  `compare_observations(...)`
+- runtime/replay types:
+  `ProposalExecutor`, `SerialProposalExecutor`,
+  `NativeParallelExecutor`, `NativeParallelExecutorError`,
+  `AuthorityReadSet`, `AuthorityWriteSet`,
+  `AuthoritySurface`, `SchedulerArtifact`, `SchedulerArtifactClass`,
+  `ProgressSummary`, `TotalStepMode`, `SearchExecutionReport`,
+  `SearchReplayArtifact`, `ReplayRoundRecord`, `ReplayExpectation`,
+  `ReplayError`, `SearchRunConfig`, `run_with_executor(...)`,
+  `replay_observation(...)`,
+  `EpochReconfigurationRequest`, `commit_epoch_reconfiguration(...)`,
+  `proposals_independent(...)`
+
+Replay validation is derived from canonical round commits rather than trusting
+stored summary fields. Epoch reconfiguration is barriered and resets
+frontier/parent/incumbent state before reseeding the new epoch from the start
+node. Fairness bundles are explicit observation and admission surfaces.
+Observation artifacts also carry canonical parent identity and incumbent
+publication traces, while fairness and capability bundles use set semantics
+rather than order-sensitive vectors.
+
+Optional layers above the core crate:
+
+- `telltale_simulator::project_search_run(...)`
+- `telltale_viewer::project_search_artifacts(...)`
+
 Module access (not re-exported at crate root):
 - Effect boundary:
   `telltale_machine::model::effects::EffectHandler`, `EffectRequest`, `EffectOutcome`,

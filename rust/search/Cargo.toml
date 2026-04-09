@@ -1,0 +1,39 @@
+[package]
+name = "telltale-search"
+version = "11.3.0"
+authors = ["Sam Hart"]
+edition = "2021"
+rust-version = "1.75"
+description = "Deterministic weighted-graph search substrate for Telltale"
+readme = "../../README.md"
+repository = "https://github.com/hxrts/telltale"
+license = "MIT OR Apache-2.0"
+keywords = ["search", "deterministic", "graph", "replay"]
+categories = ["algorithms", "concurrency"]
+
+[lib]
+bench = false
+
+[[bench]]
+name = "search_profiles"
+harness = false
+
+[features]
+default = []
+multi-thread = ["dep:rayon"]
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+rayon = { version = "1", optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = "0.3"
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = "0.5"
+
+[lints]
+workspace = true

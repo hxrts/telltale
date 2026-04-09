@@ -31,6 +31,7 @@ declare -A layer_of=(
   ["telltale-macros"]=2
   # Runtime/verification
   ["telltale-machine"]=3
+  ["telltale-search"]=3
   # Session tooling, transport, and facade layer
   ["telltale-runtime"]=4
   ["telltale-bridge"]=4

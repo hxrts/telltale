@@ -1,0 +1,609 @@
+{
+  "fairness_certificate_trace": [
+    {
+      "certified_batch_nodes": [
+        0
+      ],
+      "certified_epoch": 1,
+      "certified_normalized_commits": [
+        {
+          "g_score": 1,
+          "node": 1,
+          "parent": 0
+        },
+        {
+          "g_score": 1,
+          "node": 2,
+          "parent": 0
+        }
+      ],
+      "certified_observables": [
+        "IncumbentCost",
+        "CanonicalParentIdentity",
+        "CanonicalPathIdentity",
+        "NormalizedCommitTrace",
+        "ProgressAccounting"
+      ],
+      "certified_phase": 0,
+      "class": "CurrentMinKeyBatch",
+      "normalization_mode": "Full",
+      "required_fairness": [
+        "DeterministicSchedulerConfluence"
+      ],
+      "service_bound_steps": 1
+    },
+    {
+      "certified_batch_nodes": [
+        1,
+        2
+      ],
+      "certified_epoch": 1,
+      "certified_normalized_commits": [
+        {
+          "g_score": 2,
+          "node": 3,
+          "parent": 1
+        }
+      ],
+      "certified_observables": [
+        "IncumbentCost",
+        "CanonicalParentIdentity",
+        "CanonicalPathIdentity",
+        "NormalizedCommitTrace",
+        "ProgressAccounting"
+      ],
+      "certified_phase": 0,
+      "class": "CurrentMinKeyBatch",
+      "normalization_mode": "Full",
+      "required_fairness": [
+        "DeterministicSchedulerConfluence"
+      ],
+      "service_bound_steps": 1
+    },
+    {
+      "certified_batch_nodes": [
+        3
+      ],
+      "certified_epoch": 1,
+      "certified_normalized_commits": [],
+      "certified_observables": [
+        "IncumbentCost",
+        "CanonicalParentIdentity",
+        "CanonicalPathIdentity",
+        "NormalizedCommitTrace",
+        "ProgressAccounting"
+      ],
+      "certified_phase": 0,
+      "class": "CurrentMinKeyBatch",
+      "normalization_mode": "Full",
+      "required_fairness": [
+        "DeterministicSchedulerConfluence"
+      ],
+      "service_bound_steps": 1
+    }
+  ],
+  "final_state": {
+    "closed_nodes": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "epoch": 1,
+    "g_scores": [
+      [
+        0,
+        0
+      ],
+      [
+        1,
+        1
+      ],
+      [
+        2,
+        1
+      ],
+      [
+        3,
+        2
+      ]
+    ],
+    "incumbent_cost": 2,
+    "incumbent_path": [
+      0,
+      1,
+      3
+    ],
+    "open_nodes": [],
+    "parent_map": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        3,
+        1
+      ]
+    ],
+    "phase": 0
+  },
+  "observation": {
+    "canonical_parent_map": [
+      [
+        1,
+        0
+      ],
+      [
+        2,
+        0
+      ],
+      [
+        3,
+        1
+      ]
+    ],
+    "fairness_assumptions": [
+      "DeterministicSchedulerConfluence"
+    ],
+    "graph_epoch_trace": [
+      1
+    ],
+    "incumbent_cost": 2,
+    "incumbent_path": [
+      0,
+      1,
+      3
+    ],
+    "incumbent_publication_trace": [
+      {
+        "cost": 2,
+        "path": [
+          0,
+          1,
+          3
+        ]
+      }
+    ],
+    "normalized_commit_trace": [
+      {
+        "g_score": 1,
+        "node": 1,
+        "parent": 0
+      },
+      {
+        "g_score": 1,
+        "node": 2,
+        "parent": 0
+      },
+      {
+        "g_score": 2,
+        "node": 3,
+        "parent": 1
+      }
+    ],
+    "productive_steps": 2,
+    "replay_checkpoints": [],
+    "scheduler_profile": "CanonicalSerial",
+    "total_scheduler_steps": 3
+  },
+  "replay_rounds": [
+    {
+      "batch_nodes": [
+        0
+      ],
+      "commits": [
+        {
+          "g_score": 1,
+          "node": 1,
+          "parent": 0
+        },
+        {
+          "g_score": 1,
+          "node": 2,
+          "parent": 0
+        }
+      ],
+      "epoch": 1,
+      "fairness_certificate": {
+        "certified_batch_nodes": [
+          0
+        ],
+        "certified_epoch": 1,
+        "certified_normalized_commits": [
+          {
+            "g_score": 1,
+            "node": 1,
+            "parent": 0
+          },
+          {
+            "g_score": 1,
+            "node": 2,
+            "parent": 0
+          }
+        ],
+        "certified_observables": [
+          "IncumbentCost",
+          "CanonicalParentIdentity",
+          "CanonicalPathIdentity",
+          "NormalizedCommitTrace",
+          "ProgressAccounting"
+        ],
+        "certified_phase": 0,
+        "class": "CurrentMinKeyBatch",
+        "normalization_mode": "Full",
+        "required_fairness": [
+          "DeterministicSchedulerConfluence"
+        ],
+        "service_bound_steps": 1
+      },
+      "phase": 0,
+      "snapshot_id": "epoch-1",
+      "state_after_round": {
+        "closed_nodes": [
+          0
+        ],
+        "epoch": 1,
+        "g_scores": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ]
+        ],
+        "incumbent_cost": null,
+        "incumbent_path": null,
+        "open_nodes": [
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ]
+        ],
+        "parent_map": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ],
+        "phase": 0
+      }
+    },
+    {
+      "batch_nodes": [
+        1,
+        2
+      ],
+      "commits": [
+        {
+          "g_score": 2,
+          "node": 3,
+          "parent": 1
+        }
+      ],
+      "epoch": 1,
+      "fairness_certificate": {
+        "certified_batch_nodes": [
+          1,
+          2
+        ],
+        "certified_epoch": 1,
+        "certified_normalized_commits": [
+          {
+            "g_score": 2,
+            "node": 3,
+            "parent": 1
+          }
+        ],
+        "certified_observables": [
+          "IncumbentCost",
+          "CanonicalParentIdentity",
+          "CanonicalPathIdentity",
+          "NormalizedCommitTrace",
+          "ProgressAccounting"
+        ],
+        "certified_phase": 0,
+        "class": "CurrentMinKeyBatch",
+        "normalization_mode": "Full",
+        "required_fairness": [
+          "DeterministicSchedulerConfluence"
+        ],
+        "service_bound_steps": 1
+      },
+      "phase": 0,
+      "snapshot_id": "epoch-1",
+      "state_after_round": {
+        "closed_nodes": [
+          0,
+          1,
+          2
+        ],
+        "epoch": 1,
+        "g_scores": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            3,
+            2
+          ]
+        ],
+        "incumbent_cost": 2,
+        "incumbent_path": [
+          0,
+          1,
+          3
+        ],
+        "open_nodes": [
+          [
+            3,
+            2
+          ]
+        ],
+        "parent_map": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            1
+          ]
+        ],
+        "phase": 0
+      }
+    },
+    {
+      "batch_nodes": [
+        3
+      ],
+      "commits": [],
+      "epoch": 1,
+      "fairness_certificate": {
+        "certified_batch_nodes": [
+          3
+        ],
+        "certified_epoch": 1,
+        "certified_normalized_commits": [],
+        "certified_observables": [
+          "IncumbentCost",
+          "CanonicalParentIdentity",
+          "CanonicalPathIdentity",
+          "NormalizedCommitTrace",
+          "ProgressAccounting"
+        ],
+        "certified_phase": 0,
+        "class": "CurrentMinKeyBatch",
+        "normalization_mode": "Full",
+        "required_fairness": [
+          "DeterministicSchedulerConfluence"
+        ],
+        "service_bound_steps": 1
+      },
+      "phase": 0,
+      "snapshot_id": "epoch-1",
+      "state_after_round": {
+        "closed_nodes": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "epoch": 1,
+        "g_scores": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            1
+          ],
+          [
+            2,
+            1
+          ],
+          [
+            3,
+            2
+          ]
+        ],
+        "incumbent_cost": 2,
+        "incumbent_path": [
+          0,
+          1,
+          3
+        ],
+        "open_nodes": [],
+        "parent_map": [
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ],
+          [
+            3,
+            1
+          ]
+        ],
+        "phase": 0
+      }
+    }
+  ],
+  "route_bounds": {
+    "admissible_upper_bound": 2,
+    "approximation_ratio_milli": 1000,
+    "candidate_discovery_bound_steps": 2,
+    "discovery_certificate": {
+      "certified_observables": [
+        "IncumbentCost",
+        "CanonicalParentIdentity",
+        "CanonicalPathIdentity",
+        "NormalizedCommitTrace",
+        "ProgressAccounting"
+      ],
+      "class": "GoalWindowOneStepExact",
+      "observed_goal_window_step": 3,
+      "required_premises": [
+        "DeterministicSchedulerConfluence"
+      ],
+      "service_bound_steps": 1
+    },
+    "discovery_class": "ObservedRunBoundWithGoalWindowCertificate",
+    "goal_service_bound_steps": 1,
+    "goal_window_entry_bound_steps": 3,
+    "optimality_gap": 0,
+    "quality_class": "ExactOptimal",
+    "recovery_bound_steps_after_latest_epoch": 2,
+    "required_premises": [
+      "DeterministicSchedulerConfluence"
+    ],
+    "selected_route_cost": 2,
+    "selected_route_summary": {
+      "cost": 2,
+      "hop_count": 2,
+      "metrics": [
+        {
+          "name": "PathNodeCount",
+          "value": 3
+        },
+        {
+          "name": "HopCount",
+          "value": 2
+        },
+        {
+          "name": "ScalarCostOrderKey",
+          "value": 2
+        },
+        {
+          "name": "PublicationCount",
+          "value": 1
+        },
+        {
+          "name": "NormalizedCommitCount",
+          "value": 3
+        },
+        {
+          "name": "TraversedEpochCount",
+          "value": 1
+        }
+      ],
+      "normalized_commit_count": 3,
+      "publication_count": 1,
+      "traversed_epoch_count": 1
+    }
+  },
+  "schema_version": "search_vectors_v1",
+  "theorem_pack": {
+    "canonical_goal_window_discovery_suffix_bound_steps": 1,
+    "canonical_service_bound_steps": 1,
+    "gate": "just check-search-fairness",
+    "inventory": [
+      {
+        "name": "search_canonical_serial_exact_one_step_fairness",
+        "present": true
+      },
+      {
+        "name": "search_canonical_serial_dynamic_liveness_under_stability",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_refines_canonical_one_step",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_commit_trace_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_state_slice_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_observation_slice_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_observation_equivalent_to_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_multi_step_state_trace_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_multi_step_observation_trace_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_state_artifact_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_multi_step_state_artifact_trace_refines_canonical",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_exact_one_step_fairness",
+        "present": true
+      },
+      {
+        "name": "search_batched_parallel_exact_certified_window_fairness",
+        "present": true
+      },
+      {
+        "name": "search_batched_parallel_exact_bounded_dynamic_starvation_freedom",
+        "present": true
+      },
+      {
+        "name": "search_batched_parallel_exact_certified_window_trace_valid",
+        "present": true
+      },
+      {
+        "name": "search_batched_parallel_envelope_unconditional_fairness",
+        "present": false
+      },
+      {
+        "name": "search_canonical_serial_goal_window_service_has_exact_suffix_bound",
+        "present": true
+      },
+      {
+        "name": "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
+        "present": true
+      }
+    ]
+  }
+}

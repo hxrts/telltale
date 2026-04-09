@@ -15,6 +15,18 @@ The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-machine`, `telltale-theory`, and Lean runtime modules.
 Host-runtime handlers also remain outside the bridge and re-enter through typed effect surfaces.
 
+The same reduced-fixture parity style now also applies to `telltale-search` for
+the concurrency-critical slice. That lane covers:
+
+- canonical min-key batch extraction
+- proposal independence over declared authority surfaces
+- replay epoch and phase contracts
+- epoch-barrier transitions
+- fairness-bundle fixture alignment
+
+It is intentionally reduced. It does not attempt to prove full ARA* optimality
+or every scheduler policy.
+
 This document covers the bridge behavior implemented in `rust/bridge/src`:
 
 - `export`

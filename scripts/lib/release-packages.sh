@@ -10,6 +10,7 @@ RELEASE_PACKAGES=(
   "telltale"
   "telltale-runtime"
   "telltale-transport"
+  "telltale-search"
   "telltale-simulator"
   "telltale-bridge"
 )
@@ -35,6 +36,7 @@ manifest_path() {
     telltale) echo "Cargo.toml" ;;
     telltale-runtime) echo "rust/runtime/Cargo.toml" ;;
     telltale-transport) echo "rust/transport/Cargo.toml" ;;
+    telltale-search) echo "rust/search/Cargo.toml" ;;
     telltale-simulator) echo "rust/simulator/Cargo.toml" ;;
     telltale-bridge) echo "rust/bridge/Cargo.toml" ;;
     *)
