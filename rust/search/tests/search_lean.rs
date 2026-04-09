@@ -269,6 +269,7 @@ fn assert_barrier_contracts(fixture: &SearchParityFixture) {
     assert_eq!(fixture.fairness_bundle, vec!["EventualLiveBatchService"]);
 }
 
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 fn assert_fairness_contracts(fixture: &SearchParityFixture) {
     assert_eq!(fixture.canonical_service_bound_steps, 1);
     assert_eq!(fixture.profile_claims.canonical_serial, "exact_one_step");

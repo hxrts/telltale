@@ -731,6 +731,7 @@ where
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn route_bound_artifact_for_replay<N, G, S, C>(
     profile: SearchSchedulerProfile,
     replay: &SearchReplayArtifact<N, G, S, C>,
@@ -815,7 +816,7 @@ where
     let required_premises = replay.fairness.certificate.required_fairness.clone();
     let goal_service_bound_steps = replay.fairness.certificate.service_bound_steps;
     let discovery_certificate =
-        goal_window_entry_bound_steps.zip(goal_service_bound_steps).and_then(
+        goal_window_entry_bound_steps.zip(goal_service_bound_steps).map(
             |(observed_goal_window_step, service_bound_steps)| {
                 let class = match profile {
                     SearchSchedulerProfile::CanonicalSerial => {
@@ -833,13 +834,13 @@ where
                         )
                     }
                 };
-                Some(SearchRouteDiscoveryCertificate {
+                SearchRouteDiscoveryCertificate {
                     class,
                     service_bound_steps,
                     observed_goal_window_step,
                     required_premises: replay.fairness.certificate.required_fairness.clone(),
                     certified_observables: replay.fairness.certificate.certified_observables.clone(),
-                })
+                }
             },
         );
 
@@ -1056,6 +1057,11 @@ where
 }
 
 /// Validate one exported fairness certificate trace against replay rounds.
+///
+/// # Errors
+///
+/// Returns `SearchFairnessTraceValidationError` if the certificate trace length
+/// does not match the replay round count.
 pub fn validate_fairness_certificate_trace<N, G, S, C>(
     replay: &SearchReplayArtifact<N, G, S, C>,
 ) -> Result<(), SearchFairnessTraceValidationError>
@@ -1093,6 +1099,11 @@ where
 }
 
 /// Validate one runtime configuration against one executor kind.
+///
+/// # Errors
+///
+/// Returns `SearchRunConfigError` if the configuration is inconsistent with the
+/// executor kind, scheduler profile, fairness assumptions, or batch width.
 pub fn validate_run_config<D, X>(
     executor: &X,
     config: &SearchRunConfig,
@@ -1194,6 +1205,7 @@ where
 /// # Panics
 ///
 /// Panics if one extracted batch entry count does not fit in `u64`.
+#[allow(clippy::too_many_lines)]
 pub fn run_with_executor<D, X>(
     machine: &mut SearchMachine<D>,
     executor: &X,

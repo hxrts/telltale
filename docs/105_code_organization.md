@@ -135,7 +135,7 @@ workspace.
 It owns canonical search-machine semantics, replay artifacts, determinism and
 fairness capability vocabulary, explicit graph-epoch boundaries, and
 fairness-aware scheduler artifacts for weighted graph search. The crate is
-target-agnostic; the optional `multi-thread` feature only enables native
+target-agnostic. The optional `multi-thread` feature only enables native
 speculative proposal execution.
 
 This crate is intentionally downstream-oriented and domain-generic.

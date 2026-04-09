@@ -1,3 +1,5 @@
+#![allow(missing_docs)]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use telltale_search::{
     run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,

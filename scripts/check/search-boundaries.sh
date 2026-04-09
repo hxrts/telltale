@@ -36,11 +36,11 @@ check_has_hits() {
 }
 
 check_no_hits 'telltale-simulator|telltale-viewer|telltale-ui|telltale-web|dioxus' rust/search
-check_no_hits 'Bluetooth|bluetooth|BLE|mesh router|radio interference|RF' rust/search docs/507_search_engine.md
-check_has_hits 'telltale-search' docs/507_search_engine.md
-check_has_hits 'downstream' docs/507_search_engine.md
-check_has_hits 'optional' docs/507_search_engine.md
-check_has_hits 'generic' docs/507_search_engine.md
+check_no_hits 'Bluetooth|bluetooth|BLE|mesh router|radio interference|RF' rust/search docs/507_session_graph_search.md
+check_has_hits 'telltale-search' docs/507_session_graph_search.md
+check_has_hits 'downstream' docs/507_session_graph_search.md
+check_has_hits 'optional' docs/507_session_graph_search.md
+check_has_hits 'generic' docs/507_session_graph_search.md
 
 if [[ "$fail" -ne 0 ]]; then
   exit 1

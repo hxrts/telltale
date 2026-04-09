@@ -73,7 +73,7 @@ The `telltale-bridge` crate provides JSON export and import for cross-validation
 | [Simulation Fields](504_simulation_fields.md) | Reference | Informative |
 | [Simulation Viewer](505_simulation_viewer.md) | Reference | Mixed |
 | [Simulation Viewer Webapp](506_simulation_viewer_webapp.md) | Guide | Mixed |
-| [Search Engine](507_search_engine.md) | Reference | Mixed |
+| [Session Graph Search](507_session_graph_search.md) | Reference | Mixed |
 | [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) | Reference | Normative |
 | [Content Addressing](601_content_addressing.md) | Reference | Mixed |
 | [Resource Heap](602_resource_heap.md) | Reference | Mixed |

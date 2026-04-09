@@ -787,6 +787,7 @@ fn exact_batched_parallel_profile_matches_serial_on_exact_observables() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
     let (report, replay) = run_with_executor(
@@ -905,6 +906,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
 
 #[cfg(feature = "multi-thread")]
 #[test]
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discovery_bounds() {
     let mut exact_machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
     let (exact_report, _) = run_with_executor(
@@ -1129,6 +1131,7 @@ fn replay_artifact_records_epoch_barrier_exactly_once_across_reconfiguration() {
 }
 
 #[test]
+#[allow(clippy::cognitive_complexity)]
 fn fairness_artifact_classifies_profiles_with_the_expected_scope() {
     let canonical =
         fairness_artifact_for_profile::<u8, u64>(SearchSchedulerProfile::CanonicalSerial);
