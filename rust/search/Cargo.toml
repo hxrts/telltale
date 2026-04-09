@@ -31,6 +31,8 @@ wasm-bindgen-test = "0.3"
 
 [dev-dependencies]
 serde_json = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 criterion = "0.5"
 
 [lints]

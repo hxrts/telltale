@@ -562,6 +562,11 @@ check-durable-boundaries:
 check-search-boundaries:
     bash ./scripts/check/search-boundaries.sh
 
+# Focused Lean-backed search fairness gate: theorem-pack, parity fixture, and
+# inventory alignment.
+check-search-fairness:
+    bash ./scripts/check/search-fairness.sh
+
 # Focused telltale-search verification split: package compile and boundary checks.
 check-search-tooling:
     #!/usr/bin/env bash
@@ -577,7 +582,7 @@ check-search-tooling:
     if rustup target list --installed | grep -q '^wasm32-unknown-unknown$'; then
       cargo check -p telltale-search --target wasm32-unknown-unknown --tests
     fi
-    lake --dir lean build search_parity_runner
+    just check-search-fairness
     just check-search-boundaries
 
 # Focused durability verification split: machine contracts, simulator assurance, and boundaries.

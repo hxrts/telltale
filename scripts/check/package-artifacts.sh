@@ -191,6 +191,7 @@ manifest_paths = {
     "telltale": "Cargo.toml",
     "telltale-runtime": "rust/runtime/Cargo.toml",
     "telltale-transport": "rust/transport/Cargo.toml",
+    "telltale-search": "rust/search/Cargo.toml",
     "telltale-simulator": "rust/simulator/Cargo.toml",
     "telltale-bridge": "rust/bridge/Cargo.toml",
 }
@@ -625,10 +626,14 @@ assert_packaged_file_matches_source telltale-bridge "README.md" "${ROOT_DIR}/REA
 echo "== smoke check packaged telltale crate =="
 smoke_packaged_crate telltale cargo check --lib --features full
 ensure_rust_target_installed wasm32-unknown-unknown
-smoke_packaged_crate telltale cargo check --lib --target wasm32-unknown-unknown --features wasm
+smoke_packaged_crate telltale bash -lc \
+  "cargo check --lib --target wasm32-unknown-unknown --features wasm"
 
 echo "== smoke check packaged telltale-runtime crate =="
 smoke_packaged_crate telltale-runtime cargo check --lib --all-features
+
+echo "== smoke check packaged telltale-search crate =="
+smoke_packaged_crate telltale-search cargo check --lib --all-features
 
 echo "== smoke check packaged telltale-bridge crate =="
 smoke_packaged_crate telltale-bridge cargo check --lib --all-features
@@ -702,6 +707,9 @@ export PACKAGE_GIT_HEAD="$(git rev-parse HEAD)"
 export PACKAGE_RUSTC_VERSION="$(rustc --version)"
 export PACKAGE_CARGO_VERSION="$(cargo --version)"
 export PACKAGE_WASM_LOCK_SHA256="$(hash_file "${WASM_EXAMPLE_LOCK_PATH}")"
+export PACKAGE_SEARCH_THEOREM_PACK_PATH="$(./scripts/ops/export-search-theorem-pack.sh)"
+export PACKAGE_SEARCH_VECTORS_PATH="$(./scripts/ops/export-search-vectors.sh)"
+export PACKAGE_SEARCH_RECOVERY_VECTORS_PATH="$(./scripts/ops/export-search-recovery-vectors.sh)"
 python3 - <<'PY'
 import json
 import os
@@ -715,6 +723,9 @@ git_head = os.environ["PACKAGE_GIT_HEAD"]
 rustc_version = os.environ["PACKAGE_RUSTC_VERSION"]
 cargo_version = os.environ["PACKAGE_CARGO_VERSION"]
 wasm_lock_sha256 = os.environ["PACKAGE_WASM_LOCK_SHA256"]
+search_theorem_pack_path = pathlib.Path(os.environ["PACKAGE_SEARCH_THEOREM_PACK_PATH"])
+search_vectors_path = pathlib.Path(os.environ["PACKAGE_SEARCH_VECTORS_PATH"])
+search_recovery_vectors_path = pathlib.Path(os.environ["PACKAGE_SEARCH_RECOVERY_VECTORS_PATH"])
 
 packages = [
     "telltale-types",
@@ -741,6 +752,9 @@ resource_files = {
     "telltale-bridge:README.md": root / "README.md",
     "examples/wasm/README.md": root / "examples/wasm/README.md",
     "examples/wasm/harness.sh": root / "examples/wasm/harness.sh",
+    "telltale-search:search-theorem-pack.json": search_theorem_pack_path,
+    "telltale-search:search-vectors-v1.json": search_vectors_path,
+    "telltale-search:search-recovery-vectors-v1.json": search_recovery_vectors_path,
 }
 
 manifest = {

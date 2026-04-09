@@ -7,18 +7,22 @@ use std::num::NonZeroU64;
 use support::{FixtureDomain, UnstableOrderDomain};
 #[cfg(not(feature = "multi-thread"))]
 use telltale_search::NativeParallelExecutorError;
+use telltale_search::{
+    classify_fairness_claim, commit_epoch_reconfiguration, fairness_artifact_for_profile,
+    proposals_independent, replay_observation, run_with_executor, search_theorem_pack_artifact,
+    theorem_backed_observables, validate_fairness_certificate_trace, validate_run_config,
+    AuthorityReadSet, AuthoritySurface, AuthorityWriteSet, EpochReconfigurationRequest,
+    EpsilonMilli, NativeParallelExecutor, Proposal, ProposalKind, ReplayError, ReplayExpectation,
+    SearchDeterminismMode, SearchError, SearchFairnessAssumption, SearchFairnessCertificateClass,
+    SearchFairnessClaimClass, SearchFairnessTraceValidationError, SearchMachine,
+    SearchRouteDiscoveryBoundClass, SearchRouteDiscoveryCertificateClass, SearchRouteMetricName,
+    SearchRouteQualityClass, SearchRunConfig, SearchRunConfigError, SearchRunError,
+    SearchSchedulerProfile, SerialProposalExecutor,
+};
 #[cfg(feature = "multi-thread")]
 use telltale_search::{
     classify_scheduler_artifact, compare_observations, ObservationRelation, SchedulerArtifactClass,
-    SearchDeterminismMode, SearchObservableClass, TotalStepMode,
-};
-use telltale_search::{
-    commit_epoch_reconfiguration, proposals_independent, replay_observation, run_with_executor,
-    validate_run_config, AuthorityReadSet, AuthoritySurface, AuthorityWriteSet,
-    EpochReconfigurationRequest, EpsilonMilli, NativeParallelExecutor, Proposal, ProposalKind,
-    ReplayError, ReplayExpectation, SearchError, SearchFairnessAssumption, SearchMachine,
-    SearchRunConfig, SearchRunConfigError, SearchRunError, SearchSchedulerProfile,
-    SerialProposalExecutor,
+    SearchObservableClass, TotalStepMode,
 };
 
 fn make_domain() -> FixtureDomain {
@@ -126,6 +130,11 @@ fn serial_and_parallel_batch_width_one_are_exactly_equal() {
         classify_scheduler_artifact(SearchSchedulerProfile::ThreadedExactSingleLane),
         SchedulerArtifactClass::Exact
     );
+    assert_eq!(
+        right_report.fairness.certificate.class,
+        SearchFairnessCertificateClass::CurrentMinKeyBatchViaThreadedRefinement
+    );
+    assert!(right_report.fairness.exact_commit_trace_refines_canonical);
 }
 
 #[cfg(feature = "multi-thread")]
@@ -704,6 +713,14 @@ fn exact_and_envelope_profiles_report_the_expected_scheduler_classes() {
         SchedulerArtifactClass::Exact
     );
     assert_eq!(exact_report.progress.total_step_mode, TotalStepMode::Exact);
+    assert_eq!(
+        exact_report.fairness.certificate.class,
+        SearchFairnessCertificateClass::CertifiedCurrentMinKeyWindow
+    );
+    assert_eq!(
+        exact_report.fairness.certificate.service_bound_steps,
+        Some(1)
+    );
 
     let mut envelope_machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
     let (envelope_report, _) = run_with_executor(
@@ -723,6 +740,10 @@ fn exact_and_envelope_profiles_report_the_expected_scheduler_classes() {
     assert_eq!(
         envelope_report.progress.total_step_mode,
         TotalStepMode::FairnessBounded
+    );
+    assert_eq!(
+        envelope_report.fairness.certificate.class,
+        SearchFairnessCertificateClass::None
     );
 }
 
@@ -766,6 +787,306 @@ fn exact_batched_parallel_profile_matches_serial_on_exact_observables() {
 }
 
 #[test]
+fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("canonical run");
+    assert_eq!(
+        report.route_bounds.discovery_class,
+        SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate
+    );
+    assert_eq!(report.route_bounds.candidate_discovery_bound_steps, Some(2));
+    assert_eq!(report.route_bounds.goal_service_bound_steps, Some(1));
+    assert_eq!(report.route_bounds.goal_window_entry_bound_steps, Some(3));
+    assert_eq!(
+        report
+            .route_bounds
+            .discovery_certificate
+            .as_ref()
+            .map(|certificate| certificate.class),
+        Some(SearchRouteDiscoveryCertificateClass::GoalWindowOneStepExact)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .discovery_certificate
+            .as_ref()
+            .map(|certificate| certificate.service_bound_steps),
+        Some(1)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .discovery_certificate
+            .as_ref()
+            .map(|certificate| certificate.observed_goal_window_step),
+        Some(3)
+    );
+    assert_eq!(
+        report.route_bounds.recovery_bound_steps_after_latest_epoch,
+        Some(2)
+    );
+    assert_eq!(
+        report.route_bounds.quality_class,
+        SearchRouteQualityClass::ExactOptimal
+    );
+    assert_eq!(report.route_bounds.selected_route_cost, Some(2));
+    assert_eq!(report.route_bounds.optimality_gap, Some(0));
+    assert_eq!(report.route_bounds.approximation_ratio_milli, Some(1_000));
+    assert_eq!(report.route_bounds.admissible_upper_bound, Some(2));
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|s| s.hop_count),
+        Some(2)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|s| s.publication_count),
+        Some(1)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|s| s.normalized_commit_count),
+        Some(3)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|s| s.traversed_epoch_count),
+        Some(1)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .and_then(|s| {
+                s.metrics
+                    .iter()
+                    .find(|metric| metric.name == SearchRouteMetricName::ScalarCostOrderKey)
+                    .map(|metric| metric.value)
+            }),
+        Some(2)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .and_then(|s| {
+                s.metrics
+                    .iter()
+                    .find(|metric| metric.name == SearchRouteMetricName::PathNodeCount)
+                    .map(|metric| metric.value)
+            }),
+        Some(3)
+    );
+    assert_eq!(report.route_bounds, replay.route_bounds);
+}
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discovery_bounds() {
+    let mut exact_machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (exact_report, _) = run_with_executor(
+        &mut exact_machine,
+        &native_executor(2),
+        run_config(
+            SearchSchedulerProfile::BatchedParallelExact,
+            2,
+            &[
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+                SearchFairnessAssumption::EventualLiveBatchService,
+                SearchFairnessAssumption::NoStarvationWithinLegalWindow,
+            ],
+        ),
+    )
+    .expect("exact batched run");
+    assert_eq!(
+        exact_report.route_bounds.discovery_class,
+        SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate
+    );
+    assert_eq!(
+        exact_report.route_bounds.candidate_discovery_bound_steps,
+        Some(2)
+    );
+    assert_eq!(exact_report.route_bounds.goal_service_bound_steps, Some(1));
+    assert_eq!(
+        exact_report.route_bounds.goal_window_entry_bound_steps,
+        Some(3)
+    );
+    assert_eq!(
+        exact_report
+            .route_bounds
+            .discovery_certificate
+            .as_ref()
+            .map(|certificate| certificate.class),
+        Some(SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService)
+    );
+    assert_eq!(
+        exact_report
+            .route_bounds
+            .recovery_bound_steps_after_latest_epoch,
+        Some(2)
+    );
+    assert_eq!(
+        exact_report.route_bounds.quality_class,
+        SearchRouteQualityClass::PremisedWindowBounded
+    );
+    assert_eq!(exact_report.route_bounds.selected_route_cost, Some(2));
+    assert_eq!(exact_report.route_bounds.optimality_gap, None);
+    assert_eq!(exact_report.route_bounds.approximation_ratio_milli, None);
+    assert_eq!(exact_report.route_bounds.admissible_upper_bound, Some(2));
+    assert_eq!(
+        exact_report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|s| s.hop_count),
+        Some(2)
+    );
+    assert_eq!(
+        exact_report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|s| s.normalized_commit_count),
+        Some(3)
+    );
+    assert_eq!(
+        exact_report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .and_then(|s| {
+                s.metrics
+                    .iter()
+                    .find(|metric| metric.name == SearchRouteMetricName::HopCount)
+                    .map(|metric| metric.value)
+            }),
+        Some(2)
+    );
+
+    let mut envelope_machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (envelope_report, _) = run_with_executor(
+        &mut envelope_machine,
+        &native_executor(2),
+        run_config(
+            SearchSchedulerProfile::BatchedParallelEnvelopeBounded,
+            2,
+            &[
+                SearchFairnessAssumption::EventualLiveBatchService,
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+                SearchFairnessAssumption::NoStarvationWithinLegalWindow,
+            ],
+        ),
+    )
+    .expect("envelope run");
+    assert_eq!(
+        envelope_report.route_bounds.discovery_class,
+        SearchRouteDiscoveryBoundClass::ObservedRunBound
+    );
+    assert_eq!(
+        envelope_report.route_bounds.candidate_discovery_bound_steps,
+        Some(2)
+    );
+    assert_eq!(envelope_report.route_bounds.goal_service_bound_steps, None);
+    assert_eq!(
+        envelope_report.route_bounds.goal_window_entry_bound_steps,
+        Some(3)
+    );
+    assert_eq!(envelope_report.route_bounds.discovery_certificate, None);
+    assert_eq!(
+        envelope_report
+            .route_bounds
+            .recovery_bound_steps_after_latest_epoch,
+        Some(2)
+    );
+    assert_eq!(
+        envelope_report.route_bounds.quality_class,
+        SearchRouteQualityClass::PremiseOnly
+    );
+    assert_eq!(envelope_report.route_bounds.selected_route_cost, Some(2));
+    assert_eq!(envelope_report.route_bounds.optimality_gap, None);
+    assert_eq!(envelope_report.route_bounds.approximation_ratio_milli, None);
+    assert_eq!(envelope_report.route_bounds.admissible_upper_bound, Some(2));
+}
+
+#[test]
+fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
+    let domain = make_domain();
+    let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
+    machine.step_once().expect("first step");
+    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    let (report, _) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("post-reconfiguration run");
+    assert_eq!(report.observation.graph_epoch_trace, vec![1, 2]);
+    assert_eq!(report.route_bounds.candidate_discovery_bound_steps, Some(2));
+    assert_eq!(report.route_bounds.goal_window_entry_bound_steps, Some(4));
+    assert_eq!(
+        report.route_bounds.recovery_bound_steps_after_latest_epoch,
+        Some(2)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|summary| summary.traversed_epoch_count),
+        Some(2)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .map(|summary| summary.normalized_commit_count),
+        Some(6)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .selected_route_summary
+            .as_ref()
+            .and_then(|summary| {
+                summary
+                    .metrics
+                    .iter()
+                    .find(|metric| metric.name == SearchRouteMetricName::TraversedEpochCount)
+                    .map(|metric| metric.value)
+            }),
+        Some(2)
+    );
+}
+
+#[test]
 fn reconfiguration_preserves_progress_accounting_but_resets_search_state() {
     let domain = make_domain();
     let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
@@ -805,6 +1126,364 @@ fn replay_artifact_records_epoch_barrier_exactly_once_across_reconfiguration() {
     )
     .expect("post-reconfiguration run");
     assert_eq!(replay.epoch_trace, vec![1, 2]);
+}
+
+#[test]
+fn fairness_artifact_classifies_profiles_with_the_expected_scope() {
+    let canonical =
+        fairness_artifact_for_profile::<u8, u64>(SearchSchedulerProfile::CanonicalSerial);
+    assert_eq!(
+        canonical.claim_class,
+        SearchFairnessClaimClass::ExactOneStep
+    );
+    assert_eq!(
+        canonical.certificate.class,
+        SearchFairnessCertificateClass::CurrentMinKeyBatch
+    );
+    assert_eq!(canonical.certificate.service_bound_steps, Some(1));
+    assert!(canonical.exact_commit_trace_refines_canonical);
+    assert!(canonical.exact_state_slice_refines_canonical);
+    assert!(canonical.exact_observation_equivalent_to_canonical);
+    assert_eq!(
+        canonical.certificate.normalization_mode,
+        SearchDeterminismMode::Full
+    );
+    assert_eq!(canonical.certificate.certified_epoch, None);
+    assert_eq!(canonical.certificate.certified_phase, None);
+    assert_eq!(
+        canonical.certificate.certified_observables,
+        theorem_backed_observables(SearchSchedulerProfile::CanonicalSerial)
+    );
+    assert!(canonical.certificate.certified_batch_nodes.is_empty());
+    assert!(canonical
+        .certificate
+        .certified_normalized_commits
+        .is_empty());
+
+    let threaded =
+        fairness_artifact_for_profile::<u8, u64>(SearchSchedulerProfile::ThreadedExactSingleLane);
+    assert_eq!(
+        threaded.claim_class,
+        SearchFairnessClaimClass::ExactOneStepViaThreadedRefinement
+    );
+    assert_eq!(
+        threaded.certificate.class,
+        SearchFairnessCertificateClass::CurrentMinKeyBatchViaThreadedRefinement
+    );
+    assert_eq!(threaded.certificate.service_bound_steps, Some(1));
+    assert!(threaded.exact_commit_trace_refines_canonical);
+    assert!(threaded.exact_state_slice_refines_canonical);
+    assert!(threaded.exact_observation_equivalent_to_canonical);
+    assert_eq!(
+        threaded.certificate.normalization_mode,
+        SearchDeterminismMode::Full
+    );
+    assert_eq!(
+        threaded.certificate.certified_observables,
+        theorem_backed_observables(SearchSchedulerProfile::ThreadedExactSingleLane)
+    );
+
+    let batched_exact =
+        fairness_artifact_for_profile::<u8, u64>(SearchSchedulerProfile::BatchedParallelExact);
+    assert_eq!(
+        batched_exact.claim_class,
+        SearchFairnessClaimClass::PremisedWindowBounded
+    );
+    assert_eq!(
+        batched_exact.certificate.class,
+        SearchFairnessCertificateClass::CertifiedCurrentMinKeyWindow
+    );
+    assert_eq!(batched_exact.certificate.service_bound_steps, Some(1));
+    assert!(!batched_exact.exact_commit_trace_refines_canonical);
+    assert!(!batched_exact.exact_state_slice_refines_canonical);
+    assert!(!batched_exact.exact_observation_equivalent_to_canonical);
+    assert_eq!(
+        batched_exact.certificate.normalization_mode,
+        SearchDeterminismMode::ModuloCommutativity
+    );
+    assert_eq!(
+        batched_exact.certificate.certified_observables,
+        theorem_backed_observables(SearchSchedulerProfile::BatchedParallelExact)
+    );
+    assert!(batched_exact
+        .certificate
+        .required_fairness
+        .contains(&SearchFairnessAssumption::EventualLiveBatchService));
+    assert!(batched_exact
+        .certificate
+        .required_fairness
+        .contains(&SearchFairnessAssumption::NoStarvationWithinLegalWindow));
+
+    let envelope = fairness_artifact_for_profile::<u8, u64>(
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded,
+    );
+    assert_eq!(envelope.claim_class, SearchFairnessClaimClass::PremiseOnly);
+    assert_eq!(
+        envelope.certificate.class,
+        SearchFairnessCertificateClass::None
+    );
+    assert_eq!(envelope.certificate.service_bound_steps, None);
+    assert!(!envelope.exact_commit_trace_refines_canonical);
+    assert!(!envelope.exact_state_slice_refines_canonical);
+    assert!(!envelope.exact_observation_equivalent_to_canonical);
+    assert_eq!(
+        envelope.certificate.normalization_mode,
+        SearchDeterminismMode::Replay
+    );
+    assert_eq!(envelope.certificate.certified_observables.len(), 0);
+}
+
+#[test]
+fn fairness_classification_function_matches_reported_artifacts() {
+    for profile in [
+        SearchSchedulerProfile::CanonicalSerial,
+        SearchSchedulerProfile::ThreadedExactSingleLane,
+        SearchSchedulerProfile::BatchedParallelExact,
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded,
+    ] {
+        assert_eq!(
+            classify_fairness_claim(profile),
+            fairness_artifact_for_profile::<u8, u64>(profile).claim_class
+        );
+    }
+}
+
+#[test]
+fn replay_artifact_carries_the_same_public_fairness_surface_as_the_report() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("canonical run");
+    assert_eq!(report.fairness, replay.fairness);
+    assert_eq!(report.fairness.certificate.service_bound_steps, Some(1));
+    assert_eq!(
+        report.fairness.certificate.certified_batch_nodes,
+        replay.rounds.first().expect("replay round").batch_nodes
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_normalized_commits,
+        replay.rounds.first().expect("replay round").commits
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_epoch,
+        replay.rounds.first().map(|round| round.epoch)
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_phase,
+        replay.rounds.first().map(|round| round.phase)
+    );
+    assert_eq!(
+        report.fairness_certificate_trace,
+        replay.fairness_certificate_trace
+    );
+    assert_eq!(report.final_state, replay.final_state);
+    assert_eq!(report.theorem_pack, replay.theorem_pack);
+    assert_eq!(report.route_bounds, replay.route_bounds);
+    assert_eq!(validate_fairness_certificate_trace(&replay), Ok(()));
+}
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn batched_exact_run_emits_representative_certified_window_payload() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &native_executor(2),
+        run_config(
+            SearchSchedulerProfile::BatchedParallelExact,
+            2,
+            &[
+                SearchFairnessAssumption::DeterministicSchedulerConfluence,
+                SearchFairnessAssumption::EventualLiveBatchService,
+                SearchFairnessAssumption::NoStarvationWithinLegalWindow,
+            ],
+        ),
+    )
+    .expect("batched exact run");
+    assert_eq!(
+        report.fairness.certificate.class,
+        SearchFairnessCertificateClass::CertifiedCurrentMinKeyWindow
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_batch_nodes,
+        replay.rounds.first().expect("replay round").batch_nodes
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_normalized_commits,
+        replay.rounds.first().expect("replay round").commits
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_epoch,
+        replay.rounds.first().map(|round| round.epoch)
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_phase,
+        replay.rounds.first().map(|round| round.phase)
+    );
+    assert_eq!(report.fairness_certificate_trace.len(), replay.rounds.len());
+    assert!(report
+        .fairness_certificate_trace
+        .iter()
+        .all(|certificate| certificate.class
+            == SearchFairnessCertificateClass::CertifiedCurrentMinKeyWindow));
+    assert!(!report.fairness.exact_observation_equivalent_to_canonical);
+}
+
+#[test]
+fn theorem_pack_artifact_matches_the_expected_inventory_and_gate() {
+    let artifact = search_theorem_pack_artifact();
+    assert_eq!(artifact.canonical_service_bound_steps, 1);
+    assert_eq!(artifact.gate, "just check-search-fairness");
+    let inventory = artifact
+        .inventory
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry.present))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_state_slice_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_observation_equivalent_to_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_exact_bounded_dynamic_starvation_freedom"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_exact_certified_window_trace_valid"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_state_artifact_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get(
+            "search_threaded_exact_single_lane_multi_step_state_artifact_trace_refines_canonical"
+        ),
+        Some(&true)
+    );
+}
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn theorem_backed_observables_align_with_public_observation_comparison() {
+    let domain = make_domain();
+    let fairness = [SearchFairnessAssumption::DeterministicSchedulerConfluence];
+
+    let mut serial = SearchMachine::new(domain.clone(), 1, 0, 3, EpsilonMilli::one());
+    let (serial_report, _) = run_with_executor(
+        &mut serial,
+        &SerialProposalExecutor,
+        run_config(SearchSchedulerProfile::CanonicalSerial, 1, &fairness),
+    )
+    .expect("serial run");
+
+    let mut threaded = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
+    let (threaded_report, _) = run_with_executor(
+        &mut threaded,
+        &native_executor(1),
+        run_config(
+            SearchSchedulerProfile::ThreadedExactSingleLane,
+            1,
+            &fairness,
+        ),
+    )
+    .expect("threaded exact run");
+
+    let required = theorem_backed_observables(SearchSchedulerProfile::ThreadedExactSingleLane)
+        .into_iter()
+        .collect::<Vec<SearchObservableClass>>();
+    let comparison = compare_observations(
+        &serial_report.observation,
+        &threaded_report.observation,
+        SearchDeterminismMode::Full,
+        &required,
+    );
+    assert_eq!(comparison.relation, ObservationRelation::Exact);
+    assert!(comparison.mismatches.is_empty());
+}
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn exact_threaded_multi_step_state_trace_matches_canonical_serial() {
+    let domain = make_domain();
+    let fairness = [SearchFairnessAssumption::DeterministicSchedulerConfluence];
+
+    let mut serial = SearchMachine::new(domain.clone(), 1, 0, 3, EpsilonMilli::one());
+    let (serial_report, serial_replay) = run_with_executor(
+        &mut serial,
+        &SerialProposalExecutor,
+        run_config(SearchSchedulerProfile::CanonicalSerial, 1, &fairness),
+    )
+    .expect("serial run");
+
+    let mut threaded = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
+    let (threaded_report, threaded_replay) = run_with_executor(
+        &mut threaded,
+        &native_executor(1),
+        run_config(
+            SearchSchedulerProfile::ThreadedExactSingleLane,
+            1,
+            &fairness,
+        ),
+    )
+    .expect("threaded exact run");
+
+    assert_eq!(
+        serial_replay
+            .rounds
+            .iter()
+            .map(|round| &round.state_after_round)
+            .collect::<Vec<_>>(),
+        threaded_replay
+            .rounds
+            .iter()
+            .map(|round| &round.state_after_round)
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(serial_report.final_state, threaded_report.final_state);
+    assert_eq!(
+        serial_report
+            .fairness_certificate_trace
+            .iter()
+            .map(|certificate| &certificate.certified_normalized_commits)
+            .collect::<Vec<_>>(),
+        threaded_report
+            .fairness_certificate_trace
+            .iter()
+            .map(|certificate| &certificate.certified_normalized_commits)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn invalid_certificate_trace_is_rejected_fail_closed() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (_, mut replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("canonical run");
+    replay.fairness_certificate_trace[0].certified_phase = Some(99);
+    assert_eq!(
+        validate_fairness_certificate_trace(&replay),
+        Err(SearchFairnessTraceValidationError::PhaseMismatch)
+    );
 }
 
 #[cfg(feature = "multi-thread")]

@@ -12,8 +12,9 @@ use serde::Deserialize;
 use support::FixtureDomain;
 use telltale_search::{
     commit_epoch_reconfiguration, proposals_independent, replay_observation, run_with_executor,
-    AuthorityReadSet, AuthoritySurface, AuthorityWriteSet, EpochReconfigurationRequest,
-    EpsilonMilli, Proposal, ProposalKind, ReplayExpectation, SearchFairnessAssumption,
+    search_theorem_pack_artifact, AuthorityReadSet, AuthoritySurface, AuthorityWriteSet,
+    EpochReconfigurationRequest, EpsilonMilli, Proposal, ProposalKind, ReplayExpectation,
+    SearchFairnessAssumption, SearchFairnessCertificateClass, SearchFairnessClaimClass,
     SearchMachine, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
@@ -28,6 +29,36 @@ struct SearchParityFixture {
     barrier_after_epoch: u64,
     barrier_phase_delta: u64,
     fairness_bundle: Vec<String>,
+    canonical_service_bound_steps: u64,
+    profile_claims: SearchProfileClaims,
+    profile_certificates: SearchProfileClaims,
+    threaded_commit_trace_refines_canonical: bool,
+    threaded_state_slice_refines_canonical: bool,
+    threaded_observation_equivalent_to_canonical: bool,
+    threaded_multi_step_state_trace_refines_canonical: bool,
+    threaded_multi_step_observation_trace_refines_canonical: bool,
+    threaded_state_artifact_refines_canonical: bool,
+    threaded_multi_step_state_artifact_trace_refines_canonical: bool,
+    certified_window_trace_valid: bool,
+    fairness_inventory: Vec<SearchInventoryEntry>,
+    theorem_pack_inventory: Vec<SearchInventoryEntry>,
+    theorem_pack_service_bound_steps: u64,
+    theorem_pack_goal_window_discovery_suffix_bound_steps: u64,
+    theorem_pack_gate: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchProfileClaims {
+    canonical_serial: String,
+    threaded_exact_single_lane: String,
+    batched_parallel_exact: String,
+    batched_parallel_envelope_bounded: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchInventoryEntry {
+    name: String,
+    present: bool,
 }
 
 fn repo_root() -> PathBuf {
@@ -151,6 +182,42 @@ fn assert_replay_contracts(fixture: &SearchParityFixture, domain: FixtureDomain)
         },
     )
     .expect("canonical run");
+    assert_eq!(
+        report.fairness.claim_class,
+        SearchFairnessClaimClass::ExactOneStep
+    );
+    assert_eq!(
+        report.fairness.certificate.class,
+        SearchFairnessCertificateClass::CurrentMinKeyBatch
+    );
+    assert_eq!(report.fairness.certificate.service_bound_steps, Some(1));
+    assert!(report.fairness.exact_commit_trace_refines_canonical);
+    assert!(report.fairness.exact_state_slice_refines_canonical);
+    assert!(report.fairness.exact_observation_equivalent_to_canonical);
+    assert_eq!(
+        report.fairness.certificate.certified_batch_nodes,
+        replay
+            .rounds
+            .first()
+            .expect("representative replay round")
+            .batch_nodes
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_normalized_commits,
+        replay
+            .rounds
+            .first()
+            .expect("representative replay round")
+            .commits
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_epoch,
+        replay.rounds.first().map(|round| round.epoch)
+    );
+    assert_eq!(
+        report.fairness.certificate.certified_phase,
+        replay.rounds.first().map(|round| round.phase)
+    );
     let replayed = replay_observation(
         &replay,
         &ReplayExpectation {
@@ -202,13 +269,169 @@ fn assert_barrier_contracts(fixture: &SearchParityFixture) {
     assert_eq!(fixture.fairness_bundle, vec!["EventualLiveBatchService"]);
 }
 
+fn assert_fairness_contracts(fixture: &SearchParityFixture) {
+    assert_eq!(fixture.canonical_service_bound_steps, 1);
+    assert_eq!(fixture.profile_claims.canonical_serial, "exact_one_step");
+    assert_eq!(
+        fixture.profile_claims.threaded_exact_single_lane,
+        "exact_one_step_under_refinement"
+    );
+    assert_eq!(
+        fixture.profile_claims.batched_parallel_exact,
+        "premised_window_bounded"
+    );
+    assert_eq!(
+        fixture.profile_claims.batched_parallel_envelope_bounded,
+        "premise_only"
+    );
+    assert_eq!(
+        fixture.profile_certificates.canonical_serial,
+        "current_min_key_batch"
+    );
+    assert_eq!(
+        fixture.profile_certificates.threaded_exact_single_lane,
+        "current_min_key_batch_via_threaded_refinement"
+    );
+    assert_eq!(
+        fixture.profile_certificates.batched_parallel_exact,
+        "certified_current_min_key_window"
+    );
+    assert_eq!(
+        fixture
+            .profile_certificates
+            .batched_parallel_envelope_bounded,
+        "none"
+    );
+    assert!(fixture.threaded_commit_trace_refines_canonical);
+    assert!(fixture.threaded_state_slice_refines_canonical);
+    assert!(fixture.threaded_observation_equivalent_to_canonical);
+    assert!(fixture.threaded_multi_step_state_trace_refines_canonical);
+    assert!(fixture.threaded_multi_step_observation_trace_refines_canonical);
+    assert!(fixture.threaded_state_artifact_refines_canonical);
+    assert!(fixture.threaded_multi_step_state_artifact_trace_refines_canonical);
+    assert!(fixture.certified_window_trace_valid);
+    assert_eq!(fixture.theorem_pack_service_bound_steps, 1);
+    assert_eq!(
+        fixture.theorem_pack_goal_window_discovery_suffix_bound_steps,
+        1
+    );
+    assert_eq!(fixture.theorem_pack_gate, "just check-search-fairness");
+    let inventory = fixture
+        .fairness_inventory
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry.present))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        inventory.get("search_canonical_serial_exact_one_step_fairness"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_serial_dynamic_liveness_under_stability"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_refines_canonical_one_step"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_commit_trace_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_state_slice_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_observation_slice_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_observation_equivalent_to_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_multi_step_state_trace_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get(
+            "search_threaded_exact_single_lane_multi_step_observation_trace_refines_canonical"
+        ),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_state_artifact_refines_canonical"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get(
+            "search_threaded_exact_single_lane_multi_step_state_artifact_trace_refines_canonical"
+        ),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_threaded_exact_single_lane_exact_one_step_fairness"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_serial_goal_window_service_has_exact_suffix_bound"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory
+            .get("search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_exact_certified_window_fairness"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_exact_bounded_dynamic_starvation_freedom"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_exact_certified_window_trace_valid"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_envelope_unconditional_fairness"),
+        Some(&false)
+    );
+    let theorem_pack_inventory = fixture
+        .theorem_pack_inventory
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry.present))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(theorem_pack_inventory, inventory);
+    let rust_theorem_pack = search_theorem_pack_artifact();
+    assert_eq!(
+        rust_theorem_pack
+            .inventory
+            .iter()
+            .map(|entry| (entry.name.as_str(), entry.present))
+            .collect::<std::collections::BTreeMap<_, _>>(),
+        theorem_pack_inventory
+    );
+    assert_eq!(
+        rust_theorem_pack.canonical_service_bound_steps,
+        fixture.theorem_pack_service_bound_steps
+    );
+    assert_eq!(
+        rust_theorem_pack.canonical_goal_window_discovery_suffix_bound_steps,
+        fixture.theorem_pack_goal_window_discovery_suffix_bound_steps
+    );
+    assert_eq!(rust_theorem_pack.gate, fixture.theorem_pack_gate);
+}
+
 #[test]
 fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
     let fixture = search_fixture();
-    assert_eq!(fixture.schema_version, "search_parity_v1");
+    assert_eq!(fixture.schema_version, "search_parity_v8");
 
     let domain = make_domain();
     assert_batch_and_independence_contracts(&fixture, &domain);
     assert_replay_contracts(&fixture, domain);
     assert_barrier_contracts(&fixture);
+    assert_fairness_contracts(&fixture);
 }

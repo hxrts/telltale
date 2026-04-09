@@ -19,6 +19,7 @@ The numeric rows in this section are source-derived and checked by
 |---|---:|---|
 | Lean core-library files | 658 | `lean/CODE_MAP.md` total row |
 | Lean core-library lines | 134,293 | `lean/CODE_MAP.md` total row |
+| Lean-backed search fairness inventory entries | 18 | `lean/Runtime/Proofs/Search/Inventory.lean` |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
@@ -85,6 +86,49 @@ theorem-classification matrices, approximation admissibility gates, nested
 distributed invariance, and helper-surface non-authoritativeness checks. These
 remain executable assurance lanes rather than part of the current mechanized
 formal claim.
+
+The search crate now has a scoped Lean fairness lane as well. The current
+proved search fairness surface is:
+
+- canonical serial search is exact one-step fair for the current legal min-key
+  batch
+- canonical serial search also has a dynamic liveness theorem under an explicit
+  stability premise: if an entry remains continuously eligible and no strictly
+  better entry appears, it is eventually serviced
+- threaded exact single-lane search has the same exact one-step fairness
+  through reduced one-step, commit-trace, state-slice, and observation-slice
+  refinement theorems to canonical serial search
+- batched exact search has a certified-window fairness theorem with explicit
+  premises plus a bounded dynamic starvation-freedom theorem under an explicit
+  bounded-preemption premise
+- envelope-bounded batched search remains premise-only and is not part of the
+  unconditional proved fairness surface
+
+These search fairness claims are exposed operationally through the
+`SearchFairnessArtifact` and `SearchFairnessCertificate` runtime surfaces and
+checked by the dedicated `just check-search-fairness` gate, the Rust↔Lean
+search parity suite, and the verification-inventory gate. The current theorem
+pack is a first-class Lean artifact under
+`Runtime.Proofs.Search.TheoremPack`, with a mirrored Rust
+`SearchTheoremPackArtifact` for release-facing inventory export. Exact runtime
+runs now also export `SearchStateArtifact` plus per-round state/certificate
+traces. They also export `SearchRouteBoundArtifact`, whose current discovery
+surface is an observed run-scoped bound to first candidate publication, an
+observed recovery bound after the latest epoch transition, and a theorem-backed
+one-step goal-window service bound from the fairness certificate surface, now
+packaged as a structured `SearchRouteDiscoveryCertificate` and attached to the
+exact observed goal-window and publication steps for that run. The selected-route
+summary also carries a stable generic metric list alongside its scalar
+convenience fields. Its current quality surface remains profile-scoped rather
+than a separate Lean end-to-end discovery theorem. The release/provenance lane records the generated
+`target/search-theorem-pack/search-theorem-pack.json` artifact plus the
+generated canonical vector artifact
+`target/search-artifacts/search-vectors-v1.json` and the generated recovery
+vector artifact `target/search-artifacts/search-recovery-vectors-v1.json`.
+These claims are also backed by source-controlled search artifact vectors
+checked by the `search_vectors` and `search_recovery_vectors` conformance
+tests. They are still narrower than a blanket proof of fairness for all future
+frontier growth or all parallel modes without premises.
 
 ## Claimed Surface
 
@@ -253,6 +297,11 @@ than duplicating their inner gate lists by hand.
 For staged diffs restricted to the simulator subsystem, the narrower local gate is now `just check-simulator-subsystem-staged`.
 That path is intentionally local-only and does not replace the canonical repo-wide lanes above.
 It exists so simulator-only staged work still gets formatting, compile, test, and simulator-doc link enforcement without being blocked by unrelated pre-existing breakage elsewhere in the workspace.
+
+The dedicated local search-fairness gate is `just check-search-fairness`.
+That gate is intentionally narrower than the canonical repo-wide lanes above
+and exists to keep the Lean theorem-pack, parity fixture, and inventory rows
+aligned while working inside `telltale-search`.
 
 ## Property Coverage Baseline
 

@@ -32,8 +32,13 @@ extract_manifest_version() {
   ' "${manifest}"
 }
 
+if [[ ! -f "${manifest_path}" ]]; then
+  echo "package-provenance: missing packaged artifact manifest; generating it first" >&2
+  "${ROOT_DIR}/scripts/check/package-artifacts.sh"
+fi
+
 [[ -f "${manifest_path}" ]] || {
-  echo "error: missing provenance manifest ${manifest_path}; run package-artifacts.sh first" >&2
+  echo "error: missing provenance manifest ${manifest_path} after package-artifacts.sh" >&2
   exit 1
 }
 
@@ -44,6 +49,9 @@ export PACKAGE_PROVENANCE_MANIFEST="${manifest_path}"
 export PACKAGE_PROVENANCE_VERSION="${workspace_version}"
 export PACKAGE_PROVENANCE_HEAD="${git_head}"
 export PACKAGE_PROVENANCE_WASM_LOCK_SHA256="$(hash_file "${WASM_EXAMPLE_LOCK_PATH}")"
+export PACKAGE_PROVENANCE_SEARCH_THEOREM_PACK_PATH="$(./scripts/ops/export-search-theorem-pack.sh)"
+export PACKAGE_PROVENANCE_SEARCH_VECTORS_PATH="$(./scripts/ops/export-search-vectors.sh)"
+export PACKAGE_PROVENANCE_SEARCH_RECOVERY_VECTORS_PATH="$(./scripts/ops/export-search-recovery-vectors.sh)"
 python3 - <<'PY'
 import json
 import os
@@ -56,6 +64,11 @@ manifest_path = pathlib.Path(os.environ["PACKAGE_PROVENANCE_MANIFEST"])
 workspace_version = os.environ["PACKAGE_PROVENANCE_VERSION"]
 git_head = os.environ["PACKAGE_PROVENANCE_HEAD"]
 wasm_lock_sha256 = os.environ["PACKAGE_PROVENANCE_WASM_LOCK_SHA256"]
+search_theorem_pack_path = pathlib.Path(os.environ["PACKAGE_PROVENANCE_SEARCH_THEOREM_PACK_PATH"])
+search_vectors_path = pathlib.Path(os.environ["PACKAGE_PROVENANCE_SEARCH_VECTORS_PATH"])
+search_recovery_vectors_path = pathlib.Path(
+    os.environ["PACKAGE_PROVENANCE_SEARCH_RECOVERY_VECTORS_PATH"]
+)
 
 manifest = json.loads(manifest_path.read_text())
 
@@ -95,6 +108,9 @@ resource_files = {
     "telltale-bridge:README.md": root / "README.md",
     "examples/wasm/README.md": root / "examples/wasm/README.md",
     "examples/wasm/harness.sh": root / "examples/wasm/harness.sh",
+    "telltale-search:search-theorem-pack.json": search_theorem_pack_path,
+    "telltale-search:search-vectors-v1.json": search_vectors_path,
+    "telltale-search:search-recovery-vectors-v1.json": search_recovery_vectors_path,
 }
 
 recorded_resources = manifest.get("resource_hashes", {})
