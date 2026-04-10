@@ -137,13 +137,13 @@ theorem coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
     subst hRecv
     have hActivePre : ActiveEdge G e := by
       -- ActiveEdge after update implies ActiveEdge before (receiver was already there)
-      apply ActiveEdge_updateG_inv hActive
+      apply active_edge_update_g_inv hActive
       simp only [hLookup, Option.isSome_some]
-    apply EdgeCoherent_type_replacement (hCoh e hActivePre) hLookup (hCompat e.sender)
+    apply edge_coherent_type_replacement (hCoh e hActivePre) hLookup (hCompat e.sender)
   · -- ep is not the receiver: edge coherence depends on receiver's Consume
     have hLookupRecv : lookupG (updateG G ep L₂) { sid := e.sid, role := e.receiver } =
         lookupG G { sid := e.sid, role := e.receiver } := by
-      apply lookupG_updateG_ne
+      apply lookup_g_update_g_ne
       intro hEq
       exact hRecv hEq.symm
     intro Lrecv hLookupRecv'
@@ -166,13 +166,13 @@ theorem coherent_type_replacement {G : GEnv} {D : DEnv} {ep : Endpoint}
       -- New sender is L₂
       use L₂
       constructor
-      · subst hSend; exact lookupG_updateG_eq
+      · subst hSend; exact lookup_g_update_g_eq
       · exact hConsume
     -- coherent_type_replacement: Unrelated Endpoint Case
     · -- ep is neither sender nor receiver: both unchanged
       have hLookupSendUnch : lookupG (updateG G ep L₂) { sid := e.sid, role := e.sender } =
           lookupG G { sid := e.sid, role := e.sender } := by
-        apply lookupG_updateG_ne
+        apply lookup_g_update_g_ne
         intro hEq
         exact hSend hEq.symm
       have hActivePre : ActiveEdge G e := by
