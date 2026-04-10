@@ -7,6 +7,11 @@ open Lean (Json)
 open Runtime.Proofs.Search
 
 def main : IO Unit := do
+  let supportClassString := fun cls =>
+    match cls with
+    | .executableSemantics => "executable_semantics"
+    | .refinementCorollary => "refinement_corollary"
+    | .premiseScoped => "premise_scoped"
   let canonicalClaim :=
     match fairnessClaimClass .canonicalSerial with
     | .exactOneStep => "exact_one_step"
@@ -41,8 +46,14 @@ def main : IO Unit := do
   let theoremPackInventoryJson :=
     Json.arr <| theoremPackInventory.toArray.map fun (name, present) =>
       Json.mkObj [("name", Json.str name), ("present", Json.bool present)]
+  let theoremPackInventoryClassesJson :=
+    Json.arr <| theoremPackInventorySupportClasses.toArray.map fun (name, cls) =>
+      Json.mkObj
+        [ ("name", Json.str name)
+        , ("support_class", Json.str (supportClassString cls))
+        ]
   let payload := Json.mkObj
-    [ ("schema_version", Json.str "search_parity_v8")
+    [ ("schema_version", Json.str "search_parity_v10")
     , ("canonical_batch_nodes", Json.arr #[Json.num 1, Json.num 2])
     , ("independent_targets", Json.arr #[Json.num 4, Json.num 5])
     , ("replay_epoch_trace", Json.arr #[Json.num 1])
@@ -74,6 +85,7 @@ def main : IO Unit := do
     , ("certified_window_trace_valid", Json.bool true)
     , ("fairness_inventory", inventoryJson)
     , ("theorem_pack_inventory", theoremPackInventoryJson)
+    , ("theorem_pack_inventory_classes", theoremPackInventoryClassesJson)
     , ("theorem_pack_service_bound_steps", Json.num buildSearchFairnessTheoremPack.canonicalServiceBoundSteps)
     , ("theorem_pack_goal_window_discovery_suffix_bound_steps",
         Json.num buildSearchFairnessTheoremPack.canonicalGoalWindowDiscoverySuffixBoundSteps)

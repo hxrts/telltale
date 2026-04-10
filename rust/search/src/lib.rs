@@ -47,7 +47,8 @@ pub use runtime::{
     SearchRouteDiscoveryCertificateClass, SearchRouteMetric, SearchRouteMetricName,
     SearchRouteQualityClass, SearchRouteSummary, SearchRunConfig, SearchRunConfigError,
     SearchRunError, SearchRuntimeMarker, SearchStateArtifact, SearchTheoremInventoryEntry,
-    SearchTheoremPackArtifact, SerialProposalExecutor, TotalStepMode,
+    SearchTheoremInventorySupportClassEntry, SearchTheoremPackArtifact, SearchTheoremSupportClass,
+    SerialProposalExecutor, TotalStepMode,
 };
 
 /// Current crate scope statement used by smoke tests and boundary checks.

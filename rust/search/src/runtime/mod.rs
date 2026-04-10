@@ -22,5 +22,6 @@ pub use lifecycle::{
     SearchRouteDiscoveryCertificate, SearchRouteDiscoveryCertificateClass, SearchRouteMetric,
     SearchRouteMetricName, SearchRouteQualityClass, SearchRouteSummary, SearchRunConfig,
     SearchRunConfigError, SearchRunError, SearchRuntimeMarker, SearchStateArtifact,
-    SearchTheoremInventoryEntry, SearchTheoremPackArtifact, TotalStepMode,
+    SearchTheoremInventoryEntry, SearchTheoremInventorySupportClassEntry,
+    SearchTheoremPackArtifact, SearchTheoremSupportClass, TotalStepMode,
 };

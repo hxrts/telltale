@@ -19,7 +19,7 @@ The numeric rows in this section are source-derived and checked by
 |---|---:|---|
 | Lean core-library files | 665 | `lean/CODE_MAP.md` total row |
 | Lean core-library lines | 135,062 | `lean/CODE_MAP.md` total row |
-| Lean-backed search fairness inventory entries | 18 | `lean/Runtime/Proofs/Search/Inventory.lean` |
+| Lean-backed search fairness inventory entries | 37 | `lean/Runtime/Proofs/Search/Inventory.lean` |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
@@ -92,17 +92,44 @@ proved search fairness surface is:
 
 - canonical serial search is exact one-step fair for the current legal min-key
   batch
+- canonical serial search now has an executable reduced machine semantics plus
+  an explicit reduced Rust-facing state/artifact projection boundary
+- canonical serial search now also has a reduced machine-level invariant and
+  projection layer, including executable machine-step invariant preservation,
+  executable trace refinement into the packaged machine theorem surface, and a
+  machine-trace restatement of current min-key eventual service
 - canonical serial search also has a dynamic liveness theorem under an explicit
   stability premise: if an entry remains continuously eligible and no strictly
   better entry appears, it is eventually serviced
+- canonical serial search has a fixed-phase termination theorem under an
+  explicit finite reachable-node premise bundle
+- canonical serial search also has a rebuild-aware ARA-style termination
+  theorem under an explicit lexicographic phase/work measure premise bundle
+- canonical serial search has both bounded strict-preemption and finite
+  better-entry exhaustion theorems for entries that are not initially in the
+  current min-key batch
+- canonical serial search has both frontier-level and machine-level
+  witness-path goal-reachability theorems for the reduced model
+- canonical serial search now also has a graph-reachability-driven
+  completeness theorem under explicit reachable-path, finiteness, and
+  heuristic premises
+- canonical serial search also has an explicit machine-level bridge from goal
+  reachability to incumbent publication under a publication premise bundle
+- canonical serial search now also has an eventual optimal-goal publication
+  theorem under explicit admissibility and consistency premises
 - threaded exact single-lane search has the same exact one-step fairness
   through reduced one-step, commit-trace, state-slice, and observation-slice
   refinement theorems to canonical serial search
 - batched exact search has a certified-window fairness theorem with explicit
   premises plus a bounded dynamic starvation-freedom theorem under an explicit
-  bounded-preemption premise
-- envelope-bounded batched search remains premise-only and is not part of the
-  unconditional proved fairness surface
+  bounded-preemption premise, and its theorem-pack/export surface now also
+  carries explicit support-class metadata alongside the certified multi-step
+  window-trace validity theorem
+- envelope-bounded batched search still remains outside the unconditional proved
+  fairness surface, but that boundary is now made explicit by a checked-in Lean
+  design-boundary theorem, an empty theorem-backed observable surface, and a
+  premise-scoped theorem-pack classification rather than left as an
+  undocumented omission
 
 These search fairness claims are exposed operationally through the
 `SearchFairnessArtifact` and `SearchFairnessCertificate` runtime surfaces and
@@ -110,11 +137,13 @@ checked by the dedicated `just check-search-fairness` gate, the Rust↔Lean
 search parity suite, and the verification-inventory gate. The current theorem
 pack is a first-class Lean artifact under
 `Runtime.Proofs.Search.TheoremPack`, with a mirrored Rust
-`SearchTheoremPackArtifact` for release-facing inventory export. Exact runtime
-runs now also export `SearchStateArtifact` plus per-round state/certificate
-traces. They also export `SearchRouteBoundArtifact`, whose current discovery
-surface is an observed run-scoped bound to first candidate publication, an
-observed recovery bound after the latest epoch transition, and a theorem-backed
+`SearchTheoremPackArtifact` for release-facing inventory export, now including
+per-theorem support classes that distinguish executable-semantics theorems,
+refinement corollaries, and premise-scoped theorems. Exact runtime runs now
+also export `SearchStateArtifact` plus per-round state/certificate traces.
+They also export `SearchRouteBoundArtifact`, whose current discovery surface
+is an observed run-scoped bound to first candidate publication, an observed
+recovery bound after the latest epoch transition, and a theorem-backed
 one-step goal-window service bound from the fairness certificate surface, now
 packaged as a structured `SearchRouteDiscoveryCertificate` and attached to the
 exact observed goal-window and publication steps for that run. The selected-route
@@ -127,8 +156,9 @@ generated canonical vector artifact
 vector artifact `target/search-artifacts/search-recovery-vectors-v1.json`.
 These claims are also backed by source-controlled search artifact vectors
 checked by the `search_vectors` and `search_recovery_vectors` conformance
-tests. They are still narrower than a blanket proof of fairness for all future
-frontier growth or all parallel modes without premises.
+tests. They are still narrower than a blanket proof of fairness and
+completeness for all future frontier growth, all rebuild schedules, and all
+parallel modes without premises.
 
 ## Claimed Surface
 

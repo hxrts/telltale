@@ -309,12 +309,34 @@ pub struct SearchTheoremInventoryEntry {
     pub present: bool,
 }
 
+/// Support classification for one theorem in the search theorem pack.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum SearchTheoremSupportClass {
+    /// Direct theorem over executable reduced semantics.
+    ExecutableSemantics,
+    /// Corollary obtained by refinement from a stronger semantics theorem.
+    RefinementCorollary,
+    /// Theorem remains premise-scoped rather than unconditional.
+    PremiseScoped,
+}
+
+/// One theorem-inventory support-class row.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SearchTheoremInventorySupportClassEntry {
+    /// Stable theorem inventory key.
+    pub name: String,
+    /// Support classification for that theorem.
+    pub support_class: SearchTheoremSupportClass,
+}
+
 /// Release-facing search theorem-pack artifact mirrored from the Lean theorem
 /// pack and exposed through the Rust runtime surface.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchTheoremPackArtifact {
     /// Machine-readable theorem inventory.
     pub inventory: Vec<SearchTheoremInventoryEntry>,
+    /// Support classification for each theorem inventory row.
+    pub inventory_support_classes: Vec<SearchTheoremInventorySupportClassEntry>,
     /// Exact canonical service bound for the current theorem-pack surface.
     pub canonical_service_bound_steps: u64,
     /// Exact canonical route-discovery suffix bound once the goal is in the
@@ -614,6 +636,75 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 true,
             ),
             (
+                "search_executable_canonical_step_preserves_invariants",
+                true,
+            ),
+            (
+                "search_executable_trace_refines_canonical_machine_trace",
+                true,
+            ),
+            (
+                "search_executable_step_artifact_refines_canonical_step_artifact",
+                true,
+            ),
+            ("search_canonical_machine_step_preserves_invariants", true),
+            (
+                "search_canonical_machine_trace_currently_min_priority_eventually_serviced",
+                true,
+            ),
+            (
+                "search_canonical_machine_step_artifact_refines_runtime_boundary",
+                true,
+            ),
+            (
+                "search_canonical_machine_state_artifact_is_runtime_projection",
+                true,
+            ),
+            (
+                "search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound",
+                true,
+            ),
+            (
+                "search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure",
+                true,
+            ),
+            (
+                "search_bounded_strict_preemption_eventually_becomes_min",
+                true,
+            ),
+            (
+                "search_canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption",
+                true,
+            ),
+            (
+                "search_finite_better_entry_exhaustion_eventually_becomes_min",
+                true,
+            ),
+            (
+                "search_canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion",
+                true,
+            ),
+            (
+                "search_canonical_serial_goal_reached_from_ready_witness_path",
+                true,
+            ),
+            (
+                "search_canonical_machine_goal_reached_from_ready_witness_path",
+                true,
+            ),
+            (
+                "search_canonical_machine_goal_reached_from_graph_reachability",
+                true,
+            ),
+            (
+                "search_goal_reachability_connects_to_incumbent_publication",
+                true,
+            ),
+            (
+                "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic",
+                true,
+            ),
+            (
                 "search_threaded_exact_single_lane_refines_canonical_one_step",
                 true,
             ),
@@ -666,6 +757,10 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 true,
             ),
             (
+                "search_batched_parallel_envelope_design_boundary_explicit",
+                true,
+            ),
+            (
                 "search_batched_parallel_envelope_unconditional_fairness",
                 false,
             ),
@@ -682,6 +777,162 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
         .map(|(name, present)| SearchTheoremInventoryEntry {
             name: name.to_string(),
             present,
+        })
+        .collect(),
+        inventory_support_classes: [
+            (
+                "search_canonical_serial_exact_one_step_fairness",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_canonical_serial_dynamic_liveness_under_stability",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_executable_canonical_step_preserves_invariants",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_executable_trace_refines_canonical_machine_trace",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_executable_step_artifact_refines_canonical_step_artifact",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_canonical_machine_step_preserves_invariants",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_canonical_machine_trace_currently_min_priority_eventually_serviced",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_canonical_machine_step_artifact_refines_runtime_boundary",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_canonical_machine_state_artifact_is_runtime_projection",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_bounded_strict_preemption_eventually_becomes_min",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_finite_better_entry_exhaustion_eventually_becomes_min",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_canonical_serial_goal_reached_from_ready_witness_path",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_canonical_machine_goal_reached_from_ready_witness_path",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_canonical_machine_goal_reached_from_graph_reachability",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_goal_reachability_connects_to_incumbent_publication",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_threaded_exact_single_lane_refines_canonical_one_step",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_commit_trace_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_state_slice_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_observation_slice_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_observation_equivalent_to_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_multi_step_state_trace_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_multi_step_observation_trace_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_state_artifact_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_multi_step_state_artifact_trace_refines_canonical",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_threaded_exact_single_lane_exact_one_step_fairness",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_canonical_serial_goal_window_service_has_exact_suffix_bound",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_batched_parallel_exact_certified_window_fairness",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_batched_parallel_exact_bounded_dynamic_starvation_freedom",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_batched_parallel_exact_certified_window_trace_valid",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_batched_parallel_envelope_design_boundary_explicit",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_batched_parallel_envelope_unconditional_fairness",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+        ]
+        .into_iter()
+        .map(|(name, support_class)| SearchTheoremInventorySupportClassEntry {
+            name: name.to_string(),
+            support_class,
         })
         .collect(),
         canonical_service_bound_steps: 1,

@@ -541,6 +541,34 @@
         "present": true
       },
       {
+        "name": "search_canonical_machine_step_preserves_invariants",
+        "present": true
+      },
+      {
+        "name": "search_canonical_machine_trace_currently_min_priority_eventually_serviced",
+        "present": true
+      },
+      {
+        "name": "search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound",
+        "present": true
+      },
+      {
+        "name": "search_bounded_strict_preemption_eventually_becomes_min",
+        "present": true
+      },
+      {
+        "name": "search_canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption",
+        "present": true
+      },
+      {
+        "name": "search_canonical_serial_goal_reached_from_ready_witness_path",
+        "present": true
+      },
+      {
+        "name": "search_goal_reachability_connects_to_incumbent_publication",
+        "present": true
+      },
+      {
         "name": "search_threaded_exact_single_lane_refines_canonical_one_step",
         "present": true
       },
@@ -590,6 +618,10 @@
       },
       {
         "name": "search_batched_parallel_exact_certified_window_trace_valid",
+        "present": true
+      },
+      {
+        "name": "search_batched_parallel_envelope_design_boundary_explicit",
         "present": true
       },
       {

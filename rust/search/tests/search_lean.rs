@@ -42,6 +42,7 @@ struct SearchParityFixture {
     certified_window_trace_valid: bool,
     fairness_inventory: Vec<SearchInventoryEntry>,
     theorem_pack_inventory: Vec<SearchInventoryEntry>,
+    theorem_pack_inventory_classes: Vec<SearchInventoryClassEntry>,
     theorem_pack_service_bound_steps: u64,
     theorem_pack_goal_window_discovery_suffix_bound_steps: u64,
     theorem_pack_gate: String,
@@ -59,6 +60,12 @@ struct SearchProfileClaims {
 struct SearchInventoryEntry {
     name: String,
     present: bool,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchInventoryClassEntry {
+    name: String,
+    support_class: String,
 }
 
 fn repo_root() -> PathBuf {
@@ -331,6 +338,84 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
         Some(&true)
     );
     assert_eq!(
+        inventory.get("search_executable_canonical_step_preserves_invariants"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_executable_trace_refines_canonical_machine_trace"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_executable_step_artifact_refines_canonical_step_artifact"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_step_preserves_invariants"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_trace_currently_min_priority_eventually_serviced"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_step_artifact_refines_runtime_boundary"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_state_artifact_is_runtime_projection"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory
+            .get("search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_bounded_strict_preemption_eventually_becomes_min"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get(
+            "search_canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption"
+        ),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_finite_better_entry_exhaustion_eventually_becomes_min"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get(
+            "search_canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion"
+        ),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_serial_goal_reached_from_ready_witness_path"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_goal_reached_from_ready_witness_path"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_goal_reached_from_graph_reachability"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_goal_reachability_connects_to_incumbent_publication"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory
+            .get("search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic"),
+        Some(&true)
+    );
+    assert_eq!(
         inventory.get("search_threaded_exact_single_lane_refines_canonical_one_step"),
         Some(&true)
     );
@@ -396,6 +481,10 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
         Some(&true)
     );
     assert_eq!(
+        inventory.get("search_batched_parallel_envelope_design_boundary_explicit"),
+        Some(&true)
+    );
+    assert_eq!(
         inventory.get("search_batched_parallel_envelope_unconditional_fairness"),
         Some(&false)
     );
@@ -414,6 +503,44 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
             .collect::<std::collections::BTreeMap<_, _>>(),
         theorem_pack_inventory
     );
+    let theorem_pack_inventory_classes = fixture
+        .theorem_pack_inventory_classes
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry.support_class.as_str()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        theorem_pack_inventory_classes.get("search_canonical_serial_exact_one_step_fairness"),
+        Some(&"executable_semantics")
+    );
+    assert_eq!(
+        theorem_pack_inventory_classes
+            .get("search_executable_trace_refines_canonical_machine_trace"),
+        Some(&"refinement_corollary")
+    );
+    assert_eq!(
+        theorem_pack_inventory_classes
+            .get("search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure"),
+        Some(&"premise_scoped")
+    );
+    assert_eq!(
+        rust_theorem_pack
+            .inventory_support_classes
+            .iter()
+            .map(|entry| {
+                let support_class = match entry.support_class {
+                    telltale_search::SearchTheoremSupportClass::ExecutableSemantics => {
+                        "executable_semantics"
+                    }
+                    telltale_search::SearchTheoremSupportClass::RefinementCorollary => {
+                        "refinement_corollary"
+                    }
+                    telltale_search::SearchTheoremSupportClass::PremiseScoped => "premise_scoped",
+                };
+                (entry.name.as_str(), support_class)
+            })
+            .collect::<std::collections::BTreeMap<_, _>>(),
+        theorem_pack_inventory_classes
+    );
     assert_eq!(
         rust_theorem_pack.canonical_service_bound_steps,
         fixture.theorem_pack_service_bound_steps
@@ -428,7 +555,7 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
 #[test]
 fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
     let fixture = search_fixture();
-    assert_eq!(fixture.schema_version, "search_parity_v8");
+    assert_eq!(fixture.schema_version, "search_parity_v10");
 
     let domain = make_domain();
     assert_batch_and_independence_contracts(&fixture, &domain);
