@@ -37,7 +37,9 @@ through the incumbent.
 
 `run_with_executor(...)` is the canonical host execution entry point.
 `SearchRunConfig` provides typed runtime configuration for scheduler profile,
-executor kind, fairness assumptions, batch width, and budget limits.
+fairness assumptions, and batch width. The executor strategy is supplied
+separately via the `ProposalExecutor` implementation passed to
+`run_with_executor(...)`.
 `validate_run_config(...)` enforces fail-closed checks for scheduler-profile,
 executor-kind, fairness, and batch-width mismatches before execution begins.
 
@@ -55,7 +57,13 @@ exact-profile correspondence checks. `SearchFullStateArtifact` is the richer
 Rust-facing extraction boundary used by the strengthened full-machine
 refinement lane: it includes `OPEN`, `CLOSED`, `INCONS`, `g_score`, `parent`,
 incumbent, epsilon, epoch/snapshot, last-batch nodes, and full commit/publication
-traces.
+traces. `SearchExecutionReport` packages the run-facing result surface:
+observation, scheduler artifact, fairness artifact, fairness-certificate
+trace, final state artifact, theorem pack, route bounds, and progress summary.
+`SearchFairnessArtifact` is the public proof-claim carrier: it records the
+profile claim class, theorem-side certificate, and whether exact
+commit-trace/state-slice/observation equivalence to canonical serial is part
+of the claimed surface for that profile.
 
 ## Admission and Capabilities
 
@@ -400,7 +408,9 @@ completeness theorem surface, scheduler-fair non-min service, and the new
 certified-window envelope profile theorems.
 
 `Runtime.Proofs.Search.TheoremPack` wraps the inventory, support classes, and
-two numeric bounds into a `SearchFairnessTheoremPack` structure:
+two numeric bounds into a `SearchFairnessTheoremPack` structure. The mirrored
+Rust `SearchTheoremPackArtifact` carries those same rows plus the release-gate
+name:
 
 ```
 inventorySupportClasses
