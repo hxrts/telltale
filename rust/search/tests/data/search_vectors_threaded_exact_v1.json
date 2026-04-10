@@ -580,6 +580,18 @@
         "present": true
       },
       {
+        "name": "search_executable_canonical_step_preserves_invariants",
+        "present": true
+      },
+      {
+        "name": "search_executable_trace_refines_canonical_machine_trace",
+        "present": true
+      },
+      {
+        "name": "search_executable_step_artifact_refines_canonical_step_artifact",
+        "present": true
+      },
+      {
         "name": "search_canonical_machine_step_preserves_invariants",
         "present": true
       },
@@ -588,7 +600,19 @@
         "present": true
       },
       {
+        "name": "search_canonical_machine_step_artifact_refines_runtime_boundary",
+        "present": true
+      },
+      {
+        "name": "search_canonical_machine_state_artifact_is_runtime_projection",
+        "present": true
+      },
+      {
         "name": "search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound",
+        "present": true
+      },
+      {
+        "name": "search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure",
         "present": true
       },
       {
@@ -600,11 +624,31 @@
         "present": true
       },
       {
+        "name": "search_finite_better_entry_exhaustion_eventually_becomes_min",
+        "present": true
+      },
+      {
+        "name": "search_canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion",
+        "present": true
+      },
+      {
         "name": "search_canonical_serial_goal_reached_from_ready_witness_path",
         "present": true
       },
       {
+        "name": "search_canonical_machine_goal_reached_from_ready_witness_path",
+        "present": true
+      },
+      {
+        "name": "search_canonical_machine_goal_reached_from_graph_reachability",
+        "present": true
+      },
+      {
         "name": "search_goal_reachability_connects_to_incumbent_publication",
+        "present": true
+      },
+      {
+        "name": "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic",
         "present": true
       },
       {
@@ -674,6 +718,156 @@
       {
         "name": "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
         "present": true
+      }
+    ],
+    "inventory_support_classes": [
+      {
+        "name": "search_canonical_serial_exact_one_step_fairness",
+        "support_class": "ExecutableSemantics"
+      },
+      {
+        "name": "search_canonical_serial_dynamic_liveness_under_stability",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_executable_canonical_step_preserves_invariants",
+        "support_class": "ExecutableSemantics"
+      },
+      {
+        "name": "search_executable_trace_refines_canonical_machine_trace",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_executable_step_artifact_refines_canonical_step_artifact",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_canonical_machine_step_preserves_invariants",
+        "support_class": "ExecutableSemantics"
+      },
+      {
+        "name": "search_canonical_machine_trace_currently_min_priority_eventually_serviced",
+        "support_class": "ExecutableSemantics"
+      },
+      {
+        "name": "search_canonical_machine_step_artifact_refines_runtime_boundary",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_canonical_machine_state_artifact_is_runtime_projection",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_bounded_strict_preemption_eventually_becomes_min",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_finite_better_entry_exhaustion_eventually_becomes_min",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_canonical_serial_goal_reached_from_ready_witness_path",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_canonical_machine_goal_reached_from_ready_witness_path",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_canonical_machine_goal_reached_from_graph_reachability",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_goal_reachability_connects_to_incumbent_publication",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_refines_canonical_one_step",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_commit_trace_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_state_slice_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_observation_slice_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_observation_equivalent_to_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_multi_step_state_trace_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_multi_step_observation_trace_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_state_artifact_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_multi_step_state_artifact_trace_refines_canonical",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_exact_one_step_fairness",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_canonical_serial_goal_window_service_has_exact_suffix_bound",
+        "support_class": "ExecutableSemantics"
+      },
+      {
+        "name": "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
+        "support_class": "RefinementCorollary"
+      },
+      {
+        "name": "search_batched_parallel_exact_certified_window_fairness",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_batched_parallel_exact_bounded_dynamic_starvation_freedom",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_batched_parallel_exact_certified_window_trace_valid",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_batched_parallel_envelope_design_boundary_explicit",
+        "support_class": "PremiseScoped"
+      },
+      {
+        "name": "search_batched_parallel_envelope_unconditional_fairness",
+        "support_class": "PremiseScoped"
       }
     ]
   }

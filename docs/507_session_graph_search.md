@@ -314,6 +314,13 @@ Key theorems exposed by this module:
 - **`batched_parallel_envelope_claim_is_premise_only`** — states formally that
   the envelope-bounded profile has no proof-backed fairness guarantee.
 
+The profile-level claim surface is intentionally narrower than a full
+multi-step replay theorem for `batchedParallelExact`. What is exported today is
+exactly what Lean justifies: certified current-window fairness, certified
+window-trace validity, and premise-scoped bounded starvation-freedom. The
+runtime does not currently claim an end-to-end batched-exact replay/refinement
+theorem beyond that window-certified surface.
+
 ### Envelope Boundary (Envelope)
 
 `Runtime.Proofs.Search.Envelope` makes the remaining envelope-bounded gap
@@ -355,7 +362,10 @@ Both bounds are exactly one step, matching the `EventuallyServicedWithin ...
 The dedicated local verification gate is `just check-search-fairness`. The
 theorem-pack is also exported through the runtime API and written to
 `target/search-theorem-pack/search-theorem-pack.json` for release and
-provenance checks.
+provenance checks. On the Rust side this appears in
+`SearchTheoremPackArtifact` as both `inventory` and
+`inventory_support_classes`, so downstream checks can distinguish executable
+semantics theorems from refinement corollaries and premise-scoped theorems.
 
 ### What the Proofs Still Do Not Cover
 
@@ -363,7 +373,7 @@ provenance checks.
   executable reduced machine semantics, but it is still a reduced model. There
   is not yet a full executable refinement proof from every Rust search-machine
   transition, rebuild path, and epoch transition into that Lean machine.
-- **Unconstrained global completeness from raw successor semantics**: the new
+- **Unconstrained global completeness from raw successor semantics**: the
   completeness theorem names graph reachability, finiteness, and heuristic
   premises explicitly, but it still depends on an explicit reachable ready-path
   witness bundle. There is still no blanket theorem that every reachable goal
