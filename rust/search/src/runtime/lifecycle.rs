@@ -632,7 +632,7 @@ pub fn classify_fairness_claim(profile: SearchSchedulerProfile) -> SearchFairnes
             SearchFairnessClaimClass::PremisedWindowBounded
         }
         SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
-            SearchFairnessClaimClass::PremisedWindowBounded
+            SearchFairnessClaimClass::PremiseOnly
         }
     }
 }
@@ -659,11 +659,7 @@ pub fn theorem_backed_observables(
                 .into_iter()
                 .collect()
         }
-        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
-            [SearchObservableClass::NormalizedCommitTrace]
-                .into_iter()
-                .collect()
-        }
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => BTreeSet::new(),
     }
 }
 
