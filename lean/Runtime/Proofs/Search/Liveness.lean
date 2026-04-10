@@ -494,13 +494,13 @@ theorem canonical_machine_goal_reached_from_raw_successor_semantics
   | none =>
       have hEntryLastNode :
           Option.map FrontierEntry.node entryPath.getLast? = path.getLast? := by
-        simpa [hEntryNodes] using congrArg List.getLast? hEntryNodes
+        simpa using congrArg List.getLast? hEntryNodes
       simp [hLastEntry, hLast] at hEntryLastNode
   | some goalEntry =>
       have hGoalNode : goalEntry.node = goal := by
         have hEntryLastNode :
             Option.map FrontierEntry.node entryPath.getLast? = path.getLast? := by
-          simpa [hLastEntry] using congrArg List.getLast? hEntryNodes
+          simpa using congrArg List.getLast? hEntryNodes
         simpa [hLastEntry, hLast] using hEntryLastNode
       exact ⟨entryPath.length,
         canonical_machine_goal_reached_from_ready_witness_path
@@ -649,7 +649,7 @@ the scheduler supplies a direct service horizon. -/
 structure SchedulerFairnessPremises
     (trace : FrontierTrace)
     (start : Nat)
-    (entry : FrontierEntry) : Prop where
+    (entry : FrontierEntry) where
   canonicalTrace : CanonicalSerialTrace trace
   serviceHorizon : Nat
   presentAcrossHorizon :

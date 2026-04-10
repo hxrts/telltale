@@ -11,11 +11,12 @@ use std::process::Command;
 use serde::Deserialize;
 use support::FixtureDomain;
 use telltale_search::{
-    commit_epoch_reconfiguration, proposals_independent, replay_observation, run_with_executor,
-    search_theorem_pack_artifact, AuthorityReadSet, AuthoritySurface, AuthorityWriteSet,
-    EpochReconfigurationRequest, EpsilonMilli, Proposal, ProposalKind, ReplayExpectation,
-    SearchFairnessAssumption, SearchFairnessCertificateClass, SearchFairnessClaimClass,
-    SearchMachine, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+    commit_epoch_reconfiguration, full_state_artifact_for_machine, proposals_independent,
+    replay_observation, run_with_executor, search_theorem_pack_artifact, AuthorityReadSet,
+    AuthoritySurface, AuthorityWriteSet, EpochReconfigurationRequest, EpsilonMilli, Proposal,
+    ProposalKind, ReplayExpectation, SearchFairnessAssumption, SearchFairnessCertificateClass,
+    SearchFairnessClaimClass, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
+    SerialProposalExecutor,
 };
 
 #[derive(Debug, Deserialize)]
@@ -115,6 +116,15 @@ fn make_domain() -> FixtureDomain {
 fn assert_batch_and_independence_contracts(fixture: &SearchParityFixture, domain: &FixtureDomain) {
     let mut machine = SearchMachine::new(domain.clone(), 1, 0, 5, EpsilonMilli::one());
     machine.step_once().expect("first canonical step");
+    let full_state = full_state_artifact_for_machine(&machine);
+    assert_eq!(full_state.closed_nodes, vec![0]);
+    assert_eq!(full_state.incons_nodes, Vec::<u8>::new());
+    assert_eq!(full_state.epsilon_milli, 1_000);
+    assert_eq!(full_state.phase, 0);
+    assert_eq!(full_state.epoch, 1);
+    assert_eq!(full_state.snapshot_id, "epoch-1".to_string());
+    assert_eq!(full_state.last_batch_nodes, Some(vec![0]));
+    assert_eq!(full_state.normalized_commit_trace.len(), 2);
     let batch = machine.next_batch().expect("second batch");
     assert_eq!(
         batch
@@ -290,7 +300,7 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
     );
     assert_eq!(
         fixture.profile_claims.batched_parallel_envelope_bounded,
-        "premise_only"
+        "premised_window_bounded"
     );
     assert_eq!(
         fixture.profile_certificates.canonical_serial,
@@ -308,7 +318,7 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
         fixture
             .profile_certificates
             .batched_parallel_envelope_bounded,
-        "none"
+        "certified_current_min_key_window"
     );
     assert!(fixture.threaded_commit_trace_refines_canonical);
     assert!(fixture.threaded_state_slice_refines_canonical);
@@ -481,12 +491,34 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
         Some(&true)
     );
     assert_eq!(
-        inventory.get("search_batched_parallel_envelope_design_boundary_explicit"),
+        inventory.get("search_full_state_artifact_of_full_state_is_runtime_projection"),
         Some(&true)
     );
     assert_eq!(
-        inventory.get("search_batched_parallel_envelope_unconditional_fairness"),
-        Some(&false)
+        inventory.get("search_reduced_state_of_full_state_preserves_machine_invariants"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_canonical_machine_goal_reached_from_raw_successor_semantics"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get(
+            "search_canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness"
+        ),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_envelope_claim_is_certified_window_bounded"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_envelope_certified_window_fairness"),
+        Some(&true)
+    );
+    assert_eq!(
+        inventory.get("search_batched_parallel_envelope_certified_window_trace_valid"),
+        Some(&true)
     );
     let theorem_pack_inventory = fixture
         .theorem_pack_inventory
@@ -555,7 +587,7 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
 #[test]
 fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
     let fixture = search_fixture();
-    assert_eq!(fixture.schema_version, "search_parity_v10");
+    assert_eq!(fixture.schema_version, "search_parity_v11");
 
     let domain = make_domain();
     assert_batch_and_independence_contracts(&fixture, &domain);

@@ -1,4 +1,5 @@
 import Runtime.Proofs.Search.Liveness
+import Runtime.Proofs.Search.FullMachine
 import Runtime.Proofs.Search.Envelope
 
 set_option autoImplicit false
@@ -32,6 +33,46 @@ def fairnessTheoremInventoryRows : List SearchTheoremInventoryRow :=
   [ { name := "search_canonical_serial_exact_one_step_fairness"
     , present := true
     , supportClass := .executableSemantics
+    }
+  , { name := "search_full_state_artifact_of_full_state_is_runtime_projection"
+    , present := true
+    , supportClass := .executableSemantics
+    }
+  , { name := "search_reduced_state_of_full_state_preserves_machine_invariants"
+    , present := true
+    , supportClass := .refinementCorollary
+    }
+  , { name := "search_full_activate_batch_preserves_invariants"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_full_apply_proposal_preserves_invariants"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_full_commit_proposals_preserves_invariants"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_full_decrease_epsilon_and_rebuild_preserves_invariants"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_full_commit_epoch_reconfiguration_preserves_invariants"
+    , present := true
+    , supportClass := .executableSemantics
+    }
+  , { name := "search_full_step_once_preserves_invariants"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_full_activate_batch_refines_reduced_service_window"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_full_step_once_refines_reduced_executable_step"
+    , present := true
+    , supportClass := .premiseScoped
     }
   , { name := "search_canonical_serial_dynamic_liveness_under_stability"
     , present := true
@@ -89,6 +130,10 @@ def fairnessTheoremInventoryRows : List SearchTheoremInventoryRow :=
     , present := true
     , supportClass := .premiseScoped
     }
+  , { name := "search_canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness"
+    , present := true
+    , supportClass := .premiseScoped
+    }
   , { name := "search_canonical_serial_goal_reached_from_ready_witness_path"
     , present := true
     , supportClass := .premiseScoped
@@ -98,6 +143,10 @@ def fairnessTheoremInventoryRows : List SearchTheoremInventoryRow :=
     , supportClass := .premiseScoped
     }
   , { name := "search_canonical_machine_goal_reached_from_graph_reachability"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_canonical_machine_goal_reached_from_raw_successor_semantics"
     , present := true
     , supportClass := .premiseScoped
     }
@@ -169,12 +218,16 @@ def fairnessTheoremInventoryRows : List SearchTheoremInventoryRow :=
     , present := true
     , supportClass := .premiseScoped
     }
-  , { name := "search_batched_parallel_envelope_design_boundary_explicit"
+  , { name := "search_batched_parallel_envelope_claim_is_certified_window_bounded"
     , present := true
     , supportClass := .premiseScoped
     }
-  , { name := "search_batched_parallel_envelope_unconditional_fairness"
-    , present := false
+  , { name := "search_batched_parallel_envelope_certified_window_fairness"
+    , present := true
+    , supportClass := .premiseScoped
+    }
+  , { name := "search_batched_parallel_envelope_certified_window_trace_valid"
+    , present := true
     , supportClass := .premiseScoped
     }
   ]

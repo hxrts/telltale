@@ -51,7 +51,11 @@ The runtime emits `SchedulerArtifact` for scheduler classification,
 `SearchFairnessArtifact` for profile-scoped fairness evidence, and
 `SearchRouteBoundArtifact` for route discovery and quality reporting.
 `SearchStateArtifact` provides per-round state and certificate traces for
-exact-profile correspondence checks.
+exact-profile correspondence checks. `SearchFullStateArtifact` is the richer
+Rust-facing extraction boundary used by the strengthened full-machine
+refinement lane: it includes `OPEN`, `CLOSED`, `INCONS`, `g_score`, `parent`,
+incumbent, epsilon, epoch/snapshot, last-batch nodes, and full commit/publication
+traces.
 
 ## Admission and Capabilities
 
@@ -93,9 +97,9 @@ Observable classes include `IncumbentCost`, `CanonicalPathIdentity`,
 ## Lean Proof Support
 
 The Lean formalization lives in `Runtime.Proofs.Search` and is structured in
-ten modules: `Core`, `Fairness`, `Executable`, `Machine`, `Liveness`,
-`Refinement`, `ProfileClaims`, `Envelope`, `Inventory`, and `TheoremPack`,
-re-exported through `API`.
+eleven modules: `Core`, `Fairness`, `Executable`, `FullMachine`, `Machine`,
+`Liveness`, `Refinement`, `ProfileClaims`, `Envelope`, `Inventory`, and
+`TheoremPack`, re-exported through `API`.
 
 ### Proof Vocabulary (Core)
 
@@ -182,6 +186,45 @@ Key theorems exposed by this module:
   machine-level theorem surface now includes explicit refinement back into the
   Rust-facing reduced artifact vocabulary.
 
+### Full-Machine Semantics (FullMachine)
+
+`Runtime.Proofs.Search.FullMachine` lifts the search lane above the reduced
+frontier model into an executable proof-side machine that mirrors the
+proof-relevant Rust state more closely:
+
+- `FullSearchMachineState` — executable full-machine state carrying `OPEN`,
+  `CLOSED`, `INCONS`, `g_score`, parent table, incumbent, epsilon, phase,
+  epoch, snapshot, last batch, and commit/publication traces.
+- `fullStepOnce`, `fullDecreaseEpsilonAndRebuild`, and
+  `fullCommitEpochReconfiguration` — executable full-machine transitions for
+  canonical stepping, rebuild, and epoch changes.
+- `FullMachineInvariants` — full-machine invariant bundle for
+  open/closed discipline, `incons ⊆ closed`, parent-score coherence,
+  publication coherence, incumbent coherence, and nodup conditions.
+- `FullStateArtifactSchema` and `fullStateArtifactOfFullState` — explicit
+  full-state artifact projection aligned with the Rust-side
+  `SearchFullStateArtifact` export.
+
+Key theorems exposed by this module:
+
+- **`full_state_artifact_of_full_state_is_runtime_projection`** — the exported
+  full-state artifact is exactly the projection of the Lean full-machine state.
+- **`reduced_state_of_full_state_preserves_machine_invariants`** — the richer
+  full-machine invariant bundle implies the existing reduced machine
+  invariants.
+- **`full_activate_batch_preserves_invariants`**,
+  **`full_apply_proposal_preserves_invariants`**,
+  **`full_commit_proposals_preserves_invariants`**,
+  **`full_decrease_epsilon_and_rebuild_preserves_invariants`**,
+  **`full_commit_epoch_reconfiguration_preserves_invariants`**, and
+  **`full_step_once_preserves_invariants`** — the executable full-machine
+  transition families all have explicit invariant-preservation theorem
+  surfaces.
+- **`full_activate_batch_refines_reduced_service_window`** and
+  **`full_step_once_refines_reduced_executable_step`** — the richer machine
+  semantics refine back into the reduced executable step surface rather than
+  living as a parallel informal model.
+
 ### Fairness Proofs (Fairness)
 
 `Runtime.Proofs.Search.Fairness` proves:
@@ -263,6 +306,9 @@ min-key batch:
 - **`canonical_machine_goal_reached_from_graph_reachability`** — stronger
   completeness theorem driven by an explicit graph-reachability premise bundle
   that names reachable-node path, finiteness, and heuristic assumptions.
+- **`canonical_machine_goal_reached_from_raw_successor_semantics`** —
+  blanket public completeness theorem phrased over the raw successor contract,
+  with ready-entry progress internalized behind an explicit refinement premise.
 - **`goal_reachability_connects_to_incumbent_publication`** — machine-level
   bridge from bounded goal reachability to incumbent publication under an
   explicit publication premise bundle.
@@ -270,12 +316,15 @@ min-key batch:
   — premise-scoped optimality theorem: under explicit admissibility and
   consistency premises, eventual goal publication strengthens to eventual
   optimal-goal publication.
+- **`canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness`**
+  — public scheduler-facing non-min fairness theorem whose statement no longer
+  exposes bounded-better-arrival or finite-better-universe terminology.
 
 These liveness theorems are premise-scoped. Termination is proved only for the
 named premise bundles exposed in the theorem statements. Completeness is now
-stated over a graph-reachability bundle rather than a free-standing ready-path
-statement, but it still depends on explicit ready-path and heuristic premises
-instead of deriving from unconstrained Rust successor semantics alone.
+stated over both graph reachability and raw successor semantics, with the
+remaining assumptions made explicit in the theorem premises rather than left as
+documentation-only caveats.
 
 ### Profile Claims (ProfileClaims)
 
@@ -287,7 +336,7 @@ instead of deriving from unconstrained Rust successor semantics alone.
 | `canonicalSerial` | `exactOneStep` | proved unconditionally |
 | `threadedExactSingleLane` | `exactOneStepUnderRefinement` | proved via refinement |
 | `batchedParallelExact` | `premisedWindowBounded` | proved under `BatchedExactWindowCertificate` |
-| `batchedParallelEnvelopeBounded` | `premiseOnly` | no unconditional theorem |
+| `batchedParallelEnvelopeBounded` | `premisedWindowBounded` | proved under `BatchedEnvelopeWindowCertificate` |
 
 Key theorems exposed by this module:
 
@@ -311,8 +360,9 @@ Key theorems exposed by this module:
 - **`certified_window_trace_is_valid_for_exact_batch_service`** — validates
   that a certificate sequence matches the canonical batch at every step with
   a service bound of 1.
-- **`batched_parallel_envelope_claim_is_premise_only`** — states formally that
-  the envelope-bounded profile has no proof-backed fairness guarantee.
+- **`batched_parallel_envelope_claim_is_premised`** — states formally that the
+  envelope-bounded profile now carries the same theorem-backed certified-window
+  claim class as the other batched certified-window surface.
 
 The profile-level claim surface is intentionally narrower than a full
 multi-step replay theorem for `batchedParallelExact`. What is exported today is
@@ -321,18 +371,20 @@ window-trace validity, and premise-scoped bounded starvation-freedom. The
 runtime does not currently claim an end-to-end batched-exact replay/refinement
 theorem beyond that window-certified surface.
 
-### Envelope Boundary (Envelope)
+### Envelope Surface (Envelope)
 
-`Runtime.Proofs.Search.Envelope` makes the remaining envelope-bounded gap
-explicit:
+`Runtime.Proofs.Search.Envelope` now carries a real certified-window theorem
+surface for `batchedParallelEnvelopeBounded`:
 
-- **`EnvelopeFairnessDesignBoundary`** — checked-in design boundary listing the
-  missing ingredients for an unconditional envelope fairness theorem.
-- **`batched_parallel_envelope_design_boundary_is_explicit`** — proves that the
-  envelope-bounded profile remains premise-only by explicit design review, not
-  by omission. The current recorded reasons are lack of a certified frontier
-  window, lack of canonical commit refinement, and lack of an
-  observation-equivalence theorem.
+- **`BatchedEnvelopeWindowCertificate`** — explicit theorem-side certificate
+  object for one legal envelope-bounded service window.
+- **`certified_batched_envelope_window_is_fair`** — every current
+  `IsMinPriority` entry is removed within the certified envelope window.
+- **`certified_batched_envelope_window_eventually_services_min_priority_entries`**
+  — restates that one-window fairness theorem as `EventuallyServicedWithin ...
+  1`.
+- **`certified_envelope_window_trace_is_valid`** — validates exported envelope
+  certificate traces against the legal current min-key batch.
 
 ### Theorem Inventory (Inventory and TheoremPack)
 
@@ -341,11 +393,11 @@ a `Bool` indicating whether it is proved. `Runtime.Proofs.Search.TheoremPack`
 now also exports a support classification for every row:
 `executableSemantics`, `refinementCorollary`, or `premiseScoped`.
 
-The current inventory has **36 proved** theorems and **1 unproved**: the
-unconditional fairness theorem for `batchedParallelEnvelopeBounded` is still
-intentionally left as `false`, but the lack of that theorem is now paired with
-an explicit design-boundary theorem in `Envelope` and a premise-scoped support
-classification in the theorem pack.
+The current inventory has **50 proved** theorems and **0 unproved**. The added
+rows cover the executable full-machine artifact/projection surface, full-step
+refinement contracts back into the reduced executable lane, a raw-successor
+completeness theorem surface, scheduler-fair non-min service, and the new
+certified-window envelope profile theorems.
 
 `Runtime.Proofs.Search.TheoremPack` wraps the inventory, support classes, and
 two numeric bounds into a `SearchFairnessTheoremPack` structure:
@@ -367,27 +419,15 @@ provenance checks. On the Rust side this appears in
 `inventory_support_classes`, so downstream checks can distinguish executable
 semantics theorems from refinement corollaries and premise-scoped theorems.
 
-### What the Proofs Still Do Not Cover
+### Current Non-Goals
 
-- **Executable refinement to the full Rust machine**: the Lean lane now has an
-  executable reduced machine semantics, but it is still a reduced model. There
-  is not yet a full executable refinement proof from every Rust search-machine
-  transition, rebuild path, and epoch transition into that Lean machine.
-- **Unconstrained global completeness from raw successor semantics**: the
-  completeness theorem names graph reachability, finiteness, and heuristic
-  premises explicitly, but it still depends on an explicit reachable ready-path
-  witness bundle. There is still no blanket theorem that every reachable goal
-  in an arbitrary Rust search domain is eventually discovered from `start`
-  without those progress premises.
-- **Fairness under unbounded better-work arrival**: non-min-priority entries now
-  have proved service theorems under bounded strict preemption and under a
-  finite better-entry exhaustion bundle. There is still no fairness theorem for
-  traces that can admit an unbounded stream of strictly better entries.
-- **Unconditional fairness for `batchedParallelEnvelopeBounded`**: the profile
-  still carries no unconditional fairness theorem. What changed is that the
-  absence is now explicit and documented through the `Envelope` design-boundary
-  theorem, empty theorem-backed observable set, and premise-scoped theorem-pack
-  classification rather than left as an undocumented proof gap.
+- The strengthened search lane is still premise-scoped rather than a
+  whole-program mechanization of every future Rust search implementation
+  change. The theorem pack now makes those premise-scoped rows explicit
+  instead of leaving them as undocumented gaps.
+- `batchedParallelExact` and `batchedParallelEnvelopeBounded` are still exposed
+  as certified-window theorem surfaces, not full end-to-end replay-equivalence
+  theorems.
 
 ## Artifact Vectors
 
@@ -415,8 +455,8 @@ enables the native parallel executor for native targets.
 ## Lean/Rust Parity
 
 Reduced Lean/Rust parity currently covers canonical batch-window extraction,
-proposal independence over declared authority surfaces, replay epoch and phase
-contracts, theorem-pack support-class parity, and epoch-barrier semantics with
-fairness-bundle fixtures. See
+proposal independence over declared authority surfaces, theorem-pack
+support-class parity, the richer Rust full-state artifact boundary, and
+epoch-barrier semantics with fairness-bundle fixtures. See
 [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) for the deviation registry and
 parity policy.

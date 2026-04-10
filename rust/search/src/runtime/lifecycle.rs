@@ -388,6 +388,45 @@ where
     pub phase: u64,
 }
 
+/// Richer exported full-machine artifact used for the strengthened
+/// refinement-facing search proof boundary.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SearchFullStateArtifact<N, G, S, C>
+where
+    N: Ord,
+    G: Ord,
+    S: Ord,
+{
+    /// Canonical open frontier nodes with their current `g` scores.
+    pub open_nodes: Vec<(N, C)>,
+    /// Canonical closed-set nodes.
+    pub closed_nodes: Vec<N>,
+    /// Canonical inconsistent-set nodes.
+    pub incons_nodes: Vec<N>,
+    /// Canonical `g` scores.
+    pub g_scores: Vec<(N, C)>,
+    /// Canonical parent identities.
+    pub parent_map: Vec<(N, N)>,
+    /// Current incumbent cost.
+    pub incumbent_cost: Option<C>,
+    /// Current incumbent path.
+    pub incumbent_path: Option<Vec<N>>,
+    /// Current epsilon.
+    pub epsilon_milli: u64,
+    /// Current search phase.
+    pub phase: u64,
+    /// Frozen graph epoch.
+    pub epoch: G,
+    /// Frozen graph snapshot.
+    pub snapshot_id: S,
+    /// Last extracted batch nodes when available.
+    pub last_batch_nodes: Option<Vec<N>>,
+    /// Full normalized commit trace.
+    pub normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
+    /// Full incumbent publication trace.
+    pub incumbent_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
+}
+
 /// Typed runtime configuration for one search run.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRunConfig {
@@ -593,7 +632,7 @@ pub fn classify_fairness_claim(profile: SearchSchedulerProfile) -> SearchFairnes
             SearchFairnessClaimClass::PremisedWindowBounded
         }
         SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
-            SearchFairnessClaimClass::PremiseOnly
+            SearchFairnessClaimClass::PremisedWindowBounded
         }
     }
 }
@@ -620,7 +659,11 @@ pub fn theorem_backed_observables(
                 .into_iter()
                 .collect()
         }
-        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => BTreeSet::new(),
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
+            [SearchObservableClass::NormalizedCommitTrace]
+                .into_iter()
+                .collect()
+        }
     }
 }
 
@@ -631,6 +674,34 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
     SearchTheoremPackArtifact {
         inventory: [
             ("search_canonical_serial_exact_one_step_fairness", true),
+            (
+                "search_full_state_artifact_of_full_state_is_runtime_projection",
+                true,
+            ),
+            (
+                "search_reduced_state_of_full_state_preserves_machine_invariants",
+                true,
+            ),
+            ("search_full_activate_batch_preserves_invariants", true),
+            ("search_full_apply_proposal_preserves_invariants", true),
+            ("search_full_commit_proposals_preserves_invariants", true),
+            (
+                "search_full_decrease_epsilon_and_rebuild_preserves_invariants",
+                true,
+            ),
+            (
+                "search_full_commit_epoch_reconfiguration_preserves_invariants",
+                true,
+            ),
+            ("search_full_step_once_preserves_invariants", true),
+            (
+                "search_full_activate_batch_refines_reduced_service_window",
+                true,
+            ),
+            (
+                "search_full_step_once_refines_reduced_executable_step",
+                true,
+            ),
             (
                 "search_canonical_serial_dynamic_liveness_under_stability",
                 true,
@@ -685,6 +756,10 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 true,
             ),
             (
+                "search_canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness",
+                true,
+            ),
+            (
                 "search_canonical_serial_goal_reached_from_ready_witness_path",
                 true,
             ),
@@ -694,6 +769,10 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
             ),
             (
                 "search_canonical_machine_goal_reached_from_graph_reachability",
+                true,
+            ),
+            (
+                "search_canonical_machine_goal_reached_from_raw_successor_semantics",
                 true,
             ),
             (
@@ -757,12 +836,16 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 true,
             ),
             (
-                "search_batched_parallel_envelope_design_boundary_explicit",
+                "search_batched_parallel_envelope_claim_is_certified_window_bounded",
                 true,
             ),
             (
-                "search_batched_parallel_envelope_unconditional_fairness",
-                false,
+                "search_batched_parallel_envelope_certified_window_fairness",
+                true,
+            ),
+            (
+                "search_batched_parallel_envelope_certified_window_trace_valid",
+                true,
             ),
             (
                 "search_canonical_serial_goal_window_service_has_exact_suffix_bound",
@@ -783,6 +866,46 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
             (
                 "search_canonical_serial_exact_one_step_fairness",
                 SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_full_state_artifact_of_full_state_is_runtime_projection",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_reduced_state_of_full_state_preserves_machine_invariants",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
+            (
+                "search_full_activate_batch_preserves_invariants",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_full_apply_proposal_preserves_invariants",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_full_commit_proposals_preserves_invariants",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_full_decrease_epsilon_and_rebuild_preserves_invariants",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_full_commit_epoch_reconfiguration_preserves_invariants",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_full_step_once_preserves_invariants",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_full_activate_batch_refines_reduced_service_window",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_full_step_once_refines_reduced_executable_step",
+                SearchTheoremSupportClass::PremiseScoped,
             ),
             (
                 "search_canonical_serial_dynamic_liveness_under_stability",
@@ -841,6 +964,10 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 SearchTheoremSupportClass::PremiseScoped,
             ),
             (
+                "search_canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
                 "search_canonical_serial_goal_reached_from_ready_witness_path",
                 SearchTheoremSupportClass::PremiseScoped,
             ),
@@ -850,6 +977,10 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
             ),
             (
                 "search_canonical_machine_goal_reached_from_graph_reachability",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_canonical_machine_goal_reached_from_raw_successor_semantics",
                 SearchTheoremSupportClass::PremiseScoped,
             ),
             (
@@ -921,11 +1052,15 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 SearchTheoremSupportClass::PremiseScoped,
             ),
             (
-                "search_batched_parallel_envelope_design_boundary_explicit",
+                "search_batched_parallel_envelope_claim_is_certified_window_bounded",
                 SearchTheoremSupportClass::PremiseScoped,
             ),
             (
-                "search_batched_parallel_envelope_unconditional_fairness",
+                "search_batched_parallel_envelope_certified_window_fairness",
+                SearchTheoremSupportClass::PremiseScoped,
+            ),
+            (
+                "search_batched_parallel_envelope_certified_window_trace_valid",
                 SearchTheoremSupportClass::PremiseScoped,
             ),
         ]
@@ -979,6 +1114,62 @@ where
             .map(|incumbent| incumbent.path.clone()),
         epoch: machine.state().graph_epoch.clone(),
         phase: machine.state().phase,
+    }
+}
+
+/// Export the richer full-machine artifact boundary for one live Rust search
+/// machine state.
+#[must_use]
+pub fn full_state_artifact_for_machine<D>(
+    machine: &SearchMachine<D>,
+) -> SearchFullStateArtifact<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>
+where
+    D: SearchDomain,
+{
+    SearchFullStateArtifact {
+        open_nodes: machine
+            .state()
+            .open
+            .iter()
+            .map(|(node, entry)| (node.clone(), entry.g_score))
+            .collect(),
+        closed_nodes: machine.state().closed.iter().cloned().collect(),
+        incons_nodes: machine.state().incons.iter().cloned().collect(),
+        g_scores: machine
+            .state()
+            .g_score
+            .iter()
+            .map(|(node, score)| (node.clone(), *score))
+            .collect(),
+        parent_map: machine
+            .state()
+            .parent
+            .iter()
+            .map(|(node, parent)| (node.clone(), parent.from.clone()))
+            .collect(),
+        incumbent_cost: machine
+            .state()
+            .incumbent
+            .as_ref()
+            .map(|incumbent| incumbent.cost),
+        incumbent_path: machine
+            .state()
+            .incumbent
+            .as_ref()
+            .map(|incumbent| incumbent.path.clone()),
+        epsilon_milli: u64::from(machine.state().epsilon.0),
+        phase: machine.state().phase,
+        epoch: machine.state().graph_epoch.clone(),
+        snapshot_id: machine.state().graph_snapshot_id.clone(),
+        last_batch_nodes: machine.last_batch.as_ref().map(|batch| {
+            batch
+                .entries
+                .iter()
+                .map(|entry| entry.node.clone())
+                .collect()
+        }),
+        normalized_commit_trace: machine.observation.normalized_commit_trace.clone(),
+        incumbent_publication_trace: machine.observation.incumbent_publication_trace.clone(),
     }
 }
 
@@ -1066,34 +1257,31 @@ where
     });
     let required_premises = replay.fairness.certificate.required_fairness.clone();
     let goal_service_bound_steps = replay.fairness.certificate.service_bound_steps;
-    let discovery_certificate =
-        goal_window_entry_bound_steps.zip(goal_service_bound_steps).map(
-            |(observed_goal_window_step, service_bound_steps)| {
-                let class = match profile {
-                    SearchSchedulerProfile::CanonicalSerial => {
-                        SearchRouteDiscoveryCertificateClass::GoalWindowOneStepExact
-                    }
-                    SearchSchedulerProfile::ThreadedExactSingleLane => {
-                        SearchRouteDiscoveryCertificateClass::GoalWindowOneStepViaThreadedRefinement
-                    }
-                    SearchSchedulerProfile::BatchedParallelExact => {
-                        SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService
-                    }
-                    SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
-                        unreachable!(
-                            "envelope-bounded profiles do not carry a theorem-backed discovery certificate"
-                        )
-                    }
-                };
-                SearchRouteDiscoveryCertificate {
-                    class,
-                    service_bound_steps,
-                    observed_goal_window_step,
-                    required_premises: replay.fairness.certificate.required_fairness.clone(),
-                    certified_observables: replay.fairness.certificate.certified_observables.clone(),
+    let discovery_certificate = goal_window_entry_bound_steps
+        .zip(goal_service_bound_steps)
+        .map(|(observed_goal_window_step, service_bound_steps)| {
+            let class = match profile {
+                SearchSchedulerProfile::CanonicalSerial => {
+                    SearchRouteDiscoveryCertificateClass::GoalWindowOneStepExact
                 }
-            },
-        );
+                SearchSchedulerProfile::ThreadedExactSingleLane => {
+                    SearchRouteDiscoveryCertificateClass::GoalWindowOneStepViaThreadedRefinement
+                }
+                SearchSchedulerProfile::BatchedParallelExact => {
+                    SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService
+                }
+                SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
+                    SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService
+                }
+            };
+            SearchRouteDiscoveryCertificate {
+                class,
+                service_bound_steps,
+                observed_goal_window_step,
+                required_premises: replay.fairness.certificate.required_fairness.clone(),
+                certified_observables: replay.fairness.certificate.certified_observables.clone(),
+            }
+        });
 
     match (selected_route_cost, profile) {
         (None, _) => SearchRouteBoundArtifact {
@@ -1148,13 +1336,14 @@ where
         },
         (Some(cost), SearchSchedulerProfile::BatchedParallelEnvelopeBounded) => {
             SearchRouteBoundArtifact {
-                discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
+                discovery_class:
+                    SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate,
                 candidate_discovery_bound_steps,
                 goal_service_bound_steps,
                 goal_window_entry_bound_steps,
-                discovery_certificate: None,
+                discovery_certificate,
                 recovery_bound_steps_after_latest_epoch,
-                quality_class: SearchRouteQualityClass::PremiseOnly,
+                quality_class: SearchRouteQualityClass::PremisedWindowBounded,
                 selected_route_cost: Some(cost),
                 optimality_gap: None,
                 approximation_ratio_milli: None,

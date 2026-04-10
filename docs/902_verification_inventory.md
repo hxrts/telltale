@@ -19,7 +19,7 @@ The numeric rows in this section are source-derived and checked by
 |---|---:|---|
 | Lean core-library files | 669 | `lean/CODE_MAP.md` total row |
 | Lean core-library lines | 136,402 | `lean/CODE_MAP.md` total row |
-| Lean-backed search fairness inventory entries | 37 | `lean/Runtime/Proofs/Search/Inventory.lean` |
+| Lean-backed search fairness inventory entries | 50 | `lean/Runtime/Proofs/Search/Inventory.lean` |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
@@ -94,6 +94,9 @@ proved search fairness surface is:
   batch
 - canonical serial search now has an executable reduced machine semantics plus
   an explicit reduced Rust-facing state/artifact projection boundary
+- canonical serial search now also has an executable full-machine semantics,
+  an exported full-state artifact projection, and premise-scoped full-step
+  refinement contracts back into the reduced executable lane
 - canonical serial search now also has a reduced machine-level invariant and
   projection layer, including executable machine-step invariant preservation,
   executable trace refinement into the packaged machine theorem surface, and a
@@ -108,11 +111,17 @@ proved search fairness surface is:
 - canonical serial search has both bounded strict-preemption and finite
   better-entry exhaustion theorems for entries that are not initially in the
   current min-key batch
+- canonical serial search now also has a scheduler-facing non-min service
+  theorem whose public statement no longer exposes bounded-better-arrival or
+  finite-better-universe terminology
 - canonical serial search has both frontier-level and machine-level
   witness-path goal-reachability theorems for the reduced model
 - canonical serial search now also has a graph-reachability-driven
   completeness theorem under explicit reachable-path, finiteness, and
   heuristic premises
+- canonical serial search now also has a raw-successor-semantics completeness
+  theorem whose public statement quantifies over the domain successor contract
+  instead of a user-supplied ready-path witness
 - canonical serial search also has an explicit machine-level bridge from goal
   reachability to incumbent publication under a publication premise bundle
 - canonical serial search now also has an eventual optimal-goal publication
@@ -125,11 +134,9 @@ proved search fairness surface is:
   bounded-preemption premise, and its theorem-pack/export surface now also
   carries explicit support-class metadata alongside the certified multi-step
   window-trace validity theorem
-- envelope-bounded batched search still remains outside the unconditional proved
-  fairness surface, but that boundary is now made explicit by a checked-in Lean
-  design-boundary theorem, an empty theorem-backed observable surface, and a
-  premise-scoped theorem-pack classification rather than left as an
-  undocumented omission
+- envelope-bounded batched search now also has a certified-window theorem
+  surface, theorem-backed normalized-commit observables, and a runtime
+  certificate/export path aligned with the theorem pack
 
 These search fairness claims are exposed operationally through the
 `SearchFairnessArtifact` and `SearchFairnessCertificate` runtime surfaces and

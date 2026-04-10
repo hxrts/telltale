@@ -40,7 +40,7 @@ def fairnessClaimClass : SearchSchedulerProfile → FairnessClaimClass
   | .canonicalSerial => .exactOneStep
   | .threadedExactSingleLane => .exactOneStepUnderRefinement
   | .batchedParallelExact => .premisedWindowBounded
-  | .batchedParallelEnvelopeBounded => .premiseOnly
+  | .batchedParallelEnvelopeBounded => .premisedWindowBounded
 
 /-- The reduced threaded exact single-lane step refines canonical serial search
 exactly. This models the real implementation boundary: parallel successor
@@ -171,10 +171,10 @@ theorem certified_window_trace_is_valid_for_exact_batch_service
   · simpa using hBound j
   · simp [certifiedWindowTraceEntryOfCertificate, hBatchExact j]
 
-/-- Envelope-bounded batched search exposes only a premise-scoped fairness
-claim. -/
-theorem batched_parallel_envelope_claim_is_premise_only :
-    fairnessClaimClass .batchedParallelEnvelopeBounded = .premiseOnly :=
+/-- Envelope-bounded batched search now carries a theorem-backed certified
+window claim. -/
+theorem batched_parallel_envelope_claim_is_premised :
+    fairnessClaimClass .batchedParallelEnvelopeBounded = .premisedWindowBounded :=
   rfl
 
 end Search

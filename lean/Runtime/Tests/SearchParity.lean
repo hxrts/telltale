@@ -39,7 +39,7 @@ def main : IO Unit := do
   let canonicalCertificate := "current_min_key_batch"
   let threadedCertificate := "current_min_key_batch_via_threaded_refinement"
   let batchedExactCertificate := "certified_current_min_key_window"
-  let envelopeCertificate := "none"
+  let envelopeCertificate := "certified_current_min_key_window"
   let inventoryJson :=
     Json.arr <| fairnessTheoremInventory.toArray.map fun (name, present) =>
       Json.mkObj [("name", Json.str name), ("present", Json.bool present)]
@@ -53,7 +53,7 @@ def main : IO Unit := do
         , ("support_class", Json.str (supportClassString cls))
         ]
   let payload := Json.mkObj
-    [ ("schema_version", Json.str "search_parity_v10")
+    [ ("schema_version", Json.str "search_parity_v11")
     , ("canonical_batch_nodes", Json.arr #[Json.num 1, Json.num 2])
     , ("independent_targets", Json.arr #[Json.num 4, Json.num 5])
     , ("replay_epoch_trace", Json.arr #[Json.num 1])

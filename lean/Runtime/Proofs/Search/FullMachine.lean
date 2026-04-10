@@ -698,6 +698,25 @@ theorem full_activate_batch_refines_reduced_service_window
       executableNextFrontier (reducedStateOfFullState state) :=
   hPremises.projectionRefinement
 
+/-- Contract bundle for one full-machine step refining the reduced executable
+machine step. -/
+structure FullStepRefinementPremises
+    (sem : FullSearchSemantics)
+    (state : FullSearchMachineState) : Prop where
+  stepProjectionRefinement :
+    reducedStateOfFullState (fullStepOnce sem state) =
+      executableCanonicalStep sem.goalNode (reducedStateOfFullState state)
+
+/-- The richer full-machine semantics exposes the reduced executable machine
+step as an explicit refinement corollary. -/
+theorem full_step_once_refines_reduced_executable_step
+    {sem : FullSearchSemantics}
+    {state : FullSearchMachineState}
+    (hPremises : FullStepRefinementPremises sem state) :
+    reducedStateOfFullState (fullStepOnce sem state) =
+      executableCanonicalStep sem.goalNode (reducedStateOfFullState state) :=
+  hPremises.stepProjectionRefinement
+
 end Search
 end Proofs
 end Runtime
