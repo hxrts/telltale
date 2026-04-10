@@ -92,34 +92,155 @@ Observable classes include `IncumbentCost`, `CanonicalPathIdentity`,
 
 ## Lean Proof Support
 
-The Lean formalization provides scoped fairness and refinement results for the
-canonical serial scheduler. `Runtime.Proofs.Search.API` defines a
-search-specific fairness vocabulary over dynamic frontier entries.
-`Runtime.Proofs.Search.Fairness` proves that every entry in the current legal
-min-key batch is serviced by the next canonical serial step, restated as an
-eventual-service theorem with bound 1.
+The Lean formalization lives in `Runtime.Proofs.Search` and is structured in
+six modules: `Core`, `Fairness`, `Refinement`, `ProfileClaims`, `Inventory`,
+and `TheoremPack`, re-exported through `API`.
 
-`Runtime.Proofs.Search.Refinement` proves reduced exact single-lane threaded
-refinement down to batch-node, normalized-commit-trace, reduced state-slice,
-and reduced observation-slice equality with canonical serial search. The same
-module exposes multi-step exact threaded refinement theorems for reduced
-state-slice and observation-slice traces.
+### Proof Vocabulary (Core)
 
-`Runtime.Proofs.Search.ProfileClaims` separates the public fairness story by
-runtime profile. Canonical serial provides exact one-step fairness. Threaded
-exact single-lane proves exact one-step fairness through a reduced refinement
-theorem to canonical serial search. Batched exact provides premise-scoped
-bounded-window fairness via a certified current-window theorem and a bounded
-dynamic starvation-freedom theorem under an explicit bounded-preemption premise.
-Envelope-bounded batched provides premise-only classification without an
-unconditional fairness theorem.
+`Runtime.Proofs.Search.Core` establishes the foundational vocabulary:
 
-`Runtime.Proofs.Search.TheoremPack` packages the theorem inventory as a
-first-class Lean artifact. The dedicated local gate is
-`just check-search-fairness`. The search theorem-pack artifact is also exported
-through the runtime API and through the generated JSON at
+- `FrontierEntry` — a `(node : Nat, priority : Nat)` pair; the unit of
+  frontier membership.
+- `IsMinPriority frontier entry` — `entry` is present in `frontier` and no
+  other entry has strictly lower priority.
+- `canonicalBatch frontier` — the list of all entries satisfying
+  `IsMinPriority`; these are exactly the entries that will be serviced in the
+  next step.
+- `frontierAfterCanonicalStep frontier` — the frontier with the canonical batch
+  removed.
+- `OneStepFair frontier` — every `IsMinPriority` entry is absent from
+  `frontierAfterCanonicalStep frontier`.
+- `CanonicalSerialTrace` — a dynamic frontier trace whose successive states are
+  related by `frontierAfterCanonicalStep`.
+- `EventuallyServicedWithin trace start bound entry` — `entry` is removed from
+  `trace start` within `bound` steps.
+- `ContinuouslyEligible`, `NoStrictlyBetterEntryAppears` — predicates used in
+  the dynamic liveness theorem to constrain how the frontier evolves.
+
+The reduced artifact structures — `StepArtifact`, `StateSlice`,
+`ObservationSlice`, and `StateArtifactSchema` — define the boundary at which
+Lean and Rust search states are compared. `BatchedExactWindowCertificate` is
+a proof-carrying record whose fields provide evidence that a batched window
+covers the current canonical batch and produces a commit for each covered
+entry; downstream fairness theorems are conditioned on holding one of these
+certificates.
+
+### Fairness Proofs (Fairness)
+
+`Runtime.Proofs.Search.Fairness` proves:
+
+- **`mem_canonicalBatch_iff_isMinPriority`** — membership in the canonical
+  batch is equivalent to satisfying `IsMinPriority`. This connects the
+  computational filter to the logical predicate.
+- **`canonical_batch_entries_removed_after_step`** — every entry in the
+  canonical batch is absent after the step. This is the core removal fact.
+- **`canonical_serial_one_step_fair_for_min_priority_entries`** — if `entry`
+  satisfies `IsMinPriority`, it is absent after one canonical step. This is
+  the main one-step fairness result.
+- **`canonical_serial_batch_is_one_step_fair`** — the full frontier is
+  `OneStepFair`.
+- **`currently_min_priority_eventually_serviced_within_one_step`** — in any
+  `CanonicalSerialTrace`, a current `IsMinPriority` entry satisfies
+  `EventuallyServicedWithin ... 1`. The service bound is exactly one step.
+- **`continuously_eligible_without_strictly_better_entries_eventually_serviced`**
+  — the dynamic liveness result: if an entry remains eligible and no strictly
+  better entry arrives across a horizon, it is serviced within one step.
+
+These proofs establish unconditional one-step fairness for `canonicalSerial`.
+No fairness is claimed for entries outside the current min-key batch.
+
+### Refinement Proofs (Refinement)
+
+`Runtime.Proofs.Search.Refinement` proves that the threaded exact single-lane
+executor is identical to canonical serial at every reduced artifact boundary:
+
+- **`threaded_exact_single_lane_step_artifact_refines_canonical`** — the full
+  `StepArtifact` is equal.
+- **`threaded_exact_single_lane_commit_trace_refines_canonical`** and
+  **`threaded_exact_single_lane_batch_nodes_refine_canonical`** — the
+  `normalizedCommits` and `batchNodes` fields match individually.
+- **`threaded_exact_single_lane_state_slice_refines_canonical`** and
+  **`threaded_exact_single_lane_observation_slice_refines_canonical`** — the
+  reduced `StateSlice` and `ObservationSlice` projections are equal.
+- **`threaded_exact_single_lane_multi_step_state_trace_refines_canonical`**,
+  **`..._observation_trace_..._canonical`**, and
+  **`..._state_artifact_trace_..._canonical`** — all three multi-step trace
+  functions agree across arbitrary `FrontierTrace` inputs.
+
+These are equalities, not simulations: parallelisation of successor enumeration
+within a batch produces no observable difference in batch nodes, normalized
+commits, state, or observations.
+
+### Profile Claims (ProfileClaims)
+
+`Runtime.Proofs.Search.ProfileClaims` packages the fairness story per
+`SearchSchedulerProfile` using a `FairnessClaimClass` type:
+
+| Profile | `FairnessClaimClass` | Proof status |
+|---|---|---|
+| `canonicalSerial` | `exactOneStep` | proved unconditionally |
+| `threadedExactSingleLane` | `exactOneStepUnderRefinement` | proved via refinement |
+| `batchedParallelExact` | `premisedWindowBounded` | proved under `BatchedExactWindowCertificate` |
+| `batchedParallelEnvelopeBounded` | `premiseOnly` | no unconditional theorem |
+
+Key theorems exposed by this module:
+
+- **`canonical_serial_profile_has_exact_one_step_fairness`** and
+  **`canonical_serial_goal_window_service_has_exact_suffix_bound`** — restate
+  the `Fairness` results at profile granularity.
+- **`threaded_exact_single_lane_has_exact_one_step_fairness`** — derives
+  one-step fairness for the threaded profile by composing the `Refinement`
+  equalities.
+- **`threaded_exact_single_lane_has_exact_observation_equivalence`** —
+  observation slices match canonical serial exactly.
+- **`certified_batched_exact_window_is_fair`** — given a
+  `BatchedExactWindowCertificate`, every `IsMinPriority` entry is removed
+  within the certified window.
+- **`certified_batched_exact_window_eventually_services_min_priority_entries`**
+  — restates the above as an `EventuallyServicedWithin` bound of 1.
+- **`certified_batched_exact_window_bounded_dynamic_starvation_freedom`** —
+  the strongest premise-scoped result: given certificates for each step in a
+  horizon, a `ContinuouslyEligible` entry under `BoundedPreemptionWindow` is
+  serviced within `bound` steps.
+- **`certified_window_trace_is_valid_for_exact_batch_service`** — validates
+  that a certificate sequence matches the canonical batch at every step with
+  a service bound of 1.
+- **`batched_parallel_envelope_claim_is_premise_only`** — states formally that
+  the envelope-bounded profile has no proof-backed fairness guarantee.
+
+### Theorem Inventory (Inventory and TheoremPack)
+
+`Runtime.Proofs.Search.Inventory` records every theorem by name together with
+a `Bool` indicating whether it is proved. The current inventory has
+**17 proved** theorems and **1 unproved**: the unconditional fairness theorem
+for `batchedParallelEnvelopeBounded` is intentionally left as `false` because
+no unconditional proof exists for that profile.
+
+`Runtime.Proofs.Search.TheoremPack` wraps the inventory and two numeric
+bounds into a `SearchFairnessTheoremPack` structure:
+
+```
+canonicalServiceBoundSteps                 := 1
+canonicalGoalWindowDiscoverySuffixBoundSteps := 1
+```
+
+Both bounds are exactly one step, matching the `EventuallyServicedWithin ...
+1` statements in `Fairness` and `ProfileClaims`.
+
+The dedicated local verification gate is `just check-search-fairness`. The
+theorem-pack is also exported through the runtime API and written to
 `target/search-theorem-pack/search-theorem-pack.json` for release and
 provenance checks.
+
+### What the Proofs Do Not Cover
+
+- **Termination**: no proof that the frontier ever empties.
+- **Global completeness**: no proof that the goal node is eventually reached.
+- **Fairness for non-min-priority entries**: an entry not in the current
+  canonical batch has no service bound.
+- **Unconditional fairness for `batchedParallelEnvelopeBounded`**: this
+  profile carries premise-only classification with no supporting theorem.
 
 ## Artifact Vectors
 
