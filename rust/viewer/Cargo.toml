@@ -1,6 +1,6 @@
 [package]
 name = "telltale-viewer"
-version = "11.3.0"
+version = "12.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 rust-version = "1.75"
@@ -17,11 +17,11 @@ bench = false
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-telltale-macros = { path = "../macros", version = "11.3.0" }
-telltale-search = { path = "../search", version = "11.3.0" }
+telltale-macros = { path = "../macros", version = "12.0.0" }
+telltale-search = { path = "../search", version = "12.0.0" }
 toml = { workspace = true }
-telltale-simulator = { path = "../simulator", version = "11.3.0" }
-telltale-machine = { path = "../machine", version = "11.3.0" }
+telltale-simulator = { path = "../simulator", version = "12.0.0" }
+telltale-machine = { path = "../machine", version = "12.0.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }
