@@ -113,26 +113,26 @@ eleven modules: `Core`, `Fairness`, `Executable`, `FullMachine`, `Machine`,
 
 `Runtime.Proofs.Search.Core` establishes the foundational vocabulary:
 
-- `FrontierEntry` — a `(node : Nat, priority : Nat)` pair; the unit of
+- `FrontierEntry` - a `(node : Nat, priority : Nat)` pair; the unit of
   frontier membership.
-- `IsMinPriority frontier entry` — `entry` is present in `frontier` and no
+- `IsMinPriority frontier entry` - `entry` is present in `frontier` and no
   other entry has strictly lower priority.
-- `canonicalBatch frontier` — the list of all entries satisfying
+- `canonicalBatch frontier` - the list of all entries satisfying
   `IsMinPriority`; these are exactly the entries that will be serviced in the
   next step.
-- `frontierAfterCanonicalStep frontier` — the frontier with the canonical batch
+- `frontierAfterCanonicalStep frontier` - the frontier with the canonical batch
   removed.
-- `OneStepFair frontier` — every `IsMinPriority` entry is absent from
+- `OneStepFair frontier` - every `IsMinPriority` entry is absent from
   `frontierAfterCanonicalStep frontier`.
-- `CanonicalSerialTrace` — a dynamic frontier trace whose successive states are
+- `CanonicalSerialTrace` - a dynamic frontier trace whose successive states are
   related by `frontierAfterCanonicalStep`.
-- `EventuallyServicedWithin trace start bound entry` — `entry` is removed from
+- `EventuallyServicedWithin trace start bound entry` - `entry` is removed from
   `trace start` within `bound` steps.
-- `ContinuouslyEligible`, `NoStrictlyBetterEntryAppears` — predicates used in
+- `ContinuouslyEligible`, `NoStrictlyBetterEntryAppears` - predicates used in
   the dynamic liveness theorem to constrain how the frontier evolves.
 
-The reduced artifact structures — `StepArtifact`, `StateSlice`,
-`ObservationSlice`, and `StateArtifactSchema` — define the boundary at which
+The reduced artifact structures - `StepArtifact`, `StateSlice`,
+`ObservationSlice`, and `StateArtifactSchema` - define the boundary at which
 Lean and Rust search states are compared. `BatchedExactWindowCertificate` is
 a proof-carrying record whose fields provide evidence that a batched window
 covers the current canonical batch and produces a commit for each covered
@@ -144,28 +144,28 @@ certificates.
 `Runtime.Proofs.Search.Executable` is now the semantic center of the search
 proof lane:
 
-- `SearchMachineState` — reduced proof-relevant machine state carrying
+- `SearchMachineState` - reduced proof-relevant machine state carrying
   frontier, closed nodes, inconsistent nodes, score table, parent witnesses,
   incumbent, phase, and progress accounting.
-- `MachineInvariants` — reduced machine invariant bundle covering
+- `MachineInvariants` - reduced machine invariant bundle covering
   open/closed disjointness, `incons ⊆ closed`, parent-score coherence,
   incumbent coherence, and nodup conditions.
-- `executableCanonicalStep` — concrete reduced step function implementing
+- `executableCanonicalStep` - concrete reduced step function implementing
   canonical batch extraction, batch removal, normalized commit production,
   `open/closed/incons` movement, score updates, and reduced incumbent refresh.
 - `stateSliceOfMachineState`, `observationSliceOfMachineState`, and
-  `stateArtifactOfMachineState` — explicit Rust-facing reduced extraction
+  `stateArtifactOfMachineState` - explicit Rust-facing reduced extraction
   boundary from executable machine states back into the reduced artifact
   vocabulary used by parity tests and theorem-pack exports.
 
 Key theorems exposed by this module:
 
-- **`executable_canonical_step_preserves_invariants`** — executable reduced
+- **`executable_canonical_step_preserves_invariants`** - executable reduced
   stepping preserves the reduced machine invariant bundle.
-- **`executable_step_artifact_refines_canonical_step_artifact`** — the
+- **`executable_step_artifact_refines_canonical_step_artifact`** - the
   executable step refines exactly to the existing reduced step-artifact
   vocabulary.
-- **`runtime_state_artifact_of_machine_state_is_projection`** — the reduced
+- **`runtime_state_artifact_of_machine_state_is_projection`** - the reduced
   runtime-state artifact is an explicit projection of executable machine state.
 
 ### Machine Vocabulary (Machine)
@@ -173,24 +173,24 @@ Key theorems exposed by this module:
 `Runtime.Proofs.Search.Machine` now packages the executable semantics into the
 machine-facing theorem surface:
 
-- `CanonicalMachineStep` — packaged executable reduced step plus current-state
+- `CanonicalMachineStep` - packaged executable reduced step plus current-state
   invariant bundle.
-- `CanonicalMachineTrace` — machine trace version of canonical serial search.
+- `CanonicalMachineTrace` - machine trace version of canonical serial search.
 
 Key theorems exposed by this module:
 
-- **`canonical_machine_step_services_current_min_priority_entries`** — the
+- **`canonical_machine_step_services_current_min_priority_entries`** - the
   machine-level step relation preserves the same one-step service fact for the
   current min-key batch as the frontier-only fairness layer.
-- **`canonical_machine_step_preserves_invariants`** — machine invariants are
+- **`canonical_machine_step_preserves_invariants`** - machine invariants are
   preserved by the executable reduced step.
-- **`canonical_machine_trace_currently_min_priority_eventually_serviced`** —
+- **`canonical_machine_trace_currently_min_priority_eventually_serviced`** - 
   machine traces inherit the frontier-facing one-step eventual-service theorem
   through frontier projection.
-- **`executable_trace_refines_canonical_machine_trace`** — executable machine
+- **`executable_trace_refines_canonical_machine_trace`** - executable machine
   traces refine directly into the packaged machine-step theorem surface.
 - **`canonical_machine_step_artifact_refines_runtime_boundary`** and
-  **`canonical_machine_state_artifact_is_runtime_projection`** — the
+  **`canonical_machine_state_artifact_is_runtime_projection`** - the
   machine-level theorem surface now includes explicit refinement back into the
   Rust-facing reduced artifact vocabulary.
 
@@ -200,24 +200,24 @@ Key theorems exposed by this module:
 frontier model into an executable proof-side machine that mirrors the
 proof-relevant Rust state more closely:
 
-- `FullSearchMachineState` — executable full-machine state carrying `OPEN`,
+- `FullSearchMachineState` - executable full-machine state carrying `OPEN`,
   `CLOSED`, `INCONS`, `g_score`, parent table, incumbent, epsilon, phase,
   epoch, snapshot, last batch, and commit/publication traces.
 - `fullStepOnce`, `fullDecreaseEpsilonAndRebuild`, and
-  `fullCommitEpochReconfiguration` — executable full-machine transitions for
+  `fullCommitEpochReconfiguration` - executable full-machine transitions for
   canonical stepping, rebuild, and epoch changes.
-- `FullMachineInvariants` — full-machine invariant bundle for
+- `FullMachineInvariants` - full-machine invariant bundle for
   open/closed discipline, `incons ⊆ closed`, parent-score coherence,
   publication coherence, incumbent coherence, and nodup conditions.
-- `FullStateArtifactSchema` and `fullStateArtifactOfFullState` — explicit
+- `FullStateArtifactSchema` and `fullStateArtifactOfFullState` - explicit
   full-state artifact projection aligned with the Rust-side
   `SearchFullStateArtifact` export.
 
 Key theorems exposed by this module:
 
-- **`full_state_artifact_of_full_state_is_runtime_projection`** — the exported
+- **`full_state_artifact_of_full_state_is_runtime_projection`** - the exported
   full-state artifact is exactly the projection of the Lean full-machine state.
-- **`reduced_state_of_full_state_preserves_machine_invariants`** — the richer
+- **`reduced_state_of_full_state_preserves_machine_invariants`** - the richer
   full-machine invariant bundle implies the existing reduced machine
   invariants.
 - **`full_activate_batch_preserves_invariants`**,
@@ -225,11 +225,11 @@ Key theorems exposed by this module:
   **`full_commit_proposals_preserves_invariants`**,
   **`full_decrease_epsilon_and_rebuild_preserves_invariants`**,
   **`full_commit_epoch_reconfiguration_preserves_invariants`**, and
-  **`full_step_once_preserves_invariants`** — the executable full-machine
+  **`full_step_once_preserves_invariants`** - the executable full-machine
   transition families all have explicit invariant-preservation theorem
   surfaces.
 - **`full_activate_batch_refines_reduced_service_window`** and
-  **`full_step_once_refines_reduced_executable_step`** — the richer machine
+  **`full_step_once_refines_reduced_executable_step`** - the richer machine
   semantics refine back into the reduced executable step surface rather than
   living as a parallel informal model.
 
@@ -237,21 +237,21 @@ Key theorems exposed by this module:
 
 `Runtime.Proofs.Search.Fairness` proves:
 
-- **`mem_canonicalBatch_iff_isMinPriority`** — membership in the canonical
+- **`mem_canonicalBatch_iff_isMinPriority`** - membership in the canonical
   batch is equivalent to satisfying `IsMinPriority`. This connects the
   computational filter to the logical predicate.
-- **`canonical_batch_entries_removed_after_step`** — every entry in the
+- **`canonical_batch_entries_removed_after_step`** - every entry in the
   canonical batch is absent after the step. This is the core removal fact.
-- **`canonical_serial_one_step_fair_for_min_priority_entries`** — if `entry`
+- **`canonical_serial_one_step_fair_for_min_priority_entries`** - if `entry`
   satisfies `IsMinPriority`, it is absent after one canonical step. This is
   the main one-step fairness result.
-- **`canonical_serial_batch_is_one_step_fair`** — the full frontier is
+- **`canonical_serial_batch_is_one_step_fair`** - the full frontier is
   `OneStepFair`.
-- **`currently_min_priority_eventually_serviced_within_one_step`** — in any
+- **`currently_min_priority_eventually_serviced_within_one_step`** - in any
   `CanonicalSerialTrace`, a current `IsMinPriority` entry satisfies
   `EventuallyServicedWithin ... 1`. The service bound is exactly one step.
 - **`continuously_eligible_without_strictly_better_entries_eventually_serviced`**
-  — the dynamic liveness result: if an entry remains eligible and no strictly
+  - the dynamic liveness result: if an entry remains eligible and no strictly
   better entry arrives across a horizon, it is serviced within one step.
 
 These proofs establish unconditional one-step fairness for `canonicalSerial`.
@@ -262,17 +262,17 @@ No fairness is claimed for entries outside the current min-key batch.
 `Runtime.Proofs.Search.Refinement` proves that the threaded exact single-lane
 executor is identical to canonical serial at every reduced artifact boundary:
 
-- **`threaded_exact_single_lane_step_artifact_refines_canonical`** — the full
+- **`threaded_exact_single_lane_step_artifact_refines_canonical`** - the full
   `StepArtifact` is equal.
 - **`threaded_exact_single_lane_commit_trace_refines_canonical`** and
-  **`threaded_exact_single_lane_batch_nodes_refine_canonical`** — the
+  **`threaded_exact_single_lane_batch_nodes_refine_canonical`** - the
   `normalizedCommits` and `batchNodes` fields match individually.
 - **`threaded_exact_single_lane_state_slice_refines_canonical`** and
-  **`threaded_exact_single_lane_observation_slice_refines_canonical`** — the
+  **`threaded_exact_single_lane_observation_slice_refines_canonical`** - the
   reduced `StateSlice` and `ObservationSlice` projections are equal.
 - **`threaded_exact_single_lane_multi_step_state_trace_refines_canonical`**,
   **`..._observation_trace_..._canonical`**, and
-  **`..._state_artifact_trace_..._canonical`** — all three multi-step trace
+  **`..._state_artifact_trace_..._canonical`** - all three multi-step trace
   functions agree across arbitrary `FrontierTrace` inputs.
 
 These are equalities, not simulations: parallelisation of successor enumeration
@@ -284,48 +284,48 @@ commits, state, or observations.
 `Runtime.Proofs.Search.Liveness` extends the search lane beyond the current
 min-key batch:
 
-- **`closed_nodes_length_le_reachable_length`** — under the fixed-phase premise
+- **`closed_nodes_length_le_reachable_length`** - under the fixed-phase premise
   bundle, closed-node cardinality stays bounded by a finite reachable-node
   universe.
-- **`fixed_phase_canonical_serial_terminates_under_finite_reachable_bound`** —
+- **`fixed_phase_canonical_serial_terminates_under_finite_reachable_bound`** - 
   fixed-phase canonical serial search terminates under an explicit finite
   reachable-node premise bundle.
-- **`rebuild_aware_canonical_serial_terminates_under_phase_work_measure`** —
+- **`rebuild_aware_canonical_serial_terminates_under_phase_work_measure`** - 
   rebuild-aware ARA-style termination theorem under an explicit lexicographic
   phase/work progress measure encoded into a natural descent argument.
-- **`bounded_strict_preemption_eventually_becomes_min`** — a continuously
+- **`bounded_strict_preemption_eventually_becomes_min`** - a continuously
   present non-min-priority entry eventually reaches the min-key window when the
   count of strictly better entries is bounded and decreases strictly while it
   remains non-min.
 - **`canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption`**
-  — composes the previous theorem with one-step fairness to obtain a service
+  - composes the previous theorem with one-step fairness to obtain a service
   bound for an entry that is not initially in the current canonical batch.
 - **`finite_better_entry_exhaustion_eventually_becomes_min`** and
   **`canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion`**
-  — stronger structural non-min fairness theorems using a finite better-entry
+  - stronger structural non-min fairness theorems using a finite better-entry
   universe rather than only an ad hoc numeric preemption bound.
-- **`canonical_serial_goal_reached_from_ready_witness_path`** — global
+- **`canonical_serial_goal_reached_from_ready_witness_path`** - global
   goal-reachability theorem for the reduced model: from an explicit ready
   witness path whose successive frontier entries become service-ready in order,
   the goal entry is eventually serviced.
-- **`canonical_machine_goal_reached_from_ready_witness_path`** — machine-level
+- **`canonical_machine_goal_reached_from_ready_witness_path`** - machine-level
   version of the same theorem: executable canonical stepping closes the goal
   node within the witness-path horizon.
-- **`canonical_machine_goal_reached_from_graph_reachability`** — stronger
+- **`canonical_machine_goal_reached_from_graph_reachability`** - stronger
   completeness theorem driven by an explicit graph-reachability premise bundle
   that names reachable-node path, finiteness, and heuristic assumptions.
-- **`canonical_machine_goal_reached_from_raw_successor_semantics`** —
+- **`canonical_machine_goal_reached_from_raw_successor_semantics`** - 
   blanket public completeness theorem phrased over the raw successor contract,
   with ready-entry progress internalized behind an explicit refinement premise.
-- **`goal_reachability_connects_to_incumbent_publication`** — machine-level
+- **`goal_reachability_connects_to_incumbent_publication`** - machine-level
   bridge from bounded goal reachability to incumbent publication under an
   explicit publication premise bundle.
 - **`eventual_optimal_goal_publication_under_admissible_consistent_heuristic`**
-  — premise-scoped optimality theorem: under explicit admissibility and
+  - premise-scoped optimality theorem: under explicit admissibility and
   consistency premises, eventual goal publication strengthens to eventual
   optimal-goal publication.
 - **`canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness`**
-  — public scheduler-facing non-min fairness theorem whose statement no longer
+  - public scheduler-facing non-min fairness theorem whose statement no longer
   exposes bounded-better-arrival or finite-better-universe terminology.
 
 These liveness theorems are premise-scoped. Termination is proved only for the
@@ -349,26 +349,26 @@ documentation-only caveats.
 Key theorems exposed by this module:
 
 - **`canonical_serial_profile_has_exact_one_step_fairness`** and
-  **`canonical_serial_goal_window_service_has_exact_suffix_bound`** — restate
+  **`canonical_serial_goal_window_service_has_exact_suffix_bound`** - restate
   the `Fairness` results at profile granularity.
-- **`threaded_exact_single_lane_has_exact_one_step_fairness`** — derives
+- **`threaded_exact_single_lane_has_exact_one_step_fairness`** - derives
   one-step fairness for the threaded profile by composing the `Refinement`
   equalities.
-- **`threaded_exact_single_lane_has_exact_observation_equivalence`** —
+- **`threaded_exact_single_lane_has_exact_observation_equivalence`** - 
   observation slices match canonical serial exactly.
-- **`certified_batched_exact_window_is_fair`** — given a
+- **`certified_batched_exact_window_is_fair`** - given a
   `BatchedExactWindowCertificate`, every `IsMinPriority` entry is removed
   within the certified window.
 - **`certified_batched_exact_window_eventually_services_min_priority_entries`**
-  — restates the above as an `EventuallyServicedWithin` bound of 1.
-- **`certified_batched_exact_window_bounded_dynamic_starvation_freedom`** —
+  - restates the above as an `EventuallyServicedWithin` bound of 1.
+- **`certified_batched_exact_window_bounded_dynamic_starvation_freedom`** - 
   the strongest premise-scoped result: given certificates for each step in a
   horizon, a `ContinuouslyEligible` entry under `BoundedPreemptionWindow` is
   serviced within `bound` steps.
-- **`certified_window_trace_is_valid_for_exact_batch_service`** — validates
+- **`certified_window_trace_is_valid_for_exact_batch_service`** - validates
   that a certificate sequence matches the canonical batch at every step with
   a service bound of 1.
-- **`batched_parallel_envelope_claim_is_premised`** — states formally that the
+- **`batched_parallel_envelope_claim_is_premised`** - states formally that the
   envelope-bounded profile now carries the same theorem-backed certified-window
   claim class as the other batched certified-window surface.
 
@@ -384,14 +384,14 @@ theorem beyond that window-certified surface.
 `Runtime.Proofs.Search.Envelope` now carries a real certified-window theorem
 surface for `batchedParallelEnvelopeBounded`:
 
-- **`BatchedEnvelopeWindowCertificate`** — explicit theorem-side certificate
+- **`BatchedEnvelopeWindowCertificate`** - explicit theorem-side certificate
   object for one legal envelope-bounded service window.
-- **`certified_batched_envelope_window_is_fair`** — every current
+- **`certified_batched_envelope_window_is_fair`** - every current
   `IsMinPriority` entry is removed within the certified envelope window.
 - **`certified_batched_envelope_window_eventually_services_min_priority_entries`**
-  — restates that one-window fairness theorem as `EventuallyServicedWithin ...
+  - restates that one-window fairness theorem as `EventuallyServicedWithin ...
   1`.
-- **`certified_envelope_window_trace_is_valid`** — validates exported envelope
+- **`certified_envelope_window_trace_is_valid`** - validates exported envelope
   certificate traces against the legal current min-key batch.
 
 ### Theorem Inventory (Inventory and TheoremPack)
