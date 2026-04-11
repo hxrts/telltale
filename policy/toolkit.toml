@@ -40,6 +40,15 @@ manifest_path = "Cargo.toml"
 planned_crates = []
 file_exemptions = ["CLAUDE.md", "README.md"]
 
+[checks.docs_prose_quality]
+enabled = true
+include_paths = ["docs"]
+exclude_path_parts = ["/book/", "SUMMARY.md"]
+ban_em_dash = true
+ban_semicolon = true
+require_explanatory_prose_after_code = true
+require_prose_exceeds_code = true
+
 [checks.lean_style]
 enabled = true
 include_paths = ["policy/deferred_lean_style"]
@@ -77,7 +86,88 @@ native_decide = 3
 noncomputable = 10
 partial_def = 3
 
+[checks.lean_architecture]
+enabled = true
+include_paths = ["lean"]
+exclude_path_parts = ["/.lake/", "/build/", "/lake-packages/", "/artifacts/"]
+root_facade_files = [
+  "lean/SessionTypes.lean",
+  "lean/Choreography.lean",
+  "lean/Protocol.lean",
+  "lean/Runtime.lean",
+]
+legacy_projection_exempt_path_parts = ["/Choreography/Projection/", "/Runtime/Tests/"]
+theorempack_exempt_path_parts = ["/Runtime/Proofs/Examples/", "Runtime/Proofs/TheoremPack/Artifacts.lean"]
+
 [checks.workflow_actions]
 enabled = true
 workflow_roots = [".github/workflows"]
 pin_comment_markers = ["pin"]
+
+[checks.text_formatting]
+enabled = true
+include_paths = [
+  ".github",
+  ".githooks",
+  "docs",
+  "lean",
+  "policy",
+  "rust",
+  "scripts",
+  "AGENTS.md",
+  "CLAUDE.md",
+  "README.md",
+  "justfile",
+  "flake.nix",
+  "flake.lock",
+  "Cargo.toml",
+  "Cargo.lock",
+  "rust-toolchain.toml",
+  "lean-toolchain",
+]
+exclude_path_parts = [
+  "/.git/",
+  "/.jj/",
+  "/target/",
+  "/node_modules/",
+  "/.lake/",
+  "/artifacts/",
+  "/docs/book/",
+]
+
+[checks.workspace_layering]
+enabled = true
+manifest_path = "Cargo.toml"
+
+[checks.workspace_layering.crate_layers]
+telltale-types = 1
+telltale-theory = 2
+telltale-language = 2
+telltale-macros = 2
+telltale-machine = 3
+telltale-search = 3
+telltale-runtime = 4
+telltale-bridge = 4
+telltale-simulator = 4
+telltale-transport = 4
+telltale = 4
+telltale-lints = 4
+telltale-viewer = 5
+telltale-ui = 5
+telltale-web = 5
+
+[checks.rust_architecture]
+enabled = true
+rust_roots = ["rust"]
+determinism_runtime_paths = ["rust/machine/src", "rust/simulator/src"]
+determinism_test_paths = ["rust/machine/tests", "rust/simulator/tests"]
+kernel_paths = [
+  "rust/machine/src/kernel.rs",
+  "rust/machine/src/engine",
+  "rust/machine/src/threaded",
+  "rust/machine/src/scheduler",
+  "rust/machine/src/session",
+  "rust/machine/src/coroutine.rs",
+  "rust/machine/src/exec",
+]
+fixed_wrapper_paths = ["rust/types/src/fixed_q32.rs"]

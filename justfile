@@ -262,7 +262,8 @@ clippy-style-audit:
 
 # Rust architecture/style-guide pattern checker
 check-arch-rust:
-    ./scripts/check/architecture-rust.sh
+    just _toolkit-check unsafe_boundary
+    just _toolkit-check rust_architecture
 
 # TellTale syntax/style check suite (dependency layering, docs references, symbols)
 check-telltale-style:
@@ -280,10 +281,10 @@ check-telltale-style:
     done
     restore() { for f in "${generated[@]}"; do [[ -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; }
     trap restore EXIT
-    ./scripts/check/dependency-layers.sh
+    just _toolkit-check workspace_layering
     just _toolkit-check docs_link_check
     ./scripts/check/docs-index.sh
-    ./scripts/check/text-symbols.sh
+    just _toolkit-check text_formatting
 
 # Enforce public tooling/example cutover to generated effect interfaces and owned opens.
 check-tooling-convergence:
@@ -408,7 +409,8 @@ check-workspace-tests-split:
 
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
-    ./scripts/check/architecture-lean.sh
+    just _toolkit-check lean_escape_hatches
+    just _toolkit-check lean_architecture
 
 # Validate pinned revisions for local Lean dependency checkouts.
 check-lean-dependency-pins:
@@ -473,7 +475,7 @@ check-workflow-actions:
 
 # Enforce documentation prose style and structure.
 check-doc-quality:
-    bash ./scripts/check/docs-prose-quality.sh
+    just _toolkit-check docs_prose_quality
 
 # Reject raw session-store ownership mutation outside sanctioned entry points.
 check-session-ingress-boundary:
