@@ -7,6 +7,13 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v2
+      - name: Checkout toolkit
+        uses: actions/checkout@v4
+        with:
+          repository: hxrts/toolkit
+          path: .toolkit
+      - name: Link toolkit sibling checkout
+        run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -152,13 +159,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: gaurav-nelson/github-action-markdown-link-check@v1
+      - uses: actions/checkout@v4
         with:
-          use-quiet-mode: "yes"
-          use-verbose-mode: "yes"
-          config-file: ".github/config/markdown-link-check.json"
-          base-branch: "main"
-          folder-path: "docs"
+          repository: hxrts/toolkit
+          path: .toolkit
+      - name: Link toolkit sibling checkout
+        run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Run toolkit docs link check
+        run: ./scripts/toolkit-shell.sh toolkit-xtask check docs_link_check --repo-root . --config policy/toolkit.toml
 
   # Lean verification disabled - telltale_runner target removed in V2 refactor
   # TODO: Re-enable once V2 runner is implemented

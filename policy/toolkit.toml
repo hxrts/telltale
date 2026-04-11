@@ -1,0 +1,83 @@
+[workspace]
+crate_roots = ["rust"]
+include_crates = []
+exclude_crates = []
+
+[checks.unsafe_boundary]
+enabled = true
+include_paths = ["rust"]
+exclude_path_parts = []
+allowed_path_parts = []
+required_comment_markers = ["Safety:"]
+
+[checks.public_type_width]
+enabled = true
+include_paths = ["policy/deferred_public_type_width"]
+exclude_path_parts = []
+banned_types = ["usize", "isize", "f32", "f64"]
+
+[checks.must_use_public_return]
+enabled = true
+include_paths = ["policy/deferred_must_use_public_return"]
+exclude_path_parts = []
+allowed_return_type_prefixes = []
+
+[checks.dependency_policy]
+enabled = true
+manifest_roots = [".", "rust"]
+require_default_features_false = []
+banned_dependencies = []
+
+[checks.docs_link_check]
+enabled = true
+docs_roots = ["docs"]
+scratch_dir_prefix = "work/"
+
+[checks.docs_semantic_drift]
+enabled = true
+docs_roots = ["policy/deferred_docs_semantic_drift"]
+manifest_path = "Cargo.toml"
+planned_crates = []
+file_exemptions = ["CLAUDE.md", "README.md"]
+
+[checks.lean_style]
+enabled = true
+include_paths = ["policy/deferred_lean_style"]
+exclude_path_parts = ["/.lake/", "/build/", "/lake-packages/", "/artifacts/"]
+non_trivial_file_lines = 5
+section_header_min_lines = 120
+max_file_lines = 2000
+max_decl_lines_target = 120
+max_decl_lines_hard_limit = 240
+enforce_target_decl_lines = false
+require_problem_statement = false
+enforce_top_of_file_structure = false
+require_section_headers = false
+require_over_limit_comment = true
+require_explanatory_comment_for_long_blocks = false
+require_public_theorem_lemma_docstrings = false
+forbid_sorry = false
+banned_imports = []
+banned_import_exemptions = []
+require_todo_for_sorry = false
+todo_comment_markers = ["TODO", "todo", "TODO:"]
+over_limit_comment_markers = ["long-block-exception:"]
+file_exemptions = []
+declaration_exemptions = []
+
+[checks.lean_escape_hatches]
+enabled = true
+include_paths = ["lean"]
+exclude_path_parts = ["/.lake/", "/build/", "/lake-packages/", "/artifacts/"]
+
+[checks.lean_escape_hatches.kind_thresholds]
+empty_theorem_shell = 2
+implemented_by = 16
+native_decide = 3
+noncomputable = 10
+partial_def = 3
+
+[checks.workflow_actions]
+enabled = true
+workflow_roots = [".github/workflows"]
+pin_comment_markers = ["pin"]

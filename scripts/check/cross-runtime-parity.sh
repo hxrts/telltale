@@ -422,7 +422,7 @@ check_conformance() {
   # Cooperative backend
   cargo test -p telltale-machine --test conformance_lean
   cargo test -p telltale-machine --test equivalence_lean
-  cargo test -p telltale-machine --test lean_vm_equivalence
+  cargo test -p telltale-machine --test lean_protocol_machine_equivalence
   cargo test -p telltale-machine --test trace_corpus
   cargo test -p telltale-machine --test strict_tick_equality
 

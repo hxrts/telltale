@@ -8,7 +8,30 @@ default: book
 
 # Enter the development shell with stale temp variables cleared first.
 develop:
-    env -u TMPDIR -u TMP -u TEMP nix develop
+    env -u TMPDIR -u TMP -u TEMP nix develop --override-input toolkit path:../toolkit
+
+# Toolkit formatter check.
+_toolkit-fmt-check:
+    cargo fmt --all -- --check
+
+# Internal toolkit check wrapper.
+_toolkit-check name:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "{{name}}" == "docs_link_check" ]]; then
+      generated=()
+      for f in docs/SUMMARY.md docs/book; do
+        if [[ -e "$f" ]]; then
+          mv "$f" "$f.__toolkit_stash__"
+          generated+=("$f")
+        fi
+      done
+      restore() { for f in "${generated[@]}"; do [[ -e "$f.__toolkit_stash__" ]] && mv "$f.__toolkit_stash__" "$f"; done; }
+      trap restore EXIT
+      ./scripts/toolkit-shell.sh toolkit-xtask check "{{name}}" --repo-root . --config policy/toolkit.toml
+      exit 0
+    fi
+    ./scripts/toolkit-shell.sh toolkit-xtask check "{{name}}" --repo-root . --config policy/toolkit.toml
 
 # Run the full workspace test surface using the CI-safe split test lane.
 test-workspace: check-workspace-tests-split
@@ -157,19 +180,7 @@ check-deep-assurance:
 
 # Mirror the markdown link-check action used in GitHub check.yml docs lane
 check-doc-links-ci:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    # Match GitHub's fresh checkout by hiding generated docs artifacts.
-    generated=()
-    for f in docs/SUMMARY.md docs/book; do
-      if [[ -e "$f" ]]; then
-        mv "$f" "$f.__ci_stash__"
-        generated+=("$f")
-      fi
-    done
-    restore() { for f in "${generated[@]}"; do [[ -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; }
-    trap restore EXIT
-    find docs -name '*.md' -print0 | xargs -0 npx --yes markdown-link-check --config .github/config/markdown-link-check.json
+    just _toolkit-check docs_link_check
 
 # Canonical fast-fail structural lane: workflow definitions, ledgers, docs snippets,
 # Lean bootstrap state, and other cheap schema/convergence gates.
@@ -182,7 +193,6 @@ check-fast-structure:
     fi
     just check-ci-assurance-lanes
     just check-formal-claim-scope
-    just check-workflow-actions-regression
     just check-workflow-actions
     just check-verification-inventory
     just check-bridge-normalization
@@ -227,11 +237,16 @@ check-formal-claim-scope:
 
 # Rust style guide lint check (comprehensive)
 lint:
-    ./scripts/check/lint.sh
+    just _toolkit-fmt-check
+    just _toolkit-check unsafe_boundary
+    just _toolkit-check public_type_width
+    just _toolkit-check must_use_public_return
+    just _toolkit-check dependency_policy
 
 # Rust style guide lint check (quick - format + clippy only)
 lint-quick:
-    ./scripts/check/lint.sh --quick
+    just _toolkit-fmt-check
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 # Periodic broader Clippy style audit, kept out of the default CI lane.
 clippy-style-audit:
@@ -266,7 +281,7 @@ check-telltale-style:
     restore() { for f in "${generated[@]}"; do [[ -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; }
     trap restore EXIT
     ./scripts/check/dependency-layers.sh
-    ./scripts/check/docs-links.sh
+    just _toolkit-check docs_link_check
     ./scripts/check/docs-index.sh
     ./scripts/check/text-symbols.sh
 
@@ -446,7 +461,7 @@ check-semantic-name-parity:
 
 # Check for semantic drift in backticked identifiers, paths, crates, features, and versions.
 check-docs-semantic-drift:
-    ./scripts/check/docs-semantic-drift.sh
+    just _toolkit-check docs_semantic_drift
 
 # Validate the Document Index in docs/101_introduction.md is complete and titles match.
 check-docs-index:
@@ -454,11 +469,7 @@ check-docs-index:
 
 # Validate that all remote GitHub Action references in workflows resolve.
 check-workflow-actions:
-    ./scripts/check/workflow-actions.sh
-
-# Prove the workflow action checker rejects a known-bad remote action reference.
-check-workflow-actions-regression:
-    ./scripts/check/workflow-actions-regression.sh
+    just _toolkit-check workflow_actions
 
 # Enforce documentation prose style and structure.
 check-doc-quality:
@@ -902,7 +913,7 @@ serve: summary _gen-assets
 
 # Check Lean codebase for escape hatches (sorry, axiom, unsafe, partial, theorem shells, etc.)
 escape:
-    ./scripts/check/escape-hatches.sh
+    just _toolkit-check lean_escape_hatches
 
 # Test Lean installation
 lean-test:

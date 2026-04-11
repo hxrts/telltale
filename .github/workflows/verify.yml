@@ -14,6 +14,13 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+      - name: Checkout toolkit
+        uses: actions/checkout@v4
+        with:
+          repository: hxrts/toolkit
+          path: .toolkit
+      - name: Link toolkit sibling checkout
+        run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -61,6 +68,13 @@ jobs:
     steps:
       - name: Checkout sources
         uses: actions/checkout@v4
+      - name: Checkout toolkit
+        uses: actions/checkout@v4
+        with:
+          repository: hxrts/toolkit
+          path: .toolkit
+      - name: Link toolkit sibling checkout
+        run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable

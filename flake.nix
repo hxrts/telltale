@@ -5,6 +5,12 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
+    toolkit = {
+      url = "path:../toolkit";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.rust-overlay.follows = "rust-overlay";
+      inputs.flake-utils.follows = "flake-utils";
+    };
   };
   outputs =
     {
@@ -12,6 +18,7 @@
       nixpkgs,
       rust-overlay,
       flake-utils,
+      toolkit,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -22,6 +29,7 @@
         pkgs = import nixpkgs {
           inherit system overlays;
         };
+        toolkitSupport = toolkit.lib.${system}.consumerShellSupport;
 
         rustToolchain = pkgs.rust-bin.stable.latest.default.override {
           extensions = [
@@ -84,6 +92,7 @@
           mdbook
           mdbook-mermaid
           just
+          git
           coreutils
           findutils
           gawk
@@ -91,7 +100,7 @@
           elan
           python3
           texlive
-        ];
+        ] ++ toolkitSupport.packages;
 
         buildInputs =
           with pkgs;
@@ -100,7 +109,8 @@
           ]
           ++ lib.optionals stdenv.isDarwin [
             libiconv
-          ];
+          ]
+          ++ toolkitSupport.buildInputs;
 
       in
       {
@@ -108,6 +118,7 @@
           inherit nativeBuildInputs buildInputs;
 
           shellHook = ''
+            ${toolkitSupport.shellHook}
             [[ -r "$HOME/.local/state/secrets/cargo-registry-token" ]] && export CARGO_REGISTRY_TOKEN="$(cat "$HOME/.local/state/secrets/cargo-registry-token")"
 
             # Install cargo-based dev tools if missing or outdated
@@ -124,6 +135,7 @@
             echo "Rust: $(rustc --version)"
             echo "Lean: $(elan show 2>/dev/null | head -1 || echo 'run: elan default leanprover/lean4:v4.25.0')"
             echo "WASM: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
+            echo "Toolkit: ''${TOOLKIT_ROOT:-unavailable}"
           '';
         };
 
