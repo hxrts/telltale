@@ -666,6 +666,7 @@ pub fn theorem_backed_observables(
 /// Release-facing theorem-pack artifact for the current search fairness proof
 /// surface.
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
     SearchTheoremPackArtifact {
         inventory: [
