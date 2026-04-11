@@ -113,12 +113,12 @@ eleven modules: `Core`, `Fairness`, `Executable`, `FullMachine`, `Machine`,
 
 `Runtime.Proofs.Search.Core` establishes the foundational vocabulary:
 
-- `FrontierEntry` - a `(node : Nat, priority : Nat)` pair; the unit of
+- `FrontierEntry` - a `(node : Nat, priority : Nat)` pair, the unit of
   frontier membership.
 - `IsMinPriority frontier entry` - `entry` is present in `frontier` and no
   other entry has strictly lower priority.
 - `canonicalBatch frontier` - the list of all entries satisfying
-  `IsMinPriority`; these are exactly the entries that will be serviced in the
+  `IsMinPriority`. These are exactly the entries that will be serviced in the
   next step.
 - `frontierAfterCanonicalStep frontier` - the frontier with the canonical batch
   removed.
@@ -136,7 +136,7 @@ The reduced artifact structures - `StepArtifact`, `StateSlice`,
 Lean and Rust search states are compared. `BatchedExactWindowCertificate` is
 a proof-carrying record whose fields provide evidence that a batched window
 covers the current canonical batch and produces a commit for each covered
-entry; downstream fairness theorems are conditioned on holding one of these
+entry. Downstream fairness theorems are conditioned on holding one of these
 certificates.
 
 ### Executable Semantics (Executable)
