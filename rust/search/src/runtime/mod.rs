@@ -24,16 +24,23 @@ pub use lifecycle::{
     SearchCachingProfile, SearchEffortProfile, SearchExecutionPolicy, SearchExecutionReport,
     SearchFairnessArtifact, SearchFairnessCertificate, SearchFairnessCertificateClass,
     SearchFairnessClaimClass, SearchFairnessTraceValidationError, SearchFullStateArtifact,
-    SearchPathResultSummary, SearchReplayArtifact, SearchResultBoundArtifact,
-    SearchResultDiscoveryBoundClass, SearchResultDiscoveryCertificate,
-    SearchResultDiscoveryCertificateClass, SearchResultMetric, SearchResultMetricName,
-    SearchResultQualityClass, SearchResultSummary, SearchRouteBoundArtifact,
-    SearchRouteDiscoveryBoundClass, SearchRouteDiscoveryCertificate,
-    SearchRouteDiscoveryCertificateClass, SearchRouteMetric, SearchRouteMetricName,
-    SearchRouteQualityClass, SearchRouteSummary, SearchRunConfig, SearchRunConfigError,
-    SearchRunError, SearchRuntimeMarker, SearchSelectedResultBoundArtifact,
-    SearchSelectedResultMetric, SearchSelectedResultMetricName, SearchSelectedResultSummary,
-    SearchStateArtifact, SearchTheoremInventoryEntry, SearchTheoremInventoryProblemClassEntry,
-    SearchTheoremInventorySupportClassEntry, SearchTheoremPackArtifact, SearchTheoremProblemClass,
-    SearchTheoremSupportClass, TotalStepMode,
+    SearchPathProblemDiscoveryArtifact, SearchPathProblemReplayArtifact, SearchPathResultSummary,
+    SearchReplayArtifact, SearchResultBoundArtifact, SearchResultDiscoveryBoundClass,
+    SearchResultDiscoveryCertificate, SearchResultDiscoveryCertificateClass, SearchResultMetric,
+    SearchResultMetricName, SearchResultQualityClass, SearchResultSummary, SearchRunConfig,
+    SearchRunConfigError, SearchRunError, SearchRunTermination, SearchRuntimeMarker,
+    SearchSelectedResultBoundArtifact, SearchSelectedResultMetric, SearchSelectedResultMetricName,
+    SearchSelectedResultSummary, SearchStateArtifact, SearchTheoremInventoryEntry,
+    SearchTheoremInventoryProblemClassEntry, SearchTheoremInventorySupportClassEntry,
+    SearchTheoremPackArtifact, SearchTheoremProblemClass, SearchTheoremSupportClass, TotalStepMode,
 };
+
+/// Narrow compatibility surface retained for downstream migration from the
+/// historical route-oriented runtime vocabulary.
+pub mod compat {
+    pub use super::lifecycle::{
+        SearchRouteBoundArtifact, SearchRouteDiscoveryBoundClass, SearchRouteDiscoveryCertificate,
+        SearchRouteDiscoveryCertificateClass, SearchRouteMetric, SearchRouteMetricName,
+        SearchRouteProblemDiscoveryArtifact, SearchRouteQualityClass, SearchRouteSummary,
+    };
+}

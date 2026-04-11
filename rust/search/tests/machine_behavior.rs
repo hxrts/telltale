@@ -256,7 +256,7 @@ fn candidate_set_query_can_publish_a_selected_result_without_a_single_goal_ident
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, 2);
     assert_eq!(incumbent.witness, vec![0, 1, 3]);
-    assert_eq!(machine.query().primary_target(), &3);
+    assert_eq!(machine.query().path_goal_anchor(), None);
 }
 
 #[test]

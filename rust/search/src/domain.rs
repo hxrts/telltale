@@ -1,10 +1,29 @@
 //! Domain-extension boundary for weighted graph search.
 
 use core::cmp::Ordering;
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::cost::SearchCost;
+
+/// Fail-closed query-construction error for release-facing callers.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SearchQueryError {
+    /// The query requires at least one accepted node after normalization.
+    EmptyAcceptedSet,
+}
+
+/// How selected-result semantics are defined for one problem/domain pairing.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SearchSelectedResultSemanticsClass {
+    /// Selected-result derivation is fully determined by the query adapters and
+    /// discovered machine state.
+    QueryDerived,
+    /// Selected-result derivation depends on domain-defined admissibility or
+    /// winner logic over discovered machine state.
+    DomainDefinedFromDiscoveredState,
+}
 
 /// Generic search query accepted by the search substrate.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -50,38 +69,68 @@ where
 
     /// Construct one normalized multi-goal query.
     ///
+    /// This convenience constructor panics on invalid input; prefer
+    /// [`SearchQuery::try_multi_goal`] on release-facing call paths.
+    ///
     /// # Panics
     ///
     /// Panics if `goals` is empty after canonical deduplication.
     #[must_use]
     pub fn multi_goal(start: N, mut goals: Vec<N>) -> Self {
+        Self::try_multi_goal(start, core::mem::take(&mut goals))
+            .expect("multi-goal queries require at least one accepted goal")
+    }
+
+    /// Construct one normalized multi-goal query without panicking.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SearchQueryError::EmptyAcceptedSet`] if `goals` is empty after
+    /// canonical deduplication.
+    pub fn try_multi_goal(start: N, mut goals: Vec<N>) -> Result<Self, SearchQueryError> {
         goals.sort();
         goals.dedup();
-        assert!(
-            !goals.is_empty(),
-            "multi-goal queries require at least one accepted goal"
-        );
-        Self::MultiGoal { start, goals }
+        if goals.is_empty() {
+            return Err(SearchQueryError::EmptyAcceptedSet);
+        }
+        Ok(Self::MultiGoal { start, goals })
     }
 
     /// Construct one normalized candidate-set query.
+    ///
+    /// This convenience constructor panics on invalid input; prefer
+    /// [`SearchQuery::try_candidate_set`] on release-facing call paths.
     ///
     /// # Panics
     ///
     /// Panics if `candidates` is empty after canonical deduplication.
     #[must_use]
     pub fn candidate_set(start: N, mut candidates: Vec<N>, heuristic_anchor: Option<N>) -> Self {
+        Self::try_candidate_set(start, core::mem::take(&mut candidates), heuristic_anchor)
+            .expect("candidate-set queries require at least one accepted candidate")
+    }
+
+    /// Construct one normalized candidate-set query without panicking.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SearchQueryError::EmptyAcceptedSet`] if `candidates` is empty
+    /// after canonical deduplication.
+    pub fn try_candidate_set(
+        start: N,
+        mut candidates: Vec<N>,
+        heuristic_anchor: Option<N>,
+    ) -> Result<Self, SearchQueryError> {
         candidates.sort();
         candidates.dedup();
-        assert!(
-            !candidates.is_empty(),
-            "candidate-set queries require at least one accepted candidate"
-        );
-        Self::CandidateSet {
+        if candidates.is_empty() {
+            return Err(SearchQueryError::EmptyAcceptedSet);
+        }
+        Ok(Self::CandidateSet {
             start,
             candidates,
             heuristic_anchor,
-        }
+        })
     }
 
     /// Borrow the canonical start node for the query.
@@ -111,13 +160,16 @@ where
         self.accepted_nodes().binary_search(node).is_ok()
     }
 
-    /// Borrow one deterministic primary target retained for compatibility with
-    /// route-oriented artifacts during the migration.
+    /// Borrow the path-problem-specific goal anchor when the query has one.
+    ///
+    /// Generic selected-result semantics must not rely on this helper. It
+    /// exists only for optional path-problem-specific artifacts and adapters.
     #[must_use]
-    pub fn primary_target(&self) -> &N {
-        self.accepted_nodes()
-            .first()
-            .expect("search queries must have at least one accepted node")
+    pub fn path_goal_anchor(&self) -> Option<&N> {
+        match self {
+            Self::SingleGoal { goal, .. } => Some(goal),
+            Self::MultiGoal { .. } | Self::CandidateSet { .. } => None,
+        }
     }
 
     /// Borrow the optional distinguished heuristic anchor for the query.
@@ -211,6 +263,42 @@ pub trait SearchDomain {
     /// definition.
     fn accepts_terminal(&self, query: &SearchQuery<Self::Node>, node: &Self::Node) -> bool {
         query.accepts(node)
+    }
+
+    /// Classify how this domain defines selected-result semantics for the
+    /// provided query.
+    ///
+    /// Domains that override [`SearchDomain::selected_result_candidates`]
+    /// beyond the default query-derived behavior should also override this to
+    /// report [`SearchSelectedResultSemanticsClass::DomainDefinedFromDiscoveredState`].
+    fn selected_result_semantics_class(
+        &self,
+        _query: &SearchQuery<Self::Node>,
+    ) -> SearchSelectedResultSemanticsClass {
+        SearchSelectedResultSemanticsClass::QueryDerived
+    }
+
+    /// Enumerate admissible selected-result candidates from discovered machine
+    /// state.
+    ///
+    /// The default behavior keeps the built-in query adapters as deterministic
+    /// result selectors by scanning discovered `g_score` entries and filtering
+    /// them through [`SearchDomain::accepts_terminal`]. Domains may override
+    /// this to define narrower result admissibility or winner eligibility from
+    /// discovered state.
+    fn selected_result_candidates(
+        &self,
+        query: &SearchQuery<Self::Node>,
+        g_score: &BTreeMap<Self::Node, Self::Cost>,
+    ) -> Vec<Self::Node> {
+        let mut candidates = g_score
+            .keys()
+            .filter(|node| self.accepts_terminal(query, node))
+            .cloned()
+            .collect::<Vec<_>>();
+        candidates.sort();
+        candidates.dedup();
+        candidates
     }
 
     /// Reconstruct the witness exported for one selected solution.

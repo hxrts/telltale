@@ -4,8 +4,9 @@ use std::collections::BTreeSet;
 
 use telltale_search::{
     compare_observations, runtime::SearchRuntimeMarker, EpsilonMilli, ObservationComparison,
-    SearchBudgetState, SearchDUser, SearchDeterminismMode, SearchFairnessAssumption,
-    SearchObservableClass, SearchSchedulerProfile, SearchTraceState, CRATE_SCOPE,
+    SearchBudgetState, SearchClaimClass, SearchDUser, SearchDeterminismMode,
+    SearchFairnessAssumption, SearchObservableClass, SearchSchedulerProfile, SearchTraceState,
+    CRATE_SCOPE,
 };
 
 type CompareFn = fn(
@@ -22,6 +23,7 @@ fn phase_one_scaffold_exports_compile() {
     let _ = SearchBudgetState::default();
     let _ = SearchTraceState::default();
     let _ = SearchDUser {
+        required_claim_classes: BTreeSet::from([SearchClaimClass::GenericMachine]),
         required_observables: BTreeSet::from([SearchObservableClass::SelectedResultCost]),
         required_profiles: BTreeSet::from([SearchDeterminismMode::Full]),
         required_scheduler_profiles: BTreeSet::from([SearchSchedulerProfile::CanonicalSerial]),

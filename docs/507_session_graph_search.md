@@ -51,6 +51,22 @@ store.
 - `MultiGoal` for any-of-N terminal search
 - `CandidateSet` for selector-style best-candidate search
 
+Release-facing callers should prefer the fail-closed constructors
+`SearchQuery::try_multi_goal(...)` and
+`SearchQuery::try_candidate_set(...)`, which return `SearchQueryError`
+instead of panicking on empty accepted sets. The panicking convenience
+constructors remain available for internal happy-path call sites.
+
+`SearchDomain` also owns the selected-result boundary explicitly:
+
+- `accepts_terminal(...)` for the built-in query adapters
+- `selected_result_candidates(...)` when admissibility or winner eligibility
+  depends on discovered machine state
+- `selected_result_semantics_class(...)` to declare whether selected-result
+  semantics are query-derived or domain-defined from discovered state
+- `reconstruct_selection_witness(...)` and
+  `compare_selected_solutions(...)` for optional witness/export ordering
+
 `SearchMachine` owns the frontier, parent map, selected solution, and budget
 state. The historical incumbent vocabulary is still present for compatibility,
 but the crate also exports selected-result aliases and accessors.
@@ -71,6 +87,29 @@ checks for unsupported execution-policy variants, executor-kind mismatches,
 fairness mismatches, and batch-width mismatches before execution begins. The
 executor strategy is supplied separately via the `ProposalExecutor`
 implementation and does not define search-problem semantics.
+
+Current execution-policy status:
+
+- stable and implemented:
+  `EphemeralPerStep` caching and `RunToCompletion`
+- stable and implemented with a weaker result contract:
+  `SchedulerStepBudget(n)`, where one budget unit is one full canonical
+  batch/service step and runs stop only at batch barriers
+- explicitly rejected and outside the stable import posture:
+  `IncrementalReuse`
+
+The supported execution-policy matrix is:
+
+| Scheduler profile | Executor kind | Batch width | Required fairness | Approximation contract |
+|---|---|---|---|---|
+| `CanonicalSerial` | serial | `1` | `DeterministicSchedulerConfluence` | `Exact` |
+| `ThreadedExactSingleLane` | native parallel | `1` | `DeterministicSchedulerConfluence` | `Exact` |
+| `BatchedParallelExact` | native parallel | `> 1` | `DeterministicSchedulerConfluence` | `CertifiedWindowExact` |
+| `BatchedParallelEnvelopeBounded` | native parallel | `> 1` | `EventualLiveBatchService`, `NoStarvationWithinLegalWindow` | `EnvelopeBounded` |
+
+`SchedulerStepBudget(n)` overlays that matrix as a stable effort mode and
+changes the result contract to `BudgetedAnytime`. `IncrementalReuse` remains
+outside the stable import posture and is rejected fail-closed.
 
 `ProposalExecutor` is the trait for batch expansion strategies.
 `SerialProposalExecutor` runs proposals sequentially.
@@ -95,15 +134,24 @@ claim class, theorem-side certificate, and whether exact
 commit-trace/state-slice/observation equivalence to canonical serial is part
 of the claimed surface for that profile.
 
+Generic selected-result bounds no longer carry a distinguished goal anchor.
+Optional path-goal discovery helpers are now split out under
+`SearchPathProblemDiscoveryArtifact` (`route_bounds.path_problem`), which is
+present only for built-in single-goal path queries.
+
 `SearchResultSummary` is the generic selected-result summary exported in result
 bounds. Path-search-specific summary data now lives under its optional
 `path_summary` helper, with `SearchRouteSummary` retained as the compatibility
 alias for that path-specific wrapper rather than the primary generic summary.
+The route-oriented compatibility aliases are intentionally narrowed to
+`telltale_search::compat` (and `telltale_search::runtime::compat` for
+runtime-only imports).
 
 The theorem-pack surface is also classified conceptually into:
 
 - generic machine/refinement/fairness theorems
-- problem-class-specific completeness/discovery theorems
+- generic selected-result/result-bound theorems
+- path-problem-specific completeness/discovery theorems
 
 Rust currently exposes helper classification for this split through
 `classify_theorem_problem_class(...)` and
@@ -116,14 +164,16 @@ theorem inventory docs.
 
 `SearchDUser` and `SearchCertifiedCapability` define the admission vocabulary.
 `check_capability_containment(...)` verifies that a user's certified
-capabilities satisfy the requirements of a given scheduler profile, fairness
-assumption set, and observable class list. The check is fail-closed and returns
+capabilities satisfy the requirements of a given theorem/claim class,
+scheduler profile, fairness assumption set, and observable class list. The
+check is fail-closed and returns
 structured `AdmissionRejectionReason` values on mismatch.
 
-The capability vocabulary covers four dimensions: `SearchSchedulerProfile`,
-`SearchFairnessAssumption`, `SearchDeterminismMode`, and
-`SearchObservableClass`. These are first-class observable artifacts and
-comparison inputs throughout the runtime and replay surfaces.
+The capability vocabulary covers five dimensions: `SearchClaimClass`,
+`SearchSchedulerProfile`, `SearchFairnessAssumption`,
+`SearchDeterminismMode`, and `SearchObservableClass`. These are first-class
+observable artifacts and comparison inputs throughout the runtime and replay
+surfaces.
 
 ## Replay and Epoch Reconfiguration
 
@@ -131,7 +181,10 @@ Replay semantics are fail-closed. `SearchReplayArtifact` captures the canonical
 round commits, epoch schedule, snapshot schedule, phase schedule, and batch
 schedule from a prior run. `replay_observation(...)` re-derives the final
 observation from canonical round commits and rejects drift against the stored
-artifact.
+artifact when selected-result semantics are query-derived. For domains that
+declare `DomainDefinedFromDiscoveredState` selected-result semantics, replay
+fails closed with `UnsupportedSelectedResultSemantics` instead of silently
+falling back to any compatibility goal anchor.
 
 `EpochReconfigurationRequest` and `commit_epoch_reconfiguration(...)` handle
 graph-epoch transitions. Reconfiguration now carries an explicit
@@ -234,6 +287,12 @@ from frontier vocabulary through one-step fairness and artifact refinement into
 full-machine semantics, liveness, completeness, and approximation-contract
 inventory rows.
 
+The theorem inventory now mirrors the Rust three-way claim split:
+
+- `generic_machine`
+- `generic_selected_result`
+- `path_problem_specific`
+
 The per-profile fairness claim taxonomy determines what the runtime can assert
 on behalf of each scheduler profile:
 
@@ -278,8 +337,9 @@ are conditioned on holding one of these certificates.
 ### Fairness Proofs (Fairness)
 
 `Runtime.Proofs.Search.Fairness` proves unconditional one-step fairness for
-`canonicalSerial`. No fairness is claimed for entries outside the current
-min-key batch.
+`canonicalSerial` at the current min-key batch. Broader eventual-service
+results for non-min entries live in `Liveness` under explicit premise bundles;
+there is no unconditional all-entry fairness theorem in this module.
 
 - `mem_canonicalBatch_iff_isMinPriority` - membership in the canonical batch is
   equivalent to satisfying `IsMinPriority`. This connects the computational
@@ -574,3 +634,19 @@ support-class parity, the richer Rust full-state artifact boundary, and
 epoch-barrier semantics with fairness-bundle fixtures. See
 [Rust-Lean Bridge and Parity](802_rust_lean_parity.md) for the deviation registry and
 parity policy.
+
+## Migration Note
+
+For downstream selector-style imports such as Jacquard:
+
+- prefer `SearchQuery::try_*` constructors over panicking query builders
+- prefer `SelectedSolution`, `SearchResultBoundArtifact`, and
+  `SearchResultSummary`
+- use `SearchDomain::selected_result_candidates(...)` when winner eligibility
+  depends on discovered machine state
+- consume `SearchClaimClass` and `inventory_problem_classes` rather than
+  scraping theorem names
+- avoid the route/incumbent compatibility aliases unless migrating legacy
+  code; the intended compatibility surface is `telltale_search::compat`
+- treat `IncrementalReuse` as out of the stable import posture until it is
+  implemented

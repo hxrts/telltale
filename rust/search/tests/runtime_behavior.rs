@@ -2,6 +2,7 @@
 
 mod support;
 
+use std::collections::BTreeMap;
 use std::num::NonZeroU64;
 
 use support::{FixtureDomain, UnstableOrderDomain};
@@ -15,11 +16,12 @@ use telltale_search::{
     validate_fairness_certificate_trace, validate_run_config, AuthorityReadSet, AuthoritySurface,
     AuthorityWriteSet, EpochReconfigurationRequest, EpsilonMilli, NativeParallelExecutor, Proposal,
     ProposalKind, ReplayError, ReplayExpectation, SearchApproximationContractClass,
-    SearchDeterminismMode, SearchError, SearchExecutionPolicy, SearchFairnessAssumption,
-    SearchFairnessCertificateClass, SearchFairnessClaimClass, SearchFairnessTraceValidationError,
-    SearchMachine, SearchQuery, SearchReseedingPolicy, SearchRouteDiscoveryBoundClass,
-    SearchRouteDiscoveryCertificateClass, SearchRouteMetricName, SearchRouteQualityClass,
-    SearchRunConfig, SearchRunConfigError, SearchRunError, SearchSchedulerProfile,
+    SearchDeterminismMode, SearchDomain, SearchError, SearchExecutionPolicy,
+    SearchFairnessAssumption, SearchFairnessCertificateClass, SearchFairnessClaimClass,
+    SearchFairnessTraceValidationError, SearchMachine, SearchQuery, SearchQueryError,
+    SearchReseedingPolicy, SearchResultDiscoveryBoundClass, SearchResultDiscoveryCertificateClass,
+    SearchResultMetricName, SearchResultQualityClass, SearchRunConfig, SearchRunConfigError,
+    SearchRunError, SearchSchedulerProfile, SearchSelectedResultSemanticsClass,
     SearchTheoremProblemClass, SerialProposalExecutor,
 };
 #[cfg(feature = "multi-thread")]
@@ -52,6 +54,78 @@ fn make_unstable_domain() -> UnstableOrderDomain {
     domain
 }
 
+#[derive(Clone, Debug, Default)]
+struct SelectorDomain {
+    base: FixtureDomain,
+}
+
+impl SearchDomain for SelectorDomain {
+    type Node = u8;
+    type EdgeMeta = &'static str;
+    type Cost = u64;
+    type GraphEpoch = u64;
+    type SnapshotId = &'static str;
+    type Error = &'static str;
+
+    fn successors(
+        &self,
+        epoch: &Self::GraphEpoch,
+        node: &Self::Node,
+        out: &mut Vec<(Self::Node, Self::EdgeMeta, Self::Cost)>,
+    ) -> Result<(), Self::Error> {
+        self.base.successors(epoch, node, out)
+    }
+
+    fn heuristic(
+        &self,
+        epoch: &Self::GraphEpoch,
+        node: &Self::Node,
+        goal: &Self::Node,
+    ) -> Self::Cost {
+        self.base.heuristic(epoch, node, goal)
+    }
+
+    fn selected_result_semantics_class(
+        &self,
+        _query: &SearchQuery<Self::Node>,
+    ) -> SearchSelectedResultSemanticsClass {
+        SearchSelectedResultSemanticsClass::DomainDefinedFromDiscoveredState
+    }
+
+    fn selected_result_candidates(
+        &self,
+        query: &SearchQuery<Self::Node>,
+        g_score: &BTreeMap<Self::Node, Self::Cost>,
+    ) -> Vec<Self::Node> {
+        let mut candidates = g_score
+            .iter()
+            .filter_map(|(node, cost)| {
+                if query.accepts(node) && *cost >= 2 {
+                    Some(*node)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        candidates.sort();
+        candidates.dedup();
+        candidates
+    }
+
+    fn snapshot_id(&self, epoch: &Self::GraphEpoch) -> Self::SnapshotId {
+        self.base.snapshot_id(epoch)
+    }
+}
+
+fn make_selector_domain() -> SelectorDomain {
+    let mut base = FixtureDomain::default();
+    base.edge(0, 1, "0-1", 1);
+    base.edge(1, 3, "1-3", 0);
+    base.edge(0, 2, "0-2", 1);
+    base.edge(2, 4, "2-4", 1);
+    SelectorDomain { base }
+}
+
 #[cfg(feature = "multi-thread")]
 fn native_executor(batch_width: u64) -> NativeParallelExecutor {
     NativeParallelExecutor::new(NonZeroU64::new(batch_width).expect("non-zero batch width"))
@@ -79,6 +153,89 @@ fn make_failing_runtime_domain() -> FixtureDomain {
     domain.edge(1, 3, "1-3", 1);
     domain.edge(2, 4, "2-4", 1);
     domain
+}
+
+#[test]
+fn query_try_constructors_fail_closed_on_empty_sets() {
+    assert_eq!(
+        SearchQuery::<u8>::try_multi_goal(0, Vec::new()),
+        Err(SearchQueryError::EmptyAcceptedSet)
+    );
+    assert_eq!(
+        SearchQuery::<u8>::try_candidate_set(0, Vec::new(), None),
+        Err(SearchQueryError::EmptyAcceptedSet)
+    );
+}
+
+#[test]
+fn selector_domain_can_choose_a_winner_using_discovered_state_not_raw_candidate_set() {
+    let query = SearchQuery::candidate_set(0, vec![3, 4], None);
+    let mut machine =
+        SearchMachine::new_with_query(make_selector_domain(), 1, query, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("selector run");
+
+    assert_eq!(report.observation.selected_result_cost, Some(2));
+    assert_eq!(
+        report.observation.selected_result_witness,
+        Some(vec![0, 2, 4])
+    );
+    assert_eq!(
+        report.route_bounds.discovery_class,
+        SearchResultDiscoveryBoundClass::ObservedRunBound
+    );
+    assert_eq!(report.route_bounds.path_problem, None);
+    assert_eq!(
+        replay.selected_result_semantics_class,
+        SearchSelectedResultSemanticsClass::DomainDefinedFromDiscoveredState
+    );
+    assert_eq!(replay.path_problem, None);
+}
+
+#[test]
+fn replay_fails_closed_for_domain_defined_selected_result_semantics() {
+    let query = SearchQuery::candidate_set(0, vec![3, 4], None);
+    let mut machine =
+        SearchMachine::new_with_query(make_selector_domain(), 1, query, EpsilonMilli::one());
+    let (_, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("selector run");
+
+    let expectation = ReplayExpectation {
+        expected_epochs: replay.epoch_trace.clone(),
+        expected_snapshots: replay
+            .rounds
+            .iter()
+            .map(|round| round.snapshot_id)
+            .collect(),
+        expected_phases: replay.rounds.iter().map(|round| round.phase).collect(),
+        expected_batch_nodes: replay
+            .rounds
+            .iter()
+            .map(|round| round.batch_nodes.clone())
+            .collect(),
+        required_fairness: replay.fairness_assumptions.clone(),
+    };
+
+    assert_eq!(
+        replay_observation(&replay, &expectation),
+        Err(ReplayError::UnsupportedSelectedResultSemantics)
+    );
 }
 
 #[cfg(not(feature = "multi-thread"))]
@@ -900,23 +1057,41 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     .expect("canonical run");
     assert_eq!(
         report.route_bounds.discovery_class,
-        SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate
+        SearchResultDiscoveryBoundClass::ObservedRunBound
     );
     assert_eq!(report.route_bounds.candidate_discovery_bound_steps, Some(2));
-    assert_eq!(report.route_bounds.goal_service_bound_steps, Some(1));
-    assert_eq!(report.route_bounds.goal_window_entry_bound_steps, Some(3));
     assert_eq!(
         report
             .route_bounds
-            .discovery_certificate
+            .path_problem
             .as_ref()
-            .map(|certificate| certificate.class),
-        Some(SearchRouteDiscoveryCertificateClass::GoalWindowOneStepExact)
+            .and_then(|path| path.goal_service_bound_steps),
+        Some(1)
     );
     assert_eq!(
         report
             .route_bounds
-            .discovery_certificate
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.goal_window_entry_bound_steps),
+        Some(3)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.discovery_certificate.as_ref())
+            .as_ref()
+            .map(|certificate| certificate.class),
+        Some(SearchResultDiscoveryCertificateClass::GoalWindowOneStepExact)
+    );
+    assert_eq!(
+        report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.discovery_certificate.as_ref())
             .as_ref()
             .map(|certificate| certificate.service_bound_steps),
         Some(1)
@@ -924,7 +1099,9 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     assert_eq!(
         report
             .route_bounds
-            .discovery_certificate
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.discovery_certificate.as_ref())
             .as_ref()
             .map(|certificate| certificate.observed_goal_window_step),
         Some(3)
@@ -935,7 +1112,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     );
     assert_eq!(
         report.route_bounds.quality_class,
-        SearchRouteQualityClass::ExactOptimal
+        SearchResultQualityClass::ExactOptimal
     );
     assert_eq!(report.route_bounds.selected_result_cost, Some(2));
     assert_eq!(report.route_bounds.optimality_gap, Some(0));
@@ -981,7 +1158,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
             .and_then(|s| {
                 s.metrics
                     .iter()
-                    .find(|metric| metric.name == SearchRouteMetricName::ScalarCostOrderKey)
+                    .find(|metric| metric.name == SearchResultMetricName::ScalarCostOrderKey)
                     .map(|metric| metric.value)
             }),
         Some(2)
@@ -994,7 +1171,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
             .and_then(|s| {
                 s.metrics
                     .iter()
-                    .find(|metric| metric.name == SearchRouteMetricName::PathNodeCount)
+                    .find(|metric| metric.name == SearchResultMetricName::PathNodeCount)
                     .map(|metric| metric.value)
             }),
         Some(3)
@@ -1023,24 +1200,36 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
     .expect("exact batched run");
     assert_eq!(
         exact_report.route_bounds.discovery_class,
-        SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate
+        SearchResultDiscoveryBoundClass::ObservedRunBound
     );
     assert_eq!(
         exact_report.route_bounds.candidate_discovery_bound_steps,
         Some(2)
     );
-    assert_eq!(exact_report.route_bounds.goal_service_bound_steps, Some(1));
     assert_eq!(
-        exact_report.route_bounds.goal_window_entry_bound_steps,
-        Some(3)
+        exact_report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.discovery_certificate.as_ref())
+            .map(|certificate| certificate.class),
+        Some(SearchResultDiscoveryCertificateClass::CertifiedGoalWindowService)
     );
     assert_eq!(
         exact_report
             .route_bounds
-            .discovery_certificate
+            .path_problem
             .as_ref()
-            .map(|certificate| certificate.class),
-        Some(SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService)
+            .and_then(|path| path.goal_service_bound_steps),
+        Some(1)
+    );
+    assert_eq!(
+        exact_report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.goal_window_entry_bound_steps),
+        Some(3)
     );
     assert_eq!(
         exact_report
@@ -1050,7 +1239,7 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
     );
     assert_eq!(
         exact_report.route_bounds.quality_class,
-        SearchRouteQualityClass::PremisedWindowBounded
+        SearchResultQualityClass::PremisedWindowBounded
     );
     assert_eq!(exact_report.route_bounds.selected_result_cost, Some(2));
     assert_eq!(exact_report.route_bounds.optimality_gap, None);
@@ -1080,7 +1269,7 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
             .and_then(|s| {
                 s.metrics
                     .iter()
-                    .find(|metric| metric.name == SearchRouteMetricName::HopCount)
+                    .find(|metric| metric.name == SearchResultMetricName::HopCount)
                     .map(|metric| metric.value)
             }),
         Some(2)
@@ -1103,18 +1292,37 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
     .expect("envelope run");
     assert_eq!(
         envelope_report.route_bounds.discovery_class,
-        SearchRouteDiscoveryBoundClass::ObservedRunBound
+        SearchResultDiscoveryBoundClass::ObservedRunBound
     );
     assert_eq!(
         envelope_report.route_bounds.candidate_discovery_bound_steps,
         Some(2)
     );
-    assert_eq!(envelope_report.route_bounds.goal_service_bound_steps, None);
     assert_eq!(
-        envelope_report.route_bounds.goal_window_entry_bound_steps,
+        envelope_report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.goal_service_bound_steps),
+        None
+    );
+    assert_eq!(
+        envelope_report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.goal_window_entry_bound_steps),
         Some(3)
     );
-    assert_eq!(envelope_report.route_bounds.discovery_certificate, None);
+    assert_eq!(
+        envelope_report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.discovery_certificate.as_ref())
+            .map(|certificate| certificate.class),
+        None
+    );
     assert_eq!(
         envelope_report
             .route_bounds
@@ -1123,7 +1331,7 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
     );
     assert_eq!(
         envelope_report.route_bounds.quality_class,
-        SearchRouteQualityClass::PremiseOnly
+        SearchResultQualityClass::PremisedWindowBounded
     );
     assert_eq!(envelope_report.route_bounds.selected_result_cost, Some(2));
     assert_eq!(envelope_report.route_bounds.optimality_gap, None);
@@ -1155,7 +1363,14 @@ fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
     .expect("post-reconfiguration run");
     assert_eq!(report.observation.graph_epoch_trace, vec![1, 2]);
     assert_eq!(report.route_bounds.candidate_discovery_bound_steps, Some(2));
-    assert_eq!(report.route_bounds.goal_window_entry_bound_steps, Some(4));
+    assert_eq!(
+        report
+            .route_bounds
+            .path_problem
+            .as_ref()
+            .and_then(|path| path.goal_window_entry_bound_steps),
+        Some(4)
+    );
     assert_eq!(
         report.route_bounds.recovery_bound_steps_after_latest_epoch,
         Some(2)
@@ -1185,7 +1400,7 @@ fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
                 summary
                     .metrics
                     .iter()
-                    .find(|metric| metric.name == SearchRouteMetricName::TraversedEpochCount)
+                    .find(|metric| metric.name == SearchResultMetricName::TraversedEpochCount)
                     .map(|metric| metric.value)
             }),
         Some(2)
@@ -1495,11 +1710,15 @@ fn theorem_pack_artifact_matches_the_expected_inventory_and_gate() {
         classify_theorem_problem_class(
             "search_canonical_machine_goal_reached_from_raw_successor_semantics"
         ),
-        SearchTheoremProblemClass::ProblemSpecific
+        SearchTheoremProblemClass::PathProblemSpecific
     );
     assert_eq!(
         classify_theorem_problem_class("search_canonical_machine_step_preserves_invariants"),
         SearchTheoremProblemClass::GenericMachine
+    );
+    assert_eq!(
+        classify_theorem_problem_class("search_canonical_serial_has_exact_result_contract"),
+        SearchTheoremProblemClass::GenericSelectedResult
     );
     let problem_classes = theorem_inventory_problem_classes()
         .into_iter()
@@ -1512,11 +1731,15 @@ fn theorem_pack_artifact_matches_the_expected_inventory_and_gate() {
         .collect::<std::collections::BTreeMap<_, _>>();
     assert_eq!(
         problem_classes.get("search_canonical_machine_goal_reached_from_graph_reachability"),
-        Some(&SearchTheoremProblemClass::ProblemSpecific)
+        Some(&SearchTheoremProblemClass::PathProblemSpecific)
     );
     assert_eq!(
         problem_classes.get("search_threaded_exact_single_lane_state_slice_refines_canonical"),
         Some(&SearchTheoremProblemClass::GenericMachine)
+    );
+    assert_eq!(
+        problem_classes.get("search_scheduler_step_budget_yields_budgeted_anytime_contract"),
+        Some(&SearchTheoremProblemClass::GenericSelectedResult)
     );
     assert_eq!(artifact_problem_classes, problem_classes);
 }
@@ -1550,6 +1773,131 @@ fn approximation_contract_vocabulary_classifies_profiles_in_generic_terms() {
                 .with_effort_profile(telltale_search::SearchEffortProfile::SchedulerStepBudget(5))
         ),
         SearchApproximationContractClass::BudgetedAnytime
+    );
+}
+
+#[test]
+fn budgeted_run_can_stop_before_any_progress() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1)
+                .with_effort_profile(telltale_search::SearchEffortProfile::SchedulerStepBudget(0)),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+                .into_iter()
+                .collect(),
+        ),
+    )
+    .expect("budgeted run");
+
+    assert_eq!(
+        report.termination,
+        telltale_search::SearchRunTermination::SchedulerStepBudgetExhausted
+    );
+    assert_eq!(report.progress.total_scheduler_steps, 0);
+    assert_eq!(report.observation.selected_result_cost, None);
+    assert_eq!(report.route_bounds.selected_result_cost, None);
+    assert_eq!(
+        replay.termination,
+        telltale_search::SearchRunTermination::SchedulerStepBudgetExhausted
+    );
+}
+
+#[test]
+fn budgeted_run_can_stop_with_partial_progress_before_any_selected_result() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (report, _) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1)
+                .with_effort_profile(telltale_search::SearchEffortProfile::SchedulerStepBudget(1)),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+                .into_iter()
+                .collect(),
+        ),
+    )
+    .expect("budgeted run");
+
+    assert_eq!(
+        report.termination,
+        telltale_search::SearchRunTermination::SchedulerStepBudgetExhausted
+    );
+    assert_eq!(report.progress.total_scheduler_steps, 1);
+    assert_eq!(report.observation.selected_result_cost, None);
+    assert_eq!(report.route_bounds.selected_result_cost, None);
+}
+
+#[test]
+fn budgeted_run_can_stop_after_selected_result_publication() {
+    let mut machine = SearchMachine::new(make_domain(), 1, 0, 3, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1)
+                .with_effort_profile(telltale_search::SearchEffortProfile::SchedulerStepBudget(2)),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+                .into_iter()
+                .collect(),
+        ),
+    )
+    .expect("budgeted run");
+
+    assert_eq!(
+        report.termination,
+        telltale_search::SearchRunTermination::SchedulerStepBudgetExhausted
+    );
+    assert_eq!(report.progress.total_scheduler_steps, 2);
+    assert_eq!(report.observation.selected_result_cost, Some(2));
+    assert_eq!(report.route_bounds.selected_result_cost, Some(2));
+    assert_eq!(
+        report.route_bounds.quality_class,
+        SearchResultQualityClass::PremiseOnly
+    );
+    assert_eq!(
+        replay_observation(
+            &replay,
+            &ReplayExpectation {
+                expected_epochs: replay.epoch_trace.clone(),
+                expected_snapshots: replay
+                    .rounds
+                    .iter()
+                    .map(|round| round.snapshot_id)
+                    .collect(),
+                expected_phases: replay.rounds.iter().map(|round| round.phase).collect(),
+                expected_batch_nodes: replay
+                    .rounds
+                    .iter()
+                    .map(|round| round.batch_nodes.clone())
+                    .collect(),
+                required_fairness: replay.fairness_assumptions.clone(),
+            }
+        )
+        .expect("replay observation")
+        .selected_result_cost,
+        Some(2)
+    );
+}
+
+#[test]
+fn incremental_reuse_remains_explicitly_rejected_until_implemented() {
+    let config = SearchRunConfig::new(
+        SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1)
+            .with_caching_profile(telltale_search::SearchCachingProfile::IncrementalReuse),
+        [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+            .into_iter()
+            .collect(),
+    );
+    let err = validate_run_config::<FixtureDomain, _>(&SerialProposalExecutor, &config)
+        .expect_err("incremental reuse should stay rejected");
+    assert_eq!(
+        err,
+        SearchRunConfigError::UnsupportedCachingProfile(
+            telltale_search::SearchCachingProfile::IncrementalReuse
+        )
     );
 }
 

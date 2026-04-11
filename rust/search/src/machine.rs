@@ -198,7 +198,6 @@ pub enum SearchError<E> {
 pub struct SearchMachine<D: SearchDomain> {
     pub(crate) domain: D,
     pub(crate) start: D::Node,
-    pub(crate) goal: D::Node,
     pub(crate) query: SearchQuery<D::Node>,
     pub(crate) state: MachineState<D>,
     pub(crate) observation: SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost>,
@@ -233,7 +232,6 @@ impl<D: SearchDomain> SearchMachine<D> {
     ) -> Self {
         let snapshot_id = domain.snapshot_id(&epoch);
         let start = query.start().clone();
-        let goal = query.primary_target().clone();
         let mut state = SearchState {
             open: BTreeMap::new(),
             closed: BTreeSet::new(),
@@ -261,7 +259,6 @@ impl<D: SearchDomain> SearchMachine<D> {
         Self {
             domain,
             start,
-            goal,
             query,
             state,
             observation: SearchObservationAccumulator {
@@ -768,13 +765,10 @@ impl<D: SearchDomain> SearchMachine<D> {
     }
 
     fn best_selected_solution(&self) -> Option<(D::Cost, Vec<D::Node>)> {
-        self.query
-            .accepted_nodes()
+        self.domain
+            .selected_result_candidates(&self.query, &self.state.g_score)
             .iter()
             .filter_map(|node| {
-                if !self.domain.accepts_terminal(&self.query, node) {
-                    return None;
-                }
                 let cost = self.state.g_score.get(node).copied()?;
                 let witness =
                     self.domain

@@ -126,7 +126,7 @@ fn tampered_search_vectors_are_rejected_by_exact_fixture_comparison() {
     assert_ne!(actual, tampered_round_state);
 
     let mut tampered_discovery_certificate = expected_vectors();
-    tampered_discovery_certificate["route_bounds"]["discovery_certificate"]
+    tampered_discovery_certificate["route_bounds"]["path_problem"]["discovery_certificate"]
         ["service_bound_steps"] = json!(2);
     assert_ne!(actual, tampered_discovery_certificate);
 

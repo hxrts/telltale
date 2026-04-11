@@ -402,25 +402,27 @@
     "admissible_upper_bound": 2,
     "approximation_ratio_milli": 1000,
     "candidate_discovery_bound_steps": 2,
-    "discovery_certificate": {
-      "certified_observables": [
-        "SelectedResultCost",
-        "CanonicalParentIdentity",
-        "SelectedResultWitnessIdentity",
-        "NormalizedCommitTrace",
-        "ProgressAccounting"
-      ],
-      "class": "GoalWindowOneStepExact",
-      "observed_goal_window_step": 3,
-      "required_premises": [
-        "DeterministicSchedulerConfluence"
-      ],
-      "service_bound_steps": 1
-    },
-    "discovery_class": "ObservedRunBoundWithGoalWindowCertificate",
-    "goal_service_bound_steps": 1,
-    "goal_window_entry_bound_steps": 3,
+    "discovery_class": "ObservedRunBound",
     "optimality_gap": 0,
+    "path_problem": {
+      "discovery_certificate": {
+        "certified_observables": [
+          "SelectedResultCost",
+          "CanonicalParentIdentity",
+          "SelectedResultWitnessIdentity",
+          "NormalizedCommitTrace",
+          "ProgressAccounting"
+        ],
+        "class": "GoalWindowOneStepExact",
+        "observed_goal_window_step": 3,
+        "required_premises": [
+          "DeterministicSchedulerConfluence"
+        ],
+        "service_bound_steps": 1
+      },
+      "goal_service_bound_steps": 1,
+      "goal_window_entry_bound_steps": 3
+    },
     "quality_class": "ExactOptimal",
     "recovery_bound_steps_after_latest_epoch": 2,
     "required_premises": [

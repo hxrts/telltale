@@ -14,7 +14,8 @@ surfaces only. It does not redefine downstream search-problem semantics.
 The theorem inventory is also split conceptually into:
 
 - generic machine/refinement/fairness theorems
-- problem-class-specific completeness/discovery theorems
+- generic selected-result/result-bound theorems
+- path-problem-specific completeness/discovery theorems
 
 Path-search reachability/publication theorems remain one supported
 problem-specific family rather than the only machine shape.
@@ -53,7 +54,11 @@ def theoremPackInventorySupportClasses :
 def theoremPackGenericMachineInventory : List (String × Bool) :=
   genericMachineTheoremInventory
 
-/-- Problem-class-specific theorem rows from the packaged search theorem surface. -/
+/-- Generic selected-result theorem rows from the packaged search theorem surface. -/
+def theoremPackGenericSelectedResultInventory : List (String × Bool) :=
+  genericSelectedResultTheoremInventory
+
+/-- Path-problem-specific theorem rows from the packaged search theorem surface. -/
 def theoremPackProblemSpecificInventory : List (String × Bool) :=
   problemSpecificTheoremInventory
 

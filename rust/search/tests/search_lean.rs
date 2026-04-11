@@ -588,12 +588,17 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
     assert_eq!(
         theorem_pack_inventory_problem_classes
             .get("search_canonical_machine_goal_reached_from_raw_successor_semantics"),
-        Some(&"problem_specific")
+        Some(&"path_problem_specific")
     );
     assert_eq!(
         theorem_pack_inventory_problem_classes
             .get("search_canonical_machine_step_preserves_invariants"),
         Some(&"generic_machine")
+    );
+    assert_eq!(
+        theorem_pack_inventory_problem_classes
+            .get("search_canonical_serial_has_exact_result_contract"),
+        Some(&"generic_selected_result")
     );
     assert_eq!(
         rust_theorem_pack
@@ -602,8 +607,11 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
             .map(|entry| {
                 let problem_class = match entry.problem_class {
                     telltale_search::SearchTheoremProblemClass::GenericMachine => "generic_machine",
-                    telltale_search::SearchTheoremProblemClass::ProblemSpecific => {
-                        "problem_specific"
+                    telltale_search::SearchTheoremProblemClass::GenericSelectedResult => {
+                        "generic_selected_result"
+                    }
+                    telltale_search::SearchTheoremProblemClass::PathProblemSpecific => {
+                        "path_problem_specific"
                     }
                 };
                 (entry.name.as_str(), problem_class)

@@ -36,20 +36,23 @@ pub mod runtime;
 
 pub use admission::{
     check_capability_containment, AdmissionRejectionReason, CommutativityRegionClass,
-    SearchCertifiedCapability, SearchDUser, SearchDeterminismMode, SearchFairnessAssumption,
-    SearchObservableClass, SearchSchedulerProfile, SELECTED_RESULT_COST_OBSERVABLE,
-    SELECTED_RESULT_PUBLICATION_TRACE_OBSERVABLE, SELECTED_RESULT_WITNESS_OBSERVABLE,
+    SearchCertifiedCapability, SearchClaimClass, SearchDUser, SearchDeterminismMode,
+    SearchFairnessAssumption, SearchObservableClass, SearchSchedulerProfile,
+    SELECTED_RESULT_COST_OBSERVABLE, SELECTED_RESULT_PUBLICATION_TRACE_OBSERVABLE,
+    SELECTED_RESULT_WITNESS_OBSERVABLE,
 };
 pub use cost::{EpsilonMilli, SearchCost};
-pub use domain::{SearchDomain, SearchQuery, SearchReseedingPolicy};
+pub use domain::{
+    SearchDomain, SearchQuery, SearchQueryError, SearchReseedingPolicy,
+    SearchSelectedResultSemanticsClass,
+};
 pub use machine::{
-    CanonicalBatch, Incumbent, Proposal, ProposalKind, SearchBudgetState, SearchError,
+    CanonicalBatch, Proposal, ProposalKind, SearchBudgetState, SearchError,
     SearchInvariantViolation, SearchMachine, SearchTraceState, SelectedSolution,
 };
 pub use observe::{
-    compare_observations, IncumbentPublicationRecord, NormalizedCommitRecord,
-    ObservationComparison, ObservationRelation, SearchObservationArtifact,
-    SearchSelectedResultArtifact, SelectedSolutionPublicationRecord,
+    compare_observations, NormalizedCommitRecord, ObservationComparison, ObservationRelation,
+    SearchObservationArtifact, SearchSelectedResultArtifact, SelectedSolutionPublicationRecord,
 };
 pub use runtime::{
     classify_approximation_contract, classify_fairness_claim, classify_scheduler_artifact,
@@ -65,19 +68,29 @@ pub use runtime::{
     SearchCachingProfile, SearchEffortProfile, SearchExecutionPolicy, SearchExecutionReport,
     SearchFairnessArtifact, SearchFairnessCertificate, SearchFairnessCertificateClass,
     SearchFairnessClaimClass, SearchFairnessTraceValidationError, SearchFullStateArtifact,
-    SearchPathResultSummary, SearchReplayArtifact, SearchResultBoundArtifact,
-    SearchResultDiscoveryBoundClass, SearchResultDiscoveryCertificate,
-    SearchResultDiscoveryCertificateClass, SearchResultMetric, SearchResultMetricName,
-    SearchResultQualityClass, SearchResultSummary, SearchRouteBoundArtifact,
-    SearchRouteDiscoveryBoundClass, SearchRouteDiscoveryCertificate,
-    SearchRouteDiscoveryCertificateClass, SearchRouteMetric, SearchRouteMetricName,
-    SearchRouteQualityClass, SearchRouteSummary, SearchRunConfig, SearchRunConfigError,
-    SearchRunError, SearchRuntimeMarker, SearchSelectedResultBoundArtifact,
-    SearchSelectedResultMetric, SearchSelectedResultMetricName, SearchSelectedResultSummary,
-    SearchStateArtifact, SearchTheoremInventoryEntry, SearchTheoremInventoryProblemClassEntry,
-    SearchTheoremInventorySupportClassEntry, SearchTheoremPackArtifact, SearchTheoremProblemClass,
-    SearchTheoremSupportClass, SerialProposalExecutor, TotalStepMode,
+    SearchPathProblemDiscoveryArtifact, SearchPathProblemReplayArtifact, SearchPathResultSummary,
+    SearchReplayArtifact, SearchResultBoundArtifact, SearchResultDiscoveryBoundClass,
+    SearchResultDiscoveryCertificate, SearchResultDiscoveryCertificateClass, SearchResultMetric,
+    SearchResultMetricName, SearchResultQualityClass, SearchResultSummary, SearchRunConfig,
+    SearchRunConfigError, SearchRunError, SearchRunTermination, SearchRuntimeMarker,
+    SearchSelectedResultBoundArtifact, SearchSelectedResultMetric, SearchSelectedResultMetricName,
+    SearchSelectedResultSummary, SearchStateArtifact, SearchTheoremInventoryEntry,
+    SearchTheoremInventoryProblemClassEntry, SearchTheoremInventorySupportClassEntry,
+    SearchTheoremPackArtifact, SearchTheoremProblemClass, SearchTheoremSupportClass,
+    SerialProposalExecutor, TotalStepMode,
 };
+
+/// Narrow compatibility surface retained for downstream migration from the
+/// historical route/incumbent vocabulary.
+pub mod compat {
+    pub use crate::machine::Incumbent;
+    pub use crate::observe::IncumbentPublicationRecord;
+    pub use crate::runtime::compat::{
+        SearchRouteBoundArtifact, SearchRouteDiscoveryBoundClass, SearchRouteDiscoveryCertificate,
+        SearchRouteDiscoveryCertificateClass, SearchRouteMetric, SearchRouteMetricName,
+        SearchRouteProblemDiscoveryArtifact, SearchRouteQualityClass, SearchRouteSummary,
+    };
+}
 
 /// Current crate scope statement used by smoke tests and boundary checks.
 pub const CRATE_SCOPE: &str = "generic weighted-graph-plus-epoch search";

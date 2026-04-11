@@ -506,25 +506,27 @@
     "admissible_upper_bound": 2,
     "approximation_ratio_milli": 1000,
     "candidate_discovery_bound_steps": 2,
-    "discovery_certificate": {
-      "certified_observables": [
-        "SelectedResultCost",
-        "CanonicalParentIdentity",
-        "SelectedResultWitnessIdentity",
-        "NormalizedCommitTrace",
-        "ProgressAccounting"
-      ],
-      "class": "GoalWindowOneStepViaThreadedRefinement",
-      "observed_goal_window_step": 3,
-      "required_premises": [
-        "DeterministicSchedulerConfluence"
-      ],
-      "service_bound_steps": 1
-    },
-    "discovery_class": "ObservedRunBoundWithGoalWindowCertificate",
-    "goal_service_bound_steps": 1,
-    "goal_window_entry_bound_steps": 3,
+    "discovery_class": "ObservedRunBound",
     "optimality_gap": 0,
+    "path_problem": {
+      "discovery_certificate": {
+        "certified_observables": [
+          "SelectedResultCost",
+          "CanonicalParentIdentity",
+          "SelectedResultWitnessIdentity",
+          "NormalizedCommitTrace",
+          "ProgressAccounting"
+        ],
+        "class": "GoalWindowOneStepViaThreadedRefinement",
+        "observed_goal_window_step": 3,
+        "required_premises": [
+          "DeterministicSchedulerConfluence"
+        ],
+        "service_bound_steps": 1
+      },
+      "goal_service_bound_steps": 1,
+      "goal_window_entry_bound_steps": 3
+    },
     "quality_class": "ExactOptimal",
     "recovery_bound_steps_after_latest_epoch": 2,
     "required_premises": [
@@ -795,6 +797,10 @@
       {
         "name": "search_scheduler_step_budget_yields_budgeted_anytime_contract",
         "present": true
+      },
+      {
+        "name": "search_selected_result_observation_slice_refines_legacy_fields",
+        "present": true
       }
     ],
     "inventory_problem_classes": [
@@ -904,27 +910,27 @@
       },
       {
         "name": "search_canonical_serial_goal_reached_from_ready_witness_path",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_canonical_machine_goal_reached_from_ready_witness_path",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_canonical_machine_goal_reached_from_graph_reachability",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_canonical_machine_goal_reached_from_raw_successor_semantics",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_goal_reachability_connects_to_incumbent_publication",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_threaded_exact_single_lane_refines_canonical_one_step",
@@ -968,11 +974,11 @@
       },
       {
         "name": "search_canonical_serial_goal_window_service_has_exact_suffix_bound",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
-        "problem_class": "ProblemSpecific"
+        "problem_class": "PathProblemSpecific"
       },
       {
         "name": "search_batched_parallel_exact_certified_window_fairness",
@@ -1000,23 +1006,27 @@
       },
       {
         "name": "search_canonical_serial_has_exact_result_contract",
-        "problem_class": "GenericMachine"
+        "problem_class": "GenericSelectedResult"
       },
       {
         "name": "search_threaded_exact_single_lane_has_exact_result_contract",
-        "problem_class": "GenericMachine"
+        "problem_class": "GenericSelectedResult"
       },
       {
         "name": "search_batched_parallel_exact_has_certified_window_exact_contract",
-        "problem_class": "GenericMachine"
+        "problem_class": "GenericSelectedResult"
       },
       {
         "name": "search_batched_parallel_envelope_has_envelope_bounded_contract",
-        "problem_class": "GenericMachine"
+        "problem_class": "GenericSelectedResult"
       },
       {
         "name": "search_scheduler_step_budget_yields_budgeted_anytime_contract",
-        "problem_class": "GenericMachine"
+        "problem_class": "GenericSelectedResult"
+      },
+      {
+        "name": "search_selected_result_observation_slice_refines_legacy_fields",
+        "problem_class": "GenericSelectedResult"
       }
     ],
     "inventory_support_classes": [
@@ -1239,6 +1249,10 @@
       {
         "name": "search_scheduler_step_budget_yields_budgeted_anytime_contract",
         "support_class": "ExecutableSemantics"
+      },
+      {
+        "name": "search_selected_result_observation_slice_refines_legacy_fields",
+        "support_class": "RefinementCorollary"
       }
     ]
   }

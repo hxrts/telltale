@@ -207,10 +207,8 @@ theorem mem_of_head?_eq_some
 theorem executableServicedEntries_sublist_frontier
     (state : SearchMachineState) :
     List.Sublist (executableServicedEntries state) state.frontier := by
-  exact by
-    simpa [executableServicedEntries, canonicalBatch] using
-      (List.filter_sublist (fun entry =>
-        ∀ other, other ∈ state.frontier → entry.priority ≤ other.priority) state.frontier)
+  unfold executableServicedEntries canonicalBatch
+  exact List.filter_sublist
 
 /-- Helper: executable serviced nodes form a sublist of the frontier node list. -/
 theorem executableServicedNodes_sublist_frontierNodes
@@ -223,9 +221,8 @@ theorem executableServicedNodes_sublist_frontierNodes
 theorem executableNextFrontier_sublist_frontier
     (state : SearchMachineState) :
     List.Sublist (executableNextFrontier state) state.frontier := by
-  exact by
-    simpa [executableNextFrontier, frontierAfterCanonicalStep] using
-      (List.filter_sublist (fun entry => entry ∉ executableServicedEntries state) state.frontier)
+  unfold executableNextFrontier frontierAfterCanonicalStep
+  exact List.filter_sublist
 
 /-- Executable next-frontier nodes remain a sublist of frontier nodes. -/
 theorem executableNextFrontierNodes_sublist_frontierNodes

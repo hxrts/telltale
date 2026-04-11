@@ -105,6 +105,20 @@ theorem selected_result_observation_slice_of_step_artifact_refines_legacy
       } :=
   rfl
 
+/-- Release-facing generic selected-result theorem row stating that the
+selected-result observation slice is definitionally the legacy reduced
+observation payload under the current executable artifact boundary. -/
+theorem search_selected_result_observation_slice_refines_legacy_fields
+    (artifact : StepArtifact) :
+    selectedResultObservationSliceOfStepArtifact artifact =
+      { selectedResultCost := (observationSliceOfStepArtifact artifact).incumbentCost
+      , selectedResultIdentity := (observationSliceOfStepArtifact artifact).incumbentNode
+      , normalizedCommits := (observationSliceOfStepArtifact artifact).normalizedCommits
+      , productiveSteps := (observationSliceOfStepArtifact artifact).productiveSteps
+      , totalSchedulerSteps := (observationSliceOfStepArtifact artifact).totalSchedulerSteps
+      } :=
+  selected_result_observation_slice_of_step_artifact_refines_legacy artifact
+
 /-- Generic machine-level notion that some selected result is published,
 independent of any one distinguished goal node. -/
 def SelectedResultPublished (state : SearchMachineState) : Prop :=

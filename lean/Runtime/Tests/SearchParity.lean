@@ -15,7 +15,8 @@ def main : IO Unit := do
   let problemClassString := fun cls =>
     match cls with
     | .genericMachine => "generic_machine"
-    | .problemSpecific => "problem_specific"
+    | .genericSelectedResult => "generic_selected_result"
+    | .pathProblemSpecific => "path_problem_specific"
   let canonicalClaim :=
     match fairnessClaimClass .canonicalSerial with
     | .exactOneStep => "exact_one_step"

@@ -77,8 +77,8 @@ fn tampered_recovery_vectors_are_rejected_by_exact_fixture_comparison() {
     assert_ne!(actual, tampered_summary);
 
     let mut tampered_discovery_certificate = expected_recovery_vectors();
-    tampered_discovery_certificate["route_bounds"]["discovery_certificate"]["class"] =
-        json!("GoalWindowOneStepViaThreadedRefinement");
+    tampered_discovery_certificate["route_bounds"]["path_problem"]["discovery_certificate"]
+        ["class"] = json!("GoalWindowOneStepViaThreadedRefinement");
     assert_ne!(actual, tampered_discovery_certificate);
 
     let mut tampered_observation = expected_recovery_vectors();
