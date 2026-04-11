@@ -209,13 +209,33 @@ gate_ownership_recipes=(
 metric_value() {
   local name="$1"
   local row
-  row=$(grep -E "^\|[[:space:]]*${name}[[:space:]]*\|" docs/902_verification_inventory.md) || true
+  row=$(awk -F'|' -v target="$name" '
+    BEGIN { found = 0 }
+    /^\|/ {
+      metric = $2
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", metric)
+      if (metric == target) {
+        print
+        found += 1
+      }
+    }
+    END {
+      if (found > 1) {
+        exit 2
+      }
+    }
+  ' docs/902_verification_inventory.md)
+  local status=$?
+  if [[ $status -eq 2 ]]; then
+    echo "duplicate metric rows in docs/902_verification_inventory.md: ${name}" >&2
+    exit 1
+  fi
   if [[ -z "$row" ]]; then
     echo "missing metric row in docs/902_verification_inventory.md: ${name}" >&2
     exit 1
   fi
-  # Extract the numeric value column (second pipe-delimited field), strip commas
-  echo "$row" | sed 's/|/|/g' | awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}'
+  # Extract the numeric value column, stripping punctuation used for formatting.
+  awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}' <<<"$row"
 }
 
 # Count non-comment, non-blank indented lines in a justfile recipe body.
@@ -287,7 +307,10 @@ fi
 # Extract files count (second bold value) and lines count (third bold value)
 actual_files=$(echo "$total_row" | sed 's/[*,]//g' | awk -F'|' '{gsub(/[^0-9]/, "", $3); print $3}')
 actual_lines=$(echo "$total_row" | sed 's/[*,]//g' | awk -F'|' '{gsub(/[^0-9]/, "", $4); print $4}')
-actual_search_fairness_inventory=$(grep -c '("search_' lean/Runtime/Proofs/Search/Inventory.lean || echo 0)
+actual_search_fairness_inventory=$(awk '
+  /name := "search_/ { count += 1 }
+  END { print count + 0 }
+' lean/Runtime/Proofs/Search/Inventory.lean)
 
 check_metric "Lean core-library files" "$actual_files"
 check_metric "Lean core-library lines" "$actual_lines"
@@ -310,8 +333,14 @@ check_metric "Explicit failure/timeout observable event kinds" "$actual_explicit
 
 macro_ui_file="rust/macros/tests/macro_ui.rs"
 
-actual_pass=$(grep -c '\bt\.pass(' "$macro_ui_file" || echo 0)
-actual_fail=$(grep -c '\bt\.compile_fail(' "$macro_ui_file" || echo 0)
+actual_pass=$(awk '
+  index($0, "t.pass(") { count += 1 }
+  END { print count + 0 }
+' "$macro_ui_file")
+actual_fail=$(awk '
+  index($0, "t.compile_fail(") { count += 1 }
+  END { print count + 0 }
+' "$macro_ui_file")
 
 check_metric "Macro UI pass fixtures" "$actual_pass"
 check_metric "Macro UI compile-fail fixtures" "$actual_fail"

@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use telltale_search::{
-    run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,
-    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+    run_with_executor, EpsilonMilli, SearchDomain, SearchExecutionPolicy, SearchFairnessAssumption,
+    SearchMachine, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 use telltale_viewer::project_search_artifacts;
 
@@ -57,13 +57,10 @@ fn viewer_adapter_projects_search_artifacts() {
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: BTreeSet::from([
-                SearchFairnessAssumption::DeterministicSchedulerConfluence,
-            ]),
-        },
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            BTreeSet::from([SearchFairnessAssumption::DeterministicSchedulerConfluence]),
+        ),
     )
     .expect("search run");
 

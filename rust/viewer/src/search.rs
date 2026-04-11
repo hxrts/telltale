@@ -36,8 +36,8 @@ where
     C: Clone + Eq,
 {
     SearchViewerArtifact {
-        incumbent_path: observation.incumbent_path.clone(),
-        incumbent_cost: observation.incumbent_cost.clone(),
+        incumbent_path: observation.selected_result_witness.clone(),
+        incumbent_cost: observation.selected_result_cost.clone(),
         commit_count: observation.normalized_commit_trace.len(),
         graph_epoch_trace: observation.graph_epoch_trace.clone(),
         rounds: replay.rounds.clone(),
@@ -49,8 +49,9 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use telltale_search::{
-        run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,
-        SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+        run_with_executor, EpsilonMilli, SearchDomain, SearchExecutionPolicy,
+        SearchFairnessAssumption, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
+        SerialProposalExecutor,
     };
 
     use super::*;
@@ -103,13 +104,10 @@ mod tests {
         let (report, replay) = run_with_executor(
             &mut machine,
             &SerialProposalExecutor,
-            SearchRunConfig {
-                scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-                batch_width: 1,
-                fairness_assumptions: BTreeSet::from([
-                    SearchFairnessAssumption::DeterministicSchedulerConfluence,
-                ]),
-            },
+            SearchRunConfig::new(
+                SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+                BTreeSet::from([SearchFairnessAssumption::DeterministicSchedulerConfluence]),
+            ),
         )
         .expect("search run");
 

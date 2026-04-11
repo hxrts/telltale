@@ -411,10 +411,10 @@ pub(crate) fn export_observation_artifact(domain: BenchDomain, start: u32, goal:
     machine
         .run_to_completion()
         .expect("artifact benchmark search completion");
-    let _ = machine.observation_artifact(
+    std::mem::drop(machine.observation_artifact(
         SearchSchedulerProfile::CanonicalSerial,
         BTreeSet::from([SearchFairnessAssumption::DeterministicSchedulerConfluence]),
-    );
+    ));
 }
 
 pub(crate) fn export_full_state_artifact(domain: BenchDomain, start: u32, goal: u32) {
@@ -422,7 +422,7 @@ pub(crate) fn export_full_state_artifact(domain: BenchDomain, start: u32, goal: 
     machine
         .run_to_completion()
         .expect("artifact benchmark search completion");
-    let _ = full_state_artifact_for_machine(&machine);
+    std::mem::drop(full_state_artifact_for_machine(&machine));
 }
 
 pub(crate) fn invariant_check_frontier(
@@ -491,7 +491,7 @@ where
             .state()
             .parent
             .iter()
-            .map(|(node, parent)| (node.clone(), parent.from.clone()))
+            .map(|(node, parent)| (*node, parent.from))
             .collect::<BTreeMap<_, _>>();
         let pre_incumbent = machine.state().incumbent.clone();
 
@@ -519,7 +519,7 @@ where
                     || pre_parents.get(*node)
                         != machine.state().parent.get(*node).map(|parent| &parent.from)
             })
-            .map(|(node, _)| node.clone())
+            .map(|(node, _)| *node)
             .collect::<Vec<_>>();
         let committed_count =
             u64::try_from(committed_nodes.len()).expect("committed count must fit");

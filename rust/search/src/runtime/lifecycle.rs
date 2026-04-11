@@ -1578,12 +1578,11 @@ pub fn theorem_inventory_problem_classes() -> Vec<SearchTheoremInventoryProblemC
         name: name.to_string(),
         present: true,
     })
-        .into_iter()
-        .map(|entry| SearchTheoremInventoryProblemClassEntry {
-            problem_class: classify_theorem_problem_class(&entry.name),
-            name: entry.name,
-        })
-        .collect()
+    .map(|entry| SearchTheoremInventoryProblemClassEntry {
+        problem_class: classify_theorem_problem_class(&entry.name),
+        name: entry.name,
+    })
+    .collect()
 }
 
 impl<C> SearchResultBoundArtifact<C>
@@ -2639,9 +2638,10 @@ where
         let Some(next) = best_selected_solution_from_maps(start, query, &g_score, &parent) else {
             continue;
         };
-        let should_publish = current_incumbent.as_ref().is_none_or(|current| {
-            next.0 < current.0 || (next.0 == current.0 && next.1 < current.1)
-        });
+        let should_publish = match current_incumbent.as_ref() {
+            None => true,
+            Some(current) => next.0 < current.0 || (next.0 == current.0 && next.1 < current.1),
+        };
         if should_publish {
             publications.push(IncumbentPublicationRecord {
                 cost: next.0,

@@ -235,7 +235,7 @@ The benchmark harness reports frontier growth, batch count, proposal churn,
 duplicate elimination, commit count, rebuild count, and publication count so
 performance work can separate generic machine cost from executor and artifact
 overhead. The profiling surface should be used before making search-structure
-optimizations; hotspot assumptions should not be treated as stable until after
+optimizations, and hotspot assumptions should not be treated as stable until after
 the generalized query/result/authority surfaces are in place.
 
 The profiling split is intentionally layered:
@@ -265,7 +265,7 @@ Current review findings:
   the measured phase time from roughly `120.75-132.44 µs` to
   `44.59-56.46 µs`
 - the improved workload class is generic machine normalization cost on
-  duplicate-heavy frontiers; it did not require theorem or artifact-schema
+  duplicate-heavy frontiers, and it did not require theorem or artifact-schema
   changes
 - any further optimization should be justified against those measured workload
   classes, not assumed from the frontier implementation alone
@@ -338,7 +338,7 @@ are conditioned on holding one of these certificates.
 
 `Runtime.Proofs.Search.Fairness` proves unconditional one-step fairness for
 `canonicalSerial` at the current min-key batch. Broader eventual-service
-results for non-min entries live in `Liveness` under explicit premise bundles;
+results for non-min entries live in `Liveness` under explicit premise bundles,
 there is no unconditional all-entry fairness theorem in this module.
 
 - `mem_canonicalBatch_iff_isMinPriority` - membership in the canonical batch is
@@ -639,7 +639,8 @@ parity policy.
 
 For downstream selector-style imports such as Jacquard:
 
-- prefer `SearchQuery::try_*` constructors over panicking query builders
+- prefer `SearchQuery::try_multi_goal(...)` and
+  `SearchQuery::try_candidate_set(...)` over panicking query builders
 - prefer `SelectedSolution`, `SearchResultBoundArtifact`, and
   `SearchResultSummary`
 - use `SearchDomain::selected_result_candidates(...)` when winner eligibility
@@ -647,6 +648,6 @@ For downstream selector-style imports such as Jacquard:
 - consume `SearchClaimClass` and `inventory_problem_classes` rather than
   scraping theorem names
 - avoid the route/incumbent compatibility aliases unless migrating legacy
-  code; the intended compatibility surface is `telltale_search::compat`
+  code, because the intended compatibility surface is `telltale_search::compat`
 - treat `IncrementalReuse` as out of the stable import posture until it is
   implemented

@@ -143,7 +143,8 @@ Application-specific routing, RF, mesh, or topology policies should live in
 downstream crates that implement its domain traits rather than in
 `telltale-search` itself. The stable import posture is:
 
-- fail-closed `SearchQuery::try_*` constructors
+- fail-closed `SearchQuery::try_multi_goal(...)` and
+  `SearchQuery::try_candidate_set(...)` constructors
 - generic selected-result surfaces such as `SelectedSolution`,
   `SearchResultBoundArtifact`, and `SearchResultSummary`
 - `SearchDomain::selected_result_candidates(...)` when result admissibility is
