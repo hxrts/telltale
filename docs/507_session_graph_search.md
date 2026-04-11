@@ -390,7 +390,7 @@ a `Bool` indicating whether it is proved. `Runtime.Proofs.Search.TheoremPack`
 exports a support classification for every row: `executableSemantics`,
 `refinementCorollary`, or `premiseScoped`.
 
-The current inventory has 50 proved theorems and 0 unproved. Coverage includes
+The inventory has 50 proved theorems and 0 unproved. Coverage includes
 the full-machine artifact and projection surface, full-step refinement contracts
 back into the reduced executable lane, a raw-successor completeness theorem
 surface, scheduler-fair non-min service, and the certified-window envelope
@@ -441,7 +441,7 @@ enables the native parallel executor for native targets.
 
 ## Lean/Rust Parity
 
-Reduced Lean/Rust parity currently covers canonical batch-window extraction,
+Reduced Lean/Rust parity covers canonical batch-window extraction,
 proposal independence over declared authority surfaces, theorem-pack
 support-class parity, the richer Rust full-state artifact boundary, and
 epoch-barrier semantics with fairness-bundle fixtures. See
