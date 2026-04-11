@@ -8,16 +8,19 @@ use support::{FixtureDomain, UnstableOrderDomain};
 #[cfg(not(feature = "multi-thread"))]
 use telltale_search::NativeParallelExecutorError;
 use telltale_search::{
-    classify_fairness_claim, commit_epoch_reconfiguration, fairness_artifact_for_profile,
-    proposals_independent, replay_observation, run_with_executor, search_theorem_pack_artifact,
-    theorem_backed_observables, validate_fairness_certificate_trace, validate_run_config,
-    AuthorityReadSet, AuthoritySurface, AuthorityWriteSet, EpochReconfigurationRequest,
-    EpsilonMilli, NativeParallelExecutor, Proposal, ProposalKind, ReplayError, ReplayExpectation,
-    SearchDeterminismMode, SearchError, SearchFairnessAssumption, SearchFairnessCertificateClass,
-    SearchFairnessClaimClass, SearchFairnessTraceValidationError, SearchMachine,
-    SearchRouteDiscoveryBoundClass, SearchRouteDiscoveryCertificateClass, SearchRouteMetricName,
-    SearchRouteQualityClass, SearchRunConfig, SearchRunConfigError, SearchRunError,
-    SearchSchedulerProfile, SerialProposalExecutor,
+    classify_approximation_contract, classify_fairness_claim, classify_theorem_problem_class,
+    commit_epoch_reconfiguration, fairness_artifact_for_profile, proposals_independent,
+    replay_observation, run_with_executor, search_theorem_pack_artifact,
+    theorem_backed_observables, theorem_inventory_problem_classes,
+    validate_fairness_certificate_trace, validate_run_config, AuthorityReadSet, AuthoritySurface,
+    AuthorityWriteSet, EpochReconfigurationRequest, EpsilonMilli, NativeParallelExecutor, Proposal,
+    ProposalKind, ReplayError, ReplayExpectation, SearchApproximationContractClass,
+    SearchDeterminismMode, SearchError, SearchExecutionPolicy, SearchFairnessAssumption,
+    SearchFairnessCertificateClass, SearchFairnessClaimClass, SearchFairnessTraceValidationError,
+    SearchMachine, SearchQuery, SearchReseedingPolicy, SearchRouteDiscoveryBoundClass,
+    SearchRouteDiscoveryCertificateClass, SearchRouteMetricName, SearchRouteQualityClass,
+    SearchRunConfig, SearchRunConfigError, SearchRunError, SearchSchedulerProfile,
+    SearchTheoremProblemClass, SerialProposalExecutor,
 };
 #[cfg(feature = "multi-thread")]
 use telltale_search::{
@@ -60,11 +63,10 @@ fn run_config(
     batch_width: u64,
     fairness: &[SearchFairnessAssumption],
 ) -> SearchRunConfig {
-    SearchRunConfig {
-        scheduler_profile,
-        batch_width,
-        fairness_assumptions: fairness.iter().copied().collect(),
-    }
+    SearchRunConfig::new(
+        SearchExecutionPolicy::new(scheduler_profile, batch_width),
+        fairness.iter().copied().collect(),
+    )
 }
 
 fn make_failing_runtime_domain() -> FixtureDomain {
@@ -114,12 +116,12 @@ fn serial_and_parallel_batch_width_one_are_exactly_equal() {
     )
     .expect("parallel run");
     assert_eq!(
-        left_report.observation.incumbent_cost,
-        right_report.observation.incumbent_cost
+        left_report.observation.selected_result_cost,
+        right_report.observation.selected_result_cost
     );
     assert_eq!(
-        left_report.observation.incumbent_path,
-        right_report.observation.incumbent_path
+        left_report.observation.selected_result_witness,
+        right_report.observation.selected_result_witness
     );
     assert_eq!(
         left_report.observation.normalized_commit_trace,
@@ -158,8 +160,11 @@ fn parallel_executor_processes_the_full_legal_batch_window() {
     )
     .expect("parallel run");
 
-    assert_eq!(report.observation.incumbent_cost, Some(2));
-    assert_eq!(report.observation.incumbent_path, Some(vec![0, 2, 3]));
+    assert_eq!(report.observation.selected_result_cost, Some(2));
+    assert_eq!(
+        report.observation.selected_result_witness,
+        Some(vec![0, 2, 3])
+    );
 }
 
 #[cfg(feature = "multi-thread")]
@@ -197,8 +202,8 @@ fn parallel_envelope_run_is_admitted_modulo_commutativity() {
         &parallel_report.observation,
         SearchDeterminismMode::ModuloCommutativity,
         &[
-            SearchObservableClass::IncumbentCost,
-            SearchObservableClass::CanonicalPathIdentity,
+            SearchObservableClass::SelectedResultCost,
+            SearchObservableClass::SelectedResultWitnessIdentity,
             SearchObservableClass::NormalizedCommitTrace,
         ],
     );
@@ -214,6 +219,49 @@ fn parallel_envelope_run_is_admitted_modulo_commutativity() {
         parallel_report.scheduler.authority_class,
         SchedulerArtifactClass::Normalized
     );
+}
+
+#[test]
+fn runtime_replay_preserves_multi_goal_selected_result_observation() {
+    let mut domain = FixtureDomain::default();
+    domain.edge(0, 1, "0-1", 1);
+    domain.edge(1, 4, "1-4", 3);
+    domain.edge(0, 2, "0-2", 1);
+    domain.edge(2, 5, "2-5", 1);
+
+    let query = SearchQuery::multi_goal(0, vec![4, 5]);
+    let mut machine = SearchMachine::new_with_query(domain, 1, query, EpsilonMilli::one());
+    let (report, replay) = run_with_executor(
+        &mut machine,
+        &SerialProposalExecutor,
+        run_config(
+            SearchSchedulerProfile::CanonicalSerial,
+            1,
+            &[SearchFairnessAssumption::DeterministicSchedulerConfluence],
+        ),
+    )
+    .expect("serial run");
+
+    assert_eq!(report.observation.selected_result_cost, Some(2));
+    assert_eq!(
+        report.observation.selected_result_witness,
+        Some(vec![0, 2, 5])
+    );
+
+    let derived = replay_observation(
+        &replay,
+        &ReplayExpectation {
+            expected_epochs: vec![1],
+            expected_snapshots: vec!["epoch-1", "epoch-1", "epoch-1", "epoch-1"],
+            expected_phases: vec![0, 0, 0, 0],
+            expected_batch_nodes: vec![vec![0], vec![1, 2], vec![5], vec![4]],
+            required_fairness: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+                .into_iter()
+                .collect(),
+        },
+    )
+    .expect("replay observation");
+    assert_eq!(derived, report.observation);
 }
 
 #[cfg(feature = "multi-thread")]
@@ -246,7 +294,13 @@ fn reconfiguration_commits_new_epoch_at_barrier() {
     let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
     machine.run_to_completion().expect("search run");
     assert!(machine.state().incumbent.is_some());
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
     let observation = machine.observation_artifact(
         SearchSchedulerProfile::CanonicalSerial,
         [SearchFairnessAssumption::DeterministicSchedulerConfluence]
@@ -260,6 +314,50 @@ fn reconfiguration_commits_new_epoch_at_barrier() {
     assert_eq!(machine.state().g_score.len(), 1);
     assert!(machine.state().parent.is_empty());
     assert!(machine.state().incumbent.is_none());
+}
+
+#[test]
+fn reconfiguration_can_preserve_open_and_incons_frontier_state() {
+    let mut domain = FixtureDomain::default();
+    domain.edge(0, 1, "0-1", 1);
+    domain.edge(0, 2, "0-2", 2);
+    domain.edge(1, 3, "1-3", 5);
+    domain.edge(2, 3, "2-3", 1);
+    domain.heuristic_value(1, 1, 0);
+    domain.heuristic_value(1, 2, 100);
+    domain.heuristic_value(1, 3, 0);
+    let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli(3_000));
+
+    machine.step_once().expect("expand start");
+    machine.step_once().expect("expand node 1");
+    machine.step_once().expect("expand goal candidate");
+    machine.step_once().expect("improve closed goal candidate");
+    assert!(machine.state().incons.contains(&3));
+
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::PreserveOpenAndIncons,
+        },
+    );
+
+    assert_eq!(machine.state().graph_epoch, 2);
+    assert!(machine.state().open.contains_key(&0));
+    assert!(machine.state().open.contains_key(&3));
+    assert!(machine.state().closed.is_empty());
+    assert!(machine.state().incons.is_empty());
+
+    let observation = machine.observation_artifact(
+        SearchSchedulerProfile::CanonicalSerial,
+        [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+            .into_iter()
+            .collect(),
+    );
+    assert_eq!(
+        observation.reseed_policy_trace,
+        vec![SearchReseedingPolicy::PreserveOpenAndIncons]
+    );
 }
 
 #[test]
@@ -778,8 +876,8 @@ fn exact_batched_parallel_profile_matches_serial_on_exact_observables() {
         &exact_report.observation,
         SearchDeterminismMode::Full,
         &[
-            SearchObservableClass::IncumbentCost,
-            SearchObservableClass::CanonicalPathIdentity,
+            SearchObservableClass::SelectedResultCost,
+            SearchObservableClass::SelectedResultWitnessIdentity,
             SearchObservableClass::NormalizedCommitTrace,
         ],
     );
@@ -839,22 +937,22 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
         report.route_bounds.quality_class,
         SearchRouteQualityClass::ExactOptimal
     );
-    assert_eq!(report.route_bounds.selected_route_cost, Some(2));
+    assert_eq!(report.route_bounds.selected_result_cost, Some(2));
     assert_eq!(report.route_bounds.optimality_gap, Some(0));
     assert_eq!(report.route_bounds.approximation_ratio_milli, Some(1_000));
     assert_eq!(report.route_bounds.admissible_upper_bound, Some(2));
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
-            .map(|s| s.hop_count),
+            .and_then(|s| s.path_summary.as_ref().map(|p| p.hop_count)),
         Some(2)
     );
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .map(|s| s.publication_count),
         Some(1)
@@ -862,7 +960,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .map(|s| s.normalized_commit_count),
         Some(3)
@@ -870,7 +968,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .map(|s| s.traversed_epoch_count),
         Some(1)
@@ -878,7 +976,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .and_then(|s| {
                 s.metrics
@@ -891,7 +989,7 @@ fn exact_profiles_emit_observed_candidate_bounds_and_exact_route_quality() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .and_then(|s| {
                 s.metrics
@@ -954,22 +1052,22 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
         exact_report.route_bounds.quality_class,
         SearchRouteQualityClass::PremisedWindowBounded
     );
-    assert_eq!(exact_report.route_bounds.selected_route_cost, Some(2));
+    assert_eq!(exact_report.route_bounds.selected_result_cost, Some(2));
     assert_eq!(exact_report.route_bounds.optimality_gap, None);
     assert_eq!(exact_report.route_bounds.approximation_ratio_milli, None);
     assert_eq!(exact_report.route_bounds.admissible_upper_bound, Some(2));
     assert_eq!(
         exact_report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
-            .map(|s| s.hop_count),
+            .and_then(|s| s.path_summary.as_ref().map(|p| p.hop_count)),
         Some(2)
     );
     assert_eq!(
         exact_report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .map(|s| s.normalized_commit_count),
         Some(3)
@@ -977,7 +1075,7 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
     assert_eq!(
         exact_report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .and_then(|s| {
                 s.metrics
@@ -1027,7 +1125,7 @@ fn non_exact_profiles_emit_weaker_route_quality_classes_but_keep_observed_discov
         envelope_report.route_bounds.quality_class,
         SearchRouteQualityClass::PremiseOnly
     );
-    assert_eq!(envelope_report.route_bounds.selected_route_cost, Some(2));
+    assert_eq!(envelope_report.route_bounds.selected_result_cost, Some(2));
     assert_eq!(envelope_report.route_bounds.optimality_gap, None);
     assert_eq!(envelope_report.route_bounds.approximation_ratio_milli, None);
     assert_eq!(envelope_report.route_bounds.admissible_upper_bound, Some(2));
@@ -1038,7 +1136,13 @@ fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
     let domain = make_domain();
     let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
     machine.step_once().expect("first step");
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
     let (report, _) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
@@ -1059,7 +1163,7 @@ fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .map(|summary| summary.traversed_epoch_count),
         Some(2)
@@ -1067,7 +1171,7 @@ fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .map(|summary| summary.normalized_commit_count),
         Some(6)
@@ -1075,7 +1179,7 @@ fn latest_epoch_recovery_bound_is_reported_after_reconfiguration() {
     assert_eq!(
         report
             .route_bounds
-            .selected_route_summary
+            .selected_result_summary
             .as_ref()
             .and_then(|summary| {
                 summary
@@ -1095,7 +1199,13 @@ fn reconfiguration_preserves_progress_accounting_but_resets_search_state() {
     machine.step_once().expect("first step");
     let before_productive = machine.state().trace_state.productive_steps;
     let before_total = machine.state().trace_state.total_scheduler_steps;
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
     assert_eq!(
         machine.state().trace_state.productive_steps,
         before_productive
@@ -1116,7 +1226,13 @@ fn replay_artifact_records_epoch_barrier_exactly_once_across_reconfiguration() {
     let domain = make_domain();
     let mut machine = SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
     machine.step_once().expect("first step");
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
     let (_, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
@@ -1375,6 +1491,66 @@ fn theorem_pack_artifact_matches_the_expected_inventory_and_gate() {
         ),
         Some(&true)
     );
+    assert_eq!(
+        classify_theorem_problem_class(
+            "search_canonical_machine_goal_reached_from_raw_successor_semantics"
+        ),
+        SearchTheoremProblemClass::ProblemSpecific
+    );
+    assert_eq!(
+        classify_theorem_problem_class("search_canonical_machine_step_preserves_invariants"),
+        SearchTheoremProblemClass::GenericMachine
+    );
+    let problem_classes = theorem_inventory_problem_classes()
+        .into_iter()
+        .map(|entry| (entry.name, entry.problem_class))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    let artifact_problem_classes = artifact
+        .inventory_problem_classes
+        .iter()
+        .map(|entry| (entry.name.clone(), entry.problem_class))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        problem_classes.get("search_canonical_machine_goal_reached_from_graph_reachability"),
+        Some(&SearchTheoremProblemClass::ProblemSpecific)
+    );
+    assert_eq!(
+        problem_classes.get("search_threaded_exact_single_lane_state_slice_refines_canonical"),
+        Some(&SearchTheoremProblemClass::GenericMachine)
+    );
+    assert_eq!(artifact_problem_classes, problem_classes);
+}
+
+#[test]
+fn approximation_contract_vocabulary_classifies_profiles_in_generic_terms() {
+    assert_eq!(
+        classify_approximation_contract(SearchExecutionPolicy::new(
+            SearchSchedulerProfile::CanonicalSerial,
+            1
+        )),
+        SearchApproximationContractClass::Exact
+    );
+    assert_eq!(
+        classify_approximation_contract(SearchExecutionPolicy::new(
+            SearchSchedulerProfile::BatchedParallelExact,
+            2
+        )),
+        SearchApproximationContractClass::CertifiedWindowExact
+    );
+    assert_eq!(
+        classify_approximation_contract(SearchExecutionPolicy::new(
+            SearchSchedulerProfile::BatchedParallelEnvelopeBounded,
+            2
+        )),
+        SearchApproximationContractClass::EnvelopeBounded
+    );
+    assert_eq!(
+        classify_approximation_contract(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1)
+                .with_effort_profile(telltale_search::SearchEffortProfile::SchedulerStepBudget(5))
+        ),
+        SearchApproximationContractClass::BudgetedAnytime
+    );
 }
 
 #[cfg(feature = "multi-thread")]
@@ -1533,16 +1709,16 @@ fn parallel_width_variants_preserve_authoritative_results() {
         .expect("parallel run");
 
         assert_eq!(
-            report.observation.incumbent_cost,
-            serial_report.observation.incumbent_cost
+            report.observation.selected_result_cost,
+            serial_report.observation.selected_result_cost
         );
         assert_eq!(
-            report.observation.incumbent_path,
-            serial_report.observation.incumbent_path
+            report.observation.selected_result_witness,
+            serial_report.observation.selected_result_witness
         );
         assert_eq!(
-            replay.final_observation.incumbent_cost,
-            serial_replay.final_observation.incumbent_cost
+            replay.final_observation.selected_result_cost,
+            serial_replay.final_observation.selected_result_cost
         );
         let comparison = compare_observations(
             &serial_report.observation,
@@ -1553,8 +1729,8 @@ fn parallel_width_variants_preserve_authoritative_results() {
                 SearchDeterminismMode::ModuloCommutativity
             },
             &[
-                SearchObservableClass::IncumbentCost,
-                SearchObservableClass::CanonicalPathIdentity,
+                SearchObservableClass::SelectedResultCost,
+                SearchObservableClass::SelectedResultWitnessIdentity,
                 SearchObservableClass::NormalizedCommitTrace,
             ],
         );

@@ -8,7 +8,7 @@ mod enabled {
 
     use telltale_search::{
         run_with_executor, EpsilonMilli, NativeParallelExecutor, SearchDomain,
-        SearchFairnessAssumption, SearchRunConfig, SearchSchedulerProfile,
+        SearchExecutionPolicy, SearchFairnessAssumption, SearchRunConfig, SearchSchedulerProfile,
     };
 
     #[derive(Clone, Debug, Default)]
@@ -66,13 +66,12 @@ mod enabled {
         let (report, replay) = run_with_executor(
             &mut machine,
             &executor,
-            SearchRunConfig {
-                scheduler_profile: SearchSchedulerProfile::ThreadedExactSingleLane,
-                batch_width: 1,
-                fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+            SearchRunConfig::new(
+                SearchExecutionPolicy::new(SearchSchedulerProfile::ThreadedExactSingleLane, 1),
+                [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                     .into_iter()
                     .collect(),
-            },
+            ),
         )
         .expect("threaded vector run");
 

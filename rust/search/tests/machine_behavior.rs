@@ -5,7 +5,7 @@ mod support;
 use support::{FixtureDomain, UnstableOrderDomain};
 use telltale_search::{
     AuthorityReadSet, AuthorityWriteSet, EpsilonMilli, Proposal, ProposalKind, SearchError,
-    SearchFairnessAssumption, SearchMachine, SearchSchedulerProfile,
+    SearchFairnessAssumption, SearchMachine, SearchQuery, SearchSchedulerProfile,
 };
 
 fn make_domain(edges: &[(u8, u8, &'static str, u64)], heuristics: &[(u8, u64)]) -> FixtureDomain {
@@ -95,7 +95,7 @@ fn incumbent_tracks_canonical_reconstruction() {
     machine.run_to_completion().expect("run to completion");
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, 2);
-    assert_eq!(incumbent.path, vec![0, 1, 3]);
+    assert_eq!(incumbent.witness, vec![0, 1, 3]);
 }
 
 #[test]
@@ -127,8 +127,8 @@ fn observation_artifact_reflects_canonical_state() {
             .into_iter()
             .collect(),
     );
-    assert_eq!(artifact.incumbent_cost, Some(2));
-    assert_eq!(artifact.incumbent_path, Some(vec![0, 1, 2]));
+    assert_eq!(artifact.selected_result_cost, Some(2));
+    assert_eq!(artifact.selected_result_witness, Some(vec![0, 1, 2]));
     assert_eq!(artifact.graph_epoch_trace, vec![7]);
     assert_eq!(artifact.productive_steps, 2);
     assert_eq!(artifact.total_scheduler_steps, 3);
@@ -192,9 +192,9 @@ fn long_chain_search_reaches_the_tail_goal() {
     machine.run_to_completion().expect("run to completion");
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, 31);
-    assert_eq!(incumbent.path.len(), 32);
-    assert_eq!(incumbent.path.first(), Some(&0));
-    assert_eq!(incumbent.path.last(), Some(&31));
+    assert_eq!(incumbent.witness.len(), 32);
+    assert_eq!(incumbent.witness.first(), Some(&0));
+    assert_eq!(incumbent.witness.last(), Some(&31));
 }
 
 #[test]
@@ -214,8 +214,49 @@ fn dense_shared_successor_preserves_the_best_parent() {
     machine.run_to_completion().expect("run to completion");
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, 3);
-    assert_eq!(incumbent.path, vec![0, 2, 4]);
+    assert_eq!(incumbent.witness, vec![0, 2, 4]);
     assert_eq!(machine.state().parent.get(&4).expect("parent").from, 2);
+}
+
+#[test]
+fn multi_goal_query_selects_the_best_reachable_terminal() {
+    let domain = make_domain(
+        &[
+            (0, 1, "0-1", 1),
+            (1, 4, "1-4", 3),
+            (0, 2, "0-2", 1),
+            (2, 5, "2-5", 1),
+        ],
+        &[],
+    );
+    let query = SearchQuery::multi_goal(0, vec![4, 5]);
+    let mut machine = SearchMachine::new_with_query(domain, 1, query, EpsilonMilli::one());
+    machine.run_to_completion().expect("run to completion");
+    let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
+    assert_eq!(incumbent.cost, 2);
+    assert_eq!(incumbent.witness, vec![0, 2, 5]);
+    assert!(machine.query().accepts(&5));
+    assert!(machine.query().accepts(&4));
+}
+
+#[test]
+fn candidate_set_query_can_publish_a_selected_result_without_a_single_goal_identity() {
+    let domain = make_domain(
+        &[
+            (0, 1, "0-1", 1),
+            (1, 3, "1-3", 1),
+            (0, 2, "0-2", 1),
+            (2, 4, "2-4", 4),
+        ],
+        &[],
+    );
+    let query = SearchQuery::candidate_set(0, vec![3, 4], None);
+    let mut machine = SearchMachine::new_with_query(domain, 1, query, EpsilonMilli::one());
+    machine.run_to_completion().expect("run to completion");
+    let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
+    assert_eq!(incumbent.cost, 2);
+    assert_eq!(incumbent.witness, vec![0, 1, 3]);
+    assert_eq!(machine.query().primary_target(), &3);
 }
 
 #[test]
@@ -297,8 +338,8 @@ fn self_loops_do_not_create_infinite_productive_churn() {
             .into_iter()
             .collect(),
     );
-    assert_eq!(artifact.incumbent_cost, Some(2));
-    assert_eq!(artifact.incumbent_path, Some(vec![0, 1, 2]));
+    assert_eq!(artifact.selected_result_cost, Some(2));
+    assert_eq!(artifact.selected_result_witness, Some(vec![0, 1, 2]));
     assert_eq!(artifact.productive_steps, 2);
 }
 
@@ -317,7 +358,7 @@ fn cycles_terminate_with_stable_parent_and_goal_cost() {
     machine.run_to_completion().expect("run to completion");
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, 3);
-    assert_eq!(incumbent.path, vec![0, 1, 2, 3]);
+    assert_eq!(incumbent.witness, vec![0, 1, 2, 3]);
     assert_eq!(machine.state().parent.get(&1).expect("parent").from, 0);
 }
 
@@ -358,8 +399,8 @@ fn unreachable_cyclic_region_does_not_perturb_incumbent_publication() {
             .into_iter()
             .collect(),
     );
-    assert_eq!(artifact.incumbent_cost, Some(3));
-    assert_eq!(artifact.incumbent_publication_trace.len(), 1);
+    assert_eq!(artifact.selected_result_cost, Some(3));
+    assert_eq!(artifact.selected_result_publication_trace.len(), 1);
 }
 
 #[test]
@@ -378,7 +419,7 @@ fn saturating_costs_produce_stable_goal_selection() {
     machine.run_to_completion().expect("run to completion");
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, u64::MAX);
-    assert_eq!(incumbent.path, vec![0, 1, 3]);
+    assert_eq!(incumbent.witness, vec![0, 1, 3]);
 }
 
 #[test]
@@ -408,5 +449,5 @@ fn equal_saturating_paths_keep_tie_breaking_deterministic() {
     machine.run_to_completion().expect("run to completion");
     let incumbent = machine.state().incumbent.as_ref().expect("incumbent");
     assert_eq!(incumbent.cost, u64::MAX);
-    assert_eq!(incumbent.path, vec![0, 1, 3]);
+    assert_eq!(incumbent.witness, vec![0, 1, 3]);
 }

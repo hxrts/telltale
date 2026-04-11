@@ -4,20 +4,19 @@ mod support;
 
 use telltale_search::{
     commit_epoch_reconfiguration, run_with_executor, EpochReconfigurationRequest, EpsilonMilli,
-    SearchFairnessAssumption, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
-    SerialProposalExecutor,
+    SearchExecutionPolicy, SearchFairnessAssumption, SearchMachine, SearchReseedingPolicy,
+    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 use support::FixtureDomain;
 
 fn run_config() -> SearchRunConfig {
-    SearchRunConfig {
-        scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-        batch_width: 1,
-        fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+    SearchRunConfig::new(
+        SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+        [SearchFairnessAssumption::DeterministicSchedulerConfluence]
             .into_iter()
             .collect(),
-    }
+    )
 }
 
 #[test]
@@ -34,7 +33,10 @@ fn chain_graph_has_stable_step_commit_and_publication_counts() {
     assert_eq!(report.progress.productive_steps, 3);
     assert_eq!(report.progress.total_scheduler_steps, 4);
     assert_eq!(report.observation.normalized_commit_trace.len(), 3);
-    assert_eq!(report.observation.incumbent_publication_trace.len(), 1);
+    assert_eq!(
+        report.observation.selected_result_publication_trace.len(),
+        1
+    );
     assert_eq!(replay.rounds.len(), 4);
 }
 
@@ -55,7 +57,10 @@ fn fan_in_graph_has_stable_batch_commit_shape() {
     assert_eq!(report.progress.productive_steps, 2);
     assert_eq!(report.progress.total_scheduler_steps, 3);
     assert_eq!(report.observation.normalized_commit_trace.len(), 4);
-    assert_eq!(report.observation.incumbent_publication_trace.len(), 1);
+    assert_eq!(
+        report.observation.selected_result_publication_trace.len(),
+        1
+    );
     assert_eq!(replay.rounds[0].commits.len(), 3);
     assert_eq!(replay.rounds[1].commits.len(), 1);
     assert_eq!(replay.rounds[2].commits.len(), 0);
@@ -76,7 +81,10 @@ fn cyclic_trap_graph_has_stable_commit_and_publication_counts() {
     assert_eq!(report.progress.productive_steps, 3);
     assert_eq!(report.progress.total_scheduler_steps, 4);
     assert_eq!(report.observation.normalized_commit_trace.len(), 3);
-    assert_eq!(report.observation.incumbent_publication_trace.len(), 1);
+    assert_eq!(
+        report.observation.selected_result_publication_trace.len(),
+        1
+    );
     assert_eq!(replay.rounds.len(), 4);
 }
 
@@ -88,7 +96,13 @@ fn reconfiguration_run_has_stable_epoch_and_commit_accounting() {
 
     let mut machine = SearchMachine::new(domain, 1, 0, 2, EpsilonMilli::one());
     machine.step_once().expect("initial pre-barrier step");
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
     let (report, replay) = run_with_executor(&mut machine, &SerialProposalExecutor, run_config())
         .expect("reconfigured run");
 
@@ -96,6 +110,9 @@ fn reconfiguration_run_has_stable_epoch_and_commit_accounting() {
     assert_eq!(report.progress.productive_steps, 3);
     assert_eq!(report.progress.total_scheduler_steps, 4);
     assert_eq!(report.observation.normalized_commit_trace.len(), 3);
-    assert_eq!(report.observation.incumbent_publication_trace.len(), 1);
+    assert_eq!(
+        report.observation.selected_result_publication_trace.len(),
+        1
+    );
     assert_eq!(replay.epoch_trace, vec![1, 2]);
 }

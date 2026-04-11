@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::admission::{SearchFairnessAssumption, SearchSchedulerProfile};
 use crate::cost::{EpsilonMilli, SearchCost};
-use crate::domain::SearchDomain;
+use crate::domain::{SearchDomain, SearchQuery};
 use crate::observe::{
     IncumbentPublicationRecord, NormalizedCommitRecord, SearchObservationAccumulator,
     SearchObservationArtifact,
@@ -93,14 +93,22 @@ pub struct ParentRecord<N, E, C> {
     pub edge_cost: C,
 }
 
-/// Current best known goal solution.
+/// Current best known selected solution.
+///
+/// For built-in path-search queries, `witness` is the canonical reconstructed
+/// path to the currently selected terminal. Domains may override the witness
+/// reconstruction policy while still using the same canonical machine.
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct Incumbent<N, C> {
-    /// Canonical goal cost.
+pub struct SelectedSolution<N, C> {
+    /// Canonical selected-solution cost.
     pub cost: C,
-    /// Canonical reconstructed path.
-    pub path: Vec<N>,
+    /// Canonical selected-solution witness for path-style queries.
+    pub witness: Vec<N>,
 }
+
+/// Historical incumbent vocabulary retained alongside the generic
+/// selected-solution name during migration.
+pub type Incumbent<N, C> = SelectedSolution<N, C>;
 
 /// Proposal kind emitted by expansion work.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -146,7 +154,7 @@ pub struct SearchState<N, E, G, S, C> {
     /// Canonical parent relation for non-start nodes.
     pub parent: BTreeMap<N, ParentRecord<N, E, C>>,
     /// Current incumbent solution.
-    pub incumbent: Option<Incumbent<N, C>>,
+    pub incumbent: Option<SelectedSolution<N, C>>,
     /// Current epsilon.
     pub epsilon: EpsilonMilli,
     /// Current search phase.
@@ -191,6 +199,7 @@ pub struct SearchMachine<D: SearchDomain> {
     pub(crate) domain: D,
     pub(crate) start: D::Node,
     pub(crate) goal: D::Node,
+    pub(crate) query: SearchQuery<D::Node>,
     pub(crate) state: MachineState<D>,
     pub(crate) observation: SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost>,
     pub(crate) last_batch: Option<MachineBatch<D>>,
@@ -206,7 +215,25 @@ impl<D: SearchDomain> SearchMachine<D> {
         goal: D::Node,
         epsilon: EpsilonMilli,
     ) -> Self {
+        Self::new_with_query(
+            domain,
+            epoch,
+            SearchQuery::single_goal(start, goal),
+            epsilon,
+        )
+    }
+
+    /// Create a new canonical serial search machine for one generalized query.
+    #[must_use]
+    pub fn new_with_query(
+        domain: D,
+        epoch: D::GraphEpoch,
+        query: SearchQuery<D::Node>,
+        epsilon: EpsilonMilli,
+    ) -> Self {
         let snapshot_id = domain.snapshot_id(&epoch);
+        let start = query.start().clone();
+        let goal = query.primary_target().clone();
         let mut state = SearchState {
             open: BTreeMap::new(),
             closed: BTreeSet::new(),
@@ -224,7 +251,7 @@ impl<D: SearchDomain> SearchMachine<D> {
         let start_score = Self::frontier_entry_for(
             &domain,
             &state.graph_epoch,
-            &goal,
+            &query,
             epsilon,
             &start,
             D::Cost::zero(),
@@ -235,12 +262,14 @@ impl<D: SearchDomain> SearchMachine<D> {
             domain,
             start,
             goal,
+            query,
             state,
             observation: SearchObservationAccumulator {
                 normalized_commit_trace: Vec::new(),
                 replay_checkpoints: Vec::new(),
                 graph_epoch_trace: vec![epoch],
-                incumbent_publication_trace: Vec::new(),
+                reseed_policy_trace: Vec::new(),
+                selected_result_publication_trace: Vec::new(),
             },
             last_batch: None,
         }
@@ -250,6 +279,18 @@ impl<D: SearchDomain> SearchMachine<D> {
     #[must_use]
     pub fn state(&self) -> &MachineState<D> {
         &self.state
+    }
+
+    /// Borrow the generalized query driving the machine.
+    #[must_use]
+    pub fn query(&self) -> &SearchQuery<D::Node> {
+        &self.query
+    }
+
+    /// Borrow the current selected solution, if one has been published.
+    #[must_use]
+    pub fn selected_solution(&self) -> Option<&SelectedSolution<D::Node, D::Cost>> {
+        self.state.incumbent.as_ref()
     }
 
     /// Borrow the accumulated observation records.
@@ -284,6 +325,16 @@ impl<D: SearchDomain> SearchMachine<D> {
             entries: batch_entries,
         };
         Some(batch)
+    }
+
+    fn sorted_open_entries(&self) -> Vec<FrontierEntry<D::Node, D::Cost>> {
+        let mut entries = self.state.open.values().cloned().collect::<Vec<_>>();
+        entries.sort_by(|left, right| {
+            left.frontier_score
+                .cmp(&right.frontier_score)
+                .then(left.node.cmp(&right.node))
+        });
+        entries
     }
 
     /// Expand one canonical batch into speculative proposals.
@@ -324,15 +375,20 @@ impl<D: SearchDomain> SearchMachine<D> {
         &self,
         proposals: &mut Vec<Proposal<D::Node, D::EdgeMeta, D::Cost>>,
     ) {
-        proposals.sort_by(|left, right| {
-            left.to
-                .cmp(&right.to)
-                .then(left.tentative_g.cmp(&right.tentative_g))
-                .then(left.from.cmp(&right.from))
-                .then(left.batch_index.cmp(&right.batch_index))
-                .then(left.kind.cmp(&right.kind))
-        });
-        proposals.dedup_by(|left, right| left.to == right.to);
+        let mut best_by_target = BTreeMap::new();
+        for proposal in proposals.drain(..) {
+            match best_by_target.entry(proposal.to.clone()) {
+                std::collections::btree_map::Entry::Vacant(slot) => {
+                    slot.insert(proposal);
+                }
+                std::collections::btree_map::Entry::Occupied(mut slot) => {
+                    if Self::canonical_proposal_cmp(&proposal, slot.get()).is_lt() {
+                        slot.insert(proposal);
+                    }
+                }
+            }
+        }
+        *proposals = best_by_target.into_values().collect();
     }
 
     /// Commit one normalized proposal slice.
@@ -435,7 +491,7 @@ impl<D: SearchDomain> SearchMachine<D> {
             let entry = Self::frontier_entry_for(
                 &self.domain,
                 &self.state.graph_epoch,
-                &self.goal,
+                &self.query,
                 self.state.epsilon,
                 &node,
                 g_score,
@@ -453,26 +509,30 @@ impl<D: SearchDomain> SearchMachine<D> {
         fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
     ) -> SearchObservationArtifact<D::Node, D::GraphEpoch, D::Cost> {
         SearchObservationArtifact {
-            incumbent_cost: self
+            selected_result_cost: self
                 .state
                 .incumbent
                 .as_ref()
                 .map(|incumbent| incumbent.cost),
-            incumbent_path: self
+            selected_result_witness: self
                 .state
                 .incumbent
                 .as_ref()
-                .map(|incumbent| incumbent.path.clone()),
+                .map(|incumbent| incumbent.witness.clone()),
             canonical_parent_map: self
                 .state
                 .parent
                 .iter()
                 .map(|(node, parent)| (node.clone(), parent.from.clone()))
                 .collect(),
-            incumbent_publication_trace: self.observation.incumbent_publication_trace.clone(),
+            selected_result_publication_trace: self
+                .observation
+                .selected_result_publication_trace
+                .clone(),
             normalized_commit_trace: self.observation.normalized_commit_trace.clone(),
             replay_checkpoints: self.observation.replay_checkpoints.clone(),
             graph_epoch_trace: self.observation.graph_epoch_trace.clone(),
+            reseed_policy_trace: self.observation.reseed_policy_trace.clone(),
             scheduler_profile,
             fairness_assumptions,
             productive_steps: self.state.trace_state.productive_steps,
@@ -538,14 +598,14 @@ impl<D: SearchDomain> SearchMachine<D> {
 
         if let Some(incumbent) = &self.state.incumbent {
             let goal_cost = self
-                .state
-                .g_score
-                .get(&self.goal)
+                .selected_result_terminal()
+                .and_then(|node| self.state.g_score.get(node))
                 .ok_or(SearchInvariantViolation::IncumbentMismatch)?;
             let goal_path = self
-                .reconstruct_path(&self.goal)
+                .selected_result_terminal()
+                .and_then(|node| self.reconstruct_path(node))
                 .ok_or(SearchInvariantViolation::IncumbentMismatch)?;
-            if incumbent.cost != *goal_cost || incumbent.path != goal_path {
+            if incumbent.cost != *goal_cost || incumbent.witness != goal_path {
                 return Err(SearchInvariantViolation::IncumbentMismatch);
             }
         }
@@ -566,12 +626,12 @@ impl<D: SearchDomain> SearchMachine<D> {
     pub(crate) fn frontier_entry_for(
         domain: &D,
         epoch: &D::GraphEpoch,
-        goal: &D::Node,
+        query: &SearchQuery<D::Node>,
         epsilon: EpsilonMilli,
         node: &D::Node,
         g_score: D::Cost,
     ) -> FrontierEntry<D::Node, D::Cost> {
-        let heuristic = domain.heuristic(epoch, node, goal);
+        let heuristic = domain.query_heuristic(epoch, node, query);
         FrontierEntry {
             node: node.clone(),
             g_score,
@@ -580,16 +640,6 @@ impl<D: SearchDomain> SearchMachine<D> {
                 g_cost: g_score.order_key(),
             },
         }
-    }
-
-    fn sorted_open_entries(&self) -> Vec<FrontierEntry<D::Node, D::Cost>> {
-        let mut entries = self.state.open.values().cloned().collect::<Vec<_>>();
-        entries.sort_by(|left, right| {
-            left.frontier_score
-                .cmp(&right.frontier_score)
-                .then(left.node.cmp(&right.node))
-        });
-        entries
     }
 
     fn proposal_improves_state(&self, proposal: &Proposal<D::Node, D::EdgeMeta, D::Cost>) -> bool {
@@ -631,7 +681,7 @@ impl<D: SearchDomain> SearchMachine<D> {
             let entry = Self::frontier_entry_for(
                 &self.domain,
                 &self.state.graph_epoch,
-                &self.goal,
+                &self.query,
                 self.state.epsilon,
                 &proposal.to,
                 proposal.tentative_g,
@@ -645,62 +695,112 @@ impl<D: SearchDomain> SearchMachine<D> {
                 parent: Some(proposal.from.clone()),
                 g_score: proposal.tentative_g,
             });
-        proposal.to == self.goal
+        self.query.accepts(&proposal.to)
     }
 
     fn refresh_incumbent(&mut self) {
-        let Some(goal_cost) = self.state.g_score.get(&self.goal).copied() else {
-            return;
-        };
-        let Some(path) = self.reconstruct_path(&self.goal) else {
+        let Some((selected_cost, path)) = self.best_selected_solution() else {
             return;
         };
         match &self.state.incumbent {
             None => {
                 self.state.incumbent = Some(Incumbent {
-                    cost: goal_cost,
-                    path: path.clone(),
+                    cost: selected_cost,
+                    witness: path.clone(),
                 });
-                self.observation
-                    .incumbent_publication_trace
-                    .push(IncumbentPublicationRecord {
-                        cost: goal_cost,
-                        path,
-                    });
+                self.observation.selected_result_publication_trace.push(
+                    IncumbentPublicationRecord {
+                        cost: selected_cost,
+                        witness: path,
+                    },
+                );
             }
-            Some(current) if goal_cost < current.cost => {
-                self.state.incumbent = Some(Incumbent {
-                    cost: goal_cost,
-                    path: path.clone(),
+            Some(current) if selected_cost < current.cost => {
+                self.state.incumbent = Some(SelectedSolution {
+                    cost: selected_cost,
+                    witness: path.clone(),
                 });
-                self.observation
-                    .incumbent_publication_trace
-                    .push(IncumbentPublicationRecord {
-                        cost: goal_cost,
-                        path,
-                    });
+                self.observation.selected_result_publication_trace.push(
+                    IncumbentPublicationRecord {
+                        cost: selected_cost,
+                        witness: path,
+                    },
+                );
             }
-            Some(current) if goal_cost == current.cost && path < current.path => {
-                self.state.incumbent = Some(Incumbent {
-                    cost: goal_cost,
-                    path: path.clone(),
+            Some(current)
+                if self.domain.compare_selected_solutions(
+                    selected_cost,
+                    &path,
+                    current.cost,
+                    &current.witness,
+                ) == core::cmp::Ordering::Less =>
+            {
+                self.state.incumbent = Some(SelectedSolution {
+                    cost: selected_cost,
+                    witness: path.clone(),
                 });
-                self.observation
-                    .incumbent_publication_trace
-                    .push(IncumbentPublicationRecord {
-                        cost: goal_cost,
-                        path,
-                    });
+                self.observation.selected_result_publication_trace.push(
+                    IncumbentPublicationRecord {
+                        cost: selected_cost,
+                        witness: path,
+                    },
+                );
             }
             Some(_) => {}
         }
     }
 
-    pub(crate) fn activate_batch(&mut self, batch: &MachineBatch<D>) {
+    /// Activate one extracted batch by moving its entries from `OPEN` into the
+    /// current phase's closed set.
+    pub fn activate_batch(&mut self, batch: &MachineBatch<D>) {
         for entry in &batch.entries {
             self.state.open.remove(&entry.node);
             self.state.closed.insert(entry.node.clone());
         }
         self.last_batch = Some(batch.clone());
+    }
+
+    fn selected_result_terminal(&self) -> Option<&D::Node> {
+        self.state
+            .incumbent
+            .as_ref()
+            .and_then(|incumbent| incumbent.witness.last())
+    }
+
+    fn best_selected_solution(&self) -> Option<(D::Cost, Vec<D::Node>)> {
+        self.query
+            .accepted_nodes()
+            .iter()
+            .filter_map(|node| {
+                if !self.domain.accepts_terminal(&self.query, node) {
+                    return None;
+                }
+                let cost = self.state.g_score.get(node).copied()?;
+                let witness =
+                    self.domain
+                        .reconstruct_selection_witness(&self.start, node, &|cursor| {
+                            self.state
+                                .parent
+                                .get(cursor)
+                                .map(|parent| parent.from.clone())
+                        })?;
+                Some((cost, witness))
+            })
+            .min_by(|left, right| {
+                self.domain
+                    .compare_selected_solutions(left.0, &left.1, right.0, &right.1)
+            })
+    }
+
+    fn canonical_proposal_cmp(
+        left: &Proposal<D::Node, D::EdgeMeta, D::Cost>,
+        right: &Proposal<D::Node, D::EdgeMeta, D::Cost>,
+    ) -> std::cmp::Ordering {
+        left.to
+            .cmp(&right.to)
+            .then(left.tentative_g.cmp(&right.tentative_g))
+            .then(left.from.cmp(&right.from))
+            .then(left.batch_index.cmp(&right.batch_index))
+            .then(left.kind.cmp(&right.kind))
     }
 }

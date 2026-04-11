@@ -4,8 +4,8 @@
 use std::collections::BTreeMap;
 
 use telltale_search::{
-    run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchRunConfig,
-    SearchSchedulerProfile, SerialProposalExecutor,
+    run_with_executor, EpsilonMilli, SearchDomain, SearchExecutionPolicy, SearchFairnessAssumption,
+    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -61,13 +61,12 @@ fn main() {
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                 .into_iter()
                 .collect(),
-        },
+        ),
     )
     .expect("vector run");
 

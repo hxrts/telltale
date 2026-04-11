@@ -46,14 +46,17 @@ pub enum SearchFairnessAssumption {
 /// Search-visible observable classes that can be requested or certified.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SearchObservableClass {
-    /// Incumbent path cost.
-    IncumbentCost,
+    /// Selected-result cost.
+    #[serde(alias = "IncumbentCost")]
+    SelectedResultCost,
     /// Canonical parent identity.
     CanonicalParentIdentity,
-    /// Canonical path identity.
-    CanonicalPathIdentity,
-    /// Incumbent publication trace.
-    IncumbentPublicationTrace,
+    /// Selected-result witness identity.
+    #[serde(alias = "CanonicalPathIdentity")]
+    SelectedResultWitnessIdentity,
+    /// Selected-result publication trace.
+    #[serde(alias = "IncumbentPublicationTrace")]
+    SelectedResultPublicationTrace,
     /// Normalized commit trace.
     NormalizedCommitTrace,
     /// Replay checkpoint trace.
@@ -67,6 +70,18 @@ pub enum SearchObservableClass {
     /// Productive and total-step accounting.
     ProgressAccounting,
 }
+
+/// Generic alias for the selected-result cost observable.
+pub const SELECTED_RESULT_COST_OBSERVABLE: SearchObservableClass =
+    SearchObservableClass::SelectedResultCost;
+
+/// Generic alias for the selected-result witness observable.
+pub const SELECTED_RESULT_WITNESS_OBSERVABLE: SearchObservableClass =
+    SearchObservableClass::SelectedResultWitnessIdentity;
+
+/// Generic alias for the selected-result publication trace observable.
+pub const SELECTED_RESULT_PUBLICATION_TRACE_OBSERVABLE: SearchObservableClass =
+    SearchObservableClass::SelectedResultPublicationTrace;
 
 /// Declared commutativity region class.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
@@ -214,7 +229,7 @@ mod tests {
     fn full_user() -> SearchDUser {
         SearchDUser {
             required_observables: [
-                SearchObservableClass::IncumbentCost,
+                SearchObservableClass::SelectedResultCost,
                 SearchObservableClass::SchedulerProfileTrace,
             ]
             .into_iter()
@@ -236,7 +251,7 @@ mod tests {
     fn full_certified() -> SearchCertifiedCapability {
         SearchCertifiedCapability {
             supported_observables: [
-                SearchObservableClass::IncumbentCost,
+                SearchObservableClass::SelectedResultCost,
                 SearchObservableClass::SchedulerProfileTrace,
             ]
             .into_iter()
@@ -265,7 +280,9 @@ mod tests {
     fn containment_rejects_missing_profile_scheduler_and_fairness() {
         let user = full_user();
         let certified = SearchCertifiedCapability {
-            supported_observables: [SearchObservableClass::IncumbentCost].into_iter().collect(),
+            supported_observables: [SearchObservableClass::SelectedResultCost]
+                .into_iter()
+                .collect(),
             supported_profiles: [SearchDeterminismMode::Full].into_iter().collect(),
             supported_scheduler_profiles: [SearchSchedulerProfile::CanonicalSerial]
                 .into_iter()
@@ -297,8 +314,9 @@ mod tests {
     #[test]
     fn containment_rejects_missing_observable_and_batch_width_boundary() {
         let mut certified = full_certified();
-        certified.supported_observables =
-            [SearchObservableClass::IncumbentCost].into_iter().collect();
+        certified.supported_observables = [SearchObservableClass::SelectedResultCost]
+            .into_iter()
+            .collect();
         certified.max_certified_batch_width = 3;
         let reasons = check_capability_containment(&full_user(), &certified);
         assert!(

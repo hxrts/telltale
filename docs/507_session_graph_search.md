@@ -13,34 +13,64 @@ capability vocabulary for scheduler profiles, fairness assumptions, and
 observable classes. Downstream crates provide domain-specific node and edge
 semantics, heuristic and cost policies, graph snapshots, and epoch updates.
 
+Execution policy is explicit and separate from downstream search-problem
+semantics. Downstream control policy may choose scheduler profile, batch
+width, caching mode, and effort regime, but that execution-side choice does
+not redefine the search objective or candidate meaning.
+
 `telltale-simulator` can project search runs through
 `project_search_run(...)`. `telltale-viewer` can project search artifacts
 through `project_search_artifacts(...)`. These integration layers are optional
 and live above the crate boundary.
 
+Allowed downstream variation includes:
+
+- node and edge meaning
+- heuristic and cost policy
+- success/selection criterion
+- reconstruction witness
+- execution profile
+
+Non-goal:
+the crate does not define downstream domain truth, candidate eligibility, or
+objective semantics.
+
 ## Core Surface
 
 `SearchDomain` defines the contract a downstream domain must implement:
-successor generation, heuristic evaluation, and snapshot identity.
+successor generation, heuristic evaluation, snapshot identity, and optionally
+custom authority-surface derivation through the blanket
+`SearchAuthorityPolicy` hook.
 `SearchCost` and its concrete implementation `EpsilonMilli` define the cost
 algebra. `EpsilonMilli` uses fixed-point milli-precision with a `u32` backing
 store.
 
-`SearchMachine` owns the frontier, parent map, incumbent, and budget state. It
-exposes `step_once(...)` for single canonical steps and explicit invariant
-checks for partition discipline, parent-score coherence, incumbent coherence,
-and batch legality. `CanonicalBatch` and `Proposal` represent the min-key batch
-window and its normalized expansion results. Path reconstruction is available
-through the incumbent.
+`SearchQuery` generalizes the built-in problem surface:
+
+- `SingleGoal` for classic one-goal path search
+- `MultiGoal` for any-of-N terminal search
+- `CandidateSet` for selector-style best-candidate search
+
+`SearchMachine` owns the frontier, parent map, selected solution, and budget
+state. The historical incumbent vocabulary is still present for compatibility,
+but the crate also exports selected-result aliases and accessors.
+`SearchMachine` exposes `step_once(...)` for single canonical steps and
+explicit invariant checks for partition discipline, parent-score coherence,
+selected-result coherence, and batch legality. `CanonicalBatch` and `Proposal`
+represent the min-key batch window and its normalized expansion results. The
+built-in path-search adapters still reconstruct canonical paths.
 
 ## Runtime Surface
 
 `run_with_executor(...)` is the canonical host execution entry point.
-`SearchRunConfig` provides typed runtime configuration for scheduler profile,
-fairness assumptions, and batch width. `validate_run_config(...)` enforces
-fail-closed checks for scheduler-profile, executor-kind, fairness, and
-batch-width mismatches before execution begins. The executor strategy is
-supplied separately via the `ProposalExecutor` implementation.
+`SearchExecutionPolicy` is the explicit execution-side runtime policy surface:
+it carries scheduler profile, batch width, caching profile, and effort
+profile. `SearchRunConfig` packages that execution policy together with the
+declared fairness assumptions. `validate_run_config(...)` enforces fail-closed
+checks for unsupported execution-policy variants, executor-kind mismatches,
+fairness mismatches, and batch-width mismatches before execution begins. The
+executor strategy is supplied separately via the `ProposalExecutor`
+implementation and does not define search-problem semantics.
 
 `ProposalExecutor` is the trait for batch expansion strategies.
 `SerialProposalExecutor` runs proposals sequentially.
@@ -48,9 +78,12 @@ supplied separately via the `ProposalExecutor` implementation.
 enabled. Constructing `NativeParallelExecutor` without the feature fails
 explicitly rather than silently degrading.
 
-The runtime emits `SchedulerArtifact` for scheduler classification,
+The runtime emits `SchedulerArtifact` for scheduler classification and the
+declared execution policy,
 `SearchFairnessArtifact` for profile-scoped fairness evidence,
-`SearchRouteBoundArtifact` for route discovery and quality reporting, and
+`SearchResultBoundArtifact` for generic selected-result discovery and quality
+reporting, with `SearchRouteBoundArtifact` retained as the path-search
+compatibility alias, and
 packages them together with state traces and progress summary in
 `SearchExecutionReport`. `SearchStateArtifact` provides per-round state and
 certificate traces for exact-profile correspondence checks. `SearchFullStateArtifact`
@@ -61,6 +94,23 @@ epsilon, epoch/snapshot, last-batch nodes, and full commit/publication traces.
 claim class, theorem-side certificate, and whether exact
 commit-trace/state-slice/observation equivalence to canonical serial is part
 of the claimed surface for that profile.
+
+`SearchResultSummary` is the generic selected-result summary exported in result
+bounds. Path-search-specific summary data now lives under its optional
+`path_summary` helper, with `SearchRouteSummary` retained as the compatibility
+alias for that path-specific wrapper rather than the primary generic summary.
+
+The theorem-pack surface is also classified conceptually into:
+
+- generic machine/refinement/fairness theorems
+- problem-class-specific completeness/discovery theorems
+
+Rust currently exposes helper classification for this split through
+`classify_theorem_problem_class(...)` and
+`theorem_inventory_problem_classes()`. The theorem-pack artifact now exports
+that split directly in `inventory_problem_classes` alongside
+`inventory_support_classes`. Lean mirrors the same distinction in the search
+theorem inventory docs.
 
 ## Admission and Capabilities
 
@@ -84,9 +134,16 @@ observation from canonical round commits and rejects drift against the stored
 artifact.
 
 `EpochReconfigurationRequest` and `commit_epoch_reconfiguration(...)` handle
-graph-epoch transitions. Reconfiguration resets the canonical frontier, parent
-map, and incumbent state, then re-seeds from the start node. Runtime failures
-during proposal generation do not consume the canonical batch.
+graph-epoch transitions. Reconfiguration now carries an explicit
+`SearchReseedingPolicy`:
+
+- `StartOnly` resets the frontier and reseeds only from the canonical start
+- `PreserveOpenAndIncons` preserves the live frontier plus the retained parent
+  closure needed for witness reconstruction
+
+Replay and state artifacts record the applied reseeding policy on runs that
+cross epoch barriers. Runtime failures during proposal generation do not
+consume the canonical batch.
 
 ## Observation and Comparison
 
@@ -95,17 +152,87 @@ search run. `compare_observations(...)` compares two artifacts against a
 determinism mode and observable class list. Under `ModuloCommutativity` mode,
 normalized commit traces are compared as multisets rather than sequences.
 
-Observable classes include `IncumbentCost`, `CanonicalPathIdentity`,
-`NormalizedCommitTrace`, `GraphEpochTrace`, `SchedulerProfileTrace`, and
-`ProgressAccounting`.
+Observable classes still use the historical incumbent/path terms for backward
+compatibility on deserialization, but the primary exported names are now the
+generic selected-result terms. Observable classes include
+`SelectedResultCost`, `SelectedResultWitnessIdentity`,
+`SelectedResultPublicationTrace`, `NormalizedCommitTrace`,
+`GraphEpochTrace`, `SchedulerProfileTrace`, and `ProgressAccounting`.
+
+## Profiling Surface
+
+The repo now includes an explicit profiling matrix for the generalized search
+surface:
+
+- end-to-end Criterion workloads in `rust/search/benches/search_profiles.rs`
+- phase microbenchmarks in `rust/search/benches/search_machine_phases.rs`
+- runtime-overhead microbenchmarks in
+  `rust/search/benches/search_runtime_overheads.rs`
+- structural counters in `rust/search/benches/support.rs`
+- saved-profile helpers in `scripts/ops/profile-search-bench.sh`
+- convenience entry points:
+  - `just profile-search-chain`
+  - `just profile-search-rebuild`
+  - `just profile-search-threaded`
+  - `just profile-search-machine-only`
+  - `just profile-search-artifact`
+  - `just profile-search-invariants`
+
+The benchmark harness reports frontier growth, batch count, proposal churn,
+duplicate elimination, commit count, rebuild count, and publication count so
+performance work can separate generic machine cost from executor and artifact
+overhead. The profiling surface should be used before making search-structure
+optimizations; hotspot assumptions should not be treated as stable until after
+the generalized query/result/authority surfaces are in place.
+
+The profiling split is intentionally layered:
+
+- algorithm/search work:
+  `search_profiles` and the machine-only runtime-overhead bench
+- executor/scheduler overhead:
+  compare `runtime_machine_only_chain_256` against
+  `runtime_executor_serial_chain_256`
+- theorem/replay/artifact work:
+  `runtime_observation_export_chain_256` and
+  `runtime_full_state_export_chain_256`
+- invariant-checking cost:
+  `runtime_invariant_check_frontier_512`
+
+Current review findings:
+
+- replacing `next_batch(...)` full-frontier sorting with a naive two-pass
+  min-score scan regressed both `phase_next_batch_frontier_512` and the
+  end-to-end `serial_chain_256` workload, so that change was rejected
+- duplicate-heavy and rebuild-heavy workloads still show normalization churn
+  and rebuild work as stronger optimization candidates than batch extraction
+- `normalize_proposals(...)` was then changed from full sort-plus-dedup to
+  per-target best-selection after the duplicate-pressure phase bench isolated
+  that stage as the stronger hotspot
+- on `phase_normalize_proposals_duplicate_pressure_64x32`, that change reduced
+  the measured phase time from roughly `120.75-132.44 µs` to
+  `44.59-56.46 µs`
+- the improved workload class is generic machine normalization cost on
+  duplicate-heavy frontiers; it did not require theorem or artifact-schema
+  changes
+- any further optimization should be justified against those measured workload
+  classes, not assumed from the frontier implementation alone
+
+The `check-search-bench-tooling` just target is the regression guard for this
+surface. It syntax-checks the saved-profile script and compiles the search
+bench targets in both default and `multi-thread` configurations without
+running them. `just check-search-tooling` now calls it, so the benchmark and
+saved-profile surface is part of the normal search verification lane rather
+than an optional local-only check.
 
 ## Lean Proof Support
 
-The Lean formalization lives in `Runtime.Proofs.Search` and is structured in
-eleven modules. The proof hierarchy builds from frontier vocabulary through
-one-step fairness and artifact refinement into full-machine semantics, liveness,
-and completeness, all catalogued in a theorem inventory and re-exported through
-`API`.
+The Lean formalization lives in `Runtime.Proofs.Search`. The public proof
+surface is now split explicitly into a curated generic-machine barrel
+(`Generic`) and the path-problem-specific completeness/publication family
+(`PathProblems`), both re-exported through `API`. The supporting modules build
+from frontier vocabulary through one-step fairness and artifact refinement into
+full-machine semantics, liveness, completeness, and approximation-contract
+inventory rows.
 
 The per-profile fairness claim taxonomy determines what the runtime can assert
 on behalf of each scheduler profile:

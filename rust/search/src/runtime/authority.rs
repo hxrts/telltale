@@ -3,6 +3,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 
 use crate::cost::SearchCost;
+use crate::domain::{SearchDomain, SearchQuery};
 use crate::machine::Proposal;
 
 /// Machine authority surface touched by speculative proposals.
@@ -53,6 +54,35 @@ where
         }
     }
 }
+
+/// Downstream hook for deriving proposal authority surfaces.
+///
+/// The generic crate validates independence over these surfaces, but it does
+/// not require one hard-coded `(from, to, goal)` interpretation.
+pub trait SearchAuthorityPolicy: SearchDomain {
+    /// Derive the proposal read surface for one transition under one query.
+    #[must_use]
+    fn proposal_read_set(
+        &self,
+        _query: &SearchQuery<Self::Node>,
+        from: &Self::Node,
+        to: &Self::Node,
+    ) -> AuthorityReadSet<Self::Node> {
+        default_proposal_read_set(from, to)
+    }
+
+    /// Derive the proposal write surface for one transition under one query.
+    #[must_use]
+    fn proposal_write_set(
+        &self,
+        query: &SearchQuery<Self::Node>,
+        to: &Self::Node,
+    ) -> AuthorityWriteSet<Self::Node> {
+        default_proposal_write_set(query, to)
+    }
+}
+
+impl<D: SearchDomain> SearchAuthorityPolicy for D {}
 
 impl<N> Default for AuthorityWriteSet<N>
 where
@@ -106,7 +136,9 @@ where
             .is_disjoint(&left.read_set.surfaces)
 }
 
-pub(crate) fn proposal_read_set<N>(from: &N, to: &N) -> AuthorityReadSet<N>
+/// Derive the default proposal read surface used by the built-in runtime.
+#[must_use]
+pub fn default_proposal_read_set<N>(from: &N, to: &N) -> AuthorityReadSet<N>
 where
     N: Clone + Ord,
 {
@@ -123,14 +155,16 @@ where
     }
 }
 
-pub(crate) fn proposal_write_set<N>(to: &N, goal: &N) -> AuthorityWriteSet<N>
+/// Derive the default proposal write surface used by the built-in runtime.
+#[must_use]
+pub fn default_proposal_write_set<N>(query: &SearchQuery<N>, to: &N) -> AuthorityWriteSet<N>
 where
     N: Clone + Ord,
 {
     let mut target_nodes = BTreeSet::new();
     target_nodes.insert(to.clone());
     let mut surfaces = BTreeSet::new();
-    if to == goal {
+    if query.accepts(to) {
         surfaces.insert(AuthoritySurface::Incumbent);
     }
     AuthorityWriteSet {

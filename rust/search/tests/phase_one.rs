@@ -22,7 +22,7 @@ fn phase_one_scaffold_exports_compile() {
     let _ = SearchBudgetState::default();
     let _ = SearchTraceState::default();
     let _ = SearchDUser {
-        required_observables: BTreeSet::from([SearchObservableClass::IncumbentCost]),
+        required_observables: BTreeSet::from([SearchObservableClass::SelectedResultCost]),
         required_profiles: BTreeSet::from([SearchDeterminismMode::Full]),
         required_scheduler_profiles: BTreeSet::from([SearchSchedulerProfile::CanonicalSerial]),
         required_fairness: BTreeSet::from([

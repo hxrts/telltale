@@ -1,6 +1,7 @@
 import Runtime.Proofs.Search.Liveness
 import Runtime.Proofs.Search.FullMachine
 import Runtime.Proofs.Search.Envelope
+import Runtime.Proofs.Search.Approximation
 
 set_option autoImplicit false
 
@@ -19,6 +20,12 @@ inductive SearchTheoremSupportClass where
   | executableSemantics
   | refinementCorollary
   | premiseScoped
+  deriving DecidableEq, Repr
+
+/-- Whether one theorem is generic-machine or problem-class-specific. -/
+inductive SearchTheoremProblemClass where
+  | genericMachine
+  | problemSpecific
   deriving DecidableEq, Repr
 
 /-- One detailed theorem-inventory row. -/
@@ -230,6 +237,26 @@ def fairnessTheoremInventoryRows : List SearchTheoremInventoryRow :=
     , present := true
     , supportClass := .premiseScoped
     }
+  , { name := "search_canonical_serial_has_exact_result_contract"
+    , present := true
+    , supportClass := .executableSemantics
+    }
+  , { name := "search_threaded_exact_single_lane_has_exact_result_contract"
+    , present := true
+    , supportClass := .executableSemantics
+    }
+  , { name := "search_batched_parallel_exact_has_certified_window_exact_contract"
+    , present := true
+    , supportClass := .executableSemantics
+    }
+  , { name := "search_batched_parallel_envelope_has_envelope_bounded_contract"
+    , present := true
+    , supportClass := .executableSemantics
+    }
+  , { name := "search_scheduler_step_budget_yields_budgeted_anytime_contract"
+    , present := true
+    , supportClass := .executableSemantics
+    }
   ]
 
 /-- Compact theorem inventory used by existing gates. -/
@@ -239,6 +266,29 @@ def fairnessTheoremInventory : List (String × Bool) :=
 /-- Companion theorem-support classification surface. -/
 def fairnessTheoremInventorySupportClasses : List (String × SearchTheoremSupportClass) :=
   fairnessTheoremInventoryRows.map fun row => (row.name, row.supportClass)
+
+/-- Problem-class classification for one theorem inventory key. -/
+def classifyTheoremProblemClass (name : String) : SearchTheoremProblemClass :=
+  if name = "search_canonical_serial_goal_reached_from_ready_witness_path" ||
+      name = "search_canonical_machine_goal_reached_from_ready_witness_path" ||
+      name = "search_canonical_machine_goal_reached_from_graph_reachability" ||
+      name = "search_canonical_machine_goal_reached_from_raw_successor_semantics" ||
+      name = "search_goal_reachability_connects_to_incumbent_publication" ||
+      name = "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic" ||
+      name = "search_canonical_serial_goal_window_service_has_exact_suffix_bound" ||
+      name = "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound"
+  then .problemSpecific
+  else .genericMachine
+
+/-- Generic-machine theorem rows from the current search inventory. -/
+def genericMachineTheoremInventory : List (String × Bool) :=
+  fairnessTheoremInventory.filter fun (name, _) =>
+    classifyTheoremProblemClass name = .genericMachine
+
+/-- Problem-class-specific theorem rows from the current search inventory. -/
+def problemSpecificTheoremInventory : List (String × Bool) :=
+  fairnessTheoremInventory.filter fun (name, _) =>
+    classifyTheoremProblemClass name = .problemSpecific
 
 end Search
 end Proofs

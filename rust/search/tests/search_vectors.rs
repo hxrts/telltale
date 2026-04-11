@@ -11,8 +11,8 @@ use support::FixtureDomain;
 #[cfg(feature = "multi-thread")]
 use telltale_search::NativeParallelExecutor;
 use telltale_search::{
-    run_with_executor, validate_fairness_certificate_trace, EpsilonMilli, SearchFairnessAssumption,
-    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+    run_with_executor, validate_fairness_certificate_trace, EpsilonMilli, SearchExecutionPolicy,
+    SearchFairnessAssumption, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 fn vector_domain() -> FixtureDomain {
@@ -41,13 +41,12 @@ fn actual_canonical_vectors() -> Value {
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                 .into_iter()
                 .collect(),
-        },
+        ),
     )
     .expect("canonical vector run");
 
@@ -73,13 +72,12 @@ fn actual_threaded_exact_vectors() -> Value {
     let (report, replay) = run_with_executor(
         &mut machine,
         &executor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::ThreadedExactSingleLane,
-            batch_width: 1,
-            fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::ThreadedExactSingleLane, 1),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                 .into_iter()
                 .collect(),
-        },
+        ),
     )
     .expect("threaded exact vector run");
 
@@ -111,7 +109,7 @@ fn tampered_search_vectors_are_rejected_by_exact_fixture_comparison() {
     assert_ne!(actual, tampered_theorem_pack);
 
     let mut tampered_final_state = expected_vectors();
-    tampered_final_state["final_state"]["incumbent_cost"] = json!(3);
+    tampered_final_state["final_state"]["selected_result_cost"] = json!(3);
     assert_ne!(actual, tampered_final_state);
 
     let mut tampered_certified_batch = expected_vectors();
@@ -133,7 +131,7 @@ fn tampered_search_vectors_are_rejected_by_exact_fixture_comparison() {
     assert_ne!(actual, tampered_discovery_certificate);
 
     let mut tampered_route_metric = expected_vectors();
-    tampered_route_metric["route_bounds"]["selected_route_summary"]["metrics"][2]["value"] =
+    tampered_route_metric["route_bounds"]["selected_result_summary"]["metrics"][2]["value"] =
         json!(9);
     assert_ne!(actual, tampered_route_metric);
 }
@@ -159,8 +157,8 @@ fn threaded_exact_vectors_preserve_the_canonical_authoritative_artifacts() {
         canonical["observation"]["normalized_commit_trace"]
     );
     assert_eq!(
-        threaded["observation"]["incumbent_path"],
-        canonical["observation"]["incumbent_path"]
+        threaded["observation"]["selected_result_witness"],
+        canonical["observation"]["selected_result_witness"]
     );
     assert_eq!(
         threaded["theorem_pack"]["inventory"],
