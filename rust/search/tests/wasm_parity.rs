@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use support::FixtureDomain;
 use telltale_search::{
-    replay_observation, run_with_executor, EpsilonMilli, ReplayExpectation,
+    replay_observation, run_with_executor, EpsilonMilli, ReplayExpectation, SearchExecutionPolicy,
     SearchFairnessAssumption, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
     SerialProposalExecutor,
 };
@@ -36,20 +36,17 @@ fn canonical_run() -> CanonicalRun {
     run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: BTreeSet::from([
-                SearchFairnessAssumption::DeterministicSchedulerConfluence,
-            ]),
-        },
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            BTreeSet::from([SearchFairnessAssumption::DeterministicSchedulerConfluence]),
+        ),
     )
     .expect("canonical run")
 }
 
 fn assert_serial_and_replay_contracts() {
     let (report, replay) = canonical_run();
-    assert_eq!(report.observation.incumbent_cost, Some(2));
+    assert_eq!(report.observation.selected_result_cost, Some(2));
     assert_eq!(report.observation.graph_epoch_trace, vec![1]);
     let replayed = replay_observation(
         &replay,

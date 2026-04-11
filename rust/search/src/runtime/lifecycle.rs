@@ -6,7 +6,9 @@ use crate::admission::{
     SearchDeterminismMode, SearchFairnessAssumption, SearchObservableClass, SearchSchedulerProfile,
 };
 use crate::cost::SearchCost;
-use crate::domain::SearchDomain;
+use crate::domain::{
+    SearchDomain, SearchQuery, SearchReseedingPolicy, SearchSelectedResultSemanticsClass,
+};
 use crate::machine::{FrontierEntry, SearchError, SearchMachine, SearchState};
 use crate::observe::{
     IncumbentPublicationRecord, NormalizedCommitRecord, SearchObservationArtifact,
@@ -62,9 +64,22 @@ pub struct ProgressSummary {
     pub fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
 }
 
+/// How one run terminated under its declared effort profile.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SearchRunTermination {
+    /// The live frontier emptied and the run reached its natural barrier.
+    Completed,
+    /// The declared scheduler-step budget was exhausted before the frontier
+    /// emptied.
+    SchedulerStepBudgetExhausted,
+}
+
 /// Scheduler artifact for one run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SchedulerArtifact {
+    /// Declared execution policy. This is execution-side configuration only
+    /// and does not define downstream search-problem semantics.
+    pub execution_policy: SearchExecutionPolicy,
     /// Declared scheduler class.
     pub scheduler_profile: SearchSchedulerProfile,
     /// Whether the scheduler artifact is exact, normalized, or only diagnostic.
@@ -89,22 +104,22 @@ pub enum SearchFairnessClaimClass {
     PremiseOnly,
 }
 
-/// Public discovery-bound class for one selected route.
+/// Public discovery-bound class for one selected result.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-pub enum SearchRouteDiscoveryBoundClass {
+pub enum SearchResultDiscoveryBoundClass {
     /// The bound is an exact observed value derived from the committed replay
     /// rounds of this run.
     ObservedRunBound,
-    /// The observed bound is accompanied by the current theorem-backed
-    /// goal-window service certificate.
-    ObservedRunBoundWithGoalWindowCertificate,
     /// No candidate route was published during the run.
     NoCandidate,
 }
 
-/// Theorem-backed discovery certificate class for one selected route.
+/// Historical route-discovery vocabulary retained for compatibility.
+pub type SearchRouteDiscoveryBoundClass = SearchResultDiscoveryBoundClass;
+
+/// Theorem-backed discovery certificate class for one selected result.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-pub enum SearchRouteDiscoveryCertificateClass {
+pub enum SearchResultDiscoveryCertificateClass {
     /// The goal was in the legal service window and canonical serial search
     /// serviced it within the proved one-step bound.
     GoalWindowOneStepExact,
@@ -116,11 +131,15 @@ pub enum SearchRouteDiscoveryCertificateClass {
     CertifiedGoalWindowService,
 }
 
-/// Theorem-backed discovery certificate for one selected route.
+/// Historical route-discovery-certificate vocabulary retained for
+/// compatibility.
+pub type SearchRouteDiscoveryCertificateClass = SearchResultDiscoveryCertificateClass;
+
+/// Theorem-backed discovery certificate for one selected result.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SearchRouteDiscoveryCertificate {
+pub struct SearchResultDiscoveryCertificate {
     /// Discovery theorem class.
-    pub class: SearchRouteDiscoveryCertificateClass,
+    pub class: SearchResultDiscoveryCertificateClass,
     /// Certified service bound in scheduler steps once the goal is in the
     /// current legal service window.
     pub service_bound_steps: u64,
@@ -133,9 +152,32 @@ pub struct SearchRouteDiscoveryCertificate {
     pub certified_observables: BTreeSet<SearchObservableClass>,
 }
 
-/// Public route-quality class for one selected route.
+/// Historical route discovery certificate vocabulary retained for
+/// compatibility.
+pub type SearchRouteDiscoveryCertificate = SearchResultDiscoveryCertificate;
+
+/// Optional path-problem-specific discovery helper layered over generic
+/// selected-result bounds.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SearchPathProblemDiscoveryArtifact {
+    /// Theorem-backed bound, when available, once the path goal enters the
+    /// certified legal service window for the current profile.
+    pub goal_service_bound_steps: Option<u64>,
+    /// Observed scheduler-step bound until the path goal first appears in the
+    /// legal service window.
+    pub goal_window_entry_bound_steps: Option<u64>,
+    /// Structured theorem-backed discovery certificate for the path-goal
+    /// specialization, when available.
+    pub discovery_certificate: Option<SearchResultDiscoveryCertificate>,
+}
+
+/// Historical route-problem discovery helper vocabulary retained for
+/// compatibility.
+pub type SearchRouteProblemDiscoveryArtifact = SearchPathProblemDiscoveryArtifact;
+
+/// Public quality class for one selected result.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-pub enum SearchRouteQualityClass {
+pub enum SearchResultQualityClass {
     /// Exact profiles produced an optimal route.
     ExactOptimal,
     /// The route quality is only justified under the certified exact-window
@@ -147,30 +189,44 @@ pub enum SearchRouteQualityClass {
     NoCandidate,
 }
 
-/// Public route discovery and quality artifact for one run.
+/// Historical route-quality vocabulary retained for compatibility.
+pub type SearchRouteQualityClass = SearchResultQualityClass;
+
+/// Generic approximation/exactness contract for one run surface.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum SearchApproximationContractClass {
+    /// Exact end-to-end search contract.
+    Exact,
+    /// Exactness only once a certified service window premise is attached.
+    CertifiedWindowExact,
+    /// Budgeted anytime search contract.
+    BudgetedAnytime,
+    /// Envelope-bounded search contract.
+    EnvelopeBounded,
+    /// No selected result is available.
+    NoResult,
+}
+
+/// Public selected-result discovery and quality artifact for one run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SearchRouteBoundArtifact<C> {
+pub struct SearchResultBoundArtifact<C> {
     /// Class of the candidate discovery bound.
-    pub discovery_class: SearchRouteDiscoveryBoundClass,
+    pub discovery_class: SearchResultDiscoveryBoundClass,
     /// Observed scheduler-step bound until the first route candidate is
     /// published.
     pub candidate_discovery_bound_steps: Option<u64>,
-    /// Theorem-backed bound, when available, once the goal is in the legal
-    /// service window for the current profile.
-    pub goal_service_bound_steps: Option<u64>,
-    /// Observed scheduler-step bound until the goal first appears in the legal
-    /// service window for the selected route.
-    pub goal_window_entry_bound_steps: Option<u64>,
-    /// Structured theorem-backed discovery certificate for the current profile
-    /// when the public proof surface can justify one.
-    pub discovery_certificate: Option<SearchRouteDiscoveryCertificate>,
+    /// Optional path-problem-specific discovery helper. Generic selected-result
+    /// bounds do not rely on a distinguished goal anchor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_problem: Option<SearchPathProblemDiscoveryArtifact>,
     /// Observed scheduler-step bound from the latest epoch transition to the
     /// first route candidate published in that epoch.
     pub recovery_bound_steps_after_latest_epoch: Option<u64>,
     /// Class of the selected route quality claim.
-    pub quality_class: SearchRouteQualityClass,
-    /// Selected route cost if a candidate exists.
-    pub selected_route_cost: Option<C>,
+    pub quality_class: SearchResultQualityClass,
+    /// Selected-result cost if a candidate exists.
+    #[serde(alias = "selected_route_cost")]
+    pub selected_result_cost: Option<C>,
     /// Optimality gap when the current claim surface can justify one.
     pub optimality_gap: Option<C>,
     /// Approximation ratio in milli units when the current claim surface can
@@ -178,33 +234,73 @@ pub struct SearchRouteBoundArtifact<C> {
     pub approximation_ratio_milli: Option<u64>,
     /// Admissible upper bound on the selected route cost.
     pub admissible_upper_bound: Option<C>,
-    /// Compact selected-route summary for downstream reporting.
-    pub selected_route_summary: Option<SearchRouteSummary<C>>,
+    /// Compact selected-result summary for downstream reporting.
+    #[serde(alias = "selected_route_summary")]
+    pub selected_result_summary: Option<SearchResultSummary<C>>,
     /// Premises required by the selected route claim.
     pub required_premises: BTreeSet<SearchFairnessAssumption>,
 }
 
-/// Compact selected-route summary exported alongside route bounds.
+/// Historical route-bound vocabulary retained for compatibility.
+pub type SearchRouteBoundArtifact<C> = SearchResultBoundArtifact<C>;
+
+/// Generic selected-result bound vocabulary retained alongside the
+/// route-oriented helper during migration.
+pub type SearchSelectedResultBoundArtifact<C> = SearchResultBoundArtifact<C>;
+
+impl<C> SearchResultBoundArtifact<C> {
+    /// Borrow the optional path-problem-specific discovery helper.
+    #[must_use]
+    pub fn path_problem(&self) -> Option<&SearchPathProblemDiscoveryArtifact> {
+        self.path_problem.as_ref()
+    }
+}
+
+/// Compact selected-result summary exported alongside result bounds.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SearchRouteSummary<C> {
+#[serde(bound(deserialize = "C: Deserialize<'de>"))]
+pub struct SearchResultSummary<C> {
     /// Selected route cost.
     pub cost: C,
-    /// Number of hops in the selected route.
-    pub hop_count: u64,
+    /// Length of the selected-result witness when one structured witness is
+    /// exported by the domain.
+    pub selected_result_witness_len: Option<u64>,
     /// Number of incumbent publications observed during the run.
     pub publication_count: u64,
     /// Number of canonical normalized commits observed during the run.
     pub normalized_commit_count: u64,
     /// Number of distinct epochs traversed by this run.
     pub traversed_epoch_count: u64,
+    /// Optional path-search-specific summary helper.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_summary: Option<SearchPathResultSummary<C>>,
     /// Generic route metrics exported in stable canonical order for downstream
     /// reporting and comparison.
-    pub metrics: Vec<SearchRouteMetric>,
+    pub metrics: Vec<SearchResultMetric>,
 }
 
-/// Stable metric name for generic route summaries.
+/// Optional path-search-specific summary helper.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(bound(deserialize = "C: Deserialize<'de>"))]
+pub struct SearchPathResultSummary<C> {
+    /// Selected path cost.
+    pub cost: C,
+    /// Number of nodes in the selected path witness.
+    pub path_node_count: u64,
+    /// Number of hops in the selected path witness.
+    pub hop_count: u64,
+}
+
+/// Historical route-summary vocabulary retained for compatibility.
+pub type SearchRouteSummary<C> = SearchPathResultSummary<C>;
+
+/// Generic selected-result summary vocabulary retained alongside the
+/// route-oriented helper during migration.
+pub type SearchSelectedResultSummary<C> = SearchResultSummary<C>;
+
+/// Stable metric name for generic selected-result summaries.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-pub enum SearchRouteMetricName {
+pub enum SearchResultMetricName {
     /// Total nodes on the selected route.
     PathNodeCount,
     /// Total edges on the selected route.
@@ -219,14 +315,32 @@ pub enum SearchRouteMetricName {
     TraversedEpochCount,
 }
 
-/// One generic route metric exported with the selected-route summary.
+/// Historical route-metric-name vocabulary retained for compatibility.
+pub type SearchRouteMetricName = SearchResultMetricName;
+
+/// One generic metric exported with the selected-result summary.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct SearchRouteMetric {
+pub struct SearchResultMetric {
     /// Stable metric identity.
     pub name: SearchRouteMetricName,
     /// Metric value in canonical integer form.
     pub value: u128,
 }
+
+/// Historical route-metric vocabulary retained for compatibility.
+pub type SearchRouteMetric = SearchResultMetric;
+
+/// Generic selected-result metric vocabulary retained alongside the
+/// route-oriented helper during migration.
+pub type SearchSelectedResultMetric = SearchResultMetric;
+
+/// Generic selected-result metric-name vocabulary retained alongside the
+/// route-oriented helper during migration.
+pub type SearchSelectedResultMetricName = SearchResultMetricName;
+
+/// Generic approximation/exactness artifact vocabulary retained alongside the
+/// route-oriented helper during migration.
+pub type SearchApproximationArtifact<C> = SearchResultBoundArtifact<C>;
 
 /// Public fairness artifact for one run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -320,6 +434,17 @@ pub enum SearchTheoremSupportClass {
     PremiseScoped,
 }
 
+/// Problem-class classification for one theorem in the search theorem pack.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum SearchTheoremProblemClass {
+    /// Generic machine/refinement/fairness theorem.
+    GenericMachine,
+    /// Generic selected-result/result-bound theorem.
+    GenericSelectedResult,
+    /// Path-problem-specific discovery or completeness theorem.
+    PathProblemSpecific,
+}
+
 /// One theorem-inventory support-class row.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchTheoremInventorySupportClassEntry {
@@ -327,6 +452,15 @@ pub struct SearchTheoremInventorySupportClassEntry {
     pub name: String,
     /// Support classification for that theorem.
     pub support_class: SearchTheoremSupportClass,
+}
+
+/// One theorem-inventory problem-class row.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SearchTheoremInventoryProblemClassEntry {
+    /// Stable theorem inventory key.
+    pub name: String,
+    /// Problem-class classification for that theorem.
+    pub problem_class: SearchTheoremProblemClass,
 }
 
 /// Release-facing search theorem-pack artifact mirrored from the Lean theorem
@@ -337,6 +471,8 @@ pub struct SearchTheoremPackArtifact {
     pub inventory: Vec<SearchTheoremInventoryEntry>,
     /// Support classification for each theorem inventory row.
     pub inventory_support_classes: Vec<SearchTheoremInventorySupportClassEntry>,
+    /// Problem-class classification for each theorem inventory row.
+    pub inventory_problem_classes: Vec<SearchTheoremInventoryProblemClassEntry>,
     /// Exact canonical service bound for the current theorem-pack surface.
     pub canonical_service_bound_steps: u64,
     /// Exact canonical route-discovery suffix bound once the goal is in the
@@ -378,10 +514,16 @@ where
     pub g_scores: Vec<(N, C)>,
     /// Canonical parent identities.
     pub parent_map: Vec<(N, N)>,
-    /// Current incumbent cost.
-    pub incumbent_cost: Option<C>,
-    /// Current incumbent path.
-    pub incumbent_path: Option<Vec<N>>,
+    /// Current selected-result cost.
+    #[serde(alias = "incumbent_cost")]
+    pub selected_result_cost: Option<C>,
+    /// Current selected-result witness.
+    #[serde(alias = "incumbent_path")]
+    pub selected_result_witness: Option<Vec<N>>,
+    /// Latest applied reseeding policy when this state follows an epoch
+    /// transition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_reseed_policy: Option<SearchReseedingPolicy>,
     /// Frozen graph epoch.
     pub epoch: G,
     /// Current search phase.
@@ -407,10 +549,12 @@ where
     pub g_scores: Vec<(N, C)>,
     /// Canonical parent identities.
     pub parent_map: Vec<(N, N)>,
-    /// Current incumbent cost.
-    pub incumbent_cost: Option<C>,
-    /// Current incumbent path.
-    pub incumbent_path: Option<Vec<N>>,
+    /// Current selected-result cost.
+    #[serde(alias = "incumbent_cost")]
+    pub selected_result_cost: Option<C>,
+    /// Current selected-result witness.
+    #[serde(alias = "incumbent_path")]
+    pub selected_result_witness: Option<Vec<N>>,
     /// Current epsilon.
     pub epsilon_milli: u64,
     /// Current search phase.
@@ -423,19 +567,181 @@ where
     pub last_batch_nodes: Option<Vec<N>>,
     /// Full normalized commit trace.
     pub normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
-    /// Full incumbent publication trace.
-    pub incumbent_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
+    /// Full selected-result publication trace.
+    #[serde(alias = "incumbent_publication_trace")]
+    pub selected_result_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
+    /// Latest applied reseeding policy when this state follows an epoch
+    /// transition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_reseed_policy: Option<SearchReseedingPolicy>,
+}
+
+/// Typed runtime configuration for one search run.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SearchCachingProfile {
+    /// Recompute all transient scheduling data from the authoritative machine
+    /// state each step.
+    EphemeralPerStep,
+    #[doc(hidden)]
+    /// Reuse cached scheduling state across steps. This remains unsupported by
+    /// the current stable runtime surface and is rejected fail-closed.
+    IncrementalReuse,
+}
+
+/// Typed effort/budget profile for one search run.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub enum SearchEffortProfile {
+    /// Run the machine to completion.
+    RunToCompletion,
+    /// Stop after the given number of scheduler steps. One budget unit is one
+    /// full canonical batch/service step, and runs stop only at batch
+    /// barriers.
+    SchedulerStepBudget(u64),
+}
+
+/// Typed execution policy for one search run.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SearchExecutionPolicy {
+    /// Declared execution-side scheduler profile.
+    pub scheduler_profile: SearchSchedulerProfile,
+    /// Configured batch width.
+    pub batch_width: u64,
+    /// Selected caching profile.
+    pub caching_profile: SearchCachingProfile,
+    /// Selected effort profile.
+    pub effort_profile: SearchEffortProfile,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BatchWidthRequirement {
+    ExactlyOne,
+    GreaterThanOne,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct SearchExecutionPolicyCompatibility {
+    required_executor: ProposalExecutorKind,
+    batch_width: BatchWidthRequirement,
+    required_fairness: &'static [SearchFairnessAssumption],
+}
+
+const SERIAL_EXACT_FAIRNESS: &[SearchFairnessAssumption] =
+    &[SearchFairnessAssumption::DeterministicSchedulerConfluence];
+
+const ENVELOPE_FAIRNESS: &[SearchFairnessAssumption] = &[
+    SearchFairnessAssumption::EventualLiveBatchService,
+    SearchFairnessAssumption::NoStarvationWithinLegalWindow,
+];
+
+const fn execution_policy_compatibility(
+    scheduler_profile: SearchSchedulerProfile,
+) -> SearchExecutionPolicyCompatibility {
+    match scheduler_profile {
+        SearchSchedulerProfile::CanonicalSerial => SearchExecutionPolicyCompatibility {
+            required_executor: ProposalExecutorKind::Serial,
+            batch_width: BatchWidthRequirement::ExactlyOne,
+            required_fairness: SERIAL_EXACT_FAIRNESS,
+        },
+        SearchSchedulerProfile::ThreadedExactSingleLane => SearchExecutionPolicyCompatibility {
+            required_executor: ProposalExecutorKind::NativeParallel,
+            batch_width: BatchWidthRequirement::ExactlyOne,
+            required_fairness: SERIAL_EXACT_FAIRNESS,
+        },
+        SearchSchedulerProfile::BatchedParallelExact => SearchExecutionPolicyCompatibility {
+            required_executor: ProposalExecutorKind::NativeParallel,
+            batch_width: BatchWidthRequirement::GreaterThanOne,
+            required_fairness: SERIAL_EXACT_FAIRNESS,
+        },
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
+            SearchExecutionPolicyCompatibility {
+                required_executor: ProposalExecutorKind::NativeParallel,
+                batch_width: BatchWidthRequirement::GreaterThanOne,
+                required_fairness: ENVELOPE_FAIRNESS,
+            }
+        }
+    }
+}
+
+impl SearchExecutionPolicy {
+    /// Construct one execution policy with the current default
+    /// cache/effort settings.
+    #[must_use]
+    pub const fn new(scheduler_profile: SearchSchedulerProfile, batch_width: u64) -> Self {
+        Self {
+            scheduler_profile,
+            batch_width,
+            caching_profile: SearchCachingProfile::EphemeralPerStep,
+            effort_profile: SearchEffortProfile::RunToCompletion,
+        }
+    }
+
+    /// Return one copy with an explicit caching profile.
+    #[must_use]
+    pub const fn with_caching_profile(self, caching_profile: SearchCachingProfile) -> Self {
+        Self {
+            caching_profile,
+            ..self
+        }
+    }
+
+    /// Return one copy with an explicit effort profile.
+    #[must_use]
+    pub const fn with_effort_profile(self, effort_profile: SearchEffortProfile) -> Self {
+        Self {
+            effort_profile,
+            ..self
+        }
+    }
+}
+
+/// Classify the generic approximation/exactness contract induced by one
+/// execution policy.
+#[must_use]
+pub fn classify_approximation_contract(
+    policy: SearchExecutionPolicy,
+) -> SearchApproximationContractClass {
+    match policy.effort_profile {
+        SearchEffortProfile::SchedulerStepBudget(_) => {
+            SearchApproximationContractClass::BudgetedAnytime
+        }
+        SearchEffortProfile::RunToCompletion => match policy.scheduler_profile {
+            SearchSchedulerProfile::CanonicalSerial
+            | SearchSchedulerProfile::ThreadedExactSingleLane => {
+                SearchApproximationContractClass::Exact
+            }
+            SearchSchedulerProfile::BatchedParallelExact => {
+                SearchApproximationContractClass::CertifiedWindowExact
+            }
+            SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
+                SearchApproximationContractClass::EnvelopeBounded
+            }
+        },
+    }
 }
 
 /// Typed runtime configuration for one search run.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct SearchRunConfig {
-    /// Declared scheduler profile.
-    pub scheduler_profile: SearchSchedulerProfile,
-    /// Configured batch width.
-    pub batch_width: u64,
+    /// Declared execution policy. This is execution-side configuration only
+    /// and does not define downstream search-problem semantics.
+    pub execution_policy: SearchExecutionPolicy,
     /// Declared fairness assumptions.
     pub fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
+}
+
+impl SearchRunConfig {
+    /// Construct one runtime config from an execution policy and declared
+    /// fairness assumptions.
+    #[must_use]
+    pub fn new(
+        execution_policy: SearchExecutionPolicy,
+        fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
+    ) -> Self {
+        Self {
+            execution_policy,
+            fairness_assumptions,
+        }
+    }
 }
 
 /// Fail-closed runtime-config rejection.
@@ -443,6 +749,12 @@ pub struct SearchRunConfig {
 pub enum SearchRunConfigError {
     /// Batch width must be non-zero.
     ZeroBatchWidth,
+    /// The selected caching profile is not yet supported by the current
+    /// runtime.
+    UnsupportedCachingProfile(SearchCachingProfile),
+    /// The selected effort profile is not yet supported by the current
+    /// runtime.
+    UnsupportedEffortProfile(SearchEffortProfile),
     /// The selected scheduler profile requires the serial executor.
     RequiresSerialExecutor(SearchSchedulerProfile),
     /// The selected scheduler profile requires the native parallel executor.
@@ -499,10 +811,27 @@ where
     pub final_state: SearchStateArtifact<N, G, C>,
     /// Release-facing theorem-pack artifact for this run surface.
     pub theorem_pack: SearchTheoremPackArtifact,
-    /// Route discovery and quality artifact for the selected route.
-    pub route_bounds: SearchRouteBoundArtifact<C>,
+    /// Selected-result discovery and quality artifact for the run.
+    ///
+    /// The field name retains the historical route-bound spelling for
+    /// compatibility while the type itself is generic over selected results.
+    pub route_bounds: SearchResultBoundArtifact<C>,
+    /// How the run terminated under its declared effort profile.
+    pub termination: SearchRunTermination,
     /// Progress summary.
     pub progress: ProgressSummary,
+}
+
+impl<N, G, C> SearchExecutionReport<N, G, C>
+where
+    N: Ord,
+    G: Ord,
+{
+    /// Borrow the generic selected-result bound artifact for this run.
+    #[must_use]
+    pub fn selected_result_bounds(&self) -> &SearchResultBoundArtifact<C> {
+        &self.route_bounds
+    }
 }
 
 /// Replay record for one committed round.
@@ -529,6 +858,14 @@ where
     pub fairness_certificate: SearchFairnessCertificate<N, G, C>,
 }
 
+/// Optional path-problem-specific replay metadata.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct SearchPathProblemReplayArtifact<N> {
+    /// Canonical path-goal anchor when the query is the built-in single-goal
+    /// path adapter.
+    pub goal_anchor: N,
+}
+
 /// Canonical replay artifact for one run.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchReplayArtifact<N, G, S, C>
@@ -539,8 +876,15 @@ where
 {
     /// Canonical start node for the run.
     pub start: N,
-    /// Canonical goal node for the run.
-    pub goal: N,
+    /// Generalized query for the run.
+    pub query: SearchQuery<N>,
+    /// Selected-result semantics class used by this run.
+    pub selected_result_semantics_class: SearchSelectedResultSemanticsClass,
+    /// Optional path-problem-specific replay metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path_problem: Option<SearchPathProblemReplayArtifact<N>>,
+    /// Declared execution policy for the run.
+    pub execution_policy: SearchExecutionPolicy,
     /// Declared scheduler profile.
     pub scheduler_profile: SearchSchedulerProfile,
     /// Declared fairness assumptions.
@@ -555,12 +899,30 @@ where
     pub rounds: Vec<ReplayRoundRecord<N, G, S, C>>,
     /// Final authoritative state artifact.
     pub final_state: SearchStateArtifact<N, G, C>,
+    /// How the run terminated under its declared effort profile.
+    pub termination: SearchRunTermination,
     /// Release-facing theorem-pack artifact for this run surface.
     pub theorem_pack: SearchTheoremPackArtifact,
-    /// Route discovery and quality artifact for the selected route.
-    pub route_bounds: SearchRouteBoundArtifact<C>,
+    /// Selected-result discovery and quality artifact for the run.
+    ///
+    /// The field name retains the historical route-bound spelling for
+    /// compatibility while the type itself is generic over selected results.
+    pub route_bounds: SearchResultBoundArtifact<C>,
     /// Final observed artifact.
     pub final_observation: SearchObservationArtifact<N, G, C>,
+}
+
+impl<N, G, S, C> SearchReplayArtifact<N, G, S, C>
+where
+    N: Ord,
+    G: Ord,
+    S: Ord,
+{
+    /// Borrow the generic selected-result bound artifact for this replay.
+    #[must_use]
+    pub fn selected_result_bounds(&self) -> &SearchResultBoundArtifact<C> {
+        &self.route_bounds
+    }
 }
 
 /// Replay-time contract expected by the caller.
@@ -583,6 +945,8 @@ pub struct ReplayExpectation<N, G, S> {
 pub struct EpochReconfigurationRequest<G> {
     /// Next graph epoch.
     pub next_epoch: G,
+    /// Reseeding policy used for the new epoch.
+    pub reseeding_policy: SearchReseedingPolicy,
 }
 
 /// Replay error surface.
@@ -601,6 +965,9 @@ pub enum ReplayError {
     /// The replay artifact fairness bundle does not satisfy the requested
     /// theorem-style premise bundle.
     FairnessBundle,
+    /// The replay artifact requires domain-defined selected-result semantics
+    /// that cannot be re-derived from the generic replay payload alone.
+    UnsupportedSelectedResultSemantics,
     /// The stored final observation does not match the derived replay result.
     ObservationArtifact,
 }
@@ -646,9 +1013,9 @@ pub fn theorem_backed_observables(
     match profile {
         SearchSchedulerProfile::CanonicalSerial
         | SearchSchedulerProfile::ThreadedExactSingleLane => [
-            SearchObservableClass::IncumbentCost,
+            SearchObservableClass::SelectedResultCost,
             SearchObservableClass::CanonicalParentIdentity,
-            SearchObservableClass::CanonicalPathIdentity,
+            SearchObservableClass::SelectedResultWitnessIdentity,
             SearchObservableClass::NormalizedCommitTrace,
             SearchObservableClass::ProgressAccounting,
         ]
@@ -850,6 +1217,27 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
             ),
             (
                 "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
+                true,
+            ),
+            ("search_canonical_serial_has_exact_result_contract", true),
+            (
+                "search_threaded_exact_single_lane_has_exact_result_contract",
+                true,
+            ),
+            (
+                "search_batched_parallel_exact_has_certified_window_exact_contract",
+                true,
+            ),
+            (
+                "search_batched_parallel_envelope_has_envelope_bounded_contract",
+                true,
+            ),
+            (
+                "search_scheduler_step_budget_yields_budgeted_anytime_contract",
+                true,
+            ),
+            (
+                "search_selected_result_observation_slice_refines_legacy_fields",
                 true,
             ),
         ]
@@ -1060,6 +1448,30 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
                 "search_batched_parallel_envelope_certified_window_trace_valid",
                 SearchTheoremSupportClass::PremiseScoped,
             ),
+            (
+                "search_canonical_serial_has_exact_result_contract",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_threaded_exact_single_lane_has_exact_result_contract",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_batched_parallel_exact_has_certified_window_exact_contract",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_batched_parallel_envelope_has_envelope_bounded_contract",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_scheduler_step_budget_yields_budgeted_anytime_contract",
+                SearchTheoremSupportClass::ExecutableSemantics,
+            ),
+            (
+                "search_selected_result_observation_slice_refines_legacy_fields",
+                SearchTheoremSupportClass::RefinementCorollary,
+            ),
         ]
         .into_iter()
         .map(|(name, support_class)| SearchTheoremInventorySupportClassEntry {
@@ -1067,10 +1479,160 @@ pub fn search_theorem_pack_artifact() -> SearchTheoremPackArtifact {
             support_class,
         })
         .collect(),
+        inventory_problem_classes: theorem_inventory_problem_classes(),
         canonical_service_bound_steps: 1,
         canonical_goal_window_discovery_suffix_bound_steps: 1,
         gate: "just check-search-fairness".to_string(),
     }
+}
+
+/// Classify one theorem row as generic-machine or problem-specific.
+#[must_use]
+pub fn classify_theorem_problem_class(name: &str) -> SearchTheoremProblemClass {
+    match name {
+        "search_canonical_serial_has_exact_result_contract"
+        | "search_threaded_exact_single_lane_has_exact_result_contract"
+        | "search_batched_parallel_exact_has_certified_window_exact_contract"
+        | "search_batched_parallel_envelope_has_envelope_bounded_contract"
+        | "search_scheduler_step_budget_yields_budgeted_anytime_contract"
+        | "search_selected_result_observation_slice_refines_legacy_fields" => {
+            SearchTheoremProblemClass::GenericSelectedResult
+        }
+        "search_canonical_serial_goal_reached_from_ready_witness_path"
+        | "search_canonical_machine_goal_reached_from_ready_witness_path"
+        | "search_canonical_machine_goal_reached_from_graph_reachability"
+        | "search_canonical_machine_goal_reached_from_raw_successor_semantics"
+        | "search_goal_reachability_connects_to_incumbent_publication"
+        | "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic"
+        | "search_canonical_serial_goal_window_service_has_exact_suffix_bound"
+        | "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound" => {
+            SearchTheoremProblemClass::PathProblemSpecific
+        }
+        _ => SearchTheoremProblemClass::GenericMachine,
+    }
+}
+
+/// Derived problem-class inventory for the current theorem-pack surface.
+#[must_use]
+pub fn theorem_inventory_problem_classes() -> Vec<SearchTheoremInventoryProblemClassEntry> {
+    [
+        "search_canonical_serial_exact_one_step_fairness",
+        "search_full_state_artifact_of_full_state_is_runtime_projection",
+        "search_reduced_state_of_full_state_preserves_machine_invariants",
+        "search_full_activate_batch_preserves_invariants",
+        "search_full_apply_proposal_preserves_invariants",
+        "search_full_commit_proposals_preserves_invariants",
+        "search_full_decrease_epsilon_and_rebuild_preserves_invariants",
+        "search_full_commit_epoch_reconfiguration_preserves_invariants",
+        "search_full_step_once_preserves_invariants",
+        "search_full_activate_batch_refines_reduced_service_window",
+        "search_full_step_once_refines_reduced_executable_step",
+        "search_canonical_serial_dynamic_liveness_under_stability",
+        "search_executable_canonical_step_preserves_invariants",
+        "search_executable_trace_refines_canonical_machine_trace",
+        "search_executable_step_artifact_refines_canonical_step_artifact",
+        "search_canonical_machine_step_preserves_invariants",
+        "search_canonical_machine_trace_currently_min_priority_eventually_serviced",
+        "search_canonical_machine_step_artifact_refines_runtime_boundary",
+        "search_canonical_machine_state_artifact_is_runtime_projection",
+        "search_fixed_phase_canonical_serial_terminates_under_finite_reachable_bound",
+        "search_rebuild_aware_canonical_serial_terminates_under_phase_work_measure",
+        "search_bounded_strict_preemption_eventually_becomes_min",
+        "search_canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption",
+        "search_finite_better_entry_exhaustion_eventually_becomes_min",
+        "search_canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_entry_exhaustion",
+        "search_canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness",
+        "search_canonical_serial_goal_reached_from_ready_witness_path",
+        "search_canonical_machine_goal_reached_from_ready_witness_path",
+        "search_canonical_machine_goal_reached_from_graph_reachability",
+        "search_canonical_machine_goal_reached_from_raw_successor_semantics",
+        "search_goal_reachability_connects_to_incumbent_publication",
+        "search_eventual_optimal_goal_publication_under_admissible_consistent_heuristic",
+        "search_threaded_exact_single_lane_refines_canonical_one_step",
+        "search_threaded_exact_single_lane_commit_trace_refines_canonical",
+        "search_threaded_exact_single_lane_state_slice_refines_canonical",
+        "search_threaded_exact_single_lane_observation_slice_refines_canonical",
+        "search_threaded_exact_single_lane_observation_equivalent_to_canonical",
+        "search_threaded_exact_single_lane_multi_step_state_trace_refines_canonical",
+        "search_threaded_exact_single_lane_multi_step_observation_trace_refines_canonical",
+        "search_threaded_exact_single_lane_state_artifact_refines_canonical",
+        "search_threaded_exact_single_lane_multi_step_state_artifact_trace_refines_canonical",
+        "search_threaded_exact_single_lane_exact_one_step_fairness",
+        "search_canonical_serial_goal_window_service_has_exact_suffix_bound",
+        "search_threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound",
+        "search_batched_parallel_exact_certified_window_fairness",
+        "search_batched_parallel_exact_bounded_dynamic_starvation_freedom",
+        "search_batched_parallel_exact_certified_window_trace_valid",
+        "search_batched_parallel_envelope_claim_is_certified_window_bounded",
+        "search_batched_parallel_envelope_certified_window_fairness",
+        "search_batched_parallel_envelope_certified_window_trace_valid",
+        "search_canonical_serial_has_exact_result_contract",
+        "search_threaded_exact_single_lane_has_exact_result_contract",
+        "search_batched_parallel_exact_has_certified_window_exact_contract",
+        "search_batched_parallel_envelope_has_envelope_bounded_contract",
+        "search_scheduler_step_budget_yields_budgeted_anytime_contract",
+        "search_selected_result_observation_slice_refines_legacy_fields",
+    ]
+    .into_iter()
+    .map(|name| SearchTheoremInventoryEntry {
+        name: name.to_string(),
+        present: true,
+    })
+    .map(|entry| SearchTheoremInventoryProblemClassEntry {
+        problem_class: classify_theorem_problem_class(&entry.name),
+        name: entry.name,
+    })
+    .collect()
+}
+
+impl<C> SearchResultBoundArtifact<C>
+where
+    C: SearchCost,
+{
+    /// Borrow the selected-result cost in generic terminology.
+    #[must_use]
+    pub fn selected_result_cost(&self) -> Option<&C> {
+        self.selected_result_cost.as_ref()
+    }
+
+    /// Borrow the selected-result summary in generic terminology.
+    #[must_use]
+    pub fn selected_result_summary(&self) -> Option<&SearchResultSummary<C>> {
+        self.selected_result_summary.as_ref()
+    }
+
+    /// Borrow the optional path-search-specific summary helper.
+    #[must_use]
+    pub fn selected_path_summary(&self) -> Option<&SearchPathResultSummary<C>> {
+        self.selected_result_summary
+            .as_ref()
+            .and_then(|summary| summary.path_summary.as_ref())
+    }
+
+    /// Classify the generic approximation/exactness contract for this result
+    /// under one execution policy.
+    #[must_use]
+    pub fn approximation_contract_class(
+        &self,
+        policy: SearchExecutionPolicy,
+    ) -> SearchApproximationContractClass {
+        if self.selected_result_cost.is_none() {
+            SearchApproximationContractClass::NoResult
+        } else {
+            classify_approximation_contract(policy)
+        }
+    }
+}
+
+fn replay_path_problem_artifact<N>(
+    goal_anchor: Option<N>,
+    goal_service_bound_steps: Option<u64>,
+) -> Option<SearchPathProblemDiscoveryArtifact> {
+    goal_anchor.map(|_| SearchPathProblemDiscoveryArtifact {
+        goal_service_bound_steps,
+        goal_window_entry_bound_steps: None,
+        discovery_certificate: None,
+    })
 }
 
 fn state_artifact_for_machine<D>(
@@ -1099,16 +1661,17 @@ where
             .iter()
             .map(|(node, parent)| (node.clone(), parent.from.clone()))
             .collect(),
-        incumbent_cost: machine
+        selected_result_cost: machine
             .state()
             .incumbent
             .as_ref()
             .map(|incumbent| incumbent.cost),
-        incumbent_path: machine
+        selected_result_witness: machine
             .state()
             .incumbent
             .as_ref()
-            .map(|incumbent| incumbent.path.clone()),
+            .map(|incumbent| incumbent.witness.clone()),
+        latest_reseed_policy: machine.observation().reseed_policy_trace.last().copied(),
         epoch: machine.state().graph_epoch.clone(),
         phase: machine.state().phase,
     }
@@ -1144,16 +1707,16 @@ where
             .iter()
             .map(|(node, parent)| (node.clone(), parent.from.clone()))
             .collect(),
-        incumbent_cost: machine
+        selected_result_cost: machine
             .state()
             .incumbent
             .as_ref()
             .map(|incumbent| incumbent.cost),
-        incumbent_path: machine
+        selected_result_witness: machine
             .state()
             .incumbent
             .as_ref()
-            .map(|incumbent| incumbent.path.clone()),
+            .map(|incumbent| incumbent.witness.clone()),
         epsilon_milli: u64::from(machine.state().epsilon.0),
         phase: machine.state().phase,
         epoch: machine.state().graph_epoch.clone(),
@@ -1166,45 +1729,59 @@ where
                 .collect()
         }),
         normalized_commit_trace: machine.observation.normalized_commit_trace.clone(),
-        incumbent_publication_trace: machine.observation.incumbent_publication_trace.clone(),
+        selected_result_publication_trace: machine
+            .observation
+            .selected_result_publication_trace
+            .clone(),
+        latest_reseed_policy: machine.observation().reseed_policy_trace.last().copied(),
     }
 }
 
 #[allow(clippy::too_many_lines)]
 fn route_bound_artifact_for_replay<N, G, S, C>(
-    profile: SearchSchedulerProfile,
+    policy: SearchExecutionPolicy,
+    termination: SearchRunTermination,
     replay: &SearchReplayArtifact<N, G, S, C>,
-) -> SearchRouteBoundArtifact<C>
+) -> SearchResultBoundArtifact<C>
 where
     C: SearchCost,
     N: Ord,
     G: Clone + Ord,
     S: Ord,
 {
-    let selected_route_cost = replay.final_observation.incumbent_cost;
-    let publication_count =
-        u64::try_from(replay.final_observation.incumbent_publication_trace.len())
-            .expect("publication count fits in u64");
+    let selected_result_cost = replay.final_observation.selected_result_cost;
+    let publication_count = u64::try_from(
+        replay
+            .final_observation
+            .selected_result_publication_trace
+            .len(),
+    )
+    .expect("publication count fits in u64");
     let normalized_commit_count =
         u64::try_from(replay.final_observation.normalized_commit_trace.len())
             .expect("normalized commit count fits in u64");
     let traversed_epoch_count =
         u64::try_from(replay.epoch_trace.len()).expect("epoch trace length fits in u64");
-    let selected_route_summary = replay
+    let selected_result_summary = replay
         .final_observation
-        .incumbent_path
+        .selected_result_witness
         .as_ref()
-        .zip(selected_route_cost)
+        .zip(selected_result_cost)
         .map(|(path, cost)| {
             let path_node_count = u64::try_from(path.len()).expect("path node count fits in u64");
             let hop_count =
                 u64::try_from(path.len().saturating_sub(1)).expect("hop count fits in u64");
-            SearchRouteSummary {
+            SearchResultSummary {
                 cost,
-                hop_count,
+                selected_result_witness_len: Some(path_node_count),
                 publication_count,
                 normalized_commit_count,
                 traversed_epoch_count,
+                path_summary: Some(SearchPathResultSummary {
+                    cost,
+                    path_node_count,
+                    hop_count,
+                }),
                 metrics: vec![
                     SearchRouteMetric {
                         name: SearchRouteMetricName::PathNodeCount,
@@ -1236,12 +1813,7 @@ where
     let candidate_discovery_bound_steps = replay
         .rounds
         .iter()
-        .position(|round| round.state_after_round.incumbent_cost.is_some())
-        .map(|index| u64::try_from(index + 1).expect("round index fits in u64"));
-    let goal_window_entry_bound_steps = replay
-        .rounds
-        .iter()
-        .position(|round| round.batch_nodes.contains(&replay.goal))
+        .position(|round| round.state_after_round.selected_result_cost.is_some())
         .map(|index| u64::try_from(index + 1).expect("round index fits in u64"));
     let latest_epoch = replay.epoch_trace.last().cloned();
     let recovery_bound_steps_after_latest_epoch = latest_epoch.and_then(|latest_epoch| {
@@ -1249,103 +1821,126 @@ where
             .rounds
             .iter()
             .filter(|round| round.epoch == latest_epoch)
-            .position(|round| round.state_after_round.incumbent_cost.is_some())
+            .position(|round| round.state_after_round.selected_result_cost.is_some())
             .map(|index| u64::try_from(index + 1).expect("round index fits in u64"))
     });
     let required_premises = replay.fairness.certificate.required_fairness.clone();
-    let goal_service_bound_steps = replay.fairness.certificate.service_bound_steps;
-    let discovery_certificate = goal_window_entry_bound_steps
-        .zip(goal_service_bound_steps)
-        .map(|(observed_goal_window_step, service_bound_steps)| {
-            let class = match profile {
-                SearchSchedulerProfile::CanonicalSerial => {
-                    SearchRouteDiscoveryCertificateClass::GoalWindowOneStepExact
+    let path_problem = replay.path_problem.as_ref().map(|path_problem| {
+        let goal_window_entry_bound_steps = replay
+            .rounds
+            .iter()
+            .position(|round| round.batch_nodes.contains(&path_problem.goal_anchor))
+            .map(|index| u64::try_from(index + 1).expect("round index fits in u64"));
+        let goal_service_bound_steps = replay.fairness.certificate.service_bound_steps;
+        let discovery_certificate = goal_window_entry_bound_steps
+            .zip(goal_service_bound_steps)
+            .map(|(observed_goal_window_step, service_bound_steps)| {
+                let class = match policy.scheduler_profile {
+                    SearchSchedulerProfile::CanonicalSerial => {
+                        SearchRouteDiscoveryCertificateClass::GoalWindowOneStepExact
+                    }
+                    SearchSchedulerProfile::ThreadedExactSingleLane => {
+                        SearchRouteDiscoveryCertificateClass::GoalWindowOneStepViaThreadedRefinement
+                    }
+                    SearchSchedulerProfile::BatchedParallelExact
+                    | SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
+                        SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService
+                    }
+                };
+                SearchRouteDiscoveryCertificate {
+                    class,
+                    service_bound_steps,
+                    observed_goal_window_step,
+                    required_premises: replay.fairness.certificate.required_fairness.clone(),
+                    certified_observables: replay
+                        .fairness
+                        .certificate
+                        .certified_observables
+                        .clone(),
                 }
-                SearchSchedulerProfile::ThreadedExactSingleLane => {
-                    SearchRouteDiscoveryCertificateClass::GoalWindowOneStepViaThreadedRefinement
-                }
-                SearchSchedulerProfile::BatchedParallelExact => {
-                    SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService
-                }
-                SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
-                    SearchRouteDiscoveryCertificateClass::CertifiedGoalWindowService
-                }
-            };
-            SearchRouteDiscoveryCertificate {
-                class,
-                service_bound_steps,
-                observed_goal_window_step,
-                required_premises: replay.fairness.certificate.required_fairness.clone(),
-                certified_observables: replay.fairness.certificate.certified_observables.clone(),
-            }
-        });
-
-    match (selected_route_cost, profile) {
-        (None, _) => SearchRouteBoundArtifact {
-            discovery_class: SearchRouteDiscoveryBoundClass::NoCandidate,
-            candidate_discovery_bound_steps: None,
+            });
+        SearchPathProblemDiscoveryArtifact {
             goal_service_bound_steps,
             goal_window_entry_bound_steps,
-            discovery_certificate: None,
+            discovery_certificate,
+        }
+    });
+
+    let budget_exhausted = matches!(
+        (policy.effort_profile, termination),
+        (
+            SearchEffortProfile::SchedulerStepBudget(_),
+            SearchRunTermination::SchedulerStepBudgetExhausted
+        )
+    );
+
+    match (selected_result_cost, policy.scheduler_profile) {
+        (None, _) => SearchResultBoundArtifact {
+            discovery_class: SearchRouteDiscoveryBoundClass::NoCandidate,
+            candidate_discovery_bound_steps: None,
+            path_problem: path_problem.clone(),
             recovery_bound_steps_after_latest_epoch: None,
             quality_class: SearchRouteQualityClass::NoCandidate,
-            selected_route_cost: None,
+            selected_result_cost: None,
             optimality_gap: None,
             approximation_ratio_milli: None,
             admissible_upper_bound: None,
-            selected_route_summary: None,
+            selected_result_summary: None,
             required_premises,
         },
         (Some(cost), SearchSchedulerProfile::CanonicalSerial)
         | (Some(cost), SearchSchedulerProfile::ThreadedExactSingleLane) => {
-            SearchRouteBoundArtifact {
-                discovery_class:
-                    SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate,
+            SearchResultBoundArtifact {
+                discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
                 candidate_discovery_bound_steps,
-                goal_service_bound_steps,
-                goal_window_entry_bound_steps,
-                discovery_certificate,
+                path_problem: path_problem.clone(),
                 recovery_bound_steps_after_latest_epoch,
-                quality_class: SearchRouteQualityClass::ExactOptimal,
-                selected_route_cost: Some(cost),
-                optimality_gap: Some(C::zero()),
-                approximation_ratio_milli: Some(1_000),
+                quality_class: if budget_exhausted {
+                    SearchRouteQualityClass::PremiseOnly
+                } else {
+                    SearchRouteQualityClass::ExactOptimal
+                },
+                selected_result_cost: Some(cost),
+                optimality_gap: if budget_exhausted {
+                    None
+                } else {
+                    Some(C::zero())
+                },
+                approximation_ratio_milli: if budget_exhausted { None } else { Some(1_000) },
                 admissible_upper_bound: Some(cost),
-                selected_route_summary,
+                selected_result_summary,
                 required_premises,
             }
         }
-        (Some(cost), SearchSchedulerProfile::BatchedParallelExact) => SearchRouteBoundArtifact {
-            discovery_class:
-                SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate,
+        (Some(cost), SearchSchedulerProfile::BatchedParallelExact) => SearchResultBoundArtifact {
+            discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
             candidate_discovery_bound_steps,
-            goal_service_bound_steps,
-            goal_window_entry_bound_steps,
-            discovery_certificate,
+            path_problem: path_problem.clone(),
             recovery_bound_steps_after_latest_epoch,
-            quality_class: SearchRouteQualityClass::PremisedWindowBounded,
-            selected_route_cost: Some(cost),
+            quality_class: if budget_exhausted {
+                SearchRouteQualityClass::PremiseOnly
+            } else {
+                SearchRouteQualityClass::PremisedWindowBounded
+            },
+            selected_result_cost: Some(cost),
             optimality_gap: None,
             approximation_ratio_milli: None,
             admissible_upper_bound: Some(cost),
-            selected_route_summary,
+            selected_result_summary,
             required_premises,
         },
         (Some(cost), SearchSchedulerProfile::BatchedParallelEnvelopeBounded) => {
-            SearchRouteBoundArtifact {
-                discovery_class:
-                    SearchRouteDiscoveryBoundClass::ObservedRunBoundWithGoalWindowCertificate,
+            SearchResultBoundArtifact {
+                discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
                 candidate_discovery_bound_steps,
-                goal_service_bound_steps,
-                goal_window_entry_bound_steps,
-                discovery_certificate,
+                path_problem,
                 recovery_bound_steps_after_latest_epoch,
                 quality_class: SearchRouteQualityClass::PremisedWindowBounded,
-                selected_route_cost: Some(cost),
+                selected_result_cost: Some(cost),
                 optimality_gap: None,
                 approximation_ratio_milli: None,
                 admissible_upper_bound: Some(cost),
-                selected_route_summary,
+                selected_result_summary,
                 required_premises,
             }
         }
@@ -1540,93 +2135,65 @@ where
 /// # Errors
 ///
 /// Returns `SearchRunConfigError` if the configuration is inconsistent with the
-/// executor kind, scheduler profile, fairness assumptions, or batch width.
+/// executor kind, execution policy, fairness assumptions, or batch width.
 pub fn validate_run_config<D, X>(
     executor: &X,
     config: &SearchRunConfig,
 ) -> Result<(), SearchRunConfigError>
 where
-    D: SearchDomain,
+    D: SearchDomain + super::authority::SearchAuthorityPolicy,
     X: ProposalExecutor<D>,
 {
-    if config.batch_width == 0 {
+    let policy = config.execution_policy;
+    let compatibility = execution_policy_compatibility(policy.scheduler_profile);
+
+    if policy.batch_width == 0 {
         return Err(SearchRunConfigError::ZeroBatchWidth);
     }
 
-    match config.scheduler_profile {
-        SearchSchedulerProfile::CanonicalSerial => {
-            if executor.kind() != ProposalExecutorKind::Serial {
-                return Err(SearchRunConfigError::RequiresSerialExecutor(
-                    config.scheduler_profile,
-                ));
-            }
-            if config.batch_width != 1 {
-                return Err(SearchRunConfigError::RequiresBatchWidthOne(
-                    config.scheduler_profile,
-                ));
-            }
-            require_fairness(
-                config,
-                config.scheduler_profile,
-                SearchFairnessAssumption::DeterministicSchedulerConfluence,
-            )?;
+    if policy.caching_profile != SearchCachingProfile::EphemeralPerStep {
+        return Err(SearchRunConfigError::UnsupportedCachingProfile(
+            policy.caching_profile,
+        ));
+    }
+
+    if let SearchEffortProfile::SchedulerStepBudget(0) = policy.effort_profile {
+        // Zero-budget runs are valid and simply emit the initial artifact state
+        // without servicing any batch.
+    }
+
+    match compatibility.required_executor {
+        ProposalExecutorKind::Serial if executor.kind() != ProposalExecutorKind::Serial => {
+            return Err(SearchRunConfigError::RequiresSerialExecutor(
+                policy.scheduler_profile,
+            ));
         }
-        SearchSchedulerProfile::ThreadedExactSingleLane => {
-            if executor.kind() != ProposalExecutorKind::NativeParallel {
-                return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
-                    config.scheduler_profile,
-                ));
-            }
-            if config.batch_width != 1 {
-                return Err(SearchRunConfigError::RequiresBatchWidthOne(
-                    config.scheduler_profile,
-                ));
-            }
-            require_fairness(
-                config,
-                config.scheduler_profile,
-                SearchFairnessAssumption::DeterministicSchedulerConfluence,
-            )?;
+        ProposalExecutorKind::NativeParallel
+            if executor.kind() != ProposalExecutorKind::NativeParallel =>
+        {
+            return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
+                policy.scheduler_profile,
+            ));
         }
-        SearchSchedulerProfile::BatchedParallelExact => {
-            if executor.kind() != ProposalExecutorKind::NativeParallel {
-                return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
-                    config.scheduler_profile,
-                ));
-            }
-            if config.batch_width <= 1 {
-                return Err(SearchRunConfigError::RequiresBatchWidthGreaterThanOne(
-                    config.scheduler_profile,
-                ));
-            }
-            require_fairness(
-                config,
-                config.scheduler_profile,
-                SearchFairnessAssumption::DeterministicSchedulerConfluence,
-            )?;
+        _ => {}
+    }
+
+    match compatibility.batch_width {
+        BatchWidthRequirement::ExactlyOne if policy.batch_width != 1 => {
+            return Err(SearchRunConfigError::RequiresBatchWidthOne(
+                policy.scheduler_profile,
+            ));
         }
-        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => {
-            if executor.kind() != ProposalExecutorKind::NativeParallel {
-                return Err(SearchRunConfigError::RequiresNativeParallelExecutor(
-                    config.scheduler_profile,
-                ));
-            }
-            if config.batch_width <= 1 {
-                return Err(SearchRunConfigError::RequiresBatchWidthGreaterThanOne(
-                    config.scheduler_profile,
-                ));
-            }
-            require_fairness(
-                config,
-                config.scheduler_profile,
-                SearchFairnessAssumption::EventualLiveBatchService,
-            )?;
-            require_fairness(
-                config,
-                config.scheduler_profile,
-                SearchFairnessAssumption::NoStarvationWithinLegalWindow,
-            )?;
+        BatchWidthRequirement::GreaterThanOne if policy.batch_width <= 1 => {
+            return Err(SearchRunConfigError::RequiresBatchWidthGreaterThanOne(
+                policy.scheduler_profile,
+            ));
         }
+        _ => {}
+    }
+
+    for assumption in compatibility.required_fairness {
+        require_fairness(config, policy.scheduler_profile, *assumption)?;
     }
 
     Ok(())
@@ -1653,11 +2220,21 @@ where
     X: ProposalExecutor<D>,
 {
     validate_run_config::<D, X>(executor, &config).map_err(SearchRunError::InvalidConfig)?;
+    let policy = config.execution_policy;
+    let step_budget = match policy.effort_profile {
+        SearchEffortProfile::RunToCompletion => None,
+        SearchEffortProfile::SchedulerStepBudget(budget) => Some(budget),
+    };
     let mut rounds = Vec::new();
     let mut fairness_certificate_trace = Vec::new();
     while let Some(batch) = machine.next_batch() {
+        if step_budget
+            .is_some_and(|budget| machine.state().trace_state.total_scheduler_steps >= budget)
+        {
+            break;
+        }
         let mut proposals = executor
-            .generate(machine.domain(), &batch, machine.goal())
+            .generate(machine.domain(), &batch, machine.query())
             .map_err(SearchError::Domain)
             .map_err(SearchRunError::Search)?;
         machine.state_mut().trace_state.total_scheduler_steps += 1;
@@ -1680,7 +2257,7 @@ where
             machine.observation().normalized_commit_trace[pre_commit_len..].to_vec();
         let state_after_round = state_artifact_for_machine(machine);
         let fairness_certificate = fairness_certificate_for_round(
-            config.scheduler_profile,
+            policy.scheduler_profile,
             batch.epoch.clone(),
             batch.phase,
             batch
@@ -1706,11 +2283,21 @@ where
         });
     }
 
+    let termination = match step_budget {
+        Some(budget)
+            if machine.next_batch().is_some()
+                && machine.state().trace_state.total_scheduler_steps >= budget =>
+        {
+            SearchRunTermination::SchedulerStepBudgetExhausted
+        }
+        _ => SearchRunTermination::Completed,
+    };
+
     let observation = machine.observation_artifact(
-        config.scheduler_profile,
+        policy.scheduler_profile,
         config.fairness_assumptions.clone(),
     );
-    let total_step_mode = match config.scheduler_profile {
+    let total_step_mode = match policy.scheduler_profile {
         SearchSchedulerProfile::CanonicalSerial
         | SearchSchedulerProfile::ThreadedExactSingleLane
         | SearchSchedulerProfile::BatchedParallelExact => TotalStepMode::Exact,
@@ -1723,9 +2310,10 @@ where
         fairness_assumptions: config.fairness_assumptions.clone(),
     };
     let scheduler = SchedulerArtifact {
-        scheduler_profile: config.scheduler_profile,
-        authority_class: classify_scheduler_artifact(config.scheduler_profile),
-        batch_width: config.batch_width,
+        execution_policy: policy,
+        scheduler_profile: policy.scheduler_profile,
+        authority_class: classify_scheduler_artifact(policy.scheduler_profile),
+        batch_width: policy.batch_width,
         fairness_assumptions: config.fairness_assumptions.clone(),
     };
     let final_state = state_artifact_for_machine(machine);
@@ -1735,7 +2323,7 @@ where
         .map(|round| (round.batch_nodes.clone(), round.commits.clone()))
         .unwrap_or_else(|| (Vec::new(), Vec::new()));
     let fairness = fairness_artifact_for_window(
-        config.scheduler_profile,
+        policy.scheduler_profile,
         rounds.first().map(|round| round.epoch.clone()),
         rounds.first().map(|round| round.phase),
         representative_window.0,
@@ -1743,33 +2331,44 @@ where
     );
     let replay = SearchReplayArtifact {
         start: machine.start.clone(),
-        goal: machine.goal.clone(),
-        scheduler_profile: config.scheduler_profile,
+        query: machine.query().clone(),
+        selected_result_semantics_class: machine
+            .domain()
+            .selected_result_semantics_class(machine.query()),
+        path_problem: machine
+            .query()
+            .path_goal_anchor()
+            .cloned()
+            .map(|goal_anchor| SearchPathProblemReplayArtifact { goal_anchor }),
+        execution_policy: policy,
+        scheduler_profile: policy.scheduler_profile,
         fairness_assumptions: config.fairness_assumptions,
         fairness: fairness.clone(),
         fairness_certificate_trace: fairness_certificate_trace.clone(),
         epoch_trace: observation.graph_epoch_trace.clone(),
         rounds,
         final_state: final_state.clone(),
+        termination,
         theorem_pack: theorem_pack.clone(),
-        route_bounds: SearchRouteBoundArtifact {
+        route_bounds: SearchResultBoundArtifact {
             discovery_class: SearchRouteDiscoveryBoundClass::NoCandidate,
             candidate_discovery_bound_steps: None,
-            goal_service_bound_steps: fairness.certificate.service_bound_steps,
-            goal_window_entry_bound_steps: None,
-            discovery_certificate: None,
+            path_problem: replay_path_problem_artifact(
+                machine.query().path_goal_anchor().cloned(),
+                fairness.certificate.service_bound_steps,
+            ),
             recovery_bound_steps_after_latest_epoch: None,
             quality_class: SearchRouteQualityClass::NoCandidate,
-            selected_route_cost: None,
+            selected_result_cost: None,
             optimality_gap: None,
             approximation_ratio_milli: None,
             admissible_upper_bound: None,
-            selected_route_summary: None,
+            selected_result_summary: None,
             required_premises: fairness.certificate.required_fairness.clone(),
         },
         final_observation: observation.clone(),
     };
-    let route_bounds = route_bound_artifact_for_replay(config.scheduler_profile, &replay);
+    let route_bounds = route_bound_artifact_for_replay(policy, termination, &replay);
     let replay = SearchReplayArtifact {
         route_bounds: route_bounds.clone(),
         ..replay
@@ -1783,6 +2382,7 @@ where
             final_state,
             theorem_pack,
             route_bounds,
+            termination,
             progress,
         },
         replay,
@@ -1803,20 +2403,77 @@ pub fn commit_epoch_reconfiguration<D: SearchDomain>(
         .observation_mut()
         .graph_epoch_trace
         .push(request.next_epoch);
-    machine.state_mut().closed.clear();
-    machine.state_mut().incons.clear();
-    machine.last_batch = None;
-    machine.state_mut().open.clear();
-    machine.state_mut().g_score.clear();
-    machine.state_mut().parent.clear();
-    machine.state_mut().incumbent = None;
-
-    let entry = machine.rebuild_frontier_entry(&start, D::Cost::zero());
     machine
-        .state_mut()
-        .g_score
-        .insert(start.clone(), D::Cost::zero());
-    machine.state_mut().open.insert(start, entry);
+        .observation_mut()
+        .reseed_policy_trace
+        .push(request.reseeding_policy);
+    machine.state_mut().closed.clear();
+    machine.last_batch = None;
+    machine.state_mut().incumbent = None;
+    match request.reseeding_policy {
+        SearchReseedingPolicy::StartOnly => {
+            machine.state_mut().incons.clear();
+            machine.state_mut().open.clear();
+            machine.state_mut().g_score.clear();
+            machine.state_mut().parent.clear();
+
+            let entry = machine.rebuild_frontier_entry(&start, D::Cost::zero());
+            machine
+                .state_mut()
+                .g_score
+                .insert(start.clone(), D::Cost::zero());
+            machine.state_mut().open.insert(start, entry);
+        }
+        SearchReseedingPolicy::PreserveOpenAndIncons => {
+            let rebuild_nodes = machine
+                .state()
+                .open
+                .keys()
+                .cloned()
+                .chain(machine.state().incons.iter().cloned())
+                .chain(core::iter::once(start.clone()))
+                .collect::<BTreeSet<_>>();
+
+            let retained_nodes =
+                retained_parent_closure(&start, &rebuild_nodes, &machine.state().parent);
+            let retained_scores = machine
+                .state()
+                .g_score
+                .iter()
+                .filter(|(node, _)| retained_nodes.contains(*node))
+                .map(|(node, score)| (node.clone(), *score))
+                .collect::<BTreeMap<_, _>>();
+            let retained_parent = machine
+                .state()
+                .parent
+                .iter()
+                .filter(|(node, parent)| {
+                    retained_nodes.contains(*node) && retained_nodes.contains(&parent.from)
+                })
+                .map(|(node, parent)| (node.clone(), parent.clone()))
+                .collect::<BTreeMap<_, _>>();
+
+            machine.state_mut().open.clear();
+            machine.state_mut().incons.clear();
+            machine.state_mut().g_score = retained_scores;
+            machine.state_mut().parent = retained_parent;
+
+            for node in rebuild_nodes {
+                let g_score = *machine
+                    .state()
+                    .g_score
+                    .get(&node)
+                    .unwrap_or(&D::Cost::zero());
+                machine
+                    .state_mut()
+                    .g_score
+                    .entry(node.clone())
+                    .or_insert(g_score);
+                let entry = machine.rebuild_frontier_entry(&node, g_score);
+                machine.state_mut().open.insert(node, entry);
+            }
+        }
+    }
 }
 
 /// Replay one canonical observation artifact under an expected epoch schedule.
@@ -1884,20 +2541,36 @@ where
     .map_err(|_| ReplayError::ObservationArtifact)?;
     let total_scheduler_steps =
         u64::try_from(replay.rounds.len()).map_err(|_| ReplayError::ObservationArtifact)?;
-    let (incumbent_cost, incumbent_path) =
-        reconstruct_incumbent_from_commits(&replay.start, &replay.goal, &normalized_commit_trace);
+    let (selected_result_cost, selected_result_witness, selected_result_publication_trace) =
+        match replay.selected_result_semantics_class {
+            SearchSelectedResultSemanticsClass::QueryDerived => {
+                let (cost, witness) = reconstruct_selected_from_commits(
+                    &replay.start,
+                    &replay.query,
+                    &normalized_commit_trace,
+                );
+                let publication_trace = derive_selected_result_publication_trace_from_rounds(
+                    &replay.start,
+                    &replay.query,
+                    &replay.rounds,
+                );
+                (cost, witness, publication_trace)
+            }
+            SearchSelectedResultSemanticsClass::DomainDefinedFromDiscoveredState => {
+                return Err(ReplayError::UnsupportedSelectedResultSemantics);
+            }
+        };
     let canonical_parent_map = derive_parent_map_from_commits(&normalized_commit_trace);
-    let incumbent_publication_trace =
-        derive_incumbent_publication_trace(&replay.start, &replay.goal, &normalized_commit_trace);
 
     let derived = SearchObservationArtifact {
-        incumbent_cost,
-        incumbent_path,
+        selected_result_cost,
+        selected_result_witness,
         canonical_parent_map,
-        incumbent_publication_trace,
+        selected_result_publication_trace,
         normalized_commit_trace,
         replay_checkpoints: replay.final_observation.replay_checkpoints.clone(),
         graph_epoch_trace: replay.epoch_trace.clone(),
+        reseed_policy_trace: replay.final_observation.reseed_policy_trace.clone(),
         scheduler_profile: replay.scheduler_profile,
         fairness_assumptions: replay.fairness_assumptions.clone(),
         productive_steps,
@@ -1938,42 +2611,52 @@ where
     parent.into_iter().collect()
 }
 
-fn derive_incumbent_publication_trace<N, C>(
+fn derive_selected_result_publication_trace_from_rounds<N, G, S, C>(
     start: &N,
-    goal: &N,
-    commits: &[NormalizedCommitRecord<N, C>],
+    query: &SearchQuery<N>,
+    rounds: &[ReplayRoundRecord<N, G, S, C>],
 ) -> Vec<IncumbentPublicationRecord<N, C>>
 where
     N: Clone + Ord,
+    G: Ord,
+    S: Ord,
     C: SearchCost,
 {
     let mut g_score = BTreeMap::new();
     let mut parent = BTreeMap::new();
     let mut publications = Vec::new();
+    let mut current_incumbent: Option<(C, Vec<N>)> = None;
     g_score.insert(start.clone(), C::zero());
 
-    for commit in commits {
-        g_score.insert(commit.node.clone(), commit.g_score);
-        if let Some(parent_node) = &commit.parent {
-            parent.insert(commit.node.clone(), parent_node.clone());
+    for round in rounds {
+        for commit in &round.commits {
+            g_score.insert(commit.node.clone(), commit.g_score);
+            if let Some(parent_node) = &commit.parent {
+                parent.insert(commit.node.clone(), parent_node.clone());
+            }
         }
-        if &commit.node == goal {
-            let Some(path) = reconstruct_path(start, goal, &parent) else {
-                continue;
-            };
+        let Some(next) = best_selected_solution_from_maps(start, query, &g_score, &parent) else {
+            continue;
+        };
+        let should_publish = match current_incumbent.as_ref() {
+            None => true,
+            Some(current) => next.0 < current.0 || (next.0 == current.0 && next.1 < current.1),
+        };
+        if should_publish {
             publications.push(IncumbentPublicationRecord {
-                cost: commit.g_score,
-                path,
+                cost: next.0,
+                witness: next.1.clone(),
             });
+            current_incumbent = Some(next);
         }
     }
 
     publications
 }
 
-fn reconstruct_incumbent_from_commits<N, C>(
+fn reconstruct_selected_from_commits<N, C>(
     start: &N,
-    goal: &N,
+    query: &SearchQuery<N>,
     commits: &[NormalizedCommitRecord<N, C>],
 ) -> (Option<C>, Option<Vec<N>>)
 where
@@ -1991,9 +2674,10 @@ where
         }
     }
 
-    let incumbent_cost = g_score.get(goal).copied();
-    let incumbent_path = incumbent_cost.and_then(|_| reconstruct_path(start, goal, &parent));
-    (incumbent_cost, incumbent_path)
+    match best_selected_solution_from_maps(start, query, &g_score, &parent) {
+        Some((cost, path)) => (Some(cost), Some(path)),
+        None => (None, None),
+    }
 }
 
 fn reconstruct_path<N>(start: &N, goal: &N, parent: &BTreeMap<N, N>) -> Option<Vec<N>>
@@ -2014,6 +2698,54 @@ where
     Some(path)
 }
 
+fn retained_parent_closure<N, E, C>(
+    start: &N,
+    seeds: &BTreeSet<N>,
+    parent: &BTreeMap<N, crate::machine::ParentRecord<N, E, C>>,
+) -> BTreeSet<N>
+where
+    N: Clone + Ord,
+    E: Clone,
+    C: Copy,
+{
+    let mut retained = BTreeSet::new();
+    for seed in seeds {
+        let mut cursor = seed.clone();
+        retained.insert(cursor.clone());
+        while cursor != *start {
+            let Some(next_parent) = parent.get(&cursor) else {
+                break;
+            };
+            cursor = next_parent.from.clone();
+            if !retained.insert(cursor.clone()) {
+                break;
+            }
+        }
+    }
+    retained
+}
+
+fn best_selected_solution_from_maps<N, C>(
+    start: &N,
+    query: &SearchQuery<N>,
+    g_score: &BTreeMap<N, C>,
+    parent: &BTreeMap<N, N>,
+) -> Option<(C, Vec<N>)>
+where
+    N: Clone + Ord,
+    C: SearchCost,
+{
+    query
+        .accepted_nodes()
+        .iter()
+        .filter_map(|node| {
+            let cost = g_score.get(node).copied()?;
+            let path = reconstruct_path(start, node, parent)?;
+            Some((cost, path))
+        })
+        .min_by(|left, right| left.0.cmp(&right.0).then(left.1.cmp(&right.1)))
+}
+
 impl<D: SearchDomain> SearchMachine<D> {
     /// Internal mutable state access for runtime orchestration.
     pub(crate) fn state_mut(&mut self) -> &mut RuntimeState<D> {
@@ -2025,11 +2757,6 @@ impl<D: SearchDomain> SearchMachine<D> {
         &self.domain
     }
 
-    /// Borrow the current goal.
-    pub(crate) fn goal(&self) -> &D::Node {
-        &self.goal
-    }
-
     /// Rebuild one frontier entry under the current epoch and epsilon.
     pub(crate) fn rebuild_frontier_entry(
         &self,
@@ -2039,7 +2766,7 @@ impl<D: SearchDomain> SearchMachine<D> {
         Self::frontier_entry_for(
             &self.domain,
             &self.state.graph_epoch,
-            &self.goal,
+            &self.query,
             self.state.epsilon,
             node,
             g_score,

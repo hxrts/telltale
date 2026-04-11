@@ -12,6 +12,11 @@ def main : IO Unit := do
     | .executableSemantics => "executable_semantics"
     | .refinementCorollary => "refinement_corollary"
     | .premiseScoped => "premise_scoped"
+  let problemClassString := fun cls =>
+    match cls with
+    | .genericMachine => "generic_machine"
+    | .genericSelectedResult => "generic_selected_result"
+    | .pathProblemSpecific => "path_problem_specific"
   let canonicalClaim :=
     match fairnessClaimClass .canonicalSerial with
     | .exactOneStep => "exact_one_step"
@@ -52,8 +57,14 @@ def main : IO Unit := do
         [ ("name", Json.str name)
         , ("support_class", Json.str (supportClassString cls))
         ]
+  let theoremPackInventoryProblemClassesJson :=
+    Json.arr <| fairnessTheoremInventory.toArray.map fun (name, _) =>
+      Json.mkObj
+        [ ("name", Json.str name)
+        , ("problem_class", Json.str (problemClassString (classifyTheoremProblemClass name)))
+        ]
   let payload := Json.mkObj
-    [ ("schema_version", Json.str "search_parity_v11")
+    [ ("schema_version", Json.str "search_parity_v13")
     , ("canonical_batch_nodes", Json.arr #[Json.num 1, Json.num 2])
     , ("independent_targets", Json.arr #[Json.num 4, Json.num 5])
     , ("replay_epoch_trace", Json.arr #[Json.num 1])
@@ -86,6 +97,7 @@ def main : IO Unit := do
     , ("fairness_inventory", inventoryJson)
     , ("theorem_pack_inventory", theoremPackInventoryJson)
     , ("theorem_pack_inventory_classes", theoremPackInventoryClassesJson)
+    , ("theorem_pack_inventory_problem_classes", theoremPackInventoryProblemClassesJson)
     , ("theorem_pack_service_bound_steps", Json.num buildSearchFairnessTheoremPack.canonicalServiceBoundSteps)
     , ("theorem_pack_goal_window_discovery_suffix_bound_steps",
         Json.num buildSearchFairnessTheoremPack.canonicalGoalWindowDiscoverySuffixBoundSteps)

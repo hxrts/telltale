@@ -4,10 +4,10 @@ use std::num::{NonZeroU64, NonZeroUsize};
 use rayon::prelude::*;
 
 use crate::cost::SearchCost;
-use crate::domain::SearchDomain;
+use crate::domain::{SearchDomain, SearchQuery};
 use crate::machine::{CanonicalBatch, Proposal, ProposalKind};
 
-use super::authority::{proposal_read_set, proposal_write_set};
+use super::authority::SearchAuthorityPolicy;
 
 type RuntimeProposalVec<D> = Vec<
     Proposal<<D as SearchDomain>::Node, <D as SearchDomain>::EdgeMeta, <D as SearchDomain>::Cost>,
@@ -23,8 +23,11 @@ pub enum ProposalExecutorKind {
 }
 
 /// Runtime executor for speculative proposal generation.
-pub trait ProposalExecutor<D: SearchDomain> {
+pub trait ProposalExecutor<D: SearchDomain + SearchAuthorityPolicy> {
     /// Report the execution kind of the executor.
+    ///
+    /// This is execution-side scheduling information only. It does not define
+    /// the downstream search problem's semantic objective.
     fn kind(&self) -> ProposalExecutorKind;
 
     /// Generate speculative proposals for one frozen batch.
@@ -36,7 +39,7 @@ pub trait ProposalExecutor<D: SearchDomain> {
         &self,
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
-        goal: &D::Node,
+        query: &SearchQuery<D::Node>,
     ) -> Result<RuntimeProposalVec<D>, D::Error>;
 }
 
@@ -44,7 +47,7 @@ pub trait ProposalExecutor<D: SearchDomain> {
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SerialProposalExecutor;
 
-impl<D: SearchDomain> ProposalExecutor<D> for SerialProposalExecutor {
+impl<D: SearchDomain + SearchAuthorityPolicy> ProposalExecutor<D> for SerialProposalExecutor {
     fn kind(&self) -> ProposalExecutorKind {
         ProposalExecutorKind::Serial
     }
@@ -53,7 +56,7 @@ impl<D: SearchDomain> ProposalExecutor<D> for SerialProposalExecutor {
         &self,
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
-        goal: &D::Node,
+        query: &SearchQuery<D::Node>,
     ) -> Result<RuntimeProposalVec<D>, D::Error> {
         let mut proposals = Vec::new();
         for (batch_index, entry) in batch.entries.iter().enumerate() {
@@ -69,12 +72,11 @@ impl<D: SearchDomain> ProposalExecutor<D> for SerialProposalExecutor {
                     edge_cost,
                     tentative_g: entry.g_score.saturating_add(edge_cost),
                     kind: ProposalKind::Relax,
-                    read_set: proposal_read_set(&entry.node, &to),
-                    write_set: proposal_write_set(&to, goal),
+                    read_set: domain.proposal_read_set(query, &entry.node, &to),
+                    write_set: domain.proposal_write_set(query, &to),
                 });
             }
         }
-        let _ = goal;
         Ok(proposals)
     }
 }
@@ -139,6 +141,7 @@ impl NativeParallelExecutor {
 impl<D> ProposalExecutor<D> for NativeParallelExecutor
 where
     D: SearchDomain + Sync,
+    D: SearchAuthorityPolicy,
     D::Node: Sync,
     D::EdgeMeta: Send,
     D::GraphEpoch: Sync,
@@ -152,9 +155,8 @@ where
         &self,
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
-        goal: &D::Node,
+        query: &SearchQuery<D::Node>,
     ) -> Result<RuntimeProposalVec<D>, D::Error> {
-        let _ = goal;
         let indexed_entries = batch
             .entries
             .iter()
@@ -178,8 +180,8 @@ where
                             edge_cost,
                             tentative_g: entry.g_score.saturating_add(edge_cost),
                             kind: ProposalKind::Relax,
-                            read_set: proposal_read_set(&entry.node, &to),
-                            write_set: proposal_write_set(&to, goal),
+                            read_set: domain.proposal_read_set(query, &entry.node, &to),
+                            write_set: domain.proposal_write_set(query, &to),
                         }
                     }));
                 }
@@ -196,7 +198,7 @@ where
 }
 
 #[cfg(not(feature = "multi-thread"))]
-impl<D: SearchDomain> ProposalExecutor<D> for NativeParallelExecutor {
+impl<D: SearchDomain + SearchAuthorityPolicy> ProposalExecutor<D> for NativeParallelExecutor {
     fn kind(&self) -> ProposalExecutorKind {
         ProposalExecutorKind::NativeParallel
     }
@@ -205,9 +207,9 @@ impl<D: SearchDomain> ProposalExecutor<D> for NativeParallelExecutor {
         &self,
         domain: &D,
         batch: &CanonicalBatch<D::Node, D::GraphEpoch, D::SnapshotId, D::Cost>,
-        goal: &D::Node,
+        query: &SearchQuery<D::Node>,
     ) -> Result<RuntimeProposalVec<D>, D::Error> {
-        let _ = (domain, batch, goal);
+        let _ = (domain, batch, query);
         panic!("NativeParallelExecutor requires the `multi-thread` feature");
     }
 }

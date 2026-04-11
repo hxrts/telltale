@@ -8,8 +8,8 @@ use serde_json::{json, Value};
 use support::FixtureDomain;
 use telltale_search::{
     commit_epoch_reconfiguration, run_with_executor, validate_fairness_certificate_trace,
-    EpochReconfigurationRequest, EpsilonMilli, SearchFairnessAssumption, SearchRunConfig,
-    SearchSchedulerProfile, SerialProposalExecutor,
+    EpochReconfigurationRequest, EpsilonMilli, SearchExecutionPolicy, SearchFairnessAssumption,
+    SearchReseedingPolicy, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 fn recovery_domain() -> FixtureDomain {
@@ -30,17 +30,22 @@ fn actual_recovery_vectors() -> Value {
     let mut machine =
         telltale_search::SearchMachine::new(recovery_domain(), 1, 0, 3, EpsilonMilli::one());
     machine.step_once().expect("first pre-reconfiguration step");
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                 .into_iter()
                 .collect(),
-        },
+        ),
     )
     .expect("recovery run");
     assert_eq!(validate_fairness_certificate_trace(&replay), Ok(()));
@@ -68,12 +73,12 @@ fn tampered_recovery_vectors_are_rejected_by_exact_fixture_comparison() {
     assert_ne!(actual, tampered_bounds);
 
     let mut tampered_summary = expected_recovery_vectors();
-    tampered_summary["route_bounds"]["selected_route_summary"]["traversed_epoch_count"] = json!(1);
+    tampered_summary["route_bounds"]["selected_result_summary"]["traversed_epoch_count"] = json!(1);
     assert_ne!(actual, tampered_summary);
 
     let mut tampered_discovery_certificate = expected_recovery_vectors();
-    tampered_discovery_certificate["route_bounds"]["discovery_certificate"]["class"] =
-        json!("GoalWindowOneStepViaThreadedRefinement");
+    tampered_discovery_certificate["route_bounds"]["path_problem"]["discovery_certificate"]
+        ["class"] = json!("GoalWindowOneStepViaThreadedRefinement");
     assert_ne!(actual, tampered_discovery_certificate);
 
     let mut tampered_observation = expected_recovery_vectors();

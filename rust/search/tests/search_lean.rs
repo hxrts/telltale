@@ -14,9 +14,9 @@ use telltale_search::{
     commit_epoch_reconfiguration, full_state_artifact_for_machine, proposals_independent,
     replay_observation, run_with_executor, search_theorem_pack_artifact, AuthorityReadSet,
     AuthoritySurface, AuthorityWriteSet, EpochReconfigurationRequest, EpsilonMilli, Proposal,
-    ProposalKind, ReplayExpectation, SearchFairnessAssumption, SearchFairnessCertificateClass,
-    SearchFairnessClaimClass, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
-    SerialProposalExecutor,
+    ProposalKind, ReplayExpectation, SearchExecutionPolicy, SearchFairnessAssumption,
+    SearchFairnessCertificateClass, SearchFairnessClaimClass, SearchMachine, SearchReseedingPolicy,
+    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 #[derive(Debug, Deserialize)]
@@ -44,6 +44,7 @@ struct SearchParityFixture {
     fairness_inventory: Vec<SearchInventoryEntry>,
     theorem_pack_inventory: Vec<SearchInventoryEntry>,
     theorem_pack_inventory_classes: Vec<SearchInventoryClassEntry>,
+    theorem_pack_inventory_problem_classes: Vec<SearchInventoryProblemClassEntry>,
     theorem_pack_service_bound_steps: u64,
     theorem_pack_goal_window_discovery_suffix_bound_steps: u64,
     theorem_pack_gate: String,
@@ -67,6 +68,12 @@ struct SearchInventoryEntry {
 struct SearchInventoryClassEntry {
     name: String,
     support_class: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchInventoryProblemClassEntry {
+    name: String,
+    problem_class: String,
 }
 
 fn repo_root() -> PathBuf {
@@ -189,14 +196,13 @@ fn assert_replay_contracts(fixture: &SearchParityFixture, domain: FixtureDomain)
     let (report, replay) = run_with_executor(
         &mut replay_machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: BTreeSet::from([
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            BTreeSet::from([
                 SearchFairnessAssumption::DeterministicSchedulerConfluence,
                 SearchFairnessAssumption::EventualLiveBatchService,
             ]),
-        },
+        ),
     )
     .expect("canonical run");
     assert_eq!(
@@ -273,6 +279,7 @@ fn assert_barrier_contracts(fixture: &SearchParityFixture) {
         &mut barrier_machine,
         EpochReconfigurationRequest {
             next_epoch: fixture.barrier_after_epoch,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
         },
     );
     assert_eq!(
@@ -573,6 +580,45 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
             .collect::<std::collections::BTreeMap<_, _>>(),
         theorem_pack_inventory_classes
     );
+    let theorem_pack_inventory_problem_classes = fixture
+        .theorem_pack_inventory_problem_classes
+        .iter()
+        .map(|entry| (entry.name.as_str(), entry.problem_class.as_str()))
+        .collect::<std::collections::BTreeMap<_, _>>();
+    assert_eq!(
+        theorem_pack_inventory_problem_classes
+            .get("search_canonical_machine_goal_reached_from_raw_successor_semantics"),
+        Some(&"path_problem_specific")
+    );
+    assert_eq!(
+        theorem_pack_inventory_problem_classes
+            .get("search_canonical_machine_step_preserves_invariants"),
+        Some(&"generic_machine")
+    );
+    assert_eq!(
+        theorem_pack_inventory_problem_classes
+            .get("search_canonical_serial_has_exact_result_contract"),
+        Some(&"generic_selected_result")
+    );
+    assert_eq!(
+        rust_theorem_pack
+            .inventory_problem_classes
+            .iter()
+            .map(|entry| {
+                let problem_class = match entry.problem_class {
+                    telltale_search::SearchTheoremProblemClass::GenericMachine => "generic_machine",
+                    telltale_search::SearchTheoremProblemClass::GenericSelectedResult => {
+                        "generic_selected_result"
+                    }
+                    telltale_search::SearchTheoremProblemClass::PathProblemSpecific => {
+                        "path_problem_specific"
+                    }
+                };
+                (entry.name.as_str(), problem_class)
+            })
+            .collect::<std::collections::BTreeMap<_, _>>(),
+        theorem_pack_inventory_problem_classes
+    );
     assert_eq!(
         rust_theorem_pack.canonical_service_bound_steps,
         fixture.theorem_pack_service_bound_steps
@@ -587,7 +633,7 @@ fn assert_fairness_contracts(fixture: &SearchParityFixture) {
 #[test]
 fn lean_fixture_matches_batch_independence_replay_and_barrier_surfaces() {
     let fixture = search_fixture();
-    assert_eq!(fixture.schema_version, "search_parity_v11");
+    assert_eq!(fixture.schema_version, "search_parity_v13");
 
     let domain = make_domain();
     assert_batch_and_independence_contracts(&fixture, &domain);

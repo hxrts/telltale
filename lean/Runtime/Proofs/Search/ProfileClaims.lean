@@ -5,14 +5,17 @@ set_option autoImplicit false
 /-!
 # Runtime.Proofs.Search.ProfileClaims
 
-Profile-scoped fairness claims for search scheduling.
+Execution-profile-scoped fairness claims for search scheduling.
 
-This module makes the public fairness story explicit by scheduler profile:
+This module makes the public fairness story explicit by execution profile:
 
 - canonical serial: exact one-step fairness for the current min-key batch
 - threaded exact single-lane: exact one-step refinement to canonical serial
 - batched exact / envelope-bounded: no unconditional theorem here; they require
   additional certified window and fairness premises
+
+These profiles classify execution-side scheduling regimes only. They do not
+change the downstream search problem's semantic objective.
 -/
 
 namespace Runtime
@@ -27,6 +30,10 @@ inductive SearchSchedulerProfile where
   | batchedParallelEnvelopeBounded
   deriving DecidableEq, Repr
 
+/-- Proof-side execution-profile vocabulary. This is execution-side only and
+does not encode problem semantics. -/
+abbrev SearchExecutionProfile := SearchSchedulerProfile
+
 /-- Public fairness-claim status by scheduler profile. -/
 inductive FairnessClaimClass where
   | exactOneStep
@@ -35,8 +42,8 @@ inductive FairnessClaimClass where
   | premiseOnly
   deriving DecidableEq, Repr
 
-/-- Public fairness classification for each search scheduler profile. -/
-def fairnessClaimClass : SearchSchedulerProfile → FairnessClaimClass
+/-- Public fairness classification for each search execution profile. -/
+def fairnessClaimClass : SearchExecutionProfile → FairnessClaimClass
   | .canonicalSerial => .exactOneStep
   | .threadedExactSingleLane => .exactOneStepUnderRefinement
   | .batchedParallelExact => .premisedWindowBounded

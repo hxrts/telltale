@@ -4,8 +4,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use telltale_search::{
-    run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,
-    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+    run_with_executor, EpsilonMilli, SearchDomain, SearchExecutionPolicy, SearchFairnessAssumption,
+    SearchMachine, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 use telltale_simulator::project_search_run;
 
@@ -58,8 +58,10 @@ fn simulator_adapter_projects_search_artifacts() {
         &mut machine,
         &SerialProposalExecutor,
         SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
+            execution_policy: SearchExecutionPolicy::new(
+                SearchSchedulerProfile::CanonicalSerial,
+                1,
+            ),
             fairness_assumptions: BTreeSet::from([
                 SearchFairnessAssumption::DeterministicSchedulerConfluence,
             ]),
@@ -68,6 +70,6 @@ fn simulator_adapter_projects_search_artifacts() {
     .expect("search run");
 
     let artifact = project_search_run(&report, &replay);
-    assert_eq!(artifact.observation.incumbent_cost, Some(2));
+    assert_eq!(artifact.observation.selected_result_cost, Some(2));
     assert_eq!(artifact.rounds, replay.rounds);
 }

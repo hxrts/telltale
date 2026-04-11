@@ -151,20 +151,21 @@ heuristic, and epoch semantics through typed domain traits.
 Current serial-core exports include:
 
 - `SearchCost`, `EpsilonMilli`
-- `SearchDomain`
+- `SearchDomain`, `SearchQuery`, `SearchQueryError`,
+  `SearchSelectedResultSemanticsClass`
 - `SearchMachine`
-- `CanonicalBatch`, `Proposal`, `ProposalKind`
+- `CanonicalBatch`, `Proposal`, `ProposalKind`, `SelectedSolution`
 - `SearchBudgetState`, `SearchTraceState`
 - `SearchError`, `SearchInvariantViolation`
 - profile/admission types:
   `SearchDeterminismMode`, `SearchSchedulerProfile`,
-  `SearchFairnessAssumption`, `SearchObservableClass`,
+  `SearchFairnessAssumption`, `SearchObservableClass`, `SearchClaimClass`,
   `CommutativityRegionClass`, `SearchDUser`,
   `SearchCertifiedCapability`, `AdmissionRejectionReason`,
   `check_capability_containment(...)`
 - observation/comparison types:
   `SearchObservationArtifact`, `NormalizedCommitRecord`,
-  `IncumbentPublicationRecord`,
+  `SelectedSolutionPublicationRecord`,
   `ObservationComparison`, `ObservationRelation`,
   `compare_observations(...)`
 - runtime/replay types:
@@ -174,18 +175,35 @@ Current serial-core exports include:
   `AuthoritySurface`, `SchedulerArtifact`, `SchedulerArtifactClass`,
   `ProgressSummary`, `TotalStepMode`, `SearchExecutionReport`,
   `SearchReplayArtifact`, `ReplayRoundRecord`, `ReplayExpectation`,
-  `ReplayError`, `SearchRunConfig`, `run_with_executor(...)`,
+  `ReplayError`, `SearchRunConfig`, `SearchRunTermination`,
+  `run_with_executor(...)`,
   `replay_observation(...)`,
   `EpochReconfigurationRequest`, `commit_epoch_reconfiguration(...)`,
   `proposals_independent(...)`
 
 Replay validation is derived from canonical round commits rather than trusting
-stored summary fields. Epoch reconfiguration is barriered and resets
-frontier/parent/incumbent state before reseeding the new epoch from the start
-node. Fairness bundles are explicit observation and admission surfaces.
-Observation artifacts also carry canonical parent identity and incumbent
-publication traces, while fairness and capability bundles use set semantics
-rather than order-sensitive vectors.
+stored summary fields when selected-result semantics are query-derived. For
+domain-defined selected-result semantics, replay fails closed instead of
+silently falling back to a compatibility goal anchor. Epoch reconfiguration is
+barriered and resets frontier/parent/incumbent state before reseeding the new
+epoch from the start node. Fairness bundles are explicit observation and
+admission surfaces. Observation artifacts also carry canonical parent identity
+and selected-result publication traces, while fairness and capability bundles
+use set semantics rather than order-sensitive vectors.
+
+Import posture:
+
+- prefer `SearchQuery::try_multi_goal(...)` and
+  `SearchQuery::try_candidate_set(...)`
+- prefer generic selected-result types over route/incumbent aliases
+- use `telltale_search::compat` only for legacy migration
+- treat `SearchExecutionPolicy` as an explicit compatibility matrix:
+  `CanonicalSerial` => serial + width `1`,
+  `ThreadedExactSingleLane` => native parallel + width `1`,
+  `BatchedParallelExact`/`BatchedParallelEnvelopeBounded` => native parallel + width `> 1`
+- treat `SchedulerStepBudget(n)` as the supported budgeted-anytime effort mode
+  and `SearchCachingProfile::IncrementalReuse` as outside the stable import
+  posture until implemented
 
 Optional layers above the core crate:
 

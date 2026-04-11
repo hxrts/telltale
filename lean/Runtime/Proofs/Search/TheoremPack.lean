@@ -5,8 +5,20 @@ set_option autoImplicit false
 /-!
 # Runtime.Proofs.Search.TheoremPack
 
-Packaged theorem inventory and profile-neutral metadata for the reduced search
-theorem surface.
+Packaged theorem inventory and execution-profile-neutral metadata for the
+reduced search theorem surface.
+
+Execution-profile metadata in this pack classifies scheduler-side theorem
+surfaces only. It does not redefine downstream search-problem semantics.
+
+The theorem inventory is also split conceptually into:
+
+- generic machine/refinement/fairness theorems
+- generic selected-result/result-bound theorems
+- path-problem-specific completeness/discovery theorems
+
+Path-search reachability/publication theorems remain one supported
+problem-specific family rather than the only machine shape.
 -/
 
 namespace Runtime
@@ -37,6 +49,18 @@ def theoremPackInventory : List (String × Bool) :=
 def theoremPackInventorySupportClasses :
     List (String × SearchTheoremSupportClass) :=
   buildSearchFairnessTheoremPack.inventorySupportClasses
+
+/-- Generic-machine theorem rows from the packaged search theorem surface. -/
+def theoremPackGenericMachineInventory : List (String × Bool) :=
+  genericMachineTheoremInventory
+
+/-- Generic selected-result theorem rows from the packaged search theorem surface. -/
+def theoremPackGenericSelectedResultInventory : List (String × Bool) :=
+  genericSelectedResultTheoremInventory
+
+/-- Path-problem-specific theorem rows from the packaged search theorem surface. -/
+def theoremPackProblemSpecificInventory : List (String × Bool) :=
+  problemSpecificTheoremInventory
 
 end Search
 end Proofs

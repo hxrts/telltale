@@ -18,6 +18,14 @@ bench = false
 name = "search_profiles"
 harness = false
 
+[[bench]]
+name = "search_machine_phases"
+harness = false
+
+[[bench]]
+name = "search_runtime_overheads"
+harness = false
+
 [features]
 default = []
 multi-thread = ["dep:rayon"]

@@ -583,6 +583,7 @@ check-search-tooling:
       cargo check -p telltale-search --target wasm32-unknown-unknown --tests
     fi
     just check-search-fairness
+    just check-search-bench-tooling
     just check-search-boundaries
 
 # Focused durability verification split: machine contracts, simulator assurance, and boundaries.
@@ -662,9 +663,45 @@ wasm-check:
 bench-check:
     cargo bench --workspace --no-run
 
+# Check the search benchmark/profiling surface explicitly, including the saved-profile script.
+check-search-bench-tooling:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    bash -n scripts/ops/profile-search-bench.sh
+    cargo bench -p telltale-search --bench search_profiles --bench search_machine_phases --bench search_runtime_overheads --no-run
+    cargo bench -p telltale-search --features multi-thread --bench search_profiles --bench search_machine_phases --bench search_runtime_overheads --no-run
+
 # Profile a single protocol machine runtime benchmark with samply.
 profile-protocol-machine bench:
     samply record cargo bench -p telltale-machine --bench protocol_machine_runtime_bench -- {{ bench }}
+
+# Profile one search benchmark with samply.
+profile-search bench_target="search_profiles" bench="serial_chain_256":
+    ./scripts/ops/profile-search-bench.sh {{ bench_target }} {{ bench }}
+
+# Profile the canonical serial chain workload.
+profile-search-chain:
+    ./scripts/ops/profile-search-bench.sh search_profiles serial_chain_256
+
+# Profile the rebuild-heavy canonical serial workload.
+profile-search-rebuild:
+    ./scripts/ops/profile-search-bench.sh search_profiles serial_grid_rebuild_heavy_32x32
+
+# Profile the threaded exact single-lane search workload.
+profile-search-threaded:
+    ./scripts/ops/profile-search-bench.sh search_profiles threaded_exact_single_lane_grid_32x32 --features multi-thread
+
+# Profile machine-only search cost without runtime/executor artifact overhead.
+profile-search-machine-only:
+    ./scripts/ops/profile-search-bench.sh search_runtime_overheads runtime_machine_only_chain_256
+
+# Profile runtime artifact generation after a completed search run.
+profile-search-artifact:
+    ./scripts/ops/profile-search-bench.sh search_runtime_overheads runtime_observation_export_chain_256
+
+# Profile invariant-checking cost on a prepared frontier snapshot.
+profile-search-invariants:
+    ./scripts/ops/profile-search-bench.sh search_runtime_overheads runtime_invariant_check_frontier_512
 
 # Profile the paused-role scheduler hotspot with samply.
 profile-protocol-machine-scheduler:

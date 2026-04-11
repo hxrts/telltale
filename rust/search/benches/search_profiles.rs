@@ -1,99 +1,101 @@
 #![allow(missing_docs)]
 
+mod support;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use telltale_search::{
-    run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,
-    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+use telltale_search::EpsilonMilli;
+
+use support::{
+    capture_rebuild_metrics, capture_selector_serial_metrics, capture_serial_metrics, chain_domain,
+    duplicate_pressure_domain, fan_in_domain, grid_domain, grid_goal, print_case_metrics,
+    run_rebuild_heavy_serial, run_selector_serial, run_serial, selector_candidate_domain,
 };
 
-use std::collections::{BTreeMap, BTreeSet};
+const REBUILD_STEPS_PER_PHASE: u64 = 24;
+const REBUILD_SCHEDULE: [EpsilonMilli; 4] = [
+    EpsilonMilli(2_500),
+    EpsilonMilli(2_000),
+    EpsilonMilli(1_500),
+    EpsilonMilli::one(),
+];
 
-#[derive(Clone, Debug, Default)]
-struct BenchDomain {
-    edges: BTreeMap<u32, Vec<(u32, &'static str, u64)>>,
-}
-
-impl SearchDomain for BenchDomain {
-    type Node = u32;
-    type EdgeMeta = &'static str;
-    type Cost = u64;
-    type GraphEpoch = u64;
-    type SnapshotId = &'static str;
-    type Error = &'static str;
-
-    fn successors(
-        &self,
-        _epoch: &Self::GraphEpoch,
-        node: &Self::Node,
-        out: &mut Vec<(Self::Node, Self::EdgeMeta, Self::Cost)>,
-    ) -> Result<(), Self::Error> {
-        if let Some(edges) = self.edges.get(node) {
-            out.extend(edges.iter().cloned());
-        }
-        Ok(())
-    }
-
-    fn heuristic(
-        &self,
-        _epoch: &Self::GraphEpoch,
-        _node: &Self::Node,
-        _goal: &Self::Node,
-    ) -> Self::Cost {
-        0
-    }
-
-    fn snapshot_id(&self, _epoch: &Self::GraphEpoch) -> Self::SnapshotId {
-        "bench-epoch"
-    }
-}
-
-fn chain_domain(length: u32) -> BenchDomain {
-    let mut domain = BenchDomain::default();
-    for node in 0..length {
-        domain
-            .edges
-            .entry(node)
-            .or_default()
-            .push((node + 1, "chain", 1));
-    }
-    domain
-}
-
-fn fan_in_domain(width: u32) -> BenchDomain {
-    let mut domain = BenchDomain::default();
-    for node in 1..=width {
-        domain.edges.entry(0).or_default().push((node, "fan", 1));
-        domain
-            .edges
-            .entry(node)
-            .or_default()
-            .push((width + 1, "goal", u64::from(node)));
-    }
-    domain
-}
-
-fn run_serial(domain: BenchDomain, start: u32, goal: u32) {
-    let mut machine = SearchMachine::new(domain, 1, start, goal, EpsilonMilli::one());
-    let _ = run_with_executor(
-        &mut machine,
-        &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: BTreeSet::from([
-                SearchFairnessAssumption::DeterministicSchedulerConfluence,
-            ]),
-        },
-    )
-    .expect("benchmark search run");
+fn emit_case_metrics() {
+    print_case_metrics(
+        "serial_chain_256",
+        &capture_serial_metrics(chain_domain(256), 0, 256),
+    );
+    print_case_metrics(
+        "serial_fan_in_128",
+        &capture_serial_metrics(fan_in_domain(128), 0, 129),
+    );
+    print_case_metrics(
+        "serial_duplicate_pressure_64x32",
+        &capture_serial_metrics(duplicate_pressure_domain(64, 32), 0, 97),
+    );
+    let (selector_domain, selector_candidates) = selector_candidate_domain(128);
+    print_case_metrics(
+        "serial_selector_candidates_128",
+        &capture_selector_serial_metrics(selector_domain, 0, selector_candidates),
+    );
+    print_case_metrics(
+        "serial_grid_rebuild_heavy_32x32",
+        &capture_rebuild_metrics(
+            grid_domain(32, 32, 3),
+            0,
+            grid_goal(32, 32),
+            REBUILD_STEPS_PER_PHASE,
+            &REBUILD_SCHEDULE,
+        ),
+    );
+    #[cfg(feature = "multi-thread")]
+    print_case_metrics(
+        "threaded_exact_single_lane_grid_32x32",
+        &support::capture_threaded_exact_single_lane_metrics(
+            grid_domain(32, 32, 3),
+            0,
+            grid_goal(32, 32),
+        ),
+    );
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
+    emit_case_metrics();
+
     c.bench_function("serial_chain_256", |b| {
         b.iter(|| run_serial(black_box(chain_domain(256)), 0, 256))
     });
     c.bench_function("serial_fan_in_128", |b| {
         b.iter(|| run_serial(black_box(fan_in_domain(128)), 0, 129))
+    });
+    c.bench_function("serial_duplicate_pressure_64x32", |b| {
+        b.iter(|| run_serial(black_box(duplicate_pressure_domain(64, 32)), 0, 97))
+    });
+    c.bench_function("serial_selector_candidates_128", |b| {
+        b.iter(|| {
+            let (domain, candidates) = selector_candidate_domain(128);
+            run_selector_serial(black_box(domain), 0, black_box(candidates))
+        })
+    });
+    c.bench_function("serial_grid_rebuild_heavy_32x32", |b| {
+        b.iter(|| {
+            run_rebuild_heavy_serial(
+                black_box(grid_domain(32, 32, 3)),
+                0,
+                grid_goal(32, 32),
+                REBUILD_STEPS_PER_PHASE,
+                &REBUILD_SCHEDULE,
+            )
+        })
+    });
+    #[cfg(feature = "multi-thread")]
+    c.bench_function("threaded_exact_single_lane_grid_32x32", |b| {
+        b.iter(|| {
+            support::run_threaded_exact_single_lane(
+                black_box(grid_domain(32, 32, 3)),
+                0,
+                grid_goal(32, 32),
+            )
+        })
     });
 }
 

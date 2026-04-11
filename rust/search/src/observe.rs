@@ -8,6 +8,7 @@ use crate::admission::{
     SearchDeterminismMode, SearchFairnessAssumption, SearchObservableClass, SearchSchedulerProfile,
 };
 use crate::cost::SearchCost;
+use crate::domain::SearchReseedingPolicy;
 
 /// Accumulated replay- and observation-visible records collected during one run.
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
@@ -18,8 +19,10 @@ pub struct SearchObservationAccumulator<N, G, C> {
     pub(crate) replay_checkpoints: Vec<String>,
     /// Graph epoch trace.
     pub(crate) graph_epoch_trace: Vec<G>,
-    /// Incumbent publication trace.
-    pub(crate) incumbent_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
+    /// Epoch-reseeding policy trace.
+    pub(crate) reseed_policy_trace: Vec<SearchReseedingPolicy>,
+    /// Selected-solution publication trace.
+    pub(crate) selected_result_publication_trace: Vec<SelectedSolutionPublicationRecord<N, C>>,
 }
 
 /// One normalized canonical commit record.
@@ -33,32 +36,45 @@ pub struct NormalizedCommitRecord<N, C> {
     pub g_score: C,
 }
 
-/// One incumbent publication derived from canonical commit state.
+/// One selected-solution publication derived from canonical commit state.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct IncumbentPublicationRecord<N, C> {
-    /// Published incumbent cost.
+pub struct SelectedSolutionPublicationRecord<N, C> {
+    /// Published selected-solution cost.
     pub cost: C,
-    /// Published incumbent path.
-    pub path: Vec<N>,
+    /// Published selected-solution witness.
+    #[serde(alias = "path")]
+    pub witness: Vec<N>,
 }
 
+/// Historical incumbent-publication vocabulary retained for compatibility.
+pub type IncumbentPublicationRecord<N, C> = SelectedSolutionPublicationRecord<N, C>;
+
 /// One observed search artifact derived from a canonical machine run.
+///
+/// The selected-result fields are the generic result for the run. For the
+/// built-in path-search adapters, the witness remains a canonical path.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchObservationArtifact<N, G, C> {
-    /// Current incumbent cost.
-    pub incumbent_cost: Option<C>,
-    /// Current incumbent path.
-    pub incumbent_path: Option<Vec<N>>,
+    /// Current selected-solution cost.
+    #[serde(alias = "incumbent_cost")]
+    pub selected_result_cost: Option<C>,
+    /// Current selected-solution witness for path-style queries.
+    #[serde(alias = "incumbent_path")]
+    pub selected_result_witness: Option<Vec<N>>,
     /// Canonical parent identities derived from the authoritative machine state.
     pub canonical_parent_map: Vec<(N, N)>,
-    /// Incumbent publication trace.
-    pub incumbent_publication_trace: Vec<IncumbentPublicationRecord<N, C>>,
+    /// Selected-solution publication trace.
+    #[serde(alias = "incumbent_publication_trace")]
+    pub selected_result_publication_trace: Vec<SelectedSolutionPublicationRecord<N, C>>,
     /// Canonical normalized commit trace.
     pub normalized_commit_trace: Vec<NormalizedCommitRecord<N, C>>,
     /// Replay checkpoint markers.
     pub replay_checkpoints: Vec<String>,
     /// Graph epoch trace.
     pub graph_epoch_trace: Vec<G>,
+    /// Epoch-reseeding policy trace.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reseed_policy_trace: Vec<SearchReseedingPolicy>,
     /// Declared scheduler profile.
     pub scheduler_profile: SearchSchedulerProfile,
     /// Declared fairness assumptions.
@@ -67,6 +83,31 @@ pub struct SearchObservationArtifact<N, G, C> {
     pub productive_steps: u64,
     /// Total scheduler-step count.
     pub total_scheduler_steps: u64,
+}
+
+/// Generic selected-result artifact vocabulary retained alongside the
+/// historical observation name during migration.
+pub type SearchSelectedResultArtifact<N, G, C> = SearchObservationArtifact<N, G, C>;
+
+impl<N, G, C> SearchObservationArtifact<N, G, C> {
+    /// Borrow the selected-result cost exposed by this observation.
+    #[must_use]
+    pub fn selected_result_cost(&self) -> Option<&C> {
+        self.selected_result_cost.as_ref()
+    }
+
+    /// Borrow the selected-result witness exposed by this observation.
+    #[must_use]
+    pub fn selected_result_witness(&self) -> Option<&[N]> {
+        self.selected_result_witness.as_deref()
+    }
+
+    /// Borrow the selected-result publication trace exposed by this
+    /// observation.
+    #[must_use]
+    pub fn selected_result_publication_trace(&self) -> &[SelectedSolutionPublicationRecord<N, C>] {
+        &self.selected_result_publication_trace
+    }
 }
 
 /// Comparison relation between two observed artifacts.
@@ -105,13 +146,13 @@ where
     let mut mismatches = Vec::new();
     for observable in required {
         match observable {
-            SearchObservableClass::IncumbentCost => {
-                if left.incumbent_cost != right.incumbent_cost {
+            SearchObservableClass::SelectedResultCost => {
+                if left.selected_result_cost != right.selected_result_cost {
                     mismatches.push(*observable);
                 }
             }
-            SearchObservableClass::CanonicalPathIdentity => {
-                if left.incumbent_path != right.incumbent_path {
+            SearchObservableClass::SelectedResultWitnessIdentity => {
+                if left.selected_result_witness != right.selected_result_witness {
                     mismatches.push(*observable);
                 }
             }
@@ -120,8 +161,9 @@ where
                     mismatches.push(*observable);
                 }
             }
-            SearchObservableClass::IncumbentPublicationTrace => {
-                if left.incumbent_publication_trace != right.incumbent_publication_trace {
+            SearchObservableClass::SelectedResultPublicationTrace => {
+                if left.selected_result_publication_trace != right.selected_result_publication_trace
+                {
                     mismatches.push(*observable);
                 }
             }
@@ -216,12 +258,12 @@ mod tests {
         scheduler_profile: SearchSchedulerProfile,
     ) -> SearchObservationArtifact<u8, u64, u64> {
         SearchObservationArtifact {
-            incumbent_cost: Some(3),
-            incumbent_path: Some(vec![0, 1, 3]),
+            selected_result_cost: Some(3),
+            selected_result_witness: Some(vec![0, 1, 3]),
             canonical_parent_map: vec![(1, 0), (3, 1)],
-            incumbent_publication_trace: vec![IncumbentPublicationRecord {
+            selected_result_publication_trace: vec![IncumbentPublicationRecord {
                 cost: 3,
-                path: vec![0, 1, 3],
+                witness: vec![0, 1, 3],
             }],
             normalized_commit_trace: trace
                 .into_iter()
@@ -233,6 +275,7 @@ mod tests {
                 .collect(),
             replay_checkpoints: vec!["cp0".to_string()],
             graph_epoch_trace: vec![1],
+            reseed_policy_trace: Vec::new(),
             scheduler_profile,
             fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                 .into_iter()
@@ -306,9 +349,9 @@ mod tests {
         let left = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
         let mut right = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
         right.canonical_parent_map = vec![(1, 0), (3, 2)];
-        right.incumbent_publication_trace = vec![IncumbentPublicationRecord {
+        right.selected_result_publication_trace = vec![IncumbentPublicationRecord {
             cost: 4,
-            path: vec![0, 2, 3],
+            witness: vec![0, 2, 3],
         }];
         let comparison = compare_observations(
             &left,
@@ -316,7 +359,7 @@ mod tests {
             SearchDeterminismMode::Full,
             &[
                 SearchObservableClass::CanonicalParentIdentity,
-                SearchObservableClass::IncumbentPublicationTrace,
+                SearchObservableClass::SelectedResultPublicationTrace,
             ],
         );
         assert_eq!(comparison.relation, ObservationRelation::Mismatch);
@@ -324,8 +367,16 @@ mod tests {
             comparison.mismatches,
             vec![
                 SearchObservableClass::CanonicalParentIdentity,
-                SearchObservableClass::IncumbentPublicationTrace,
+                SearchObservableClass::SelectedResultPublicationTrace,
             ]
         );
+    }
+
+    #[test]
+    fn selected_result_helpers_expose_the_generic_alias_surface() {
+        let artifact = artifact(vec![(1, 1)], SearchSchedulerProfile::CanonicalSerial);
+        assert_eq!(artifact.selected_result_cost(), Some(&3));
+        assert_eq!(artifact.selected_result_witness(), Some(&[0, 1, 3][..]));
+        assert_eq!(artifact.selected_result_publication_trace().len(), 1);
     }
 }

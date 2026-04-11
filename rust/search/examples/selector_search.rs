@@ -1,12 +1,12 @@
 #![allow(clippy::expect_used)]
-//! Minimal generic weighted-graph example for `telltale-search`.
+//! Selector-style search example for `telltale-search`.
 
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 
 use telltale_search::{
     run_with_executor, EpsilonMilli, SearchDomain, SearchExecutionPolicy, SearchFairnessAssumption,
-    SearchMachine, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+    SearchMachine, SearchQuery, SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -45,22 +45,33 @@ impl SearchDomain for ExampleDomain {
     }
 
     fn snapshot_id(&self, _epoch: &Self::GraphEpoch) -> Self::SnapshotId {
-        "static-demo"
+        "selector-demo"
     }
 }
 
 fn main() {
     let mut domain = ExampleDomain::default();
+    domain.edges.insert(
+        "seed",
+        vec![("left", "seed-left", 1), ("right", "seed-right", 1)],
+    );
     domain
         .edges
-        .insert("A", vec![("B", "A-B", 1), ("C", "A-C", 3)]);
-    domain.edges.insert("B", vec![("D", "B-D", 2)]);
-    domain.edges.insert("C", vec![("D", "C-D", 1)]);
-    domain.heuristics.insert(("A", "D"), 2);
-    domain.heuristics.insert(("B", "D"), 1);
-    domain.heuristics.insert(("C", "D"), 1);
+        .insert("left", vec![("candidate-a", "left-a", 2)]);
+    domain
+        .edges
+        .insert("right", vec![("candidate-b", "right-b", 1)]);
+    domain.heuristics.insert(("seed", "candidate-a"), 2);
+    domain.heuristics.insert(("seed", "candidate-b"), 1);
+    domain.heuristics.insert(("left", "candidate-a"), 1);
+    domain.heuristics.insert(("right", "candidate-b"), 0);
 
-    let mut machine = SearchMachine::new(domain, 1, "A", "D", EpsilonMilli::one());
+    let query = SearchQuery::candidate_set(
+        "seed",
+        vec!["candidate-a", "candidate-b"],
+        Some("candidate-b"),
+    );
+    let mut machine = SearchMachine::new_with_query(domain, 1, query, EpsilonMilli::one());
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
@@ -69,15 +80,15 @@ fn main() {
             BTreeSet::from([SearchFairnessAssumption::DeterministicSchedulerConfluence]),
         ),
     )
-    .expect("example run");
+    .expect("selector example run");
 
     println!(
-        "selected_result_cost={:?}",
+        "selected_cost={:?}",
         report.observation.selected_result_cost
     );
     println!(
-        "selected_result_witness={:?}",
+        "selected_witness={:?}",
         report.observation.selected_result_witness
     );
-    println!("rounds={}", replay.rounds.len());
+    println!("query={:?}", replay.query);
 }

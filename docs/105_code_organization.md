@@ -141,7 +141,23 @@ speculative proposal execution.
 This crate is intentionally downstream-oriented and domain-generic.
 Application-specific routing, RF, mesh, or topology policies should live in
 downstream crates that implement its domain traits rather than in
-`telltale-search` itself.
+`telltale-search` itself. The stable import posture is:
+
+- fail-closed `SearchQuery::try_multi_goal(...)` and
+  `SearchQuery::try_candidate_set(...)` constructors
+- generic selected-result surfaces such as `SelectedSolution`,
+  `SearchResultBoundArtifact`, and `SearchResultSummary`
+- `SearchDomain::selected_result_candidates(...)` when result admissibility is
+  narrower than the raw built-in query adapter
+- `SearchClaimClass` and theorem-pack problem-class exports for admission
+  checks
+- the validated `SearchExecutionPolicy` matrix rather than ad hoc scheduler
+  knobs
+
+Legacy route/incumbent aliases remain available through the narrow
+`telltale_search::compat` surface for migration, but they are no longer the
+recommended generic API boundary. `SearchCachingProfile::IncrementalReuse`
+also remains outside the stable import posture until it is implemented.
 
 ### telltale-ui
 

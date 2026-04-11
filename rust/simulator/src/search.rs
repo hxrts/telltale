@@ -47,8 +47,9 @@ mod tests {
     use std::collections::{BTreeMap, BTreeSet};
 
     use telltale_search::{
-        run_with_executor, EpsilonMilli, SearchDomain, SearchFairnessAssumption, SearchMachine,
-        SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
+        run_with_executor, EpsilonMilli, SearchDomain, SearchExecutionPolicy,
+        SearchFairnessAssumption, SearchMachine, SearchRunConfig, SearchSchedulerProfile,
+        SerialProposalExecutor,
     };
 
     use super::*;
@@ -102,8 +103,10 @@ mod tests {
             &mut machine,
             &SerialProposalExecutor,
             SearchRunConfig {
-                scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-                batch_width: 1,
+                execution_policy: SearchExecutionPolicy::new(
+                    SearchSchedulerProfile::CanonicalSerial,
+                    1,
+                ),
                 fairness_assumptions: BTreeSet::from([
                     SearchFairnessAssumption::DeterministicSchedulerConfluence,
                 ]),
@@ -112,7 +115,7 @@ mod tests {
         .expect("search run");
 
         let artifact = project_search_run(&report, &replay);
-        assert_eq!(artifact.observation.incumbent_cost, Some(2));
+        assert_eq!(artifact.observation.selected_result_cost, Some(2));
         assert_eq!(
             artifact.scheduler.scheduler_profile,
             SearchSchedulerProfile::CanonicalSerial

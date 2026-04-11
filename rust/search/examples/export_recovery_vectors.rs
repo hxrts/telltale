@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 
 use telltale_search::{
     commit_epoch_reconfiguration, run_with_executor, EpochReconfigurationRequest, EpsilonMilli,
-    SearchDomain, SearchFairnessAssumption, SearchRunConfig, SearchSchedulerProfile,
-    SerialProposalExecutor,
+    SearchDomain, SearchExecutionPolicy, SearchFairnessAssumption, SearchReseedingPolicy,
+    SearchRunConfig, SearchSchedulerProfile, SerialProposalExecutor,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -60,18 +60,23 @@ fn main() {
 
     let mut machine = telltale_search::SearchMachine::new(domain, 1, 0, 3, EpsilonMilli::one());
     machine.step_once().expect("first pre-reconfiguration step");
-    commit_epoch_reconfiguration(&mut machine, EpochReconfigurationRequest { next_epoch: 2 });
+    commit_epoch_reconfiguration(
+        &mut machine,
+        EpochReconfigurationRequest {
+            next_epoch: 2,
+            reseeding_policy: SearchReseedingPolicy::StartOnly,
+        },
+    );
 
     let (report, replay) = run_with_executor(
         &mut machine,
         &SerialProposalExecutor,
-        SearchRunConfig {
-            scheduler_profile: SearchSchedulerProfile::CanonicalSerial,
-            batch_width: 1,
-            fairness_assumptions: [SearchFairnessAssumption::DeterministicSchedulerConfluence]
+        SearchRunConfig::new(
+            SearchExecutionPolicy::new(SearchSchedulerProfile::CanonicalSerial, 1),
+            [SearchFairnessAssumption::DeterministicSchedulerConfluence]
                 .into_iter()
                 .collect(),
-        },
+        ),
     )
     .expect("recovery vector run");
 

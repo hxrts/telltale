@@ -46,14 +46,17 @@ pub enum SearchFairnessAssumption {
 /// Search-visible observable classes that can be requested or certified.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum SearchObservableClass {
-    /// Incumbent path cost.
-    IncumbentCost,
+    /// Selected-result cost.
+    #[serde(alias = "IncumbentCost")]
+    SelectedResultCost,
     /// Canonical parent identity.
     CanonicalParentIdentity,
-    /// Canonical path identity.
-    CanonicalPathIdentity,
-    /// Incumbent publication trace.
-    IncumbentPublicationTrace,
+    /// Selected-result witness identity.
+    #[serde(alias = "CanonicalPathIdentity")]
+    SelectedResultWitnessIdentity,
+    /// Selected-result publication trace.
+    #[serde(alias = "IncumbentPublicationTrace")]
+    SelectedResultPublicationTrace,
     /// Normalized commit trace.
     NormalizedCommitTrace,
     /// Replay checkpoint trace.
@@ -68,6 +71,18 @@ pub enum SearchObservableClass {
     ProgressAccounting,
 }
 
+/// Generic alias for the selected-result cost observable.
+pub const SELECTED_RESULT_COST_OBSERVABLE: SearchObservableClass =
+    SearchObservableClass::SelectedResultCost;
+
+/// Generic alias for the selected-result witness observable.
+pub const SELECTED_RESULT_WITNESS_OBSERVABLE: SearchObservableClass =
+    SearchObservableClass::SelectedResultWitnessIdentity;
+
+/// Generic alias for the selected-result publication trace observable.
+pub const SELECTED_RESULT_PUBLICATION_TRACE_OBSERVABLE: SearchObservableClass =
+    SearchObservableClass::SelectedResultPublicationTrace;
+
 /// Declared commutativity region class.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub enum CommutativityRegionClass {
@@ -79,9 +94,22 @@ pub enum CommutativityRegionClass {
     CertifiedFrontierWindow,
 }
 
+/// High-level theorem/claim classes exposed at the Rust admission boundary.
+#[derive(Clone, Copy, Debug, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+pub enum SearchClaimClass {
+    /// Generic machine/refinement/fairness support.
+    GenericMachine,
+    /// Generic selected-result and result-bound support.
+    GenericSelectedResult,
+    /// Path-problem-specific discovery or completeness support.
+    PathProblemSpecific,
+}
+
 /// User-requested determinism and replay capability.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchDUser {
+    /// Required theorem/claim classes.
+    pub required_claim_classes: BTreeSet<SearchClaimClass>,
     /// Required observable classes.
     pub required_observables: BTreeSet<SearchObservableClass>,
     /// Required determinism profiles.
@@ -103,6 +131,8 @@ pub struct SearchDUser {
 /// Runtime/artifact-certified search capability.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct SearchCertifiedCapability {
+    /// Supported theorem/claim classes.
+    pub supported_claim_classes: BTreeSet<SearchClaimClass>,
     /// Supported observable classes.
     pub supported_observables: BTreeSet<SearchObservableClass>,
     /// Supported determinism profiles.
@@ -124,6 +154,8 @@ pub struct SearchCertifiedCapability {
 /// Structured admission rejection.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub enum AdmissionRejectionReason {
+    /// Requested theorem/claim class is unsupported.
+    MissingClaimClass(SearchClaimClass),
     /// Requested observable class is unsupported.
     MissingObservable(SearchObservableClass),
     /// Requested determinism profile is unsupported.
@@ -154,6 +186,13 @@ pub fn check_capability_containment(
     certified: &SearchCertifiedCapability,
 ) -> Vec<AdmissionRejectionReason> {
     let mut reasons = Vec::new();
+
+    reasons.extend(
+        user.required_claim_classes
+            .difference(&certified.supported_claim_classes)
+            .copied()
+            .map(AdmissionRejectionReason::MissingClaimClass),
+    );
 
     reasons.extend(
         user.required_observables
@@ -213,8 +252,9 @@ mod tests {
 
     fn full_user() -> SearchDUser {
         SearchDUser {
+            required_claim_classes: [SearchClaimClass::GenericMachine].into_iter().collect(),
             required_observables: [
-                SearchObservableClass::IncumbentCost,
+                SearchObservableClass::SelectedResultCost,
                 SearchObservableClass::SchedulerProfileTrace,
             ]
             .into_iter()
@@ -235,8 +275,15 @@ mod tests {
 
     fn full_certified() -> SearchCertifiedCapability {
         SearchCertifiedCapability {
+            supported_claim_classes: [
+                SearchClaimClass::GenericMachine,
+                SearchClaimClass::GenericSelectedResult,
+                SearchClaimClass::PathProblemSpecific,
+            ]
+            .into_iter()
+            .collect(),
             supported_observables: [
-                SearchObservableClass::IncumbentCost,
+                SearchObservableClass::SelectedResultCost,
                 SearchObservableClass::SchedulerProfileTrace,
             ]
             .into_iter()
@@ -265,7 +312,12 @@ mod tests {
     fn containment_rejects_missing_profile_scheduler_and_fairness() {
         let user = full_user();
         let certified = SearchCertifiedCapability {
-            supported_observables: [SearchObservableClass::IncumbentCost].into_iter().collect(),
+            supported_claim_classes: [SearchClaimClass::GenericSelectedResult]
+                .into_iter()
+                .collect(),
+            supported_observables: [SearchObservableClass::SelectedResultCost]
+                .into_iter()
+                .collect(),
             supported_profiles: [SearchDeterminismMode::Full].into_iter().collect(),
             supported_scheduler_profiles: [SearchSchedulerProfile::CanonicalSerial]
                 .into_iter()
@@ -280,6 +332,11 @@ mod tests {
         };
 
         let reasons = check_capability_containment(&user, &certified);
+        assert!(
+            reasons.contains(&AdmissionRejectionReason::MissingClaimClass(
+                SearchClaimClass::GenericMachine
+            ))
+        );
         assert!(reasons.contains(&AdmissionRejectionReason::MissingProfile(
             SearchDeterminismMode::Replay
         )));
@@ -297,8 +354,9 @@ mod tests {
     #[test]
     fn containment_rejects_missing_observable_and_batch_width_boundary() {
         let mut certified = full_certified();
-        certified.supported_observables =
-            [SearchObservableClass::IncumbentCost].into_iter().collect();
+        certified.supported_observables = [SearchObservableClass::SelectedResultCost]
+            .into_iter()
+            .collect();
         certified.max_certified_batch_width = 3;
         let reasons = check_capability_containment(&full_user(), &certified);
         assert!(
