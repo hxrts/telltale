@@ -229,11 +229,11 @@ check-focused-assurance:
 
 # Verify that CI/workflow ownership flows through the canonical PR/deep lane recipes.
 check-ci-assurance-lanes:
-    ./scripts/check/ci-assurance-lanes.sh
+    just _toolkit-check ci_assurance_lanes
 
 # Verify that the public formal-verification claim, scope, and TCB wording stay exact.
 check-formal-claim-scope:
-    ./scripts/check/formal-claim-scope.sh
+    just _toolkit-check formal_claim_scope
 
 # Rust style guide lint check (comprehensive)
 lint:
@@ -283,7 +283,7 @@ check-telltale-style:
     trap restore EXIT
     just _toolkit-check workspace_layering
     just _toolkit-check docs_link_check
-    ./scripts/check/docs-index.sh
+    just _toolkit-check docs_index
     just _toolkit-check text_formatting
 
 # Enforce public tooling/example cutover to generated effect interfaces and owned opens.
@@ -292,7 +292,7 @@ check-tooling-convergence:
 
 # Validate source markdown DSL snippets against the real parser.
 check-source-doc-snippets:
-    ./scripts/check/source-doc-snippets.sh
+    cargo test -p telltale-runtime --test source_doc_snippets -- --nocapture
 
 # Narrow subsystem-safe simulator verification path for staged simulator-only changes.
 check-simulator-subsystem-staged:
@@ -305,7 +305,7 @@ check-simulator-subsystem-self-test:
 # Check that key public verification/capability docs stay aligned with
 # source-derived rows and trusted ledgers.
 check-docs-as-contract:
-    ./scripts/check/docs-as-contract.sh
+    cargo test -p telltale-bridge --test docs_contract_tests -- --nocapture
 
 # Deliberately perturb narrow verification boundaries and prove each gate fails closed.
 check-fail-closed-mutations:
@@ -414,7 +414,7 @@ check-arch-lean:
 
 # Validate pinned revisions for local Lean dependency checkouts.
 check-lean-dependency-pins:
-    ./scripts/check/lean-dependency-pins.sh
+    just _toolkit-check git_dependency_pins
 
 # Ensure pinned Lean dependency checkouts also have the required prebuilt artifacts.
 check-lean-prebuilt:
@@ -438,7 +438,7 @@ perf-baseline mode="check":
 
 # Prevent new placeholder/stub/TODO markers in executable Lean protocol machine modules.
 check-protocol-machine-placeholders:
-    ./scripts/check/protocol-machine-placeholders.sh
+    just _toolkit-check protocol_machine_placeholders
 
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
@@ -455,7 +455,8 @@ check-ownership-contracts:
 
 # Enforce parity type ledger plus deviation registry presence/shape.
 check-parity-ledger:
-    ./scripts/check/parity-ledger.sh
+    just _toolkit-check parity_ledger
+    just check-parity --types
 
 # Enforce canonical Lean↔Rust protocol-machine semantic-object naming.
 check-semantic-name-parity:
@@ -467,7 +468,7 @@ check-docs-semantic-drift:
 
 # Validate the Document Index in docs/101_introduction.md is complete and titles match.
 check-docs-index:
-    ./scripts/check/docs-index.sh
+    just _toolkit-check docs_index
 
 # Validate that all remote GitHub Action references in workflows resolve.
 check-workflow-actions:
@@ -479,15 +480,15 @@ check-doc-quality:
 
 # Reject raw session-store ownership mutation outside sanctioned entry points.
 check-session-ingress-boundary:
-    ./scripts/check/session-ingress-boundary.sh
+    cargo run -q -p telltale-lints -- session-ingress rust/machine/src
 
 # Reject raw wall-clock/timer usage in deterministic runtime paths.
 check-time-domain-boundaries:
-    ./scripts/check/time-domain-boundaries.sh
+    cargo run -q -p telltale-lints -- time-domain rust/machine/src rust/simulator/src rust/bridge/src
 
 # Enforce style/serialization boundaries in selected core crates.
 check-style-boundaries:
-    ./scripts/check/style-boundaries.sh
+    cargo run -q -p telltale-lints -- style rust/machine/src rust/simulator/src rust/bridge/src rust/types/src rust/transport/src
 
 # Keep a small authoritative verification inventory aligned with source-of-truth metrics.
 check-verification-inventory:
@@ -569,11 +570,11 @@ check-aura-borrowed-lints:
 
 # Keep typed durability artifacts on the authoritative machine/runtime side.
 check-durable-boundaries:
-    ./scripts/check/durable-boundaries.sh
+    just _toolkit-check durable_boundaries
 
 # Enforce the generic search crate boundary and docs alignment.
 check-search-boundaries:
-    bash ./scripts/check/search-boundaries.sh
+    just _toolkit-check search_boundaries
 
 # Focused Lean-backed search fairness gate: theorem-pack, parity fixture, and
 # inventory alignment.
@@ -607,7 +608,7 @@ check-durable-assurance:
 
 # Enforce the shared viewer/webapp boundary and docs alignment.
 check-viewer-tooling-boundaries:
-    ./scripts/check/viewer-tooling-boundaries.sh
+    just _toolkit-check viewer_tooling_boundaries
 
 # Focused shared webapp verification split: pure model, ownership/lints, and UI integration.
 check-viewer-tooling:

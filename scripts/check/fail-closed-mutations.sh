@@ -84,7 +84,7 @@ assert_gate_fails() {
 
 # Mutation ledger:
 # - bridge normalization ledger drift should be rejected by bridge-normalization-ledger.sh
-# - source-derived capability/authority docs drift should be rejected by docs-as-contract.sh
+# - source-derived capability/authority docs drift should be rejected by just check-docs-as-contract
 # - verification inventory metric drift should be rejected by verification-inventory.sh
 # - package manifest resource drift should be rejected by package-artifacts.sh
 # - release package registry drift should be rejected by release-recovery.sh
@@ -109,7 +109,7 @@ replace_once \
 assert_gate_fails \
   "capability admission docs row mutation" \
   "missing expected docs row:" \
-  ./scripts/check/docs-as-contract.sh
+  just check-docs-as-contract
 restore_now docs/702_capability_admission.md "${admission_doc_backup}"
 
 authority_doc_backup="$(backup_file docs/703_authority_language_surface.md)"
@@ -120,7 +120,7 @@ replace_once \
 assert_gate_fails \
   "authority language docs row mutation" \
   "missing expected docs row:" \
-  ./scripts/check/docs-as-contract.sh
+  just check-docs-as-contract
 restore_now docs/703_authority_language_surface.md "${authority_doc_backup}"
 
 replace_once \

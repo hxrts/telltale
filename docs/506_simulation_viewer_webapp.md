@@ -143,12 +143,12 @@ The viewer work uses an explicit three-way testing split:
 
 - pure model tests in `telltale-viewer`
 - ownership/compile-fail/boundary checks in `telltale-macros` and
-  `scripts/check/viewer-tooling-boundaries.sh`
+  `just check-viewer-tooling-boundaries`
 - Dioxus shell integration tests in `telltale-ui`
 
 The canonical local/CI recipe is `just check-viewer-tooling`.
 That recipe runs the pure model tests, the UI shell tests, the thin web-shell
-compile, and the boundary check script.
+compile, and the boundary check.
 
 ## Local Development
 

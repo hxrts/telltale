@@ -33,12 +33,301 @@ enabled = true
 docs_roots = ["docs"]
 scratch_dir_prefix = "work/"
 
+[checks.docs_index]
+enabled = true
+docs_root = "docs"
+index_file = "docs/101_introduction.md"
+heading = "## Document Index"
+exclude_files = ["101_introduction.md", "SUMMARY.md"]
+
 [checks.docs_semantic_drift]
 enabled = true
 docs_roots = ["policy/deferred_docs_semantic_drift"]
 manifest_path = "Cargo.toml"
 planned_crates = []
 file_exemptions = ["CLAUDE.md", "README.md"]
+
+[checks.ci_assurance_lanes]
+enabled = true
+justfile_path = "justfile"
+
+[[checks.ci_assurance_lanes.recipe_contracts]]
+recipe = "ci-dry-run"
+required_literals = ["just check-pr-critical", "just check-deep-assurance"]
+forbidden_literals = []
+
+[[checks.ci_assurance_lanes.recipe_contracts]]
+recipe = "check-focused-assurance"
+required_literals = []
+forbidden_literals = ["just check-scale-budgets"]
+
+[[checks.ci_assurance_lanes.file_contracts]]
+path = "justfile"
+required_literals = ["check-pr-critical:", "check-deep-assurance:"]
+forbidden_literals = []
+
+[[checks.ci_assurance_lanes.file_contracts]]
+path = ".github/workflows/check.yml"
+required_literals = ["run: just check-pr-critical"]
+forbidden_literals = []
+
+[[checks.ci_assurance_lanes.file_contracts]]
+path = ".github/workflows/verify.yml"
+required_literals = [
+  "just check-pr-critical | tee artifacts/check-pr-critical.log",
+  "just check-deep-assurance | tee artifacts/check-deep-assurance.log",
+]
+forbidden_literals = [
+  "Run fast structural verification lane",
+  "Run focused assurance lane",
+  "Run packaged artifact assurance lane",
+  "Run cross-target matrix lane",
+  "Run Track B gate",
+  "Run property-based lane",
+  "Run composition stress lane",
+]
+
+[checks.formal_claim_scope]
+enabled = true
+
+[[checks.formal_claim_scope.files]]
+path = "docs/902_verification_inventory.md"
+required_literals = [
+  "## Current Formal Verification Claim",
+  "Telltale is formally verified for the declared shipped surface documented in",
+  "## Claimed Surface",
+  "## Compiler and Macro Claim Boundary",
+  "## Artifact Correspondence Claim",
+  "the current public formal-verification claim does not include any Rust parser,",
+  "`tell!` macro expansion are outside the formal claim",
+  "## Out of Scope / Assumption Boundaries",
+  "First-class protocol-critical capability semantics are in scope.",
+  "General host application authorization is out of scope.",
+  "## Public TCB Ledger",
+  "## Final Surface Audit",
+  "## Final Public Claim Text",
+  "## Refinement Coverage Map",
+  "| Per-step event stream, theorem-defined `pre_state`/`post_state`, selected coroutine/type state, `session_type_counts`, `ready_queue`, and `blocked` snapshots |",
+  "| Rust/Lean bridge normalization and interchange |",
+  "| Release/package scripts and generated resources |",
+]
+forbidden_literals = [
+  "blanket public claim that \"Telltale is",
+  "formally verified\" end to end.",
+]
+
+[[checks.formal_claim_scope.files]]
+path = "README.md"
+required_literals = [
+  "Telltale is formally verified for the declared shipped surface documented in",
+]
+forbidden_literals = []
+
+[[checks.formal_claim_scope.files]]
+path = "docs/104_architecture.md"
+required_literals = [
+  "The current formal-verification claim is narrower than this full architecture",
+]
+forbidden_literals = []
+
+[[checks.formal_claim_scope.files]]
+path = "rust/language/src/lib.rs"
+required_literals = [
+  "intentionally outside the current formal-verification claim",
+]
+forbidden_literals = []
+
+[[checks.formal_claim_scope.files]]
+path = "rust/runtime/src/compiler/mod.rs"
+required_literals = [
+  "intentionally outside the current",
+]
+forbidden_literals = []
+
+[[checks.formal_claim_scope.files]]
+path = "docs/103_theory.md"
+required_literals = []
+forbidden_literals = [
+  "implements these concepts in Rust with formal verification in Lean.",
+]
+
+[[checks.formal_claim_scope.files]]
+path = "docs/202_choreographic_dsl.md"
+required_literals = []
+forbidden_literals = [
+  "tell! is part of the current formal-verification claim",
+]
+
+[[checks.formal_claim_scope.files]]
+path = "rust/bridge/src/lib.rs"
+required_literals = []
+forbidden_literals = [
+  "enabling formal verification of",
+]
+
+[[checks.formal_claim_scope.files]]
+path = "rust/types/src/lib.rs"
+required_literals = []
+forbidden_literals = [
+  "enabling formal verification and proof correspondence.",
+]
+
+[checks.parity_ledger]
+enabled = true
+
+[[checks.parity_ledger.files]]
+path = "docs/802_rust_lean_parity.md"
+required_literals = [
+  "### Deviation Registry",
+  "| ID | Status | Owner | Revisit | Summary |",
+]
+forbidden_literals = []
+
+[checks.durable_boundaries]
+enabled = true
+
+[[checks.durable_boundaries.forbidden_patterns]]
+pattern = "PersistedDurabilityArtifact|PersistedDurabilityPayload|AgreementWalArtifact|DurableRecoveryMetadata|EvidenceOutcomeCacheArtifact"
+include_paths = ["rust/simulator/src/generated.rs", "rust/viewer/src", "rust/ui/src", "rust/web/src"]
+
+[[checks.durable_boundaries.required_patterns]]
+pattern = "telltale_machine::model::durability"
+include_paths = ["docs/901_api_reference.md"]
+
+[[checks.durable_boundaries.required_patterns]]
+pattern = "wal_sync"
+include_paths = ["docs/802_rust_lean_parity.md"]
+
+[[checks.durable_boundaries.required_patterns]]
+pattern = "walSyncMetadata"
+include_paths = ["lean/Runtime/ProtocolMachine/Model/Durability.lean"]
+
+[[checks.durable_boundaries.required_patterns]]
+pattern = "durableRecoveryDecision_gate_crossing_requires_recovered_agreement"
+include_paths = ["lean/Runtime/Proofs/ProtocolMachine/Durability.lean"]
+
+[[checks.durable_boundaries.required_patterns]]
+pattern = "On-disk checkpoint and replay bundles now use the typed"
+include_paths = ["docs/501_simulation_overview.md"]
+
+[[checks.durable_boundaries.required_patterns]]
+pattern = "Simulator reports and viewer projections should consume typed durable artifacts"
+include_paths = ["docs/501_simulation_overview.md"]
+
+[checks.protocol_machine_placeholders]
+enabled = true
+
+[[checks.protocol_machine_placeholders.forbidden_patterns]]
+pattern = "(?i)\\b(?:TODO|FIXME|TBD|placeholder|stub|unimplemented|WIP)\\b"
+include_paths = [
+  "lean/Runtime/ProtocolMachine/Model",
+  "lean/Runtime/ProtocolMachine/Semantics",
+  "lean/Runtime/ProtocolMachine/Runtime",
+  "lean/Runtime/ProtocolMachine/API.lean",
+]
+
+[[checks.protocol_machine_placeholders.forbidden_patterns]]
+pattern = "^\\s*import\\s+Runtime\\.Proofs(\\.|$)"
+include_paths = [
+  "lean/Runtime/ProtocolMachine/Model",
+  "lean/Runtime/ProtocolMachine/Semantics",
+  "lean/Runtime/ProtocolMachine/Runtime",
+  "lean/Runtime/ProtocolMachine/API.lean",
+]
+
+[checks.search_boundaries]
+enabled = true
+
+[[checks.search_boundaries.forbidden_patterns]]
+pattern = "telltale-simulator|telltale-viewer|telltale-ui|telltale-web|dioxus"
+include_paths = ["rust/search"]
+
+[[checks.search_boundaries.forbidden_patterns]]
+pattern = "\\b(Bluetooth|bluetooth|BLE|RF)\\b|mesh router|radio interference"
+include_paths = ["rust/search", "docs/507_session_graph_search.md"]
+
+[[checks.search_boundaries.required_patterns]]
+pattern = "telltale-search"
+include_paths = ["docs/507_session_graph_search.md"]
+
+[[checks.search_boundaries.required_patterns]]
+pattern = "downstream"
+include_paths = ["docs/507_session_graph_search.md"]
+
+[[checks.search_boundaries.required_patterns]]
+pattern = "optional"
+include_paths = ["docs/507_session_graph_search.md"]
+
+[[checks.search_boundaries.required_patterns]]
+pattern = "generic"
+include_paths = ["docs/507_session_graph_search.md"]
+
+[checks.viewer_tooling_boundaries]
+enabled = true
+
+[[checks.viewer_tooling_boundaries.forbidden_patterns]]
+pattern = "web_sys|js_sys|wasm_bindgen|wasm_bindgen_futures"
+include_paths = ["rust/viewer/src", "rust/ui/src"]
+
+[[checks.viewer_tooling_boundaries.forbidden_patterns]]
+pattern = "dioxus"
+include_paths = ["rust/viewer/src"]
+
+[[checks.viewer_tooling_boundaries.forbidden_patterns]]
+pattern = "ScenarioBranchPatch|ScenarioPatchOperation"
+include_paths = ["rust/ui/src", "rust/web/src"]
+
+[[checks.viewer_tooling_boundaries.forbidden_patterns]]
+pattern = "ViewerCommand::CreateBranch|ViewerCommand::UpdateBranch|ViewerCommand::DeleteBranch"
+include_paths = ["rust/ui/src", "rust/web/src"]
+
+[[checks.viewer_tooling_boundaries.forbidden_patterns]]
+pattern = "SemanticComparisonResult \\{|TheoremAwareCounterexample \\{|MinimizationResult \\{"
+include_paths = ["rust/ui/src", "rust/web/src"]
+
+[[checks.viewer_tooling_boundaries.forbidden_patterns]]
+pattern = "EffectTraceArtifact \\{|DeterministicSweepReport \\{|ExperimentSuiteReport \\{"
+include_paths = ["rust/ui/src", "rust/web/src"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "telltale-viewer"
+include_paths = ["docs/505_simulation_viewer.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "telltale-ui"
+include_paths = ["docs/505_simulation_viewer.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "telltale-web"
+include_paths = ["docs/505_simulation_viewer.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "Observed"
+include_paths = ["docs/506_simulation_viewer_webapp.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "semantic comparison"
+include_paths = ["docs/505_simulation_viewer.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "counterexample"
+include_paths = ["docs/505_simulation_viewer.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "sweep"
+include_paths = ["docs/506_simulation_viewer_webapp.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "effect"
+include_paths = ["docs/506_simulation_viewer_webapp.md"]
+
+[[checks.viewer_tooling_boundaries.required_patterns]]
+pattern = "downstream"
+include_paths = ["docs/506_simulation_viewer_webapp.md"]
+
+[checks.git_dependency_pins]
+enabled = true
+pins_file = "lean/dependency_pins.json"
 
 [checks.docs_prose_quality]
 enabled = true
