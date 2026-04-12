@@ -3,22 +3,22 @@ crate_roots = ["rust"]
 include_crates = []
 exclude_crates = []
 
-[checks.unsafe_boundary]
+[bundles.rust_base]
 enabled = true
-include_paths = ["rust"]
-exclude_path_parts = []
-allowed_path_parts = []
-required_comment_markers = ["Safety:"]
+rust_roots = ["rust"]
+docs_roots = ["docs"]
+manifest_path = "Cargo.toml"
+workflow_roots = [".github/workflows"]
 
 [checks.public_type_width]
 enabled = true
-include_paths = ["policy/deferred_public_type_width"]
+include_paths = ["toolkit/deferred_public_type_width"]
 exclude_path_parts = []
 banned_types = ["usize", "isize", "f32", "f64"]
 
 [checks.must_use_public_return]
 enabled = true
-include_paths = ["policy/deferred_must_use_public_return"]
+include_paths = ["toolkit/deferred_must_use_public_return"]
 exclude_path_parts = []
 allowed_return_type_prefixes = []
 
@@ -27,11 +27,6 @@ enabled = true
 manifest_roots = [".", "rust"]
 require_default_features_false = []
 banned_dependencies = []
-
-[checks.docs_link_check]
-enabled = true
-docs_roots = ["docs"]
-scratch_dir_prefix = "work/"
 
 [checks.docs_index]
 enabled = true
@@ -42,7 +37,7 @@ exclude_files = ["101_introduction.md", "SUMMARY.md"]
 
 [checks.docs_semantic_drift]
 enabled = true
-docs_roots = ["policy/deferred_docs_semantic_drift"]
+docs_roots = ["toolkit/deferred_docs_semantic_drift"]
 manifest_path = "Cargo.toml"
 planned_crates = []
 file_exemptions = ["CLAUDE.md", "README.md"]
@@ -329,18 +324,9 @@ include_paths = ["docs/506_simulation_viewer_webapp.md"]
 enabled = true
 pins_file = "lean/dependency_pins.json"
 
-[checks.docs_prose_quality]
-enabled = true
-include_paths = ["docs"]
-exclude_path_parts = ["/book/", "SUMMARY.md"]
-ban_em_dash = true
-ban_semicolon = true
-require_explanatory_prose_after_code = true
-require_prose_exceeds_code = true
-
 [checks.lean_style]
 enabled = true
-include_paths = ["policy/deferred_lean_style"]
+include_paths = ["toolkit/deferred_lean_style"]
 exclude_path_parts = ["/.lake/", "/build/", "/lake-packages/", "/artifacts/"]
 non_trivial_file_lines = 5
 section_header_min_lines = 120
@@ -375,24 +361,6 @@ native_decide = 3
 noncomputable = 10
 partial_def = 3
 
-[checks.lean_architecture]
-enabled = true
-include_paths = ["lean"]
-exclude_path_parts = ["/.lake/", "/build/", "/lake-packages/", "/artifacts/"]
-root_facade_files = [
-  "lean/SessionTypes.lean",
-  "lean/Choreography.lean",
-  "lean/Protocol.lean",
-  "lean/Runtime.lean",
-]
-legacy_projection_exempt_path_parts = ["/Choreography/Projection/", "/Runtime/Tests/"]
-theorempack_exempt_path_parts = ["/Runtime/Proofs/Examples/", "Runtime/Proofs/TheoremPack/Artifacts.lean"]
-
-[checks.workflow_actions]
-enabled = true
-workflow_roots = [".github/workflows"]
-pin_comment_markers = ["pin"]
-
 [checks.text_formatting]
 enabled = true
 include_paths = [
@@ -400,9 +368,9 @@ include_paths = [
   ".githooks",
   "docs",
   "lean",
-  "policy",
   "rust",
   "scripts",
+  "toolkit",
   "AGENTS.md",
   "CLAUDE.md",
   "README.md",
@@ -423,40 +391,3 @@ exclude_path_parts = [
   "/artifacts/",
   "/docs/book/",
 ]
-
-[checks.workspace_layering]
-enabled = true
-manifest_path = "Cargo.toml"
-
-[checks.workspace_layering.crate_layers]
-telltale-types = 1
-telltale-theory = 2
-telltale-language = 2
-telltale-macros = 2
-telltale-machine = 3
-telltale-search = 3
-telltale-runtime = 4
-telltale-bridge = 4
-telltale-simulator = 4
-telltale-transport = 4
-telltale = 4
-telltale-lints = 4
-telltale-viewer = 5
-telltale-ui = 5
-telltale-web = 5
-
-[checks.rust_architecture]
-enabled = true
-rust_roots = ["rust"]
-determinism_runtime_paths = ["rust/machine/src", "rust/simulator/src"]
-determinism_test_paths = ["rust/machine/tests", "rust/simulator/tests"]
-kernel_paths = [
-  "rust/machine/src/kernel.rs",
-  "rust/machine/src/engine",
-  "rust/machine/src/threaded",
-  "rust/machine/src/scheduler",
-  "rust/machine/src/session",
-  "rust/machine/src/coroutine.rs",
-  "rust/machine/src/exec",
-]
-fixed_wrapper_paths = ["rust/types/src/fixed_q32.rs"]

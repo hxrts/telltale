@@ -11,6 +11,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hxrts/toolkit
+          ref: v0.2.0
           path: .toolkit
       - name: Link toolkit sibling checkout
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
@@ -162,13 +163,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: hxrts/toolkit
+          ref: v0.2.0
           path: .toolkit
       - name: Link toolkit sibling checkout
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Run toolkit docs link check
-        run: ./scripts/toolkit-shell.sh toolkit-xtask check docs_link_check --repo-root . --config policy/toolkit.toml
+        run: ./scripts/toolkit-shell.sh toolkit-xtask check docs_link_check --repo-root . --config toolkit/toolkit.toml
 
   # Lean verification disabled - telltale_runner target removed in V2 refactor
   # TODO: Re-enable once V2 runner is implemented

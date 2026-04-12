@@ -104,14 +104,18 @@
         ]
       },
       "locked": {
-        "lastModified": 1775935836,
-        "narHash": "sha256-wZH6MH5IJuJbV/U4VvZh+scDoyZrbKrpeqmXQ0bagJA=",
-        "path": "/Users/hxrts/projects/toolkit",
-        "type": "path"
+        "lastModified": 1775977542,
+        "narHash": "sha256-lRrfHUrR1OPYuAxXVpqlm372vi2XEFSJAJAJTvd2hzY=",
+        "owner": "hxrts",
+        "repo": "toolkit",
+        "rev": "efeddf10549cbe30dc702322a2a1b75e489daa06",
+        "type": "github"
       },
       "original": {
-        "path": "../toolkit",
-        "type": "path"
+        "owner": "hxrts",
+        "ref": "v0.2.0",
+        "repo": "toolkit",
+        "type": "github"
       }
     }
   },

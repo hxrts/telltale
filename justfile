@@ -8,6 +8,10 @@ default: book
 
 # Enter the development shell with stale temp variables cleared first.
 develop:
+    env -u TMPDIR -u TMP -u TEMP nix develop
+
+# Enter the development shell with a sibling toolkit checkout overriding the pinned input.
+develop-local-toolkit:
     env -u TMPDIR -u TMP -u TEMP nix develop --override-input toolkit path:../toolkit
 
 # Toolkit formatter check.
@@ -26,12 +30,12 @@ _toolkit-check name:
           generated+=("$f")
         fi
       done
-      restore() { for f in "${generated[@]}"; do [[ -e "$f.__toolkit_stash__" ]] && mv "$f.__toolkit_stash__" "$f"; done; }
+      restore() { for f in "${generated[@]:-}"; do [[ -n "$f" && -e "$f.__toolkit_stash__" ]] && mv "$f.__toolkit_stash__" "$f"; done; true; }
       trap restore EXIT
-      ./scripts/toolkit-shell.sh toolkit-xtask check "{{name}}" --repo-root . --config policy/toolkit.toml
+      ./scripts/toolkit-shell.sh toolkit-xtask check "{{name}}" --repo-root . --config toolkit/toolkit.toml
       exit 0
     fi
-    ./scripts/toolkit-shell.sh toolkit-xtask check "{{name}}" --repo-root . --config policy/toolkit.toml
+    ./scripts/toolkit-shell.sh toolkit-xtask check "{{name}}" --repo-root . --config toolkit/toolkit.toml
 
 # Run the full workspace test surface using the CI-safe split test lane.
 test-workspace: check-workspace-tests-split
@@ -263,7 +267,7 @@ clippy-style-audit:
 # Rust architecture/style-guide pattern checker
 check-arch-rust:
     just _toolkit-check unsafe_boundary
-    just _toolkit-check rust_architecture
+    ./scripts/check/architecture-rust.sh
 
 # TellTale syntax/style check suite (dependency layering, docs references, symbols)
 check-telltale-style:
@@ -279,9 +283,9 @@ check-telltale-style:
         generated+=("$f")
       fi
     done
-    restore() { for f in "${generated[@]}"; do [[ -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; }
+    restore() { for f in "${generated[@]:-}"; do [[ -n "$f" && -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; true; }
     trap restore EXIT
-    just _toolkit-check workspace_layering
+    ./scripts/check/dependency-layers.sh
     just _toolkit-check docs_link_check
     just _toolkit-check docs_index
     just _toolkit-check text_formatting
@@ -410,7 +414,7 @@ check-workspace-tests-split:
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     just _toolkit-check lean_escape_hatches
-    just _toolkit-check lean_architecture
+    ./scripts/check/architecture-lean.sh
 
 # Validate pinned revisions for local Lean dependency checkouts.
 check-lean-dependency-pins:
@@ -476,7 +480,7 @@ check-workflow-actions:
 
 # Enforce documentation prose style and structure.
 check-doc-quality:
-    just _toolkit-check docs_prose_quality
+    ./scripts/check/docs-prose-quality.sh
 
 # Reject raw session-store ownership mutation outside sanctioned entry points.
 check-session-ingress-boundary:

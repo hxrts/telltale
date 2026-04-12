@@ -172,7 +172,7 @@ else
 fi
 
 # 2.5. Toolkit-backed docs/workflow fast checks for staged metadata changes.
-staged_docs_or_workflows=$(git diff --cached --name-only --diff-filter=d | grep -E '^(docs/|\.github/workflows/|policy/toolkit\.toml|scripts/toolkit-shell\.sh|Justfile|flake\.nix)' || true)
+staged_docs_or_workflows=$(git diff --cached --name-only --diff-filter=d | grep -E '^(docs/|\.github/workflows/|toolkit/toolkit\.toml|scripts/toolkit-shell\.sh|Justfile|flake\.nix)' || true)
 if [[ -n "$staged_docs_or_workflows" ]]; then
     echo -n "Checking toolkit doc/workflow policy... "
     if just check-doc-links-ci >/dev/null && just check-workflow-actions >/dev/null; then
