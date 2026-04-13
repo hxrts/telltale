@@ -7,6 +7,7 @@ fn choreography_macro_ui() {
     t.pass("tests/ui/pass/broadcast_protocol.rs");
     t.pass("tests/ui/pass/authority_surface.rs");
     t.pass("tests/ui/pass/authority_control_flow.rs");
+    t.pass("tests/ui/pass/authority_case_timeout.rs");
     t.pass("tests/ui/pass/commitment_surface.rs");
     t.pass("tests/ui/pass/namespaced_protocol.rs");
     t.pass("tests/ui/pass/profiled_protocol.rs");

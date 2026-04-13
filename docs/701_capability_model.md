@@ -120,7 +120,7 @@ The strict Rust↔Lean correspondence lane checks the capability/finalization
 surface through:
 
 - `rust/bridge/tests/capability_model_correspondence.rs`
-- `scripts/check/lean-bridge-strict.sh`
+- `toolkit/xtask/src/checks/lean_bridge_strict.rs`
 
 That lane keeps canonical vs invalidated finalization paths and
 committed-cutover vs rolled-back runtime-upgrade artifacts executable and

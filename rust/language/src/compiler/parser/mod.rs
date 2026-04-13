@@ -3593,9 +3593,10 @@ protocol AcceptFlow =
 "#;
 
         let choreography = parse_choreography_str(input).expect("semantic surface should parse");
-        let err = project(&choreography, &choreography.roles[0])
-            .expect_err("new semantic forms should remain fail-closed in projection");
-        assert!(!err.to_string().is_empty());
+        for role in &choreography.roles {
+            project(&choreography, role)
+                .unwrap_or_else(|err| panic!("project {}: {err}", role.name()));
+        }
     }
 
     // ── standalone tests ─────────────────────────────────────────────

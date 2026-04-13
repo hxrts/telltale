@@ -4,6 +4,8 @@
 
 `TelltaleHandler` implements choreographic effects over session-typed channels. This guide documents setup patterns, API surface, and operational behavior.
 
+The handler is the primary integration point for applications that execute protocols at runtime. It wraps session-typed channel pairs, manages endpoint lifecycle, and dispatches send and receive operations according to the choreographic projection for each participant role.
+
 ## Quick Start
 
 ### Basic Two-Party Protocol

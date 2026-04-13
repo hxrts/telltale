@@ -282,15 +282,16 @@ language validation and MPST projection.
 | nominal `effect` declarations | not projected directly | describe external obligations, not local communication actions |
 | `protocol ... uses ...` | validation-only metadata | constrains which effects may be referenced |
 | `check Effect.op(...)` in local expressions | validation-only until lowered | remains a typed external query, not a local type action by itself |
-| `case ... of` | rejected by current projection pass | explicit projection rule set not finalized |
-| `timeout ... on timeout ... on cancel ...` | rejected by current projection pass | protocol-visible timeout branching needs explicit local-type semantics |
-| `when check ... yields witness` guards | validated, then rejected unless lowered | evidence-binding branch conditions are not yet projected directly |
+| `case ... of` | projected directly | constructor labels become case-local branch labels; divergent senders become `LocalChoice`, receivers become `Branch` |
+| `timeout ... on timeout ... on cancel ...` | projected directly | timeout owners/participants receive `LocalType::Timeout { body, on_timeout, on_cancel }` |
+| `when check ... yields witness` guards | projected directly | evidence guards constrain validation, then projection proceeds structurally through the guarded branch bodies |
+| `publish ...`, `publish ... as ...`, `materialize ...`, `handoff ...`, `dependent work ...` | projected through to continuation | semantic wrapper forms do not add a session action of their own |
 
 Current fail-closed rule:
 
 - if a choreography relies on authority constructs that do not yet have an
-  explicit projection rule, projection stops with a validation error instead of
-  guessing a local-session encoding
+  explicit projection rule such as `begin`, `await`, `resolve`, or `invalidate`,
+  projection stops with a validation error instead of guessing a local-session encoding
 
 Current linearity rule:
 
@@ -317,15 +318,16 @@ pub enum LocalType {
     Loop { condition, body },
     Rec { label, body },
     Var(label),
-    Timeout { duration, body },
+    Timeout { duration, body, on_timeout, on_cancel },
     End,
 }
 ```
 
 Each variant represents a different local type pattern.
-The `Timeout` local variant here refers to the existing local-type timeout
-annotation surface. It is not yet the projection target for the newer
-authority-level `timeout ... on timeout ... on cancel ...` choreography form.
+For authority-level timeout choreography, the projection now preserves the
+happy-path body plus the explicit timeout and cancellation branches in the
+local AST. Rust session-type code generation still erases those timeout arms to
+the body because timeout handling remains a runtime concern.
 
 ### Code Generation
 

@@ -238,10 +238,14 @@ fn generate_choices_impl(input: &mut ItemEnum, idents: &[Ident], labels: &[Type]
                 message: <Self::Role as Role>::Message,
             ) -> ::core::result::Result<Self, <Self::Role as Role>::Message> {
                 #(let message = match ::telltale::Message::downcast(message) {
-                    Ok(label) => return Ok(Self::#idents(label, ::telltale::FromState::from_state(state))),
-                    Err(message) => message
+                    ::core::result::Result::Ok(label) => {
+                        return ::core::result::Result::Ok(
+                            Self::#idents(label, ::telltale::FromState::from_state(state))
+                        )
+                    }
+                    ::core::result::Result::Err(message) => message
                 };)*
-                Err(message)
+                ::core::result::Result::Err(message)
             }
         }
     }

@@ -1,11 +1,9 @@
 //! Two-party travel agency negotiation with evidence binding and typed failure.
 //!
-//! This is an effect-boundary example demonstrating authority constructs that go
-//! beyond session projection: `let`/`check` evidence bindings, `case`/`of`
-//! typed result matching, and `timeout`/`on cancel` failure paths. The protocol
-//! parses and generates proof-backed metadata but is not session-projectable
-//! because it uses authority-level constructs. Rust reads the generated metadata
-//! to inspect the authority surface.
+//! This is an effect-boundary example demonstrating authority constructs with
+//! proof-backed metadata: `let`/`check` evidence bindings, `case`/`of` typed
+//! result matching, and `timeout`/`on cancel` failure paths. Rust reads the
+//! generated metadata to inspect the authority surface.
 
 use telltale::tell;
 
@@ -13,37 +11,20 @@ tell! {
     -- // Execution profile for the proof-backed effect boundary.
     profile Replay fairness eventual admissibility replay escalation_window bounded
 
-    -- // Typed result from the agency quote check.
-    type alias QuoteResult = Result QuoteError QuoteApproval
+    -- // Typed error carries the rejection reason.
+    type QuoteError =
+      | NotAvailable
+      | TooExpensive
 
     -- // Typed approval carries the quoted price and delivery window.
     type alias QuoteApproval =
     {
       price : Int
-      deliveryDays : Int
     }
-
-    -- // Typed error carries the rejection reason.
-    type alias QuoteError =
-    {
-      reason : String
-      retryAfter : Int
-    }
-
-    -- // Customer host provides the travel request.
-    effect CustomerPreferences
-      command request : Session -> Int
-      {
-        class : best_effort
-        progress : immediate
-        region : session
-        agreement_use : none
-        reentrancy : allow
-      }
 
     -- // Agency host computes a quote, which may fail.
     effect AgencyRuntime
-      authoritative quote : Int -> QuoteResult
+      authoritative quote : Int -> Result QuoteError QuoteApproval
       {
         class : authoritative
         progress : may_block
@@ -56,15 +37,15 @@ tell! {
     -- // A successful quote flows into the accept branch as a witness value.
     -- // A failed quote ends with an explicit typed rejection. The timeout
     -- // branch fires if the agency does not respond within 5 seconds.
-    protocol TravelAgency uses CustomerPreferences, AgencyRuntime under Replay =
+    protocol TravelAgency uses AgencyRuntime under Replay =
       roles Customer, Agency
-      Customer -> Agency : Order(i32)
+      Customer -> Agency : Order
       authoritative let approval = check AgencyRuntime.quote(distance)
       case approval of
         | Ok(witness) =>
-            Agency -> Customer : Confirmation(witness)
+            Agency -> Customer : Confirmation
         | Err(reason) =>
-            Agency -> Customer : Rejection(reason)
+            Agency -> Customer : Rejection
       timeout 5s Agency at
         Agency -> Customer : Scheduled
       on timeout =>

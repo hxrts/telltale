@@ -13,7 +13,7 @@ When one of these values changes legitimately:
 3. rerun `just check-verification-inventory`.
 
 The numeric rows in this section are source-derived and checked by
-`scripts/check/verification-inventory.sh`.
+`toolkit/xtask/src/checks/verification_inventory.rs`.
 
 | Metric | Value | Source |
 |---|---:|---|
@@ -23,37 +23,37 @@ The numeric rows in this section are source-derived and checked by
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
-| Macro UI pass fixtures | 10 | `rust/macros/tests/macro_ui.rs` |
+| Macro UI pass fixtures | 11 | `rust/macros/tests/macro_ui.rs` |
 | Macro UI compile-fail fixtures | 13 | `rust/macros/tests/macro_ui.rs` |
-| Property buckets with executable assurance suites | 22 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Lean-backed correspondence strict suites | 8 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Identity and replay semantic assurance suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Commitment and progress semantic assurance suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Cross-mode semantic parity suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Fail-closed lowering and admission gate suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Structural locality and reconfiguration executable assurance suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Semantic lifecycle invariant suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Deterministic adversarial lifecycle scenarios | 10 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| End-to-end DSL runtime semantic conformance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Simulator semantic contract categories enforced automatically | 6 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Theorem-pack and admission executable assurance suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Distributed and topology semantic harness suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Agreement and composition runtime semantic suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Extension and middleware semantic hardening suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Generated topology and transport public-path suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Runtime substrate boundary assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Handler contract boundary assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Long-horizon recovery differential harness suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Artifact and release assurance suites | 4 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Mutation fail-closed assurance suites | 2 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Concrete protocol-machine refinement suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Compiler and serialization pipeline suites | 5 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Deadlock automation fragment assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Docs-as-contract assurance suites | 3 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Deterministic scale and budget assurance suites | 1 | Curated property-suite map in `scripts/check/verification-inventory.sh` |
-| Explicit unsupported or fail-closed property notes | 1 | Curated unsupported-surface note list in `scripts/check/verification-inventory.sh` |
+| Property buckets with executable assurance suites | 22 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Property buckets currently lacking executable assurance suites | 0 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Authority and ownership semantic assurance suites | 2 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Lean-backed correspondence strict suites | 8 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Identity and replay semantic assurance suites | 5 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Commitment and progress semantic assurance suites | 4 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Cross-mode semantic parity suites | 4 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Fail-closed lowering and admission gate suites | 5 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Structural locality and reconfiguration executable assurance suites | 5 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Semantic lifecycle invariant suites | 1 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Deterministic adversarial lifecycle scenarios | 10 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| End-to-end DSL runtime semantic conformance suites | 1 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Simulator semantic contract categories enforced automatically | 6 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Theorem-pack and admission executable assurance suites | 4 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Distributed and topology semantic harness suites | 3 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Agreement and composition runtime semantic suites | 4 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Extension and middleware semantic hardening suites | 2 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Generated topology and transport public-path suites | 1 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Runtime substrate boundary assurance suites | 2 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Handler contract boundary assurance suites | 2 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Long-horizon recovery differential harness suites | 1 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Artifact and release assurance suites | 4 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Mutation fail-closed assurance suites | 2 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Concrete protocol-machine refinement suites | 3 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Compiler and serialization pipeline suites | 5 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Deadlock automation fragment assurance suites | 3 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Docs-as-contract assurance suites | 3 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Deterministic scale and budget assurance suites | 1 | Curated property-suite map in `toolkit/xtask/src/checks/verification_inventory.rs` |
+| Explicit unsupported or fail-closed property notes | 0 | Curated unsupported-surface note list in `toolkit/xtask/src/checks/verification_inventory.rs` |
 
 ## Current Formal Verification Claim
 
@@ -325,9 +325,9 @@ than duplicating their inner gate lists by hand.
 
 | Gate | Canonical entry point | Primary owning files | Local run surface | GitHub run surface |
 |---|---|---|---|---|
-| Fast structural verification | `just check-fast-structure` | `justfile`, `check-formal-claim-scope`, `check-ci-assurance-lanes`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh`, `scripts/check/fail-closed-mutations.sh`, `check-source-doc-snippets`, `scripts/check/tooling-convergence.sh`, Lean bootstrap scripts | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Fast structural verification | `just check-fast-structure` | `justfile`, `check-formal-claim-scope`, `check-ci-assurance-lanes`, `toolkit/xtask/src/checks/verification_inventory.rs`, `toolkit/xtask/src/checks/bridge_normalization_ledger.rs`, `toolkit/xtask/src/checks/fail_closed_mutations.rs`, `check-source-doc-snippets`, `toolkit/xtask/src/checks/tooling_convergence.rs`, Lean bootstrap scripts | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Focused assurance | `just check-focused-assurance` | `justfile`, strict Lean bridge suites, compiler pipeline suites, metatheory/refinement/runtime boundary suites | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
-| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `scripts/check/package-artifacts.sh`, `scripts/check/package-provenance.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
+| Packaged artifact assurance | `just check-package-artifacts` | `justfile`, `toolkit/xtask/src/checks/package_artifacts.rs`, `toolkit/xtask/src/checks/package_provenance.rs`, `toolkit/xtask/src/checks/durable_boundaries (via _toolkit-check)`, `toolkit/xtask/src/checks/release_recovery.rs` | `just check-pr-critical`, `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | PR-critical assurance | `just check-pr-critical` | `justfile`, `.github/workflows/check.yml`, `.github/workflows/verify.yml` | `just ci-dry-run`, direct local recipe use | `check.yml`, `verify.yml` |
 | Scheduled deep assurance | `just check-deep-assurance` | `justfile`, `.github/workflows/verify.yml`, scale-budget and larger-corpus verification lanes | `just ci-dry-run full`, direct local recipe use | `verify.yml` |
 
@@ -367,12 +367,12 @@ The aim is to make gaps explicit rather than to produce vanity totals.
 | Runtime substrate | Target-aware wrapper contracts | `rust/runtime/tests/runtime_substrate_contracts.rs`, `rust/runtime/tests/wasm_compat.rs` | Native and WASM wrapper seams now have direct regression coverage for `spawn`, `spawn_local`, and deterministic clock/RNG discipline, and deterministic assurance suites are guarded against accidental `SystemClock` / `SystemRng` drift |
 | Handler contract boundary | Machine-checkable contract profiles for first-party handlers and transports, plus fail-closed extension dispatch | `rust/runtime/tests/handler_contracts.rs`, `rust/runtime/tests/transport_contracts.rs` | `ChoreoHandler` and the first-party transport families now have explicit machine-checkable contract ledgers that separate protocol-semantic obligations from policy choices, validate shipped production and harness profiles mechanically, and prove deterministic registered-only extension dispatch plus fail-closed unregistered behavior through runtime tests. User-supplied third-party handlers/transports remain outside the formal claim unless they separately satisfy the same contract |
 | Recovery | Long-horizon differential harness | `rust/bridge/tests/reconfiguration_recovery_harness.rs` | Ownership-transfer replay artifacts, bridge export/import, topology-derived placement artifacts, atomic multi-step reconfiguration plans, snapshot/restore recovery, and deterministic suffix replay now execute as one end-to-end recovery family with explicit divergence detection |
-| Artifact / release | Packaged-crate, provenance, and resume verification | `scripts/check/package-artifacts.sh`, `scripts/check/package-provenance.sh`, `scripts/check/package-resource-audit.sh`, `scripts/check/release-recovery.sh` | Every publishable crate now goes through the `cargo publish --dry-run --locked --no-verify` packaging path, package-manifest resource paths are checked before packaging, the full packaged crate set is compiled from extracted tarballs, critical embedded resources are compared byte-for-byte against source, external consumer canaries for `telltale`, `telltale-runtime`, and `telltale-bridge` run outside the workspace layout with exact last-line stdout assertions, a provenance manifest records tarball hashes plus source/resource/toolchain metadata for the packaged set, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
-| Mutation pressure | Direct fail-closed perturbation suites | `rust/machine/src/runtime_contracts.rs`, `scripts/check/fail-closed-mutations.sh` | Representative bridge payload, theorem-boundary, source-derived docs-row, package-registry, package-manifest, package-resource, and inventory mutations are injected directly against the narrow owning gates so drift is rejected before broader integration lanes run |
+| Artifact / release | Packaged-crate, provenance, and resume verification | `toolkit/xtask/src/checks/package_artifacts.rs`, `toolkit/xtask/src/checks/package_provenance.rs`, `toolkit/xtask/src/checks/durable_boundaries (via _toolkit-check)`, `toolkit/xtask/src/checks/release_recovery.rs` | Every publishable crate now goes through the `cargo publish --dry-run --locked --no-verify` packaging path, package-manifest resource paths are checked before packaging, the full packaged crate set is compiled from extracted tarballs, critical embedded resources are compared byte-for-byte against source, external consumer canaries for `telltale`, `telltale-runtime`, and `telltale-bridge` run outside the workspace layout with exact last-line stdout assertions, a provenance manifest records tarball hashes plus source/resource/toolchain metadata for the packaged set, package-root resource escapes are fail-closed, the packaged WASM and embedded-grammar surfaces are verified explicitly, and release resume behavior is exercised under a deterministic fake cargo/git harness |
+| Mutation pressure | Direct fail-closed perturbation suites | `rust/machine/src/runtime_contracts.rs`, `toolkit/xtask/src/checks/fail_closed_mutations.rs` | Representative bridge payload, theorem-boundary, source-derived docs-row, package-registry, package-manifest, package-resource, and inventory mutations are injected directly against the narrow owning gates so drift is rejected before broader integration lanes run |
 | Concrete refinement | Exact cooperative/Lean/threaded state-slice parity plus Lean proof-connected slice | `rust/bridge/tests/protocol_machine_differential_steps.rs`, `rust/machine/tests/lean_protocol_machine_equivalence.rs`, `rust/machine/tests/threaded_equivalence.rs` | The first concrete protocol-machine refinement slice now compares coroutine/session/scheduler state exactly across Rust, Lean, and canonical threaded execution, exports bounded `u64` bridge fields fail-closed, and is connected to dedicated Lean refinement theorems over the same slice |
 | Compiler / serialization pipeline | Strict DSL-to-theory lowering, exact-shape JSON bridge, and Lean-backed projection acceptance | `rust/bridge/tests/compiler_pipeline_conformance.rs`, `rust/bridge/tests/projection_equivalence.rs`, `rust/bridge/tests/proptest_json_roundtrip.rs`, `rust/bridge/tests/lean_integration_tests.rs`, `rust/bridge/tests/merge_semantics_tests.rs` | This pipeline is operationally checked, not part of the current formal claim: the supported DSL subset runs through parser -> `protocol_to_global()` / `local_to_local_r()` -> exact-shape import/export -> Lean projection export and validator acceptance in deterministic strict lanes, and bridge import rejects unknown fields fail-closed so schema drift cannot hide behind permissive parsing |
 | Deadlock automation | Lean-sound regular-fragment checker mirrored into Rust diagnostics | `rust/types/src/local.rs`, `rust/bridge/tests/regular_practical_fragment_checks.rs`, `rust/tests/dsl_runtime_semantics_tests.rs` | The automatic deadlock-discharge fragment is now mechanically characterized as closed + contractive projected locals whose full unfold exposes send/recv, checked first in Lean on `SessionTypes.LocalTypeR`, mirrored in Rust only for macro/proof-status diagnostics, and exercised end to end through bridge parity and generated `proof_status` surfaces |
-| Public docs as contract | Source-derived capability/admission, authority-support, and trust-surface tables | `rust/bridge/tests/docs_contract_tests.rs`, `scripts/check/verification-inventory.sh`, `scripts/check/bridge-normalization-ledger.sh` | The highest-value public verification/capability docs now separate source-derived tables from explanatory prose, and those rows are checked mechanically against runtime-contract, DSL-tier, and bridge-ledger facts |
+| Public docs as contract | Source-derived capability/admission, authority-support, and trust-surface tables | `rust/bridge/tests/docs_contract_tests.rs`, `toolkit/xtask/src/checks/verification_inventory.rs`, `toolkit/xtask/src/checks/bridge_normalization_ledger.rs` | The highest-value public verification/capability docs now separate source-derived tables from explanatory prose, and those rows are checked mechanically against runtime-contract, DSL-tier, and bridge-ledger facts |
 | Deterministic scale budgets | Larger supported corpora with structural size envelopes | `rust/bridge/tests/scale_budget_contracts.rs` | Larger lowering/projection corpora, longer record/replay histories, larger reconfiguration snapshots, and larger Lean bridge payloads now run as deterministic structural-budget gates with exact replay/snapshot equality and explicit serialized-size envelopes rather than ambient wall-clock benchmarks |
 
 ## Bridge Normalization Trust Surface
@@ -382,7 +382,7 @@ That logic is intentionally narrow and is audited explicitly in CI by
 `just check-bridge-normalization`.
 The rows in this table are source-derived and checked by
 `telltale_bridge::bridge_normalization_ledger()` via
-`scripts/check/bridge-normalization-ledger.sh`.
+`toolkit/xtask/src/checks/bridge_normalization_ledger.rs`.
 
 | Surface | Normalization rule | Classification | Why permitted |
 |---|---|---|---|

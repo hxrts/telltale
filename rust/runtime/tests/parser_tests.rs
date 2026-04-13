@@ -2,9 +2,9 @@
 #![allow(clippy::unwrap_used)]
 #![allow(clippy::expect_used)]
 
-use telltale_runtime::ast::Protocol;
+use telltale_runtime::ast::{LocalType, Protocol};
 use telltale_runtime::compiler::parser::{parse_choreography_str, ParseError};
-use telltale_runtime::compiler::projection::{project, ProjectionError};
+use telltale_runtime::compiler::projection::project;
 
 #[test]
 fn test_parse_simple_protocol() {
@@ -66,7 +66,7 @@ protocol Demo
 }
 
 #[test]
-fn test_projection_rejects_authority_case_constructs_fail_closed() {
+fn test_projection_projects_authority_case_constructs() {
     let input = r#"
 effect Runtime
   authoritative ready : Session -> Result CommitError ReadyWitness
@@ -94,17 +94,33 @@ protocol CommitFlow uses Runtime =
         .iter()
         .find(|role| role.name() == "Coordinator")
         .expect("coordinator role");
-    let err = project(&choreo, coordinator).expect_err("projection should fail closed");
+    let worker = choreo
+        .roles
+        .iter()
+        .find(|role| role.name() == "Worker")
+        .expect("worker role");
+
+    let coordinator_projection =
+        project(&choreo, coordinator).expect("case projection should succeed");
+    let worker_projection = project(&choreo, worker).expect("case projection should succeed");
+
     assert!(matches!(
-        err,
-        ProjectionError::UnsupportedAuthorityConstruct {
-            construct: "case/of"
-        }
+        coordinator_projection,
+        LocalType::LocalChoice { ref branches }
+            if branches.iter().map(|(label, _)| label.to_string()).collect::<Vec<_>>()
+                == vec!["Ok", "Err"]
+    ));
+    assert!(matches!(
+        worker_projection,
+        LocalType::Branch { ref from, ref branches }
+            if from.name() == "Coordinator"
+                && branches.iter().map(|(label, _)| label.to_string()).collect::<Vec<_>>()
+                    == vec!["Err", "Ok"]
     ));
 }
 
 #[test]
-fn test_projection_rejects_timeout_constructs_fail_closed() {
+fn test_projection_projects_timeout_constructs() {
     let input = r#"
 protocol TimeoutFlow =
   roles Coordinator, Worker
@@ -120,12 +136,109 @@ protocol TimeoutFlow =
         .iter()
         .find(|role| role.name() == "Coordinator")
         .expect("coordinator role");
-    let err = project(&choreo, coordinator).expect_err("projection should fail closed");
+    let worker = choreo
+        .roles
+        .iter()
+        .find(|role| role.name() == "Worker")
+        .expect("worker role");
+
+    let coordinator_projection =
+        project(&choreo, coordinator).expect("timeout projection should succeed");
+    let worker_projection = project(&choreo, worker).expect("timeout projection should succeed");
+
     assert!(matches!(
-        err,
-        ProjectionError::UnsupportedAuthorityConstruct {
-            construct: "timeout"
-        }
+        coordinator_projection,
+        LocalType::Timeout {
+            body,
+            on_timeout,
+            on_cancel: None,
+            ..
+        } if matches!(
+            (body.as_ref(), on_timeout.as_ref()),
+            (
+                LocalType::Receive { from, .. },
+                LocalType::Send { to, .. },
+            ) if from.name() == "Worker" && to.name() == "Worker"
+        )
+    ));
+    assert!(matches!(
+        worker_projection,
+        LocalType::Timeout {
+            body,
+            on_timeout,
+            on_cancel: None,
+            ..
+        } if matches!(
+            (body.as_ref(), on_timeout.as_ref()),
+            (
+                LocalType::Send { to, .. },
+                LocalType::Receive { from, .. },
+            ) if to.name() == "Coordinator" && from.name() == "Coordinator"
+        )
+    ));
+}
+
+#[test]
+fn test_projection_projects_evidence_binding_guards() {
+    let input = r#"
+effect Runtime
+  authoritative ready : Session -> Result CommitError ReadyWitness
+  {
+    class : authoritative
+    progress : may_block
+    region : fragment
+    agreement_use : required
+    reentrancy : reject_same_fragment
+  }
+
+protocol GuardedChoice uses Runtime =
+  roles Coordinator, Worker
+  choice Coordinator at
+    | Commit when check Runtime.ready(session) yields witness =>
+        Coordinator -> Worker : Commit(witness)
+    | Abort =>
+        Coordinator -> Worker : Abort
+"#;
+
+    let choreo = parse_choreography_str(input).expect("parse should succeed");
+    let worker = choreo
+        .roles
+        .iter()
+        .find(|role| role.name() == "Worker")
+        .expect("worker role");
+
+    let projection = project(&choreo, worker).expect("guarded choice should project directly");
+    assert!(matches!(
+        projection,
+        LocalType::Branch { ref from, ref branches }
+            if from.name() == "Coordinator" && branches.len() == 2
+    ));
+}
+
+#[test]
+fn test_projection_projects_authority_wrappers_through_continuation() {
+    let input = r#"
+protocol WrapperFlow =
+  roles Coordinator, Worker
+  let receipt = transfer Session from Coordinator to Worker
+  publish receipt as DelegationRecorded
+  materialize delegationProof from DelegationRecorded
+  handoff acceptInvite to Worker with receipt
+  dependent work SyncMembership(channel) required for acceptInvite
+  Coordinator -> Worker : Commit
+"#;
+
+    let choreo = parse_choreography_str(input).expect("parse should succeed");
+    let coordinator = choreo
+        .roles
+        .iter()
+        .find(|role| role.name() == "Coordinator")
+        .expect("coordinator role");
+
+    let projection = project(&choreo, coordinator).expect("wrapper projection should succeed");
+    assert!(matches!(
+        projection,
+        LocalType::Send { ref to, .. } if to.name() == "Worker"
     ));
 }
 

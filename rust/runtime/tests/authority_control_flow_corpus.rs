@@ -34,7 +34,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
         construct: "case",
         pass: PassCase {
             name: "case_authoritative_binding",
-            session_projectable: false,
+            session_projectable: true,
             protocol_machine_executable: true,
             theory_convertible: false,
         },
@@ -84,7 +84,7 @@ const CONTROL_FLOW_PAIRS: &[ControlFlowPair] = &[
         construct: "timeout",
         pass: PassCase {
             name: "timeout_observational_binding",
-            session_projectable: false,
+            session_projectable: true,
             protocol_machine_executable: true,
             theory_convertible: false,
         },

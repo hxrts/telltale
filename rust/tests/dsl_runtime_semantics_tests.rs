@@ -484,19 +484,18 @@ fn generated_proof_status_exposes_required_theorem_packs() {
 
 #[test]
 fn generated_proof_status_exposes_deadlock_automation_diagnostics() {
-    const _: () = assert!(!MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_ELIGIBLE);
-    assert!(
-        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_ROLES.is_empty(),
-        "non-projectable protocols should not advertise automatic deadlock discharge roles"
+    const _: () = assert!(MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_ELIGIBLE);
+    assert_eq!(
+        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_ROLES,
+        ["Coordinator", "Worker"]
     );
     assert_eq!(
         MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_FRAGMENT,
         "closed + contractive projected local types whose full unfold exposes send/recv"
     );
     assert!(
-        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_DIAGNOSTIC
-            .expect("non-projectable protocol should explain why automatic deadlock discharge is unavailable")
-            .contains("session projection failed")
+        MacroAuthorityFlow::proof_status::DEADLOCK_AUTOMATION_DIAGNOSTIC.is_none(),
+        "session-projectable authority protocols should be in the automatic deadlock fragment"
     );
 }
 
@@ -699,7 +698,7 @@ fn generated_authority_metadata_matches_semantic_object_shapes() {
         handoff.capability_class,
         &semantic_handoff,
     );
-    const _: () = assert!(!MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
+    const _: () = assert!(MacroAuthorityFlow::proof_status::SESSION_PROJECTABLE);
     const _: () = assert!(MacroAuthorityFlow::proof_status::PROTOCOL_MACHINE_EXECUTABLE);
 }
 
@@ -913,15 +912,15 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
             "{fixture} should remain protocol-machine executable"
         );
         assert!(
-            !status.session_projectable,
-            "{fixture} should remain non-projectable until explicit lowering exists"
+            status.session_projectable,
+            "{fixture} should now be session-projectable"
         );
         assert!(
             !status.theory_convertible,
             "{fixture} should remain outside the theory-convertible subset"
         );
         let err = choreography_to_global(&choreography)
-            .expect_err("non-projectable fixture must fail theory conversion");
+            .expect_err("non-theory-convertible fixture must fail theory conversion");
         assert!(
             err.to_string().contains(expected_feature),
             "{fixture} should fail theory conversion with an explicit {expected_feature} blocker, got {err}"
@@ -1212,9 +1211,10 @@ fn structure_surface_remains_fail_closed_in_projection() {
             .language_tier_status()
             .protocol_machine_executable
     );
-    assert!(!choreography.language_tier_status().session_projectable);
+    assert!(choreography.language_tier_status().session_projectable);
 
-    let err = telltale_language::project(&choreography, &choreography.roles[0])
-        .expect_err("authority/structure surface must remain fail-closed in projection");
-    assert!(!err.to_string().is_empty());
+    for role in &choreography.roles {
+        telltale_language::project(&choreography, role)
+            .unwrap_or_else(|err| panic!("project {}: {err}", role.name()));
+    }
 }

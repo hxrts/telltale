@@ -282,9 +282,9 @@ fn verification_inventory_declares_source_derived_metrics_and_trust_rows() {
 
     for needle in [
         "The numeric rows in this section are source-derived and checked by",
-        "`scripts/check/verification-inventory.sh`",
+        "`toolkit/xtask/src/checks/verification_inventory.rs`",
         "The rows in this table are source-derived and checked by",
-        "`scripts/check/bridge-normalization-ledger.sh`",
+        "`toolkit/xtask/src/checks/bridge_normalization_ledger.rs`",
         "| Public docs as contract |",
         "## Compiler and Macro Claim Boundary",
         "the current public formal-verification claim does not include any Rust parser,",

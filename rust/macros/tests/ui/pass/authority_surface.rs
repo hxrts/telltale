@@ -79,5 +79,5 @@ fn main() {
         ));
     let watch = AuthorityFlow::effects::runtime::request_metadata(&watch_request);
     assert_eq!(watch.operation_name, "watchPresence");
-    assert!(!AuthorityFlow::proof_status::SESSION_PROJECTABLE);
+    assert!(AuthorityFlow::proof_status::SESSION_PROJECTABLE);
 }

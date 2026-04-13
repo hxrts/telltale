@@ -181,7 +181,7 @@ impl<'a> ProjectionContext<'a> {
     /// This is used for merging choice continuations where we need to preserve
     /// the original choice labels. When a receiver gets different messages per branch,
     /// the resulting Branch node should use the semantic choice labels, not message names.
-    fn merge_local_types_labeled(
+    pub(super) fn merge_local_types_labeled(
         &self,
         labeled_projections: Vec<(Ident, LocalType)>,
     ) -> Result<LocalType, ProjectionError> {
