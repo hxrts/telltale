@@ -70,6 +70,8 @@ pub enum LocalType {
     Timeout {
         duration: Duration,
         body: Box<LocalType>,
+        on_timeout: Box<LocalType>,
+        on_cancel: Option<Box<LocalType>>,
     },
 
     /// Type termination
@@ -104,7 +106,18 @@ impl LocalType {
                 result
             }
             LocalType::Var(label) => rec_vars.contains(label),
-            LocalType::Timeout { body, .. } => body.check_well_formed(rec_vars),
+            LocalType::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                body.check_well_formed(rec_vars)
+                    && on_timeout.check_well_formed(rec_vars)
+                    && on_cancel
+                        .as_deref()
+                        .map_or(true, |branch| branch.check_well_formed(rec_vars))
+            }
             LocalType::End => true,
         }
     }
@@ -122,9 +135,18 @@ impl LocalType {
             | LocalType::LocalChoice { branches } => {
                 1 + branches.iter().map(|(_, t)| t.depth()).max().unwrap_or(0)
             }
-            LocalType::Loop { body, .. }
-            | LocalType::Rec { body, .. }
-            | LocalType::Timeout { body, .. } => 1 + body.depth(),
+            LocalType::Loop { body, .. } | LocalType::Rec { body, .. } => 1 + body.depth(),
+            LocalType::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                1 + body
+                    .depth()
+                    .max(on_timeout.depth())
+                    .max(on_cancel.as_deref().map_or(0, LocalType::depth))
+            }
         }
     }
 }

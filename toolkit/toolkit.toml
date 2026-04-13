@@ -209,6 +209,14 @@ include_paths = ["docs/501_simulation_overview.md"]
 pattern = "Simulator reports and viewer projections should consume typed durable artifacts"
 include_paths = ["docs/501_simulation_overview.md"]
 
+[[checks.durable_boundaries.forbidden_patterns]]
+pattern = 'include_(str|bytes)!\("(\.\./|\.\.\\)'
+include_paths = ["rust/bridge/src", "rust/language/src", "rust/lints/src", "rust/macros/src", "rust/machine/src", "rust/runtime/src", "rust/search/src", "rust/simulator/src", "rust/theory/src", "rust/transport/src", "rust/types/src", "rust/src"]
+
+[[checks.durable_boundaries.forbidden_patterns]]
+pattern = 'env!\("CARGO_MANIFEST_DIR"\).*\.join\("(\.\./|\.\.\\)'
+include_paths = ["rust/bridge/src", "rust/language/src", "rust/lints/src", "rust/macros/src", "rust/machine/src", "rust/runtime/src", "rust/search/src", "rust/simulator/src", "rust/theory/src", "rust/transport/src", "rust/types/src", "rust/src"]
+
 [checks.protocol_machine_placeholders]
 enabled = true
 

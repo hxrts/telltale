@@ -1405,23 +1405,30 @@ fn find_session_projection_blocker(protocol: &Protocol) -> Option<&'static str> 
         Protocol::Invalidate { .. } => {
             Some("invalidate requires protocol-machine commitment semantics")
         }
-        Protocol::Case { .. } => Some("authority-local case/of requires protocol-machine lowering"),
-        Protocol::Timeout { .. } => Some("timeout requires protocol-machine progress semantics"),
-        Protocol::Publish { .. } => Some("publish requires publication/materialization semantics"),
-        Protocol::PublishAuthority { .. } => {
-            Some("publish requires publication/materialization semantics")
-        }
-        Protocol::Materialize { .. } => {
-            Some("materialize requires publication/materialization semantics")
-        }
-        Protocol::Handoff { .. } => Some("handoff requires semantic handoff semantics"),
-        Protocol::DependentWork { .. } => {
-            Some("dependent work requires protocol-machine commitment semantics")
-        }
         Protocol::Send { continuation, .. }
         | Protocol::Broadcast { continuation, .. }
         | Protocol::Let { continuation, .. }
+        | Protocol::Publish { continuation, .. }
+        | Protocol::PublishAuthority { continuation, .. }
+        | Protocol::Materialize { continuation, .. }
+        | Protocol::Handoff { continuation, .. }
+        | Protocol::DependentWork { continuation, .. }
         | Protocol::Extension { continuation, .. } => find_session_projection_blocker(continuation),
+        Protocol::Case { branches, .. } => branches
+            .iter()
+            .find_map(|branch| find_session_projection_blocker(&branch.protocol)),
+        Protocol::Timeout {
+            body,
+            on_timeout,
+            on_cancel,
+            ..
+        } => find_session_projection_blocker(body)
+            .or_else(|| find_session_projection_blocker(on_timeout))
+            .or_else(|| {
+                on_cancel
+                    .as_deref()
+                    .and_then(find_session_projection_blocker)
+            }),
         Protocol::Choice { branches, .. } => branches
             .iter()
             .find_map(|branch| find_session_projection_blocker(&branch.protocol)),

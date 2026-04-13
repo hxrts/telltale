@@ -45,7 +45,7 @@ echo -e "${GREEN}OK${NC}"
 # 0.5. Simulator-only staged path: run targeted subsystem checks and skip the
 # broader staged-crate fallback path so unrelated workspace breakage does not
 # block simulator-only work.
-if ./scripts/check/simulator-subsystem.sh --applies-to-staged >/dev/null 2>&1; then
+if cargo run --quiet --manifest-path toolkit/xtask/Cargo.toml -- check simulator-subsystem --repo-root . -- --applies-to-staged >/dev/null 2>&1; then
     echo -n "Checking simulator subsystem... "
     if just check-simulator-subsystem-staged >/dev/null; then
         echo -e "${GREEN}OK${NC}"

@@ -1,6 +1,6 @@
 //! Core Telltale library for session-typed communication.
 //!
-//! This crate provides session types (Send, Receive, Select, Branch, End) and
+//! This crate provides session types (Send, Receive, Select, LocalChoice, Branch, End) and
 //! channel abstractions for safe multiparty communication.
 //!
 //! # Modules
@@ -59,8 +59,8 @@ pub use telltale_macros::{session, Message, Role, Roles};
 pub mod prelude {
     pub use super::{session, tell, try_session};
     pub use super::{
-        Branch, Choice, Choices, End, FromState, IntoSession, Message, Receive, ReceiveError, Role,
-        Route, Select, Send, Session, SessionError,
+        Branch, Choice, Choices, End, FromState, IntoSession, LocalChoice, Message, Receive,
+        ReceiveError, Role, Route, Select, Send, Session, SessionError,
     };
     pub use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 }
@@ -467,6 +467,41 @@ where
 impl<Q: Role, R, C> private::Session for Select<'_, Q, R, C> {}
 
 impl<'q, Q: Role, R, C> Session<'q> for Select<'q, Q, R, C> {}
+
+/// A protocol state where this role makes a local branch decision without
+/// sending a label to a peer.
+pub struct LocalChoice<'q, Q: Role, C> {
+    state: State<'q, Q>,
+    phantom: PhantomData<C>,
+}
+
+impl<'q, Q: Role, C> FromState<'q> for LocalChoice<'q, Q, C> {
+    type Role = Q;
+
+    #[inline]
+    fn from_state(state: State<'q, Self::Role>) -> Self {
+        Self {
+            state,
+            phantom: PhantomData,
+        }
+    }
+}
+
+impl<'q, Q: Role, C> LocalChoice<'q, Q, C> {
+    /// Select a local branch label and continue without a transport send.
+    #[inline]
+    pub fn select<L>(self, _label: L) -> <C as Choice<'q, L>>::Session
+    where
+        C: Choice<'q, L>,
+        C::Session: FromState<'q, Role = Q>,
+    {
+        FromState::from_state(self.state)
+    }
+}
+
+impl<Q: Role, C> private::Session for LocalChoice<'_, Q, C> {}
+
+impl<'q, Q: Role, C> Session<'q> for LocalChoice<'q, Q, C> {}
 
 /// Trait for an enum of possible branch choices.
 ///

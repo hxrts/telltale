@@ -111,6 +111,20 @@ impl PartialEq for LocalType {
                     body: b2,
                 },
             ) => l1 == l2 && b1 == b2,
+            (
+                LocalType::Timeout {
+                    duration: d1,
+                    body: b1,
+                    on_timeout: t1,
+                    on_cancel: c1,
+                },
+                LocalType::Timeout {
+                    duration: d2,
+                    body: b2,
+                    on_timeout: t2,
+                    on_cancel: c2,
+                },
+            ) => d1 == d2 && b1 == b2 && t1 == t2 && c1 == c2,
             _ => false,
         }
     }

@@ -13,7 +13,7 @@ pub(crate) const REQUIRED_PATTERNS: &[PatternExpectation] = &[
     },
     PatternExpectation {
         path: "../../../justfile",
-        pattern: "./scripts/check/tooling-convergence.sh",
+        pattern: "just _local-check tooling-convergence",
     },
     PatternExpectation {
         path: "../../../docs/201_getting_started.md",

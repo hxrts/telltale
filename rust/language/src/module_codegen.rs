@@ -2250,9 +2250,7 @@ fn collect_label_surfaces(
             collect_choice_surfaces(branches, labels)?;
         }
         Protocol::Case { branches, .. } => {
-            for branch in branches {
-                collect_label_surfaces(&branch.protocol, labels)?;
-            }
+            collect_case_surfaces(branches, labels)?;
         }
         Protocol::Timeout {
             body,
@@ -2304,6 +2302,26 @@ fn collect_choice_surfaces(
             Some(LabelSurface::Choice { .. }) | None => {
                 labels.entry(key).or_insert_with(|| LabelSurface::Choice {
                     name: branch.label.clone(),
+                });
+            }
+        }
+        collect_label_surfaces(&branch.protocol, labels)?;
+    }
+
+    Ok(())
+}
+
+fn collect_case_surfaces(
+    branches: &[crate::ast::CaseBranch],
+    labels: &mut BTreeMap<String, LabelSurface>,
+) -> Result<()> {
+    for branch in branches {
+        let key = branch.pattern.constructor.clone();
+        match labels.get(&key) {
+            Some(LabelSurface::Message { .. }) => {}
+            Some(LabelSurface::Choice { .. }) | None => {
+                labels.entry(key).or_insert_with(|| LabelSurface::Choice {
+                    name: format_ident!("{}", branch.pattern.constructor),
                 });
             }
         }
@@ -2476,11 +2494,10 @@ impl ChoiceCodegenState {
             }
             LocalType::LocalChoice { branches } => {
                 // Local decisions without communication still need a choice
-                // enum so the implementation can branch.  We generate a
-                // `Select`-style enum without a partner role; the runtime
-                // dispatcher uses it structurally.
+                // enum so the implementation can branch. Local choice does
+                // not send a label over the transport.
                 let enum_name = self.push_choice_enum(branches)?;
-                Ok(quote! { ::telltale::Select<Self, #enum_name> })
+                Ok(quote! { ::telltale::LocalChoice<#enum_name> })
             }
             LocalType::Timeout { body, .. } => {
                 // Timeout is a runtime concern. The session type for the

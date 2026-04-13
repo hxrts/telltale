@@ -177,6 +177,8 @@ impl ProtocolExtension for TimeoutProtocol {
             Ok(LocalType::Timeout {
                 duration: self.duration,
                 body: Box::new(LocalType::End),
+                on_timeout: Box::new(LocalType::End),
+                on_cancel: None,
             })
         } else {
             // This role doesn't participate in timeout, return End
@@ -233,6 +235,8 @@ impl LocalType {
         Self::Timeout {
             duration,
             body: Box::new(body),
+            on_timeout: Box::new(LocalType::End),
+            on_cancel: None,
         }
     }
 }

@@ -73,7 +73,12 @@ fn generate_type_expr(local_type: &LocalType) -> TokenStream {
             quote! { End }
         }
 
-        LocalType::Timeout { duration: _, body } => {
+        LocalType::Timeout {
+            duration: _,
+            body,
+            on_timeout: _,
+            on_cancel: _,
+        } => {
             // Timeout duration is a runtime concern; type is determined by body
             generate_type_expr(body)
         }

@@ -363,8 +363,8 @@ and validated by `rust/bridge/tests/docs_contract_tests.rs`.
 | counted `loop` with authoritative binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
 | recursion with authoritative binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
 | `par` with observational binding | yes | yes | no | `runtime_semantic_only` | `Parallel` |
-| `case/of` with authoritative binding | yes | no | no | `runtime_semantic_only` | `Case` |
-| `timeout` with observational binding | yes | no | no | `runtime_semantic_only` | `Timeout` |
+| `case/of` with authoritative binding | yes | yes | no | `runtime_semantic_only` | `Case` |
+| `timeout` with observational binding | yes | yes | no | `runtime_semantic_only` | `Timeout` |
 
 Explanatory prose below remains hand-written. The table above is the checked
 contract surface for the reviewed authority/control-flow subset.

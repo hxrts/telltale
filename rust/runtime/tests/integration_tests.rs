@@ -352,15 +352,10 @@ fn test_performance_characteristics() {
 
     let duration = start.elapsed();
 
-    // Keep a broad regression guard here: this runs in debug mode as part of the
-    // full workspace suite, so the threshold needs enough headroom for normal CI
-    // variance while still catching pathological slowdowns.
-    const DEBUG_SUITE_PERFORMANCE_BUDGET_MS: u128 = 10_000;
-    assert!(
-        duration.as_millis() < DEBUG_SUITE_PERFORMANCE_BUDGET_MS,
-        "Performance test took too long: {:?}",
-        duration
-    );
+    // Log timing for observability but do not assert on wall-clock duration.
+    // Wall-clock budgets are inherently non-deterministic and belong in
+    // dedicated benchmark lanes (`just bench-check`), not in the workspace
+    // test suite where debug-mode variance and CI load cause flaky failures.
     println!(
         "Performance test completed 100 iterations in {:?}",
         duration

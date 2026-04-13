@@ -4,7 +4,9 @@ mod merge;
 mod ops;
 
 use crate::ast::{Branch, Choreography, LocalType, MessageType, Protocol, Role, RoleParam};
+use proc_macro2::{Ident, Span};
 use std::collections::HashMap;
+use std::time::Duration;
 
 pub use merge::merge_local_types;
 
@@ -175,13 +177,15 @@ impl<'a> ProjectionContext<'a> {
 
             Protocol::Let { continuation, .. } => self.project_protocol(continuation),
 
-            Protocol::Case { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
-                construct: "case/of",
-            }),
+            Protocol::Case { branches, .. } => self.project_case(branches),
 
-            Protocol::Timeout { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
-                construct: "timeout",
-            }),
+            Protocol::Timeout {
+                role,
+                duration_ms,
+                body,
+                on_timeout,
+                on_cancel,
+            } => self.project_timeout(role, *duration_ms, body, on_timeout, on_cancel.as_deref()),
 
             Protocol::Loop { condition, body } => self.project_loop(condition.as_ref(), body),
 
@@ -191,27 +195,11 @@ impl<'a> ProjectionContext<'a> {
 
             Protocol::Var(label) => self.project_var(label),
 
-            Protocol::Publish { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
-                construct: "publish",
-            }),
-
-            Protocol::PublishAuthority { .. } => {
-                Err(ProjectionError::UnsupportedAuthorityConstruct {
-                    construct: "publish as",
-                })
-            }
-
-            Protocol::Materialize { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
-                construct: "materialize",
-            }),
-
-            Protocol::Handoff { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
-                construct: "handoff",
-            }),
-
-            Protocol::DependentWork { .. } => Err(ProjectionError::UnsupportedAuthorityConstruct {
-                construct: "dependent work",
-            }),
+            Protocol::Publish { continuation, .. }
+            | Protocol::PublishAuthority { continuation, .. }
+            | Protocol::Materialize { continuation, .. }
+            | Protocol::Handoff { continuation, .. }
+            | Protocol::DependentWork { continuation, .. } => self.project_protocol(continuation),
 
             Protocol::End => Ok(LocalType::End),
 
@@ -481,6 +469,81 @@ impl<'a> ProjectionContext<'a> {
                 condition: condition.cloned(),
                 body: Box::new(body_projection),
             })
+        }
+    }
+
+    fn project_case(
+        &mut self,
+        branches: &[crate::ast::CaseBranch],
+    ) -> Result<LocalType, ProjectionError> {
+        let mut local_branches = Vec::with_capacity(branches.len());
+        for branch in branches {
+            let label = Ident::new(&branch.pattern.constructor, Span::call_site());
+            let local_type = self.project_protocol(&branch.protocol)?;
+            local_branches.push((label, local_type));
+        }
+
+        self.project_local_branches(local_branches)
+    }
+
+    fn project_timeout(
+        &mut self,
+        timeout_role: &Role,
+        duration_ms: u64,
+        body: &Protocol,
+        on_timeout: &Protocol,
+        on_cancel: Option<&Protocol>,
+    ) -> Result<LocalType, ProjectionError> {
+        let body = self.project_protocol(body)?;
+        let on_timeout = self.project_protocol(on_timeout)?;
+        let on_cancel = on_cancel
+            .map(|branch| self.project_protocol(branch).map(Box::new))
+            .transpose()?;
+
+        let owns_timeout = self.role_matches(timeout_role)?;
+        let branch_has_effect = body != LocalType::End
+            || on_timeout != LocalType::End
+            || on_cancel
+                .as_deref()
+                .is_some_and(|branch| branch != &LocalType::End);
+
+        if owns_timeout || branch_has_effect {
+            Ok(LocalType::Timeout {
+                duration: Duration::from_millis(duration_ms),
+                body: Box::new(body),
+                on_timeout: Box::new(on_timeout),
+                on_cancel,
+            })
+        } else {
+            Ok(LocalType::End)
+        }
+    }
+
+    fn project_local_branches(
+        &self,
+        local_branches: Vec<(Ident, LocalType)>,
+    ) -> Result<LocalType, ProjectionError> {
+        let projections_only: Vec<_> = local_branches
+            .iter()
+            .map(|(_, projection)| projection)
+            .collect();
+        if projections_only
+            .windows(2)
+            .all(|window| window[0] == window[1])
+        {
+            return Ok(local_branches
+                .into_iter()
+                .next()
+                .map(|(_, projection)| projection)
+                .unwrap_or(LocalType::End));
+        }
+
+        match self.merge_local_types_labeled(local_branches.clone()) {
+            Ok(merged) => Ok(merged),
+            Err(ProjectionError::MergeFailure(_)) => Ok(LocalType::LocalChoice {
+                branches: local_branches,
+            }),
+            Err(err) => Err(err),
         }
     }
 

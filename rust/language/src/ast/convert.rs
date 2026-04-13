@@ -751,6 +751,8 @@ mod tests {
         let local = LocalType::Timeout {
             duration: std::time::Duration::from_millis(100),
             body: Box::new(LocalType::End),
+            on_timeout: Box::new(LocalType::End),
+            on_cancel: None,
         };
         let result = local_to_local_r(&local);
         assert!(

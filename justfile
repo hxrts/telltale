@@ -18,6 +18,10 @@ develop-local-toolkit:
 _toolkit-fmt-check:
     cargo fmt --all -- --check
 
+# Internal local xtask check wrapper.
+_local-check name *args:
+    cargo run --manifest-path toolkit/xtask/Cargo.toml -- check "{{name}}" --repo-root . {{args}}
+
 # Internal toolkit check wrapper.
 _toolkit-check name:
     #!/usr/bin/env bash
@@ -267,7 +271,7 @@ clippy-style-audit:
 # Rust architecture/style-guide pattern checker
 check-arch-rust:
     just _toolkit-check unsafe_boundary
-    ./scripts/check/architecture-rust.sh
+    just _local-check architecture-rust
 
 # TellTale syntax/style check suite (dependency layering, docs references, symbols)
 check-telltale-style:
@@ -285,14 +289,14 @@ check-telltale-style:
     done
     restore() { for f in "${generated[@]:-}"; do [[ -n "$f" && -e "$f.__ci_stash__" ]] && mv "$f.__ci_stash__" "$f"; done; true; }
     trap restore EXIT
-    ./scripts/check/dependency-layers.sh
+    just _local-check dependency-layers
     just _toolkit-check docs_link_check
     just _toolkit-check docs_index
     just _toolkit-check text_formatting
 
 # Enforce public tooling/example cutover to generated effect interfaces and owned opens.
 check-tooling-convergence:
-    ./scripts/check/tooling-convergence.sh
+    just _local-check tooling-convergence
 
 # Validate source markdown DSL snippets against the real parser.
 check-source-doc-snippets:
@@ -300,11 +304,11 @@ check-source-doc-snippets:
 
 # Narrow subsystem-safe simulator verification path for staged simulator-only changes.
 check-simulator-subsystem-staged:
-    ./scripts/check/simulator-subsystem.sh
+    just _local-check simulator-subsystem
 
 # Self-test the staged simulator subsystem classification logic.
 check-simulator-subsystem-self-test:
-    ./scripts/check/simulator-subsystem.sh --self-test
+    just _local-check simulator-subsystem -- --self-test
 
 # Check that key public verification/capability docs stay aligned with
 # source-derived rows and trusted ledgers.
@@ -321,7 +325,7 @@ check-fail-closed-mutations:
     fi
     cargo test -p telltale-bridge --lib parse_protocol_machine_run_output_rejects_ -- --nocapture
     cargo test -p telltale-machine transported_theorem_boundary_fail_closes_ -- --nocapture
-    ./scripts/check/fail-closed-mutations.sh
+    just _local-check fail-closed-mutations
 
 # Reclaim build space when the local volume is close to exhaustion.
 reclaim-build-space-if-needed min_free_mb="2048":
@@ -362,7 +366,7 @@ check-authority-metatheory:
 
 # Run deterministic larger-corpus structural budget suites.
 check-scale-budgets:
-    ./scripts/check/scale-budgets.sh
+    just _local-check scale-budgets
 
 # Generate Rust effect interfaces and simulator scaffolds from Telltale DSL declarations.
 effect-scaffold dsl out="artifacts/effect_handler_scaffold":
@@ -414,7 +418,7 @@ check-workspace-tests-split:
 # Lean architecture/style-guide pattern checker
 check-arch-lean:
     just _toolkit-check lean_escape_hatches
-    ./scripts/check/architecture-lean.sh
+    just _local-check architecture-lean
 
 # Validate pinned revisions for local Lean dependency checkouts.
 check-lean-dependency-pins:
@@ -426,15 +430,15 @@ check-lean-prebuilt:
 
 # Build required Lean bridge binaries and fail closed if strict bridge suites would otherwise skip.
 check-lean-bridge-strict:
-    ./scripts/check/lean-bridge-strict.sh
+    just _local-check lean-bridge-strict
 
 # Consolidated capability gate checks (byzantine, delegation, envelope, failure, contracts, speculation)
 check-capability-gates:
-    ./scripts/check/capability-gates.sh --all
+    just _local-check capability-gates -- --all
 
 # Release theorem-capability and conformance checks
 check-release-conformance:
-    ./scripts/check/release-conformance.sh
+    just _local-check release-conformance
 
 # Performance baseline management (check, freeze, run, sla)
 perf-baseline mode="check":
@@ -446,7 +450,7 @@ check-protocol-machine-placeholders:
 
 # Consolidated Lean/Rust parity checks (types, suite, conformance)
 check-parity mode="--all":
-    ./scripts/check/cross-runtime-parity.sh {{ mode }}
+    just _local-check cross-runtime-parity -- {{ mode }}
 
 # Focused ownership-contract assertions, delegation negatives, and replay checks.
 check-ownership-contracts:
@@ -464,7 +468,7 @@ check-parity-ledger:
 
 # Enforce canonical Lean↔Rust protocol-machine semantic-object naming.
 check-semantic-name-parity:
-    ./scripts/check/lean-rust-semantic-name-parity.sh
+    just _local-check lean-rust-semantic-name-parity
 
 # Check for semantic drift in backticked identifiers, paths, crates, features, and versions.
 check-docs-semantic-drift:
@@ -480,7 +484,7 @@ check-workflow-actions:
 
 # Enforce documentation prose style and structure.
 check-doc-quality:
-    ./scripts/check/docs-prose-quality.sh
+    just _local-check docs-prose-quality
 
 # Reject raw session-store ownership mutation outside sanctioned entry points.
 check-session-ingress-boundary:
@@ -496,20 +500,19 @@ check-style-boundaries:
 
 # Keep a small authoritative verification inventory aligned with source-of-truth metrics.
 check-verification-inventory:
-    ./scripts/check/verification-inventory.sh
+    just _local-check verification-inventory
 
 # Validate publishable crate artifacts from their packaged form, plus package-root
 # resource boundaries and release-script resume behavior.
 check-package-artifacts:
-    ./scripts/check/package-artifacts.sh
-    ./scripts/check/package-provenance.sh
-    ./scripts/check/package-resource-audit.sh
-    ./scripts/check/release-recovery.sh
+    just _local-check package-artifacts
+    just _local-check package-provenance
+    just _local-check release-recovery
 
 # Audit the trusted bridge normalization surface so new compared fields or
 # schema backfills cannot appear silently.
 check-bridge-normalization:
-    ./scripts/check/bridge-normalization-ledger.sh
+    just _local-check bridge-normalization-ledger
 
 # Run the first concrete protocol-machine refinement slice across Lean,
 # cooperative Rust, and canonical threaded execution.
@@ -583,7 +586,7 @@ check-search-boundaries:
 # Focused Lean-backed search fairness gate: theorem-pack, parity fixture, and
 # inventory alignment.
 check-search-fairness:
-    bash ./scripts/check/search-fairness.sh
+    just _local-check search-fairness
 
 # Focused telltale-search verification split: package compile and boundary checks.
 check-search-tooling:

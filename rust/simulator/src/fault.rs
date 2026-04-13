@@ -1,7 +1,7 @@
 //! Budgeted adversary middleware for simulator transport and crash disturbances.
 #![allow(missing_docs)]
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
@@ -408,7 +408,7 @@ impl<H: EffectHandler> AdversaryInjector<H> {
 
     pub fn summary(&self) -> Result<AdversarySummary, String> {
         let state = self.lock_state()?;
-        let mut activated = HashSet::new();
+        let mut activated = BTreeSet::new();
         let mut exhausted = Vec::new();
         let mut consumed = 0_u64;
         for record in &state.budget_history {
