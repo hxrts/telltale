@@ -5,6 +5,7 @@ set -euo pipefail
 
 # ── Paths & Metadata ──────────────────────────────────────────────────
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+LEAN_DIR="${ROOT_DIR}/lean"
 METADATA_FILE="${ROOT_DIR}/papers/artifact_metadata.env"
 
 ARTIFACT_DOI="DOI-UNSET"
@@ -54,7 +55,12 @@ CURRENT_COMMIT="$(git -C "${ROOT_DIR}" rev-parse HEAD)"
 COMMIT_TEX="$(format_commit_tex "${CURRENT_COMMIT}")"
 COMMIT_ROW="Pinned commit & ${COMMIT_TEX} \\\\"
 DOI_ROW="Archival DOI & \\texttt{${ARTIFACT_DOI}} \\\\"
-LEAN_ROW="$(bash "${ROOT_DIR}/scripts/ops/lean-stats.sh" --latex-row)"
+
+_lean_files="$(find "${LEAN_DIR}" -type f -name '*.lean' | wc -l | tr -d ' ')"
+_lean_loc="$(find "${LEAN_DIR}" -type f -name '*.lean' -print0 | xargs -0 cat | wc -l | tr -d ' ')"
+_lean_axioms="$( (rg -n '^[[:space:]]*axiom\b' "${LEAN_DIR}" || true) | wc -l | tr -d ' ' )"
+_lean_sorries="$( (rg -n '\bsorry\b' "${LEAN_DIR}" || true) | wc -l | tr -d ' ' )"
+LEAN_ROW="Lean source statistics & ${_lean_files} files, ${_lean_loc} LOC, axioms: ${_lean_axioms}, unresolved proof holes (\\texttt{sorry}): ${_lean_sorries} \\\\"
 COMMIT_ROW_AWK="$(printf '%s' "${COMMIT_ROW}" | sed 's/\\/\\\\/g')"
 DOI_ROW_AWK="$(printf '%s' "${DOI_ROW}" | sed 's/\\/\\\\/g')"
 LEAN_ROW_AWK="$(printf '%s' "${LEAN_ROW}" | sed 's/\\/\\\\/g')"
