@@ -1,6 +1,6 @@
 [package]
 name = "telltale-machine"
-version = "13.0.0"
+version = "14.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
@@ -21,8 +21,8 @@ wasm = ["getrandom/js"]
 multi-thread = ["rayon"]
 
 [dependencies]
-telltale-types = { path = "../types", version = "=13.0.0" }
-telltale-theory = { path = "../theory", version = "=13.0.0" }
+telltale-types = { path = "../types", version = "=14.0.0" }
+telltale-theory = { path = "../theory", version = "=14.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_cbor = { workspace = true }
@@ -38,7 +38,7 @@ getrandom = { workspace = true, features = ["js"] }
 wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
-telltale-theory = { path = "../theory", version = "=13.0.0" }
+telltale-theory = { path = "../theory", version = "=14.0.0" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
 criterion = { workspace = true }
