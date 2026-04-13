@@ -18,6 +18,8 @@ const RELEASE_PACKAGES: &[&str] = &[
     "telltale-bridge",
 ];
 
+const NON_RELEASE_WORKSPACE_PACKAGES: &[&str] = &["telltale-lints", "telltale-ui", "telltale-web"];
+
 const WASM_EXAMPLE_LOCK_PACKAGES: &[&str] = &[
     "telltale",
     "telltale-language",
@@ -185,23 +187,33 @@ pub fn run(repo_root: &Path) -> Result<()> {
     println!("== build and package release tarballs ==");
     let saved_tarball_dir = repo_root.join("target/package-artifact-tarballs");
     fs::create_dir_all(&saved_tarball_dir)?;
+    for package in RELEASE_PACKAGES {
+        let tarball_name = format!("{package}-{workspace_version}.crate");
+        let target_tarball = repo_root.join("target/package").join(&tarball_name);
+        if target_tarball.exists() {
+            fs::remove_file(&target_tarball)?;
+        }
+        let saved_tarball = saved_tarball_dir.join(&tarball_name);
+        if saved_tarball.exists() {
+            fs::remove_file(&saved_tarball)?;
+        }
+    }
+
+    let mut package_cmd = Command::new("cargo");
+    package_cmd
+        .arg("package")
+        .arg("--workspace")
+        .arg("--no-verify")
+        .arg("--allow-dirty");
+    for package in NON_RELEASE_WORKSPACE_PACKAGES {
+        package_cmd.arg("--exclude").arg(package);
+    }
+    let status = package_cmd.current_dir(repo_root).status()?;
+    if !status.success() {
+        bail!("error: cargo package failed for release workspace");
+    }
 
     for package in RELEASE_PACKAGES {
-        let rel_manifest = manifest_path(package).unwrap();
-        let status = Command::new("cargo")
-            .args([
-                "package",
-                "--manifest-path",
-                rel_manifest,
-                "--no-verify",
-                "--allow-dirty",
-            ])
-            .current_dir(repo_root)
-            .status()?;
-        if !status.success() {
-            bail!("error: cargo package failed for {package}");
-        }
-
         // Find generated tarball
         let tarball_src = repo_root
             .join("target/package")
