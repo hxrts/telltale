@@ -366,7 +366,7 @@ impl ThreadedProtocolMachine {
             });
 
         let mut progressed = false;
-        for (pick, result) in picks.into_iter().zip(results.into_iter()) {
+        for (pick, result) in picks.into_iter().zip(results) {
             progressed |= self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
         }
         Ok(progressed)

@@ -252,7 +252,7 @@ impl ExtensionRegistry {
     /// Get all grammar extensions
     pub fn grammar_extensions(&self) -> impl Iterator<Item = &dyn GrammarExtension> {
         let mut ordered: Vec<_> = self.grammar_extensions.iter().collect();
-        ordered.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
+        ordered.sort_by_key(|(id_a, _)| *id_a);
         ordered.into_iter().map(|(_, e)| e.as_ref())
     }
 
@@ -317,7 +317,7 @@ impl ExtensionRegistry {
         let unknown_ext = "unknown".to_string();
 
         let mut conflicts: Vec<_> = self.rule_conflicts.iter().collect();
-        conflicts.sort_by(|(rule_a, _), (rule_b, _)| rule_a.cmp(rule_b));
+        conflicts.sort_by_key(|(rule_a, _)| *rule_a);
 
         for (rule, conflicting_extensions) in conflicts {
             if !conflicting_extensions.is_empty() {
@@ -398,7 +398,7 @@ impl ExtensionRegistry {
         let mut docs = String::from("# Extension Documentation\n\n");
 
         let mut entries: Vec<_> = self.grammar_extensions.iter().collect();
-        entries.sort_by(|(id_a, _), (id_b, _)| id_a.cmp(id_b));
+        entries.sort_by_key(|(id_a, _)| *id_a);
 
         for (id, extension) in entries {
             docs.push_str(&format!("## {}\n\n", id));

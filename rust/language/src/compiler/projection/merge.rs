@@ -430,8 +430,8 @@ fn merge_select_branches(
     // Sort both branch lists for comparison
     let mut sorted1: Vec<_> = branches1.to_vec();
     let mut sorted2: Vec<_> = branches2.to_vec();
-    sorted1.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
-    sorted2.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+    sorted1.sort_by_key(|a| a.0.to_string());
+    sorted2.sort_by_key(|a| a.0.to_string());
 
     // Must have same number of branches
     if sorted1.len() != sorted2.len() {
@@ -491,13 +491,13 @@ fn merge_branch_branches(
 
     // Convert back to vector, sorted by label name for determinism
     let mut branches: Vec<_> = result.into_values().collect();
-    branches.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+    branches.sort_by_key(|a| a.0.to_string());
 
     Ok(branches)
 }
 
 fn sort_branches_by_label(branches: &mut [(proc_macro2::Ident, LocalType)]) {
-    branches.sort_by(|a, b| a.0.to_string().cmp(&b.0.to_string()));
+    branches.sort_by_key(|a| a.0.to_string());
 }
 
 /// Compare two optional conditions for equality.

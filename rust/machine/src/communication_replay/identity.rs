@@ -30,7 +30,7 @@ fn zero_hash() -> Hash {
 
 fn xor_hash(lhs: Hash, rhs: Hash) -> Hash {
     let mut out = [0_u8; 32];
-    for (slot, (left, right)) in out.iter_mut().zip(lhs.0.into_iter().zip(rhs.0.into_iter())) {
+    for (slot, (left, right)) in out.iter_mut().zip(lhs.0.into_iter().zip(rhs.0)) {
         *slot = left ^ right;
     }
     Hash(out)

@@ -37,8 +37,8 @@ impl ProtocolMachine {
         let tick = self.clock.tick;
         let expired_witnesses: Vec<TimeoutWitness> = self
             .timed_out_sites
-            .iter()
-            .filter_map(|(_, witness)| (witness.until_tick <= tick).then_some(witness.clone()))
+            .values()
+            .filter_map(|witness| (witness.until_tick <= tick).then_some(witness.clone()))
             .collect();
         if !expired_witnesses.is_empty() {
             for witness in &expired_witnesses {

@@ -1510,31 +1510,28 @@ fn derive_regions(
 
 fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSemanticObjects {
     out.operation_instances
-        .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
-    out.outstanding_effects
-        .sort_by(|lhs, rhs| lhs.effect_id.cmp(&rhs.effect_id));
-    out.semantic_handoffs
-        .sort_by(|lhs, rhs| lhs.handoff_id.cmp(&rhs.handoff_id));
+        .sort_by_key(|lhs| lhs.operation_id.clone());
+    out.outstanding_effects.sort_by_key(|lhs| lhs.effect_id);
+    out.semantic_handoffs.sort_by_key(|lhs| lhs.handoff_id);
     out.transformation_obligations
-        .sort_by(|lhs, rhs| lhs.handoff_id.cmp(&rhs.handoff_id));
+        .sort_by_key(|lhs| lhs.handoff_id);
     out.authoritative_reads
-        .sort_by(|lhs, rhs| lhs.read_id.cmp(&rhs.read_id));
-    out.observed_reads
-        .sort_by(|lhs, rhs| lhs.read_id.cmp(&rhs.read_id));
+        .sort_by_key(|lhs| lhs.read_id.clone());
+    out.observed_reads.sort_by_key(|lhs| lhs.read_id.clone());
     out.materialization_proofs
-        .sort_by(|lhs, rhs| lhs.proof_id.cmp(&rhs.proof_id));
+        .sort_by_key(|lhs| lhs.proof_id.clone());
     out.canonical_handles
-        .sort_by(|lhs, rhs| lhs.handle_id.cmp(&rhs.handle_id));
+        .sort_by_key(|lhs| lhs.handle_id.clone());
     out.publication_events
-        .sort_by(|lhs, rhs| lhs.publication_id.cmp(&rhs.publication_id));
+        .sort_by_key(|lhs| lhs.publication_id.clone());
     out.prestate_bindings
-        .sort_by(|lhs, rhs| lhs.binding_id.cmp(&rhs.binding_id));
+        .sort_by_key(|lhs| lhs.binding_id.clone());
     out.agreement_profiles
-        .sort_by(|lhs, rhs| lhs.profile_name.cmp(&rhs.profile_name));
+        .sort_by_key(|lhs| lhs.profile_name.clone());
     out.agreement_contracts
-        .sort_by(|lhs, rhs| lhs.contract_name.cmp(&rhs.contract_name));
+        .sort_by_key(|lhs| lhs.contract_name.clone());
     out.agreement_evidence
-        .sort_by(|lhs, rhs| lhs.evidence_id.cmp(&rhs.evidence_id));
+        .sort_by_key(|lhs| lhs.evidence_id.clone());
     out.agreement_states.sort_by(|lhs, rhs| {
         (
             &lhs.operation_id,
@@ -1549,8 +1546,7 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
                 rhs.last_updated_tick.unwrap_or(0),
             ))
     });
-    out.regions
-        .sort_by(|lhs, rhs| lhs.region_id.cmp(&rhs.region_id));
+    out.regions.sort_by_key(|lhs| lhs.region_id.clone());
     for region in &mut out.regions {
         region.operation_ids.sort();
         region.operation_ids.dedup();
@@ -1564,7 +1560,7 @@ fn canonicalize(mut out: ProtocolMachineSemanticObjects) -> ProtocolMachineSeman
         region.publication_ids.dedup();
     }
     out.progress_contracts
-        .sort_by(|lhs, rhs| lhs.operation_id.cmp(&rhs.operation_id));
+        .sort_by_key(|lhs| lhs.operation_id.clone());
     out.progress_transitions.sort_by(|lhs, rhs| {
         (
             lhs.tick,
