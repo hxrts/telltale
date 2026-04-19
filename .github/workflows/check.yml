@@ -18,6 +18,7 @@ jobs:
       - name: Install toolchain
         uses: actions-rs/toolchain@v1
         with:
+          toolchain: 1.95.0
           components: clippy, rustfmt
       - name: Install Lean toolchain
         run: |
@@ -92,7 +93,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: stable
+          toolchain: 1.95.0
           target: wasm32-unknown-unknown
       - name: Install wasm-pack
         run: cargo install wasm-pack --version 0.14.0 --locked
@@ -126,6 +127,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
+          toolchain: 1.95.0
       - name: Install gnuplot
         run: sudo apt-get update && sudo apt-get install -y gnuplot
       - name: Build benchmark targets
@@ -168,7 +170,7 @@ jobs:
       - name: Link toolkit sibling checkout
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
       - name: Run toolkit docs link check
         run: ./scripts/toolkit-shell.sh toolkit-xtask check docs_link_check --repo-root . --config toolkit/toolkit.toml
 
