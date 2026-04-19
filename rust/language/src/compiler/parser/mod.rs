@@ -249,7 +249,7 @@ fn parse_choreography_str_core(
                         validate_authority_surface(&body_statements, &layout)?;
 
                         let mut local_protocols: Vec<_> = protocol_defs.iter().collect();
-                        local_protocols.sort_by(|(lhs, _), (rhs, _)| lhs.cmp(rhs));
+                        local_protocols.sort_by_key(|(lhs, _)| *lhs);
                         for (_, local_statements) in local_protocols {
                             validate_linear_vm_assets(local_statements, &layout)?;
                             validate_authority_surface(local_statements, &layout)?;
@@ -819,7 +819,7 @@ fn collect_extension_bindings<'a>(registry: &'a ExtensionRegistry) -> Vec<Extens
             prefix,
         });
     }
-    bindings.sort_by(|left, right| right.prefix.len().cmp(&left.prefix.len()));
+    bindings.sort_by_key(|right| std::cmp::Reverse(right.prefix.len()));
     bindings
 }
 

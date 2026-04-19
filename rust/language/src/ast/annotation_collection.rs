@@ -70,7 +70,7 @@ impl Annotations {
 
     pub fn from_dsl_map(map: &HashMap<String, String>) -> Self {
         let mut entries: Vec<_> = map.iter().collect();
-        entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+        entries.sort_by_key(|(key_a, _)| *key_a);
         let entries = entries
             .into_iter()
             .map(|(key, value)| DslAnnotationEntry::new(key.clone(), value.clone()))

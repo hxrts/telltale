@@ -29,7 +29,7 @@ pub fn generate_annotation_docs(annotations: &HashMap<String, String>) -> TokenS
     }
 
     let mut entries: Vec<_> = annotations.iter().collect();
-    entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+    entries.sort_by_key(|(key_a, _)| *key_a);
 
     let doc_lines: Vec<TokenStream> = entries
         .into_iter()
@@ -65,7 +65,7 @@ pub fn generate_annotation_metadata(
             }
         })
         .collect();
-    supported.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+    supported.sort_by_key(|(key_a, _)| *key_a);
     if supported.is_empty() {
         return quote! {};
     }
@@ -150,7 +150,7 @@ pub fn generate_runtime_annotation_access(name: &str, protocol: &Protocol) -> To
     // Convert to a flat key-value map for code generation.
     let annotation_map = all_annotations.dsl_map();
     let mut annotation_entries: Vec<_> = annotation_map.iter().collect();
-    annotation_entries.sort_by(|(key_a, _), (key_b, _)| key_a.cmp(key_b));
+    annotation_entries.sort_by_key(|(key_a, _)| *key_a);
 
     let annotation_inserts: Vec<TokenStream> = annotation_entries
         .into_iter()
