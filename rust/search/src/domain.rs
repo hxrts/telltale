@@ -1,6 +1,6 @@
 //! Domain-extension boundary for weighted graph search.
 
-use core::cmp::Ordering;
+use core::{cmp::Ordering, hash::Hash};
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
@@ -197,7 +197,7 @@ pub enum SearchReseedingPolicy {
 /// Domain behavior required by the canonical search machine.
 pub trait SearchDomain {
     /// Canonically ordered node identifier.
-    type Node: Clone + Ord + Send + Sync + core::fmt::Debug + 'static;
+    type Node: Clone + Ord + Hash + Send + Sync + core::fmt::Debug + 'static;
     /// Edge metadata retained for reconstruction and diagnostics.
     type EdgeMeta: Clone + Send + Sync + core::fmt::Debug + 'static;
     /// Search-cost domain.
@@ -313,8 +313,15 @@ pub trait SearchDomain {
         target: &Self::Node,
         parent_of: &dyn Fn(&Self::Node) -> Option<Self::Node>,
     ) -> Option<Vec<Self::Node>> {
-        let mut witness = vec![target.clone()];
+        let mut path_len = 1usize;
         let mut cursor = target.clone();
+        while &cursor != start {
+            cursor = parent_of(&cursor)?;
+            path_len = path_len.saturating_add(1);
+        }
+        let mut witness = Vec::with_capacity(path_len);
+        witness.push(target.clone());
+        cursor = target.clone();
         while &cursor != start {
             cursor = parent_of(&cursor)?;
             witness.push(cursor.clone());

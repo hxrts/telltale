@@ -1,46 +1,11 @@
 {
   "final_state": {
-    "closed_nodes": [
-      0,
-      1,
-      2,
-      3
-    ],
+    "closed_nodes": [],
     "epoch": 2,
-    "g_scores": [
-      [
-        0,
-        0
-      ],
-      [
-        1,
-        1
-      ],
-      [
-        2,
-        1
-      ],
-      [
-        3,
-        2
-      ]
-    ],
+    "g_scores": [],
     "latest_reseed_policy": "StartOnly",
     "open_nodes": [],
-    "parent_map": [
-      [
-        1,
-        0
-      ],
-      [
-        2,
-        0
-      ],
-      [
-        3,
-        1
-      ]
-    ],
+    "parent_map": [],
     "phase": 1,
     "selected_result_cost": 2,
     "selected_result_witness": [

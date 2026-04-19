@@ -83,46 +83,11 @@
     }
   ],
   "final_state": {
-    "closed_nodes": [
-      0,
-      1,
-      2,
-      3
-    ],
+    "closed_nodes": [],
     "epoch": 1,
-    "g_scores": [
-      [
-        0,
-        0
-      ],
-      [
-        1,
-        1
-      ],
-      [
-        2,
-        1
-      ],
-      [
-        3,
-        2
-      ]
-    ],
+    "g_scores": [],
     "open_nodes": [],
-    "parent_map": [
-      [
-        1,
-        0
-      ],
-      [
-        2,
-        0
-      ],
-      [
-        3,
-        1
-      ]
-    ],
+    "parent_map": [],
     "phase": 0,
     "selected_result_cost": 2,
     "selected_result_witness": [

@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    env,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -1666,11 +1669,30 @@ where
             .incumbent
             .as_ref()
             .map(|incumbent| incumbent.cost),
-        selected_result_witness: machine
+        selected_result_witness: machine.selected_result_witness_for_export(),
+        latest_reseed_policy: machine.observation().reseed_policy_trace.last().copied(),
+        epoch: machine.state().graph_epoch.clone(),
+        phase: machine.state().phase,
+    }
+}
+
+fn report_only_state_artifact_for_machine<D>(
+    machine: &SearchMachine<D>,
+) -> SearchStateArtifact<D::Node, D::GraphEpoch, D::Cost>
+where
+    D: SearchDomain,
+{
+    SearchStateArtifact {
+        open_nodes: Vec::new(),
+        closed_nodes: Vec::new(),
+        g_scores: Vec::new(),
+        parent_map: Vec::new(),
+        selected_result_cost: machine
             .state()
             .incumbent
             .as_ref()
-            .map(|incumbent| incumbent.witness.clone()),
+            .map(|incumbent| incumbent.cost),
+        selected_result_witness: machine.selected_result_witness_for_export(),
         latest_reseed_policy: machine.observation().reseed_policy_trace.last().copied(),
         epoch: machine.state().graph_epoch.clone(),
         phase: machine.state().phase,
@@ -1712,11 +1734,7 @@ where
             .incumbent
             .as_ref()
             .map(|incumbent| incumbent.cost),
-        selected_result_witness: machine
-            .state()
-            .incumbent
-            .as_ref()
-            .map(|incumbent| incumbent.witness.clone()),
+        selected_result_witness: machine.selected_result_witness_for_export(),
         epsilon_milli: u64::from(machine.state().epsilon.0),
         phase: machine.state().phase,
         epoch: machine.state().graph_epoch.clone(),
@@ -1935,6 +1953,160 @@ where
                 candidate_discovery_bound_steps,
                 path_problem,
                 recovery_bound_steps_after_latest_epoch,
+                quality_class: SearchRouteQualityClass::PremisedWindowBounded,
+                selected_result_cost: Some(cost),
+                optimality_gap: None,
+                approximation_ratio_milli: None,
+                admissible_upper_bound: Some(cost),
+                selected_result_summary,
+                required_premises,
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+fn route_bound_artifact_for_report_only<N, G, C>(
+    policy: SearchExecutionPolicy,
+    termination: SearchRunTermination,
+    observation: &SearchObservationArtifact<N, G, C>,
+    path_goal_anchor: Option<N>,
+    fairness: &SearchFairnessArtifact<N, G, C>,
+) -> SearchResultBoundArtifact<C>
+where
+    C: SearchCost,
+    N: Clone + Ord,
+    G: Ord,
+{
+    let selected_result_cost = observation.selected_result_cost;
+    let publication_count = u64::try_from(observation.selected_result_publication_trace.len())
+        .expect("publication count fits in u64");
+    let normalized_commit_count = u64::try_from(observation.normalized_commit_trace.len())
+        .expect("normalized commit count fits in u64");
+    let traversed_epoch_count =
+        u64::try_from(observation.graph_epoch_trace.len()).expect("epoch trace length fits in u64");
+    let selected_result_summary = observation
+        .selected_result_witness
+        .as_ref()
+        .zip(selected_result_cost)
+        .map(|(path, cost)| {
+            let path_node_count = u64::try_from(path.len()).expect("path node count fits in u64");
+            let hop_count =
+                u64::try_from(path.len().saturating_sub(1)).expect("hop count fits in u64");
+            SearchResultSummary {
+                cost,
+                selected_result_witness_len: Some(path_node_count),
+                publication_count,
+                normalized_commit_count,
+                traversed_epoch_count,
+                path_summary: Some(SearchPathResultSummary {
+                    cost,
+                    path_node_count,
+                    hop_count,
+                }),
+                metrics: vec![
+                    SearchRouteMetric {
+                        name: SearchRouteMetricName::PathNodeCount,
+                        value: u128::from(path_node_count),
+                    },
+                    SearchRouteMetric {
+                        name: SearchRouteMetricName::HopCount,
+                        value: u128::from(hop_count),
+                    },
+                    SearchRouteMetric {
+                        name: SearchRouteMetricName::ScalarCostOrderKey,
+                        value: cost.order_key(),
+                    },
+                    SearchRouteMetric {
+                        name: SearchRouteMetricName::PublicationCount,
+                        value: u128::from(publication_count),
+                    },
+                    SearchRouteMetric {
+                        name: SearchRouteMetricName::NormalizedCommitCount,
+                        value: u128::from(normalized_commit_count),
+                    },
+                    SearchRouteMetric {
+                        name: SearchRouteMetricName::TraversedEpochCount,
+                        value: u128::from(traversed_epoch_count),
+                    },
+                ],
+            }
+        });
+    let required_premises = fairness.certificate.required_fairness.clone();
+    let path_problem = path_goal_anchor.map(|_| SearchPathProblemDiscoveryArtifact {
+        goal_service_bound_steps: fairness.certificate.service_bound_steps,
+        goal_window_entry_bound_steps: None,
+        discovery_certificate: None,
+    });
+    let budget_exhausted = matches!(
+        (policy.effort_profile, termination),
+        (
+            SearchEffortProfile::SchedulerStepBudget(_),
+            SearchRunTermination::SchedulerStepBudgetExhausted
+        )
+    );
+
+    match (selected_result_cost, policy.scheduler_profile) {
+        (None, _) => SearchResultBoundArtifact {
+            discovery_class: SearchRouteDiscoveryBoundClass::NoCandidate,
+            candidate_discovery_bound_steps: None,
+            path_problem,
+            recovery_bound_steps_after_latest_epoch: None,
+            quality_class: SearchRouteQualityClass::NoCandidate,
+            selected_result_cost: None,
+            optimality_gap: None,
+            approximation_ratio_milli: None,
+            admissible_upper_bound: None,
+            selected_result_summary: None,
+            required_premises,
+        },
+        (Some(cost), SearchSchedulerProfile::CanonicalSerial)
+        | (Some(cost), SearchSchedulerProfile::ThreadedExactSingleLane) => {
+            SearchResultBoundArtifact {
+                discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
+                candidate_discovery_bound_steps: None,
+                path_problem,
+                recovery_bound_steps_after_latest_epoch: None,
+                quality_class: if budget_exhausted {
+                    SearchRouteQualityClass::PremiseOnly
+                } else {
+                    SearchRouteQualityClass::ExactOptimal
+                },
+                selected_result_cost: Some(cost),
+                optimality_gap: if budget_exhausted {
+                    None
+                } else {
+                    Some(C::zero())
+                },
+                approximation_ratio_milli: if budget_exhausted { None } else { Some(1_000) },
+                admissible_upper_bound: Some(cost),
+                selected_result_summary,
+                required_premises,
+            }
+        }
+        (Some(cost), SearchSchedulerProfile::BatchedParallelExact) => SearchResultBoundArtifact {
+            discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
+            candidate_discovery_bound_steps: None,
+            path_problem,
+            recovery_bound_steps_after_latest_epoch: None,
+            quality_class: if budget_exhausted {
+                SearchRouteQualityClass::PremiseOnly
+            } else {
+                SearchRouteQualityClass::PremisedWindowBounded
+            },
+            selected_result_cost: Some(cost),
+            optimality_gap: None,
+            approximation_ratio_milli: None,
+            admissible_upper_bound: Some(cost),
+            selected_result_summary,
+            required_premises,
+        },
+        (Some(cost), SearchSchedulerProfile::BatchedParallelEnvelopeBounded) => {
+            SearchResultBoundArtifact {
+                discovery_class: SearchRouteDiscoveryBoundClass::ObservedRunBound,
+                candidate_discovery_bound_steps: None,
+                path_problem,
+                recovery_bound_steps_after_latest_epoch: None,
                 quality_class: SearchRouteQualityClass::PremisedWindowBounded,
                 selected_result_cost: Some(cost),
                 optimality_gap: None,
@@ -2316,7 +2488,7 @@ where
         batch_width: policy.batch_width,
         fairness_assumptions: config.fairness_assumptions.clone(),
     };
-    let final_state = state_artifact_for_machine(machine);
+    let final_state = report_only_state_artifact_for_machine(machine);
     let theorem_pack = search_theorem_pack_artifact();
     let representative_window = rounds
         .first()
@@ -2389,6 +2561,167 @@ where
     ))
 }
 
+type ReportOnlyExecutionResult<D> = Result<
+    SearchExecutionReport<
+        <D as SearchDomain>::Node,
+        <D as SearchDomain>::GraphEpoch,
+        <D as SearchDomain>::Cost,
+    >,
+    SearchRunError<<D as SearchDomain>::Error>,
+>;
+
+/// Execute one machine to completion without materializing replay rounds.
+///
+/// # Errors
+///
+/// Returns an error if the execution config is invalid, executor proposal
+/// generation fails, or the machine violates its invariants while advancing.
+///
+/// # Panics
+///
+/// Panics if a batch size does not fit in `u64`.
+#[allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines
+)]
+pub fn run_with_executor_report_only<D, X>(
+    machine: &mut SearchMachine<D>,
+    executor: &X,
+    config: SearchRunConfig,
+) -> ReportOnlyExecutionResult<D>
+where
+    D: SearchDomain,
+    X: ProposalExecutor<D>,
+{
+    validate_run_config::<D, X>(executor, &config).map_err(SearchRunError::InvalidConfig)?;
+    machine.set_observation_trace_recording(false);
+    machine.set_selected_result_witness_deferral(true);
+    let progress_logging_enabled = env::var("JACQUARD_TELLTALE_PROGRESS").as_deref() == Ok("1");
+    let policy = config.execution_policy;
+    let step_budget = match policy.effort_profile {
+        SearchEffortProfile::RunToCompletion => None,
+        SearchEffortProfile::SchedulerStepBudget(budget) => Some(budget),
+    };
+    let mut representative_epoch = None;
+    let mut representative_phase = None;
+    let mut representative_batch_nodes = Vec::new();
+    let mut representative_commits = Vec::new();
+    while let Some(batch) = machine.next_batch() {
+        if step_budget
+            .is_some_and(|budget| machine.state().trace_state.total_scheduler_steps >= budget)
+        {
+            break;
+        }
+        let mut proposals = executor
+            .generate(machine.domain(), &batch, machine.query())
+            .map_err(SearchError::Domain)
+            .map_err(SearchRunError::Search)?;
+        machine.state_mut().trace_state.total_scheduler_steps += 1;
+        let pre_commit_len = machine.observation().normalized_commit_trace.len();
+        machine.activate_batch(&batch);
+        machine.normalize_proposals(&mut proposals);
+        let changed = machine.commit_proposals(&proposals);
+        machine.state_mut().budget_state.expansions +=
+            u64::try_from(batch.entries.len()).expect("batch entry count must fit in u64");
+        machine.state_mut().budget_state.batches += 1;
+        if changed {
+            machine.state_mut().trace_state.productive_steps += 1;
+        }
+        if progress_logging_enabled
+            && machine.state().trace_state.total_scheduler_steps % 50_000 == 0
+        {
+            eprintln!(
+                "[telltale-progress] steps={} productive={} batches={} open={} closed={} accepted_nodes={}",
+                machine.state().trace_state.total_scheduler_steps,
+                machine.state().trace_state.productive_steps,
+                machine.state().budget_state.batches,
+                machine.state().open.len(),
+                machine.state().closed.len(),
+                machine.query().accepted_nodes().len(),
+            );
+        }
+        machine
+            .check_invariants()
+            .map_err(SearchError::InvariantViolation)
+            .map_err(SearchRunError::Search)?;
+
+        if representative_epoch.is_none() {
+            representative_epoch = Some(batch.epoch.clone());
+            representative_phase = Some(batch.phase);
+            representative_batch_nodes = batch
+                .entries
+                .iter()
+                .map(|entry| entry.node.clone())
+                .collect();
+            representative_commits =
+                machine.observation().normalized_commit_trace[pre_commit_len..].to_vec();
+        }
+    }
+
+    let termination = match step_budget {
+        Some(budget)
+            if machine.next_batch().is_some()
+                && machine.state().trace_state.total_scheduler_steps >= budget =>
+        {
+            SearchRunTermination::SchedulerStepBudgetExhausted
+        }
+        _ => SearchRunTermination::Completed,
+    };
+
+    let observation = machine.observation_artifact_without_replay(
+        policy.scheduler_profile,
+        config.fairness_assumptions.clone(),
+    );
+    let total_step_mode = match policy.scheduler_profile {
+        SearchSchedulerProfile::CanonicalSerial
+        | SearchSchedulerProfile::ThreadedExactSingleLane
+        | SearchSchedulerProfile::BatchedParallelExact => TotalStepMode::Exact,
+        SearchSchedulerProfile::BatchedParallelEnvelopeBounded => TotalStepMode::FairnessBounded,
+    };
+    let progress = ProgressSummary {
+        productive_steps: observation.productive_steps,
+        total_scheduler_steps: observation.total_scheduler_steps,
+        total_step_mode,
+        fairness_assumptions: config.fairness_assumptions.clone(),
+    };
+    let scheduler = SchedulerArtifact {
+        execution_policy: policy,
+        scheduler_profile: policy.scheduler_profile,
+        authority_class: classify_scheduler_artifact(policy.scheduler_profile),
+        batch_width: policy.batch_width,
+        fairness_assumptions: config.fairness_assumptions.clone(),
+    };
+    let final_state = state_artifact_for_machine(machine);
+    let theorem_pack = search_theorem_pack_artifact();
+    let fairness = fairness_artifact_for_window(
+        policy.scheduler_profile,
+        representative_epoch,
+        representative_phase,
+        representative_batch_nodes,
+        representative_commits,
+    );
+    let route_bounds = route_bound_artifact_for_report_only(
+        policy,
+        termination,
+        &observation,
+        machine.query().path_goal_anchor().cloned(),
+        &fairness,
+    );
+    Ok(SearchExecutionReport {
+        observation,
+        scheduler,
+        fairness,
+        fairness_certificate_trace: Vec::new(),
+        final_state,
+        theorem_pack,
+        route_bounds,
+        termination,
+        progress,
+    })
+}
+
 /// Commit one pending epoch update at a machine barrier.
 pub fn commit_epoch_reconfiguration<D: SearchDomain>(
     machine: &mut SearchMachine<D>,
@@ -2410,6 +2743,7 @@ pub fn commit_epoch_reconfiguration<D: SearchDomain>(
     machine.state_mut().closed.clear();
     machine.last_batch = None;
     machine.state_mut().incumbent = None;
+    machine.state_mut().selected_terminal = None;
     match request.reseeding_policy {
         SearchReseedingPolicy::StartOnly => {
             machine.state_mut().incons.clear();
@@ -2423,6 +2757,7 @@ pub fn commit_epoch_reconfiguration<D: SearchDomain>(
                 .g_score
                 .insert(start.clone(), D::Cost::zero());
             machine.state_mut().open.insert(start, entry);
+            machine.sync_lookup_state_from_canonical();
         }
         SearchReseedingPolicy::PreserveOpenAndIncons => {
             let rebuild_nodes = machine
@@ -2472,6 +2807,7 @@ pub fn commit_epoch_reconfiguration<D: SearchDomain>(
                 let entry = machine.rebuild_frontier_entry(&node, g_score);
                 machine.state_mut().open.insert(node, entry);
             }
+            machine.sync_lookup_state_from_canonical();
         }
     }
 }
@@ -2634,20 +2970,21 @@ where
             if let Some(parent_node) = &commit.parent {
                 parent.insert(commit.node.clone(), parent_node.clone());
             }
-        }
-        let Some(next) = best_selected_solution_from_maps(start, query, &g_score, &parent) else {
-            continue;
-        };
-        let should_publish = match current_incumbent.as_ref() {
-            None => true,
-            Some(current) => next.0 < current.0 || (next.0 == current.0 && next.1 < current.1),
-        };
-        if should_publish {
-            publications.push(IncumbentPublicationRecord {
-                cost: next.0,
-                witness: next.1.clone(),
-            });
-            current_incumbent = Some(next);
+            let Some(next) = best_selected_solution_from_maps(start, query, &g_score, &parent)
+            else {
+                continue;
+            };
+            let should_publish = match current_incumbent.as_ref() {
+                None => true,
+                Some(current) => next.0 < current.0 || (next.0 == current.0 && next.1 < current.1),
+            };
+            if should_publish {
+                publications.push(IncumbentPublicationRecord {
+                    cost: next.0,
+                    witness: next.1.clone(),
+                });
+                current_incumbent = Some(next);
+            }
         }
     }
 

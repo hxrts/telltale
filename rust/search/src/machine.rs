@@ -1,6 +1,9 @@
 //! Canonical serial search machine and invariant checks.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    collections::{BTreeMap, BTreeSet, HashMap},
+    hash::{BuildHasherDefault, Hasher},
+};
 
 use crate::admission::{SearchFairnessAssumption, SearchSchedulerProfile};
 use crate::cost::{EpsilonMilli, SearchCost};
@@ -28,6 +31,37 @@ type MachineBatch<D> = CanonicalBatch<
 
 type MachineProposal<D> =
     Proposal<<D as SearchDomain>::Node, <D as SearchDomain>::EdgeMeta, <D as SearchDomain>::Cost>;
+#[derive(Default)]
+struct Fnv1aHasher(u64);
+
+impl Hasher for Fnv1aHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        let mut hash = if self.0 == 0 {
+            0xcbf29ce484222325
+        } else {
+            self.0
+        };
+        for byte in bytes {
+            hash ^= u64::from(*byte);
+            hash = hash.wrapping_mul(0x100000001b3);
+        }
+        self.0 = hash;
+    }
+}
+
+type LookupMap<K, V> = HashMap<K, V, BuildHasherDefault<Fnv1aHasher>>;
+type ParentLookupMap<D> = LookupMap<
+    <D as SearchDomain>::Node,
+    ParentRecord<
+        <D as SearchDomain>::Node,
+        <D as SearchDomain>::EdgeMeta,
+        <D as SearchDomain>::Cost,
+    >,
+>;
 
 /// Stable ordering key for one frontier entry.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -155,6 +189,8 @@ pub struct SearchState<N, E, G, S, C> {
     pub parent: BTreeMap<N, ParentRecord<N, E, C>>,
     /// Current incumbent solution.
     pub incumbent: Option<SelectedSolution<N, C>>,
+    /// Current selected terminal for the incumbent under the active query.
+    pub selected_terminal: Option<N>,
     /// Current epsilon.
     pub epsilon: EpsilonMilli,
     /// Current search phase.
@@ -200,7 +236,12 @@ pub struct SearchMachine<D: SearchDomain> {
     pub(crate) start: D::Node,
     pub(crate) query: SearchQuery<D::Node>,
     pub(crate) state: MachineState<D>,
+    g_score_lookup: LookupMap<D::Node, D::Cost>,
+    parent_lookup: ParentLookupMap<D>,
     pub(crate) observation: SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost>,
+    pub(crate) record_observation_traces: bool,
+    pub(crate) defer_selected_result_witness: bool,
+    pub(crate) export_selected_result_witness: bool,
     pub(crate) last_batch: Option<MachineBatch<D>>,
 }
 
@@ -239,6 +280,7 @@ impl<D: SearchDomain> SearchMachine<D> {
             g_score: BTreeMap::new(),
             parent: BTreeMap::new(),
             incumbent: None,
+            selected_terminal: None,
             epsilon,
             phase: 0,
             budget_state: SearchBudgetState::default(),
@@ -256,11 +298,15 @@ impl<D: SearchDomain> SearchMachine<D> {
         );
         state.g_score.insert(start.clone(), D::Cost::zero());
         state.open.insert(start.clone(), start_score);
+        let mut g_score_lookup = LookupMap::default();
+        g_score_lookup.insert(start.clone(), D::Cost::zero());
         Self {
             domain,
             start,
             query,
             state,
+            g_score_lookup,
+            parent_lookup: LookupMap::default(),
             observation: SearchObservationAccumulator {
                 normalized_commit_trace: Vec::new(),
                 replay_checkpoints: Vec::new(),
@@ -268,6 +314,9 @@ impl<D: SearchDomain> SearchMachine<D> {
                 reseed_policy_trace: Vec::new(),
                 selected_result_publication_trace: Vec::new(),
             },
+            record_observation_traces: true,
+            defer_selected_result_witness: false,
+            export_selected_result_witness: true,
             last_batch: None,
         }
     }
@@ -302,6 +351,35 @@ impl<D: SearchDomain> SearchMachine<D> {
         &mut self,
     ) -> &mut SearchObservationAccumulator<D::Node, D::GraphEpoch, D::Cost> {
         &mut self.observation
+    }
+
+    pub(crate) fn set_observation_trace_recording(&mut self, enabled: bool) {
+        self.record_observation_traces = enabled;
+    }
+
+    pub(crate) fn set_selected_result_witness_deferral(&mut self, enabled: bool) {
+        self.defer_selected_result_witness = enabled;
+    }
+
+    /// Control whether exported observation/state artifacts include the
+    /// selected-result witness.
+    pub fn set_selected_result_witness_export_enabled(&mut self, enabled: bool) {
+        self.export_selected_result_witness = enabled;
+    }
+
+    pub(crate) fn sync_lookup_state_from_canonical(&mut self) {
+        self.g_score_lookup = self
+            .state
+            .g_score
+            .iter()
+            .map(|(node, score)| (node.clone(), *score))
+            .collect();
+        self.parent_lookup = self
+            .state
+            .parent
+            .iter()
+            .map(|(node, parent)| (node.clone(), parent.clone()))
+            .collect();
     }
 
     /// Extract the next legal min-key batch from `OPEN`.
@@ -394,10 +472,17 @@ impl<D: SearchDomain> SearchMachine<D> {
         proposals: &[Proposal<D::Node, D::EdgeMeta, D::Cost>],
     ) -> bool {
         let mut changed = false;
+        let query_derived = self.domain.selected_result_semantics_class(&self.query)
+            == crate::domain::SearchSelectedResultSemanticsClass::QueryDerived;
         let mut goal_changed = false;
         for proposal in proposals {
             if self.proposal_improves_state(proposal) {
-                goal_changed |= self.apply_proposal(proposal);
+                let terminal_changed = self.apply_proposal(proposal);
+                if query_derived && terminal_changed {
+                    self.refresh_query_derived_incumbent_from_terminal(&proposal.to);
+                } else {
+                    goal_changed |= terminal_changed;
+                }
                 changed = true;
             }
         }
@@ -511,11 +596,7 @@ impl<D: SearchDomain> SearchMachine<D> {
                 .incumbent
                 .as_ref()
                 .map(|incumbent| incumbent.cost),
-            selected_result_witness: self
-                .state
-                .incumbent
-                .as_ref()
-                .map(|incumbent| incumbent.witness.clone()),
+            selected_result_witness: self.selected_result_witness_for_export(),
             canonical_parent_map: self
                 .state
                 .parent
@@ -537,19 +618,84 @@ impl<D: SearchDomain> SearchMachine<D> {
         }
     }
 
+    /// Derive one reduced observation artifact without replay traces.
+    #[must_use]
+    pub fn observation_artifact_without_replay(
+        &self,
+        scheduler_profile: SearchSchedulerProfile,
+        fairness_assumptions: BTreeSet<SearchFairnessAssumption>,
+    ) -> SearchObservationArtifact<D::Node, D::GraphEpoch, D::Cost> {
+        SearchObservationArtifact {
+            selected_result_cost: self
+                .state
+                .incumbent
+                .as_ref()
+                .map(|incumbent| incumbent.cost),
+            selected_result_witness: self.selected_result_witness_for_export(),
+            canonical_parent_map: self
+                .state
+                .parent
+                .iter()
+                .map(|(node, parent)| (node.clone(), parent.from.clone()))
+                .collect(),
+            selected_result_publication_trace: Vec::new(),
+            normalized_commit_trace: Vec::new(),
+            replay_checkpoints: Vec::new(),
+            graph_epoch_trace: self.observation.graph_epoch_trace.clone(),
+            reseed_policy_trace: self.observation.reseed_policy_trace.clone(),
+            scheduler_profile,
+            fairness_assumptions,
+            productive_steps: self.state.trace_state.productive_steps,
+            total_scheduler_steps: self.state.trace_state.total_scheduler_steps,
+        }
+    }
+
     /// Reconstruct one canonical path from the start node to the target node.
     #[must_use]
     pub fn reconstruct_path(&self, target: &D::Node) -> Option<Vec<D::Node>> {
-        let _ = self.state.g_score.get(target)?;
-        let mut path = vec![target.clone()];
+        let _ = self.g_score_lookup.get(target)?;
         let mut cursor = target.clone();
+        let mut path_len = 1usize;
+        let mut remaining_steps = self.parent_lookup.len().saturating_add(1);
         while cursor != self.start {
-            let parent = self.state.parent.get(&cursor)?;
+            if remaining_steps == 0 {
+                return None;
+            }
+            remaining_steps -= 1;
+            let parent = self.parent_lookup.get(&cursor)?;
+            cursor = parent.from.clone();
+            path_len = path_len.saturating_add(1);
+        }
+        let mut path = Vec::with_capacity(path_len);
+        path.push(target.clone());
+        cursor = target.clone();
+        remaining_steps = self.parent_lookup.len().saturating_add(1);
+        while cursor != self.start {
+            if remaining_steps == 0 {
+                return None;
+            }
+            remaining_steps -= 1;
+            let parent = self.parent_lookup.get(&cursor)?;
             cursor = parent.from.clone();
             path.push(cursor.clone());
         }
         path.reverse();
         Some(path)
+    }
+
+    pub(crate) fn selected_result_witness_owned(&self) -> Option<Vec<D::Node>> {
+        let incumbent = self.state.incumbent.as_ref()?;
+        if !incumbent.witness.is_empty() {
+            return Some(incumbent.witness.clone());
+        }
+        let terminal = self.selected_result_terminal()?;
+        self.reconstruct_path(terminal)
+    }
+
+    pub(crate) fn selected_result_witness_for_export(&self) -> Option<Vec<D::Node>> {
+        self.export_selected_result_witness
+            .then(|| self.selected_result_witness_owned())
+            .flatten()
     }
 
     /// Check the explicit canonical invariant set.
@@ -596,13 +742,21 @@ impl<D: SearchDomain> SearchMachine<D> {
         if let Some(incumbent) = &self.state.incumbent {
             let goal_cost = self
                 .selected_result_terminal()
-                .and_then(|node| self.state.g_score.get(node))
+                .and_then(|node| self.g_score_lookup.get(node))
                 .ok_or(SearchInvariantViolation::IncumbentMismatch)?;
-            let goal_path = self
-                .selected_result_terminal()
-                .and_then(|node| self.reconstruct_path(node))
-                .ok_or(SearchInvariantViolation::IncumbentMismatch)?;
-            if incumbent.cost != *goal_cost || incumbent.witness != goal_path {
+            if incumbent.cost != *goal_cost {
+                return Err(SearchInvariantViolation::IncumbentMismatch);
+            }
+            if !self.defer_selected_result_witness {
+                let goal_path = self
+                    .selected_result_terminal()
+                    .and_then(|node| self.reconstruct_path(node))
+                    .ok_or(SearchInvariantViolation::IncumbentMismatch)?;
+                if incumbent.witness != goal_path {
+                    return Err(SearchInvariantViolation::IncumbentMismatch);
+                }
+            }
+            if self.defer_selected_result_witness && self.state.selected_terminal.is_none() {
                 return Err(SearchInvariantViolation::IncumbentMismatch);
             }
         }
@@ -640,7 +794,7 @@ impl<D: SearchDomain> SearchMachine<D> {
     }
 
     fn proposal_improves_state(&self, proposal: &Proposal<D::Node, D::EdgeMeta, D::Cost>) -> bool {
-        match self.state.g_score.get(&proposal.to).copied() {
+        match self.g_score_lookup.get(&proposal.to).copied() {
             None => true,
             Some(current) if proposal.tentative_g < current => true,
             Some(current) if proposal.tentative_g == current => {
@@ -651,8 +805,7 @@ impl<D: SearchDomain> SearchMachine<D> {
     }
 
     fn equal_cost_parent_better(&self, proposal: &Proposal<D::Node, D::EdgeMeta, D::Cost>) -> bool {
-        self.state
-            .parent
+        self.parent_lookup
             .get(&proposal.to)
             .is_some_and(|current| proposal.from < current.from)
     }
@@ -661,7 +814,17 @@ impl<D: SearchDomain> SearchMachine<D> {
         self.state
             .g_score
             .insert(proposal.to.clone(), proposal.tentative_g);
+        self.g_score_lookup
+            .insert(proposal.to.clone(), proposal.tentative_g);
         self.state.parent.insert(
+            proposal.to.clone(),
+            ParentRecord {
+                from: proposal.from.clone(),
+                edge: proposal.edge.clone(),
+                edge_cost: proposal.edge_cost,
+            },
+        );
+        self.parent_lookup.insert(
             proposal.to.clone(),
             ParentRecord {
                 from: proposal.from.clone(),
@@ -685,13 +848,15 @@ impl<D: SearchDomain> SearchMachine<D> {
             );
             self.state.open.insert(proposal.to.clone(), entry);
         }
-        self.observation
-            .normalized_commit_trace
-            .push(NormalizedCommitRecord {
-                node: proposal.to.clone(),
-                parent: Some(proposal.from.clone()),
-                g_score: proposal.tentative_g,
-            });
+        if self.record_observation_traces {
+            self.observation
+                .normalized_commit_trace
+                .push(NormalizedCommitRecord {
+                    node: proposal.to.clone(),
+                    parent: Some(proposal.from.clone()),
+                    g_score: proposal.tentative_g,
+                });
+        }
         self.query.accepts(&proposal.to)
     }
 
@@ -699,49 +864,155 @@ impl<D: SearchDomain> SearchMachine<D> {
         let Some((selected_cost, path)) = self.best_selected_solution() else {
             return;
         };
+        let terminal = path
+            .last()
+            .cloned()
+            .expect("selected solution witness must include a terminal node");
+        self.publish_selected_solution_if_better(selected_cost, terminal, Some(path));
+    }
+
+    fn refresh_query_derived_incumbent_from_terminal(&mut self, terminal: &D::Node) {
+        let Some(selected_cost) = self.g_score_lookup.get(terminal).copied() else {
+            return;
+        };
+        if self.defer_selected_result_witness {
+            match &self.state.incumbent {
+                None => {
+                    self.publish_selected_solution_if_better(selected_cost, terminal.clone(), None);
+                    return;
+                }
+                Some(current) if selected_cost < current.cost => {
+                    self.publish_selected_solution_if_better(selected_cost, terminal.clone(), None);
+                    return;
+                }
+                Some(current) if selected_cost > current.cost => return,
+                Some(_) if !self.export_selected_result_witness => {
+                    self.publish_selected_solution_if_better(selected_cost, terminal.clone(), None);
+                    return;
+                }
+                Some(current) => {
+                    let Some(path) = self.reconstruct_selection_witness_for_terminal(terminal)
+                    else {
+                        return;
+                    };
+                    let Some(current_path) = self.selected_result_witness_owned() else {
+                        return;
+                    };
+                    if self.domain.compare_selected_solutions(
+                        selected_cost,
+                        &path,
+                        current.cost,
+                        &current_path,
+                    ) == core::cmp::Ordering::Less
+                    {
+                        self.publish_selected_solution_if_better(
+                            selected_cost,
+                            terminal.clone(),
+                            Some(path),
+                        );
+                    }
+                    return;
+                }
+            }
+        }
+
+        let Some(path) = self.reconstruct_selection_witness_for_terminal(terminal) else {
+            return;
+        };
+        self.publish_selected_solution_if_better(selected_cost, terminal.clone(), Some(path));
+    }
+
+    fn reconstruct_selection_witness_for_terminal(
+        &self,
+        terminal: &D::Node,
+    ) -> Option<Vec<D::Node>> {
+        self.domain
+            .reconstruct_selection_witness(&self.start, terminal, &|cursor| {
+                self.parent_lookup
+                    .get(cursor)
+                    .map(|parent| parent.from.clone())
+            })
+    }
+
+    fn publish_selected_solution_if_better(
+        &mut self,
+        selected_cost: D::Cost,
+        terminal: D::Node,
+        path: Option<Vec<D::Node>>,
+    ) {
+        let stored_witness = path.clone().unwrap_or_default();
         match &self.state.incumbent {
             None => {
                 self.state.incumbent = Some(Incumbent {
                     cost: selected_cost,
-                    witness: path.clone(),
+                    witness: stored_witness.clone(),
                 });
-                self.observation.selected_result_publication_trace.push(
-                    IncumbentPublicationRecord {
-                        cost: selected_cost,
-                        witness: path,
-                    },
-                );
+                self.state.selected_terminal = Some(terminal);
+                if self.record_observation_traces {
+                    self.observation.selected_result_publication_trace.push(
+                        IncumbentPublicationRecord {
+                            cost: selected_cost,
+                            witness: path.expect("publication tracing requires a witness"),
+                        },
+                    );
+                }
             }
             Some(current) if selected_cost < current.cost => {
                 self.state.incumbent = Some(SelectedSolution {
                     cost: selected_cost,
-                    witness: path.clone(),
+                    witness: stored_witness.clone(),
                 });
-                self.observation.selected_result_publication_trace.push(
-                    IncumbentPublicationRecord {
-                        cost: selected_cost,
-                        witness: path,
-                    },
-                );
+                self.state.selected_terminal = Some(terminal);
+                if self.record_observation_traces {
+                    self.observation.selected_result_publication_trace.push(
+                        IncumbentPublicationRecord {
+                            cost: selected_cost,
+                            witness: path.expect("publication tracing requires a witness"),
+                        },
+                    );
+                }
             }
+            Some(current)
+                if path.is_none()
+                    && !self.export_selected_result_witness
+                    && selected_cost == current.cost
+                    && self
+                        .state
+                        .selected_terminal
+                        .as_ref()
+                        .is_some_and(|current_terminal| terminal < *current_terminal) =>
+            {
+                self.state.incumbent = Some(SelectedSolution {
+                    cost: selected_cost,
+                    witness: stored_witness,
+                });
+                self.state.selected_terminal = Some(terminal);
+            }
+            Some(_) if path.is_none() && !self.export_selected_result_witness => {}
             Some(current)
                 if self.domain.compare_selected_solutions(
                     selected_cost,
-                    &path,
+                    path.as_ref()
+                        .expect("comparison updates require a selected-result witness"),
                     current.cost,
-                    &current.witness,
+                    self.selected_result_witness_owned()
+                        .as_deref()
+                        .expect("current incumbent must have a reconstructible witness"),
                 ) == core::cmp::Ordering::Less =>
             {
                 self.state.incumbent = Some(SelectedSolution {
                     cost: selected_cost,
-                    witness: path.clone(),
+                    witness: stored_witness.clone(),
                 });
-                self.observation.selected_result_publication_trace.push(
-                    IncumbentPublicationRecord {
-                        cost: selected_cost,
-                        witness: path,
-                    },
-                );
+                self.state.selected_terminal = Some(terminal);
+                if self.record_observation_traces {
+                    self.observation.selected_result_publication_trace.push(
+                        IncumbentPublicationRecord {
+                            cost: selected_cost,
+                            witness: path.expect("publication tracing requires a witness"),
+                        },
+                    );
+                }
             }
             Some(_) => {}
         }
@@ -758,32 +1029,95 @@ impl<D: SearchDomain> SearchMachine<D> {
     }
 
     fn selected_result_terminal(&self) -> Option<&D::Node> {
-        self.state
-            .incumbent
-            .as_ref()
-            .and_then(|incumbent| incumbent.witness.last())
+        self.state.selected_terminal.as_ref().or_else(|| {
+            self.state
+                .incumbent
+                .as_ref()
+                .and_then(|incumbent| incumbent.witness.last())
+        })
     }
 
     fn best_selected_solution(&self) -> Option<(D::Cost, Vec<D::Node>)> {
-        self.domain
-            .selected_result_candidates(&self.query, &self.state.g_score)
+        if self.domain.selected_result_semantics_class(&self.query)
+            == crate::domain::SearchSelectedResultSemanticsClass::QueryDerived
+        {
+            return self.best_query_derived_selected_solution();
+        }
+
+        let mut candidates = self
+            .domain
+            .selected_result_candidates(&self.query, &self.state.g_score);
+        candidates.sort_by(|left, right| {
+            self.state
+                .g_score
+                .get(left)
+                .cmp(&self.state.g_score.get(right))
+                .then_with(|| left.cmp(right))
+        });
+        candidates.dedup();
+
+        self.best_selected_solution_from_candidates(candidates)
+    }
+
+    fn best_query_derived_selected_solution(&self) -> Option<(D::Cost, Vec<D::Node>)> {
+        let mut candidates = self
+            .query
+            .accepted_nodes()
             .iter()
-            .filter_map(|node| {
-                let cost = self.state.g_score.get(node).copied()?;
-                let witness =
-                    self.domain
-                        .reconstruct_selection_witness(&self.start, node, &|cursor| {
-                            self.state
-                                .parent
-                                .get(cursor)
-                                .map(|parent| parent.from.clone())
-                        })?;
-                Some((cost, witness))
-            })
-            .min_by(|left, right| {
+            .filter(|node| self.g_score_lookup.contains_key(*node))
+            .cloned()
+            .collect::<Vec<_>>();
+        candidates.sort_by(|left, right| {
+            self.g_score_lookup
+                .get(left)
+                .cmp(&self.g_score_lookup.get(right))
+                .then_with(|| left.cmp(right))
+        });
+        candidates.dedup();
+        self.best_selected_solution_from_candidates(candidates)
+    }
+
+    fn best_selected_solution_from_candidates<I>(
+        &self,
+        candidates: I,
+    ) -> Option<(D::Cost, Vec<D::Node>)>
+    where
+        I: IntoIterator<Item = D::Node>,
+    {
+        let mut best: Option<(D::Cost, Vec<D::Node>)> = None;
+        for node in candidates {
+            let Some(cost) = self.g_score_lookup.get(&node).copied() else {
+                continue;
+            };
+            if best
+                .as_ref()
+                .is_some_and(|(best_cost, _)| cost > *best_cost)
+            {
+                break;
+            }
+            let witness =
                 self.domain
-                    .compare_selected_solutions(left.0, &left.1, right.0, &right.1)
-            })
+                    .reconstruct_selection_witness(&self.start, &node, &|cursor| {
+                        self.parent_lookup
+                            .get(cursor)
+                            .map(|parent| parent.from.clone())
+                    })?;
+            match best.as_ref() {
+                None => best = Some((cost, witness)),
+                Some((best_cost, best_witness))
+                    if self.domain.compare_selected_solutions(
+                        cost,
+                        &witness,
+                        *best_cost,
+                        best_witness,
+                    ) == core::cmp::Ordering::Less =>
+                {
+                    best = Some((cost, witness));
+                }
+                Some(_) => {}
+            }
+        }
+        best
     }
 
     fn canonical_proposal_cmp(
