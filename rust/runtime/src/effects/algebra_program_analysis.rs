@@ -172,13 +172,12 @@ impl<R: RoleId, M> Program<R, M> {
                 Effect::Extension(_) => {
                     // Extensions are always valid - validation happens at runtime
                 }
-                Effect::End => {
-                    if idx + 1 != self.effects.len() {
-                        return Err(ProgramError::InvalidStructure(
-                            "End must be the final effect".to_string(),
-                        ));
-                    }
+                Effect::End if idx + 1 != self.effects.len() => {
+                    return Err(ProgramError::InvalidStructure(
+                        "End must be the final effect".to_string(),
+                    ));
                 }
+                Effect::End => {}
                 _ => {}
             }
         }

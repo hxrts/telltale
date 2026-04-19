@@ -399,15 +399,15 @@ impl PropertyMonitor {
                         });
                     }
                 }
-                (Property::Simplex, PropertyState::Invariant { violated }) => {
-                    if !*violated && !check_simplex(ctx) {
-                        *violated = true;
-                        self.violations.push(PropertyViolation {
-                            property_name: prop.name(),
-                            tick: ctx.tick,
-                            details: "state left simplex".into(),
-                        });
-                    }
+                (Property::Simplex, PropertyState::Invariant { violated })
+                    if !*violated && !check_simplex(ctx) =>
+                {
+                    *violated = true;
+                    self.violations.push(PropertyViolation {
+                        property_name: prop.name(),
+                        tick: ctx.tick,
+                        details: "state left simplex".into(),
+                    });
                 }
                 (Property::BufferBound { sid, max }, PropertyState::Invariant { violated }) => {
                     if *violated {
