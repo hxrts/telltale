@@ -52,6 +52,24 @@ ensure_iris_linter_config() {
   fi
 }
 
+package_config_path() {
+  local package_name="$1"
+  local package_dir=".lake/packages/${package_name}"
+  local config_path
+
+  for config_path in \
+    "${package_dir}/lakefile.toml" \
+    "${package_dir}/lakefile.lean"
+  do
+    if [[ -f "${config_path}" ]]; then
+      printf '%s\n' "${config_path}"
+      return 0
+    fi
+  done
+
+  return 1
+}
+
 cd "${LEAN_DIR}"
 
 # Step 1: generate or refresh lake-manifest.json.
@@ -72,7 +90,25 @@ else
   echo "OK   lake-manifest.json present"
 fi
 
-ensure_iris_linter_config ".lake/packages/iris/lakefile.toml"
+if ! iris_config_path="$(package_config_path "iris")"; then
+  echo "== lake update (materializing missing package checkout: iris) =="
+  lake update
+  if ! iris_config_path="$(package_config_path "iris")"; then
+    echo "error: missing iris package config under .lake/packages/iris" >&2
+    exit 1
+  fi
+fi
+
+if ! package_config_path "mathlib" >/dev/null 2>&1; then
+  echo "== lake update (materializing missing package checkout: mathlib) =="
+  lake update
+  if ! package_config_path "mathlib" >/dev/null 2>&1; then
+    echo "error: missing mathlib package config under .lake/packages/mathlib" >&2
+    exit 1
+  fi
+fi
+
+ensure_iris_linter_config "${iris_config_path}"
 
 # Step 2: fetch prebuilt Mathlib oleans from cache.leanprover.community.
 # The cache key is the exact mathlib commit pinned in lake-manifest.json.
