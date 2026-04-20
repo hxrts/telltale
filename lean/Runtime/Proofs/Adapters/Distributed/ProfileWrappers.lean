@@ -12,6 +12,7 @@ import Distributed.Families.FailureDetectors
 import Distributed.Families.DataAvailability
 import Distributed.Families.Coordination
 import Distributed.Families.CRDT
+import Distributed.Families.TriangleOfForgetting
 import Distributed.Families.ByzantineSafety
 import Distributed.Model.ConsensusEnvelope
 import Runtime.Adequacy.EnvelopeCore
@@ -83,6 +84,9 @@ abbrev CoordinationProfile := Distributed.Coordination.CoordinationProtocol
 /-- Canonical CRDT theorem-family profile carried by the invariant space. -/
 abbrev CRDTProfile := Distributed.CRDT.CRDTProtocol
 
+/-- Canonical triangle-of-forgetting profile carried by the invariant space. -/
+abbrev TriangleOfForgettingProfile := Distributed.TriangleOfForgetting.ImpossibilityProtocol
+
 /-- Canonical Byzantine-safety theorem-family profile carried by the invariant space. -/
 abbrev ByzantineSafetyProfile := Distributed.ByzantineSafety.SafetyProtocol
 
@@ -126,6 +130,7 @@ structure DistributedProfiles where
   dataAvailability? : Option DataAvailabilityProfile := none
   coordination? : Option CoordinationProfile := none
   crdt? : Option CRDTProfile := none
+  triangleOfForgetting? : Option TriangleOfForgettingProfile := none
   byzantineSafety? : Option ByzantineSafetyProfile := none
   consensusEnvelope? : Option ConsensusEnvelopeProfile := none
   failureEnvelope? : Option FailureEnvelopeProfile := none

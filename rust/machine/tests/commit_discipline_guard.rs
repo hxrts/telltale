@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Guardrail: commit-owned ProtocolMachine state must be mutated only in `commit_pack`.
 //!
 //! This check is intentionally source-based. It protects the canonical ProtocolMachine

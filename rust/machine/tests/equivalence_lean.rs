@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Cross-language equivalence tests: Rust ProtocolMachine vs Lean ProtocolMachine runner.
 #![allow(

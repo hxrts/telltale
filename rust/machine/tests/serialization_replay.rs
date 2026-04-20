@@ -1,6 +1,6 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Serialization round-trip and replay conformance tests.
-#![allow(missing_docs)]
 
 use cfg_if::cfg_if;
 

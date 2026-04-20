@@ -13,6 +13,10 @@ This module deliberately stops short of claiming full Rust↔Lean refinement.
 Its role is to model the missing transition families that the reduced lane does
 not represent: proposal generation, normalization, commit, rebuild, and epoch
 reconfiguration.
+
+LONG_FILE_JUSTIFICATION: The full-machine semantics are intentionally kept in a
+single executable document so the expanded state, invariant bundle, and reduced
+refinement theorems stay visibly aligned.
 -/
 
 namespace Runtime

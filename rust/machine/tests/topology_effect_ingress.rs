@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Topology perturbations must ingress through effect handlers.
 

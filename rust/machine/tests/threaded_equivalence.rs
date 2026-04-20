@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Threaded vs cooperative ProtocolMachine equivalence tests.
 

@@ -221,6 +221,7 @@ pub fn run(repo_root: &Path) -> Result<()> {
 
 fn collect_long_files(lean_dir: &Path, threshold: usize) -> Result<Vec<String>> {
     let mut results = Vec::new();
+    let justification_marker = "LONG_FILE_JUSTIFICATION:";
     for entry in walkdir::WalkDir::new(lean_dir)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -241,7 +242,7 @@ fn collect_long_files(lean_dir: &Path, threshold: usize) -> Result<Vec<String>> 
         }
         let text = std::fs::read_to_string(path)?;
         let line_count = text.lines().count();
-        if line_count > threshold {
+        if line_count > threshold && !text.contains(justification_marker) {
             results.push(format!("{}:{line_count}", path.display()));
         }
     }

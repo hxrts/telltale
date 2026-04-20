@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Guardrail: examples, benches, and tooling must use the canonical public surfaces.
 
 use wasm_bindgen_test::wasm_bindgen_test;

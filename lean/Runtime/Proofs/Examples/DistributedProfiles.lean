@@ -111,10 +111,28 @@ example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.Coordina
     ).coordination?.isSome = true := by
   rfl
 
+example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.CoordinationProfile) :
+    (buildProtocolMachineTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withCoordination p)
+    ).calm?.isSome = true := by
+  rfl
+
 example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.CRDTProfile) :
     (buildProtocolMachineTheoremPack
       (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withCRDT p)
     ).crdt?.isSome = true := by
+  rfl
+
+example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.CRDTProfile) :
+    (buildProtocolMachineTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withCRDT p)
+    ).crdtMonotonicity?.isSome = true := by
+  rfl
+
+example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.TriangleOfForgettingProfile) :
+    (buildProtocolMachineTheoremPack
+      (space := (baseSpace (ν := ν) (store₀ := store₀) (State := State) bundle).withTriangleOfForgetting p)
+    ).triangleOfForgetting?.isSome = true := by
   rfl
 
 example (bundle : ProtocolMachineLivenessBundle store₀) (p : Adapters.ByzantineSafetyProfile) :

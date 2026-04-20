@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Flow-policy serialization compatibility tests.
 
 use cfg_if::cfg_if;

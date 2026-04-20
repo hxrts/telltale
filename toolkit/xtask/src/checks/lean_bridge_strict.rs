@@ -1,5 +1,6 @@
+use std::io::Write;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{bail, Result};
 
@@ -17,7 +18,7 @@ pub fn run(repo_root: &Path) -> Result<()> {
 
     println!("build strict Lean verification binaries");
     let status = Command::new("lake")
-        .args(["build", "telltale_validator", "protocol_machine_runner"])
+        .args(["build", "telltale_validator"])
         .arg("--dir")
         .arg(&lean_dir)
         .env("LEAN_NUM_THREADS", &lean_threads)
@@ -26,6 +27,28 @@ pub fn run(repo_root: &Path) -> Result<()> {
     if !status.success() {
         bail!("lean-bridge-strict: lake build failed");
     }
+
+    let runner_script = repo_root.join("scripts/lean/protocol-machine-runner.sh");
+    if !runner_script.is_file() {
+        bail!("lean-bridge-strict: protocol-machine runner fallback script missing");
+    }
+    prewarm_json_entrypoint(
+        &runner_script,
+        "{\"operation\":\"validateTrace\",\"payload\":{\"choreographies\":[],\"trace\":[]}}",
+        "protocol-machine runner",
+        repo_root,
+    )?;
+
+    let validator_script = repo_root.join("scripts/lean/protocol-machine-validator.sh");
+    if !validator_script.is_file() {
+        bail!("lean-bridge-strict: protocol-machine validator fallback script missing");
+    }
+    prewarm_json_entrypoint(
+        &validator_script,
+        "{\"operation\":\"verifyProtocolBundle\",\"payload\":{\"claims\":{}}}",
+        "protocol-machine validator",
+        repo_root,
+    )?;
 
     let strict_suites: &[(&[&str], &[(&str, &str)])] = &[
         (
@@ -158,5 +181,28 @@ pub fn run(repo_root: &Path) -> Result<()> {
     }
 
     println!("lean-bridge-strict: ok");
+    Ok(())
+}
+
+fn prewarm_json_entrypoint(
+    script: &Path,
+    payload: &str,
+    name: &str,
+    repo_root: &Path,
+) -> Result<()> {
+    println!("prewarm {name}");
+    let mut child = Command::new(script)
+        .current_dir(repo_root)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::inherit())
+        .spawn()?;
+    if let Some(stdin) = child.stdin.as_mut() {
+        stdin.write_all(payload.as_bytes())?;
+    }
+    let status = child.wait()?;
+    if !status.success() {
+        bail!("lean-bridge-strict: {name} prewarm failed");
+    }
     Ok(())
 }

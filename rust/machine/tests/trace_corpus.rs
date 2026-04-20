@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Deterministic LocalTypeR trace corpus tests.
 //!
 //! These tests run on both native and WASM targets using wasm_bindgen_test's

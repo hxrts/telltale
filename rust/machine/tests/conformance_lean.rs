@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Named Lean theorem conformance tests.
 #![allow(clippy::needless_collect, clippy::let_underscore_must_use)]

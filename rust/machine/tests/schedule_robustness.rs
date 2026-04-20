@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Scheduler-robustness invariants for strict Lean-observable behavior.
 

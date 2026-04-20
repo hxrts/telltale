@@ -50,7 +50,10 @@ structure ProtocolMachineTheoremPack
   failureDetectors? : Option FailureDetectorsArtifact
   dataAvailability? : Option DataAvailabilityArtifact
   coordination? : Option CoordinationArtifact
+  calm? : Option CALMArtifact
   crdt? : Option CRDTArtifact
+  crdtMonotonicity? : Option CRDTMonotonicityArtifact
+  triangleOfForgetting? : Option TriangleOfForgettingArtifact
   byzantineSafety? : Option ByzantineSafetyArtifact
   consensusEnvelope? : Option ConsensusEnvelopeArtifact
   failureEnvelope? : Option FailureEnvelopeArtifact
@@ -212,6 +215,16 @@ def buildProtocolMachineTheoremPack
           { protocol := p
           , characterization := p.characterization
           }
+  let calm? :=
+    match space.distributed.coordination? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p
+          , characterization := p.characterization
+          , coordinationFreeWhenMonotone := fun hMono => p.characterization.1 hMono
+          , coordinationRequiredWhenNonMonotone := fun hNonMono => p.characterization.2 hNonMono
+          }
 
   -- Builder: CRDT and Consensus Envelope Families
 
@@ -236,6 +249,25 @@ def buildProtocolMachineTheoremPack
           , hcrdtDynamics := p.hcrdtDynamics
           , hcrdtExtensions := p.hcrdtExtensions
           , hcrdtLimits := p.hcrdtLimits
+          }
+  let crdtMonotonicity? :=
+    match space.distributed.crdt? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p
+          , semilatticeCore := p.assumptions.semilatticeCoreClass
+          , opContextLayer := p.assumptions.opContextLayerClass
+          , approximationMonotonicity := p.approximationMonotonicity
+          , hcrdtCore := p.hcrdtCore
+          }
+  let triangleOfForgetting? :=
+    match space.distributed.triangleOfForgetting? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p
+          , proof := p.impossibility
           }
 
   -- Builder: Byzantine and Consensus Envelope Families
@@ -358,7 +390,10 @@ def buildProtocolMachineTheoremPack
   , failureDetectors? := failureDetectors?
   , dataAvailability? := dataAvailability?
   , coordination? := coordination?
+  , calm? := calm?
   , crdt? := crdt?
+  , crdtMonotonicity? := crdtMonotonicity?
+  , triangleOfForgetting? := triangleOfForgetting?
   , byzantineSafety? := byzantineSafety?
   , consensusEnvelope? := consensusEnvelope?
   , failureEnvelope? := failureEnvelope?

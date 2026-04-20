@@ -525,7 +525,7 @@ check-concrete-refinement:
 # Keep the transported-theorem admission boundary explicit across Lean, Rust, and bridge artifacts.
 check-transported-theorem-boundary:
     LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build Runtime.Proofs.TheoremPack.AdmissionBoundary
-    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build protocol_machine_runner
+    test -x scripts/lean/protocol-machine-runner.sh
     cargo test -p telltale-machine transported_theorem_boundary_ -- --nocapture
     cargo test -p telltale-bridge --test invariant_verification test_verify_protocol_bundle_emits_transported_theorem_boundary_inventory -- --exact --nocapture
 
@@ -600,7 +600,7 @@ check-search-tooling:
     cargo test -p telltale-simulator --test search_integration -- --nocapture
     cargo test -p telltale-viewer --test search_adapter -- --nocapture
     cargo test -p telltale-search --example basic_search --no-run
-    if rustup target list --installed | grep -q '^wasm32-unknown-unknown$'; then
+    if command -v rustup >/dev/null 2>&1 && rustup target list --installed | grep -q '^wasm32-unknown-unknown$'; then
       cargo check -p telltale-search --target wasm32-unknown-unknown --tests
     fi
     just check-search-fairness
@@ -878,7 +878,10 @@ _clean-assets:
 
 # Build the book after regenerating the summary
 book: summary _gen-assets
-    mdbook build && just _clean-assets
+    #!/usr/bin/env bash
+    set -euo pipefail
+    mdbook build 2> >(grep -Fv "The mdbook-mermaid preprocessor was built against version 0.5.0 of mdbook, but we're being called from version 0.5.1" >&2)
+    just _clean-assets
 
 # Build paper PDFs (requires texlive from nix develop shell)
 paper:

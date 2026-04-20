@@ -1,6 +1,6 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Ownership-contract and delegation lifecycle assertions.
-#![allow(missing_docs)]
 
 #[allow(dead_code, unreachable_pub)]
 #[path = "support/mod.rs"]

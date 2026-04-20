@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Lean protocol-machine runner vs Rust protocol-machine equivalence tests.
 #![allow(clippy::needless_collect)]

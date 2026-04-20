@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::expect_used)]
 //! Contract tests for first-party machine effect-handler wrappers.

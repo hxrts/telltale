@@ -7,6 +7,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PINS_FILE="${ROOT_DIR}/lean/dependency_pins.json"
+IRIS_LINTER_ARGS='moreLeanArgs = ["-Dlinter.unusedSectionVars=false", "-Dlinter.unusedVariables=false"]'
 
 # ── Prerequisites ─────────────────────────────────────────────────────
 
@@ -29,6 +30,35 @@ repo_for_name() {
     iris-lean)  echo "https://github.com/hxrts/iris-lean.git" ;;
     *)          return 1 ;;
   esac
+}
+
+ensure_iris_linter_config() {
+  local config_path="$1"
+  local config_dir
+  local config_name
+
+  config_dir="$(dirname "${config_path}")"
+  config_name="$(basename "${config_path}")"
+
+  if [[ ! -f "${config_path}" ]]; then
+    echo "error: missing iris package config: ${config_path}" >&2
+    exit 1
+  fi
+
+  if ! grep -Fq "${IRIS_LINTER_ARGS}" "${config_path}"; then
+    perl -0pi -e '
+      my $line = qq{'"${IRIS_LINTER_ARGS}"'\n};
+      if ($_ !~ /moreLeanArgs = \["-Dlinter\.unusedSectionVars=false", "-Dlinter\.unusedVariables=false"\]/) {
+        if (!s/\n\[\[require\]\]/\n$line\n[[require]]/) {
+          $_ .= "\n$line";
+        }
+      }
+    ' "${config_path}"
+  fi
+
+  if [[ -d "${config_dir}/.git" ]]; then
+    git -C "${config_dir}" update-index --assume-unchanged "${config_name}"
+  fi
 }
 
 # ── Mathlib Cache ─────────────────────────────────────────────────────
@@ -61,19 +91,25 @@ ensure_mathlib_cache() {
 
 ensure_iris_build() {
   local checkout="$1"
+  local -a lake_args=(
+    "--log-level=error"
+    "-KmoreLeanArgs=#[\"-Dlinter.unusedSectionVars=false\",\"-Dlinter.unusedVariables=false\"]"
+  )
+
+  ensure_iris_linter_config "${checkout}/lakefile.toml"
 
   if find "${checkout}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
     echo "OK   iris-lean build artifacts present under ${checkout}/.lake/build/lib/lean"
     return
   fi
 
-  echo "build iris-lean: compiling pinned dependency with \`lake build Iris\`"
+  echo "build iris-lean: compiling pinned dependency with quiet upstream lint settings"
   local attempts=0
   local max_attempts=3
   local ok=0
   while [[ "${attempts}" -lt "${max_attempts}" ]]; do
     attempts=$((attempts + 1))
-    if (cd "${checkout}" && lake build Iris); then
+    if (cd "${checkout}" && lake "${lake_args[@]}" build Iris); then
       ok=1
       break
     fi
@@ -83,12 +119,12 @@ ensure_iris_build() {
     fi
   done
   if [[ "${ok}" -ne 1 ]]; then
-    echo "error: failed to build iris-lean at ${checkout} after ${max_attempts} attempts; run \`cd ${checkout} && lake build Iris\` after resolving the local issue" >&2
+    echo "error: failed to build iris-lean at ${checkout} after ${max_attempts} attempts; run \`cd ${checkout} && lake ${lake_args[*]} build Iris\` after resolving the local issue" >&2
     exit 1
   fi
 
   if ! find "${checkout}/.lake/build/lib/lean" -type f -name '*.olean' -print -quit 2>/dev/null | grep -q .; then
-    echo "error: \`lake build Iris\` completed but iris-lean oleans are still missing under ${checkout}/.lake/build/lib/lean" >&2
+    echo "error: \`lake ${lake_args[*]} build Iris\` completed but iris-lean oleans are still missing under ${checkout}/.lake/build/lib/lean" >&2
     exit 1
   fi
 

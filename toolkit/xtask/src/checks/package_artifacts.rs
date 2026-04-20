@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -28,6 +29,9 @@ const WASM_EXAMPLE_LOCK_PACKAGES: &[&str] = &[
     "telltale-theory",
     "telltale-types",
 ];
+
+const IGNORED_PACKAGE_STDERR_SUBSTRINGS: &[&str] =
+    &["package `core2 v0.4.0` in Cargo.lock is yanked in registry `crates-io`"];
 
 fn manifest_path(package: &str) -> Option<&'static str> {
     match package {
@@ -91,6 +95,49 @@ fn extract_path_field(cargo_toml: &str, field: &str) -> Option<String> {
         }
     }
     None
+}
+
+fn print_filtered_output(output: &std::process::Output) {
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    if !stdout.is_empty() {
+        print!("{stdout}");
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    for line in stderr.lines() {
+        if IGNORED_PACKAGE_STDERR_SUBSTRINGS
+            .iter()
+            .any(|needle| line.contains(needle))
+        {
+            continue;
+        }
+        eprintln!("{line}");
+    }
+}
+
+fn run_command_filtered(cmd: &mut Command, context: &str) -> Result<()> {
+    let rendered = format_command(cmd);
+    let output = cmd.output()?;
+    print_filtered_output(&output);
+    if !output.status.success() {
+        bail!("{context}: `{rendered}` failed");
+    }
+    Ok(())
+}
+
+fn format_command(cmd: &Command) -> String {
+    let program = cmd.get_program().to_string_lossy().into_owned();
+    let args = cmd
+        .get_args()
+        .map(OsStr::to_string_lossy)
+        .map(|arg| arg.into_owned())
+        .collect::<Vec<_>>()
+        .join(" ");
+    if args.is_empty() {
+        program
+    } else {
+        format!("{program} {args}")
+    }
 }
 
 pub fn run(repo_root: &Path) -> Result<()> {
@@ -208,10 +255,10 @@ pub fn run(repo_root: &Path) -> Result<()> {
     for package in NON_RELEASE_WORKSPACE_PACKAGES {
         package_cmd.arg("--exclude").arg(package);
     }
-    let status = package_cmd.current_dir(repo_root).status()?;
-    if !status.success() {
-        bail!("error: cargo package failed for release workspace");
-    }
+    run_command_filtered(
+        package_cmd.current_dir(repo_root),
+        "error: cargo package failed for release workspace",
+    )?;
 
     for package in RELEASE_PACKAGES {
         // Find generated tarball

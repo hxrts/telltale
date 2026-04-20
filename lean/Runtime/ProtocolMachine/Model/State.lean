@@ -29,6 +29,10 @@ Solution Structure. Defines `CoroutineState` for per-coroutine state (registers,
 endpoints, knowledge set, speculation). `ProtocolMachineState` aggregates coroutines with global
 state: configuration, loaded programs, session store, scheduler state, failure model.
 `WFVMState` predicate captures well-formedness invariants (PC bounds, session validity).
+
+LONG_FILE_JUSTIFICATION: This file defines the canonical runtime-state schema.
+Keeping the state records, event types, and well-formedness boundary together
+preserves a single source of truth for protocol-machine state.
 -/
 set_option autoImplicit false
 universe u

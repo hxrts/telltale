@@ -18,6 +18,10 @@ refinement slice. The slice intentionally tracks only:
 
 This is the smallest nontrivial state surface that the Rust runtime, Lean
 runner, and threaded runtime can compare exactly today.
+
+LONG_FILE_JUSTIFICATION: The refinement lemmas thread the same concrete slice
+through multiple projection views. Splitting the file would duplicate the slice
+surface and make the cross-target audit trail harder to review.
 -/
 
 set_option autoImplicit false

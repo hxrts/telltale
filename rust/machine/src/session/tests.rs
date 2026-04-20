@@ -84,14 +84,22 @@
         };
 
         // Get current type: Send { ... Var("step") }
-        let lt = store.lookup_type(&ep_a).unwrap().clone();
+        let lt = store
+            .lookup_type(&ep_a)
+            .expect("endpoint A should have an unfolded local type")
+            .clone();
         let (_, _vt, continuation) = match &lt {
-            LocalTypeR::Send { branches, .. } => branches.first().unwrap().clone(),
+            LocalTypeR::Send { branches, .. } => branches
+                .first()
+                .expect("send branch list should contain the recursive continuation")
+                .clone(),
             _ => panic!("expected Send"),
         };
 
         // Continuation is Var("step") — resolve it.
-        let original = store.original_type(&ep_a).unwrap();
+        let original = store
+            .original_type(&ep_a)
+            .expect("endpoint A should retain the original recursive local type");
         let resolved = unfold_if_var(&continuation, original);
         assert!(matches!(resolved, LocalTypeR::Send { .. }));
 
@@ -161,8 +169,10 @@
             &single_send_recv_types(),
         );
 
-        let session = store.get_mut(sid).unwrap();
-        session.send("A", "B", Value::Nat(42)).unwrap();
+        let session = store.get_mut(sid).expect("session should exist");
+        session
+            .send("A", "B", Value::Nat(42))
+            .expect("single send/recv session should accept one enqueued value");
         assert!(session.has_message("A", "B"));
         assert!(!session.has_message("B", "A"));
 
@@ -349,10 +359,13 @@
 
         store
             .get_mut(sid1)
-            .unwrap()
+            .expect("first session should exist")
             .send("A", "B", Value::Nat(1))
-            .unwrap();
-        assert!(!store.get(sid2).unwrap().has_message("A", "B"));
+            .expect("send into first session should succeed");
+        assert!(!store
+            .get(sid2)
+            .expect("second session should exist")
+            .has_message("A", "B"));
     }
 
     #[test]

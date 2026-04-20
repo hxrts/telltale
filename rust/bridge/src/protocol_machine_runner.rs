@@ -262,8 +262,14 @@ pub struct ProtocolMachineRunner {
 impl ProtocolMachineRunner {
     /// Default path to the protocol-machine runner binary (relative to workspace root).
     pub const DEFAULT_BINARY_PATH: &'static str = "lean/.lake/build/bin/protocol_machine_runner";
+    /// Default path to the protocol-machine validator binary (relative to workspace root).
+    pub const VALIDATOR_BINARY_PATH: &'static str =
+        "lean/.lake/build/bin/protocol_machine_validator";
     /// Fallback source-backed launcher for the protocol-machine runner.
     pub const FALLBACK_SCRIPT_PATH: &'static str = "scripts/lean/protocol-machine-runner.sh";
+    /// Fallback source-backed launcher for the protocol-machine validator.
+    pub const VALIDATOR_FALLBACK_SCRIPT_PATH: &'static str =
+        "scripts/lean/protocol-machine-validator.sh";
     /// Default timeout for protocol-machine runner process invocations.
     pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
 
@@ -361,6 +367,27 @@ impl ProtocolMachineRunner {
                 return Some(native);
             }
             let fallback = root.join(Self::FALLBACK_SCRIPT_PATH);
+            if fallback.is_file() {
+                return Some(fallback);
+            }
+            None
+        })
+    }
+
+    fn uses_validator(operation: &str) -> bool {
+        matches!(
+            operation,
+            "verifyProtocolBundle" | "validateReconfigurationTransition" | "inspectCapabilityModel"
+        )
+    }
+
+    fn get_validator_path() -> Option<PathBuf> {
+        Self::find_workspace_root().and_then(|root| {
+            let native = root.join(Self::VALIDATOR_BINARY_PATH);
+            if native.is_file() {
+                return Some(native);
+            }
+            let fallback = root.join(Self::VALIDATOR_FALLBACK_SCRIPT_PATH);
             if fallback.is_file() {
                 return Some(fallback);
             }
@@ -510,7 +537,13 @@ impl ProtocolMachineRunner {
         let bytes = serde_json::to_vec(&input)
             .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
 
-        let mut cmd = Command::new(&self.binary_path)
+        let operation_binary = if Self::uses_validator(operation) {
+            Self::get_validator_path().unwrap_or_else(|| self.binary_path.clone())
+        } else {
+            self.binary_path.clone()
+        };
+
+        let mut cmd = Command::new(&operation_binary)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

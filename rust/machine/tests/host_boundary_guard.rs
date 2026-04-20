@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Guardrail: host-facing surfaces must keep the owned boundary canonical.
 
 use wasm_bindgen_test::wasm_bindgen_test;

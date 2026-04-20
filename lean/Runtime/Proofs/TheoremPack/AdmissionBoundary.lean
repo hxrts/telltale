@@ -107,7 +107,22 @@ def transportedTheoremBoundaryInventory : List TransportedTheoremBoundaryEntry :
     , consumedByRustRuntimeAdmission := false
     , consumedByLeanRuntimeGate := false
     }
+  , { key := "calm_characterization"
+    , usageClass := .blackBoxPremiseOnly
+    , consumedByRustRuntimeAdmission := false
+    , consumedByLeanRuntimeGate := false
+    }
   , { key := "crdt_envelope_and_equivalence"
+    , usageClass := .blackBoxPremiseOnly
+    , consumedByRustRuntimeAdmission := false
+    , consumedByLeanRuntimeGate := false
+    }
+  , { key := "crdt_monotonicity"
+    , usageClass := .blackBoxPremiseOnly
+    , consumedByRustRuntimeAdmission := false
+    , consumedByLeanRuntimeGate := false
+    }
+  , { key := "triangle_of_forgetting_impossibility"
     , usageClass := .blackBoxPremiseOnly
     , consumedByRustRuntimeAdmission := false
     , consumedByLeanRuntimeGate := false

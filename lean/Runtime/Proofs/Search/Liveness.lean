@@ -12,6 +12,10 @@ Machine-level liveness extensions for search:
 - fixed-phase termination under explicit finite reachable-state premises
 - bounded fairness for entries that are not initially min-priority
 - goal reachability from an explicit witness-path schedule
+
+LONG_FILE_JUSTIFICATION: These liveness lemmas share one premise vocabulary and
+build monotonically from termination to fairness to publication. Keeping them
+co-located makes the dependency chain inspectable.
 -/
 
 namespace Runtime

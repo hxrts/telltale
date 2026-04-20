@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Guardrail: ProtocolMachine kernel modules must not call host nondeterministic APIs directly.
 //!
 //! Nondeterminism is required to flow through `EffectHandler` so cross-target

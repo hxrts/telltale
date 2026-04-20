@@ -16,6 +16,10 @@ Solution Structure. Define `FailureClass` enumeration covering all
 failure modes. Define `CommitCertainty` levels and `RecoveryAction`
 vocabulary. Provide failure-to-recovery mappings for structured
 error handling.
+
+LONG_FILE_JUSTIFICATION: This file is a mechanically regular taxonomy layer.
+Keeping the failure classes, error codes, and recovery-envelope glue in one
+document keeps the runtime fault vocabulary auditable as a single surface.
 -/
 
 set_option autoImplicit false

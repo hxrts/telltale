@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Unknown opcode rejection tests.
 
 use wasm_bindgen_test::wasm_bindgen_test;

@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 //! Property-based invariant tests for ProtocolMachine conformance.
 #![allow(

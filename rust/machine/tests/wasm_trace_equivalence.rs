@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Wasm trace equivalence tests.
 #![cfg(target_arch = "wasm32")]
 

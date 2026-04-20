@@ -207,7 +207,7 @@ mod tests {
     fn test_untrusted_validate_correct() {
         let global = simple_global();
         let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
-            .unwrap()
+            .expect("projection should succeed for a well-formed test global")
             .into_iter()
             .collect();
         let image = UntrustedImage::from_local_types(&projected, &global);
@@ -262,7 +262,7 @@ mod tests {
     fn test_trusted_and_untrusted_validated_images_match() {
         let global = simple_global();
         let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
-            .unwrap()
+            .expect("projection should succeed for a well-formed test global")
             .into_iter()
             .collect();
 
@@ -280,7 +280,7 @@ mod tests {
     fn test_validate_ignores_untrusted_program_payload_and_recompiles() {
         let global = simple_global();
         let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
-            .unwrap()
+            .expect("projection should succeed for a well-formed test global")
             .into_iter()
             .collect();
 
@@ -305,7 +305,7 @@ mod tests {
     fn test_trusted_runtime_shape_rejects_program_local_type_role_mismatch() {
         let global = simple_global();
         let projected: BTreeMap<_, _> = telltale_theory::projection::project_all(&global)
-            .unwrap()
+            .expect("projection should succeed for a well-formed test global")
             .into_iter()
             .collect();
         let mut image = CodeImage::from_local_types(&projected, &global);

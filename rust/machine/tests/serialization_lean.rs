@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 //! Serialization/schema conformance for strict Lean value surface.
 
 use std::collections::BTreeSet;

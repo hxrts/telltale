@@ -40,11 +40,11 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    16 |   2,193 | Transported theorems (queueing, large deviations, mixing)  |
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
-| Distributed    |    59 |   7,266 | Distributed assumptions, validation, FLP/CAP theorem packaging |
+| Distributed    |    64 |   8,587 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,133 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   199 |  38,513 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   199 |  38,636 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **679** | **138,125** |                                                            |
+| **Total**      | **684** | **139,569** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**

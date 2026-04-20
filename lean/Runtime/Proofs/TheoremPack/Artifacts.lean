@@ -14,6 +14,10 @@ the protocol structure and its correctness proof in a uniform format.
 Solution Structure. Define artifact structures for each theorem family:
 `FLPLowerBoundArtifact`, `CAPImpossibilityArtifact`, `QuorumGeometry-
 Artifact`, etc. Each bundles the protocol model with its proof term.
+
+LONG_FILE_JUSTIFICATION: The theorem-pack artifact layer is a schema surface.
+Keeping the artifact records in one file makes the exported certificate schema
+reviewable without chasing re-exports across helper modules.
 -/
 
 set_option autoImplicit false
@@ -280,6 +284,20 @@ structure CoordinationArtifact where
   characterization :
     Distributed.Coordination.CoordinationCharacterization protocol.model
 
+/-! ## Coordination, CALM, and CRDT Monotonicity -/
+
+/-- Packaged CALM characterization artifact. -/
+structure CALMArtifact where
+  protocol : Distributed.Coordination.CoordinationProtocol
+  characterization :
+    Distributed.Coordination.CoordinationCharacterization protocol.model
+  coordinationFreeWhenMonotone :
+    ∀ hMono : protocol.model.monotoneUpdateClass,
+      Distributed.Coordination.CoordinationFreeSafety protocol.model
+  coordinationRequiredWhenNonMonotone :
+    ∀ hNonMono : ¬ protocol.model.monotoneUpdateClass,
+      Distributed.Coordination.CoordinationRequired protocol.model
+
 /-! ## Data Availability and Coordination -/
 
 /-- Packaged CRDT theorem-family artifact. -/
@@ -324,6 +342,24 @@ structure CRDTArtifact where
   hcrdtDynamics : Distributed.CRDT.HcrdtDynamics protocol.model
   hcrdtExtensions : Distributed.CRDT.HcrdtExtensions protocol.model
   hcrdtLimits : Distributed.CRDT.HcrdtLimits protocol.model
+
+-- Packaged CRDT monotonicity artifact surfaced independently in theorem packs.
+/-- Packaged CRDT monotonicity artifact. -/
+structure CRDTMonotonicityArtifact where
+  protocol : Distributed.CRDT.CRDTProtocol
+  semilatticeCore : protocol.model.semilatticeCoreClass
+  opContextLayer : protocol.model.opContextLayerClass
+  approximationMonotonicity :
+    Distributed.CRDT.ApproximationMonotoneUnderPolicyTightening
+      protocol.model protocol.premises.approxPolicy protocol.premises.approxPolicy
+      protocol.premises.horizon protocol.premises.epsilon
+      protocol.premises.referenceRun protocol.premises.deployedRun
+  hcrdtCore : Distributed.CRDT.HcrdtCore protocol.model
+
+/-- Packaged triangle-of-forgetting impossibility artifact. -/
+structure TriangleOfForgettingArtifact where
+  protocol : Distributed.TriangleOfForgetting.ImpossibilityProtocol
+  proof : ¬ Distributed.TriangleOfForgetting.TriangleGuarantee protocol.model
 
 /-! ## Byzantine and Consensus Envelope Families -/
 

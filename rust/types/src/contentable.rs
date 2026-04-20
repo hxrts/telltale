@@ -16,8 +16,8 @@
 //! # Serialization Formats
 //!
 //! - **JSON** (default): Simple and human-readable. Uses `to_bytes`/`from_bytes`.
-//! - **DAG-CBOR** (with `dag-cbor` feature): Compact binary format compatible
-//!   with IPLD/IPFS. Uses `to_cbor_bytes`/`from_cbor_bytes`.
+//! - **DAG-CBOR** (with `dag-cbor` feature): Compact binary format with a
+//!   canonical CBOR backend. Uses `to_cbor_bytes`/`from_cbor_bytes`.
 //!
 //! # Lean Correspondence
 //!
@@ -29,6 +29,12 @@ use crate::content_id::Sha256Hasher;
 use crate::content_id::{Blake3Hasher, ContentId, DefaultContentHasher, Hasher};
 use crate::de_bruijn::{GlobalTypeDB, LocalTypeRDB};
 use crate::{GlobalType, Label, LocalTypeR, PayloadSort};
+#[cfg(feature = "dag-cbor")]
+use ciborium::{
+    de::from_reader as cbor_from_reader,
+    ser::into_writer as cbor_into_writer,
+    value::{CanonicalValue, Value as CborValue},
+};
 use serde::{de::DeserializeOwned, Serialize};
 
 /// Trait for types with canonical serialization.
@@ -87,7 +93,7 @@ pub trait Contentable: Sized {
     /// Serialize to DAG-CBOR bytes (requires `dag-cbor` feature).
     ///
     /// DAG-CBOR is a deterministic subset of CBOR designed for content addressing.
-    /// It produces more compact output than JSON and is compatible with IPLD/IPFS.
+    /// It produces more compact output than JSON while preserving canonical bytes.
     ///
     /// # Errors
     ///
@@ -182,7 +188,7 @@ pub trait Contentable: Sized {
     /// Compute content ID from DAG-CBOR bytes (requires `dag-cbor` feature).
     ///
     /// This produces a different content ID than the JSON-based methods.
-    /// Use this for IPLD/IPFS compatibility.
+    /// Use this when the binary canonical encoding matters.
     ///
     /// # Errors
     ///
@@ -286,14 +292,79 @@ struct LocalTemplateEnvelope {
 // Helper for DAG-CBOR serialization (requires dag-cbor feature)
 #[cfg(feature = "dag-cbor")]
 fn to_cbor_bytes_impl<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableError> {
-    serde_ipld_dagcbor::to_vec(value)
-        .map_err(|e| ContentableError::SerializationFailed(format!("dag-cbor: {e}")))
+    let value = CborValue::serialized(value).map_err(|e| {
+        ContentableError::SerializationFailed(format!("dag-cbor serialize value: {e}"))
+    })?;
+    let value = canonicalize_cbor_value(value)?;
+    let mut bytes = Vec::new();
+    cbor_into_writer(&value, &mut bytes)
+        .map_err(|e| ContentableError::SerializationFailed(format!("dag-cbor encode: {e}")))?;
+    Ok(bytes)
 }
 
 #[cfg(feature = "dag-cbor")]
 fn from_cbor_bytes_impl<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
-    serde_ipld_dagcbor::from_slice(bytes)
+    let value: CborValue = cbor_from_reader(bytes)
+        .map_err(|e| ContentableError::DeserializationFailed(format!("dag-cbor decode: {e}")))?;
+    let value = canonicalize_cbor_value(value)?;
+    value
+        .deserialized()
         .map_err(|e| ContentableError::DeserializationFailed(format!("dag-cbor: {e}")))
+}
+
+#[cfg(feature = "dag-cbor")]
+fn canonicalize_cbor_value(value: CborValue) -> Result<CborValue, ContentableError> {
+    match value {
+        CborValue::Integer(_)
+        | CborValue::Bytes(_)
+        | CborValue::Float(_)
+        | CborValue::Text(_)
+        | CborValue::Bool(_)
+        | CborValue::Null => Ok(value),
+        CborValue::Tag(tag, _) => Err(ContentableError::InvalidFormat(format!(
+            "unsupported DAG-CBOR tag: {tag}"
+        ))),
+        CborValue::Array(values) => values
+            .into_iter()
+            .map(canonicalize_cbor_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map(CborValue::Array),
+        CborValue::Map(entries) => canonicalize_cbor_map(entries),
+        other => Err(ContentableError::InvalidFormat(format!(
+            "unsupported DAG-CBOR value variant: {other:?}"
+        ))),
+    }
+}
+
+#[cfg(feature = "dag-cbor")]
+fn canonicalize_cbor_map(
+    entries: Vec<(CborValue, CborValue)>,
+) -> Result<CborValue, ContentableError> {
+    let mut canonical_entries = entries
+        .into_iter()
+        .map(|(key, value)| {
+            Ok((
+                canonicalize_cbor_value(key)?,
+                canonicalize_cbor_value(value)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, ContentableError>>()?;
+
+    canonical_entries.sort_by(|(left, _), (right, _)| {
+        CanonicalValue::from(left.clone()).cmp(&CanonicalValue::from(right.clone()))
+    });
+
+    for pair in canonical_entries.windows(2) {
+        let left = CanonicalValue::from(pair[0].0.clone());
+        let right = CanonicalValue::from(pair[1].0.clone());
+        if left == right {
+            return Err(ContentableError::InvalidFormat(
+                "DAG-CBOR map contains duplicate canonical keys".to_string(),
+            ));
+        }
+    }
+
+    Ok(CborValue::Map(canonical_entries))
 }
 
 // ============================================================================

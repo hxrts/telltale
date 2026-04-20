@@ -215,6 +215,15 @@ def ProtocolMachineInvariantSpaceWithProfiles.withCRDT
   ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with crdt? := some p })
 
+/-- Attach a triangle-of-forgetting distributed profile to a combined space. -/
+def ProtocolMachineInvariantSpaceWithProfiles.withTriangleOfForgetting
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.TriangleOfForgettingProfile) :
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with triangleOfForgetting? := some p })
+
 /-- Attach a Byzantine-safety distributed profile to a combined space. -/
 def ProtocolMachineInvariantSpaceWithProfiles.withByzantineSafety
     {store₀ : SessionStore ν} {State : Type v}

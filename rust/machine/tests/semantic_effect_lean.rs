@@ -1,3 +1,4 @@
+#![allow(missing_docs)]
 #![cfg(not(target_arch = "wasm32"))]
 #![allow(clippy::expect_used)]
 //! Reduced semantic-effect parity checks against Lean fixtures.
