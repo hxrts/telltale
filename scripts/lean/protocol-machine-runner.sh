@@ -6,7 +6,9 @@ LEAN_DIR="${ROOT_DIR}/lean"
 STRICT_TMPDIR="${ROOT_DIR}/.tmp/protocol-machine-runner"
 
 mkdir -p "${STRICT_TMPDIR}"
-export TMPDIR="${TMPDIR:-${STRICT_TMPDIR}}"
+export TMPDIR="${STRICT_TMPDIR}"
+export TMP="${STRICT_TMPDIR}"
+export TEMP="${STRICT_TMPDIR}"
 
 cd "${LEAN_DIR}"
 exec lake env lean --run Runtime/Tests/ProtocolMachineRunner.lean "$@"
