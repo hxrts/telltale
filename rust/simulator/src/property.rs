@@ -389,15 +389,15 @@ impl PropertyMonitor {
 
         for (idx, prop) in self.properties.iter().enumerate() {
             match (&prop, &mut self.states[idx]) {
-                (Property::NoFaults, PropertyState::Invariant { violated }) => {
-                    if !*violated && !check_no_faults(ctx) {
-                        *violated = true;
-                        self.violations.push(PropertyViolation {
-                            property_name: prop.name(),
-                            tick: ctx.tick,
-                            details: "faulted coroutine detected".into(),
-                        });
-                    }
+                (Property::NoFaults, PropertyState::Invariant { violated })
+                    if !*violated && !check_no_faults(ctx) =>
+                {
+                    *violated = true;
+                    self.violations.push(PropertyViolation {
+                        property_name: prop.name(),
+                        tick: ctx.tick,
+                        details: "faulted coroutine detected".into(),
+                    });
                 }
                 (Property::Simplex, PropertyState::Invariant { violated })
                     if !*violated && !check_simplex(ctx) =>
