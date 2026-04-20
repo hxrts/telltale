@@ -1,6 +1,6 @@
 [package]
 name = "telltale"
-version = "14.0.0"
+version = "15.0.0"
 authors = ["Zak Cutner <me@zakcutner.uk>", "Sam Hart <sam@hxrts.com>"]
 edition = "2021"
 rust-version = "1.75"
@@ -43,11 +43,11 @@ futures = { workspace = true }
 time = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
-telltale-macros = { path = "rust/macros", version = "14.0.0" }
-telltale-machine = { path = "rust/machine", version = "14.0.0" }
-telltale-language = { path = "rust/language", version = "14.0.0" }
-telltale-types = { path = "rust/types", version = "14.0.0" }
-telltale-theory = { path = "rust/theory", version = "14.0.0", optional = true }
+telltale-macros = { path = "rust/macros", version = "15.0.0" }
+telltale-machine = { path = "rust/machine", version = "15.0.0" }
+telltale-language = { path = "rust/language", version = "15.0.0" }
+telltale-types = { path = "rust/types", version = "15.0.0" }
+telltale-theory = { path = "rust/theory", version = "15.0.0", optional = true }
 thiserror = { workspace = true }
 anyhow = { workspace = true }
 async-trait = { workspace = true }
@@ -85,7 +85,7 @@ proptest = { workspace = true }
 anyhow = { workspace = true }
 tracing-subscriber = { workspace = true }
 # For examples
-telltale-theory = { path = "rust/theory", version = "14.0.0" }
+telltale-theory = { path = "rust/theory", version = "15.0.0" }
 serde_json = { workspace = true }
 
 [features]
