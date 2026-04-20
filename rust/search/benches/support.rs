@@ -477,11 +477,7 @@ where
     let mut schedule_index = 0usize;
     let mut phase_steps = 0u64;
 
-    loop {
-        let Some(batch) = machine.next_batch() else {
-            break;
-        };
-
+    while let Some(batch) = machine.next_batch() {
         let mut proposals = executor
             .generate(&domain_for_executor, &batch, machine.query())
             .expect("profiled benchmark search run");
