@@ -19,7 +19,12 @@ pub fn run(repo_root: &Path) -> Result<()> {
 
     println!("build strict Lean verification binaries");
     let status = Command::new("lake")
-        .args(["build", "telltale_validator"])
+        .args([
+            "build",
+            "telltale_validator",
+            "Runtime.Tests.ProtocolMachineRunner",
+            "Runtime.Tests.ProtocolMachineValidator",
+        ])
         .arg("--dir")
         .arg(&lean_dir)
         .env("LEAN_NUM_THREADS", &lean_threads)
