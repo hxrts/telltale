@@ -33,23 +33,29 @@ pub fn run(repo_root: &Path) -> Result<()> {
     if !runner_script.is_file() {
         bail!("lean-bridge-strict: protocol-machine runner fallback script missing");
     }
-    prewarm_json_entrypoint(
+    if let Err(err) = prewarm_json_entrypoint(
         &runner_script,
         "{\"operation\":\"validateTrace\",\"payload\":{\"choreographies\":[],\"trace\":[]}}",
         "protocol-machine runner",
         repo_root,
-    )?;
+    ) {
+        eprintln!("{err:#}");
+        eprintln!("lean-bridge-strict: continuing after protocol-machine runner prewarm miss");
+    }
 
     let validator_script = repo_root.join("scripts/lean/protocol-machine-validator.sh");
     if !validator_script.is_file() {
         bail!("lean-bridge-strict: protocol-machine validator fallback script missing");
     }
-    prewarm_json_entrypoint(
+    if let Err(err) = prewarm_json_entrypoint(
         &validator_script,
         "{\"operation\":\"verifyProtocolBundle\",\"payload\":{\"claims\":{}}}",
         "protocol-machine validator",
         repo_root,
-    )?;
+    ) {
+        eprintln!("{err:#}");
+        eprintln!("lean-bridge-strict: continuing after protocol-machine validator prewarm miss");
+    }
 
     let strict_suites: &[(&[&str], &[(&str, &str)])] = &[
         (
