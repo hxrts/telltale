@@ -29,6 +29,8 @@ Solution Structure. We define:
 
 namespace ProtocolClassical
 
+variable [EntropyAPI.AnalysisLaws]
+
 /-! ## Foster-Lyapunov State and Assumptions -/
 
 /-- Coherence-projected state space used for 3.9.1 transport instantiation.

@@ -30,6 +30,7 @@ universe u v
 section
 
 variable {ν : Type u} [VerificationModel ν]
+variable [EntropyAPI.AnalysisLaws]
 
 /-! ## Semantic Object Artifact Family -/
 

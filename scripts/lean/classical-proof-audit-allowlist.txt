@@ -1,0 +1,23 @@
+# Classical proof audit allowlist.
+#
+# Format: one extended regular expression per non-comment line. Each expression
+# is matched against a relative `path:line:content` audit hit.
+#
+# Policy:
+# - Prefer exact file or namespace entries.
+# - Do not allowlist vacuous `True` guarantees.
+# - Do not allowlist theorem-shaped final-result fields in profile records.
+# - External analysis laws belong in explicit API/Instance trust boundaries.
+
+# Existing explicit real-analysis trust boundary documented in lean/CODE_MAP.md.
+^lean/ClassicalAnalysisAPI\.lean:
+^lean/ClassicalAnalysisInstance\.lean:
+^lean/ClassicalAnalysisInstance/
+
+# Non-classical theorem-pack artifact fields share the artifact schema file.
+^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*safeFinality[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*probabilisticSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*settlementFinality[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*accountableSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*byzantineSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*recoveryActionSafety[[:space:]]*:

@@ -53,20 +53,21 @@ Three inventory keys are derived from other profiles and have no distinct setter
 
 ## Classical Families
 
-Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`. Only Foster carries a per-family setter. Other classical profiles are attached through `withClassicalProfiles`, which replaces the entire `ClassicalProfiles` record on the combined space.
+Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`. Each classical family has a per-family setter on `ProtocolMachineInvariantSpaceWithProfiles`. `withClassicalProfiles` remains available as a batch replacement API when a caller wants to replace the whole `ClassicalProfiles` record.
 
-| Family | Wrapper type | Inventory key |
-|---|---|---|
-| Foster-Lyapunov | `FosterProfile` | `classical_foster` |
-| MaxWeight | `MaxWeightProfile` | `classical_maxweight` |
-| large deviations | `LDPProfile` | `classical_ldp` |
-| mean-field | `MeanFieldProfile` | `classical_mean_field` |
-| heavy-traffic | `HeavyTrafficProfile` | `classical_heavy_traffic` |
-| mixing time | `MixingProfile` | `classical_mixing` |
-| fluid limit | `FluidProfile` | `classical_fluid` |
-| concentration bounds | `ConcentrationProfile` | `classical_concentration` |
-| Little's law | `LittlesLawProfile` | `classical_littles_law` |
-| functional CLT | `FunctionalCLTProfile` | `classical_functional_clt` |
+| Family | Setter | Wrapper type | Inventory key |
+|---|---|---|---|
+| Foster-Lyapunov | `withFoster` | `FosterProfile` | `classical_foster` |
+| MaxWeight | `withMaxWeight` | `MaxWeightProfile` | `classical_maxweight` |
+| large deviations | `withLDP` | `LDPProfile` | `classical_ldp` |
+| mean-field | `withMeanField` | `MeanFieldProfile` | `classical_mean_field` |
+| heavy-traffic | `withHeavyTraffic` | `HeavyTrafficProfile` | `classical_heavy_traffic` |
+| mixing time | `withMixing` | `MixingProfile` | `classical_mixing` |
+| fluid limit | `withFluid` | `FluidProfile` | `classical_fluid` |
+| concentration bounds | `withConcentration` | `ConcentrationProfile` | `classical_concentration` |
+| Little's law | `withLittlesLaw` | `LittlesLawProfile` | `classical_littles_law` |
+| functional CLT | `withFunctionalCLT` | `FunctionalCLTProfile` | `classical_functional_clt` |
+| spectral-gap termination | `withSpectralGap` | `SpectralGapProfile` | `classical_spectral_gap_termination` |
 
 Classical artifacts carry small semantic obligations such as Lyapunov descent, backpressure optimality, or mixing-time bounds. They do not assert stronger system-level claims beyond their declared assumptions.
 

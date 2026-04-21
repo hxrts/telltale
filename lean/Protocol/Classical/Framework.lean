@@ -27,6 +27,8 @@ section
 
 namespace ProtocolClassical
 
+variable [EntropyAPI.AnalysisLaws]
+
 /-- Function-style protocol evolution packaged with transport prerequisites. -/
 structure TransportFramework where
   step : CoherenceState → CoherenceState

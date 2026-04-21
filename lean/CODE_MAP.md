@@ -38,13 +38,13 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | SessionCoTypes |    78 |  16,302 | Coinductive EQ2, bisimulation, duality, async subtyping    |
 | Choreography   |    89 |  19,361 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
-| Classical      |    16 |   2,193 | Transported theorems (queueing, large deviations, mixing)  |
+| Classical      |    17 |   2,439 | Transported theorems (queueing, large deviations, mixing)  |
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
-| Protocol       |   170 |  40,133 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   199 |  38,700 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Protocol       |   170 |  40,152 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |   199 |  39,280 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **700** | **140,761** |                                                            |
+| **Total**      | **701** | **141,606** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**

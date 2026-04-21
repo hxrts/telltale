@@ -284,6 +284,11 @@ pub struct FunctionalCLTConfig {
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+pub struct SpectralGapTerminationConfig {
+    pub enabled: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ClassicalClaims {
     pub foster: Option<FosterConfig>,
     pub max_weight: Option<MaxWeightConfig>,
@@ -295,6 +300,7 @@ pub struct ClassicalClaims {
     pub concentration: Option<ConcentrationConfig>,
     pub littles_law: Option<LittlesLawConfig>,
     pub functional_clt: Option<FunctionalCLTConfig>,
+    pub spectral_gap_termination: Option<SpectralGapTerminationConfig>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

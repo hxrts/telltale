@@ -94,8 +94,8 @@ pub use invariants::{
     NakamotoConfig, PartialSynchronyConfig, PartitionModel, ProtocolBundle,
     ProtocolEnvelopeBridgeConfig, ProtocolMachineEnvelopeAdherenceConfig,
     ProtocolMachineEnvelopeAdmissionConfig, QuorumGeometryConfig, QuorumSystemKind,
-    ReconfigurationConfig, ResponsivenessConfig, SchedulerKind, TimingModel,
-    PROTOCOL_BUNDLE_SCHEMA_VERSION,
+    ReconfigurationConfig, ResponsivenessConfig, SchedulerKind, SpectralGapTerminationConfig,
+    TimingModel, PROTOCOL_BUNDLE_SCHEMA_VERSION,
 };
 pub use protocol_machine_trace::{
     event_session, normalize_semantic_audit, observationally_equivalent, partition_by_session,

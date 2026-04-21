@@ -73,6 +73,8 @@ The theorem program is operationalized through theorem-pack inventory and admiss
 
 Rust admission paths in `rust/machine/src/runtime_contracts.rs` and `rust/machine/src/composition.rs` consume these proof-facing concepts as executable gates.
 
+Classical theorem packs follow the same path: protocol or transport constructors build semantic inputs, runtime adapter profiles attach them to the invariant space, and `buildProtocolMachineTheoremPack` emits artifacts and inventory keys. The current classical keys are documentation-background inventory, not Rust runtime-admission gates, and the real-analysis dependency is isolated behind the named `ClassicalAnalysis` API/Instance boundary.
+
 ## Related Docs
 
 - [Lean Verification](801_lean_verification.md)

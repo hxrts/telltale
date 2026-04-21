@@ -330,6 +330,7 @@ fn documentation_background_transported_theorem_entries() -> Vec<TransportedTheo
         "classical_concentration",
         "classical_littles_law",
         "classical_functional_clt",
+        "classical_spectral_gap_termination",
     ]
     .into_iter()
     .map(|key| boundary_entry(key, DocumentationBackgroundOnly, false, false, None))

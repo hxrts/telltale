@@ -112,7 +112,9 @@ Distributed and classical families are part of the active theorem-pack space. Th
 
 Distributed families include FLP, CAP, quorum geometry, partial synchrony, responsiveness, Nakamoto security, reconfiguration, atomic broadcast, accountable safety, failure detectors, data availability, coordination, CRDT, Byzantine safety, consensus envelope, and failure envelope.
 
-Classical transport families include Foster-Lyapunov, MaxWeight, large deviations, mean-field, heavy-traffic, mixing, fluid limits, concentration bounds, Little's law, and functional CLT.
+Classical transport families include Foster-Lyapunov, MaxWeight, large deviations, mean-field, heavy-traffic, mixing, fluid limits, concentration bounds, Little's law, functional CLT, and spectral-gap termination. The runtime proof-pack path is `Classical.Profiles` / `Protocol.Classical` constructors, `Runtime.Proofs.Adapters.Classical` profiles, `ProtocolMachineInvariantSpaceWithProfiles` setters, and `buildProtocolMachineTheoremPack` artifacts.
+
+Real-analysis facts used by these families remain explicit behind the `ClassicalAnalysisAPI.lean` and `ClassicalAnalysisInstance.lean` trust boundary. The Classical proof audit rejects new theorem-shaped assumptions outside named API/Instance boundaries.
 
 ## Runtime Alignment Lanes
 

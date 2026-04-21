@@ -55,10 +55,12 @@ def wtConfigNMarkovChain (step : FStep) :
 /-- 2.7 task: protocol-level Cheeger inequality over the `WTConfigN` chain. -/
 theorem wt_config_n_cheeger_inequality (step : FStep)
     (hGap : 0 ≤ spectralGap (wtConfigNMarkovChain step))
-    (w : ConductanceWitness (wtConfigNMarkovChain step)) :
+    (w : ConductanceWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
     (conductance (wtConfigNMarkovChain step) w) ^ 2 / 2 ≤
       spectralGap (wtConfigNMarkovChain step) := by
-  simpa using cheeger_inequality (mc := wtConfigNMarkovChain step) hGap w
+  simpa using
+    @cheeger_inequality.{0, 0, 0, 0} WTConfigN inferInstance inferInstance
+      inferInstance (wtConfigNMarkovChain step) hGap w
 
 /-- Strict positivity of protocol spectral gap from `|λ₂| < 1`. -/
 theorem wt_config_n_spectral_gap_pos (step : FStep)
@@ -70,38 +72,42 @@ theorem wt_config_n_spectral_gap_pos (step : FStep)
 
 /-- Existence of a stationary distribution from an explicit protocol witness. -/
 theorem wt_config_n_exists_stationary_dist (step : FStep)
-    (w : StationaryWitness (wtConfigNMarkovChain step)) :
+    (w : StationaryWitness.{0} (wtConfigNMarkovChain step)) :
     ∃ π : WTConfigN → ℝ,
       IsProbabilityDist π ∧ IsStationary (wtConfigNMarkovChain step) π := by
-  simpa using exists_stationary_dist (mc := wtConfigNMarkovChain step) w
+  simpa using
+    @exists_stationary_dist.{0, 0, 0, 0} WTConfigN inferInstance inferInstance
+      (wtConfigNMarkovChain step) w
 
 /-- Hitting-time spectral upper bound specialized to protocol states. -/
 theorem wt_config_n_hitting_time_spectral_bound (step : FStep)
     (hGap : 0 < spectralGap (wtConfigNMarkovChain step))
-    (w : HittingTimeWitness (wtConfigNMarkovChain step)) :
+    (w : HittingTimeWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
     ∀ st, expectedHittingTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
-  simpa using hitting_time_spectral_bound (mc := wtConfigNMarkovChain step) hGap w
+  simpa using
+    @hitting_time_spectral_bound.{0, 0, 0, 0} WTConfigN inferInstance
+      inferInstance inferInstance (wtConfigNMarkovChain step) hGap w
 
 /-- Expected termination-time bound specialized to protocol states. -/
 theorem wt_config_n_expected_termination_bound (step : FStep)
     (hGap : 0 < spectralGap (wtConfigNMarkovChain step))
-    (w : TerminationWitness (wtConfigNMarkovChain step)) :
+    (w : TerminationWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
     ∀ st, expectedTerminationTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
-  simpa using expected_termination_bound (mc := wtConfigNMarkovChain step) hGap w
+  simpa using
+    @expected_termination_bound.{0, 0, 0, 0} WTConfigN inferInstance
+      inferInstance inferInstance (wtConfigNMarkovChain step) hGap w
 
 /-! ## Product-Chain Spectral Gap -/
 
 /-- Independent-session spectral-gap lower bound for two protocol kernels. -/
 theorem wt_config_n_independent_sessions_spectral_gap
     (step₁ step₂ : FStep)
-    (w : IndependentSessionsWitness
+    (w : IndependentSessionsWitness.{0, 0, 0, 0}
       (wtConfigNMarkovChain step₁)
       (wtConfigNMarkovChain step₂)) :
     min (spectralGap (wtConfigNMarkovChain step₁))
         (spectralGap (wtConfigNMarkovChain step₂)) ≤
       spectralGap w.productChain := by
-  simpa using independent_sessions_spectral_gap
-    (mc₁ := wtConfigNMarkovChain step₁)
-    (mc₂ := wtConfigNMarkovChain step₂) w
+  exact w.gap_lower_bound
 
 end ProtocolClassical

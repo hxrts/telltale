@@ -26,6 +26,8 @@ Solution Structure.
 
 namespace ProtocolClassical
 
+variable [EntropyAPI.AnalysisLaws]
+
 /-! ## Mixing-Time Instantiation -/
 
 /-- Protocol-level model for geometric mixing bounds. -/
@@ -122,7 +124,7 @@ def protocolConcentrationWitness (m : ProtocolConcentrationModel) :
 
 /-- Instantiate `ConcentrationInput` from protocol-side model data. -/
 def mkProtocolConcentrationInputFromModel
-    (m : ProtocolConcentrationModel) : ConcentrationInput :=
+    (m : ProtocolConcentrationModel) : Classical.Transport.ConcentrationInput :=
   { p := m.p
     witness := protocolConcentrationWitness m }
 
@@ -179,7 +181,8 @@ structure ProtocolFunctionalCLTModel where
 
 /-- Scaled process for protocol trajectories. -/
 def protocolScaledProcess (m : ProtocolFunctionalCLTModel) : Real :=
-  Classical.FunctionalCLT.scaledProcess (fun _ => m.c) m.c m.N m.t
+  @Classical.FunctionalCLT.scaledProcess.{0, 0, 0, 0} inferInstance
+    (fun _ : Nat => m.c) m.c m.N m.t
 
 /-- Instantiate `FunctionalCLTInput` from protocol model quantities. -/
 def mkProtocolFunctionalCLTInput
@@ -187,7 +190,9 @@ def mkProtocolFunctionalCLTInput
   { c := m.c
     N := m.N
     t := m.t
-    N_ne_zero := m.N_ne_zero }
+    N_ne_zero := m.N_ne_zero
+    path_eq_const := rfl
+    mean_eq_const := rfl }
 
 /-- Centering-at-mean for the protocol scaled process. -/
 theorem protocol_functional_clt_centering (m : ProtocolFunctionalCLTModel) :
@@ -204,14 +209,16 @@ structure ProtocolMeanFieldModel where
 
 /-- Empirical mean over session states. -/
 def protocolEmpiricalMean (m : ProtocolMeanFieldModel) : Real :=
-  Classical.PropagationOfChaos.empiricalMean m.x
+  @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0} m.n inferInstance m.x
 
 /-- Sessions are exchangeable (permutation invariance of empirical mean). -/
 theorem protocol_mean_field_permutation_invariance
     (m : ProtocolMeanFieldModel) :
     ∀ σ : Equiv.Perm (Fin m.n),
-      Classical.PropagationOfChaos.empiricalMean (fun i => m.x (σ i)) =
-        Classical.PropagationOfChaos.empiricalMean m.x := by
+      @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
+          m.n inferInstance (fun i => m.x (σ i)) =
+        @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
+          m.n inferInstance m.x := by
   intro σ
   exact Classical.PropagationOfChaos.empirical_mean_perm (σ := σ) (x := m.x)
 
@@ -227,8 +234,10 @@ theorem protocol_transported_mean_field (m : ProtocolMeanFieldModel) :
 /-- Multi-session scalability analysis contract. -/
 def MultiSessionScalabilityLaw (m : ProtocolMeanFieldModel) : Prop :=
   ∀ σ : Equiv.Perm (Fin m.n),
-    Classical.PropagationOfChaos.empiricalMean (fun i => m.x (σ i)) =
-      Classical.PropagationOfChaos.empiricalMean m.x
+    @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
+        m.n inferInstance (fun i => m.x (σ i)) =
+      @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
+        m.n inferInstance m.x
 
 theorem protocol_multi_session_scalability (m : ProtocolMeanFieldModel) :
     MultiSessionScalabilityLaw m := by

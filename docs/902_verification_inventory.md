@@ -17,8 +17,8 @@ The numeric rows in this section are source-derived and checked by
 
 | Metric | Value | Source |
 |---|---:|---|
-| Lean core-library files | 700 | `lean/CODE_MAP.md` total row |
-| Lean core-library lines | 140,761 | `lean/CODE_MAP.md` total row |
+| Lean core-library files | 701 | `lean/CODE_MAP.md` total row |
+| Lean core-library lines | 141,606 | `lean/CODE_MAP.md` total row |
 | Lean-backed search fairness inventory entries | 56 | `lean/Runtime/Proofs/Search/Inventory.lean` |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
@@ -268,6 +268,7 @@ The current trusted computing base for the public claim is:
 |---|---|---|
 | Lean kernel and imported proof libraries | theorem checker and proof environment | Lean build + code map + proof targets |
 | Lean model definitions | theorems are only as correct as the modeled semantics | Lean proof suites and docs inventory |
+| Classical real-analysis API | external analytic laws used by transported classical families | `ClassicalAnalysisAPI.lean`, `ClassicalAnalysisInstance.lean`, and `scripts/lean/check-classical-proof-audit.sh` |
 | Rust/Lean bridge normalization and interchange | comparison/equality surface between Rust and Lean | `just check-bridge-normalization`, strict correspondence suites |
 | Rust runtime implementation | shipped executable semantics are still comparison-checked, not fully proved | strict correspondence, semantic assurance, refinement slice |
 | First-party handlers/transports | external impurity boundary for the runtime | handler-contract, transport-contract, and runtime-boundary suites |

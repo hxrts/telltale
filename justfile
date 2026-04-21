@@ -123,6 +123,7 @@ ci-dry-run lane="fast":
     just telltale-lean-check-failing
     just check-parity
     just check-capability-gates
+    just reclaim-build-space-if-needed 10000
     # Benchmark target compilation checks
     just bench-check
     if [[ "{{lane}}" == "full" ]]; then
@@ -166,6 +167,7 @@ check-pr-critical-core:
     just check-ownership-contracts
     just check-aura-borrowed-lints
     just check-capability-gates
+    just reclaim-build-space-if-needed 10000
     just check-release-conformance
     just verify-lean-protocol-machine-targets
     just verify-protocols
@@ -210,6 +212,7 @@ check-fast-structure:
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
     just check-lean-metrics
+    ./scripts/lean/check-classical-proof-audit.sh
     just check-tooling-convergence
     just check-lean-prebuilt
     just check-lean-dependency-pins
@@ -334,9 +337,13 @@ reclaim-build-space-if-needed min_free_mb="2048":
     set -euo pipefail
     free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
     if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
-      echo "Low disk space (${free_mb}MB free); reclaiming Cargo build artifacts"
-      rm -rf .tmp target/capability-gates
-      cargo clean
+      echo "Low disk space (${free_mb}MB free); reclaiming auxiliary Cargo build artifacts"
+      rm -rf .tmp target/capability-gates target/tests
+      free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
+      if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
+        echo "Still low disk space (${free_mb}MB free); running cargo clean"
+        cargo clean
+      fi
     fi
 
 # Run the deterministic extension statement parsing/dispatch regression suites.
