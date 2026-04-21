@@ -7,7 +7,7 @@ use crate::config::TcpTransportConfig;
 const ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 use std::time::Duration;
 use telltale_runtime::{
@@ -30,7 +30,7 @@ fn scale_duration_by_fixed(duration: Duration, factor: FixedQ32) -> Duration {
     }
 
     let duration_nanos = duration.as_nanos();
-    let factor_bits = u128::try_from(factor.to_bits()).unwrap_or_default();
+    let factor_bits = u128::try_from(factor.to_bits().max(0)).unwrap_or_default();
     let scaled = duration_nanos
         .saturating_mul(factor_bits)
         .checked_shr(FixedQ32::FRACTIONAL_BITS)
@@ -81,6 +81,8 @@ pub struct TcpTransport {
     accept_task: Arc<Mutex<Option<JoinHandle<()>>>>,
     /// Active connection tasks.
     connection_tasks: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// Peer roles with currently live inbound connections.
+    claimed_inbound_roles: Arc<Mutex<BTreeSet<String>>>,
 }
 
 impl TcpTransport {
@@ -95,6 +97,7 @@ impl TcpTransport {
             shutdown_tx: Arc::new(Mutex::new(None)),
             accept_task: Arc::new(Mutex::new(None)),
             connection_tasks: Arc::new(Mutex::new(Vec::new())),
+            claimed_inbound_roles: Arc::new(Mutex::new(BTreeSet::new())),
         }
     }
 
@@ -141,10 +144,13 @@ impl TcpTransport {
         mut shutdown_rx: mpsc::Receiver<()>,
     ) -> JoinHandle<()> {
         let incoming_senders = Arc::clone(&self.incoming_senders);
+        let claimed_roles = Arc::clone(&self.claimed_inbound_roles);
         let state = Arc::clone(&self.state);
         let connection_tasks = Arc::clone(&self.connection_tasks);
         let role = self.config.role.clone();
         let buffer_size = self.config.buffer_size;
+        let max_connections = self.config.max_connections;
+        let read_timeout = self.config.read_timeout;
 
         tokio::spawn(async move {
             loop {
@@ -154,15 +160,31 @@ impl TcpTransport {
                         match accept_result {
                             Ok((stream, addr)) => {
                                 debug!(peer_addr = %addr, "Accepted connection");
+                                let mut tasks = connection_tasks.lock().await;
+                                tasks.retain(|join_handle| !join_handle.is_finished());
+                                if tasks.len() >= max_connections {
+                                    warn!(
+                                        peer_addr = %addr,
+                                        max_connections,
+                                        "Rejecting connection because max_connections is reached"
+                                    );
+                                    continue;
+                                }
                                 let senders = Arc::clone(&incoming_senders);
+                                let claims = Arc::clone(&claimed_roles);
                                 let role_name = role.clone();
                                 let task = tokio::spawn(async move {
-                                    if let Err(e) = handle_connection(stream, senders, &role_name, buffer_size).await {
+                                    if let Err(e) = handle_connection(
+                                        stream,
+                                        senders,
+                                        claims,
+                                        &role_name,
+                                        buffer_size,
+                                        read_timeout,
+                                    ).await {
                                         warn!(error = %e, "Connection handler error");
                                     }
                                 });
-                                let mut tasks = connection_tasks.lock().await;
-                                tasks.retain(|join_handle| !join_handle.is_finished());
                                 tasks.push(task);
                             }
                             Err(e) => {
@@ -245,9 +267,10 @@ impl TcpTransport {
                             "Role name exceeds u32 length prefix".to_string(),
                         )
                     })?;
-                    stream.write_all(&len.to_be_bytes()).await?;
-                    stream.write_all(role_bytes).await?;
-                    stream.flush().await?;
+                    write_all_timeout(&mut stream, &len.to_be_bytes(), self.config.write_timeout)
+                        .await?;
+                    write_all_timeout(&mut stream, role_bytes, self.config.write_timeout).await?;
+                    flush_timeout(&mut stream, self.config.write_timeout).await?;
 
                     info!(peer = peer_role, addr = %addr, "Connected to peer");
                     self.outgoing
@@ -319,12 +342,14 @@ impl DocumentedTransportContract for TcpTransport {
 async fn handle_connection(
     mut stream: TcpStream,
     senders: Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
+    claimed_roles: Arc<Mutex<BTreeSet<String>>>,
     local_role: &str,
     _buffer_size: QueueCapacity,
+    read_timeout: Duration,
 ) -> TcpResult<()> {
     // Read peer's role name
     let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf).await?;
+    read_exact_timeout(&mut stream, &mut len_buf, read_timeout).await?;
     let len = usize::try_from(u32::from_be_bytes(len_buf))
         .map_err(|_| TcpTransportError::InvalidMessage("Invalid role name length".to_string()))?;
 
@@ -335,7 +360,7 @@ async fn handle_connection(
     }
 
     let mut role_buf = vec![0u8; len];
-    stream.read_exact(&mut role_buf).await?;
+    read_exact_timeout(&mut stream, &mut role_buf, read_timeout).await?;
     let peer_role = String::from_utf8(role_buf)
         .map_err(|e| TcpTransportError::InvalidMessage(format!("Invalid role name: {}", e)))?;
 
@@ -345,32 +370,73 @@ async fn handle_connection(
         warn!(peer = %peer_role, local = local_role, "Unknown peer attempted connection");
         return Err(TcpTransportError::UnknownPeer(peer_role));
     };
+    claim_peer_role(&claimed_roles, &peer_role).await?;
+    let result = async {
+        loop {
+            // forever: reads messages until connection closed (EOF) or error
+            let mut len_buf = [0u8; 4];
+            match read_exact_timeout(&mut stream, &mut len_buf, read_timeout).await {
+                Ok(_) => {}
+                Err(TcpTransportError::Io(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+                    debug!(peer = %peer_role, "Connection closed by peer");
+                    break;
+                }
+                Err(e) => return Err(e),
+            }
+            let len = u32::from_be_bytes(len_buf);
+            let len = MessageLenBytes::try_new(len)
+                .map_err(|e| TcpTransportError::InvalidMessage(e.to_string()))?;
 
-    loop {
-        // forever: reads messages until connection closed (EOF) or error
-        let mut len_buf = [0u8; 4];
-        match stream.read_exact(&mut len_buf).await {
-            Ok(_) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                debug!(peer = %peer_role, "Connection closed by peer");
+            let mut payload = vec![0u8; len.as_usize()];
+            read_exact_timeout(&mut stream, &mut payload, read_timeout).await?;
+
+            if sender.send(payload).await.is_err() {
+                debug!(peer = %peer_role, "Receiver dropped");
                 break;
             }
-            Err(e) => return Err(e.into()),
         }
-        let len = u32::from_be_bytes(len_buf);
-        let len = MessageLenBytes::try_new(len)
-            .map_err(|e| TcpTransportError::InvalidMessage(e.to_string()))?;
-
-        let mut payload = vec![0u8; len.as_usize()];
-        stream.read_exact(&mut payload).await?;
-
-        if sender.send(payload).await.is_err() {
-            debug!(peer = %peer_role, "Receiver dropped");
-            break;
-        }
+        Ok(())
     }
+    .await;
+    claimed_roles.lock().await.remove(&peer_role);
+    result
+}
 
+async fn claim_peer_role(
+    claimed_roles: &Arc<Mutex<BTreeSet<String>>>,
+    peer_role: &str,
+) -> TcpResult<()> {
+    let mut claimed = claimed_roles.lock().await;
+    if !claimed.insert(peer_role.to_string()) {
+        return Err(TcpTransportError::DuplicatePeer(peer_role.to_string()));
+    }
     Ok(())
+}
+
+async fn read_exact_timeout(
+    stream: &mut TcpStream,
+    buf: &mut [u8],
+    timeout: Duration,
+) -> TcpResult<()> {
+    tokio::time::timeout(timeout, stream.read_exact(buf))
+        .await
+        .map_err(|_| TcpTransportError::Timeout)?
+        .map(|_| ())
+        .map_err(Into::into)
+}
+
+async fn write_all_timeout(stream: &mut TcpStream, buf: &[u8], timeout: Duration) -> TcpResult<()> {
+    tokio::time::timeout(timeout, stream.write_all(buf))
+        .await
+        .map_err(|_| TcpTransportError::Timeout)?
+        .map_err(Into::into)
+}
+
+async fn flush_timeout(stream: &mut TcpStream, timeout: Duration) -> TcpResult<()> {
+    tokio::time::timeout(timeout, stream.flush())
+        .await
+        .map_err(|_| TcpTransportError::Timeout)?
+        .map_err(Into::into)
 }
 
 #[allow(clippy::type_complexity)]
@@ -401,18 +467,19 @@ impl Transport for TcpTransport {
         // Write length prefix
         let len = MessageLenBytes::try_from(message.len())
             .map_err(|e| TransportError::SendFailed(e.to_string()))?;
-        stream
-            .write_all(&len.get().to_be_bytes())
-            .await
-            .map_err(|e| TransportError::SendFailed(e.to_string()))?;
+        write_all_timeout(
+            &mut stream,
+            &len.get().to_be_bytes(),
+            self.config.write_timeout,
+        )
+        .await
+        .map_err(|e| TransportError::SendFailed(e.to_string()))?;
 
         // Write payload
-        stream
-            .write_all(&message)
+        write_all_timeout(&mut stream, &message, self.config.write_timeout)
             .await
             .map_err(|e| TransportError::SendFailed(e.to_string()))?;
-        stream
-            .flush()
+        flush_timeout(&mut stream, self.config.write_timeout)
             .await
             .map_err(|e| TransportError::SendFailed(e.to_string()))?;
 
@@ -474,6 +541,7 @@ impl Transport for TcpTransport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::SocketAddr;
 
     #[tokio::test]
     async fn test_transport_state_transitions() {
@@ -550,5 +618,103 @@ mod tests {
             config.peers.get("Dave"),
             Some(&"[fe80::1]:3000".to_string())
         );
+    }
+
+    #[test]
+    fn scale_duration_negative_factor_preserves_duration() {
+        let duration = Duration::from_millis(25);
+        let factor = FixedQ32::from_ratio(-1, 1).expect("negative fixed factor");
+        assert_eq!(scale_duration_by_fixed(duration, factor), duration);
+    }
+
+    async fn connect_and_claim_role(addr: SocketAddr, role: &str) -> TcpStream {
+        let mut stream = TcpStream::connect(addr).await.expect("connect test client");
+        let role_bytes = role.as_bytes();
+        let role_len = u32::try_from(role_bytes.len()).expect("test role length fits u32");
+        stream
+            .write_all(&role_len.to_be_bytes())
+            .await
+            .expect("write role length");
+        stream
+            .write_all(role_bytes)
+            .await
+            .expect("write role bytes");
+        stream.flush().await.expect("flush role claim");
+        stream
+    }
+
+    #[tokio::test]
+    async fn duplicate_live_role_claim_is_rejected() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("test listener address");
+
+        let (tx, _rx) = mpsc::channel(4);
+        let senders = Arc::new(Mutex::new(BTreeMap::from([("Bob".to_string(), tx)])));
+        let claimed_roles = Arc::new(Mutex::new(BTreeSet::new()));
+        let read_timeout = Duration::from_secs(5);
+        let buffer_size = QueueCapacity::try_new(4).expect("test queue capacity");
+
+        let first_senders = Arc::clone(&senders);
+        let first_claims = Arc::clone(&claimed_roles);
+        let first_accept = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept first client");
+            handle_connection(
+                stream,
+                first_senders,
+                first_claims,
+                "Alice",
+                buffer_size,
+                read_timeout,
+            )
+            .await
+        });
+
+        let first_client = connect_and_claim_role(addr, "Bob").await;
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if claimed_roles.lock().await.contains("Bob") {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("first role claim should become active");
+
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind second test listener");
+        let second_addr = listener.local_addr().expect("second listener address");
+        let second_senders = Arc::clone(&senders);
+        let second_claims = Arc::clone(&claimed_roles);
+        let second_accept = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept second client");
+            handle_connection(
+                stream,
+                second_senders,
+                second_claims,
+                "Alice",
+                buffer_size,
+                read_timeout,
+            )
+            .await
+        });
+
+        let _second_client = connect_and_claim_role(second_addr, "Bob").await;
+        let err = tokio::time::timeout(Duration::from_secs(1), second_accept)
+            .await
+            .expect("duplicate role claim should finish promptly")
+            .expect("duplicate handler task should not panic")
+            .expect_err("duplicate role claim must fail");
+        assert!(matches!(err, TcpTransportError::DuplicatePeer(role) if role == "Bob"));
+
+        drop(first_client);
+        tokio::time::timeout(Duration::from_secs(1), first_accept)
+            .await
+            .expect("first connection should close promptly")
+            .expect("first handler task should not panic")
+            .expect("first handler should close cleanly");
     }
 }

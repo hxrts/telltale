@@ -23,6 +23,10 @@ pub enum TcpTransportError {
     #[error("unknown peer: {0}")]
     UnknownPeer(String),
 
+    /// Peer role already has a live inbound connection.
+    #[error("duplicate peer connection: {0}")]
+    DuplicatePeer(String),
+
     /// Transport not started.
     #[error("transport not started")]
     NotStarted,

@@ -7,6 +7,9 @@ use serde_json::Value;
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort, ValType};
 use thiserror::Error;
 
+pub const MAX_BRIDGE_JSON_BYTES: usize = 8 * 1024 * 1024;
+pub const MAX_BRIDGE_JSON_DEPTH: usize = 256;
+
 /// Errors that can occur during JSON import.
 #[derive(Debug, Error)]
 pub enum ImportError {
@@ -30,6 +33,21 @@ pub enum ImportError {
 
     #[error("Unexpected field '{field}' in {context}")]
     UnexpectedField { context: String, field: String },
+
+    #[error("Input too large: {0}")]
+    InputTooLarge(String),
+
+    #[error("Input too deep: {0}")]
+    InputTooDeep(String),
+}
+
+fn check_depth(depth: usize) -> Result<(), ImportError> {
+    if depth > MAX_BRIDGE_JSON_DEPTH {
+        return Err(ImportError::InputTooDeep(format!(
+            "JSON type depth exceeds {MAX_BRIDGE_JSON_DEPTH}"
+        )));
+    }
+    Ok(())
 }
 
 fn ensure_only_fields(json: &Value, context: &str, allowed: &[&str]) -> Result<(), ImportError> {
@@ -68,7 +86,7 @@ fn required_array<'a>(json: &'a Value, field: &str) -> Result<&'a [Value], Impor
         .ok_or_else(|| ImportError::ExpectedArray(value.to_string()))
 }
 
-fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
+fn parse_global_comm(json: &Value, depth: usize) -> Result<GlobalType, ImportError> {
     ensure_only_fields(
         json,
         "global comm",
@@ -76,7 +94,7 @@ fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
     )?;
     let sender = required_str(json, "sender")?;
     let receiver = required_str(json, "receiver")?;
-    let branches = parse_global_branches(required_array(json, "branches")?)?;
+    let branches = parse_global_branches(required_array(json, "branches")?, depth + 1)?;
     Ok(GlobalType::Comm {
         sender,
         receiver,
@@ -84,7 +102,11 @@ fn parse_global_comm(json: &Value) -> Result<GlobalType, ImportError> {
     })
 }
 
-fn parse_global_branches(branches: &[Value]) -> Result<Vec<(Label, GlobalType)>, ImportError> {
+fn parse_global_branches(
+    branches: &[Value],
+    depth: usize,
+) -> Result<Vec<(Label, GlobalType)>, ImportError> {
+    check_depth(depth)?;
     let mut parsed = Vec::with_capacity(branches.len());
     for branch in branches {
         ensure_only_fields(branch, "global branch", &["label", "continuation"])?;
@@ -93,20 +115,21 @@ fn parse_global_branches(branches: &[Value]) -> Result<Vec<(Label, GlobalType)>,
                 .get("label")
                 .ok_or_else(|| ImportError::MissingField("label in branch".to_string()))?,
         )?;
-        let cont = json_to_global(
+        let cont = json_to_global_with_depth(
             branch
                 .get("continuation")
                 .ok_or_else(|| ImportError::MissingField("continuation in branch".to_string()))?,
+            depth + 1,
         )?;
         parsed.push((label, cont));
     }
     Ok(parsed)
 }
 
-fn parse_global_rec(json: &Value) -> Result<GlobalType, ImportError> {
+fn parse_global_rec(json: &Value, depth: usize) -> Result<GlobalType, ImportError> {
     ensure_only_fields(json, "global rec", &["kind", "var", "body"])?;
     let var = required_str(json, "var")?;
-    let body = json_to_global(required_field(json, "body")?)?;
+    let body = json_to_global_with_depth(required_field(json, "body")?, depth + 1)?;
     Ok(GlobalType::mu(var, body))
 }
 
@@ -128,6 +151,11 @@ fn parse_global_var(json: &Value) -> Result<GlobalType, ImportError> {
 /// assert!(matches!(g, telltale_types::GlobalType::End));
 /// ```
 pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
+    json_to_global_with_depth(json, 0)
+}
+
+fn json_to_global_with_depth(json: &Value, depth: usize) -> Result<GlobalType, ImportError> {
+    check_depth(depth)?;
     let kind = json
         .get("kind")
         .and_then(|v| v.as_str())
@@ -138,8 +166,8 @@ pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
             ensure_only_fields(json, "global end", &["kind"])?;
             Ok(GlobalType::End)
         }
-        "comm" => parse_global_comm(json),
-        "rec" => parse_global_rec(json),
+        "comm" => parse_global_comm(json, depth + 1),
+        "rec" => parse_global_rec(json, depth + 1),
         "var" => parse_global_var(json),
         other => Err(ImportError::InvalidKind(other.to_string())),
     }
@@ -147,7 +175,9 @@ pub fn json_to_global(json: &Value) -> Result<GlobalType, ImportError> {
 
 fn parse_local_branches(
     branches: &[Value],
+    depth: usize,
 ) -> Result<Vec<(Label, Option<ValType>, LocalTypeR)>, ImportError> {
+    check_depth(depth)?;
     let mut parsed = Vec::with_capacity(branches.len());
     for branch in branches {
         ensure_only_fields(branch, "local branch", &["label", "continuation"])?;
@@ -156,34 +186,35 @@ fn parse_local_branches(
                 .get("label")
                 .ok_or_else(|| ImportError::MissingField("label in branch".to_string()))?,
         )?;
-        let cont = json_to_local(
+        let cont = json_to_local_with_depth(
             branch
                 .get("continuation")
                 .ok_or_else(|| ImportError::MissingField("continuation in branch".to_string()))?,
+            depth + 1,
         )?;
         parsed.push((label, None, cont));
     }
     Ok(parsed)
 }
 
-fn parse_local_send(json: &Value) -> Result<LocalTypeR, ImportError> {
+fn parse_local_send(json: &Value, depth: usize) -> Result<LocalTypeR, ImportError> {
     ensure_only_fields(json, "local send", &["kind", "partner", "branches"])?;
     let partner = required_str(json, "partner")?;
-    let branches = parse_local_branches(required_array(json, "branches")?)?;
+    let branches = parse_local_branches(required_array(json, "branches")?, depth + 1)?;
     Ok(LocalTypeR::Send { partner, branches })
 }
 
-fn parse_local_recv(json: &Value) -> Result<LocalTypeR, ImportError> {
+fn parse_local_recv(json: &Value, depth: usize) -> Result<LocalTypeR, ImportError> {
     ensure_only_fields(json, "local recv", &["kind", "partner", "branches"])?;
     let partner = required_str(json, "partner")?;
-    let branches = parse_local_branches(required_array(json, "branches")?)?;
+    let branches = parse_local_branches(required_array(json, "branches")?, depth + 1)?;
     Ok(LocalTypeR::Recv { partner, branches })
 }
 
-fn parse_local_rec(json: &Value) -> Result<LocalTypeR, ImportError> {
+fn parse_local_rec(json: &Value, depth: usize) -> Result<LocalTypeR, ImportError> {
     ensure_only_fields(json, "local rec", &["kind", "var", "body"])?;
     let var = required_str(json, "var")?;
-    let body = json_to_local(required_field(json, "body")?)?;
+    let body = json_to_local_with_depth(required_field(json, "body")?, depth + 1)?;
     Ok(LocalTypeR::mu(var, body))
 }
 
@@ -205,6 +236,11 @@ fn parse_local_var(json: &Value) -> Result<LocalTypeR, ImportError> {
 /// assert!(matches!(lt, telltale_types::LocalTypeR::End));
 /// ```
 pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
+    json_to_local_with_depth(json, 0)
+}
+
+fn json_to_local_with_depth(json: &Value, depth: usize) -> Result<LocalTypeR, ImportError> {
+    check_depth(depth)?;
     let kind = json
         .get("kind")
         .and_then(|v| v.as_str())
@@ -215,9 +251,9 @@ pub fn json_to_local(json: &Value) -> Result<LocalTypeR, ImportError> {
             ensure_only_fields(json, "local end", &["kind"])?;
             Ok(LocalTypeR::End)
         }
-        "send" => parse_local_send(json),
-        "recv" => parse_local_recv(json),
-        "rec" => parse_local_rec(json),
+        "send" => parse_local_send(json, depth + 1),
+        "recv" => parse_local_recv(json, depth + 1),
+        "rec" => parse_local_rec(json, depth + 1),
         "var" => parse_local_var(json),
         other => Err(ImportError::InvalidKind(other.to_string())),
     }
@@ -284,6 +320,12 @@ fn parse_sort(json: &Value) -> Result<PayloadSort, ImportError> {
 
 /// Parse a GlobalType from a JSON string.
 pub fn parse_global_from_str(s: &str) -> Result<GlobalType, ImportError> {
+    if s.len() > MAX_BRIDGE_JSON_BYTES {
+        return Err(ImportError::InputTooLarge(format!(
+            "bridge JSON input is {} bytes, max is {MAX_BRIDGE_JSON_BYTES}",
+            s.len()
+        )));
+    }
     let json: Value = serde_json::from_str(s)
         .map_err(|_| ImportError::ExpectedObject("invalid JSON".to_string()))?;
     json_to_global(&json)
@@ -291,6 +333,12 @@ pub fn parse_global_from_str(s: &str) -> Result<GlobalType, ImportError> {
 
 /// Parse a LocalTypeR from a JSON string.
 pub fn parse_local_from_str(s: &str) -> Result<LocalTypeR, ImportError> {
+    if s.len() > MAX_BRIDGE_JSON_BYTES {
+        return Err(ImportError::InputTooLarge(format!(
+            "bridge JSON input is {} bytes, max is {MAX_BRIDGE_JSON_BYTES}",
+            s.len()
+        )));
+    }
     let json: Value = serde_json::from_str(s)
         .map_err(|_| ImportError::ExpectedObject("invalid JSON".to_string()))?;
     json_to_local(&json)
@@ -555,6 +603,28 @@ mod tests {
 
         let err = json_to_global(&json).expect_err("branches should require array");
         assert!(matches!(err, ImportError::ExpectedArray(_)));
+    }
+
+    #[test]
+    fn test_parse_global_rejects_excessive_depth() {
+        let mut json = json!({ "kind": "end" });
+        for _ in 0..(MAX_BRIDGE_JSON_DEPTH + 1) {
+            json = json!({
+                "kind": "rec",
+                "var": "x",
+                "body": json
+            });
+        }
+
+        let err = json_to_global(&json).expect_err("deep import should fail closed");
+        assert!(matches!(err, ImportError::InputTooDeep(_)));
+    }
+
+    #[test]
+    fn test_parse_global_from_str_rejects_oversized_input() {
+        let input = " ".repeat(MAX_BRIDGE_JSON_BYTES + 1);
+        let err = parse_global_from_str(&input).expect_err("oversized import should fail closed");
+        assert!(matches!(err, ImportError::InputTooLarge(_)));
     }
 
     #[cfg(target_pointer_width = "32")]

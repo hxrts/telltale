@@ -106,23 +106,12 @@ pub(crate) fn pretty_json(raw: &str) -> String {
 #[component]
 pub(crate) fn CodeBlock(content: String) -> Element {
     let id = format!("tt-code-{}", content.len());
-    use_effect({
-        let id = id.clone();
-        let content = content.clone();
-        move || {
-            let script = format!(
-                "setTimeout(function(){{ var el = document.getElementById({id_json}); if (el) el.textContent = {content_json}; }}, 0)",
-                id_json = serde_json::to_string(&id).unwrap_or_default(),
-                content_json = serde_json::to_string(&content).unwrap_or_default(),
-            );
-            let _ = eval(&script);
-        }
-    });
     rsx! {
         pre {
             id: "{id}",
             class: "font-mono text-[0.6875rem] leading-relaxed text-muted-foreground bg-background rounded-sm px-3 py-2 w-full min-w-0 max-w-full",
             style: "white-space: pre-wrap; word-break: break-word; overflow-wrap: break-word;",
+            "{content}"
         }
     }
 }

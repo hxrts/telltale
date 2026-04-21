@@ -4,6 +4,7 @@ use super::{validate_non_negative, validate_probability, Scenario};
 use std::collections::BTreeSet;
 
 pub(super) fn validate_semantics(scenario: &Scenario) -> Result<(), String> {
+    validate_scenario_name(&scenario.name)?;
     let role_set = validate_roles(scenario)?;
     validate_limits(scenario)?;
     validate_network(scenario, &role_set)?;
@@ -11,6 +12,30 @@ pub(super) fn validate_semantics(scenario: &Scenario) -> Result<(), String> {
     validate_adversaries(scenario, &role_set)?;
     if scenario.property_monitor()?.is_some() {
         // Property monitor configuration is validated by construction here.
+    }
+    Ok(())
+}
+
+fn validate_scenario_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("scenario.name must not be empty".to_string());
+    }
+    if name.contains('\0') {
+        return Err("scenario.name must not contain NUL bytes".to_string());
+    }
+    if name.contains('/') || name.contains('\\') || name.contains("..") {
+        return Err(
+            "scenario.name must be a single safe path component without separators or '..'"
+                .to_string(),
+        );
+    }
+    if name
+        .chars()
+        .any(|ch| !(ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.')))
+    {
+        return Err(
+            "scenario.name may only contain ASCII letters, digits, '.', '_' and '-'".to_string(),
+        );
     }
     Ok(())
 }

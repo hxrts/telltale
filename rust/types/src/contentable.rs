@@ -28,7 +28,7 @@
 use crate::content_id::Sha256Hasher;
 use crate::content_id::{Blake3Hasher, ContentId, DefaultContentHasher, Hasher};
 use crate::de_bruijn::{GlobalTypeDB, LocalTypeRDB};
-use crate::{GlobalType, Label, LocalTypeR, PayloadSort};
+use crate::{GlobalType, Label, LocalTypeR, PayloadSort, MAX_MESSAGE_LEN_BYTES};
 #[cfg(feature = "dag-cbor")]
 use ciborium::{
     de::from_reader as cbor_from_reader,
@@ -36,6 +36,11 @@ use ciborium::{
     value::{CanonicalValue, Value as CborValue},
 };
 use serde::{de::DeserializeOwned, Serialize};
+
+/// Maximum accepted canonical artifact size for direct `Contentable` decodes.
+pub const MAX_CONTENTABLE_BYTES: usize = MAX_MESSAGE_LEN_BYTES as usize;
+/// Maximum accepted recursion depth for binder-carrying protocol artifacts.
+pub const MAX_CONTENTABLE_RECURSION_DEPTH: usize = 256;
 
 /// Trait for types with canonical serialization.
 ///
@@ -73,10 +78,32 @@ pub trait Contentable: Sized {
 
     /// Deserialize from JSON bytes.
     ///
+    /// Callers that load bytes from a content-addressed store should prefer
+    /// [`Contentable::from_bytes_verified`] so the expected content ID is checked
+    /// before deserialization. Implementations must reject oversized inputs.
+    ///
     /// # Errors
     ///
     /// Returns an error if deserialization fails.
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
+
+    /// Verify the content ID before deserializing from JSON bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bytes do not match `expected` or deserialization fails.
+    fn from_bytes_verified<H: Hasher>(
+        bytes: &[u8],
+        expected: &ContentId<H>,
+    ) -> Result<Self, ContentableError> {
+        let actual = ContentId::<H>::from_bytes(bytes);
+        if &actual != expected {
+            return Err(ContentableError::InvalidFormat(format!(
+                "content ID mismatch: expected {expected}, got {actual}"
+            )));
+        }
+        Self::from_bytes(bytes)
+    }
 
     /// Serialize to template bytes, allowing open terms with explicit
     /// free-variable interfaces when supported by the implementation.
@@ -267,6 +294,13 @@ fn to_json_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableError> {
 }
 
 fn from_json_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
+    if bytes.len() > MAX_CONTENTABLE_BYTES {
+        return Err(ContentableError::InvalidFormat(format!(
+            "contentable JSON input too large: {} bytes exceeds {}",
+            bytes.len(),
+            MAX_CONTENTABLE_BYTES
+        )));
+    }
     serde_json::from_slice(bytes)
         .map_err(|e| ContentableError::DeserializationFailed(e.to_string()))
 }
@@ -304,6 +338,13 @@ fn to_cbor_bytes_impl<T: Serialize>(value: &T) -> Result<Vec<u8>, ContentableErr
 
 #[cfg(feature = "dag-cbor")]
 fn from_cbor_bytes_impl<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ContentableError> {
+    if bytes.len() > MAX_CONTENTABLE_BYTES {
+        return Err(ContentableError::InvalidFormat(format!(
+            "contentable CBOR input too large: {} bytes exceeds {}",
+            bytes.len(),
+            MAX_CONTENTABLE_BYTES
+        )));
+    }
     let value: CborValue = cbor_from_reader(bytes)
         .map_err(|e| ContentableError::DeserializationFailed(format!("dag-cbor decode: {e}")))?;
     let value = canonicalize_cbor_value(value)?;
@@ -435,7 +476,7 @@ impl Contentable for GlobalType {
         // Note: This returns a type with generated variable names,
         // since de Bruijn indices don't preserve names.
         let db: GlobalTypeDB = from_json_bytes(bytes)?;
-        Ok(global_from_de_bruijn(&db, &mut vec![]))
+        global_from_de_bruijn(&db, &mut vec![], 0)
     }
 
     #[cfg(feature = "dag-cbor")]
@@ -452,7 +493,7 @@ impl Contentable for GlobalType {
     #[cfg(feature = "dag-cbor")]
     fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
         let db: GlobalTypeDB = from_cbor_bytes_impl(bytes)?;
-        Ok(global_from_de_bruijn(&db, &mut vec![]))
+        global_from_de_bruijn(&db, &mut vec![], 0)
     }
 }
 
@@ -481,7 +522,7 @@ impl Contentable for LocalTypeR {
         // Note: This returns a type with generated variable names,
         // since de Bruijn indices don't preserve names.
         let db: LocalTypeRDB = from_json_bytes(bytes)?;
-        Ok(local_from_de_bruijn(&db, &mut vec![]))
+        local_from_de_bruijn(&db, &mut vec![], 0)
     }
 
     #[cfg(feature = "dag-cbor")]
@@ -498,7 +539,7 @@ impl Contentable for LocalTypeR {
     #[cfg(feature = "dag-cbor")]
     fn from_cbor_bytes(bytes: &[u8]) -> Result<Self, ContentableError> {
         let db: LocalTypeRDB = from_cbor_bytes_impl(bytes)?;
-        Ok(local_from_de_bruijn(&db, &mut vec![]))
+        local_from_de_bruijn(&db, &mut vec![], 0)
     }
 }
 
@@ -506,31 +547,45 @@ impl Contentable for LocalTypeR {
 // De Bruijn back-conversion (generates fresh variable names)
 // ============================================================================
 
-fn global_from_de_bruijn(db: &GlobalTypeDB, names: &mut Vec<String>) -> GlobalType {
+fn check_contentable_depth(depth: usize) -> Result<(), ContentableError> {
+    if depth > MAX_CONTENTABLE_RECURSION_DEPTH {
+        return Err(ContentableError::InvalidFormat(format!(
+            "contentable recursion depth exceeds {MAX_CONTENTABLE_RECURSION_DEPTH}"
+        )));
+    }
+    Ok(())
+}
+
+fn global_from_de_bruijn(
+    db: &GlobalTypeDB,
+    names: &mut Vec<String>,
+    depth: usize,
+) -> Result<GlobalType, ContentableError> {
+    check_contentable_depth(depth)?;
     match db {
-        GlobalTypeDB::End => GlobalType::End,
+        GlobalTypeDB::End => Ok(GlobalType::End),
         GlobalTypeDB::Comm {
             sender,
             receiver,
             branches,
-        } => GlobalType::Comm {
+        } => Ok(GlobalType::Comm {
             sender: sender.clone(),
             receiver: receiver.clone(),
             branches: branches
                 .iter()
-                .map(|(l, cont)| (l.clone(), global_from_de_bruijn(cont, names)))
-                .collect(),
-        },
+                .map(|(l, cont)| Ok((l.clone(), global_from_de_bruijn(cont, names, depth + 1)?)))
+                .collect::<Result<Vec<_>, ContentableError>>()?,
+        }),
         GlobalTypeDB::Rec(body) => {
             // Generate a fresh variable name
             let var_name = format!("t{}", names.len());
             names.push(var_name.clone());
-            let body_converted = global_from_de_bruijn(body, names);
+            let body_converted = global_from_de_bruijn(body, names, depth + 1);
             names.pop();
-            GlobalType::Mu {
+            Ok(GlobalType::Mu {
                 var: var_name,
-                body: Box::new(body_converted),
-            }
+                body: Box::new(body_converted?),
+            })
         }
         GlobalTypeDB::Var(idx) => {
             // Look up the variable name from the environment
@@ -538,38 +593,55 @@ fn global_from_de_bruijn(db: &GlobalTypeDB, names: &mut Vec<String>) -> GlobalTy
                 .get(names.len().saturating_sub(1 + idx))
                 .cloned()
                 .unwrap_or_else(|| format!("free{idx}"));
-            GlobalType::Var(name)
+            Ok(GlobalType::Var(name))
         }
     }
 }
 
-fn local_from_de_bruijn(db: &LocalTypeRDB, names: &mut Vec<String>) -> LocalTypeR {
+fn local_from_de_bruijn(
+    db: &LocalTypeRDB,
+    names: &mut Vec<String>,
+    depth: usize,
+) -> Result<LocalTypeR, ContentableError> {
+    check_contentable_depth(depth)?;
     match db {
-        LocalTypeRDB::End => LocalTypeR::End,
-        LocalTypeRDB::Send { partner, branches } => LocalTypeR::Send {
+        LocalTypeRDB::End => Ok(LocalTypeR::End),
+        LocalTypeRDB::Send { partner, branches } => Ok(LocalTypeR::Send {
             partner: partner.clone(),
             branches: branches
                 .iter()
-                .map(|(l, vt, cont)| (l.clone(), vt.clone(), local_from_de_bruijn(cont, names)))
-                .collect(),
-        },
-        LocalTypeRDB::Recv { partner, branches } => LocalTypeR::Recv {
+                .map(|(l, vt, cont)| {
+                    Ok((
+                        l.clone(),
+                        vt.clone(),
+                        local_from_de_bruijn(cont, names, depth + 1)?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ContentableError>>()?,
+        }),
+        LocalTypeRDB::Recv { partner, branches } => Ok(LocalTypeR::Recv {
             partner: partner.clone(),
             branches: branches
                 .iter()
-                .map(|(l, vt, cont)| (l.clone(), vt.clone(), local_from_de_bruijn(cont, names)))
-                .collect(),
-        },
+                .map(|(l, vt, cont)| {
+                    Ok((
+                        l.clone(),
+                        vt.clone(),
+                        local_from_de_bruijn(cont, names, depth + 1)?,
+                    ))
+                })
+                .collect::<Result<Vec<_>, ContentableError>>()?,
+        }),
         LocalTypeRDB::Rec(body) => {
             // Generate a fresh variable name
             let var_name = format!("t{}", names.len());
             names.push(var_name.clone());
-            let body_converted = local_from_de_bruijn(body, names);
+            let body_converted = local_from_de_bruijn(body, names, depth + 1);
             names.pop();
-            LocalTypeR::Mu {
+            Ok(LocalTypeR::Mu {
                 var: var_name,
-                body: Box::new(body_converted),
-            }
+                body: Box::new(body_converted?),
+            })
         }
         LocalTypeRDB::Var(idx) => {
             // Look up the variable name from the environment
@@ -577,7 +649,7 @@ fn local_from_de_bruijn(db: &LocalTypeRDB, names: &mut Vec<String>) -> LocalType
                 .get(names.len().saturating_sub(1 + idx))
                 .cloned()
                 .unwrap_or_else(|| format!("free{idx}"));
-            LocalTypeR::Var(name)
+            Ok(LocalTypeR::Var(name))
         }
     }
 }
@@ -591,6 +663,32 @@ mod tests {
         let g = GlobalType::send("A", "B", Label::new("msg"), GlobalType::End);
         let cid = g.content_id_default().unwrap();
         assert_eq!(cid.algorithm(), "blake3");
+    }
+
+    #[test]
+    fn from_bytes_verified_rejects_wrong_content_id() {
+        let label = Label::new("msg");
+        let bytes = label.to_bytes().unwrap();
+        let wrong = ContentId::<Blake3Hasher>::from_bytes(b"different");
+        let err = Label::from_bytes_verified(&bytes, &wrong).expect_err("wrong cid must fail");
+        assert!(matches!(err, ContentableError::InvalidFormat(_)));
+    }
+
+    #[test]
+    fn global_from_bytes_rejects_excessive_depth() {
+        let mut db = GlobalTypeDB::End;
+        for _ in 0..(MAX_CONTENTABLE_RECURSION_DEPTH + 1) {
+            db = GlobalTypeDB::Rec(Box::new(db));
+        }
+        let bytes = to_json_bytes(&db).unwrap();
+        GlobalType::from_bytes(&bytes).expect_err("deep artifact must fail");
+    }
+
+    #[test]
+    fn from_bytes_rejects_oversized_input() {
+        let bytes = vec![b' '; MAX_CONTENTABLE_BYTES + 1];
+        let err = Label::from_bytes(&bytes).expect_err("oversized input must fail");
+        assert!(matches!(err, ContentableError::InvalidFormat(_)));
     }
 
     #[test]

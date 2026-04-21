@@ -25,11 +25,10 @@ telltale-types = { path = "../types", version = "=15.0.0" }
 telltale-theory = { path = "../theory", version = "=15.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-serde_cbor = { workspace = true }
+ciborium = { workspace = true }
 bincode = { workspace = true }
 thiserror = { workspace = true }
 rayon = { version = "1", optional = true }
-serde_yaml = { workspace = true }
 cfg-if = { workspace = true }
 parking_lot = { workspace = true }
 
@@ -44,6 +43,7 @@ wasm-bindgen-test = "0.3"
 criterion = { workspace = true }
 telltale-bridge = { path = "../bridge" }
 tempfile = { workspace = true }
+serde_yaml = "0.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 proptest = { workspace = true }

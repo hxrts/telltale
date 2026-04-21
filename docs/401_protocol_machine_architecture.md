@@ -2,6 +2,12 @@
 
 This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces.
 
+**Transport security boundary:** the first-party TCP transports are currently
+plaintext and unauthenticated. Use them only on localhost, a trusted host
+network, or a trusted VPN unless a deployment provides an authenticated
+transport profile that satisfies the protocol machine's documented transport
+contract.
+
 ## Architecture Overview
 
 The protocol machine is the sole authority over semantic progression. It realizes structure conservation and authority conservation from the [Conservation Framework](102_conservation_framework.md). All protocol-visible truth is committed through the protocol machine. Handlers may stage and return effect outcomes, but they do not mutate semantic state directly.

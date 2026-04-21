@@ -109,6 +109,13 @@ clock map later.
 Transfer/handoff and runtime upgrade/reconfiguration are also explicit. They
 emit typed transition artifacts rather than relying on hidden host-local state.
 
+`ProtocolMachineConfig.host_contract_assertions` is a typed
+`HostContractMode`. The default `Enforced` mode checks handler identity
+stability, deterministic topology-event ordering, and transfer-event audit
+coverage before those host-supplied facts are accepted into the machine. The
+`RelaxedTestOnly` mode is reserved for targeted tests that intentionally violate
+those contracts; it is rejected with `DeterminismMode::Full`.
+
 ## Lean and Bridge Surfaces
 
 The Lean model exports this surface through:

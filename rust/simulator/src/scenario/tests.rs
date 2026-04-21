@@ -81,6 +81,30 @@ fn test_default_seed_when_missing() {
 }
 
 #[test]
+fn reject_path_like_scenario_names() {
+    for name in [
+        "../escape",
+        "/absolute",
+        "nested/path",
+        "bad\\path",
+        "bad:name",
+    ] {
+        let toml = format!(
+            r#"
+            name = '{name}'
+            roles = ["A", "B"]
+            steps = 1
+            "#
+        );
+        let error = Scenario::parse(&toml).expect_err("path-like scenario name must fail");
+        assert!(
+            error.contains("scenario.name"),
+            "unexpected error for {name}: {error}"
+        );
+    }
+}
+
+#[test]
 fn test_parse_durable_wal_scenario() {
     let toml = r#"
             name = "durable_wal"

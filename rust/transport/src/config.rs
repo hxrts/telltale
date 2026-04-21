@@ -18,6 +18,12 @@ pub struct TcpTransportConfig {
     pub retry: RetryConfig,
     /// Channel buffer size for incoming messages.
     pub buffer_size: QueueCapacity,
+    /// Maximum concurrently accepted inbound connections.
+    pub max_connections: usize,
+    /// Timeout for inbound handshake and frame reads.
+    pub read_timeout: Duration,
+    /// Timeout for outbound handshake and frame writes.
+    pub write_timeout: Duration,
 }
 
 /// Configuration for connection retry behavior.
@@ -53,6 +59,9 @@ impl Default for TcpTransportConfig {
             peers: BTreeMap::new(),
             retry: RetryConfig::default(),
             buffer_size: QueueCapacity::try_new(32).expect("default buffer size in range"),
+            max_connections: 1024,
+            read_timeout: Duration::from_secs(30),
+            write_timeout: Duration::from_secs(10),
         }
     }
 }
@@ -71,6 +80,9 @@ impl TcpTransportConfig {
             peers: BTreeMap::new(),
             retry: RetryConfig::default(),
             buffer_size: QueueCapacity::try_new(32).expect("default buffer size in range"),
+            max_connections: 1024,
+            read_timeout: Duration::from_secs(30),
+            write_timeout: Duration::from_secs(10),
         }
     }
 
@@ -92,6 +104,21 @@ impl TcpTransportConfig {
     #[must_use]
     pub fn with_buffer_size(mut self, size: QueueCapacity) -> Self {
         self.buffer_size = size;
+        self
+    }
+
+    /// Set the maximum number of concurrently accepted inbound connections.
+    #[must_use]
+    pub fn with_max_connections(mut self, max_connections: usize) -> Self {
+        self.max_connections = max_connections;
+        self
+    }
+
+    /// Set read and write timeouts for TCP handshakes and frames.
+    #[must_use]
+    pub fn with_io_timeouts(mut self, read_timeout: Duration, write_timeout: Duration) -> Self {
+        self.read_timeout = read_timeout;
+        self.write_timeout = write_timeout;
         self
     }
 

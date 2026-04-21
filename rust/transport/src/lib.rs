@@ -20,6 +20,15 @@
 //! - Graceful shutdown support
 //! - Tracing instrumentation for observability
 //!
+//! ## Security Boundary
+//!
+//! The first-party TCP transport is plaintext and does not authenticate peers.
+//! Use it only on localhost, a trusted host network, or a trusted VPN until an
+//! authenticated transport profile is configured. The protocol machine's formal
+//! guarantees assume the selected transport satisfies its documented contract.
+//! Debug-level transport logs include peer roles and socket addresses for
+//! diagnosis; route debug logs only to sinks that may see deployment topology.
+//!
 //! ## Example
 //!
 //! ```no_run

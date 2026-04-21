@@ -35,11 +35,16 @@ Types that can be serialized canonically implement `Contentable`.
 pub trait Contentable: Sized {
     fn to_bytes(&self) -> Result<Vec<u8>, ContentableError>;
     fn from_bytes(bytes: &[u8]) -> Result<Self, ContentableError>;
+    fn from_bytes_verified<H: Hasher>(
+        bytes: &[u8],
+        expected: &ContentId<H>,
+    ) -> Result<Self, ContentableError>;
     fn to_template_bytes(&self) -> Result<Vec<u8>, ContentableError>;
 }
 ```
 
 `GlobalType`, `LocalTypeR`, `Label`, and `PayloadSort` implement this trait. The serializer converts types to a de Bruijn representation and normalizes branch ordering. Alpha equivalent types share the same content ID.
+Callers loading bytes from a content-addressed store should prefer `from_bytes_verified`, which hashes the bytes first and rejects a content-ID mismatch before deserializing.
 
 ## Closed vs Open Terms
 

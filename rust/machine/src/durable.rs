@@ -2,6 +2,7 @@
 //! and recovery metadata.
 
 use std::collections::BTreeMap;
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use parking_lot::Mutex;
@@ -14,6 +15,31 @@ use crate::semantic_objects::{
 
 /// Stable schema version for persisted durability artifacts.
 pub const PERSISTED_DURABILITY_SCHEMA_VERSION: &str = "telltale.machine.durability.v1";
+
+/// Maximum encoded size accepted for persisted durability artifacts.
+pub const MAX_PERSISTED_DURABILITY_BYTES: usize = 64 * 1024 * 1024;
+
+fn decode_cbor<T>(bytes: &[u8], context: &str) -> Result<T, String>
+where
+    T: for<'de> Deserialize<'de>,
+{
+    if bytes.len() > MAX_PERSISTED_DURABILITY_BYTES {
+        return Err(format!(
+            "{context}: input is {} bytes, max is {MAX_PERSISTED_DURABILITY_BYTES}",
+            bytes.len()
+        ));
+    }
+    ciborium::from_reader(Cursor::new(bytes)).map_err(|err| format!("{context}: {err}"))
+}
+
+fn encode_cbor<T>(value: &T, context: &str) -> Result<Vec<u8>, String>
+where
+    T: Serialize,
+{
+    let mut bytes = Vec::new();
+    ciborium::into_writer(value, &mut bytes).map_err(|err| format!("{context}: {err}"))?;
+    Ok(bytes)
+}
 
 /// One append-only agreement WAL entry.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -952,8 +978,7 @@ impl PersistedDurabilityArtifact {
     /// Returns an error if the bytes are invalid CBOR, the schema version is
     /// unsupported, or the payload does not decode.
     pub fn from_slice(bytes: &[u8]) -> Result<Self, String> {
-        let artifact: Self = serde_cbor::from_slice(bytes)
-            .map_err(|err| format!("decode persisted durability artifact: {err}"))?;
+        let artifact: Self = decode_cbor(bytes, "decode persisted durability artifact")?;
         if artifact.schema_version != PERSISTED_DURABILITY_SCHEMA_VERSION {
             return Err(format!(
                 "unsupported persisted durability schema version `{}`",
@@ -986,8 +1011,7 @@ impl PersistedDurabilityArtifact {
     ///
     /// Returns an error when serialization fails.
     pub fn to_cbor(&self) -> Result<Vec<u8>, String> {
-        serde_cbor::to_vec(self)
-            .map_err(|err| format!("encode persisted durability artifact: {err}"))
+        encode_cbor(self, "encode persisted durability artifact")
     }
 
     /// Persist the artifact to disk as CBOR.

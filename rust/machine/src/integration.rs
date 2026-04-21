@@ -7,6 +7,21 @@ use crate::determinism::{replay_consistent, DeterminismMode};
 use crate::effect::{EffectHandler, RecordingEffectHandler};
 use crate::engine::{ProtocolMachine, ProtocolMachineError};
 use serde::{Deserialize, Serialize};
+use std::io::Cursor;
+
+fn encode_snapshot(machine: &ProtocolMachine) -> Result<Vec<u8>, ProtocolMachineError> {
+    let mut bytes = Vec::new();
+    ciborium::into_writer(machine, &mut bytes).map_err(|e| {
+        ProtocolMachineError::PersistenceError(format!("integration snapshot encode failed: {e}"))
+    })?;
+    Ok(bytes)
+}
+
+fn decode_snapshot(bytes: &[u8]) -> Result<ProtocolMachine, ProtocolMachineError> {
+    ciborium::from_reader(Cursor::new(bytes)).map_err(|e| {
+        ProtocolMachineError::PersistenceError(format!("integration snapshot decode failed: {e}"))
+    })
+}
 
 /// Summary from loaded protocol-machine record/replay conformance execution.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -43,9 +58,7 @@ pub fn run_loaded_protocol_machine_record_replay_conformance(
     handler: &dyn EffectHandler,
     max_steps: usize,
 ) -> Result<LoadedProtocolMachineReplayConformance, ProtocolMachineError> {
-    let snapshot = serde_yaml::to_string(machine).map_err(|e| {
-        ProtocolMachineError::PersistenceError(format!("integration snapshot encode failed: {e}"))
-    })?;
+    let snapshot = encode_snapshot(machine)?;
 
     let recording = RecordingEffectHandler::new(handler);
     machine.run(&recording, max_steps)?;
@@ -55,9 +68,7 @@ pub fn run_loaded_protocol_machine_record_replay_conformance(
     let baseline_effect_trace = machine.effect_trace().to_vec();
     let determinism_mode = machine.config().determinism_mode;
 
-    let mut replay_vm: ProtocolMachine = serde_yaml::from_str(&snapshot).map_err(|e| {
-        ProtocolMachineError::PersistenceError(format!("integration snapshot decode failed: {e}"))
-    })?;
+    let mut replay_vm = decode_snapshot(&snapshot)?;
     replay_vm.run_replay(handler, &recorded_effects, max_steps)?;
 
     let replay_trace = replay_vm.trace().to_vec();

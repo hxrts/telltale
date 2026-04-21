@@ -1,3 +1,44 @@
+/// Runtime host-contract assertion mode.
+///
+/// Production configurations should use [`HostContractMode::Enforced`]. The
+/// relaxed mode exists for tests that intentionally violate handler identity,
+/// topology ordering, or transfer-audit contracts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum HostContractMode {
+    /// Enforce host integration contracts at runtime.
+    #[default]
+    Enforced,
+    /// Disable host integration assertions for targeted tests only.
+    RelaxedTestOnly,
+}
+
+impl HostContractMode {
+    /// Whether runtime host-contract assertions are enabled.
+    #[must_use]
+    pub const fn is_enforced(self) -> bool {
+        matches!(self, Self::Enforced)
+    }
+}
+
+fn deserialize_host_contract_mode<'de, D>(deserializer: D) -> Result<HostContractMode, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Compat {
+        Bool(bool),
+        Mode(HostContractMode),
+    }
+
+    Ok(match Compat::deserialize(deserializer)? {
+        Compat::Bool(true) => HostContractMode::Enforced,
+        Compat::Bool(false) => HostContractMode::RelaxedTestOnly,
+        Compat::Mode(mode) => mode,
+    })
+}
+
 /// ProtocolMachine configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtocolMachineConfig {
@@ -63,9 +104,16 @@ pub struct ProtocolMachineConfig {
     /// Upper bound for ProtocolMachine payload values in estimated wire bytes.
     #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: usize,
-    /// Enable runtime host-contract assertions with deterministic diagnostics.
-    #[serde(default)]
-    pub host_contract_assertions: bool,
+    /// Runtime host-contract assertion mode with deterministic diagnostics.
+    #[serde(
+        default = "default_host_contract_assertions",
+        deserialize_with = "deserialize_host_contract_mode"
+    )]
+    pub host_contract_assertions: HostContractMode,
+}
+
+fn default_host_contract_assertions() -> HostContractMode {
+    HostContractMode::Enforced
 }
 
 impl Default for ProtocolMachineConfig {
@@ -95,7 +143,7 @@ impl Default for ProtocolMachineConfig {
             payload_validation_mode: PayloadValidationMode::Structural,
             communication_replay_mode: CommunicationReplayMode::Off,
             max_payload_bytes: default_max_payload_bytes(),
-            host_contract_assertions: false,
+            host_contract_assertions: default_host_contract_assertions(),
         }
     }
 }
@@ -129,6 +177,14 @@ impl ProtocolMachineConfig {
             && self.observability_retention.capacity == 0
         {
             return Err("observability_retention.capacity must be > 0 in capped mode".to_string());
+        }
+        if self.determinism_mode == DeterminismMode::Full
+            && self.host_contract_assertions == HostContractMode::RelaxedTestOnly
+        {
+            return Err(
+                "host_contract_assertions=relaxed_test_only is not valid with DeterminismMode::Full"
+                    .to_string(),
+            );
         }
         Ok(())
     }
