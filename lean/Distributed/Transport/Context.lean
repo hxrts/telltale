@@ -48,16 +48,16 @@ inductive ClassicalAssumption where
   | coherentInvariant
   | harmonyCommutation
   | markovAbstraction
-  | driftWitness
+  | driftEvidence
   | schedulerOptimality
-  | exponentialTailWitness
+  | exponentialTailEvidence
   | exchangeability
   | heavyTrafficScaling
-  | mixingWitness
-  | fluidDescentWitness
-  | boundedIncrementWitness
+  | mixingEvidence
+  | fluidDescentEvidence
+  | boundedIncrementEvidence
   | queueRateWaitInputs
-  | cltMomentWitness
+  | cltMomentEvidence
   | spectralGapPos
   deriving Repr, DecidableEq, Inhabited
 
@@ -69,16 +69,16 @@ structure ClassicalEvidence where
   coherentInvariant : Bool := false
   harmonyCommutation : Bool := false
   markovAbstraction : Bool := false
-  driftWitness : Bool := false
+  driftEvidence : Bool := false
   schedulerOptimality : Bool := false
-  exponentialTailWitness : Bool := false
+  exponentialTailEvidence : Bool := false
   exchangeability : Bool := false
   heavyTrafficScaling : Bool := false
-  mixingWitness : Bool := false
-  fluidDescentWitness : Bool := false
-  boundedIncrementWitness : Bool := false
+  mixingEvidence : Bool := false
+  fluidDescentEvidence : Bool := false
+  boundedIncrementEvidence : Bool := false
   queueRateWaitInputs : Bool := false
-  cltMomentWitness : Bool := false
+  cltMomentEvidence : Bool := false
   spectralGapPos : Bool := false
   deriving Repr, DecidableEq, Inhabited
 
@@ -113,25 +113,25 @@ def assumptionsFor (p : ClassicalProperty) : List ClassicalAssumption :=
   let base := [ClassicalAssumption.finiteState, .coherentInvariant, .harmonyCommutation]
   match p with
   | .fosterLyapunov =>
-      base ++ [.markovAbstraction, .driftWitness]
+      base ++ [.markovAbstraction, .driftEvidence]
   | .maxWeight =>
       base ++ [.schedulerOptimality]
   | .largeDeviation =>
-      base ++ [.markovAbstraction, .exponentialTailWitness]
+      base ++ [.markovAbstraction, .exponentialTailEvidence]
   | .meanField =>
       base ++ [.exchangeability]
   | .heavyTraffic =>
       base ++ [.markovAbstraction, .heavyTrafficScaling]
   | .mixingTime =>
-      base ++ [.markovAbstraction, .mixingWitness]
+      base ++ [.markovAbstraction, .mixingEvidence]
   | .fluidLimit =>
-      base ++ [.fluidDescentWitness]
+      base ++ [.fluidDescentEvidence]
   | .concentration =>
-      base ++ [.boundedIncrementWitness]
+      base ++ [.boundedIncrementEvidence]
   | .littlesLaw =>
       base ++ [.queueRateWaitInputs]
   | .functionalCLT =>
-      base ++ [.markovAbstraction, .cltMomentWitness]
+      base ++ [.markovAbstraction, .cltMomentEvidence]
   | .spectralGapTermination =>
       base ++ [.markovAbstraction, .spectralGapPos]
 
@@ -144,16 +144,16 @@ def hasAssumption (ev : ClassicalEvidence) (a : ClassicalAssumption) : Bool :=
   | .coherentInvariant => ev.coherentInvariant
   | .harmonyCommutation => ev.harmonyCommutation
   | .markovAbstraction => ev.markovAbstraction
-  | .driftWitness => ev.driftWitness
+  | .driftEvidence => ev.driftEvidence
   | .schedulerOptimality => ev.schedulerOptimality
-  | .exponentialTailWitness => ev.exponentialTailWitness
+  | .exponentialTailEvidence => ev.exponentialTailEvidence
   | .exchangeability => ev.exchangeability
   | .heavyTrafficScaling => ev.heavyTrafficScaling
-  | .mixingWitness => ev.mixingWitness
-  | .fluidDescentWitness => ev.fluidDescentWitness
-  | .boundedIncrementWitness => ev.boundedIncrementWitness
+  | .mixingEvidence => ev.mixingEvidence
+  | .fluidDescentEvidence => ev.fluidDescentEvidence
+  | .boundedIncrementEvidence => ev.boundedIncrementEvidence
   | .queueRateWaitInputs => ev.queueRateWaitInputs
-  | .cltMomentWitness => ev.cltMomentWitness
+  | .cltMomentEvidence => ev.cltMomentEvidence
   | .spectralGapPos => ev.spectralGapPos
 
 /-- Assumption atoms still missing for a requested property. -/

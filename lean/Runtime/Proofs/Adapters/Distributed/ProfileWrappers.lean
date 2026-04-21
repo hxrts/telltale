@@ -84,6 +84,9 @@ abbrev CoordinationProfile := Distributed.Coordination.CoordinationProtocol
 /-- Canonical CRDT theorem-family profile carried by the invariant space. -/
 abbrev CRDTProfile := Distributed.CRDT.CRDTProtocol
 
+/-- Canonical CRDT OpCore-erasure profile carried by the invariant space. -/
+abbrev CRDTErasureProfile := Distributed.CRDT.CRDTErasureProtocol
+
 /-- Canonical triangle-of-forgetting profile carried by the invariant space. -/
 abbrev TriangleOfForgettingProfile := Distributed.TriangleOfForgetting.ImpossibilityProtocol
 
@@ -130,6 +133,7 @@ structure DistributedProfiles where
   dataAvailability? : Option DataAvailabilityProfile := none
   coordination? : Option CoordinationProfile := none
   crdt? : Option CRDTProfile := none
+  crdtErasure? : Option CRDTErasureProfile := none
   triangleOfForgetting? : Option TriangleOfForgettingProfile := none
   byzantineSafety? : Option ByzantineSafetyProfile := none
   consensusEnvelope? : Option ConsensusEnvelopeProfile := none

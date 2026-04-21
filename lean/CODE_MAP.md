@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-04-20
+**Last Updated:** 2026-04-21
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -40,11 +40,11 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    16 |   2,193 | Transported theorems (queueing, large deviations, mixing)  |
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
-| Distributed    |    64 |   8,587 | Distributed assumptions, validation, FLP/CAP theorem packaging |
+| Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,133 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   199 |  38,636 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   199 |  38,700 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **684** | **139,569** |                                                            |
+| **Total**      | **700** | **140,761** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -403,6 +403,30 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Families/FailureDetectors.lean | Failure-detector family: detector-class solvability/impossibility boundary forms |
 | Families/DataAvailability.lean | Data-availability family: k-of-n availability/retrievability under sampling and withholding bounds |
 | Families/Coordination.lean | Coordination family: CALM-style monotonicity characterization of coordination necessity |
+| Families/CRDT.lean | CRDT theorem family: state-based merge laws, envelope, OpCore erasure, monotonicity, SEC, and boundary counterexamples |
+| Families/TriangleOfForgetting.lean | Triangle of Forgetting family: monotone merge + temporal secrecy + dynamic membership impossibility |
+| Families/ByzantineSafety.lean | Byzantine safety characterization and specialization bridges for quorum/Nakamoto/hybrid families |
+| Model/ConsensusEnvelope.lean | Consensus-envelope exactness, capability admission, `d_int`, and BFT bridge packaging |
+
+### Family Profile Constructors
+
+| File | Description |
+|------|-------------|
+| Families/FLP/Profile.lean | Constructors for FLP lower-bound and impossibility protocol profiles |
+| Families/CAP/Profile.lean | Constructor for CAP impossibility protocol profiles |
+| Families/QuorumGeometry/Profile.lean | Constructor for quorum-geometry safety protocol profiles |
+| Families/PartialSynchrony/Profile.lean | Constructor for partial-synchrony liveness protocol profiles |
+| Families/Responsiveness/Profile.lean | Constructor for responsiveness protocol profiles |
+| Families/Nakamoto/Profile.lean | Constructor for Nakamoto safety/finality/liveness protocol profiles |
+| Families/Reconfiguration/Profile.lean | Constructor for reconfiguration safety/liveness protocol profiles |
+| Families/AtomicBroadcast/Profile.lean | Constructor for atomic-broadcast theorem profiles |
+| Families/AccountableSafety/Profile.lean | Constructor for accountable-safety theorem profiles |
+| Families/FailureDetectors/Profile.lean | Constructor for failure-detector boundary profiles |
+| Families/DataAvailability/Profile.lean | Constructor for data-availability and retrievability profiles |
+| Families/Coordination/Profile.lean | Constructor for CALM/coordination theorem profiles |
+| Families/CRDT/Profile.lean | Constructors for CRDT envelope/monotonicity and OpCore-erasure profiles |
+| Families/TriangleOfForgetting/Profile.lean | Constructor for Triangle of Forgetting impossibility profiles |
+| Families/ByzantineSafety/Profile.lean | Constructor for Byzantine safety characterization profiles |
 
 ### Transport
 
@@ -776,26 +800,21 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ReconfigurationObserver.lean | 253 | Canonical proof-facing surface for region layering, linking/delegation harmony, observer equivalence, and replay/cross-target observer alignment |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
 | Proofs/InvariantSpace.lean | 231 | Proof-carrying invariant-space bundle with tightened progress-contract witnesses and integrated semantic-object families |
-| Proofs/Adapters/Progress.lean | 50 | Invariant-space adapters for liveness/progress theorems |
-| Proofs/Adapters/Classical.lean | 416 | Invariant-space adapters for classical transport profiles and artifacts |
-| Proofs/Adapters/Distributed.lean | 87 | V2: Distributed adapter re-exports |
-| Proofs/Adapters/Distributed/CoreProfiles.lean | 10 | V2: Distributed profile definitions |
-| Proofs/Adapters/Distributed/ProfileSetters.lean | 223 | V2: Profile configuration utilities |
-| Proofs/Adapters/Distributed/ProfileWrappers.lean | 146 | V2: Canonical distributed profile wrapper types, including protocol-machine envelope profiles |
-| Proofs/Adapters/Distributed/ProfileExtractionTheorems.lean | 217 | V2: Profile extraction theorems |
-| Proofs/Adapters/Distributed/EnvelopeTheorems.lean | 488 | V2: Envelope theorem facade |
-| Proofs/Adapters/Distributed/EnvelopeTheoremsAdmissionBridge.lean | 133 | V2: Admission and bridge theorems |
+| Proofs/Adapters/Progress.lean | 53 | Invariant-space adapters for liveness/progress theorems |
+| Proofs/Adapters/Classical.lean | 273 | Invariant-space adapters for classical transport profiles and artifacts |
+| Proofs/Adapters/Distributed/ProfileWrappers.lean | 151 | Canonical distributed profile wrapper types, including protocol-machine envelope profiles |
 
 ### Proofs/TheoremPack (V2 Theorem Bundle Infrastructure)
 
 | File | Lines | Description |
 |------|------:|-------------|
-| Proofs/TheoremPack/API.lean | 334 | V2: Public theorem-pack interface including proof-carrying metadata, semantic-object composition, inventory, and runtime gate APIs |
-| Proofs/TheoremPack/Build.lean | 418 | V2: Theorem-pack construction plus execution-profile/adherence correspondence theorems |
-| Proofs/TheoremPack/Artifacts.lean | 555 | V2: Artifact generation plus semantic-object packaging and proof-carrying metadata surfaces |
-| Proofs/TheoremPack/Profiles.lean | 407 | V2: Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
-| Proofs/TheoremPack/Inventory.lean | 111 | V2: Capability inventory management including semantic-object and proof-carrying metadata inventories |
-| Proofs/TheoremPack/ReleaseConformance.lean | 299 | V2: Release gate conformance checking |
+| Proofs/TheoremPack/API.lean | 368 | Public theorem-pack interface including proof-carrying metadata, semantic-object composition, inventory, and runtime gate APIs |
+| Proofs/TheoremPack/AdmissionBoundary.lean | 273 | Explicit admission-boundary ledger for transported theorem usage |
+| Proofs/TheoremPack/Artifacts.lean | 591 | Artifact generation plus semantic-object packaging and proof-carrying metadata surfaces |
+| Proofs/TheoremPack/Build.lean | 453 | Theorem-pack construction plus execution-profile/adherence correspondence theorems |
+| Proofs/TheoremPack/Inventory.lean | 114 | Capability inventory management including semantic-object and proof-carrying metadata inventories |
+| Proofs/TheoremPack/Profiles.lean | 416 | Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
+| Proofs/TheoremPack/ReleaseConformance.lean | 304 | Release gate conformance checking |
 
 ### Proofs/EffectBisim (V2 Handler Equivalence)
 
@@ -816,9 +835,16 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/SchedulingBoundCore.lean | 424 | Core k-fair scheduler termination bounds |
 | Proofs/SchedulingBoundTightness.lean | 328 | Tightness proofs and round-robin corollary |
 | Proofs/Diamond.lean | 468 | Cross-session diamond lemmas and main confluence theorem |
-| Proofs/Examples/DistributedProfiles.lean | 115 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
-| Proofs/Examples/ComposedProofPack.lean | 347 | End-to-end theorem-pack example showing semantic-object witness bundles flowing through the canonical composition and inventory path |
-| Proofs/Examples/InvariantBundle.lean | 74 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
+| Proofs/Examples/AgreementProfiles.lean | 141 | Agreement-profile theorem-pack examples |
+| Proofs/Examples/ComposedProofPack.lean | 356 | End-to-end theorem-pack example showing semantic-object witness bundles flowing through the canonical composition and inventory path |
+| Proofs/Examples/CrossTargetProgressDependentWork.lean | 198 | Cross-target progress and dependent-work examples |
+| Proofs/Examples/DistributedLoweringProfiles.lean | 110 | Lowering-backed distributed theorem-pack profile examples |
+| Proofs/Examples/DistributedProfiles.lean | 178 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
+| Proofs/Examples/EffectContracts.lean | 114 | Effect-contract theorem-pack examples |
+| Proofs/Examples/InvariantBundle.lean | 144 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
+| Proofs/Examples/PublicationMaterialization.lean | 266 | Publication and materialization examples |
+| Proofs/Examples/ReplayFailureExactness.lean | 205 | Replay and failure exactness examples |
+| Proofs/Examples/SchedulerBundle.lean | 56 | Scheduler-bundle examples |
 
 ### Examples and Tests
 

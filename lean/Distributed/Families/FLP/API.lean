@@ -18,8 +18,8 @@ universe u v w x
 
 /-- A protocol packaged for FLP lower-bound certification.
 
-`lowerBound` has a default proof term, so users only provide model assumptions
-and valency-style premises; the theorem is derived automatically. -/
+Users provide model assumptions and valency-style premises; the theorem is
+derived by `lower_bound_of_protocol`. -/
 structure LowerBoundProtocol where
   State : Type u
   Value : Type v
@@ -28,9 +28,6 @@ structure LowerBoundProtocol where
   model : Model State Value Event Party
   assumptions : Assumptions model
   premises : LowerBoundPremises model
-  lowerBound :
-    ∃ run, premises.FairRun run ∧ ∀ n, premises.Uncommitted (run n) :=
-      lower_bound_of_assumptions assumptions premises
 
 /-- Stronger protocol package: includes premises sufficient to derive
 the full FLP impossibility (negation of universal fair-run termination). -/
@@ -42,24 +39,18 @@ structure ImpossibilityProtocol where
   model : Model State Value Event Party
   assumptions : Assumptions model
   premises : ImpossibilityPremises model
-  lowerBound :
-    ∃ run, premises.FairRun run ∧ ∀ n, premises.Uncommitted (run n) :=
-      lower_bound_of_assumptions assumptions premises.toLowerBoundPremises
-  impossibility :
-    ¬ TerminatesOnAllFairRuns model premises.FairRun :=
-      impossibility_of_assumptions assumptions premises
 
 /-! ## Certified Bundle Extractors -/
 
 /-- Extract the FLP lower-bound theorem from a certified protocol bundle. -/
 theorem lower_bound_of_protocol (P : LowerBoundProtocol) :
     ∃ run, P.premises.FairRun run ∧ ∀ n, P.premises.Uncommitted (run n) :=
-  P.lowerBound
+  lower_bound_of_assumptions P.assumptions P.premises
 
 /-- Extract the full FLP impossibility theorem from a full protocol bundle. -/
 theorem impossibility_of_protocol (P : ImpossibilityProtocol) :
     ¬ TerminatesOnAllFairRuns P.model P.premises.FairRun :=
-  P.impossibility
+  impossibility_of_assumptions P.assumptions P.premises
 
 /-- Runtime-style certificate object for downstream APIs. -/
 structure LowerBoundCertificate (P : LowerBoundProtocol) where
@@ -70,9 +61,10 @@ structure LowerBoundCertificate (P : LowerBoundProtocol) where
 /-- Materialize a certificate witness from a certified protocol bundle. -/
 theorem certify (P : LowerBoundProtocol) : Nonempty (LowerBoundCertificate P) := by
   classical
-  refine ⟨⟨Classical.choose P.lowerBound, ?_, ?_⟩⟩
-  · exact (Classical.choose_spec P.lowerBound).1
-  · exact (Classical.choose_spec P.lowerBound).2
+  let hLower := lower_bound_of_protocol P
+  refine ⟨⟨Classical.choose hLower, ?_, ?_⟩⟩
+  · exact (Classical.choose_spec hLower).1
+  · exact (Classical.choose_spec hLower).2
 
 /-- FLP core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : LowerBoundProtocol) :

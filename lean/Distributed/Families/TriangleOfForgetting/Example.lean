@@ -116,6 +116,7 @@ def sHeal : State :=
 
 /-- Small explicit reachability relation for the worked example. -/
 def reachable (s₁ s₂ : State) : Prop :=
+  s₁ = s₂ ∨
   (s₁ = sBase ∧ s₂ = sJoin) ∨
   (s₁ = sJoin ∧ s₂ = sLeave) ∨
   (s₁ = sComp ∧ s₂ = sHeal)
@@ -164,7 +165,10 @@ theorem left_shape
     sLive = sJoin ∧ sExpired = sLeave ∧ m = 0 := by
   -- Split on the explicit reachability relation and rule out the non-leave branches.
   rcases hLeft with ⟨hReach, hActive, hInactive⟩
-  rcases hReach with hBase | hTail
+  rcases hReach with hSame | hStep
+  · subst hSame
+    exact False.elim (hInactive hActive)
+  rcases hStep with hBase | hTail
   · rcases hBase with ⟨rfl, rfl⟩
     exfalso
     have hZero : m = 0 := by
@@ -193,7 +197,10 @@ theorem recovered_shape
     sCompromised = sComp ∧ sRecovered = sHeal ∧ m = 0 := by
   -- Split on the explicit reachability relation and rule out the non-recovery branches.
   rcases hRecovered with ⟨hReach, hCompromised, hHealed⟩
-  rcases hReach with hBase | hTail
+  rcases hReach with hSame | hStep
+  · subst hSame
+    exact False.elim (hHealed hCompromised)
+  rcases hStep with hBase | hTail
   · rcases hBase with ⟨rfl, rfl⟩
     exfalso
     simp [model, modelOfCRDT, mkModel, sBase] at hCompromised
@@ -287,7 +294,7 @@ theorem lateVsInvalidAmbiguity : LateVsInvalidAmbiguity model := by
 theorem recoveryWitness : RecoveryWitness model := by
   -- Exhibit the concrete `sComp → sHeal` recovery transition together with `uRecover`.
   refine ⟨sComp, sHeal, uRecover, ?_, ?_⟩
-  · refine ⟨Or.inr (Or.inr ⟨rfl, rfl⟩), ?_, ?_⟩
+  · refine ⟨Or.inr (Or.inr (Or.inr ⟨rfl, rfl⟩)), ?_, ?_⟩
     · simp [model, modelOfCRDT, mkModel, sComp, uRecover]
     · simp [model, modelOfCRDT, mkModel, sHeal, uRecover]
   · refine ⟨?_, ?_⟩
@@ -310,7 +317,9 @@ theorem compromiseRecoveryAmbiguity : CompromiseRecoveryAmbiguity model := by
 /-- The example packages its direct witnesses into the reusable triangle
 assumption bundle. -/
 def assumptions : Assumptions model :=
-  { asynchronous := by trivial
+  { asynchronous := by
+      intro s
+      exact Or.inl rfl
   , localAcceptance := localAcceptance
   , dynamicMembershipProvidesRevocation := by
       intro _hDynamic

@@ -20,23 +20,6 @@ structure SafetyProtocol where
   Party : Type x
   model : Model State Decision Certificate Party
   assumptions : Assumptions model
-  noConflictingCommits :
-    ∀ {s d₁ d₂},
-      Committed model s d₁ →
-      Committed model s d₂ →
-      ¬ model.conflicts d₁ d₂ := by
-        intro s d₁ d₂ hCommitted₁ hCommitted₂
-        exact no_conflicting_commits_of_assumptions assumptions hCommitted₁ hCommitted₂
-  forkExclusion :
-    ∀ s, ¬ Forked model s := by
-      intro s
-      exact fork_exclusion_of_assumptions assumptions s
-  safeFinality :
-    ∀ {s d},
-      Finalized model s d →
-      ∀ d', Committed model s d' → ¬ model.conflicts d d' := by
-        intro s d hFinalized d' hCommitted
-        exact safe_finality_of_assumptions assumptions hFinalized d' hCommitted
 
 /-- Extract no-conflicting-commits theorem from a certified protocol bundle. -/
 theorem no_conflicting_commits_of_protocol (P : SafetyProtocol) :
@@ -44,19 +27,21 @@ theorem no_conflicting_commits_of_protocol (P : SafetyProtocol) :
       Committed P.model s d₁ →
       Committed P.model s d₂ →
       ¬ P.model.conflicts d₁ d₂ :=
-  P.noConflictingCommits
+  fun hCommitted₁ hCommitted₂ =>
+    no_conflicting_commits_of_assumptions P.assumptions hCommitted₁ hCommitted₂
 
 /-- Extract fork-exclusion theorem from a certified protocol bundle. -/
 theorem fork_exclusion_of_protocol (P : SafetyProtocol) :
     ∀ s, ¬ Forked P.model s :=
-  P.forkExclusion
+  fork_exclusion_of_assumptions P.assumptions
 
 /-- Extract safe-finality theorem from a certified protocol bundle. -/
 theorem safe_finality_of_protocol (P : SafetyProtocol) :
     ∀ {s d},
       Finalized P.model s d →
       ∀ d', Committed P.model s d' → ¬ P.model.conflicts d d' :=
-  P.safeFinality
+  fun hFinalized d' hCommitted =>
+    safe_finality_of_assumptions P.assumptions hFinalized d' hCommitted
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : SafetyProtocol) :

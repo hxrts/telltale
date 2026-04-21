@@ -114,6 +114,7 @@ ci-dry-run lane="fast":
     just book
     # WASM compilation checks
     just wasm-check
+    just reclaim-build-space-if-needed 30000
     just wasm-test-all
     # Golden file equivalence tests (fast, no Lean required)
     just test-golden
@@ -802,7 +803,9 @@ wasm-test-all:
     );
     EOF
     CARGO_TARGET_DIR="$machine_target" NODE_PATH="$shim_root" wasm-pack test --node rust/machine --features wasm -- --nocapture
+    rm -rf "$machine_target"
     CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/runtime --features "wasm _wasm_integration_tests" -- --nocapture
+    rm -rf "$choreo_target"
     cd examples/wasm
     CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
 

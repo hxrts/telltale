@@ -28,13 +28,13 @@ universe u v w x
 structure NoQuorumCounterexample
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
-  witness : SafetyContradictionWitness M
+  conflict : SafetyContradictionWitness M
 
 /-- Counterexample shell: dropping auth/evidence validity can admit conflicts. -/
 structure InvalidAuthCounterexample
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
-  witness : SafetyContradictionWitness M
+  conflict : SafetyContradictionWitness M
   invalidEvidence : ByzantineEvidence
   evidenceInvalid : ¬ EvidenceValid invalidEvidence
 
@@ -42,13 +42,13 @@ structure InvalidAuthCounterexample
 structure ThresholdBudgetCounterexample
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
-  witness : SafetyContradictionWitness M
+  conflict : SafetyContradictionWitness M
 
 /-- Counterexample shell: primitive mismatch can admit conflicting finalizations. -/
 structure PrimitiveMismatchCounterexample
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
-  witness : SafetyContradictionWitness M
+  conflict : SafetyContradictionWitness M
 
 /-- Any contradiction witness refutes certified-side characterization immediately. -/
 theorem contradiction_witness_refutes_characterization
@@ -71,7 +71,7 @@ def noQuorumCounterexample_of_droppedAssumption
     (w : SafetyContradictionWitness M) :
     NoQuorumCounterexample M := by
   -- The dropped assumption class is tracked by the theorem premise; the witness is canonical.
-  exact { witness := w }
+  exact { conflict := w }
 
 /-- Dropping auth/evidence validity obligations admits a packaged contradiction witness. -/
 def invalidAuthCounterexample_of_droppedAssumption
@@ -85,7 +85,7 @@ def invalidAuthCounterexample_of_droppedAssumption
     InvalidAuthCounterexample M := by
   -- Keep invalid-evidence payload explicit so converse theorems can reuse the same witness.
   exact
-    { witness := w
+    { conflict := w
     , invalidEvidence := invalidEvidence
     , evidenceInvalid := hInvalid
     }
@@ -101,7 +101,7 @@ def thresholdBudgetCounterexample_of_droppedAssumption
     (w : SafetyContradictionWitness M) :
     ThresholdBudgetCounterexample M := by
   -- The dropped-threshold class is tracked in hypotheses; the witness is reused directly.
-  exact { witness := w }
+  exact { conflict := w }
 
 /-- Dropping primitive-consistency obligations admits a contradiction witness. -/
 def primitiveMismatchCounterexample_of_droppedAssumption
@@ -114,7 +114,7 @@ def primitiveMismatchCounterexample_of_droppedAssumption
     (w : SafetyContradictionWitness M) :
     PrimitiveMismatchCounterexample M := by
   -- Primitive mismatch is represented at the assumption layer, with witness-level contradiction.
-  exact { witness := w }
+  exact { conflict := w }
 
 /-! ### Minimality Refuters -/
 
@@ -125,7 +125,7 @@ theorem no_quorum_counterexample_minimal
     (cex : NoQuorumCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- Any packaged contradiction witness immediately refutes characterization.
-  exact contradiction_witness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.conflict
 
 /-- Minimality form: every invalid-auth counterexample refutes characterization. -/
 theorem invalid_auth_counterexample_minimal
@@ -134,7 +134,7 @@ theorem invalid_auth_counterexample_minimal
     (cex : InvalidAuthCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- The contradiction witness, not the payload shape, is the minimal refuter.
-  exact contradiction_witness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.conflict
 
 /-- Minimality form: every threshold-budget counterexample refutes characterization. -/
 theorem threshold_budget_counterexample_minimal
@@ -143,7 +143,7 @@ theorem threshold_budget_counterexample_minimal
     (cex : ThresholdBudgetCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- The contradiction witness is sufficient to refute characterization.
-  exact contradiction_witness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.conflict
 
 /-- Minimality form: every primitive-mismatch counterexample refutes characterization. -/
 theorem primitive_mismatch_counterexample_minimal
@@ -152,7 +152,7 @@ theorem primitive_mismatch_counterexample_minimal
     (cex : PrimitiveMismatchCounterexample M) :
     ¬ CharacterizationCondition M := by
   -- The contradiction witness is sufficient to refute characterization.
-  exact contradiction_witness_refutes_characterization cex.witness
+  exact contradiction_witness_refutes_characterization cex.conflict
 
 /-! ## Weight-Based and Coupled Specializations -/
 
@@ -166,7 +166,7 @@ def modelOfNakamoto
       , certified := fun s d _ => d = M.chain s
       , committed := fun s d => d = M.chain s
       , conflicts := fun d₁ d₂ => d₁ ≠ d₂
-      , certificateWitness := by
+      , certificateForCommit := by
           -- Commitment is definitional equality with the observed chain.
           intro s d hCommitted
           exact ⟨(), hCommitted⟩

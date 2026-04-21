@@ -1,2 +1,3 @@
 import Distributed.Families.PartialSynchrony.Core
 import Distributed.Families.PartialSynchrony.API
+import Distributed.Families.PartialSynchrony.Profile

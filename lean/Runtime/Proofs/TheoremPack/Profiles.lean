@@ -215,6 +215,15 @@ def ProtocolMachineInvariantSpaceWithProfiles.withCRDT
   ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
     (fun distributed => { distributed with crdt? := some p })
 
+/-- Attach a CRDT OpCore-erasure distributed profile to a combined space. -/
+def ProtocolMachineInvariantSpaceWithProfiles.withCRDTErasure
+    {store₀ : SessionStore ν} {State : Type v}
+    (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
+    (p : Adapters.CRDTErasureProfile) :
+    ProtocolMachineInvariantSpaceWithProfiles store₀ State :=
+  ProtocolMachineInvariantSpaceWithProfiles.updateDistributedProfiles space
+    (fun distributed => { distributed with crdtErasure? := some p })
+
 /-- Attach a triangle-of-forgetting distributed profile to a combined space. -/
 def ProtocolMachineInvariantSpaceWithProfiles.withTriangleOfForgetting
     {store₀ : SessionStore ν} {State : Type v}

@@ -22,14 +22,11 @@ structure ImpossibilityProtocol where
   View : Type x
   model : Model State Update Member View
   assumptions : Assumptions model
-  impossibility :
-    ¬ TriangleGuarantee model :=
-      not_triangle_guarantee_of_assumptions assumptions
 
 /-- Extract the full triangle-of-forgetting impossibility theorem from a certified protocol. -/
 theorem impossibility_of_protocol (P : ImpossibilityProtocol) :
     ¬ TriangleGuarantee P.model :=
-  P.impossibility
+  not_triangle_guarantee_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : ImpossibilityProtocol) :

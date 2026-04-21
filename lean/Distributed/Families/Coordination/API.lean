@@ -19,26 +19,23 @@ structure CoordinationProtocol where
   model : Model State Update
   assumptions : Assumptions model
   premises : Premises model
-  characterization :
-    CoordinationCharacterization model :=
-      coordination_characterization_of_assumptions assumptions premises
 
 /-- Extract coordination characterization from a certified protocol bundle. -/
 theorem characterization_of_protocol (P : CoordinationProtocol) :
     CoordinationCharacterization P.model :=
-  P.characterization
+  coordination_characterization_of_assumptions P.assumptions P.premises
 
 /-- Monotone side of the characterization. -/
 theorem coordination_free_of_monotone (P : CoordinationProtocol)
-    (hMono : P.model.monotoneUpdateClass) :
+    (hMono : MonotoneUpdates P.model) :
     CoordinationFreeSafety P.model :=
-  P.characterization.1 hMono
+  (characterization_of_protocol P).1 hMono
 
 /-- Non-monotone side of the characterization. -/
 theorem coordination_required_of_non_monotone (P : CoordinationProtocol)
-    (hNonMono : ¬ P.model.monotoneUpdateClass) :
+    (hNonMono : ¬ MonotoneUpdates P.model) :
     CoordinationRequired P.model :=
-  P.characterization.2 hNonMono
+  (characterization_of_protocol P).2 hNonMono
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : CoordinationProtocol) :

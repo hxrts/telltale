@@ -118,9 +118,11 @@ structure ErasurePremises
   lower : LowerToCore KRich OpTag Args
   encode : OpCore OpTag Args → Enc
   decode : Enc → Option (OpCore OpTag Args)
-  weakestWitness : WeakestOpCoreErasureTheorem M evalRich interp erase
-  replayStableWitness : ReplayStableCoreEval interp
-  serializationWitness : TransportSerializationInvariant encode decode
+  erasureSound : ErasureSoundness M evalRich interp erase
+  erasureComplete : ErasureCompleteness M interp erase
+  erasureMaximal : ErasureMaximality M interp erase
+  replayStable : ReplayStableCoreEval interp
+  serializationRoundTrip : SerializationRoundTrip encode decode
   lowerSound : ∀ kr kc, lower kr = some kc → kc = erase kr
 
 /-- Derive weakest-core erasure theorem from explicit erasure premises. -/
@@ -130,7 +132,7 @@ theorem weakest_op_core_erasure_of_premises
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
     (p : ErasurePremises M KRich OpTag Args Enc) :
     WeakestOpCoreErasureTheorem M p.evalRich p.interp p.erase :=
-  p.weakestWitness
+  ⟨p.erasureSound, p.erasureComplete, p.erasureMaximal⟩
 
 /-- Derive replay stability of `OpCore` evaluation from erasure premises. -/
 theorem op_core_replay_stable_of_premises
@@ -139,7 +141,7 @@ theorem op_core_replay_stable_of_premises
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
     (p : ErasurePremises M KRich OpTag Args Enc) :
     ReplayStableCoreEval p.interp :=
-  p.replayStableWitness
+  p.replayStable
 
 /-- Derive transport-serialization invariance from erasure premises. -/
 theorem op_core_serialization_invariant_of_premises
@@ -148,7 +150,7 @@ theorem op_core_serialization_invariant_of_premises
     {KRich : Type z} {OpTag : Type v} {Args : Type w} {Enc : Type x}
     (p : ErasurePremises M KRich OpTag Args Enc) :
     TransportSerializationInvariant p.encode p.decode :=
-  p.serializationWitness
+  transport_serialization_invariant_of_round_trip p.encode p.decode p.serializationRoundTrip
 
 /-! ## Premise-Derived Conformance Gate Lemma -/
 

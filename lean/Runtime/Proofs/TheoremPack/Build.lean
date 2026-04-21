@@ -53,6 +53,7 @@ structure ProtocolMachineTheoremPack
   calm? : Option CALMArtifact
   crdt? : Option CRDTArtifact
   crdtMonotonicity? : Option CRDTMonotonicityArtifact
+  crdtErasure? : Option CRDTErasureArtifact
   triangleOfForgetting? : Option TriangleOfForgettingArtifact
   byzantineSafety? : Option ByzantineSafetyArtifact
   consensusEnvelope? : Option ConsensusEnvelopeArtifact
@@ -94,7 +95,7 @@ def buildProtocolMachineTheoremPack
     | none => none
     | some w =>
         some
-          { witness := w
+          { condition := w
           , soundness := w.sound
           }
   let semanticObjects? :=
@@ -106,24 +107,28 @@ def buildProtocolMachineTheoremPack
   let flpLowerBound? :=
     match space.distributed.flp? with
     | none => none
-    | some p => some { protocol := p, proof := p.lowerBound }
+    | some p => some
+        { protocol := p
+        , proof := Distributed.FLP.lower_bound_of_assumptions
+            p.assumptions p.premises.toLowerBoundPremises
+        }
   let flpImpossibility? :=
     match space.distributed.flp? with
     | none => none
-    | some p => some { protocol := p, proof := p.impossibility }
+    | some p => some { protocol := p, proof := Distributed.FLP.impossibility_of_protocol p }
   let capImpossibility? :=
     match space.distributed.cap? with
     | none => none
-    | some p => some { protocol := p, proof := p.impossibility }
+    | some p => some { protocol := p, proof := Distributed.CAP.impossibility_of_protocol p }
   let quorumGeometry? :=
     match space.distributed.quorumGeometry? with
     | none => none
     | some p =>
         some
           { protocol := p
-          , noConflictingCommits := p.noConflictingCommits
-          , forkExclusion := p.forkExclusion
-          , safeFinality := p.safeFinality
+          , noConflictingCommits := Distributed.QuorumGeometry.no_conflicting_commits_of_protocol p
+          , forkExclusion := Distributed.QuorumGeometry.fork_exclusion_of_protocol p
+          , safeFinality := Distributed.QuorumGeometry.safe_finality_of_protocol p
           }
 
   -- Builder: Liveness and Responsiveness
@@ -134,8 +139,8 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , eventualDecision := p.eventualDecision
-          , boundedPostGST := p.boundedPostGST
+          , eventualDecision := Distributed.PartialSynchrony.eventual_decision_of_protocol p
+          , boundedPostGST := Distributed.PartialSynchrony.bounded_post_gst_of_protocol p
           }
   let responsiveness? :=
     match space.distributed.responsiveness? with
@@ -143,9 +148,9 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , eventualDecision := p.eventualDecision
+          , eventualDecision := Distributed.Responsiveness.eventual_decision_of_protocol p
 /- ## Structured Block 3 -/
-          , timeoutIndependentLatency := p.timeoutIndependentLatency
+          , timeoutIndependentLatency := Distributed.Responsiveness.timeout_independent_latency_of_protocol p
           }
   let nakamoto? :=
     match space.distributed.nakamoto? with
@@ -153,9 +158,9 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , probabilisticSafety := p.probabilisticSafety
-          , settlementFinality := p.settlementFinality
-          , livenessUnderChurn := p.livenessUnderChurn
+          , probabilisticSafety := Distributed.Nakamoto.probabilistic_safety_of_protocol p
+          , settlementFinality := Distributed.Nakamoto.settlement_finality_of_protocol p
+          , livenessUnderChurn := Distributed.Nakamoto.liveness_under_churn_of_protocol p
           }
   let reconfiguration? :=
     match space.distributed.reconfiguration? with
@@ -163,9 +168,9 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , noSplitBrain := p.noSplitBrain
-          , safeHandoff := p.safeHandoff
-          , livenessPreserved := p.livenessPreserved
+          , noSplitBrain := Distributed.Reconfiguration.no_split_brain_of_protocol p
+          , safeHandoff := Distributed.Reconfiguration.safe_handoff_of_protocol p
+          , livenessPreserved := Distributed.Reconfiguration.liveness_preserved_of_protocol p
           }
   let atomicBroadcast? :=
     match space.distributed.atomicBroadcast? with
@@ -173,9 +178,9 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , totalOrderConsistency := p.totalOrderConsistency
-          , logPrefixCompatibility := p.logPrefixCompatibility
-          , consensusAtomicBroadcastBridge := p.consensusAtomicBroadcastBridge
+          , totalOrderConsistency := Distributed.AtomicBroadcast.total_order_consistency_of_protocol p
+          , logPrefixCompatibility := Distributed.AtomicBroadcast.log_prefix_compatibility_of_protocol p
+          , consensusAtomicBroadcastBridge := Distributed.AtomicBroadcast.bridge_of_protocol p
           }
 
   -- Builder: Safety Boundaries and Availability
@@ -186,7 +191,7 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , accountableSafety := p.accountableSafety
+          , accountableSafety := Distributed.AccountableSafety.accountable_safety_of_protocol p
           }
   let failureDetectors? :=
     match space.distributed.failureDetectors? with
@@ -194,8 +199,8 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , solvabilityBoundary := p.solvabilityBoundary
-          , impossibilityBoundary := p.impossibilityBoundary
+          , solvabilityBoundary := Distributed.FailureDetectors.solvability_boundary_of_protocol p
+          , impossibilityBoundary := Distributed.FailureDetectors.impossibility_boundary_of_protocol p
           }
   let dataAvailability? :=
 /- ## Structured Block 4 -/
@@ -204,8 +209,8 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , availability := p.availability
-          , retrievability := p.retrievability
+          , availability := Distributed.DataAvailability.availability_of_protocol p
+          , retrievability := Distributed.DataAvailability.retrievability_of_protocol p
           }
   let coordination? :=
     match space.distributed.coordination? with
@@ -213,7 +218,7 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , characterization := p.characterization
+          , characterization := Distributed.Coordination.characterization_of_protocol p
           }
   let calm? :=
     match space.distributed.coordination? with
@@ -221,9 +226,10 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , characterization := p.characterization
-          , coordinationFreeWhenMonotone := fun hMono => p.characterization.1 hMono
-          , coordinationRequiredWhenNonMonotone := fun hNonMono => p.characterization.2 hNonMono
+          , characterization := Distributed.Coordination.characterization_of_protocol p
+          , coordinationFreeWhenMonotone := Distributed.Coordination.coordination_free_of_monotone p
+          , coordinationRequiredWhenNonMonotone :=
+              Distributed.Coordination.coordination_required_of_non_monotone p
           }
 
   -- Builder: CRDT and Consensus Envelope Families
@@ -234,21 +240,21 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , exactEnvelope := p.exactEnvelope
-          , adequacy := p.adequacy
-          , principalCapability := p.principalCapability
-          , admissionSoundness := p.admissionSoundness
-          , admissionCompleteness := p.admissionCompleteness
-          , opStateEquivalence := p.opStateEquivalence
-          , gcSafetyIff := p.gcSafetyIffCausalDominance
-          , boundedApproximation := p.boundedApproximation
-          , approximationMonotonicity := p.approximationMonotonicity
-          , exactSECAsLimit := p.exactSECAsLimit
-          , hcrdtCore := p.hcrdtCore
-          , hcrdtFoundation := p.hcrdtFoundation
-          , hcrdtDynamics := p.hcrdtDynamics
-          , hcrdtExtensions := p.hcrdtExtensions
-          , hcrdtLimits := p.hcrdtLimits
+          , exactEnvelope := Distributed.CRDT.exact_envelope_of_protocol p
+          , adequacy := Distributed.CRDT.adequacy_of_protocol p
+          , principalCapability := Distributed.CRDT.principal_capability_of_protocol p
+          , admissionSoundness := Distributed.CRDT.admission_soundness_of_protocol p
+          , admissionCompleteness := Distributed.CRDT.admission_completeness_of_protocol p
+          , opStateEquivalence := Distributed.CRDT.op_state_equivalence_of_protocol p
+          , gcSafetyIff := Distributed.CRDT.gc_safety_iff_of_protocol p
+          , boundedApproximation := Distributed.CRDT.bounded_approximation_of_protocol p
+          , approximationMonotonicity := Distributed.CRDT.approximation_monotone_of_protocol p
+          , exactSECAsLimit := Distributed.CRDT.exact_sec_as_limit_of_protocol p
+          , hcrdtCore := Distributed.CRDT.hcrdt_core_of_protocol p
+          , hcrdtFoundation := Distributed.CRDT.hcrdt_foundation_of_protocol p
+          , hcrdtDynamics := Distributed.CRDT.hcrdt_dynamics_of_protocol p
+          , hcrdtExtensions := Distributed.CRDT.hcrdt_extensions_of_protocol p
+          , hcrdtLimits := Distributed.CRDT.hcrdt_limits_of_protocol p
           }
   let crdtMonotonicity? :=
     match space.distributed.crdt? with
@@ -258,8 +264,29 @@ def buildProtocolMachineTheoremPack
           { protocol := p
           , semilatticeCore := p.assumptions.semilatticeCoreClass
           , opContextLayer := p.assumptions.opContextLayerClass
-          , approximationMonotonicity := p.approximationMonotonicity
-          , hcrdtCore := p.hcrdtCore
+          , mergeInflationary :=
+              Distributed.CRDT.merge_inflationary_of_state_based_crdt p.premises.stateSemantics
+          , mergeMonotone :=
+              Distributed.CRDT.merge_monotone_of_state_based_crdt p.premises.stateSemantics
+          , strongEventualConvergence :=
+              Distributed.CRDT.strong_eventual_convergence_of_state_based_crdt
+                p.premises.stateSemantics
+          , finiteCausalDeliveryConverges :=
+              Distributed.CRDT.finite_causal_delivery_converges_of_state_based_crdt
+                p.premises.stateSemantics
+          , approximationMonotonicity := Distributed.CRDT.approximation_monotone_of_protocol p
+          , hcrdtCore := Distributed.CRDT.hcrdt_core_of_protocol p
+          }
+  let crdtErasure? :=
+    match space.distributed.crdtErasure? with
+    | none => none
+    | some p =>
+        some
+          { protocol := p
+          , weakestOpCoreErasure := p.weakestOpCoreErasure
+          , replayStable := p.replayStable
+          , serializationInvariant := p.serializationInvariant
+          , conformanceGateIffLowered := p.conformanceGateIffLowered
           }
   let triangleOfForgetting? :=
     match space.distributed.triangleOfForgetting? with
@@ -267,7 +294,7 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , proof := p.impossibility
+          , proof := Distributed.TriangleOfForgetting.impossibility_of_protocol p
           }
 
   -- Builder: Byzantine and Consensus Envelope Families
@@ -278,7 +305,7 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , exactCharacterization := p.exactCharacterization
+          , exactCharacterization := Distributed.ByzantineSafety.exact_characterization_of_protocol p
           , byzantineSafety := Distributed.ByzantineSafety.byzantine_safety_of_protocol p
           , characterization := Distributed.ByzantineSafety.characterization_of_protocol p
           , assumptionsPassed := Distributed.ByzantineSafety.byzantine_assumptions_all_passed p
@@ -290,11 +317,11 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , exactEnvelope := p.exactEnvelope
-          , adequacy := p.adequacy
-          , principalCapability := p.principalCapability
-          , admissionSoundness := p.admissionSoundness
-          , admissionCompleteness := p.admissionCompleteness
+          , exactEnvelope := Distributed.ConsensusEnvelope.exact_envelope_of_protocol p
+          , adequacy := Distributed.ConsensusEnvelope.adequacy_of_protocol p
+          , principalCapability := Distributed.ConsensusEnvelope.principal_capability_of_protocol p
+          , admissionSoundness := Distributed.ConsensusEnvelope.admission_soundness_of_protocol p
+          , admissionCompleteness := Distributed.ConsensusEnvelope.admission_completeness_of_protocol p
           }
   let failureEnvelope? :=
     match space.distributed.failureEnvelope? with
@@ -393,6 +420,7 @@ def buildProtocolMachineTheoremPack
   , calm? := calm?
   , crdt? := crdt?
   , crdtMonotonicity? := crdtMonotonicity?
+  , crdtErasure? := crdtErasure?
   , triangleOfForgetting? := triangleOfForgetting?
   , byzantineSafety? := byzantineSafety?
   , consensusEnvelope? := consensusEnvelope?

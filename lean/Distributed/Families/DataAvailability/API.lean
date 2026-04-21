@@ -18,23 +18,16 @@ structure DAProtocol where
   Chunk : Type v
   model : Model State Chunk
   assumptions : Assumptions model
-  premises : Premises model
-  availability :
-    DataAvailability model :=
-      availability_of_assumptions assumptions premises
-  retrievability :
-    DataRetrievability model :=
-      retrievability_of_assumptions assumptions premises
 
 /-- Extract data-availability theorem from a certified protocol bundle. -/
 theorem availability_of_protocol (P : DAProtocol) :
     DataAvailability P.model :=
-  P.availability
+  availability_of_assumptions P.assumptions
 
 /-- Extract data-retrievability theorem from a certified protocol bundle. -/
 theorem retrievability_of_protocol (P : DAProtocol) :
     DataRetrievability P.model :=
-  P.retrievability
+  retrievability_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : DAProtocol) :

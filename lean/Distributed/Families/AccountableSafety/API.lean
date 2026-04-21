@@ -19,15 +19,11 @@ structure AccountableProtocol where
   Fault : Type w
   model : Model State Decision Fault
   assumptions : Assumptions model
-  premises : Premises model
-  accountableSafety :
-    AccountableSafety model :=
-      accountable_safety_of_assumptions assumptions premises
 
 /-- Extract accountable-safety theorem from a certified protocol bundle. -/
 theorem accountable_safety_of_protocol (P : AccountableProtocol) :
     AccountableSafety P.model :=
-  P.accountableSafety
+  accountable_safety_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : AccountableProtocol) :

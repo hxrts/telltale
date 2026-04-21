@@ -29,7 +29,7 @@ atomic-broadcast families.
 namespace Distributed
 namespace ByzantineSafety
 
-universe u v w x
+universe u v w x y
 
 /-- Canonical run type for Byzantine safety/equivalence statements. -/
 abbrev Run (State : Type u) := Nat → State
@@ -111,7 +111,7 @@ structure Model
   certified : State → Decision → Certificate → Prop
   committed : State → Decision → Prop
   conflicts : Decision → Decision → Prop
-  certificateWitness : ∀ {s d}, committed s d → ∃ c, certified s d c
+  certificateForCommit : ∀ {s d}, committed s d → ∃ c, certified s d c
   commitmentFromCertificate : ∀ {s d c}, certified s d c → committed s d
 
 /-- Safety-visible observation projection for Byzantine analyses. -/
@@ -206,7 +206,13 @@ structure SafetyAssumptions
   quorumIntersectionWitnessed : Prop
   timingAuthCompatible : Prop
   adversarialBudgetBounded : Prop
-  characterizationWitness : CharacterizationCondition M
+  Party : Type y
+  quorumModel : Distributed.QuorumGeometry.Model State Decision Certificate Party
+  quorumAssumptions : Distributed.QuorumGeometry.Assumptions quorumModel
+  certifiedToQuorum :
+    ∀ {s d c}, M.certified s d c → quorumModel.certified s d c
+  conflictToQuorum :
+    ∀ {d₁ d₂}, M.conflicts d₁ d₂ → quorumModel.conflicts d₁ d₂
 
 /-- Liveness-side assumptions tracked separately from safety characterization. -/
 structure LivenessAssumptions where
@@ -244,8 +250,8 @@ theorem byzantine_safety_sound_of_characterization
     ByzantineSafety M := by
   -- Lift committed decisions to certificates, then apply the characterization premise.
   intro s d₁ d₂ hCommitted₁ hCommitted₂
-  rcases M.certificateWitness hCommitted₁ with ⟨c₁, hCert₁⟩
-  rcases M.certificateWitness hCommitted₂ with ⟨c₂, hCert₂⟩
+  rcases M.certificateForCommit hCommitted₁ with ⟨c₁, hCert₁⟩
+  rcases M.certificateForCommit hCommitted₂ with ⟨c₂, hCert₂⟩
   exact hChar s d₁ d₂ c₁ c₂ hCert₁ hCert₂
 
 /-- Completeness: committed-side safety implies certified-side characterization. -/
@@ -286,8 +292,18 @@ theorem byzantine_safety_of_assumptions
     (M : Model State Decision Certificate Obs)
     (H : SafetyAssumptions M) :
     ByzantineSafety M := by
-  -- The assumption bundle carries the characterization witness used by soundness.
-  exact byzantine_safety_sound_of_characterization M H.characterizationWitness
+  -- Certified conflicts are excluded by the embedded quorum-geometry proof.
+  exact byzantine_safety_sound_of_characterization M (by
+    intro s d₁ d₂ c₁ c₂ hCert₁ hCert₂
+    intro hConflict
+    let qCommitted₁ : Distributed.QuorumGeometry.Committed H.quorumModel s d₁ :=
+      ⟨c₁, H.certifiedToQuorum hCert₁⟩
+    let qCommitted₂ : Distributed.QuorumGeometry.Committed H.quorumModel s d₂ :=
+      ⟨c₂, H.certifiedToQuorum hCert₂⟩
+    exact
+      (Distributed.QuorumGeometry.no_conflicting_commits_of_assumptions
+        H.quorumAssumptions qCommitted₁ qCommitted₂)
+        (H.conflictToQuorum hConflict))
 
 /-- Assumption-indexed exact characterization object for explicit-assumption workflows. -/
 theorem exact_byzantine_safety_characterization_of_assumptions
@@ -341,7 +357,7 @@ def modelOfQuorumGeometry
   certified := M.certified
   committed := Distributed.QuorumGeometry.Committed M
   conflicts := M.conflicts
-  certificateWitness := by
+  certificateForCommit := by
     -- Quorum-geometry commitment is definitionally an existential certificate.
     intro s d hCommitted
     exact hCommitted
@@ -350,13 +366,37 @@ def modelOfQuorumGeometry
     intro s d c hCert
     exact ⟨c, hCert⟩
 
+/-- Quorum-geometry profiles induce Byzantine safety assumptions for the embedded model. -/
+def safetyAssumptionsOfQuorumGeometry
+    (P : Distributed.QuorumGeometry.SafetyProtocol)
+    (protocolSpec : ProtocolSpec) :
+    SafetyAssumptions (modelOfQuorumGeometry P.model) where
+  byzantineFaultModel := protocolSpec.faultModel = .byzantine
+  evidencePrimitiveConsistent := evidencePrimitiveConsistentCheck protocolSpec = true
+  conflictExclusionPrimitiveConsistent :=
+    conflictExclusionPrimitiveConsistentCheck protocolSpec = true
+  finalizationWitnessPrimitiveConsistent :=
+    finalizationWitnessPrimitiveConsistentCheck protocolSpec = true
+  quorumIntersectionWitnessed := quorumIntersectionWitnessedCheck protocolSpec = true
+  timingAuthCompatible := timingAuthCompatibleCheck protocolSpec = true
+  adversarialBudgetBounded := adversarialBudgetBoundedCheck protocolSpec = true
+  Party := P.Party
+  quorumModel := P.model
+  quorumAssumptions := P.assumptions
+  certifiedToQuorum := by
+    intro s d c hCert
+    exact hCert
+  conflictToQuorum := by
+    intro d₁ d₂ hConflict
+    exact hConflict
+
 /-- BFT specialization: quorum-geometry safety yields Byzantine safety. -/
 theorem bft_specialization_of_quorum_geometry
     (P : Distributed.QuorumGeometry.SafetyProtocol) :
     ByzantineSafety (modelOfQuorumGeometry P.model) := by
   -- Reuse the certified no-conflicting-commits theorem directly.
   intro s d₁ d₂ hCommitted₁ hCommitted₂
-  exact P.noConflictingCommits hCommitted₁ hCommitted₂
+  exact Distributed.QuorumGeometry.no_conflicting_commits_of_protocol P hCommitted₁ hCommitted₂
 
 /-- BFT specialization also yields certified-side characterization. -/
 theorem bft_characterization_of_quorum_geometry
@@ -368,17 +408,21 @@ theorem bft_characterization_of_quorum_geometry
 /-- Accountable-safety packaging: a safety violation yields explicit evidence. -/
 theorem accountable_evidence_of_safety_violation
     (P : Distributed.AccountableSafety.AccountableProtocol)
-    (hNotSafe : ¬ Distributed.AccountableSafety.SafetyHolds P.model) :
-    Distributed.AccountableSafety.AccountableEvidenceExists P.model := by
-  -- Unpack accountable safety and eliminate the safety branch.
-  rcases P.accountableSafety with hSafe | hEvidence
-  · exact (hNotSafe hSafe).elim
-  · exact hEvidence
+    {s : P.State} {d₁ d₂ : P.Decision}
+    (hDec₁ : P.model.decided s d₁)
+    (hDec₂ : P.model.decided s d₂)
+    (hConflict : P.model.conflicts d₁ d₂) :
+    Distributed.AccountableSafety.SlashableEvidenceForConflict P.model s d₁ d₂ := by
+  -- Accountable safety turns each concrete conflict into slashable evidence.
+  have hAccountable :=
+    Distributed.AccountableSafety.accountable_safety_of_protocol P s d₁ d₂ hDec₁ hDec₂
+  cases hAccountable with
+  | inl hNoConflict => exact (hNoConflict hConflict).elim
+  | inr hEvidence => exact hEvidence
 
 /-- Atomic-broadcast bridge extracted for Byzantine theorem composition. -/
 theorem atomic_broadcast_bridge_of_protocol
     (P : Distributed.AtomicBroadcast.AtomicBroadcastProtocol) :
     Distributed.AtomicBroadcast.ConsensusAtomicBroadcastBridge P.model :=
   -- Reuse the protocol-level bridge theorem object.
-  P.consensusAtomicBroadcastBridge
-
+  Distributed.AtomicBroadcast.bridge_of_protocol P

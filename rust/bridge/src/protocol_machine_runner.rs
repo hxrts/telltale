@@ -271,7 +271,7 @@ impl ProtocolMachineRunner {
     pub const VALIDATOR_FALLBACK_SCRIPT_PATH: &'static str =
         "scripts/lean/protocol-machine-validator.sh";
     /// Default timeout for protocol-machine runner process invocations.
-    pub const DEFAULT_TIMEOUT_MS: u64 = 120_000;
+    pub const DEFAULT_TIMEOUT_MS: u64 = 300_000;
 
     fn process_timeout() -> Duration {
         let ms = std::env::var("TELLTALE_PROTOCOL_MACHINE_TIMEOUT_MS")

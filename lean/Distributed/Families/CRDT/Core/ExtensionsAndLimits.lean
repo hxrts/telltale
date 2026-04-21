@@ -69,39 +69,39 @@ def recycledActorRun : Run Nat :=
 def structuredSingleScaleModel : Model (Nat × Nat) Unit Unit Nat Unit where
   observe := Prod.fst
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := True
-  opContextLayerClass := True
-  minimalOpStateEquivalenceAssumptions := True
-  canonicalConvergenceDistanceClass := True
-  mixingTimeControlledClass := True
-  hotspotSlowModesClass := True
-  driftDecayClass := True
-  sequenceSubclassClass := True
-  epochBarrierClass := True
-  boundedMetadataApproxClass := True
+  semilatticeCoreClass := NatSemilatticeCoreLaw
+  opContextLayerClass := UnitOpContextLayerLaw
+  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
+  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
+  mixingTimeControlledClass := NatMixingControlLaw
+  hotspotSlowModesClass := NatHotspotSlowModeLaw
+  driftDecayClass := NatDriftDecayLaw
+  sequenceSubclassClass := NatSequenceSubclassLaw
+  epochBarrierClass := NatEpochBarrierLaw
+  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
   multiscaleObservablesClass := False
-  metadataTradeoffFrontierClass := True
-  gcCausalDominanceClass := True
-  stabilizationLowerBoundClass := True
+  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
+  gcCausalDominanceClass := NatGCCausalDominanceLaw
+  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
 
 /-- Structured-state model with multi-scale observable projection. -/
 def structuredMultiScaleModel : Model (Nat × Nat) Unit Unit (Nat × Nat) Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := True
-  opContextLayerClass := True
-  minimalOpStateEquivalenceAssumptions := True
-  canonicalConvergenceDistanceClass := True
-  mixingTimeControlledClass := True
-  hotspotSlowModesClass := True
-  driftDecayClass := True
-  sequenceSubclassClass := True
-  epochBarrierClass := True
-  boundedMetadataApproxClass := True
-  multiscaleObservablesClass := True
-  metadataTradeoffFrontierClass := True
-  gcCausalDominanceClass := True
-  stabilizationLowerBoundClass := True
+  semilatticeCoreClass := NatSemilatticeCoreLaw
+  opContextLayerClass := UnitOpContextLayerLaw
+  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
+  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
+  mixingTimeControlledClass := NatMixingControlLaw
+  hotspotSlowModesClass := NatHotspotSlowModeLaw
+  driftDecayClass := NatDriftDecayLaw
+  sequenceSubclassClass := NatSequenceSubclassLaw
+  epochBarrierClass := NatEpochBarrierLaw
+  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
+  multiscaleObservablesClass := NatMultiscaleObservableLaw
+  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
+  gcCausalDominanceClass := NatGCCausalDominanceLaw
+  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
 
 /-! ## Extension Counterexample Theorems -/
 

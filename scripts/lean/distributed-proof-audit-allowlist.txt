@@ -1,0 +1,19 @@
+# Distributed proof audit allowlist.
+#
+# Format: one extended regular expression per non-comment line. Each expression
+# is matched against a relative `path:line:content` audit hit.
+#
+# Policy:
+# - Prefer exact file or namespace entries.
+# - Do not allowlist theorem-shaped distributed `Premises` fields.
+# - Do not allowlist vacuous `True` guarantees.
+# - Add future distributed external-law APIs here only after documenting the
+#   corresponding API/Instance trust boundary in the Lean file header.
+
+# Existing explicit trust boundaries documented in lean/CODE_MAP.md.
+^lean/ClassicalAnalysisAPI\.lean:
+^lean/ClassicalAnalysisInstance\.lean:
+^lean/ClassicalAnalysisInstance/
+^lean/IrisExtractionAPI\.lean:
+^lean/IrisExtractionInstance\.lean:
+^lean/IrisExtractionInstance/
