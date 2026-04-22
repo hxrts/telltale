@@ -25,13 +25,13 @@ struct TestGrammarExtension;
 impl GrammarExtension for TestGrammarExtension {
     fn grammar_rules(&self) -> &'static str {
         r#"
-        test_stmt = { "test" ~ ident ~ "{" ~ protocol_body ~ "}" }
-        simple_test = { "simple" ~ ident }
+        test_extension_stmt = { "test" ~ ident ~ "{" ~ protocol_body ~ "}" }
+        test_extension_simple = { "simple" ~ ident }
         "#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["test_stmt", "simple_test"]
+        vec!["test_extension_stmt", "test_extension_simple"]
     }
 
     fn extension_id(&self) -> &'static str {
@@ -48,11 +48,11 @@ struct HighPriorityExtension;
 
 impl GrammarExtension for HighPriorityExtension {
     fn grammar_rules(&self) -> &'static str {
-        r#"priority_stmt = { "priority" ~ integer }"#
+        r#"high_priority_stmt = { "priority" ~ integer }"#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["priority_stmt"]
+        vec!["high_priority_stmt"]
     }
 
     fn extension_id(&self) -> &'static str {
@@ -69,11 +69,14 @@ struct TestStatementParser;
 
 impl StatementParser for TestStatementParser {
     fn can_parse(&self, rule_name: &str) -> bool {
-        matches!(rule_name, "test_stmt" | "simple_test")
+        matches!(rule_name, "test_extension_stmt" | "test_extension_simple")
     }
 
     fn supported_rules(&self) -> Vec<String> {
-        vec!["test_stmt".to_string(), "simple_test".to_string()]
+        vec![
+            "test_extension_stmt".to_string(),
+            "test_extension_simple".to_string(),
+        ]
     }
 
     fn parse_statement(
@@ -188,7 +191,7 @@ mod grammar_composition_tests {
         assert!(result.is_ok(), "Grammar composition should succeed");
 
         let composed = result.unwrap();
-        assert!(composed.contains("test_stmt"));
+        assert!(composed.contains("test_extension_stmt"));
         assert!(composed.contains("choreography"));
         assert!(composed.contains("// Extension Rules"));
     }
@@ -210,8 +213,8 @@ mod grammar_composition_tests {
         );
 
         let composed = result.unwrap();
-        assert!(composed.contains("test_stmt"));
-        assert!(composed.contains("priority_stmt"));
+        assert!(composed.contains("test_extension_stmt"));
+        assert!(composed.contains("high_priority_stmt"));
         assert!(composer.extension_count() == 2);
     }
 
@@ -259,8 +262,8 @@ mod grammar_composition_tests {
 
         // Results should be different
         assert_ne!(result1, result2);
-        assert!(result2.contains("test_stmt"));
-        assert!(!result1.contains("test_stmt"));
+        assert!(result2.contains("test_extension_stmt"));
+        assert!(!result1.contains("test_extension_stmt"));
     }
 
     #[test]
@@ -276,12 +279,12 @@ mod grammar_composition_tests {
         let result = composer.compose().unwrap();
 
         // Both extensions should be present
-        assert!(result.contains("test_stmt"));
-        assert!(result.contains("priority_stmt"));
+        assert!(result.contains("test_extension_stmt"));
+        assert!(result.contains("high_priority_stmt"));
 
         // Higher priority extension should be processed first
-        let test_pos = result.find("test_stmt").unwrap();
-        let priority_pos = result.find("priority_stmt").unwrap();
+        let test_pos = result.find("test_extension_stmt").unwrap();
+        let priority_pos = result.find("high_priority_stmt").unwrap();
 
         // Note: Actual ordering depends on implementation, this tests that both are present
         assert!(test_pos > 0);
@@ -295,8 +298,8 @@ mod grammar_composition_tests {
             .register_extension(TestGrammarExtension)
             .expect("extension should register");
 
-        assert!(composer.has_extension_rule("test_stmt"));
-        assert!(composer.has_extension_rule("simple_test"));
+        assert!(composer.has_extension_rule("test_extension_stmt"));
+        assert!(composer.has_extension_rule("test_extension_simple"));
         assert!(!composer.has_extension_rule("nonexistent_rule"));
     }
 
@@ -315,7 +318,7 @@ mod grammar_composition_tests {
         assert!(composed.contains("roles"));
 
         // Should have extension rules
-        assert!(composed.contains("test_stmt"));
+        assert!(composed.contains("test_extension_stmt"));
 
         // Should have proper structure
         let (open_braces, close_braces) = count_braces_outside_quotes(&composed);
@@ -335,8 +338,8 @@ mod grammar_composition_tests {
             .build();
 
         assert_eq!(composer.extension_count(), 2);
-        assert!(composer.has_extension_rule("test_stmt"));
-        assert!(composer.has_extension_rule("priority_stmt"));
+        assert!(composer.has_extension_rule("test_extension_stmt"));
+        assert!(composer.has_extension_rule("high_priority_stmt"));
     }
 }
 
@@ -365,8 +368,8 @@ mod extension_parser_tests {
 
         let stats = parser.extension_stats();
         assert_eq!(stats.grammar_extensions, 1);
-        assert!(parser.can_handle_statement("test_stmt"));
-        assert!(parser.can_handle_statement("simple_test"));
+        assert!(parser.can_handle_statement("test_extension_stmt"));
+        assert!(parser.can_handle_statement("test_extension_simple"));
         assert!(!parser.can_handle_statement("unknown_stmt"));
     }
 
@@ -396,7 +399,7 @@ mod extension_parser_tests {
             .expect("test extension should register")
             .build();
 
-        assert!(parser.can_handle_statement("test_stmt"));
+        assert!(parser.can_handle_statement("test_extension_stmt"));
         let stats = parser.extension_stats();
         assert_eq!(stats.grammar_extensions, 1);
     }
@@ -413,7 +416,7 @@ mod extension_parser_tests {
 
         let grammar = result.unwrap();
         assert!(
-            grammar.contains("test_stmt"),
+            grammar.contains("test_extension_stmt"),
             "Should contain extension rule"
         );
         assert!(

@@ -8,7 +8,7 @@ use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort, ValType};
 use thiserror::Error;
 
 pub const MAX_BRIDGE_JSON_BYTES: usize = 8 * 1024 * 1024;
-pub const MAX_BRIDGE_JSON_DEPTH: usize = 256;
+pub const MAX_BRIDGE_JSON_DEPTH_COUNT: usize = 256;
 
 /// Errors that can occur during JSON import.
 #[derive(Debug, Error)]
@@ -42,9 +42,9 @@ pub enum ImportError {
 }
 
 fn check_depth(depth: usize) -> Result<(), ImportError> {
-    if depth > MAX_BRIDGE_JSON_DEPTH {
+    if depth > MAX_BRIDGE_JSON_DEPTH_COUNT {
         return Err(ImportError::InputTooDeep(format!(
-            "JSON type depth exceeds {MAX_BRIDGE_JSON_DEPTH}"
+            "JSON type depth exceeds {MAX_BRIDGE_JSON_DEPTH_COUNT}"
         )));
     }
     Ok(())
@@ -608,7 +608,7 @@ mod tests {
     #[test]
     fn test_parse_global_rejects_excessive_depth() {
         let mut json = json!({ "kind": "end" });
-        for _ in 0..(MAX_BRIDGE_JSON_DEPTH + 1) {
+        for _ in 0..(MAX_BRIDGE_JSON_DEPTH_COUNT + 1) {
             json = json!({
                 "kind": "rec",
                 "var": "x",

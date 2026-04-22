@@ -40,7 +40,7 @@ use serde::{de::DeserializeOwned, Serialize};
 /// Maximum accepted canonical artifact size for direct `Contentable` decodes.
 pub const MAX_CONTENTABLE_BYTES: usize = MAX_MESSAGE_LEN_BYTES as usize;
 /// Maximum accepted recursion depth for binder-carrying protocol artifacts.
-pub const MAX_CONTENTABLE_RECURSION_DEPTH: usize = 256;
+pub const MAX_CONTENTABLE_RECURSION_DEPTH_COUNT: usize = 256;
 
 /// Trait for types with canonical serialization.
 ///
@@ -548,9 +548,9 @@ impl Contentable for LocalTypeR {
 // ============================================================================
 
 fn check_contentable_depth(depth: usize) -> Result<(), ContentableError> {
-    if depth > MAX_CONTENTABLE_RECURSION_DEPTH {
+    if depth > MAX_CONTENTABLE_RECURSION_DEPTH_COUNT {
         return Err(ContentableError::InvalidFormat(format!(
-            "contentable recursion depth exceeds {MAX_CONTENTABLE_RECURSION_DEPTH}"
+            "contentable recursion depth exceeds {MAX_CONTENTABLE_RECURSION_DEPTH_COUNT}"
         )));
     }
     Ok(())
@@ -677,7 +677,7 @@ mod tests {
     #[test]
     fn global_from_bytes_rejects_excessive_depth() {
         let mut db = GlobalTypeDB::End;
-        for _ in 0..(MAX_CONTENTABLE_RECURSION_DEPTH + 1) {
+        for _ in 0..(MAX_CONTENTABLE_RECURSION_DEPTH_COUNT + 1) {
             db = GlobalTypeDB::Rec(Box::new(db));
         }
         let bytes = to_json_bytes(&db).unwrap();

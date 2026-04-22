@@ -2,8 +2,8 @@
 
 use crate::config::{TcpPeerAuthentication, TcpTransportConfig};
 
-const TCP_AUTH_NONE: u8 = 0;
-const TCP_AUTH_PSK: u8 = 1;
+const TCP_AUTH_NONE_BYTE: u8 = 0;
+const TCP_AUTH_PSK_BYTE: u8 = 1;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
 use std::collections::{BTreeMap, BTreeSet};
@@ -501,7 +501,7 @@ async fn write_authentication(
             if !explicit_allow {
                 return Err(TcpTransportError::AuthenticationModeNotConfigured);
             }
-            wire::write_all_timeout(stream, &[TCP_AUTH_NONE], timeout)
+            wire::write_all_timeout(stream, &[TCP_AUTH_NONE_BYTE], timeout)
                 .await
                 .map_err(Into::into)
         }
@@ -511,7 +511,7 @@ async fn write_authentication(
             nonce[..8].copy_from_slice(&rng.next_u64().to_be_bytes());
             nonce[8..].copy_from_slice(&rng.next_u64().to_be_bytes());
             let mac = psk_mac(key, role_bytes, &nonce);
-            wire::write_all_timeout(stream, &[TCP_AUTH_PSK], timeout).await?;
+            wire::write_all_timeout(stream, &[TCP_AUTH_PSK_BYTE], timeout).await?;
             wire::write_all_timeout(stream, &nonce, timeout).await?;
             wire::write_all_timeout(stream, &mac, timeout)
                 .await
@@ -533,7 +533,7 @@ async fn read_and_verify_authentication(
             if !explicit_allow {
                 return Err(TcpTransportError::AuthenticationModeNotConfigured);
             }
-            if auth_mode[0] == TCP_AUTH_NONE {
+            if auth_mode[0] == TCP_AUTH_NONE_BYTE {
                 Ok(())
             } else {
                 Err(TcpTransportError::AuthenticationFailed(
@@ -542,7 +542,7 @@ async fn read_and_verify_authentication(
             }
         }
         TcpPeerAuthentication::PreSharedKey(key) => {
-            if auth_mode[0] != TCP_AUTH_PSK {
+            if auth_mode[0] != TCP_AUTH_PSK_BYTE {
                 return Err(TcpTransportError::AuthenticationFailed(
                     "peer did not present PSK authentication".to_string(),
                 ));
@@ -833,7 +833,7 @@ mod tests {
         wire::write_role_name(&mut stream, role.as_bytes(), Duration::from_secs(1))
             .await
             .expect("write role name");
-        wire::write_all_timeout(&mut stream, &[TCP_AUTH_NONE], Duration::from_secs(1))
+        wire::write_all_timeout(&mut stream, &[TCP_AUTH_NONE_BYTE], Duration::from_secs(1))
             .await
             .expect("write unauthenticated auth mode");
         wire::flush_timeout(&mut stream, Duration::from_secs(1))

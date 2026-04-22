@@ -220,11 +220,11 @@ mod tests {
 
     impl GrammarExtension for TestGrammarExtension {
         fn grammar_rules(&self) -> &'static str {
-            "test_stmt = { \"test\" ~ ident }"
+            "test_extension_stmt = { \"test\" ~ ident }"
         }
 
         fn statement_rules(&self) -> Vec<&'static str> {
-            vec!["test_stmt"]
+            vec!["test_extension_stmt"]
         }
 
         fn extension_id(&self) -> &'static str {
@@ -237,11 +237,11 @@ mod tests {
 
     impl StatementParser for TestStatementParser {
         fn can_parse(&self, rule_name: &str) -> bool {
-            rule_name == "test_stmt"
+            rule_name == "test_extension_stmt"
         }
 
         fn supported_rules(&self) -> Vec<String> {
-            vec!["test_stmt".to_string()]
+            vec!["test_extension_stmt".to_string()]
         }
 
         fn parse_statement(
@@ -274,7 +274,7 @@ mod tests {
 
         let stats = parser.extension_stats();
         assert_eq!(stats.grammar_extensions, 1);
-        assert!(parser.can_handle_statement("test_stmt"));
+        assert!(parser.can_handle_statement("test_extension_stmt"));
     }
 
     #[test]
@@ -284,7 +284,7 @@ mod tests {
             .expect("test extension should register")
             .build();
 
-        assert!(parser.can_handle_statement("test_stmt"));
+        assert!(parser.can_handle_statement("test_extension_stmt"));
     }
 
     #[test]
@@ -309,7 +309,7 @@ mod tests {
 
         let grammar = result.unwrap();
         assert!(
-            grammar.contains("test_stmt"),
+            grammar.contains("test_extension_stmt"),
             "Should contain extension rule"
         );
         assert!(

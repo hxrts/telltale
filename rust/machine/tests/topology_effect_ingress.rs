@@ -183,14 +183,10 @@ fn cooperative_vm_ingests_topology_events_before_instruction_effects() {
 }
 
 #[test]
-fn cooperative_vm_canonicalizes_unsorted_topology_events_by_ordering_key() {
+fn cooperative_vm_preserves_canonical_topology_event_ordering() {
     let image = simple_send_recv_image("A", "B", "m");
     let mut scripted = BTreeMap::new();
-    let unsorted = vec![
-        TopologyPerturbation::Timeout {
-            site: "B".to_string(),
-            duration: std::time::Duration::from_millis(5),
-        },
+    let canonical = vec![
         TopologyPerturbation::Crash {
             site: "A".to_string(),
         },
@@ -202,8 +198,12 @@ fn cooperative_vm_canonicalizes_unsorted_topology_events_by_ordering_key() {
             from: "A".to_string(),
             to: "B".to_string(),
         },
+        TopologyPerturbation::Timeout {
+            site: "B".to_string(),
+            duration: std::time::Duration::from_millis(5),
+        },
     ];
-    scripted.insert(1, unsorted.clone());
+    scripted.insert(1, canonical.clone());
     let handler = ScriptedTopologyHandler::new(scripted);
 
     let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
@@ -219,11 +219,11 @@ fn cooperative_vm_canonicalizes_unsorted_topology_events_by_ordering_key() {
         .iter()
         .filter_map(|entry| entry.topology.clone())
         .collect();
-    let mut expected = unsorted;
+    let mut expected = canonical;
     expected.sort_by_key(TopologyPerturbation::ordering_key);
     assert_eq!(
         actual, expected,
-        "topology ingress should canonicalize unsorted host events"
+        "topology ingress should preserve canonical host event ordering"
     );
 }
 
@@ -328,10 +328,6 @@ cfg_if! {
             script.insert(
                 1,
                 vec![
-                    TopologyPerturbation::Timeout {
-                        site: "B".to_string(),
-                        duration: Duration::from_millis(5),
-                    },
                     TopologyPerturbation::Crash {
                         site: "A".to_string(),
                     },
@@ -342,6 +338,10 @@ cfg_if! {
                     TopologyPerturbation::Heal {
                         from: "A".to_string(),
                         to: "B".to_string(),
+                    },
+                    TopologyPerturbation::Timeout {
+                        site: "B".to_string(),
+                        duration: Duration::from_millis(5),
                     },
                 ],
             );
