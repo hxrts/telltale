@@ -4,6 +4,8 @@
 //! - `InMemoryTransport`: In-process communication using channels
 //! - `TcpTransport`: Network communication over TCP
 
+#[cfg(not(target_arch = "wasm32"))]
+use super::wire;
 use super::{
     validate_transport_contract_profile, DocumentedTransportContract, Location, Topology,
     TransportContractProfile, TransportContractTier, TransportOperationalContract,
@@ -29,20 +31,14 @@ use std::time::Instant;
 use thiserror::Error;
 
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::net::{TcpListener, TcpStream};
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::time::{sleep, timeout, Duration};
+use tokio::time::{sleep, Duration};
 
-#[cfg(not(target_arch = "wasm32"))]
-const TCP_ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
-#[cfg(not(target_arch = "wasm32"))]
-const TCP_WIRE_MAGIC: [u8; 4] = *b"TTL1";
-#[cfg(not(target_arch = "wasm32"))]
-const TCP_WIRE_VERSION: u8 = 1;
 #[cfg(not(target_arch = "wasm32"))]
 const TCP_READ_TIMEOUT: Duration = Duration::from_secs(30);
 #[cfg(not(target_arch = "wasm32"))]
@@ -384,29 +380,8 @@ impl TcpRoleState {
     }
 
     async fn handle_socket(&self, mut socket: TcpStream) -> TransportResult<()> {
-        let mut magic = [0_u8; 4];
-        read_exact_timeout(&mut socket, &mut magic).await?;
-        if magic != TCP_WIRE_MAGIC {
-            return Err(TransportError::UnsupportedProtocol(
-                "invalid TCP wire magic".to_string(),
-            ));
-        }
-        let mut version = [0_u8; 1];
-        read_exact_timeout(&mut socket, &mut version).await?;
-        if version[0] != TCP_WIRE_VERSION {
-            return Err(TransportError::UnsupportedProtocol(format!(
-                "unsupported TCP wire version {}",
-                version[0]
-            )));
-        }
-        let role_len = read_u32_timeout(&mut socket).await? as usize;
-        if role_len > TCP_ROLE_NAME_LEN_MAX_BYTES {
-            return Err(TransportError::ReceiveFailed(format!(
-                "sender role header is {role_len} bytes, max is {TCP_ROLE_NAME_LEN_MAX_BYTES}"
-            )));
-        }
-        let mut role_buf = vec![0_u8; role_len];
-        read_exact_timeout(&mut socket, &mut role_buf).await?;
+        wire::read_preamble(&mut socket, TCP_READ_TIMEOUT).await?;
+        let role_buf = wire::read_role_name_bytes(&mut socket, TCP_READ_TIMEOUT).await?;
         let from_role = String::from_utf8(role_buf).map_err(|err| {
             TransportError::ReceiveFailed(format!("invalid sender header: {err}"))
         })?;
@@ -425,13 +400,11 @@ impl TcpRoleState {
             })?;
         self.claim_inbound_role(&sender_role).await?;
         let result = async {
-            let payload_len = read_u32_timeout(&mut socket).await?;
-            let payload_len = telltale_types::MessageLenBytes::try_new(payload_len)
-                .map_err(|err| TransportError::ReceiveFailed(err.to_string()))?;
+            let payload_len = wire::read_payload_len(&mut socket, TCP_READ_TIMEOUT).await?;
             let _payload_permit =
                 acquire_tcp_payload_budget(&self.payload_budget, payload_len.as_usize()).await?;
             let mut payload = vec![0_u8; payload_len.as_usize()];
-            read_exact_timeout(&mut socket, &mut payload).await?;
+            wire::read_exact_timeout(&mut socket, &mut payload, TCP_READ_TIMEOUT).await?;
             sender
                 .send(payload)
                 .await
@@ -534,35 +507,6 @@ async fn acquire_tcp_payload_budget(
                 "global in-flight TCP payload byte cap reached".to_string(),
             )
         })
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-async fn read_exact_timeout(stream: &mut TcpStream, buf: &mut [u8]) -> TransportResult<()> {
-    timeout(TCP_READ_TIMEOUT, stream.read_exact(buf))
-        .await
-        .map_err(|_| TransportError::Timeout)?
-        .map(|_| ())
-        .map_err(Into::into)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-async fn read_u32_timeout(stream: &mut TcpStream) -> TransportResult<u32> {
-    let mut bytes = [0_u8; 4];
-    read_exact_timeout(stream, &mut bytes).await?;
-    Ok(u32::from_be_bytes(bytes))
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-async fn write_all_timeout(stream: &mut TcpStream, bytes: &[u8]) -> TransportResult<()> {
-    timeout(TCP_WRITE_TIMEOUT, stream.write_all(bytes))
-        .await
-        .map_err(|_| TransportError::Timeout)?
-        .map_err(Into::into)
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-async fn write_u32_timeout(stream: &mut TcpStream, value: u32) -> TransportResult<()> {
-    write_all_timeout(stream, &value.to_be_bytes()).await
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -676,16 +620,12 @@ impl Transport for TcpPeerTransport {
         })?;
         let mut stream = connect_with_retry(&endpoint).await?;
         let role_bytes = self.state.role.to_string().into_bytes();
-        let role_len = u32::try_from(role_bytes.len())
-            .map_err(|err| TransportError::SendFailed(err.to_string()))?;
         let message_len = telltale_types::MessageLenBytes::try_from(message.len())
             .map_err(|err| TransportError::SendFailed(err.to_string()))?;
-        write_all_timeout(&mut stream, &TCP_WIRE_MAGIC).await?;
-        write_all_timeout(&mut stream, &[TCP_WIRE_VERSION]).await?;
-        write_u32_timeout(&mut stream, role_len).await?;
-        write_all_timeout(&mut stream, &role_bytes).await?;
-        write_u32_timeout(&mut stream, message_len.get()).await?;
-        write_all_timeout(&mut stream, &message).await?;
+        wire::write_preamble(&mut stream, TCP_WRITE_TIMEOUT).await?;
+        wire::write_role_name(&mut stream, &role_bytes, TCP_WRITE_TIMEOUT).await?;
+        wire::write_payload_len(&mut stream, message_len, TCP_WRITE_TIMEOUT).await?;
+        wire::write_all_timeout(&mut stream, &message, TCP_WRITE_TIMEOUT).await?;
         stream.shutdown().await?;
         Ok(())
     }
@@ -758,14 +698,12 @@ impl Transport for TcpRoleTransport {
             })?;
         let mut stream = connect_with_retry(&endpoint).await?;
         let role_bytes = self.state.role.to_string().into_bytes();
-        let role_len = u32::try_from(role_bytes.len())
-            .map_err(|err| TransportError::SendFailed(err.to_string()))?;
         let message_len = telltale_types::MessageLenBytes::try_from(message.len())
             .map_err(|err| TransportError::SendFailed(err.to_string()))?;
-        write_u32_timeout(&mut stream, role_len).await?;
-        write_all_timeout(&mut stream, &role_bytes).await?;
-        write_u32_timeout(&mut stream, message_len.get()).await?;
-        write_all_timeout(&mut stream, &message).await?;
+        wire::write_preamble(&mut stream, TCP_WRITE_TIMEOUT).await?;
+        wire::write_role_name(&mut stream, &role_bytes, TCP_WRITE_TIMEOUT).await?;
+        wire::write_payload_len(&mut stream, message_len, TCP_WRITE_TIMEOUT).await?;
+        wire::write_all_timeout(&mut stream, &message, TCP_WRITE_TIMEOUT).await?;
         stream.shutdown().await?;
         Ok(())
     }
@@ -1051,20 +989,12 @@ mod tests {
 
     async fn write_runtime_role_claim(addr: SocketAddr, role: &str) -> TcpStream {
         let mut stream = TcpStream::connect(addr).await.expect("connect test client");
-        write_all_timeout(&mut stream, &TCP_WIRE_MAGIC)
+        wire::write_preamble(&mut stream, TCP_WRITE_TIMEOUT)
             .await
-            .expect("write wire magic");
-        write_all_timeout(&mut stream, &[TCP_WIRE_VERSION])
+            .expect("write wire preamble");
+        wire::write_role_name(&mut stream, role.as_bytes(), TCP_WRITE_TIMEOUT)
             .await
-            .expect("write wire version");
-        let role_bytes = role.as_bytes();
-        let role_len = u32::try_from(role_bytes.len()).expect("test role length fits u32");
-        write_u32_timeout(&mut stream, role_len)
-            .await
-            .expect("write role length");
-        write_all_timeout(&mut stream, role_bytes)
-            .await
-            .expect("write role bytes");
+            .expect("write role name");
         stream
     }
 
@@ -1127,5 +1057,30 @@ mod tests {
             .await
             .expect("first runtime connection should close promptly")
             .expect("first runtime handler should not panic");
+    }
+
+    #[tokio::test]
+    async fn runtime_tcp_rejects_unknown_role_claim() {
+        let state = Arc::new(TcpRoleState::new(
+            RoleName::from_static("Alice"),
+            None,
+            [RoleName::from_static("Bob")],
+        ));
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("test listener address");
+        let accept = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.expect("accept client");
+            state.handle_socket(socket).await
+        });
+
+        let _client = write_runtime_role_claim(addr, "Mallory").await;
+        let err = tokio::time::timeout(Duration::from_secs(1), accept)
+            .await
+            .expect("unknown role claim should finish promptly")
+            .expect("unknown role handler should not panic")
+            .expect_err("unknown role claim must fail closed");
+        assert!(matches!(err, TransportError::ReceiveFailed(_)));
     }
 }

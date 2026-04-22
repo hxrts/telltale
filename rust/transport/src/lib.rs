@@ -1,13 +1,15 @@
-//! Production Transport for Telltale Session Types
+//! Example TCP Transport for Telltale Session Types
 //!
-//! This crate provides production-ready transport implementations for
-//! the Telltale session types library.
+//! This crate provides a reference TCP transport implementation for the
+//! Telltale session types library. It is useful as an executable example and
+//! integration target; applications with stronger operational requirements
+//! may wrap or replace it with a transport that satisfies the same documented
+//! contract.
 //!
-//! `telltale-transport` ships first-party transport implementations. Those
-//! implementations participate in the current first-party runtime contract
-//! boundary through documented transport-contract profiles. Third-party
-//! transports remain outside the formal-verification claim unless they
-//! separately satisfy the same contract.
+//! `telltale-transport` participates in the first-party runtime contract
+//! boundary as a reference implementation with documented transport-contract
+//! profiles. Third-party transports remain outside the formal-verification
+//! claim unless they separately satisfy the same contract.
 //!
 //! ## Features
 //!
@@ -77,11 +79,6 @@
 //! // Mixed IPv4 and IPv6 peers
 //! let mixed = TcpTransportConfig::new("Gateway", "0.0.0.0:8080")
 //!     .allow_unauthenticated_for_trusted_network()
-#![allow(
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    clippy::must_use_candidate
-)]
 //!     .with_peer("IPv4Peer", "192.168.1.100:8081")
 //!     .with_peer("IPv6Peer", "[2001:db8::1]:8082");
 //! ```
@@ -108,6 +105,12 @@
 //!
 //! When a connection is established, the connecting peer sends its role name
 //! (also length-prefixed) so the receiving peer can route messages correctly.
+
+#![allow(
+    clippy::missing_errors_doc,
+    clippy::missing_panics_doc,
+    clippy::must_use_candidate
+)]
 
 mod config;
 mod error;

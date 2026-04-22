@@ -2,11 +2,6 @@
 
 use crate::config::{TcpPeerAuthentication, TcpTransportConfig};
 
-/// Maximum length for role names in the TCP protocol handshake.
-/// Role names exceeding this limit are rejected to prevent denial-of-service attacks.
-const ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
-const TCP_WIRE_MAGIC: [u8; 4] = *b"TTL1";
-const TCP_WIRE_VERSION: u8 = 1;
 const TCP_AUTH_NONE: u8 = 0;
 const TCP_AUTH_PSK: u8 = 1;
 use crate::error::{TcpResult, TcpTransportError};
@@ -16,13 +11,12 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use telltale_runtime::{
-    DocumentedTransportContract, MessageLenBytes, QueueCapacity, RoleName, Transport,
-    TransportContractProfile, TransportContractTier, TransportError, TransportOperationalContract,
-    TransportResult, TransportSemanticContract, TransportStartupMode,
+    topology::wire, DocumentedTransportContract, MessageLenBytes, QueueCapacity, RoleName,
+    Transport, TransportContractProfile, TransportContractTier, TransportError,
+    TransportOperationalContract, TransportResult, TransportSemanticContract, TransportStartupMode,
 };
 use telltale_types::effects::{ChaCha20Rng, Rng, SecureRng};
 use telltale_types::FixedQ32;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, Mutex, OwnedSemaphorePermit, RwLock, Semaphore};
 use tokio::task::JoinHandle;
@@ -320,20 +314,10 @@ impl TcpTransport {
             // bounded: exits on success or when attempts >= retry.max_attempts
             match TcpStream::connect(addr).await {
                 Ok(mut stream) => {
-                    // Send our role name
-                    write_all_timeout(&mut stream, &TCP_WIRE_MAGIC, self.config.write_timeout)
-                        .await?;
-                    write_all_timeout(&mut stream, &[TCP_WIRE_VERSION], self.config.write_timeout)
-                        .await?;
                     let role_bytes = self.config.role.as_bytes();
-                    let len = u32::try_from(role_bytes.len()).map_err(|_| {
-                        TcpTransportError::InvalidMessage(
-                            "Role name exceeds u32 length prefix".to_string(),
-                        )
-                    })?;
-                    write_all_timeout(&mut stream, &len.to_be_bytes(), self.config.write_timeout)
+                    wire::write_preamble(&mut stream, self.config.write_timeout).await?;
+                    wire::write_role_name(&mut stream, role_bytes, self.config.write_timeout)
                         .await?;
-                    write_all_timeout(&mut stream, role_bytes, self.config.write_timeout).await?;
                     write_authentication(
                         &mut stream,
                         &self.config.authentication,
@@ -341,7 +325,7 @@ impl TcpTransport {
                         self.config.write_timeout,
                     )
                     .await?;
-                    flush_timeout(&mut stream, self.config.write_timeout).await?;
+                    wire::flush_timeout(&mut stream, self.config.write_timeout).await?;
 
                     info!(
                         peer = %log_value(peer_role),
@@ -407,9 +391,10 @@ impl DocumentedTransportContract for TcpTransport {
                 environment_resolved: false,
             },
             notes: vec![
-                "First-party TCP transport in the separate telltale-transport crate.",
+                "Reference TCP transport in the separate telltale-transport crate.",
                 "Requires explicit start before first use.",
-                "trusted-network only unless an authenticated transport wrapper is used.",
+                "Authentication is configuration-dependent; this static profile is conservative.",
+                "Unauthenticated mode is trusted-network only and must be explicitly enabled.",
             ],
         }
     }
@@ -426,35 +411,8 @@ async fn handle_connection(
     _buffer_size: QueueCapacity,
     read_timeout: Duration,
 ) -> TcpResult<()> {
-    // Read peer's role name
-    let mut magic = [0u8; 4];
-    read_exact_timeout(&mut stream, &mut magic, read_timeout).await?;
-    if magic != TCP_WIRE_MAGIC {
-        return Err(TcpTransportError::UnsupportedProtocol(
-            "invalid TCP wire magic".to_string(),
-        ));
-    }
-    let mut version = [0u8; 1];
-    read_exact_timeout(&mut stream, &mut version, read_timeout).await?;
-    if version[0] != TCP_WIRE_VERSION {
-        return Err(TcpTransportError::UnsupportedProtocol(format!(
-            "unsupported TCP wire version {}",
-            version[0]
-        )));
-    }
-    let mut len_buf = [0u8; 4];
-    read_exact_timeout(&mut stream, &mut len_buf, read_timeout).await?;
-    let len = usize::try_from(u32::from_be_bytes(len_buf))
-        .map_err(|_| TcpTransportError::InvalidMessage("Invalid role name length".to_string()))?;
-
-    if len > ROLE_NAME_LEN_MAX_BYTES {
-        return Err(TcpTransportError::InvalidMessage(
-            "Role name too long".to_string(),
-        ));
-    }
-
-    let mut role_buf = vec![0u8; len];
-    read_exact_timeout(&mut stream, &mut role_buf, read_timeout).await?;
+    wire::read_preamble(&mut stream, read_timeout).await?;
+    let role_buf = wire::read_role_name_bytes(&mut stream, read_timeout).await?;
     let peer_role = String::from_utf8(role_buf)
         .map_err(|e| TcpTransportError::InvalidMessage(format!("Invalid role name: {}", e)))?;
     read_and_verify_authentication(
@@ -483,22 +441,18 @@ async fn handle_connection(
     let result = async {
         loop {
             // forever: reads messages until connection closed (EOF) or error
-            let mut len_buf = [0u8; 4];
-            match read_exact_timeout(&mut stream, &mut len_buf, read_timeout).await {
-                Ok(_) => {}
-                Err(TcpTransportError::Io(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
+            let len = match wire::read_payload_len(&mut stream, read_timeout).await {
+                Ok(len) => len,
+                Err(wire::TcpWireError::Io(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
                     debug!(peer = %log_value(&peer_role), "Connection closed by peer");
                     break;
                 }
-                Err(e) => return Err(e),
-            }
-            let len = u32::from_be_bytes(len_buf);
-            let len = MessageLenBytes::try_new(len)
-                .map_err(|e| TcpTransportError::InvalidMessage(e.to_string()))?;
+                Err(e) => return Err(e.into()),
+            };
 
             let _payload_permit = acquire_payload_budget(&payload_budget, len.as_usize()).await?;
             let mut payload = vec![0u8; len.as_usize()];
-            read_exact_timeout(&mut stream, &mut payload, read_timeout).await?;
+            wire::read_exact_timeout(&mut stream, &mut payload, read_timeout).await?;
 
             if sender.send(payload).await.is_err() {
                 debug!(peer = %log_value(&peer_role), "Receiver dropped");
@@ -526,9 +480,10 @@ fn ensure_authentication_configured(authentication: &TcpPeerAuthentication) -> T
 }
 
 fn psk_mac(key: &[u8; 32], role_bytes: &[u8], nonce: &[u8; 16]) -> [u8; 32] {
-    let mut input = Vec::with_capacity(TCP_WIRE_MAGIC.len() + 1 + role_bytes.len() + nonce.len());
-    input.extend_from_slice(&TCP_WIRE_MAGIC);
-    input.push(TCP_WIRE_VERSION);
+    let mut input =
+        Vec::with_capacity(wire::TCP_WIRE_MAGIC.len() + 1 + role_bytes.len() + nonce.len());
+    input.extend_from_slice(&wire::TCP_WIRE_MAGIC);
+    input.push(wire::TCP_WIRE_VERSION);
     input.extend_from_slice(role_bytes);
     input.extend_from_slice(nonce);
     *blake3::keyed_hash(key, &input).as_bytes()
@@ -545,7 +500,9 @@ async fn write_authentication(
             if !explicit_allow {
                 return Err(TcpTransportError::AuthenticationModeNotConfigured);
             }
-            write_all_timeout(stream, &[TCP_AUTH_NONE], timeout).await
+            wire::write_all_timeout(stream, &[TCP_AUTH_NONE], timeout)
+                .await
+                .map_err(Into::into)
         }
         TcpPeerAuthentication::PreSharedKey(key) => {
             let mut nonce = [0_u8; 16];
@@ -553,9 +510,11 @@ async fn write_authentication(
             nonce[..8].copy_from_slice(&rng.next_u64().to_be_bytes());
             nonce[8..].copy_from_slice(&rng.next_u64().to_be_bytes());
             let mac = psk_mac(key, role_bytes, &nonce);
-            write_all_timeout(stream, &[TCP_AUTH_PSK], timeout).await?;
-            write_all_timeout(stream, &nonce, timeout).await?;
-            write_all_timeout(stream, &mac, timeout).await
+            wire::write_all_timeout(stream, &[TCP_AUTH_PSK], timeout).await?;
+            wire::write_all_timeout(stream, &nonce, timeout).await?;
+            wire::write_all_timeout(stream, &mac, timeout)
+                .await
+                .map_err(Into::into)
         }
     }
 }
@@ -567,7 +526,7 @@ async fn read_and_verify_authentication(
     timeout: Duration,
 ) -> TcpResult<()> {
     let mut auth_mode = [0_u8; 1];
-    read_exact_timeout(stream, &mut auth_mode, timeout).await?;
+    wire::read_exact_timeout(stream, &mut auth_mode, timeout).await?;
     match authentication {
         TcpPeerAuthentication::UnauthenticatedTrustedNetwork { explicit_allow } => {
             if !explicit_allow {
@@ -589,8 +548,8 @@ async fn read_and_verify_authentication(
             }
             let mut nonce = [0_u8; 16];
             let mut mac = [0_u8; 32];
-            read_exact_timeout(stream, &mut nonce, timeout).await?;
-            read_exact_timeout(stream, &mut mac, timeout).await?;
+            wire::read_exact_timeout(stream, &mut nonce, timeout).await?;
+            wire::read_exact_timeout(stream, &mut mac, timeout).await?;
             let expected = psk_mac(key, role_bytes, &nonce);
             if mac == expected {
                 Ok(())
@@ -676,32 +635,6 @@ async fn claim_peer_role(
     Ok(())
 }
 
-async fn read_exact_timeout(
-    stream: &mut TcpStream,
-    buf: &mut [u8],
-    timeout: Duration,
-) -> TcpResult<()> {
-    tokio::time::timeout(timeout, stream.read_exact(buf))
-        .await
-        .map_err(|_| TcpTransportError::Timeout)?
-        .map(|_| ())
-        .map_err(Into::into)
-}
-
-async fn write_all_timeout(stream: &mut TcpStream, buf: &[u8], timeout: Duration) -> TcpResult<()> {
-    tokio::time::timeout(timeout, stream.write_all(buf))
-        .await
-        .map_err(|_| TcpTransportError::Timeout)?
-        .map_err(Into::into)
-}
-
-async fn flush_timeout(stream: &mut TcpStream, timeout: Duration) -> TcpResult<()> {
-    tokio::time::timeout(timeout, stream.flush())
-        .await
-        .map_err(|_| TcpTransportError::Timeout)?
-        .map_err(Into::into)
-}
-
 #[allow(clippy::type_complexity)]
 async fn lookup_sender(
     senders: &Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
@@ -730,19 +663,15 @@ impl Transport for TcpTransport {
         // Write length prefix
         let len = MessageLenBytes::try_from(message.len())
             .map_err(|e| TransportError::SendFailed(e.to_string()))?;
-        write_all_timeout(
-            &mut stream,
-            &len.get().to_be_bytes(),
-            self.config.write_timeout,
-        )
-        .await
-        .map_err(|e| TransportError::SendFailed(e.to_string()))?;
-
-        // Write payload
-        write_all_timeout(&mut stream, &message, self.config.write_timeout)
+        wire::write_payload_len(&mut *stream, len, self.config.write_timeout)
             .await
             .map_err(|e| TransportError::SendFailed(e.to_string()))?;
-        flush_timeout(&mut stream, self.config.write_timeout)
+
+        // Write payload
+        wire::write_all_timeout(&mut *stream, &message, self.config.write_timeout)
+            .await
+            .map_err(|e| TransportError::SendFailed(e.to_string()))?;
+        wire::flush_timeout(&mut *stream, self.config.write_timeout)
             .await
             .map_err(|e| TransportError::SendFailed(e.to_string()))?;
 
@@ -897,30 +826,111 @@ mod tests {
 
     async fn connect_and_claim_role(addr: SocketAddr, role: &str) -> TcpStream {
         let mut stream = TcpStream::connect(addr).await.expect("connect test client");
-        stream
-            .write_all(&TCP_WIRE_MAGIC)
+        wire::write_preamble(&mut stream, Duration::from_secs(1))
             .await
-            .expect("write wire magic");
-        stream
-            .write_all(&[TCP_WIRE_VERSION])
+            .expect("write wire preamble");
+        wire::write_role_name(&mut stream, role.as_bytes(), Duration::from_secs(1))
             .await
-            .expect("write wire version");
-        let role_bytes = role.as_bytes();
-        let role_len = u32::try_from(role_bytes.len()).expect("test role length fits u32");
-        stream
-            .write_all(&role_len.to_be_bytes())
-            .await
-            .expect("write role length");
-        stream
-            .write_all(role_bytes)
-            .await
-            .expect("write role bytes");
-        stream
-            .write_all(&[TCP_AUTH_NONE])
+            .expect("write role name");
+        wire::write_all_timeout(&mut stream, &[TCP_AUTH_NONE], Duration::from_secs(1))
             .await
             .expect("write unauthenticated auth mode");
-        stream.flush().await.expect("flush role claim");
+        wire::flush_timeout(&mut stream, Duration::from_secs(1))
+            .await
+            .expect("flush role claim");
         stream
+    }
+
+    #[tokio::test]
+    async fn transport_start_requires_configured_authentication() {
+        let config = TcpTransportConfig::new("Alice", "127.0.0.1:0");
+        let transport = TcpTransport::new(config);
+        let err = transport
+            .start()
+            .await
+            .expect_err("start should reject implicit unauthenticated mode");
+        assert!(matches!(
+            err,
+            TcpTransportError::AuthenticationModeNotConfigured
+        ));
+    }
+
+    #[tokio::test]
+    async fn psk_authentication_rejects_unauthenticated_peer() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("test listener address");
+
+        let (tx, _rx) = mpsc::channel(4);
+        let senders = Arc::new(Mutex::new(BTreeMap::from([("Bob".to_string(), tx)])));
+        let claimed_roles = Arc::new(Mutex::new(BTreeSet::new()));
+        let payload_budget = Arc::new(Semaphore::new(1024 * 1024));
+        let buffer_size = QueueCapacity::try_new(4).expect("test queue capacity");
+        let read_timeout = Duration::from_secs(5);
+
+        let accept = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            handle_connection(
+                stream,
+                senders,
+                claimed_roles,
+                payload_budget,
+                TcpPeerAuthentication::PreSharedKey([7; 32]),
+                "Alice",
+                buffer_size,
+                read_timeout,
+            )
+            .await
+        });
+
+        let _client = connect_and_claim_role(addr, "Bob").await;
+        let err = tokio::time::timeout(Duration::from_secs(1), accept)
+            .await
+            .expect("auth failure should finish promptly")
+            .expect("auth failure handler should not panic")
+            .expect_err("unauthenticated peer must fail PSK admission");
+        assert!(matches!(err, TcpTransportError::AuthenticationFailed(_)));
+    }
+
+    #[tokio::test]
+    async fn unknown_role_claim_is_rejected() {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("test listener address");
+
+        let (tx, _rx) = mpsc::channel(4);
+        let senders = Arc::new(Mutex::new(BTreeMap::from([("Bob".to_string(), tx)])));
+        let claimed_roles = Arc::new(Mutex::new(BTreeSet::new()));
+        let payload_budget = Arc::new(Semaphore::new(1024 * 1024));
+        let buffer_size = QueueCapacity::try_new(4).expect("test queue capacity");
+        let read_timeout = Duration::from_secs(5);
+
+        let accept = tokio::spawn(async move {
+            let (stream, _) = listener.accept().await.expect("accept client");
+            handle_connection(
+                stream,
+                senders,
+                claimed_roles,
+                payload_budget,
+                TcpPeerAuthentication::UnauthenticatedTrustedNetwork {
+                    explicit_allow: true,
+                },
+                "Alice",
+                buffer_size,
+                read_timeout,
+            )
+            .await
+        });
+
+        let _client = connect_and_claim_role(addr, "Mallory").await;
+        let err = tokio::time::timeout(Duration::from_secs(1), accept)
+            .await
+            .expect("unknown role claim should finish promptly")
+            .expect("unknown role handler should not panic")
+            .expect_err("unknown role claim must fail closed");
+        assert!(matches!(err, TcpTransportError::UnknownPeer(role) if role == "Mallory"));
     }
 
     #[tokio::test]

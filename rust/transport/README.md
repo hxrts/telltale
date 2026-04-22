@@ -1,14 +1,14 @@
 # telltale-transport
 
-TCP transport implementations for the Telltale session types runtime.
+Reference TCP transport implementation for the Telltale session types runtime.
 
 ## Overview
 
-`telltale-transport` provides a TCP implementation of the `Transport` interface from `telltale-runtime`. It is intended for multi-process and multi-host deployments where roles communicate over network sockets. The crate includes endpoint resolution from environment variables and a factory API for runtime construction.
+`telltale-transport` provides an example TCP implementation of the `Transport` interface from `telltale-runtime`. It is intended as a reusable reference for multi-process and multi-host deployments where roles communicate over network sockets. The crate includes endpoint resolution from environment variables and a factory API for runtime construction.
 
 ## Features
 
-The transport uses versioned length-prefixed message framing, role-addressed routing, optional pre-shared-key peer authentication, and retry with exponential backoff. Unauthenticated TCP is trusted-network only and must be enabled explicitly with `allow_unauthenticated_for_trusted_network()`. It supports IPv4 and IPv6 endpoints and provides `EnvResolver` and `TcpTransportFactory` for environment-driven configuration.
+The transport uses versioned length-prefixed message framing, role-addressed routing, pre-shared-key peer authentication, and retry with exponential backoff. Unauthenticated TCP is trusted-network only and must be enabled explicitly with `allow_unauthenticated_for_trusted_network()`. It supports IPv4 and IPv6 endpoints and provides `EnvResolver` and `TcpTransportFactory` for environment-driven configuration.
 
 ## Installation
 
@@ -144,7 +144,7 @@ let config = TcpTransportConfig::new("Server", "[::1]:8080")
 
 let dual_stack = TcpTransportConfig::new("Server", "[::]:8080");
 
-let production = TcpTransportConfig::new("Server", "[2001:db8::1]:8080")
+let remote = TcpTransportConfig::new("Server", "[2001:db8::1]:8080")
     .with_peer("Client", "[2001:db8::2]:8081");
 ```
 

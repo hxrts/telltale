@@ -21,6 +21,9 @@ mod handler;
 mod parser;
 mod transport;
 mod validation_types;
+#[cfg(not(target_arch = "wasm32"))]
+#[doc(hidden)]
+pub mod wire;
 
 pub use contract::{
     validate_transport_contract_profile, validated_transport_contract_profile,

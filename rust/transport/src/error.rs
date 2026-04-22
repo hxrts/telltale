@@ -1,6 +1,7 @@
 //! Error types for TCP transport.
 
 use std::io;
+use telltale_runtime::topology::wire::TcpWireError;
 use thiserror::Error;
 
 /// Errors specific to TCP transport operations.
@@ -66,3 +67,14 @@ pub enum TcpTransportError {
 
 /// Result type for TCP transport operations.
 pub type TcpResult<T> = std::result::Result<T, TcpTransportError>;
+
+impl From<TcpWireError> for TcpTransportError {
+    fn from(error: TcpWireError) -> Self {
+        match error {
+            TcpWireError::Io(error) => Self::Io(error),
+            TcpWireError::Timeout => Self::Timeout,
+            TcpWireError::UnsupportedProtocol(message) => Self::UnsupportedProtocol(message),
+            TcpWireError::InvalidMessage(message) => Self::InvalidMessage(message),
+        }
+    }
+}
