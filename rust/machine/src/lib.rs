@@ -251,11 +251,12 @@ pub mod runtime {
             request_determinism_profile, requires_protocol_machine_runtime_contracts,
             runtime_capability_snapshot, runtime_execution_profile,
             rust_runtime_critical_transport_theorem_keys, transported_theorem_boundary,
-            DeterminismArtifacts, ProtocolMachineAdmissibilityClass,
-            ProtocolMachineEscalationWindowClass, ProtocolMachineExecutionProfile,
-            ProtocolMachineFairnessAssumption, RuntimeAdmissionResult, RuntimeCapability,
-            RuntimeContracts, RuntimeGateResult, TransportedTheoremBoundaryEntry,
-            TransportedTheoremUsageClass,
+            validate_transport_contracts_for_execution_profile, DeterminismArtifacts,
+            ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+            ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption,
+            RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts, RuntimeGateResult,
+            RuntimeTransportContract, TheoremTransportRequirements, TransportContractGateError,
+            TransportedTheoremBoundaryEntry, TransportedTheoremUsageClass,
         };
     }
 
@@ -384,9 +385,11 @@ pub use runtime_contracts::{
     request_determinism_profile, requires_protocol_machine_runtime_contracts,
     runtime_capability_snapshot, runtime_execution_profile,
     rust_runtime_critical_transport_theorem_keys, transported_theorem_boundary,
-    DeterminismArtifacts, ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+    validate_transport_contracts_for_execution_profile, DeterminismArtifacts,
+    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
     ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeAdmissionResult,
-    RuntimeCapability, RuntimeContracts, RuntimeGateResult, TransportedTheoremBoundaryEntry,
+    RuntimeCapability, RuntimeContracts, RuntimeGateResult, RuntimeTransportContract,
+    TheoremTransportRequirements, TransportContractGateError, TransportedTheoremBoundaryEntry,
     TransportedTheoremUsageClass,
 };
 pub use scheduler::{

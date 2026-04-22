@@ -3665,6 +3665,7 @@ version = "15.0.0"
 dependencies = [
  "async-trait",
  "blake3",
+ "telltale-machine",
  "telltale-runtime",
  "telltale-types",
  "thiserror 1.0.69",

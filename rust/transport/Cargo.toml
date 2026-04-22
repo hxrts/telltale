@@ -11,6 +11,7 @@ categories = ["asynchronous", "network-programming"]
 readme = "README.md"
 
 [dependencies]
+telltale-machine = { version = "15.0.0", path = "../machine" }
 telltale-runtime = { version = "15.0.0", path = "../runtime" }
 telltale-types = { version = "15.0.0", path = "../types" }
 async-trait = "0.1"

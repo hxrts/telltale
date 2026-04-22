@@ -29,6 +29,176 @@ pub enum RuntimeGateResult {
     RejectedUnsupportedDeterminismProfile,
 }
 
+/// Machine-side summary of a selected transport contract.
+///
+/// This mirrors the semantic fields exposed by `DocumentedTransportContract`
+/// without making `telltale-machine` depend on `telltale-runtime`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeTransportContract {
+    /// Stable transport/profile name.
+    pub transport_name: String,
+    /// Human-readable transport kind, e.g. `InMemory` or `Tcp`.
+    pub transport_type: String,
+    /// Whether messages are routed by role identity.
+    pub role_addressed_routing: bool,
+    /// Whether peer identity is authenticated at the transport boundary.
+    pub authenticated_peers: bool,
+    /// Whether each peer stream preserves FIFO delivery.
+    pub per_peer_fifo_delivery: bool,
+    /// Whether unknown role claims are rejected instead of admitted.
+    pub fail_closed_unknown_role: bool,
+    /// Whether the transport can synthesize messages not sent by a peer.
+    pub no_message_synthesis: bool,
+    /// Whether startup/readiness failures are surfaced explicitly.
+    pub explicit_readiness_errors: bool,
+    /// Whether the transport is deterministic enough for regression harnesses.
+    pub deterministic_for_regression: bool,
+}
+
+impl RuntimeTransportContract {
+    /// Start a semantic transport contract summary.
+    #[must_use]
+    pub fn new(transport_name: impl Into<String>, transport_type: impl Into<String>) -> Self {
+        Self {
+            transport_name: transport_name.into(),
+            transport_type: transport_type.into(),
+            role_addressed_routing: false,
+            authenticated_peers: false,
+            per_peer_fifo_delivery: false,
+            fail_closed_unknown_role: false,
+            no_message_synthesis: false,
+            explicit_readiness_errors: false,
+            deterministic_for_regression: false,
+        }
+    }
+
+    /// Contract summary for the first-party in-process channel transport.
+    #[must_use]
+    pub fn first_party_in_memory() -> Self {
+        Self::new("InMemoryChannelTransport", "InMemory")
+            .with_role_addressed_routing(true)
+            .with_authenticated_peers(true)
+            .with_per_peer_fifo_delivery(true)
+            .with_fail_closed_unknown_role(true)
+            .with_no_message_synthesis(true)
+            .with_deterministic_for_regression(true)
+    }
+
+    /// Set whether messages are routed by role identity.
+    #[must_use]
+    pub fn with_role_addressed_routing(mut self, value: bool) -> Self {
+        self.role_addressed_routing = value;
+        self
+    }
+
+    /// Set whether peer identity is authenticated at the transport boundary.
+    #[must_use]
+    pub fn with_authenticated_peers(mut self, value: bool) -> Self {
+        self.authenticated_peers = value;
+        self
+    }
+
+    /// Set whether each peer stream preserves FIFO delivery.
+    #[must_use]
+    pub fn with_per_peer_fifo_delivery(mut self, value: bool) -> Self {
+        self.per_peer_fifo_delivery = value;
+        self
+    }
+
+    /// Set whether unknown role claims are rejected instead of admitted.
+    #[must_use]
+    pub fn with_fail_closed_unknown_role(mut self, value: bool) -> Self {
+        self.fail_closed_unknown_role = value;
+        self
+    }
+
+    /// Set whether the transport can synthesize messages not sent by a peer.
+    #[must_use]
+    pub fn with_no_message_synthesis(mut self, value: bool) -> Self {
+        self.no_message_synthesis = value;
+        self
+    }
+
+    /// Set whether startup/readiness failures are surfaced explicitly.
+    #[must_use]
+    pub fn with_explicit_readiness_errors(mut self, value: bool) -> Self {
+        self.explicit_readiness_errors = value;
+        self
+    }
+
+    /// Set whether the transport is deterministic enough for regression harnesses.
+    #[must_use]
+    pub fn with_deterministic_for_regression(mut self, value: bool) -> Self {
+        self.deterministic_for_regression = value;
+        self
+    }
+}
+
+/// Transport semantics required by a theorem-pack execution profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TheoremTransportRequirements {
+    /// Whether the theorem profile depends on role-addressed routing.
+    pub role_addressed_routing: bool,
+    /// Whether the theorem profile depends on authenticated peer identity.
+    pub authenticated_peers: bool,
+    /// Whether the theorem profile depends on per-peer FIFO delivery.
+    pub per_peer_fifo_delivery: bool,
+    /// Whether unknown role claims must fail closed.
+    pub fail_closed_unknown_role: bool,
+    /// Whether the transport must not synthesize messages.
+    pub no_message_synthesis: bool,
+}
+
+impl TheoremTransportRequirements {
+    /// No transport assumptions are required.
+    #[must_use]
+    pub const fn none() -> Self {
+        Self {
+            role_addressed_routing: false,
+            authenticated_peers: false,
+            per_peer_fifo_delivery: false,
+            fail_closed_unknown_role: false,
+            no_message_synthesis: false,
+        }
+    }
+
+    /// Standard theorem-pack requirements for protocol-origin claims.
+    #[must_use]
+    pub const fn protocol_origin_integrity() -> Self {
+        Self {
+            role_addressed_routing: true,
+            authenticated_peers: true,
+            per_peer_fifo_delivery: true,
+            fail_closed_unknown_role: true,
+            no_message_synthesis: true,
+        }
+    }
+
+    /// Whether any transport premise is required.
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        !self.role_addressed_routing
+            && !self.authenticated_peers
+            && !self.per_peer_fifo_delivery
+            && !self.fail_closed_unknown_role
+            && !self.no_message_synthesis
+    }
+}
+
+/// Transport-contract admission failure for theorem-pack claims.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TransportContractGateError {
+    /// The theorem profile needs transport contracts but none were supplied.
+    MissingTransportContracts,
+    /// One selected transport does not satisfy a required semantic field.
+    UnsatisfiedTransportRequirement {
+        /// Selected transport profile name.
+        transport_name: String,
+        /// Required semantic field.
+        requirement: &'static str,
+    },
+}
+
 /// How one transported theorem family participates in shipped assurance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -223,6 +393,74 @@ impl ProtocolMachineExecutionProfile {
     pub fn supports_protocol_envelope_bridge(&self) -> bool {
         self.eligibility("protocol_envelope_bridge")
     }
+
+    /// Transport semantics required by the enabled theorem-pack claims.
+    #[must_use]
+    pub fn transport_requirements(&self) -> TheoremTransportRequirements {
+        if self
+            .theorem_pack_eligibility
+            .iter()
+            .any(|(_, enabled)| *enabled)
+        {
+            TheoremTransportRequirements::protocol_origin_integrity()
+        } else {
+            TheoremTransportRequirements::none()
+        }
+    }
+}
+
+fn missing_transport_requirement(
+    requirements: TheoremTransportRequirements,
+    transport: &RuntimeTransportContract,
+) -> Option<&'static str> {
+    if requirements.role_addressed_routing && !transport.role_addressed_routing {
+        Some("role_addressed_routing")
+    } else if requirements.authenticated_peers && !transport.authenticated_peers {
+        Some("authenticated_peers")
+    } else if requirements.per_peer_fifo_delivery && !transport.per_peer_fifo_delivery {
+        Some("per_peer_fifo_delivery")
+    } else if requirements.fail_closed_unknown_role && !transport.fail_closed_unknown_role {
+        Some("fail_closed_unknown_role")
+    } else if requirements.no_message_synthesis && !transport.no_message_synthesis {
+        Some("no_message_synthesis")
+    } else {
+        None
+    }
+}
+
+/// Validate selected transport contracts against an execution profile's theorem claims.
+///
+/// Every selected transport must satisfy the required semantic fields because a
+/// single weaker path can invalidate origin/order assumptions used by the
+/// theorem pack.
+///
+/// # Errors
+///
+/// Returns [`TransportContractGateError`] when theorem claims require transport
+/// evidence and no selected contract is supplied, or when any selected
+/// transport lacks a required semantic field.
+pub fn validate_transport_contracts_for_execution_profile(
+    profile: &ProtocolMachineExecutionProfile,
+    transports: &[RuntimeTransportContract],
+) -> Result<(), TransportContractGateError> {
+    let requirements = profile.transport_requirements();
+    if requirements.is_empty() {
+        return Ok(());
+    }
+    if transports.is_empty() {
+        return Err(TransportContractGateError::MissingTransportContracts);
+    }
+    for transport in transports {
+        if let Some(requirement) = missing_transport_requirement(requirements, transport) {
+            return Err(
+                TransportContractGateError::UnsatisfiedTransportRequirement {
+                    transport_name: transport.transport_name.clone(),
+                    requirement,
+                },
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Canonical transported-theorem boundary ledger for admission and guarantee surfaces.
@@ -461,6 +699,8 @@ pub struct RuntimeContracts {
     pub capabilities: BTreeSet<RuntimeCapability>,
     /// Proof-carrying execution profile aligned with Lean theorem-pack metadata.
     pub execution_profile: ProtocolMachineExecutionProfile,
+    /// Transport profiles selected for theorem-backed execution.
+    pub transport_contracts: Vec<RuntimeTransportContract>,
 }
 
 impl RuntimeContracts {
@@ -472,7 +712,18 @@ impl RuntimeContracts {
             can_use_mixed_determinism_profiles: true,
             capabilities: RuntimeCapability::ALL.into_iter().collect(),
             execution_profile: ProtocolMachineExecutionProfile::full(),
+            transport_contracts: vec![RuntimeTransportContract::first_party_in_memory()],
         }
+    }
+
+    /// Replace selected transport contracts.
+    #[must_use]
+    pub fn with_transport_contracts(
+        mut self,
+        contracts: impl IntoIterator<Item = RuntimeTransportContract>,
+    ) -> Self {
+        self.transport_contracts = contracts.into_iter().collect();
+        self
     }
 }
 
@@ -778,6 +1029,47 @@ mod tests {
             &cfg,
             Some(&RuntimeContracts::full())
         ));
+    }
+
+    #[test]
+    fn theorem_transport_requirements_reject_missing_contracts() {
+        let profile = ProtocolMachineExecutionProfile::full();
+        assert_eq!(
+            validate_transport_contracts_for_execution_profile(&profile, &[]),
+            Err(TransportContractGateError::MissingTransportContracts)
+        );
+    }
+
+    #[test]
+    fn theorem_transport_requirements_accept_in_memory_profile() {
+        let profile = ProtocolMachineExecutionProfile::full();
+        assert_eq!(
+            validate_transport_contracts_for_execution_profile(
+                &profile,
+                &[RuntimeTransportContract::first_party_in_memory()]
+            ),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn theorem_transport_requirements_reject_unauthenticated_profile_for_authenticated_claims() {
+        let profile = ProtocolMachineExecutionProfile::full();
+        let unauthenticated = RuntimeTransportContract::new("UnauthenticatedTransport", "Network")
+            .with_role_addressed_routing(true)
+            .with_per_peer_fifo_delivery(true)
+            .with_fail_closed_unknown_role(true)
+            .with_no_message_synthesis(true)
+            .with_explicit_readiness_errors(true);
+        assert_eq!(
+            validate_transport_contracts_for_execution_profile(&profile, &[unauthenticated]),
+            Err(
+                TransportContractGateError::UnsatisfiedTransportRequirement {
+                    transport_name: "UnauthenticatedTransport".to_string(),
+                    requirement: "authenticated_peers",
+                }
+            )
+        );
     }
 
     #[test]

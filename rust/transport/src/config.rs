@@ -2,6 +2,7 @@
 
 use std::collections::BTreeMap;
 use std::time::Duration;
+use telltale_machine::RuntimeTransportContract;
 use telltale_runtime::QueueCapacity;
 use telltale_types::FixedQ32;
 
@@ -192,6 +193,24 @@ impl TcpTransportConfig {
         self
     }
 
+    /// Export the semantic transport contract used by theorem-pack admission.
+    ///
+    /// The ProtocolMachine only consumes the semantic result. The TCP-specific
+    /// authentication-mode mapping stays in this crate.
+    #[must_use]
+    pub fn runtime_transport_contract(&self) -> RuntimeTransportContract {
+        RuntimeTransportContract::new("TcpTransport", "Tcp")
+            .with_role_addressed_routing(true)
+            .with_authenticated_peers(matches!(
+                self.authentication,
+                TcpPeerAuthentication::PreSharedKey(_)
+            ))
+            .with_per_peer_fifo_delivery(true)
+            .with_fail_closed_unknown_role(true)
+            .with_no_message_synthesis(true)
+            .with_explicit_readiness_errors(true)
+    }
+
     /// Create configuration from environment variables.
     ///
     /// Expected variables:
@@ -222,6 +241,10 @@ impl TcpTransportConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use telltale_machine::{
+        validate_transport_contracts_for_execution_profile, ProtocolMachineExecutionProfile,
+        TransportContractGateError,
+    };
 
     #[test]
     fn test_config_builder() {
@@ -245,5 +268,88 @@ mod tests {
         let retry = RetryConfig::default();
         assert_eq!(retry.max_attempts, 5);
         assert_eq!(retry.initial_delay, Duration::from_millis(100));
+    }
+
+    #[test]
+    fn runtime_transport_contract_reflects_preshared_key_authentication() {
+        let contract = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .with_preshared_key([1; 32])
+            .runtime_transport_contract();
+
+        assert_eq!(contract.transport_name, "TcpTransport");
+        assert_eq!(contract.transport_type, "Tcp");
+        assert!(contract.role_addressed_routing);
+        assert!(contract.authenticated_peers);
+        assert!(contract.per_peer_fifo_delivery);
+        assert!(contract.fail_closed_unknown_role);
+        assert!(contract.no_message_synthesis);
+    }
+
+    #[test]
+    fn runtime_transport_contract_reflects_trusted_network_mode() {
+        let contract = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .allow_unauthenticated_for_trusted_network()
+            .runtime_transport_contract();
+
+        assert!(contract.role_addressed_routing);
+        assert!(!contract.authenticated_peers);
+        assert!(contract.per_peer_fifo_delivery);
+        assert!(contract.fail_closed_unknown_role);
+        assert!(contract.no_message_synthesis);
+    }
+
+    #[test]
+    fn preshared_key_contract_satisfies_theorem_transport_admission() {
+        let profile = ProtocolMachineExecutionProfile::full();
+        let contract = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .with_preshared_key([1; 32])
+            .runtime_transport_contract();
+
+        assert_eq!(
+            validate_transport_contracts_for_execution_profile(&profile, &[contract]),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn trusted_network_contract_fails_authenticated_theorem_admission() {
+        let profile = ProtocolMachineExecutionProfile::full();
+        let contract = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .allow_unauthenticated_for_trusted_network()
+            .runtime_transport_contract();
+
+        assert_eq!(
+            validate_transport_contracts_for_execution_profile(&profile, &[contract]),
+            Err(
+                TransportContractGateError::UnsatisfiedTransportRequirement {
+                    transport_name: "TcpTransport".to_string(),
+                    requirement: "authenticated_peers",
+                }
+            )
+        );
+    }
+
+    #[test]
+    fn mixed_transport_set_fails_if_any_selected_transport_is_unauthenticated() {
+        let profile = ProtocolMachineExecutionProfile::full();
+        let authenticated = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .with_preshared_key([1; 32])
+            .runtime_transport_contract();
+        let unauthenticated = TcpTransportConfig::new("Bob", "127.0.0.1:0")
+            .allow_unauthenticated_for_trusted_network()
+            .runtime_transport_contract();
+
+        assert_eq!(
+            validate_transport_contracts_for_execution_profile(
+                &profile,
+                &[authenticated, unauthenticated]
+            ),
+            Err(
+                TransportContractGateError::UnsatisfiedTransportRequirement {
+                    transport_name: "TcpTransport".to_string(),
+                    requirement: "authenticated_peers",
+                }
+            )
+        );
     }
 }

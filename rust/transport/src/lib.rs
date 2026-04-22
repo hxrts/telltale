@@ -28,8 +28,10 @@
 //! Plaintext unauthenticated mode is trusted-network only and must be enabled
 //! explicitly with `allow_unauthenticated_for_trusted_network()`. The protocol
 //! machine's formal guarantees assume the selected transport satisfies its
-//! documented contract. Enable the `redacted-logs` feature when structured logs
-//! must not expose peer roles or socket addresses.
+//! documented contract; use `TcpTransportConfig::runtime_transport_contract()`
+//! to export the semantic contract consumed by theorem-pack admission. Enable
+//! the `redacted-logs` feature when structured logs must not expose peer roles
+//! or socket addresses.
 //!
 //! ## Example
 //!
