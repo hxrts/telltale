@@ -198,12 +198,12 @@ It also uses `telltale-theory` and `telltale-runtime` behind optional features a
 
 ### telltale-transport
 
-`telltale-transport` provides first-party production transport implementations.
+`telltale-transport` provides a first-party reference TCP transport implementation.
 Today it is centered on TCP transport support over the choreography-layer transport abstractions from `telltale-runtime`.
 It depends on `telltale-runtime` and `telltale-types`.
 
 This crate should be read as a transport implementation layer, not as the main protocol frontend or runtime semantic core.
-Its job is to realize transport contracts for deployed choreography-layer systems.
+Its job is to demonstrate how concrete transports realize runtime transport contracts for choreography-layer systems.
 
 ### telltale-lints
 

@@ -31,8 +31,11 @@
 //! documented contract; use `TcpTransportConfig::runtime_transport_contract()`
 //! to export the semantic contract consumed by theorem-pack admission.
 //! Pre-shared-key mode satisfies authenticated-peer theorem requirements.
-//! Trusted-network mode does not. Enable the `redacted-logs` feature when
-//! structured logs must not expose peer roles or socket addresses.
+//! Trusted-network mode does not. TLS is intentionally out of scope for this
+//! reference transport; production deployments that need certificate-based
+//! identity should wrap or replace it with a transport that exports equivalent
+//! semantic contract evidence. Enable the `redacted-logs` feature when structured
+//! logs must not expose peer roles or socket addresses.
 //!
 //! ## Example
 //!

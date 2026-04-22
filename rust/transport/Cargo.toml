@@ -8,7 +8,6 @@ description = "Reference TCP transport implementation for Telltale session types
 repository = "https://github.com/hxrts/telltale"
 keywords = ["session-types", "tcp", "transport", "async", "networking"]
 categories = ["asynchronous", "network-programming"]
-readme = "README.md"
 
 [dependencies]
 telltale-machine = { version = "15.0.0", path = "../machine" }

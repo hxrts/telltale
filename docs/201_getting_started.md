@@ -26,7 +26,7 @@ Use this table to pick the right entry point.
 | protocol-machine execution in a host runtime | `telltale-machine` |
 | deterministic simulation and host-handler testing | `telltale-simulator` |
 | Lean JSON import, export, and validation tools | `telltale-bridge` |
-| production choreography transports | `telltale-transport` |
+| reference choreography transport | `telltale-transport` |
 
 The important split is between the shared frontend and the execution layers.
 `telltale-language` is the shared frontend.
@@ -48,7 +48,7 @@ It provides async `ChoreoHandler` integration, topology support, testing helpers
 
 `telltale-simulator` wraps the protocol machine with deterministic middleware for testing.
 `telltale-bridge` supports Rust↔Lean conversion and validation.
-`telltale-transport` provides first-party transport implementations for choreography-layer systems.
+`telltale-transport` provides a first-party reference TCP transport for choreography-layer systems.
 
 ## Feature Flags
 
