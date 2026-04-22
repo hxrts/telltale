@@ -20,7 +20,9 @@ use async_trait::async_trait;
 use cfg_if::cfg_if;
 #[cfg(target_arch = "wasm32")]
 use futures::{SinkExt, StreamExt};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::BTreeSet;
 #[cfg(not(target_arch = "wasm32"))]
 use std::net::IpAddr;
 use std::sync::Arc;

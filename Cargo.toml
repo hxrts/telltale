@@ -74,7 +74,6 @@ syn = { workspace = true }
 rand = { workspace = true, optional = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
 futures = { workspace = true, features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { workspace = true }
@@ -87,6 +86,9 @@ tracing-subscriber = { workspace = true }
 # For examples
 telltale-theory = { path = "rust/theory", version = "15.0.0" }
 serde_json = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = { workspace = true }
 
 [features]
 default = []

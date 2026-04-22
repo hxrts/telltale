@@ -56,7 +56,6 @@ wasm-timer = { workspace = true }
 getrandom = { workspace = true }
 
 [dev-dependencies]
-criterion = { workspace = true }
 tempfile = { workspace = true }
 tracing-subscriber = { workspace = true }
 
@@ -64,6 +63,7 @@ tracing-subscriber = { workspace = true }
 wasm-bindgen-test = "0.3"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = { workspace = true }
 proptest = { workspace = true }
 tokio = { workspace = true, features = ["macros", "rt", "rt-multi-thread", "sync", "time", "net", "io-util"] }
 

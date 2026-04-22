@@ -40,12 +40,12 @@ wasm-bindgen = { workspace = true }
 telltale-theory = { path = "../theory", version = "=15.0.0" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
-criterion = { workspace = true }
 telltale-bridge = { path = "../bridge" }
 tempfile = { workspace = true }
 serde_yaml = "0.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = { workspace = true }
 proptest = { workspace = true }
 
 [lints]
