@@ -22,12 +22,12 @@
 //!
 //! ## Security Boundary
 //!
-//! The first-party TCP transport is plaintext and does not authenticate peers.
-//! Use it only on localhost, a trusted host network, or a trusted VPN until an
-//! authenticated transport profile is configured. The protocol machine's formal
-//! guarantees assume the selected transport satisfies its documented contract.
-//! Debug-level transport logs include peer roles and socket addresses for
-//! diagnosis; route debug logs only to sinks that may see deployment topology.
+//! The first-party TCP transport supports pre-shared-key peer authentication.
+//! Plaintext unauthenticated mode is trusted-network only and must be enabled
+//! explicitly with `allow_unauthenticated_for_trusted_network()`. The protocol
+//! machine's formal guarantees assume the selected transport satisfies its
+//! documented contract. Enable the `redacted-logs` feature when structured logs
+//! must not expose peer roles or socket addresses.
 //!
 //! ## Example
 //!
@@ -39,6 +39,7 @@
 //! async fn main() -> Result<(), Box<dyn std::error::Error>> {
 //!     // Option 1: Direct configuration with IPv4
 //!     let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
+//!         .allow_unauthenticated_for_trusted_network()
 //!         .with_peer("Bob", "127.0.0.1:8081")
 //!         .with_peer("Carol", "127.0.0.1:8082");
 //!
@@ -66,13 +67,16 @@
 //!
 //! // IPv6 loopback
 //! let config = TcpTransportConfig::new("Server", "[::1]:8080")
+//!     .allow_unauthenticated_for_trusted_network()
 //!     .with_peer("Client", "[::1]:8081");
 //!
 //! // IPv6 any address (dual-stack binding)
-//! let dual_stack = TcpTransportConfig::new("Server", "[::]:8080");
+//! let dual_stack = TcpTransportConfig::new("Server", "[::]:8080")
+//!     .allow_unauthenticated_for_trusted_network();
 //!
 //! // Mixed IPv4 and IPv6 peers
 //! let mixed = TcpTransportConfig::new("Gateway", "0.0.0.0:8080")
+//!     .allow_unauthenticated_for_trusted_network()
 #![allow(
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,

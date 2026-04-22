@@ -208,6 +208,7 @@ check-fast-structure:
     just check-verification-inventory
     just check-bridge-normalization
     just check-fail-closed-mutations
+    just check-ui-eval-safety
     just check-docs-as-contract
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
@@ -1072,6 +1073,9 @@ verify-properties:
     cargo test -p telltale-bridge --test proptest_projection
     cargo test -p telltale-bridge --test proptest_json_roundtrip
     cargo test -p telltale-bridge --test proptest_async_subtyping
+
+check-ui-eval-safety:
+    ./scripts/check-ui-eval-safety.sh
 
 # Generate normalized traces for bridge-level protocol machine correspondence fixtures.
 generate-test-traces:

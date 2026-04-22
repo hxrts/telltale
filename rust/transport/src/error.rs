@@ -27,6 +27,14 @@ pub enum TcpTransportError {
     #[error("duplicate peer connection: {0}")]
     DuplicatePeer(String),
 
+    /// Authentication mode was not explicitly configured.
+    #[error("authentication mode not configured")]
+    AuthenticationModeNotConfigured,
+
+    /// Peer authentication failed.
+    #[error("authentication failed: {0}")]
+    AuthenticationFailed(String),
+
     /// Transport not started.
     #[error("transport not started")]
     NotStarted,
@@ -39,9 +47,17 @@ pub enum TcpTransportError {
     #[error("invalid message: {0}")]
     InvalidMessage(String),
 
+    /// Unsupported wire protocol.
+    #[error("unsupported protocol: {0}")]
+    UnsupportedProtocol(String),
+
     /// Connection closed unexpectedly.
     #[error("connection closed")]
     ConnectionClosed,
+
+    /// Transport-level resource limit exceeded.
+    #[error("resource limit exceeded: {0}")]
+    ResourceLimitExceeded(String),
 
     /// Operation timed out.
     #[error("operation timed out")]

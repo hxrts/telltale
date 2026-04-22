@@ -646,7 +646,11 @@ impl Choreography {
                                 let op_decl = effect_ops
                                     .get(effect)
                                     .and_then(|ops| ops.get(operation))
-                                    .expect("validated effect operation should exist");
+                                    .ok_or_else(|| {
+                                        ValidationError::ExtensionError(format!(
+                                            "effect invocation `{effect}.{operation}` was not declared"
+                                        ))
+                                    })?;
                                 if matches!(
                                     op_decl.authority_class,
                                     EffectAuthorityClass::Authoritative
@@ -674,7 +678,11 @@ impl Choreography {
                                 let op_decl = effect_ops
                                     .get(effect)
                                     .and_then(|ops| ops.get(operation))
-                                    .expect("validated effect operation should exist");
+                                    .ok_or_else(|| {
+                                        ValidationError::ExtensionError(format!(
+                                            "effect invocation `{effect}.{operation}` was not declared"
+                                        ))
+                                    })?;
                                 if !matches!(
                                     op_decl.authority_class,
                                     EffectAuthorityClass::Authoritative

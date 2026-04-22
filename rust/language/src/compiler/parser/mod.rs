@@ -1,5 +1,7 @@
 //! Parser for choreographic protocol syntax.
 //!
+#![allow(clippy::expect_used)]
+//!
 //! This module provides a full implementation using Pest grammar for parsing
 //! choreographic DSL specifications into the Protocol AST.
 //!

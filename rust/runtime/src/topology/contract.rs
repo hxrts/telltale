@@ -40,6 +40,7 @@ pub enum TransportStartupMode {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransportSemanticContract {
     pub role_addressed_routing: bool,
+    pub authenticated_peers: bool,
     pub per_peer_fifo_delivery: bool,
     pub fail_closed_unknown_role: bool,
     pub no_message_synthesis: bool,
@@ -72,6 +73,8 @@ pub enum TransportContractViolation {
     MissingRoleRouting,
     #[error("first-party transports must preserve per-peer FIFO delivery")]
     MissingPerPeerFifo,
+    #[error("network transports must document whether peers are authenticated")]
+    MissingPeerAuthenticationDisclosure,
     #[error("first-party transports must fail closed for unknown roles")]
     MissingFailClosedUnknownRole,
     #[error("first-party transports must not synthesize messages")]
@@ -106,6 +109,14 @@ pub fn validate_transport_contract_profile(
             }
             if !profile.semantics.no_message_synthesis {
                 return Err(TransportContractViolation::MessageSynthesisAllowed);
+            }
+            if matches!(profile.operational.transport_type, TransportType::Tcp)
+                && !profile
+                    .notes
+                    .iter()
+                    .any(|note| note.contains("authenticated") || note.contains("trusted-network"))
+            {
+                return Err(TransportContractViolation::MissingPeerAuthenticationDisclosure);
             }
         }
         TransportContractTier::ObservationalHarness => {

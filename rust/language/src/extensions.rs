@@ -10,6 +10,76 @@ use std::any::{Any, TypeId};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
 
+/// Core Pest rule names reserved by the built-in choreography grammar.
+///
+/// Extension grammar rules must not reuse these names. Extension-owned rules
+/// are also required to start with `<extension_id>_` so composed grammars remain
+/// collision-resistant by construction.
+pub const RESERVED_RULE_NAMES: &[&str] = &[
+    "WHITESPACE",
+    "COMMENT",
+    "choreography",
+    "top_level_decl",
+    "module_decl",
+    "import_decl",
+    "protocol_decl",
+    "where_block",
+    "proof_bundle_decl",
+    "profile_decl",
+    "agreement_profile_decl",
+    "type_decl",
+    "effect_decl",
+    "role_set_decl",
+    "topology_decl",
+    "fragment_decl",
+    "operation_decl",
+    "guest_runtime_decl",
+    "roles_decl",
+    "role_list",
+    "role_decl",
+    "protocol_body",
+    "block_protocol",
+    "statement",
+    "begin_stmt",
+    "await_stmt",
+    "resolve_stmt",
+    "invalidate_stmt",
+    "authority_let_in_stmt",
+    "authority_let_stmt",
+    "observe_let_in_stmt",
+    "observe_let_stmt",
+    "let_in_stmt",
+    "let_stmt",
+    "case_stmt",
+    "timeout_stmt",
+    "authority_expr",
+    "duration",
+    "time_unit",
+    "call_stmt",
+    "publish_authority_stmt",
+    "publish_stmt",
+    "materialize_stmt",
+    "handoff_stmt",
+    "dependent_work_stmt",
+    "continue_stmt",
+    "send_stmt",
+    "broadcast_stmt",
+    "role_ref",
+    "role_index",
+    "choice_stmt",
+    "par_stmt",
+    "guard",
+    "loop_stmt",
+    "rec_stmt",
+    "branch_body",
+    "message",
+    "type_spec",
+    "payload",
+    "ident",
+    "integer",
+    "string",
+];
+
 /// Documentation for an extension
 #[derive(Debug, Clone)]
 pub struct ExtensionDocumentation {
@@ -163,6 +233,7 @@ impl ExtensionRegistry {
         let id = extension.extension_id().to_string();
         let rules = extension.statement_rules();
         let priority = extension.priority();
+        validate_extension_grammar(&id, extension.grammar_rules(), &rules)?;
 
         // Check for conflicts and resolve by priority
         for rule in &rules {
@@ -379,11 +450,13 @@ impl ExtensionRegistry {
     pub fn with_builtin_extensions() -> Self {
         let mut registry = Self::new();
 
-        // Register timeout extension
-        registry
+        // Built-in registration is static and covered by extension tests.
+        if registry
             .register_grammar(timeout::TimeoutGrammarExtension)
-            .expect("builtin timeout extension should register successfully");
-        registry.register_parser(timeout::TimeoutStatementParser, "timeout".to_string());
+            .is_ok()
+        {
+            registry.register_parser(timeout::TimeoutStatementParser, "timeout".to_string());
+        }
 
         registry
     }
@@ -419,6 +492,123 @@ impl ExtensionRegistry {
 
         docs
     }
+}
+
+fn validate_extension_grammar(
+    extension_id: &str,
+    grammar_rules: &str,
+    statement_rules: &[&str],
+) -> Result<(), ParseError> {
+    if !is_pest_identifier(extension_id) {
+        return Err(ParseError::RegistrationFailed {
+            extension: extension_id.to_string(),
+            rule: extension_id.to_string(),
+            details: "extension ID must be a Pest identifier".to_string(),
+        });
+    }
+
+    let prefix = format!("{extension_id}_");
+    let parsed_rules = collect_pest_rule_names(grammar_rules);
+    let mut seen = BTreeMap::<String, usize>::new();
+
+    for rule in &parsed_rules {
+        let count = seen.entry(rule.clone()).or_insert(0);
+        *count += 1;
+
+        if RESERVED_RULE_NAMES.contains(&rule.as_str()) {
+            return Err(ParseError::RegistrationFailed {
+                extension: extension_id.to_string(),
+                rule: rule.clone(),
+                details: "rule name is reserved by the core choreography grammar".to_string(),
+            });
+        }
+
+        if !rule.starts_with(&prefix) {
+            return Err(ParseError::RegistrationFailed {
+                extension: extension_id.to_string(),
+                rule: rule.clone(),
+                details: format!("rule name must start with `{prefix}`"),
+            });
+        }
+    }
+
+    if let Some((duplicate, _)) = seen.iter().find(|(_, count)| **count > 1) {
+        return Err(ParseError::RegistrationFailed {
+            extension: extension_id.to_string(),
+            rule: duplicate.clone(),
+            details: "extension grammar defines the same Pest rule more than once".to_string(),
+        });
+    }
+
+    for rule in statement_rules {
+        if RESERVED_RULE_NAMES.contains(rule) {
+            return Err(ParseError::RegistrationFailed {
+                extension: extension_id.to_string(),
+                rule: (*rule).to_string(),
+                details: "statement rule name is reserved by the core choreography grammar"
+                    .to_string(),
+            });
+        }
+
+        if !rule.starts_with(&prefix) {
+            return Err(ParseError::RegistrationFailed {
+                extension: extension_id.to_string(),
+                rule: (*rule).to_string(),
+                details: format!("statement rule must start with `{prefix}`"),
+            });
+        }
+
+        if !parsed_rules.iter().any(|parsed| parsed == rule) {
+            return Err(ParseError::RegistrationFailed {
+                extension: extension_id.to_string(),
+                rule: (*rule).to_string(),
+                details: "statement rule is not defined by extension grammar".to_string(),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn collect_pest_rule_names(grammar: &str) -> Vec<String> {
+    let mut rules = Vec::new();
+
+    for line in grammar.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+
+        let Some(first) = trimmed.chars().next() else {
+            continue;
+        };
+        if !(first == '_' || first.is_ascii_alphabetic()) {
+            continue;
+        }
+
+        let name_len = trimmed
+            .char_indices()
+            .take_while(|(_, ch)| *ch == '_' || ch.is_ascii_alphanumeric())
+            .last()
+            .map_or(0, |(idx, ch)| idx + ch.len_utf8());
+
+        let (name, rest) = trimmed.split_at(name_len);
+        let rest = rest.trim_start();
+        if rest.starts_with('=') && is_pest_identifier(name) {
+            rules.push(name.to_string());
+        }
+    }
+
+    rules
+}
+
+fn is_pest_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first == '_' || first.is_ascii_alphabetic())
+        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
 /// Context provided during statement parsing
@@ -542,11 +732,11 @@ mod tests {
 
     impl GrammarExtension for MockGrammarExtension {
         fn grammar_rules(&self) -> &'static str {
-            "timeout_stmt = { \"timeout\" ~ integer ~ protocol_block }"
+            "mock_timeout_stmt = { \"timeout\" ~ integer ~ protocol_body }"
         }
 
         fn statement_rules(&self) -> Vec<&'static str> {
-            vec!["timeout_stmt"]
+            vec!["mock_timeout_stmt"]
         }
 
         fn extension_id(&self) -> &'static str {
@@ -564,14 +754,14 @@ mod tests {
             .expect("extension registration should succeed");
 
         // Test rule mapping
-        assert!(registry.can_handle("timeout_stmt"));
+        assert!(registry.can_handle("mock_timeout_stmt"));
         assert!(!registry.can_handle("unknown_rule"));
 
         // Test grammar composition
         let base = "basic_rule = { \"test\" }";
         let composed = registry.compose_grammar(base);
         assert!(composed.contains("basic_rule"));
-        assert!(composed.contains("timeout_stmt"));
+        assert!(composed.contains("mock_timeout_stmt"));
     }
 
     #[test]
@@ -605,56 +795,26 @@ mod tests {
     }
 
     #[test]
-    fn test_detailed_conflicts() {
+    fn test_extension_rule_prefix_is_required() {
         #[derive(Debug)]
-        struct TestExt1;
-        impl GrammarExtension for TestExt1 {
+        struct BadExt;
+        impl GrammarExtension for BadExt {
             fn grammar_rules(&self) -> &'static str {
-                "rule1 = { \"test1\" }"
+                "rule1 = { \"test\" }"
             }
             fn statement_rules(&self) -> Vec<&'static str> {
                 vec!["rule1"]
             }
-            fn priority(&self) -> u32 {
-                200
-            }
             fn extension_id(&self) -> &'static str {
-                "test_ext1"
-            }
-        }
-
-        #[derive(Debug)]
-        struct TestExt2;
-        impl GrammarExtension for TestExt2 {
-            fn grammar_rules(&self) -> &'static str {
-                "rule1 = { \"test2\" }"
-            }
-            fn statement_rules(&self) -> Vec<&'static str> {
-                vec!["rule1"]
-            }
-            fn priority(&self) -> u32 {
-                100
-            }
-            fn extension_id(&self) -> &'static str {
-                "test_ext2"
+                "bad_ext"
             }
         }
 
         let mut registry = ExtensionRegistry::new();
-
-        // Register lower priority first
-        registry
-            .register_grammar(TestExt2)
-            .expect("lower priority extension should register");
-        // Register higher priority second (should override)
-        registry
-            .register_grammar(TestExt1)
-            .expect("higher priority extension should override");
-
-        let conflicts = registry.get_detailed_conflicts();
-        assert!(!conflicts.is_empty());
-        assert!(conflicts[0].contains("overrode"));
-        assert!(conflicts[0].contains("priority"));
+        let err = registry
+            .register_grammar(BadExt)
+            .expect_err("unprefixed rule must be rejected");
+        assert!(err.to_string().contains("bad_ext_"));
     }
 
     #[test]
@@ -687,10 +847,10 @@ mod tests {
         struct AlphaExt;
         impl GrammarExtension for AlphaExt {
             fn grammar_rules(&self) -> &'static str {
-                "alpha_stmt = { \"alpha\" }"
+                "alpha_ext_stmt = { \"alpha\" }"
             }
             fn statement_rules(&self) -> Vec<&'static str> {
-                vec!["alpha_stmt"]
+                vec!["alpha_ext_stmt"]
             }
             fn priority(&self) -> u32 {
                 100
@@ -704,10 +864,10 @@ mod tests {
         struct BetaExt;
         impl GrammarExtension for BetaExt {
             fn grammar_rules(&self) -> &'static str {
-                "beta_stmt = { \"beta\" }"
+                "beta_ext_stmt = { \"beta\" }"
             }
             fn statement_rules(&self) -> Vec<&'static str> {
-                vec!["beta_stmt"]
+                vec!["beta_ext_stmt"]
             }
             fn priority(&self) -> u32 {
                 100
@@ -722,9 +882,32 @@ mod tests {
         registry.register_grammar(AlphaExt).unwrap();
 
         let composed = registry.compose_grammar("base = { \"x\" }");
-        let alpha_idx = composed.find("alpha_stmt").unwrap();
-        let beta_idx = composed.find("beta_stmt").unwrap();
+        let alpha_idx = composed.find("alpha_ext_stmt").unwrap();
+        let beta_idx = composed.find("beta_ext_stmt").unwrap();
         assert!(alpha_idx < beta_idx);
+    }
+
+    #[test]
+    fn test_reserved_core_rule_is_rejected() {
+        #[derive(Debug)]
+        struct BadCoreCollisionExt;
+        impl GrammarExtension for BadCoreCollisionExt {
+            fn grammar_rules(&self) -> &'static str {
+                "send_stmt = { \"shadow\" }"
+            }
+            fn statement_rules(&self) -> Vec<&'static str> {
+                vec!["send_stmt"]
+            }
+            fn extension_id(&self) -> &'static str {
+                "send"
+            }
+        }
+
+        let mut registry = ExtensionRegistry::new();
+        let err = registry
+            .register_grammar(BadCoreCollisionExt)
+            .expect_err("core rule collision must be rejected");
+        assert!(err.to_string().contains("reserved"));
     }
 
     #[test]

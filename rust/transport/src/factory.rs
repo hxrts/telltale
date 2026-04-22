@@ -80,6 +80,7 @@ impl<R: EndpointResolver + 'static> TcpTransportFactory<R> {
         // Create TCP transport configuration for this role
         let transport_config =
             crate::config::TcpTransportConfig::new(role.as_str(), endpoint.as_str())
+                .allow_unauthenticated_for_trusted_network()
                 .with_retry(self.config.retry.clone())
                 .with_buffer_size(self.config.buffer_size);
 

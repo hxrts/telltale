@@ -58,6 +58,11 @@ The main direct dependency directions are:
 The important organizational change is that the shared frontend now lives in `telltale-language`.
 `telltale-runtime` is no longer the right crate to describe as the main DSL parser and projection layer.
 
+YAML is not a supported user configuration boundary today. If a future crate accepts
+user-provided YAML, the parser must cap input bytes and recursion depth before
+deserialization and should prefer `serde_yaml_ng` over the increasingly stale
+`serde_yaml` crate.
+
 ## Crate Responsibilities
 
 ### telltale-types

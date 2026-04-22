@@ -8,7 +8,7 @@ TCP transport implementations for the Telltale session types runtime.
 
 ## Features
 
-The transport uses length-prefixed message framing, role-addressed routing, and retry with exponential backoff. It supports IPv4 and IPv6 endpoints. It also provides `EnvResolver` and `TcpTransportFactory` for environment-driven configuration.
+The transport uses versioned length-prefixed message framing, role-addressed routing, optional pre-shared-key peer authentication, and retry with exponential backoff. Unauthenticated TCP is trusted-network only and must be enabled explicitly with `allow_unauthenticated_for_trusted_network()`. It supports IPv4 and IPv6 endpoints and provides `EnvResolver` and `TcpTransportFactory` for environment-driven configuration.
 
 ## Installation
 
@@ -34,6 +34,7 @@ use telltale_transport::{TcpTransport, TcpTransportConfig, Transport};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
+        .allow_unauthenticated_for_trusted_network()
         .with_peer("Bob", "127.0.0.1:8081");
 
     let transport = TcpTransport::new(config);

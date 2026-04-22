@@ -7,6 +7,8 @@
 use std::time::Duration;
 
 use crate::FixedQ32;
+use rand::{RngCore, SeedableRng};
+use rand_chacha::ChaCha20Rng;
 
 /// Trait for random number generation in protocol execution.
 ///
@@ -96,10 +98,34 @@ pub trait Rng: Send {
         Self: Sized;
 }
 
+/// Marker trait for reproducible RNGs used by simulation and tests.
+///
+/// Implementations must be seedable or otherwise replayable. Do not use this
+/// trait for secrets, tokens, nonces, or other security-sensitive material.
+pub trait DeterministicRng: Rng {}
+
+/// Marker trait for RNGs acceptable for security-sensitive runtime material.
+///
+/// Implementations must draw from a cryptographically secure generator and be
+/// safe to move across worker threads.
+pub trait SecureRng: Rng + Send + Sync {
+    /// Construct a fresh instance from host operating-system entropy.
+    fn from_os_entropy() -> Self
+    where
+        Self: Sized;
+}
+
 /// Seeded RNG for reproducible randomness.
 ///
 /// Uses a simple xorshift64 algorithm for fast, reproducible random numbers.
 /// This is suitable for testing but not for cryptographic purposes.
+///
+/// # Security Warning
+///
+/// `SeededRng` is deterministic and is **not** suitable for secrets, tokens,
+/// authentication nonces, key material, or any other security-sensitive use.
+/// Use a `SecureRng` implementation such as `ChaCha20Rng::from_os_entropy()`
+/// for those cases.
 ///
 /// # Algorithm
 ///
@@ -164,6 +190,26 @@ impl Rng for SeededRng {
         // Advance parent state so parent and child diverge (value discarded).
         self.next_u64();
         Self::new(fork_seed)
+    }
+}
+
+impl DeterministicRng for SeededRng {}
+
+impl Rng for ChaCha20Rng {
+    fn next_u64(&mut self) -> u64 {
+        RngCore::next_u64(self)
+    }
+
+    fn fork(&mut self) -> Self {
+        let mut seed = <Self as SeedableRng>::Seed::default();
+        self.fill_bytes(seed.as_mut());
+        Self::from_seed(seed)
+    }
+}
+
+impl SecureRng for ChaCha20Rng {
+    fn from_os_entropy() -> Self {
+        <Self as SeedableRng>::from_entropy()
     }
 }
 
@@ -280,5 +326,16 @@ mod tests {
                 "bucket count {count} too far from expected {expected}"
             );
         }
+    }
+
+    #[test]
+    fn chacha20_rng_is_secure_rng() {
+        fn assert_secure<T: SecureRng>() {}
+        assert_secure::<ChaCha20Rng>();
+
+        let mut rng = <ChaCha20Rng as SecureRng>::from_os_entropy();
+        let first = Rng::next_u64(&mut rng);
+        let second = Rng::next_u64(&mut rng);
+        assert_ne!(first, second);
     }
 }

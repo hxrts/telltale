@@ -219,7 +219,9 @@ impl Role {
 
     /// Create a role array with a concrete size (e.g., `Worker[3]`)
     pub fn array(name: Ident, size: usize) -> RoleValidationResult<Self> {
-        let size_token: TokenStream = size.to_string().parse().unwrap();
+        let size_token = TokenStream::from(proc_macro2::TokenTree::Literal(
+            proc_macro2::Literal::usize_unsuffixed(size),
+        ));
         let role = Self::new_unchecked(
             name,
             Some(RoleParam::safe_static(u32::try_from(size).map_err(

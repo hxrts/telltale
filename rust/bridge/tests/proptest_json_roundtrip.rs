@@ -11,6 +11,7 @@
 use proptest::prelude::*;
 use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
+use serde_json::Value;
 use telltale_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
 use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
 
@@ -146,6 +147,23 @@ fn simple_local_strategy() -> impl Strategy<Value = LocalTypeR> {
     ]
 }
 
+fn arbitrary_json_value_strategy() -> impl Strategy<Value = Value> {
+    let leaf = prop_oneof![
+        Just(Value::Null),
+        any::<bool>().prop_map(Value::Bool),
+        any::<i64>().prop_map(|n| Value::Number(n.into())),
+        "[a-zA-Z0-9_]{0,32}".prop_map(Value::String),
+    ];
+
+    leaf.prop_recursive(6, 64, 8, |inner| {
+        prop_oneof![
+            prop::collection::vec(inner.clone(), 0..8).prop_map(Value::Array),
+            prop::collection::btree_map("[a-zA-Z_][a-zA-Z0-9_]{0,15}", inner, 0..8)
+                .prop_map(|entries| { Value::Object(entries.into_iter().collect()) }),
+        ]
+    })
+}
+
 proptest! {
     #![proptest_config(deterministic_config())]
 
@@ -188,6 +206,12 @@ proptest! {
     #[test]
     fn no_free_vars_in_generated(g in simple_global_strategy()) {
         prop_assert!(g.free_vars().is_empty(), "Simple types have no free vars");
+    }
+
+    /// Property: arbitrary bounded JSON never panics the GlobalType importer.
+    #[test]
+    fn json_to_global_handles_random_bounded_values(json in arbitrary_json_value_strategy()) {
+        let _ = json_to_global(&json);
     }
 }
 

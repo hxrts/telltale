@@ -1,28 +1,52 @@
 //! TCP transport implementation.
 
-use crate::config::TcpTransportConfig;
+use crate::config::{TcpPeerAuthentication, TcpTransportConfig};
 
 /// Maximum length for role names in the TCP protocol handshake.
 /// Role names exceeding this limit are rejected to prevent denial-of-service attacks.
 const ROLE_NAME_LEN_MAX_BYTES: usize = 1024;
+const TCP_WIRE_MAGIC: [u8; 4] = *b"TTL1";
+const TCP_WIRE_VERSION: u8 = 1;
+const TCP_AUTH_NONE: u8 = 0;
+const TCP_AUTH_PSK: u8 = 1;
 use crate::error::{TcpResult, TcpTransportError};
 use async_trait::async_trait;
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::IpAddr;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use telltale_runtime::{
     DocumentedTransportContract, MessageLenBytes, QueueCapacity, RoleName, Transport,
     TransportContractProfile, TransportContractTier, TransportError, TransportOperationalContract,
     TransportResult, TransportSemanticContract, TransportStartupMode,
 };
+use telltale_types::effects::{ChaCha20Rng, Rng, SecureRng};
 use telltale_types::FixedQ32;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{mpsc, Mutex, OwnedSemaphorePermit, RwLock, Semaphore};
 use tokio::task::JoinHandle;
 use tracing::{debug, error, info, instrument, warn};
 
 type IncomingReceiver = Arc<Mutex<mpsc::Receiver<Vec<u8>>>>;
+
+#[cfg(feature = "redacted-logs")]
+fn log_value(value: &str) -> String {
+    let digest = blake3::hash(value.as_bytes());
+    format!("redacted:{}", &digest.to_hex()[..16])
+}
+
+#[cfg(not(feature = "redacted-logs"))]
+fn log_value(value: &str) -> &str {
+    value
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SourceRateState {
+    window_start: Instant,
+    attempts: usize,
+    live_connections: usize,
+}
 
 fn scale_duration_by_fixed(duration: Duration, factor: FixedQ32) -> Duration {
     if factor <= FixedQ32::zero() {
@@ -83,11 +107,16 @@ pub struct TcpTransport {
     connection_tasks: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// Peer roles with currently live inbound connections.
     claimed_inbound_roles: Arc<Mutex<BTreeSet<String>>>,
+    /// Global cap for payload bytes currently being read by inbound handlers.
+    payload_budget: Arc<Semaphore>,
+    /// Per-source connection and reconnect state.
+    source_limits: Arc<Mutex<BTreeMap<IpAddr, SourceRateState>>>,
 }
 
 impl TcpTransport {
     /// Create a new TCP transport with the given configuration.
     pub fn new(config: TcpTransportConfig) -> Self {
+        let max_inflight_payload_bytes = config.max_inflight_payload_bytes;
         Self {
             config,
             state: Arc::new(RwLock::new(TransportState::Created)),
@@ -98,6 +127,8 @@ impl TcpTransport {
             accept_task: Arc::new(Mutex::new(None)),
             connection_tasks: Arc::new(Mutex::new(Vec::new())),
             claimed_inbound_roles: Arc::new(Mutex::new(BTreeSet::new())),
+            payload_budget: Arc::new(Semaphore::new(max_inflight_payload_bytes)),
+            source_limits: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -112,6 +143,7 @@ impl TcpTransport {
     }
 
     async fn ensure_created_and_mark_running(&self) -> TcpResult<()> {
+        ensure_authentication_configured(&self.config.authentication)?;
         let mut state = self.state.write().await;
         if *state != TransportState::Created {
             return Err(TcpTransportError::AlreadyStarted);
@@ -145,12 +177,18 @@ impl TcpTransport {
     ) -> JoinHandle<()> {
         let incoming_senders = Arc::clone(&self.incoming_senders);
         let claimed_roles = Arc::clone(&self.claimed_inbound_roles);
+        let payload_budget = Arc::clone(&self.payload_budget);
+        let source_limits = Arc::clone(&self.source_limits);
         let state = Arc::clone(&self.state);
         let connection_tasks = Arc::clone(&self.connection_tasks);
         let role = self.config.role.clone();
         let buffer_size = self.config.buffer_size;
         let max_connections = self.config.max_connections;
+        let per_source_connection_limit = self.config.per_source_connection_limit;
+        let per_source_reconnect_limit = self.config.per_source_reconnect_limit;
+        let reconnect_window = self.config.reconnect_window;
         let read_timeout = self.config.read_timeout;
+        let authentication = self.config.authentication.clone();
 
         tokio::spawn(async move {
             loop {
@@ -159,31 +197,52 @@ impl TcpTransport {
                     accept_result = listener.accept() => {
                         match accept_result {
                             Ok((stream, addr)) => {
-                                debug!(peer_addr = %addr, "Accepted connection");
+                                debug!(peer_addr = %log_value(&addr.to_string()), "Accepted connection");
+                                let source_ip = addr.ip();
                                 let mut tasks = connection_tasks.lock().await;
                                 tasks.retain(|join_handle| !join_handle.is_finished());
                                 if tasks.len() >= max_connections {
                                     warn!(
-                                        peer_addr = %addr,
+                                        peer_addr = %log_value(&addr.to_string()),
                                         max_connections,
                                         "Rejecting connection because max_connections is reached"
                                     );
                                     continue;
                                 }
+                                if let Err(error) = admit_source(
+                                    &source_limits,
+                                    source_ip,
+                                    per_source_connection_limit,
+                                    per_source_reconnect_limit,
+                                    reconnect_window,
+                                ).await {
+                                    warn!(
+                                        peer_addr = %log_value(&addr.to_string()),
+                                        error = %error,
+                                        "Rejecting connection because source limits are reached"
+                                    );
+                                    continue;
+                                }
                                 let senders = Arc::clone(&incoming_senders);
                                 let claims = Arc::clone(&claimed_roles);
+                                let budget = Arc::clone(&payload_budget);
+                                let connection_authentication = authentication.clone();
+                                let source_state = Arc::clone(&source_limits);
                                 let role_name = role.clone();
                                 let task = tokio::spawn(async move {
                                     if let Err(e) = handle_connection(
                                         stream,
                                         senders,
                                         claims,
+                                        budget,
+                                        connection_authentication,
                                         &role_name,
                                         buffer_size,
                                         read_timeout,
                                     ).await {
                                         warn!(error = %e, "Connection handler error");
                                     }
+                                    release_source(&source_state, source_ip).await;
                                 });
                                 tasks.push(task);
                             }
@@ -220,7 +279,7 @@ impl TcpTransport {
     }
 
     /// Start the transport (begin listening for connections).
-    #[instrument(skip(self), fields(role = %self.config.role))]
+    #[instrument(skip(self), fields(role = %log_value(&self.config.role)))]
     pub async fn start(&self) -> TcpResult<()> {
         self.ensure_created_and_mark_running().await?;
 
@@ -232,7 +291,7 @@ impl TcpTransport {
                 reason: e.to_string(),
             })?;
 
-        info!(addr = %self.config.listen_addr, "TCP transport listening");
+        info!(addr = %log_value(&self.config.listen_addr), "TCP transport listening");
 
         self.initialize_incoming_channels().await;
 
@@ -244,8 +303,9 @@ impl TcpTransport {
     }
 
     /// Connect to a peer role.
-    #[instrument(skip(self), fields(role = %self.config.role))]
+    #[instrument(skip(self), fields(role = %log_value(&self.config.role)))]
     pub async fn connect_to(&self, peer_role: &str) -> TcpResult<()> {
+        ensure_authentication_configured(&self.config.authentication)?;
         let addr = self
             .config
             .peers
@@ -261,6 +321,10 @@ impl TcpTransport {
             match TcpStream::connect(addr).await {
                 Ok(mut stream) => {
                     // Send our role name
+                    write_all_timeout(&mut stream, &TCP_WIRE_MAGIC, self.config.write_timeout)
+                        .await?;
+                    write_all_timeout(&mut stream, &[TCP_WIRE_VERSION], self.config.write_timeout)
+                        .await?;
                     let role_bytes = self.config.role.as_bytes();
                     let len = u32::try_from(role_bytes.len()).map_err(|_| {
                         TcpTransportError::InvalidMessage(
@@ -270,9 +334,20 @@ impl TcpTransport {
                     write_all_timeout(&mut stream, &len.to_be_bytes(), self.config.write_timeout)
                         .await?;
                     write_all_timeout(&mut stream, role_bytes, self.config.write_timeout).await?;
+                    write_authentication(
+                        &mut stream,
+                        &self.config.authentication,
+                        role_bytes,
+                        self.config.write_timeout,
+                    )
+                    .await?;
                     flush_timeout(&mut stream, self.config.write_timeout).await?;
 
-                    info!(peer = peer_role, addr = %addr, "Connected to peer");
+                    info!(
+                        peer = %log_value(peer_role),
+                        addr = %log_value(addr),
+                        "Connected to peer"
+                    );
                     self.outgoing
                         .write()
                         .await
@@ -288,7 +363,7 @@ impl TcpTransport {
                         });
                     }
                     warn!(
-                        peer = peer_role,
+                        peer = %log_value(peer_role),
                         attempt = attempts,
                         delay_ms = delay.as_millis(),
                         "Connection failed, retrying"
@@ -319,6 +394,7 @@ impl DocumentedTransportContract for TcpTransport {
             tier: TransportContractTier::FirstPartyRuntime,
             semantics: TransportSemanticContract {
                 role_addressed_routing: true,
+                authenticated_peers: false,
                 per_peer_fifo_delivery: true,
                 fail_closed_unknown_role: true,
                 no_message_synthesis: true,
@@ -333,6 +409,7 @@ impl DocumentedTransportContract for TcpTransport {
             notes: vec![
                 "First-party TCP transport in the separate telltale-transport crate.",
                 "Requires explicit start before first use.",
+                "trusted-network only unless an authenticated transport wrapper is used.",
             ],
         }
     }
@@ -343,11 +420,28 @@ async fn handle_connection(
     mut stream: TcpStream,
     senders: Arc<Mutex<BTreeMap<String, mpsc::Sender<Vec<u8>>>>>,
     claimed_roles: Arc<Mutex<BTreeSet<String>>>,
+    payload_budget: Arc<Semaphore>,
+    authentication: TcpPeerAuthentication,
     local_role: &str,
     _buffer_size: QueueCapacity,
     read_timeout: Duration,
 ) -> TcpResult<()> {
     // Read peer's role name
+    let mut magic = [0u8; 4];
+    read_exact_timeout(&mut stream, &mut magic, read_timeout).await?;
+    if magic != TCP_WIRE_MAGIC {
+        return Err(TcpTransportError::UnsupportedProtocol(
+            "invalid TCP wire magic".to_string(),
+        ));
+    }
+    let mut version = [0u8; 1];
+    read_exact_timeout(&mut stream, &mut version, read_timeout).await?;
+    if version[0] != TCP_WIRE_VERSION {
+        return Err(TcpTransportError::UnsupportedProtocol(format!(
+            "unsupported TCP wire version {}",
+            version[0]
+        )));
+    }
     let mut len_buf = [0u8; 4];
     read_exact_timeout(&mut stream, &mut len_buf, read_timeout).await?;
     let len = usize::try_from(u32::from_be_bytes(len_buf))
@@ -363,11 +457,26 @@ async fn handle_connection(
     read_exact_timeout(&mut stream, &mut role_buf, read_timeout).await?;
     let peer_role = String::from_utf8(role_buf)
         .map_err(|e| TcpTransportError::InvalidMessage(format!("Invalid role name: {}", e)))?;
+    read_and_verify_authentication(
+        &mut stream,
+        &authentication,
+        peer_role.as_bytes(),
+        read_timeout,
+    )
+    .await?;
 
-    debug!(peer = %peer_role, local = local_role, "Identified peer");
+    debug!(
+        peer = %log_value(&peer_role),
+        local = %log_value(local_role),
+        "Identified peer"
+    );
     let sender = lookup_sender(&senders, &peer_role).await;
     let Some(sender) = sender else {
-        warn!(peer = %peer_role, local = local_role, "Unknown peer attempted connection");
+        warn!(
+            peer = %log_value(&peer_role),
+            local = %log_value(local_role),
+            "Unknown peer attempted connection"
+        );
         return Err(TcpTransportError::UnknownPeer(peer_role));
     };
     claim_peer_role(&claimed_roles, &peer_role).await?;
@@ -378,7 +487,7 @@ async fn handle_connection(
             match read_exact_timeout(&mut stream, &mut len_buf, read_timeout).await {
                 Ok(_) => {}
                 Err(TcpTransportError::Io(e)) if e.kind() == std::io::ErrorKind::UnexpectedEof => {
-                    debug!(peer = %peer_role, "Connection closed by peer");
+                    debug!(peer = %log_value(&peer_role), "Connection closed by peer");
                     break;
                 }
                 Err(e) => return Err(e),
@@ -387,11 +496,12 @@ async fn handle_connection(
             let len = MessageLenBytes::try_new(len)
                 .map_err(|e| TcpTransportError::InvalidMessage(e.to_string()))?;
 
+            let _payload_permit = acquire_payload_budget(&payload_budget, len.as_usize()).await?;
             let mut payload = vec![0u8; len.as_usize()];
             read_exact_timeout(&mut stream, &mut payload, read_timeout).await?;
 
             if sender.send(payload).await.is_err() {
-                debug!(peer = %peer_role, "Receiver dropped");
+                debug!(peer = %log_value(&peer_role), "Receiver dropped");
                 break;
             }
         }
@@ -400,6 +510,159 @@ async fn handle_connection(
     .await;
     claimed_roles.lock().await.remove(&peer_role);
     result
+}
+
+fn ensure_authentication_configured(authentication: &TcpPeerAuthentication) -> TcpResult<()> {
+    match authentication {
+        TcpPeerAuthentication::PreSharedKey(_) => Ok(()),
+        TcpPeerAuthentication::UnauthenticatedTrustedNetwork { explicit_allow } => {
+            if *explicit_allow {
+                Ok(())
+            } else {
+                Err(TcpTransportError::AuthenticationModeNotConfigured)
+            }
+        }
+    }
+}
+
+fn psk_mac(key: &[u8; 32], role_bytes: &[u8], nonce: &[u8; 16]) -> [u8; 32] {
+    let mut input = Vec::with_capacity(TCP_WIRE_MAGIC.len() + 1 + role_bytes.len() + nonce.len());
+    input.extend_from_slice(&TCP_WIRE_MAGIC);
+    input.push(TCP_WIRE_VERSION);
+    input.extend_from_slice(role_bytes);
+    input.extend_from_slice(nonce);
+    *blake3::keyed_hash(key, &input).as_bytes()
+}
+
+async fn write_authentication(
+    stream: &mut TcpStream,
+    authentication: &TcpPeerAuthentication,
+    role_bytes: &[u8],
+    timeout: Duration,
+) -> TcpResult<()> {
+    match authentication {
+        TcpPeerAuthentication::UnauthenticatedTrustedNetwork { explicit_allow } => {
+            if !explicit_allow {
+                return Err(TcpTransportError::AuthenticationModeNotConfigured);
+            }
+            write_all_timeout(stream, &[TCP_AUTH_NONE], timeout).await
+        }
+        TcpPeerAuthentication::PreSharedKey(key) => {
+            let mut nonce = [0_u8; 16];
+            let mut rng = <ChaCha20Rng as SecureRng>::from_os_entropy();
+            nonce[..8].copy_from_slice(&rng.next_u64().to_be_bytes());
+            nonce[8..].copy_from_slice(&rng.next_u64().to_be_bytes());
+            let mac = psk_mac(key, role_bytes, &nonce);
+            write_all_timeout(stream, &[TCP_AUTH_PSK], timeout).await?;
+            write_all_timeout(stream, &nonce, timeout).await?;
+            write_all_timeout(stream, &mac, timeout).await
+        }
+    }
+}
+
+async fn read_and_verify_authentication(
+    stream: &mut TcpStream,
+    authentication: &TcpPeerAuthentication,
+    role_bytes: &[u8],
+    timeout: Duration,
+) -> TcpResult<()> {
+    let mut auth_mode = [0_u8; 1];
+    read_exact_timeout(stream, &mut auth_mode, timeout).await?;
+    match authentication {
+        TcpPeerAuthentication::UnauthenticatedTrustedNetwork { explicit_allow } => {
+            if !explicit_allow {
+                return Err(TcpTransportError::AuthenticationModeNotConfigured);
+            }
+            if auth_mode[0] == TCP_AUTH_NONE {
+                Ok(())
+            } else {
+                Err(TcpTransportError::AuthenticationFailed(
+                    "unexpected authenticated peer on unauthenticated transport".to_string(),
+                ))
+            }
+        }
+        TcpPeerAuthentication::PreSharedKey(key) => {
+            if auth_mode[0] != TCP_AUTH_PSK {
+                return Err(TcpTransportError::AuthenticationFailed(
+                    "peer did not present PSK authentication".to_string(),
+                ));
+            }
+            let mut nonce = [0_u8; 16];
+            let mut mac = [0_u8; 32];
+            read_exact_timeout(stream, &mut nonce, timeout).await?;
+            read_exact_timeout(stream, &mut mac, timeout).await?;
+            let expected = psk_mac(key, role_bytes, &nonce);
+            if mac == expected {
+                Ok(())
+            } else {
+                Err(TcpTransportError::AuthenticationFailed(
+                    "invalid PSK MAC".to_string(),
+                ))
+            }
+        }
+    }
+}
+
+async fn admit_source(
+    sources: &Arc<Mutex<BTreeMap<IpAddr, SourceRateState>>>,
+    source_ip: IpAddr,
+    live_limit: usize,
+    reconnect_limit: usize,
+    reconnect_window: Duration,
+) -> TcpResult<()> {
+    let mut sources = sources.lock().await;
+    let now = Instant::now();
+    let state = sources.entry(source_ip).or_insert(SourceRateState {
+        window_start: now,
+        attempts: 0,
+        live_connections: 0,
+    });
+
+    if now.duration_since(state.window_start) > reconnect_window {
+        state.window_start = now;
+        state.attempts = 0;
+    }
+
+    if state.live_connections >= live_limit {
+        return Err(TcpTransportError::ResourceLimitExceeded(format!(
+            "source {source_ip} has too many live connections"
+        )));
+    }
+    if state.attempts >= reconnect_limit {
+        return Err(TcpTransportError::ResourceLimitExceeded(format!(
+            "source {source_ip} exceeded reconnect limit"
+        )));
+    }
+
+    state.live_connections += 1;
+    state.attempts += 1;
+    Ok(())
+}
+
+async fn release_source(
+    sources: &Arc<Mutex<BTreeMap<IpAddr, SourceRateState>>>,
+    source_ip: IpAddr,
+) {
+    let mut sources = sources.lock().await;
+    if let Some(state) = sources.get_mut(&source_ip) {
+        state.live_connections = state.live_connections.saturating_sub(1);
+    }
+}
+
+async fn acquire_payload_budget(
+    payload_budget: &Arc<Semaphore>,
+    bytes: usize,
+) -> TcpResult<OwnedSemaphorePermit> {
+    let permits = u32::try_from(bytes).map_err(|_| {
+        TcpTransportError::ResourceLimitExceeded("payload length exceeds permit range".to_string())
+    })?;
+    Arc::clone(payload_budget)
+        .try_acquire_many_owned(permits)
+        .map_err(|_| {
+            TcpTransportError::ResourceLimitExceeded(
+                "global in-flight payload byte cap reached".to_string(),
+            )
+        })
 }
 
 async fn claim_peer_role(
@@ -450,7 +713,7 @@ async fn lookup_sender(
 
 #[async_trait]
 impl Transport for TcpTransport {
-    #[instrument(skip(self, message), fields(role = %self.config.role, to = %to_role, msg_len = message.len()))]
+    #[instrument(skip(self, message), fields(role = %log_value(&self.config.role), to = %log_value(to_role.as_str()), msg_len = message.len()))]
     async fn send(&self, to_role: &RoleName, message: Vec<u8>) -> TransportResult<()> {
         let role_str = to_role.as_str();
         let stream = {
@@ -487,7 +750,7 @@ impl Transport for TcpTransport {
         Ok(())
     }
 
-    #[instrument(skip(self), fields(role = %self.config.role, from = %from_role))]
+    #[instrument(skip(self), fields(role = %log_value(&self.config.role), from = %log_value(from_role.as_str())))]
     async fn recv(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
         let role_str = from_role.as_str();
         let receiver = self.incoming_receiver_for_role(role_str, from_role).await?;
@@ -533,7 +796,7 @@ impl Transport for TcpTransport {
         self.outgoing.write().await.clear();
         *self.state.write().await = TransportState::Stopped;
 
-        info!(role = %self.config.role, "Transport closed");
+        info!(role = %log_value(&self.config.role), "Transport closed");
         Ok(())
     }
 }
@@ -553,8 +816,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_transport_lifecycle() {
-        let config =
-            TcpTransportConfig::new("Alice", "127.0.0.1:0").with_peer("Bob", "127.0.0.1:9999");
+        let config = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .allow_unauthenticated_for_trusted_network()
+            .with_peer("Bob", "127.0.0.1:9999");
 
         let transport = TcpTransport::new(config);
         assert_eq!(transport.role(), "Alice");
@@ -575,7 +839,9 @@ mod tests {
     #[tokio::test]
     async fn test_transport_ipv6_lifecycle() {
         // Test that transport can bind to IPv6 loopback
-        let config = TcpTransportConfig::new("Alice", "[::1]:0").with_peer("Bob", "[::1]:9999");
+        let config = TcpTransportConfig::new("Alice", "[::1]:0")
+            .allow_unauthenticated_for_trusted_network()
+            .with_peer("Bob", "[::1]:9999");
 
         let transport = TcpTransport::new(config);
         assert_eq!(transport.role(), "Alice");
@@ -591,7 +857,8 @@ mod tests {
     #[tokio::test]
     async fn test_transport_ipv6_dual_stack() {
         // Test IPv6 any address (dual-stack if supported)
-        let config = TcpTransportConfig::new("Server", "[::]:0");
+        let config =
+            TcpTransportConfig::new("Server", "[::]:0").allow_unauthenticated_for_trusted_network();
         let transport = TcpTransport::new(config);
 
         transport.start().await.unwrap();
@@ -604,6 +871,7 @@ mod tests {
     async fn test_transport_config_with_ipv6_peers() {
         // Verify configuration accepts IPv6 peer addresses
         let config = TcpTransportConfig::new("Alice", "127.0.0.1:0")
+            .allow_unauthenticated_for_trusted_network()
             .with_peer("Bob", "[::1]:8080")
             .with_peer("Carol", "[2001:db8::1]:9000")
             .with_peer("Dave", "[fe80::1]:3000");
@@ -629,6 +897,14 @@ mod tests {
 
     async fn connect_and_claim_role(addr: SocketAddr, role: &str) -> TcpStream {
         let mut stream = TcpStream::connect(addr).await.expect("connect test client");
+        stream
+            .write_all(&TCP_WIRE_MAGIC)
+            .await
+            .expect("write wire magic");
+        stream
+            .write_all(&[TCP_WIRE_VERSION])
+            .await
+            .expect("write wire version");
         let role_bytes = role.as_bytes();
         let role_len = u32::try_from(role_bytes.len()).expect("test role length fits u32");
         stream
@@ -639,6 +915,10 @@ mod tests {
             .write_all(role_bytes)
             .await
             .expect("write role bytes");
+        stream
+            .write_all(&[TCP_AUTH_NONE])
+            .await
+            .expect("write unauthenticated auth mode");
         stream.flush().await.expect("flush role claim");
         stream
     }
@@ -653,17 +933,23 @@ mod tests {
         let (tx, _rx) = mpsc::channel(4);
         let senders = Arc::new(Mutex::new(BTreeMap::from([("Bob".to_string(), tx)])));
         let claimed_roles = Arc::new(Mutex::new(BTreeSet::new()));
+        let payload_budget = Arc::new(Semaphore::new(1024 * 1024));
         let read_timeout = Duration::from_secs(5);
         let buffer_size = QueueCapacity::try_new(4).expect("test queue capacity");
 
         let first_senders = Arc::clone(&senders);
         let first_claims = Arc::clone(&claimed_roles);
+        let first_budget = Arc::clone(&payload_budget);
         let first_accept = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("accept first client");
             handle_connection(
                 stream,
                 first_senders,
                 first_claims,
+                first_budget,
+                TcpPeerAuthentication::UnauthenticatedTrustedNetwork {
+                    explicit_allow: true,
+                },
                 "Alice",
                 buffer_size,
                 read_timeout,
@@ -689,12 +975,17 @@ mod tests {
         let second_addr = listener.local_addr().expect("second listener address");
         let second_senders = Arc::clone(&senders);
         let second_claims = Arc::clone(&claimed_roles);
+        let second_budget = Arc::clone(&payload_budget);
         let second_accept = tokio::spawn(async move {
             let (stream, _) = listener.accept().await.expect("accept second client");
             handle_connection(
                 stream,
                 second_senders,
                 second_claims,
+                second_budget,
+                TcpPeerAuthentication::UnauthenticatedTrustedNetwork {
+                    explicit_allow: true,
+                },
                 "Alice",
                 buffer_size,
                 read_timeout,

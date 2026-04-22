@@ -19,6 +19,7 @@
 //! |------|-----------|----------|
 //! | `MockClock` | Atomic counter | Testing |
 //! | `SeededRng` | Xorshift64 | Fast deterministic testing |
+//! | `ChaCha20Rng` | ChaCha20 | Security-sensitive runtime randomness |
 //!
 //! More sophisticated implementations (e.g., ChaCha8-based RNG) are provided
 //! by downstream crates like `telltale-simulator`.
@@ -27,4 +28,5 @@ mod clock;
 mod rng;
 
 pub use clock::{Clock, MockClock, WallClock};
-pub use rng::{Rng, SeededRng};
+pub use rand_chacha::ChaCha20Rng;
+pub use rng::{DeterministicRng, Rng, SecureRng, SeededRng};

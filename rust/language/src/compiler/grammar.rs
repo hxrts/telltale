@@ -193,21 +193,12 @@ impl GrammarComposer {
         &self,
         grammar: &str,
     ) -> Result<(), GrammarCompositionError> {
-        // Pre-allocate HashSet with estimated capacity
-        let estimated_rules = grammar.matches(" = {").count();
-        let mut rule_names = HashSet::with_capacity(estimated_rules);
+        let rule_names = collect_pest_rule_names(grammar);
+        let mut unique_rule_names = HashSet::with_capacity(rule_names.len());
 
-        for line in grammar.lines() {
-            let line = line.trim();
-            if line.contains(" = {") && !line.starts_with("//") {
-                if let Some(rule_name) = line.split(" = {").next() {
-                    let rule_name = rule_name.trim();
-                    if !rule_names.insert(rule_name) {
-                        return Err(GrammarCompositionError::DuplicateRule(
-                            rule_name.to_string(),
-                        ));
-                    }
-                }
+        for rule_name in rule_names {
+            if !unique_rule_names.insert(rule_name.clone()) {
+                return Err(GrammarCompositionError::DuplicateRule(rule_name));
             }
         }
 
@@ -244,6 +235,37 @@ impl GrammarComposer {
         })?;
         Ok(())
     }
+}
+
+fn collect_pest_rule_names(grammar: &str) -> Vec<String> {
+    let mut rules = Vec::new();
+
+    for line in grammar.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty() || trimmed.starts_with("//") {
+            continue;
+        }
+
+        let Some(first) = trimmed.chars().next() else {
+            continue;
+        };
+        if !(first == '_' || first.is_ascii_alphabetic()) {
+            continue;
+        }
+
+        let name_len = trimmed
+            .char_indices()
+            .take_while(|(_, ch)| *ch == '_' || ch.is_ascii_alphanumeric())
+            .last()
+            .map_or(0, |(idx, ch)| idx + ch.len_utf8());
+        let (name, rest) = trimmed.split_at(name_len);
+
+        if rest.trim_start().starts_with('=') {
+            rules.push(name.to_string());
+        }
+    }
+
+    rules
 }
 
 fn count_braces_outside_quotes(grammar: &str) -> (usize, usize) {
@@ -382,11 +404,11 @@ mod tests {
 
     impl GrammarExtension for TestExtension {
         fn grammar_rules(&self) -> &'static str {
-            "audit_stmt = { \"audit\" ~ ident ~ block }"
+            "test_timeout_audit_stmt = { \"audit\" ~ ident ~ block }"
         }
 
         fn statement_rules(&self) -> Vec<&'static str> {
-            vec!["audit_stmt"]
+            vec!["test_timeout_audit_stmt"]
         }
 
         fn extension_id(&self) -> &'static str {
@@ -409,7 +431,7 @@ mod tests {
             .register_extension(TestExtension)
             .expect("extension should register");
         assert_eq!(composer.extension_count(), 1);
-        assert!(composer.has_extension_rule("audit_stmt"));
+        assert!(composer.has_extension_rule("test_timeout_audit_stmt"));
     }
 
     #[test]
@@ -423,7 +445,7 @@ mod tests {
         assert!(result.is_ok(), "Grammar composition should succeed");
 
         let composed = result.unwrap();
-        assert!(composed.contains("audit_stmt"));
+        assert!(composed.contains("test_timeout_audit_stmt"));
         assert!(composed.contains("choreography"));
         assert!(composed.contains("// Extension Rules"));
     }
@@ -467,7 +489,7 @@ mod tests {
             .build();
 
         assert_eq!(composer.extension_count(), 1);
-        assert!(composer.has_extension_rule("audit_stmt"));
+        assert!(composer.has_extension_rule("test_timeout_audit_stmt"));
     }
 
     #[test]
