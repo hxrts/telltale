@@ -170,6 +170,10 @@ impl TcpTransportConfig {
     }
 
     /// Authenticate TCP peers with a pre-shared key.
+    ///
+    /// This mode exports `authenticated_peers = true` from
+    /// [`TcpTransportConfig::runtime_transport_contract`] and can satisfy
+    /// theorem-pack admission profiles that require protocol-origin integrity.
     #[must_use]
     pub fn with_preshared_key(mut self, key: [u8; 32]) -> Self {
         self.authentication = TcpPeerAuthentication::PreSharedKey(key);
@@ -177,6 +181,11 @@ impl TcpTransportConfig {
     }
 
     /// Explicitly allow unauthenticated TCP for trusted-network deployments.
+    ///
+    /// This mode exports `authenticated_peers = false` from
+    /// [`TcpTransportConfig::runtime_transport_contract`]. It is valid for
+    /// example and trusted-network deployments, but theorem-pack admission will
+    /// reject protocol-origin claims that require authenticated peers.
     #[must_use]
     pub fn allow_unauthenticated_for_trusted_network(mut self) -> Self {
         self.authentication = TcpPeerAuthentication::UnauthenticatedTrustedNetwork {
@@ -196,7 +205,9 @@ impl TcpTransportConfig {
     /// Export the semantic transport contract used by theorem-pack admission.
     ///
     /// The ProtocolMachine only consumes the semantic result. The TCP-specific
-    /// authentication-mode mapping stays in this crate.
+    /// authentication-mode mapping stays in this crate: pre-shared-key mode is
+    /// authenticated, while trusted-network mode is deliberately
+    /// unauthenticated.
     #[must_use]
     pub fn runtime_transport_contract(&self) -> RuntimeTransportContract {
         RuntimeTransportContract::new("TcpTransport", "Tcp")

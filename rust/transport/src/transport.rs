@@ -394,6 +394,7 @@ impl DocumentedTransportContract for TcpTransport {
                 "Reference TCP transport in the separate telltale-transport crate.",
                 "Requires explicit start before first use.",
                 "Authentication is configuration-dependent; this static profile is conservative.",
+                "Use TcpTransportConfig::runtime_transport_contract() for theorem-pack admission.",
                 "Unauthenticated mode is trusted-network only and must be explicitly enabled.",
             ],
         }

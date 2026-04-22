@@ -2,11 +2,13 @@
 
 This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces.
 
-**Transport security boundary:** the first-party TCP transports are currently
-plaintext and unauthenticated. Use them only on localhost, a trusted host
-network, or a trusted VPN unless a deployment provides an authenticated
-transport profile that satisfies the protocol machine's documented transport
-contract.
+**Transport security boundary:** the runtime topology TCP helper is
+trusted-network-only. The reference `telltale-transport` crate supports
+pre-shared-key peer authentication and can export a semantic transport contract
+for theorem-pack admission, but it is still plaintext TCP. Use trusted-network
+TCP only on localhost, a trusted host network, or a trusted VPN unless a
+deployment provides an authenticated transport profile that satisfies the
+protocol machine's documented transport contract.
 
 ## Architecture Overview
 

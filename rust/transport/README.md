@@ -16,8 +16,8 @@ Add these dependencies to `Cargo.toml`.
 
 ```toml
 [dependencies]
-telltale-transport = "6.0.0"
-telltale-runtime = "6.0.0"
+telltale-transport = "15.0.0"
+telltale-runtime = "15.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
@@ -84,6 +84,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ```
 
 This flow is useful when role endpoints are injected by deployment tooling instead of hardcoded in application code.
+
+### Theorem-Pack Admission
+
+The protocol machine consumes semantic transport contracts rather than TCP-specific settings. Use pre-shared-key mode when a theorem pack requires authenticated protocol origins.
+
+```rust
+use telltale_machine::RuntimeContracts;
+use telltale_transport::TcpTransportConfig;
+
+let key = [7u8; 32];
+let config = TcpTransportConfig::new("Alice", "127.0.0.1:8080")
+    .with_preshared_key(key)
+    .with_peer("Bob", "127.0.0.1:8081");
+
+let contracts = RuntimeContracts::full()
+    .with_transport_contracts([config.runtime_transport_contract()]);
+
+assert!(contracts.transport_contracts[0].authenticated_peers);
+```
+
+`allow_unauthenticated_for_trusted_network()` is still available for examples and trusted deployments, but its exported contract has `authenticated_peers = false`. Theorem-pack admission rejects that contract for profiles that depend on protocol-origin integrity.
 
 ### Custom Environment Prefix
 

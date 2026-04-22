@@ -31,8 +31,12 @@ pub enum RuntimeGateResult {
 
 /// Machine-side summary of a selected transport contract.
 ///
-/// This mirrors the semantic fields exposed by `DocumentedTransportContract`
-/// without making `telltale-machine` depend on `telltale-runtime`.
+/// This is semantic evidence, not a transport implementation hook. Concrete
+/// transport crates translate their selected authentication, routing, and
+/// delivery mode into these fields; `telltale-machine` only checks whether the
+/// selected runtime path satisfies the theorem-pack assumptions. That keeps the
+/// machine independent of TCP, TLS, pre-shared keys, or any other concrete
+/// authentication mechanism.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RuntimeTransportContract {
     /// Stable transport/profile name.
@@ -42,6 +46,9 @@ pub struct RuntimeTransportContract {
     /// Whether messages are routed by role identity.
     pub role_addressed_routing: bool,
     /// Whether peer identity is authenticated at the transport boundary.
+    ///
+    /// This must be `false` for trusted-network-only transports. Theorem packs
+    /// that depend on protocol-origin integrity require this field to be true.
     pub authenticated_peers: bool,
     /// Whether each peer stream preserves FIFO delivery.
     pub per_peer_fifo_delivery: bool,
@@ -57,6 +64,9 @@ pub struct RuntimeTransportContract {
 
 impl RuntimeTransportContract {
     /// Start a semantic transport contract summary.
+    ///
+    /// All semantic fields default to `false` so callers must opt in to each
+    /// contract they can justify for the selected runtime transport.
     #[must_use]
     pub fn new(transport_name: impl Into<String>, transport_type: impl Into<String>) -> Self {
         Self {
@@ -92,6 +102,10 @@ impl RuntimeTransportContract {
     }
 
     /// Set whether peer identity is authenticated at the transport boundary.
+    ///
+    /// Set this to `true` only when the selected transport mode cryptographically
+    /// or otherwise operationally binds a peer to its claimed role. Plain TCP on
+    /// a trusted network should leave this `false`.
     #[must_use]
     pub fn with_authenticated_peers(mut self, value: bool) -> Self {
         self.authenticated_peers = value;
@@ -135,6 +149,11 @@ impl RuntimeTransportContract {
 }
 
 /// Transport semantics required by a theorem-pack execution profile.
+///
+/// The standard protocol-origin profile deliberately asks for authenticated
+/// peers. Without that premise, a network peer can claim a role name that the
+/// proof treats as an origin identity, invalidating the end-to-end theorem
+/// claim even if the protocol choreography is otherwise verified.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TheoremTransportRequirements {
     /// Whether the theorem profile depends on role-addressed routing.
@@ -717,6 +736,11 @@ impl RuntimeContracts {
     }
 
     /// Replace selected transport contracts.
+    ///
+    /// Each selected transport contract is checked against the theorem-pack
+    /// execution profile before admission. Passing a trusted-network-only
+    /// contract intentionally rejects theorem claims that require authenticated
+    /// protocol origins.
     #[must_use]
     pub fn with_transport_contracts(
         mut self,

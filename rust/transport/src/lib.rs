@@ -29,9 +29,10 @@
 //! explicitly with `allow_unauthenticated_for_trusted_network()`. The protocol
 //! machine's formal guarantees assume the selected transport satisfies its
 //! documented contract; use `TcpTransportConfig::runtime_transport_contract()`
-//! to export the semantic contract consumed by theorem-pack admission. Enable
-//! the `redacted-logs` feature when structured logs must not expose peer roles
-//! or socket addresses.
+//! to export the semantic contract consumed by theorem-pack admission.
+//! Pre-shared-key mode satisfies authenticated-peer theorem requirements.
+//! Trusted-network mode does not. Enable the `redacted-logs` feature when
+//! structured logs must not expose peer roles or socket addresses.
 //!
 //! ## Example
 //!

@@ -103,6 +103,12 @@ The execution profile also carries a list of `TransportNecessityProfile` values.
 
 `runtimeCriticalTransportedTheoremBoundaryInventory` narrows the ledger to families that gate runtime admission. `rustRuntimeCriticalTransportedTheoremKeys` and `leanRuntimeCriticalTransportedTheoremKeys` expose the Rust and Lean subsets consumed by admission paths. `runtimeCriticalTransportedTheoremsExplicit_true` certifies that the Rust and Lean lists agree.
 
+### Transport Contracts
+
+Theorem-backed distributed claims also require selected transport contracts. The Rust machine consumes `RuntimeTransportContract` values as semantic evidence, not as TCP-, TLS-, or key-management-specific implementation details. Concrete transport crates are responsible for mapping their configured mode into those fields.
+
+The standard protocol-origin profile requires role-addressed routing, authenticated peers, per-peer FIFO delivery, fail-closed unknown-role handling, and no message synthesis. For `telltale-transport`, `TcpTransportConfig::runtime_transport_contract()` maps pre-shared-key TCP to `authenticated_peers = true` and trusted-network TCP to `authenticated_peers = false`. Trusted-network contracts are intentionally rejected for theorem-pack profiles that depend on authenticated protocol origins.
+
 ## Release Conformance
 
 `buildReleaseConformanceReport` in `lean/Runtime/Proofs/TheoremPack/ReleaseConformance.lean` assembles a `ReleaseConformanceReport` from the pack and a replay trace. Report fields include the theorem inventory, a transformation-eligibility snapshot, replay conformance, cross-target failure-envelope witness presence, restart-adequacy witness presence, and single-thread, multi-thread, and sharded evidence flags. `releaseBuildGate` derives the build-gate Boolean from the report when release-tagged.
