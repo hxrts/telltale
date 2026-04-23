@@ -19,7 +19,7 @@ depends on information that may be hidden by delay:
 1. `MonotoneMerge`: a still-live update remains mergeable when it arrives late
 2. `TemporalSecrecy`: updates must eventually stop counting after revocation or
    post-compromise recovery
-3. `DynamicMembership`: the member set supports both joins and leaves
+3. `DynamicMembership`: the member set supports joins and leaves
 
 The obstruction is local indistinguishability: the same visible update can be
 merely late in one global state and security-invalid in another.
