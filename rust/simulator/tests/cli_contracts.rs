@@ -205,7 +205,13 @@ fn replay_binary_fails_closed_on_invalid_checkpoint_artifact() {
     )
     .expect("write scenario");
     let checkpoint_path = tmp.path().join("bad_checkpoint.cbor");
-    std::fs::write(&checkpoint_path, b"not a persisted replay artifact").expect("write checkpoint");
+    let malformed_checkpoint = b"not a persisted replay artifact";
+    std::fs::write(&checkpoint_path, malformed_checkpoint).expect("write checkpoint");
+    std::fs::write(
+        tmp.path().join("bad_checkpoint.cbor.blake3"),
+        blake3::hash(malformed_checkpoint).to_hex().to_string(),
+    )
+    .expect("write checkpoint integrity sidecar");
 
     let replay = Command::new(env!("CARGO_BIN_EXE_replay"))
         .current_dir(tmp.path())

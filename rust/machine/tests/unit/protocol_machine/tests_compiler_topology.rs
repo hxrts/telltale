@@ -321,7 +321,7 @@
         let image = CodeImage::from_local_types(&local_types, &global);
 
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
-            host_contract_assertions: true,
+            host_contract_assertions: HostContractMode::Enforced,
             ..ProtocolMachineConfig::default()
         });
         machine.load_choreography(&image).expect("load choreography");
@@ -350,7 +350,7 @@
         let image = CodeImage::from_local_types(&local_types, &global);
 
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig {
-            host_contract_assertions: true,
+            host_contract_assertions: HostContractMode::Enforced,
             ..ProtocolMachineConfig::default()
         });
         machine.load_choreography(&image).expect("load choreography");
@@ -588,7 +588,7 @@
     #[test]
     fn test_host_contract_assertions_reject_unaudited_transfer_events() {
         let machine = ProtocolMachine::new(ProtocolMachineConfig {
-            host_contract_assertions: true,
+            host_contract_assertions: HostContractMode::Enforced,
             ..ProtocolMachineConfig::default()
         });
         let err = machine

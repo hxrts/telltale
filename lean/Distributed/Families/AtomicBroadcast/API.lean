@@ -19,31 +19,21 @@ structure AtomicBroadcastProtocol where
   Value : Type w
   model : Model State Message Value
   assumptions : Assumptions model
-  premises : Premises model
-  totalOrderConsistency :
-    TotalOrderConsistency model :=
-      total_order_consistency_of_assumptions assumptions premises
-  logPrefixCompatibility :
-    LogPrefixCompatibility model :=
-      log_prefix_compatibility_of_assumptions assumptions premises
-  consensusAtomicBroadcastBridge :
-    ConsensusAtomicBroadcastBridge model :=
-      bridge_of_assumptions assumptions premises
 
 /-- Extract total-order-consistency theorem from a certified protocol bundle. -/
 theorem total_order_consistency_of_protocol (P : AtomicBroadcastProtocol) :
     TotalOrderConsistency P.model :=
-  P.totalOrderConsistency
+  total_order_consistency_of_assumptions P.assumptions
 
 /-- Extract log-prefix-compatibility theorem from a certified protocol bundle. -/
 theorem log_prefix_compatibility_of_protocol (P : AtomicBroadcastProtocol) :
     LogPrefixCompatibility P.model :=
-  P.logPrefixCompatibility
+  log_prefix_compatibility_of_assumptions P.assumptions
 
 /-- Extract consensus/AB bridge theorem from a certified protocol bundle. -/
 theorem bridge_of_protocol (P : AtomicBroadcastProtocol) :
     ConsensusAtomicBroadcastBridge P.model :=
-  P.consensusAtomicBroadcastBridge
+  bridge_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : AtomicBroadcastProtocol) :

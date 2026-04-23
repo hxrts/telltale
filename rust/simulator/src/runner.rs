@@ -876,6 +876,7 @@ fn execute_loaded_scenario_machine(
         .unwrap_or_else(|| PropertyMonitor::new(Vec::new()));
 
     let mut checkpoints = scenario.checkpoint_interval.map(|interval| {
+        // scenario.name is validated as a single safe path component at parse time.
         let dir = std::path::PathBuf::from("artifacts").join(&scenario.name);
         CheckpointStore::with_dir(interval, dir)
     });

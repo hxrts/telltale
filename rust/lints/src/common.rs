@@ -92,6 +92,7 @@ pub(crate) fn has_allowed_constant_suffix(name: &str) -> bool {
         "_SECS",
         "_COUNT",
         "_BITS",
+        "_BYTE",
         "_BYTES",
         "_SIZE",
         "_CAPACITY",

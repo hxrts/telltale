@@ -4,24 +4,26 @@ version = "15.0.0"
 edition = "2021"
 authors = ["Telltale Contributors"]
 license = "MIT OR Apache-2.0"
-description = "Production transport implementations for Telltale session types"
+description = "Reference TCP transport implementation for Telltale session types"
 repository = "https://github.com/hxrts/telltale"
 keywords = ["session-types", "tcp", "transport", "async", "networking"]
 categories = ["asynchronous", "network-programming"]
-readme = "README.md"
 
 [dependencies]
+telltale-machine = { version = "15.0.0", path = "../machine" }
 telltale-runtime = { version = "15.0.0", path = "../runtime" }
 telltale-types = { version = "15.0.0", path = "../types" }
 async-trait = "0.1"
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "macros", "rt-multi-thread"] }
 thiserror = "1"
 tracing = "0.1"
+blake3 = "1.5"
 
 [dev-dependencies]
 tokio-test = "0.4"
 
 [features]
 default = []
+redacted-logs = []
 # Enable TLS support (future)
 # tls = ["tokio-rustls", "rustls"]

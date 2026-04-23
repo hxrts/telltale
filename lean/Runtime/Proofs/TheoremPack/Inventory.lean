@@ -94,6 +94,7 @@ def theoremInventory
   , ("classical_concentration", pack.concentration?.isSome)
   , ("classical_littles_law", pack.littlesLaw?.isSome)
   , ("classical_functional_clt", pack.functionalCLT?.isSome)
+  , ("classical_spectral_gap_termination", pack.spectralGapTermination?.isSome)
   ] ++ semanticObjectInventory (pack := pack) ++
     proofCarryingMetadataInventory (pack := pack)
 

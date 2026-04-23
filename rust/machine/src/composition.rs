@@ -16,9 +16,10 @@ use crate::loader::CodeImage;
 use crate::output_condition::OutputConditionPolicy;
 use crate::runtime_contracts::{
     enforce_protocol_machine_runtime_gates, execution_profile_supported,
-    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
-    ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeContracts,
-    RuntimeGateResult,
+    validate_transport_contracts_for_execution_profile, ProtocolMachineAdmissibilityClass,
+    ProtocolMachineEscalationWindowClass, ProtocolMachineExecutionProfile,
+    ProtocolMachineFairnessAssumption, RuntimeContracts, RuntimeGateResult,
+    TransportContractGateError,
 };
 use crate::scheduler::SchedPolicy;
 use telltale_types::{
@@ -164,6 +165,12 @@ impl TheoremPackCapabilities {
                 ),
             ],
         }
+    }
+
+    /// Transport semantics required by this theorem-pack capability set.
+    #[must_use]
+    pub fn transport_requirements(&self) -> crate::runtime_contracts::TheoremTransportRequirements {
+        self.execution_profile().transport_requirements()
     }
 }
 
@@ -412,6 +419,24 @@ pub enum CompositionError {
     MissingRuntimeContracts {
         /// Certificate artifact id that failed admission.
         artifact_id: String,
+    },
+    /// Theorem-backed admission requires transport contracts.
+    #[error(
+        "bundle `{artifact_id}` rejected: missing transport contracts for theorem-pack claims"
+    )]
+    MissingTransportContracts {
+        /// Certificate artifact id that failed admission.
+        artifact_id: String,
+    },
+    /// A selected transport does not satisfy theorem-pack transport requirements.
+    #[error("bundle `{artifact_id}` rejected: transport `{transport_name}` does not satisfy required contract `{requirement}`")]
+    UnsatisfiedTransportContract {
+        /// Certificate artifact id that failed admission.
+        artifact_id: String,
+        /// Transport profile that failed admission.
+        transport_name: String,
+        /// Required semantic field.
+        requirement: &'static str,
     },
     /// Bundle index does not exist.
     #[error("bundle index {bundle_idx} is out of range")]
@@ -1446,6 +1471,7 @@ impl ComposedRuntime {
         self.require_determinism_capability(cert, caps)?;
         self.require_execution_profile(cert, caps, runtime_contracts)?;
         self.require_output_condition_gating(cert, caps)?;
+        self.require_transport_contracts(cert, caps, runtime_contracts)?;
         self.require_reconfiguration_capabilities(bundle, runtime_contracts)?;
         Ok(())
     }
@@ -1553,6 +1579,43 @@ impl ComposedRuntime {
                 capability: "output_condition_gating".to_string(),
             })
         }
+    }
+
+    fn require_transport_contracts(
+        &self,
+        cert: &CompositionCertificate,
+        caps: &TheoremPackCapabilities,
+        runtime_contracts: Option<&RuntimeContracts>,
+    ) -> Result<(), CompositionError> {
+        let profile = caps.execution_profile();
+        let requirements = profile.transport_requirements();
+        if requirements.is_empty() {
+            return Ok(());
+        }
+        let Some(runtime_contracts) = runtime_contracts else {
+            return Err(CompositionError::MissingTransportContracts {
+                artifact_id: cert.artifact_id.clone(),
+            });
+        };
+        validate_transport_contracts_for_execution_profile(
+            &profile,
+            &runtime_contracts.transport_contracts,
+        )
+        .map_err(|error| match error {
+            TransportContractGateError::MissingTransportContracts => {
+                CompositionError::MissingTransportContracts {
+                    artifact_id: cert.artifact_id.clone(),
+                }
+            }
+            TransportContractGateError::UnsatisfiedTransportRequirement {
+                transport_name,
+                requirement,
+            } => CompositionError::UnsatisfiedTransportContract {
+                artifact_id: cert.artifact_id.clone(),
+                transport_name,
+                requirement,
+            },
+        })
     }
 
     fn require_reconfiguration_capabilities(
@@ -1675,7 +1738,7 @@ mod tests {
                 artifact_id: "cert/bad".to_string(),
                 link_ok_full: false,
                 theorem_pack: TheoremPackCapabilities::full(),
-                runtime_contracts: None,
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
         assert!(matches!(
@@ -1695,7 +1758,7 @@ mod tests {
                 artifact_id: "cert/1".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
-                runtime_contracts: None,
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
         let b2 = ProtocolBundle::new(
@@ -1704,7 +1767,7 @@ mod tests {
                 artifact_id: "cert/2".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
-                runtime_contracts: None,
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
         runtime.admit_bundle(b1).expect("admit b1");
@@ -1725,7 +1788,7 @@ mod tests {
                 artifact_id: "cert/ok".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities::full(),
-                runtime_contracts: None,
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
         runtime.admit_bundle(b).expect("admit");
@@ -1754,7 +1817,10 @@ mod tests {
                 artifact_id: "cert/no-sched".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities {
-                    determinism: vec![DeterminismCapability::Full],
+                    determinism: vec![
+                        DeterminismCapability::Full,
+                        DeterminismCapability::ModuloEffects,
+                    ],
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
                 },
@@ -1785,7 +1851,10 @@ mod tests {
                 artifact_id: "cert/no-det".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities {
-                    determinism: vec![DeterminismCapability::Full],
+                    determinism: vec![
+                        DeterminismCapability::Full,
+                        DeterminismCapability::ModuloEffects,
+                    ],
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
                 },
@@ -1820,7 +1889,7 @@ mod tests {
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: false,
                 },
-                runtime_contracts: None,
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
 
@@ -1869,14 +1938,17 @@ mod tests {
                 artifact_id: "cert/minimal-required".to_string(),
                 link_ok_full: true,
                 theorem_pack: TheoremPackCapabilities {
-                    determinism: vec![DeterminismCapability::Full],
+                    determinism: vec![
+                        DeterminismCapability::Full,
+                        DeterminismCapability::ModuloEffects,
+                    ],
                     schedulers: vec![
                         SchedulerCapability::Cooperative,
                         SchedulerCapability::ProgressAware,
                     ],
                     output_condition_gating: true,
                 },
-                runtime_contracts: None,
+                runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
         runtime
@@ -1934,6 +2006,64 @@ mod tests {
             err,
             CompositionError::MissingCapability { capability, .. }
             if capability == "determinism_profile::Replay"
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_theorem_pack_without_transport_contracts() {
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/no-transport-contracts".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: None,
+            },
+        );
+        let err = runtime
+            .admit_bundle(bundle)
+            .expect_err("theorem claims should require transport contracts");
+        assert!(matches!(
+            err,
+            CompositionError::MissingTransportContracts { .. }
+        ));
+    }
+
+    #[test]
+    fn admission_rejects_unauthenticated_transport_for_authenticated_theorem_claims() {
+        let mut runtime =
+            ComposedRuntime::new(ProtocolMachineConfig::default(), MemoryBudget::default());
+        let unauthenticated = crate::runtime_contracts::RuntimeTransportContract::new(
+            "UnauthenticatedTransport",
+            "Network",
+        )
+        .with_role_addressed_routing(true)
+        .with_per_peer_fifo_delivery(true)
+        .with_fail_closed_unknown_role(true)
+        .with_no_message_synthesis(true)
+        .with_explicit_readiness_errors(true);
+        let contracts = RuntimeContracts::full().with_transport_contracts([unauthenticated]);
+        let bundle = ProtocolBundle::new(
+            image("m"),
+            CompositionCertificate {
+                artifact_id: "cert/unauthenticated-transport".to_string(),
+                link_ok_full: true,
+                theorem_pack: TheoremPackCapabilities::full(),
+                runtime_contracts: Some(contracts),
+            },
+        );
+        let err = runtime.admit_bundle(bundle).expect_err(
+            "unauthenticated transport should not satisfy authenticated theorem claims",
+        );
+        assert!(matches!(
+            err,
+            CompositionError::UnsatisfiedTransportContract {
+                ref transport_name,
+                requirement,
+                ..
+            } if transport_name == "UnauthenticatedTransport" && requirement == "authenticated_peers"
         ));
     }
 

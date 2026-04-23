@@ -56,12 +56,12 @@ struct TestStatementGrammarExtension;
 impl GrammarExtension for TestStatementGrammarExtension {
     fn grammar_rules(&self) -> &'static str {
         r#"
-test_ext_stmt = { "test_ext" ~ integer }
+test_statement_ext_stmt = { "test_ext" ~ integer }
 "#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["test_ext_stmt"]
+        vec!["test_statement_ext_stmt"]
     }
 
     fn extension_id(&self) -> &'static str {
@@ -74,11 +74,11 @@ struct TestStatementParser;
 
 impl StatementParser for TestStatementParser {
     fn can_parse(&self, rule_name: &str) -> bool {
-        rule_name == "test_ext_stmt"
+        rule_name == "test_statement_ext_stmt"
     }
 
     fn supported_rules(&self) -> Vec<String> {
-        vec!["test_ext_stmt".to_string()]
+        vec!["test_statement_ext_stmt".to_string()]
     }
 
     fn parse_statement(
@@ -87,7 +87,7 @@ impl StatementParser for TestStatementParser {
         content: &str,
         _context: &ParseContext,
     ) -> Result<Box<dyn ProtocolExtension>, ParseError> {
-        if rule_name != "test_ext_stmt" {
+        if rule_name != "test_statement_ext_stmt" {
             return Err(ParseError::InvalidSyntax {
                 details: format!("unexpected rule {rule_name}"),
             });
@@ -451,7 +451,7 @@ async fn extension_statement_dispatch_executes_through_parser_lowering_and_runti
         .expect("register test statement extension")
         .build();
 
-    assert!(parser.can_handle_statement("test_ext_stmt"));
+    assert!(parser.can_handle_statement("test_statement_ext_stmt"));
     let stats = parser.extension_stats();
     assert_eq!(stats.grammar_extensions, 1);
     assert_eq!(stats.statement_parsers, 1);

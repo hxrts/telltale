@@ -1,5 +1,7 @@
 //! Parser-level lint diagnostics and fix suggestions.
 
+#![allow(clippy::unwrap_used)]
+
 use super::*;
 use crate::ast::Protocol;
 use std::fmt::Write;

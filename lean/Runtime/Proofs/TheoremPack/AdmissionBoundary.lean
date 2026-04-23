@@ -214,6 +214,11 @@ def transportedTheoremBoundaryInventory : List TransportedTheoremBoundaryEntry :
     , consumedByRustRuntimeAdmission := false
     , consumedByLeanRuntimeGate := false
     }
+  , { key := "classical_spectral_gap_termination"
+    , usageClass := .documentationBackgroundOnly
+    , consumedByRustRuntimeAdmission := false
+    , consumedByLeanRuntimeGate := false
+    }
   ]
 
 /-- Canonical subset of transported theorems that materially influence a shipped

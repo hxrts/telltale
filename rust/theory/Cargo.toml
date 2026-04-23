@@ -22,8 +22,10 @@ thiserror = { workspace = true }
 [dev-dependencies]
 proptest = { workspace = true }
 assert_matches = { workspace = true }
-criterion = { workspace = true }
 telltale-bridge = { path = "../bridge" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+criterion = { workspace = true }
 
 [features]
 default = ["projection", "duality", "merge", "well-formedness", "bounded", "async-subtyping", "sync-subtyping", "semantics", "coherence"]

@@ -31,43 +31,82 @@ structure CRDTProtocol where
   model : Model State Op Context Obs Program
   assumptions : Assumptions model
   premises : Premises model
-  exactEnvelope :
-    ExactEnvelopeCharacterization model premises.RefRun premises.ImplRun :=
-      exact_envelope_of_assumptions assumptions premises
-  adequacy :
-    ObservationalAdequacyModuloEnvelope model premises.RefRun premises.ImplRun :=
-      adequacy_of_assumptions assumptions premises
-  principalCapability :
-    PrincipalCapability premises.inferredBudget premises.envelopeBudget :=
-      principal_capability_of_assumptions assumptions premises
-  admissionSoundness :
-    AdmissionSoundness premises.inferredBudget premises.envelopeBudget :=
-      admission_soundness_of_assumptions assumptions premises
-  admissionCompleteness :
-    AdmissionCompleteness premises.inferredBudget premises.envelopeBudget :=
-      admission_completeness_of_assumptions assumptions premises
-  opStateEquivalence :
-    OpStateEquivalence model premises.opRun premises.stateRun :=
-      op_state_equivalence_of_assumptions assumptions premises
-  gcSafetyIffCausalDominance :
-    GCSafetyIffCausalDominance premises.GCSafe premises.CausalDominanceEstablished :=
-      gc_safety_iff_of_assumptions assumptions premises
-  boundedApproximation :
-    BoundedMetadataApproximation model premises.approxPolicy premises.horizon
-      premises.epsilon premises.referenceRun premises.deployedRun :=
-      bounded_approximation_of_assumptions assumptions premises
-  approximationMonotonicity :
-    ApproximationMonotoneUnderPolicyTightening model premises.approxPolicy premises.approxPolicy
-      premises.horizon premises.epsilon premises.referenceRun premises.deployedRun :=
-      approximation_monotone_of_assumptions assumptions premises
-  exactSECAsLimit :
-    ExactSECRecoveryAsLimit model premises.approxPolicy premises.referenceRun premises.deployedRun :=
-      exact_sec_as_limit_of_assumptions assumptions premises
-  hcrdtCore : HcrdtCore model := hcrdt_core_of_assumptions assumptions
-  hcrdtFoundation : HcrdtFoundation model := hcrdt_foundation_of_assumptions assumptions
-  hcrdtDynamics : HcrdtDynamics model := hcrdt_dynamics_of_assumptions assumptions
-  hcrdtExtensions : HcrdtExtensions model := hcrdt_extensions_of_assumptions assumptions
-  hcrdtLimits : HcrdtLimits model := hcrdt_limits_of_assumptions assumptions
+
+/-! ## Certified Protocol Extractors -/
+
+/-- Extract exact envelope characterization from a certified CRDT bundle. -/
+theorem exact_envelope_of_protocol (P : CRDTProtocol) :
+    ExactEnvelopeCharacterization P.model P.premises.RefRun P.premises.ImplRun :=
+  exact_envelope_of_assumptions P.assumptions P.premises
+
+/-- Extract observational adequacy from a certified CRDT bundle. -/
+theorem adequacy_of_protocol (P : CRDTProtocol) :
+    ObservationalAdequacyModuloEnvelope P.model P.premises.RefRun P.premises.ImplRun :=
+  adequacy_of_assumptions P.assumptions P.premises
+
+/-- Extract principal capability from a certified CRDT bundle. -/
+theorem principal_capability_of_protocol (P : CRDTProtocol) :
+    PrincipalCapability P.premises.inferredBudget P.premises.envelopeBudget :=
+  principal_capability_of_assumptions P.assumptions P.premises
+
+/-- Extract admission soundness from a certified CRDT bundle. -/
+theorem admission_soundness_of_protocol (P : CRDTProtocol) :
+    AdmissionSoundness P.premises.inferredBudget P.premises.envelopeBudget :=
+  admission_soundness_of_assumptions P.assumptions P.premises
+
+/-- Extract admission completeness from a certified CRDT bundle. -/
+theorem admission_completeness_of_protocol (P : CRDTProtocol) :
+    AdmissionCompleteness P.premises.inferredBudget P.premises.envelopeBudget :=
+  admission_completeness_of_assumptions P.assumptions P.premises
+
+/-- Extract operation/state equivalence from a certified CRDT bundle. -/
+theorem op_state_equivalence_of_protocol (P : CRDTProtocol) :
+    OpStateEquivalence P.model P.premises.opRun P.premises.stateRun :=
+  op_state_equivalence_of_assumptions P.assumptions P.premises
+
+/-- Extract GC-safety iff causal-dominance from a certified CRDT bundle. -/
+theorem gc_safety_iff_of_protocol (P : CRDTProtocol) :
+    GCSafetyIffCausalDominance P.premises.GCSafe P.premises.CausalDominanceEstablished :=
+  gc_safety_iff_of_assumptions P.assumptions P.premises
+
+/-- Extract bounded metadata approximation from a certified CRDT bundle. -/
+theorem bounded_approximation_of_protocol (P : CRDTProtocol) :
+    BoundedMetadataApproximation P.model P.premises.approxPolicy P.premises.horizon
+      P.premises.epsilon P.premises.referenceRun P.premises.deployedRun :=
+  bounded_approximation_of_assumptions P.assumptions P.premises
+
+/-- Extract approximation monotonicity from a certified CRDT bundle. -/
+theorem approximation_monotone_of_protocol (P : CRDTProtocol) :
+    ApproximationMonotoneUnderPolicyTightening P.model P.premises.approxPolicy
+      P.premises.approxPolicy P.premises.horizon P.premises.epsilon
+      P.premises.referenceRun P.premises.deployedRun :=
+  approximation_monotone_of_assumptions P.assumptions P.premises
+
+/-- Extract exact-SEC-as-limit from a certified CRDT bundle. -/
+theorem exact_sec_as_limit_of_protocol (P : CRDTProtocol) :
+    ExactSECRecoveryAsLimit P.model P.premises.approxPolicy
+      P.premises.referenceRun P.premises.deployedRun :=
+  exact_sec_as_limit_of_assumptions P.assumptions P.premises
+
+/-- Extract the CRDT core hierarchy from a certified CRDT bundle. -/
+theorem hcrdt_core_of_protocol (P : CRDTProtocol) : HcrdtCore P.model :=
+  hcrdt_core_of_assumptions P.assumptions
+
+/-- Extract the CRDT foundation hierarchy from a certified CRDT bundle. -/
+theorem hcrdt_foundation_of_protocol (P : CRDTProtocol) : HcrdtFoundation P.model :=
+  hcrdt_foundation_of_assumptions P.assumptions
+
+/-- Extract the CRDT dynamics hierarchy from a certified CRDT bundle. -/
+theorem hcrdt_dynamics_of_protocol (P : CRDTProtocol) : HcrdtDynamics P.model :=
+  hcrdt_dynamics_of_assumptions P.assumptions
+
+/-- Extract the CRDT extensions hierarchy from a certified CRDT bundle. -/
+theorem hcrdt_extensions_of_protocol (P : CRDTProtocol) : HcrdtExtensions P.model :=
+  hcrdt_extensions_of_assumptions P.assumptions
+
+/-- Extract the CRDT limits hierarchy from a certified CRDT bundle. -/
+theorem hcrdt_limits_of_protocol (P : CRDTProtocol) : HcrdtLimits P.model :=
+  hcrdt_limits_of_assumptions P.assumptions
 
 /-! ## Certified Erasure Bundle -/
 
@@ -116,9 +155,11 @@ def coreEquivalentErasurePremises
   , lower := lowerCoreEquivalent
   , encode := encode
   , decode := decode
-  , weakestWitness := weakest_op_core_erasure_core_equivalent M interp
-  , replayStableWitness := hReplay
-  , serializationWitness := hSerial
+  , erasureSound := (weakest_op_core_erasure_core_equivalent M interp).1
+  , erasureComplete := (weakest_op_core_erasure_core_equivalent M interp).2.1
+  , erasureMaximal := (weakest_op_core_erasure_core_equivalent M interp).2.2
+  , replayStable := hReplay
+  , serializationRoundTrip := hSerial
   , lowerSound := by
       intro kr kc hk
       exact lower_core_equivalent_sound kr kc hk

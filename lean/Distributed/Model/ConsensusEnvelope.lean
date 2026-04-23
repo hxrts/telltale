@@ -365,22 +365,16 @@ structure Premises
   coreAssumptionsPassed : consensusCoreAssumptionsPassed protocol = true
   RefRun : Run State → Prop
   ImplRun : Run State → Prop
-  adequacyWitness :
-    ObservationalAdequacyModuloEnvelope_consensus observe RefRun ImplRun
   envelopeBudget : DiffBudget
   inferredBudget : DiffBudget
-  principalCapabilityWitness :
-    PrincipalCapability_consensus inferredBudget envelopeBudget
-  admissionSoundnessWitness :
-    AdmissionSoundness_consensus inferredBudget envelopeBudget
-  admissionCompletenessWitness :
-    AdmissionCompleteness_consensus inferredBudget envelopeBudget
-  envelopeSoundnessWitness :
-    EnvelopeSoundness_consensus observe RefRun ImplRun
-  envelopeRealizabilityWitness :
-    EnvelopeRealizability_consensus observe RefRun ImplRun
-  envelopeMaximalityWitness :
-    EnvelopeMaximality_consensus observe RefRun ImplRun
+  implementationMatchesReference :
+    ∀ ref impl n, RefRun ref → ImplRun impl →
+      Eq_safe_consensus observe (ref n) (impl n)
+  realizableWhenMatches :
+    ∀ ref impl, RefRun ref →
+      (∀ n, Eq_safe_consensus observe (ref n) (impl n)) →
+      ImplRun impl
+  budgetAligned : inferredBudget = envelopeBudget
 
 /-! ## Premise Bundles and Certified Package: Derived Theorems -/
 
@@ -390,7 +384,14 @@ theorem exact_envelope_consensus_of_premises
     {observe : State → Obs}
     (p : Premises observe) :
     ExactEnvelopeCharacterization_consensus observe p.RefRun p.ImplRun := by
-  exact ⟨p.envelopeSoundnessWitness, p.envelopeRealizabilityWitness, p.envelopeMaximalityWitness⟩
+  constructor
+  · intro ref impl hRef hImpl n
+    exact p.implementationMatchesReference ref impl n hRef hImpl
+  constructor
+  · intro ref impl hRef hEnvelope
+    exact p.realizableWhenMatches ref impl hRef hEnvelope
+  · intro R hR ref impl hRef hImpl hRel n
+    exact hR ref impl hRef hImpl hRel n
 
 /-! ## Derived Theorems: Adequacy and Bounds -/
 
@@ -399,8 +400,9 @@ theorem adequacy_consensus_of_premises
     {State : Type u} {Obs : Type v}
     {observe : State → Obs}
     (p : Premises observe) :
-    ObservationalAdequacyModuloEnvelope_consensus observe p.RefRun p.ImplRun :=
-  p.adequacyWitness
+    ObservationalAdequacyModuloEnvelope_consensus observe p.RefRun p.ImplRun := by
+  intro abs rt hAbs hRt n
+  exact p.implementationMatchesReference abs rt n hAbs hRt
 
 /-- `d_int` lower/upper bound witness extraction from consensus premises. -/
 theorem d_int_bounds_of_premises
@@ -418,24 +420,42 @@ structure ConsensusEnvelopeProtocol where
   Obs : Type v
   observe : State → Obs
   premises : Premises observe
-  exactEnvelope :
-    ExactEnvelopeCharacterization_consensus observe premises.RefRun premises.ImplRun :=
-      exact_envelope_consensus_of_premises premises
-  adequacy :
-    ObservationalAdequacyModuloEnvelope_consensus observe premises.RefRun premises.ImplRun :=
-      adequacy_consensus_of_premises premises
-  principalCapability :
-    PrincipalCapability_consensus premises.inferredBudget premises.envelopeBudget :=
-      premises.principalCapabilityWitness
-  admissionSoundness :
-    AdmissionSoundness_consensus premises.inferredBudget premises.envelopeBudget :=
-      premises.admissionSoundnessWitness
-  admissionCompleteness :
-    AdmissionCompleteness_consensus premises.inferredBudget premises.envelopeBudget :=
-      premises.admissionCompletenessWitness
-  dIntBounds :
-    premises.dIntTheorem.lower ≤ premises.dIntTheorem.upper :=
-      d_int_bounds_of_premises premises
+
+/-- Extract exact consensus-envelope characterization from a certified bundle. -/
+theorem exact_envelope_of_protocol (P : ConsensusEnvelopeProtocol) :
+    ExactEnvelopeCharacterization_consensus P.observe P.premises.RefRun P.premises.ImplRun :=
+  exact_envelope_consensus_of_premises P.premises
+
+/-- Extract consensus-envelope adequacy from a certified bundle. -/
+theorem adequacy_of_protocol (P : ConsensusEnvelopeProtocol) :
+    ObservationalAdequacyModuloEnvelope_consensus P.observe P.premises.RefRun P.premises.ImplRun :=
+  adequacy_consensus_of_premises P.premises
+
+/-- Extract principal capability from a certified consensus-envelope bundle. -/
+theorem principal_capability_of_protocol (P : ConsensusEnvelopeProtocol) :
+    PrincipalCapability_consensus P.premises.inferredBudget P.premises.envelopeBudget :=
+  P.premises.budgetAligned
+
+/-- Extract admission soundness from a certified consensus-envelope bundle. -/
+theorem admission_soundness_of_protocol (P : ConsensusEnvelopeProtocol) :
+    AdmissionSoundness_consensus P.premises.inferredBudget P.premises.envelopeBudget := by
+  intro _dUser hLe
+  simpa [CapabilityAdmissible_consensus, P.premises.budgetAligned] using hLe
+
+/-- Extract admission completeness from a certified consensus-envelope bundle. -/
+theorem admission_completeness_of_protocol (P : ConsensusEnvelopeProtocol) :
+    AdmissionCompleteness_consensus P.premises.inferredBudget P.premises.envelopeBudget := by
+  intro _dUser
+  constructor
+  · intro hLe
+    simpa [CapabilityAdmissible_consensus, P.premises.budgetAligned] using hLe
+  · intro hAdmit
+    simpa [CapabilityAdmissible_consensus, P.premises.budgetAligned] using hAdmit
+
+/-- Extract `d_int` bounds from a certified consensus-envelope bundle. -/
+theorem d_int_bounds_of_protocol (P : ConsensusEnvelopeProtocol) :
+    P.premises.dIntTheorem.lower ≤ P.premises.dIntTheorem.upper :=
+  d_int_bounds_of_premises P.premises
 
 end ConsensusEnvelope
 end Distributed

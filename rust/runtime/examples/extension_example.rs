@@ -255,14 +255,14 @@ struct LoggingGrammarExtension;
 impl GrammarExtension for LoggingGrammarExtension {
     fn grammar_rules(&self) -> &'static str {
         r#"
-log_stmt = { "log" ~ log_level ~ string_literal }
-log_level = { "debug" | "info" | "warn" | "error" }
-string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
+logging_stmt = { "log" ~ logging_level ~ logging_string_literal }
+logging_level = { "debug" | "info" | "warn" | "error" }
+logging_string_literal = { "\"" ~ (!"\"" ~ ANY)* ~ "\"" }
 "#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["log_stmt"]
+        vec!["logging_stmt"]
     }
 
     fn extension_id(&self) -> &'static str {
@@ -275,11 +275,11 @@ struct LoggingStatementParser;
 
 impl StatementParser for LoggingStatementParser {
     fn can_parse(&self, rule_name: &str) -> bool {
-        rule_name == "log_stmt"
+        rule_name == "logging_stmt"
     }
 
     fn supported_rules(&self) -> Vec<String> {
-        vec!["log_stmt".to_string()]
+        vec!["logging_stmt".to_string()]
     }
 
     fn parse_statement(
@@ -389,7 +389,7 @@ mod tests {
     fn test_logging_extension() {
         let ext = LoggingGrammarExtension;
         assert_eq!(ext.extension_id(), "logging");
-        assert!(ext.statement_rules().contains(&"log_stmt"));
+        assert!(ext.statement_rules().contains(&"logging_stmt"));
     }
 
     #[test]
@@ -402,7 +402,7 @@ mod tests {
             .build();
 
         assert!(parser.can_handle_statement("priority_stmt"));
-        assert!(parser.can_handle_statement("log_stmt"));
+        assert!(parser.can_handle_statement("logging_stmt"));
         assert!(!parser.can_handle_statement("unknown_stmt"));
     }
 }

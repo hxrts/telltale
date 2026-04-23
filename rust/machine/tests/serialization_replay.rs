@@ -277,16 +277,16 @@ fn canonical_replay_fragment_sorts_topology_state() {
     events.insert(
         1,
         vec![
-            TopologyPerturbation::Timeout {
-                site: "B".to_string(),
-                duration: Duration::from_millis(2),
-            },
             TopologyPerturbation::Crash {
                 site: "A".to_string(),
             },
             TopologyPerturbation::Partition {
                 from: "B".to_string(),
                 to: "A".to_string(),
+            },
+            TopologyPerturbation::Timeout {
+                site: "B".to_string(),
+                duration: Duration::from_millis(2),
             },
         ],
     );

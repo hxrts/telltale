@@ -15,7 +15,7 @@ use telltale_bridge::{
     PartialSynchronyConfig, PartitionModel, ProtocolBundle, ProtocolEnvelopeBridgeConfig,
     ProtocolMachineEnvelopeAdherenceConfig, ProtocolMachineEnvelopeAdmissionConfig,
     QuorumGeometryConfig, QuorumSystemKind, ReconfigurationConfig, ResponsivenessConfig,
-    TimingModel,
+    SpectralGapTerminationConfig, TimingModel,
 };
 use telltale_types::{FixedQ32, GlobalType, Label, LocalTypeR};
 
@@ -84,6 +84,7 @@ fn classical_slot_count(classical: &ClassicalClaims) -> usize {
         + usize::from(classical.concentration.is_some())
         + usize::from(classical.littles_law.is_some())
         + usize::from(classical.functional_clt.is_some())
+        + usize::from(classical.spectral_gap_termination.is_some())
 }
 
 fn arb_consistency_level() -> impl Strategy<Value = ConsistencyLevel> {
@@ -426,6 +427,15 @@ proptest! {
         claims.classical.functional_clt = Some(FunctionalCLTConfig { enabled });
         let decoded = roundtrip_claims(claims);
         assert!(decoded.classical.functional_clt.is_some());
+        assert_single_classical_slot(&decoded);
+    }
+
+    #[test]
+    fn classical_spectral_gap_termination_roundtrip(enabled in any::<bool>()) {
+        let mut claims = empty_claims();
+        claims.classical.spectral_gap_termination = Some(SpectralGapTerminationConfig { enabled });
+        let decoded = roundtrip_claims(claims);
+        assert!(decoded.classical.spectral_gap_termination.is_some());
         assert_single_classical_slot(&decoded);
     }
 }

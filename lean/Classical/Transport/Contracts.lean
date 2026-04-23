@@ -10,6 +10,7 @@ import Classical.Families.FluidLimitStability
 import Classical.Families.ConcentrationInequalities
 import Classical.Families.LittlesLaw
 import Classical.Families.FunctionalCLT
+import Classical.Families.SpectralGapTermination
 
 set_option autoImplicit false
 
@@ -103,6 +104,10 @@ abbrev HeavyTrafficAssumptions := HeavyTrafficInput
 def HeavyTrafficConclusion (input : HeavyTrafficInput) : Prop :=
   (input.σ * HeavyTrafficDiffusion.diffusionScale input.n) ^ 2 = input.σ ^ 2 * input.n
 
+/-- Named heavy-traffic diffusion-scale law exposed to runtime theorem packs. -/
+def HeavyTrafficDiffusionScaleLaw (input : HeavyTrafficInput) : Prop :=
+  HeavyTrafficConclusion input
+
 /-! ## Mixing Contracts -/
 
 /-- Mixing-time transport contract. -/
@@ -142,6 +147,12 @@ abbrev ConcentrationAssumptions := ConcentrationInput
 def ConcentrationConclusion (input : ConcentrationInput) : Prop :=
   input.p 0 ≤ 2
 
+/-- Full sub-Gaussian concentration tail bound. -/
+def ConcentrationTailConclusion (input : ConcentrationInput) : Prop :=
+  ∀ t, 0 ≤ t →
+    input.p t ≤
+      ConcentrationInequalities.subGaussianTail input.witness.σ t
+
 /-! ## Little's Law Contracts -/
 
 /-- Little's law transport contract. -/
@@ -153,6 +164,14 @@ abbrev LittlesLawAssumptions := LittlesLawInput
 def LittlesLawConclusion (input : LittlesLawInput) : Prop :=
   input.L = input.lam * input.W
 
+/-- Little's-law wait-time corollary. -/
+def LittlesLawWaitTimeConclusion (input : LittlesLawInput) : Prop :=
+  input.lam ≠ 0 → input.W = input.L / input.lam
+
+/-- Little's-law throughput corollary. -/
+def LittlesLawThroughputConclusion (input : LittlesLawInput) : Prop :=
+  input.W ≠ 0 → input.lam = input.L / input.W
+
 /-! ## Functional CLT Contracts -/
 
 /-- Functional CLT transport contract. -/
@@ -161,12 +180,41 @@ structure FunctionalCLTInput where
   N : Nat
   t : Nat
   N_ne_zero : N ≠ 0
+  x : Nat → Real := fun _ => c
+  μ : Real := c
+  path_eq_const : x = (fun _ : Nat => c)
+  mean_eq_const : μ = c
 
 /-- Naming-normalized alias: assumptions required for functional-CLT transport. -/
 abbrev FunctionalCLTAssumptions := FunctionalCLTInput
 
 def FunctionalCLTConclusion (input : FunctionalCLTInput) : Prop :=
-  FunctionalCLT.scaledProcess (fun _ => input.c) input.c input.N input.t = 0
+  FunctionalCLT.scaledProcess input.x input.μ input.N input.t = 0
+
+/-- Named path-level scaled-process centering law exposed to runtime theorem packs. -/
+def FunctionalCLTScaledProcessLaw (input : FunctionalCLTInput) : Prop :=
+  FunctionalCLTConclusion input
+
+/-! ## Spectral-Gap Termination Contracts -/
+
+/-- Spectral-gap termination transport contract over a finite-state Markov chain. -/
+structure SpectralGapInput (State : Type u) [Fintype State] [DecidableEq State] where
+  chain : SpectralGapTermination.MarkovChain State
+  gap_pos : SpectralGapTermination.SpectralGapPos chain
+  termination : SpectralGapTermination.TerminationWitness chain
+
+/-- Naming-normalized alias: assumptions required for spectral-gap termination. -/
+abbrev SpectralGapAssumptions
+    (State : Type u) [Fintype State] [DecidableEq State] :=
+  SpectralGapInput State
+
+/-- Expected termination is bounded by inverse spectral gap. -/
+def SpectralGapConclusion
+    {State : Type u} [Fintype State] [DecidableEq State]
+    (input : SpectralGapInput State) : Prop :=
+  ∀ st,
+    SpectralGapTermination.expectedTerminationTime input.termination st ≤
+      1 / SpectralGapTermination.spectralGap input.chain
 
 /-! ## Certificate Types -/
 
@@ -206,6 +254,11 @@ abbrev LittlesLawCertificate (input : LittlesLawInput) :=
 
 abbrev FunctionalCLTCertificate (input : FunctionalCLTInput) :=
   Certificate FunctionalCLTInput FunctionalCLTConclusion
+
+abbrev SpectralGapCertificate
+    {State : Type u} [Fintype State] [DecidableEq State]
+    (input : SpectralGapInput State) :=
+  Certificate (SpectralGapInput State) SpectralGapConclusion
 
 end Transport
 end Classical

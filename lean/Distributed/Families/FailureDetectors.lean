@@ -1,2 +1,3 @@
 import Distributed.Families.FailureDetectors.Core
 import Distributed.Families.FailureDetectors.API
+import Distributed.Families.FailureDetectors.Profile

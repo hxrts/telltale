@@ -503,14 +503,14 @@ struct AuraAnnotationExtension;
 impl GrammarExtension for AuraAnnotationExtension {
     fn grammar_rules(&self) -> &'static str {
         r#"
-aura_annotation_stmt = { role_ref ~ "[" ~ aura_annotation_list ~ "]" ~ "->" ~ role_ref ~ ":" ~ message ~ ";" }
-aura_annotation_list = { aura_annotation_item ~ ("," ~ aura_annotation_item)* }
-aura_annotation_item = { ident ~ "=" ~ annotation_value }
+aura_annotations_stmt = { role_ref ~ "[" ~ aura_annotations_list ~ "]" ~ "->" ~ role_ref ~ ":" ~ message ~ ";" }
+aura_annotations_list = { aura_annotations_item ~ ("," ~ aura_annotations_item)* }
+aura_annotations_item = { ident ~ "=" ~ annotation_value }
 "#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["aura_annotation_stmt"]
+        vec!["aura_annotations_stmt"]
     }
 
     fn priority(&self) -> u32 {

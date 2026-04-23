@@ -26,10 +26,11 @@ telltale-machine = { path = "../machine", version = "15.0.0" }
 telltale-theory = { path = "../theory", version = "15.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-serde_cbor = { workspace = true }
+ciborium = { workspace = true }
 toml = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+blake3 = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Native-only dependencies (none yet)

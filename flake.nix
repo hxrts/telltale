@@ -6,7 +6,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     toolkit = {
-      url = "github:hxrts/toolkit?ref=v0.2.0";
+      url = "github:hxrts/toolkit?ref=v0.4.1";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.rust-overlay.follows = "rust-overlay";
       inputs.flake-utils.follows = "flake-utils";

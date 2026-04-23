@@ -966,13 +966,17 @@ fn replay_loader_fails_closed_for_corruption_and_mismatch() {
         payload: LegacyPayload,
     }
 
-    let legacy_bytes = serde_cbor::to_vec(&LegacyPersistedReplayArtifact {
-        schema_version: "telltale.simulator.persisted_replay.v1".to_string(),
-        payload: LegacyPayload::Checkpoint(LegacyCheckpointArtifact {
-            tick: checkpoint.tick,
-            machine_state: checkpoint.machine_state.clone(),
-        }),
-    })
+    let mut legacy_bytes = Vec::new();
+    ciborium::into_writer(
+        &LegacyPersistedReplayArtifact {
+            schema_version: "telltale.simulator.persisted_replay.v1".to_string(),
+            payload: LegacyPayload::Checkpoint(LegacyCheckpointArtifact {
+                tick: checkpoint.tick,
+                machine_state: checkpoint.machine_state.clone(),
+            }),
+        },
+        &mut legacy_bytes,
+    )
     .expect("serialize legacy checkpoint artifact");
     let legacy_checkpoint = PersistedReplayArtifact::from_slice(&legacy_bytes)
         .expect("decode legacy-shaped checkpoint")

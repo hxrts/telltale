@@ -4,6 +4,8 @@
 //! - `InMemoryTransport`: In-process communication using channels
 //! - `TcpTransport`: Network communication over TCP
 
+#[cfg(not(target_arch = "wasm32"))]
+use super::wire;
 use super::{
     validate_transport_contract_profile, DocumentedTransportContract, Location, Topology,
     TransportContractProfile, TransportContractTier, TransportOperationalContract,
@@ -19,17 +21,40 @@ use cfg_if::cfg_if;
 #[cfg(target_arch = "wasm32")]
 use futures::{SinkExt, StreamExt};
 use std::collections::BTreeMap;
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::BTreeSet;
+#[cfg(not(target_arch = "wasm32"))]
+use std::net::IpAddr;
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::{Mutex as StdMutex, OnceLock};
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 use thiserror::Error;
 
 #[cfg(not(target_arch = "wasm32"))]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 #[cfg(not(target_arch = "wasm32"))]
 use tokio::net::{TcpListener, TcpStream};
 #[cfg(not(target_arch = "wasm32"))]
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+#[cfg(not(target_arch = "wasm32"))]
 use tokio::time::{sleep, Duration};
+
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_READ_TIMEOUT: Duration = Duration::from_secs(30);
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_WRITE_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_MAX_CONNECTIONS: usize = 1024;
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_MAX_INFLIGHT_PAYLOAD_BYTES: usize = 16 * 1024 * 1024;
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_PER_SOURCE_CONNECTION_LIMIT: usize = 64;
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_PER_SOURCE_RECONNECT_LIMIT: usize = 128;
+#[cfg(not(target_arch = "wasm32"))]
+const TCP_RECONNECT_WINDOW: Duration = Duration::from_secs(10);
 
 /// Errors that can occur during transport operations.
 #[derive(Debug, Error)]
@@ -51,6 +76,12 @@ pub enum TransportError {
 
     #[error("unknown role: {0}")]
     UnknownRole(RoleName),
+
+    #[error("duplicate peer connection: {0}")]
+    DuplicatePeer(RoleName),
+
+    #[error("unsupported protocol: {0}")]
+    UnsupportedProtocol(String),
 
     #[error("transport not ready")]
     NotReady,
@@ -153,6 +184,7 @@ impl DocumentedTransportContract for InMemoryChannelTransport {
             tier: TransportContractTier::FirstPartyRuntime,
             semantics: TransportSemanticContract {
                 role_addressed_routing: true,
+                authenticated_peers: true,
                 per_peer_fifo_delivery: true,
                 fail_closed_unknown_role: true,
                 no_message_synthesis: true,
@@ -255,12 +287,24 @@ enum TcpListenerState {
 }
 
 #[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug, Clone, Copy)]
+struct TcpSourceRateState {
+    window_start: Instant,
+    attempts: usize,
+    live_connections: usize,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 struct TcpRoleState {
     role: RoleName,
     self_endpoint: Option<crate::identifiers::Endpoint>,
     inbound_senders: BTreeMap<RoleName, mpsc::Sender<Vec<u8>>>,
     inbound_receivers: Arc<Mutex<BTreeMap<RoleName, mpsc::Receiver<Vec<u8>>>>>,
     listener_state: Arc<Mutex<TcpListenerState>>,
+    claimed_inbound_roles: Arc<Mutex<BTreeSet<RoleName>>>,
+    active_connections: Arc<Mutex<usize>>,
+    payload_budget: Arc<Semaphore>,
+    source_limits: Arc<Mutex<BTreeMap<IpAddr, TcpSourceRateState>>>,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -283,6 +327,10 @@ impl TcpRoleState {
             inbound_senders,
             inbound_receivers: Arc::new(Mutex::new(inbound_receivers)),
             listener_state: Arc::new(Mutex::new(TcpListenerState::NotStarted)),
+            claimed_inbound_roles: Arc::new(Mutex::new(BTreeSet::new())),
+            active_connections: Arc::new(Mutex::new(0)),
+            payload_budget: Arc::new(Semaphore::new(TCP_MAX_INFLIGHT_PAYLOAD_BYTES)),
+            source_limits: Arc::new(Mutex::new(BTreeMap::new())),
         }
     }
 
@@ -319,26 +367,26 @@ impl TcpRoleState {
 
     async fn accept_loop(self: Arc<Self>, listener: TcpListener) {
         loop {
-            let Ok((socket, _)) = listener.accept().await else {
+            let Ok((socket, addr)) = listener.accept().await else {
                 break;
             };
+            if self.admit_connection(addr.ip()).await.is_err() {
+                continue;
+            }
             let role_state = Arc::clone(&self);
             spawn(async move {
                 let _ = role_state.handle_socket(socket).await;
+                role_state.release_connection(addr.ip()).await;
             });
         }
     }
 
     async fn handle_socket(&self, mut socket: TcpStream) -> TransportResult<()> {
-        let role_len = socket.read_u32().await? as usize;
-        let mut role_buf = vec![0_u8; role_len];
-        socket.read_exact(&mut role_buf).await?;
+        wire::read_preamble(&mut socket, TCP_READ_TIMEOUT).await?;
+        let role_buf = wire::read_role_name_bytes(&mut socket, TCP_READ_TIMEOUT).await?;
         let from_role = String::from_utf8(role_buf).map_err(|err| {
             TransportError::ReceiveFailed(format!("invalid sender header: {err}"))
         })?;
-        let payload_len = socket.read_u32().await? as usize;
-        let mut payload = vec![0_u8; payload_len];
-        socket.read_exact(&mut payload).await?;
         let sender_role = RoleName::new(from_role.clone()).map_err(|err| {
             TransportError::ReceiveFailed(format!("invalid sender role `{from_role}`: {err}"))
         })?;
@@ -352,10 +400,90 @@ impl TcpRoleState {
                     self.role
                 ))
             })?;
-        sender
-            .send(payload)
-            .await
-            .map_err(|_| TransportError::ChannelClosed)
+        self.claim_inbound_role(&sender_role).await?;
+        let result = async {
+            let payload_len = wire::read_payload_len(&mut socket, TCP_READ_TIMEOUT).await?;
+            let _payload_permit =
+                acquire_tcp_payload_budget(&self.payload_budget, payload_len.as_usize()).await?;
+            let mut payload = vec![0_u8; payload_len.as_usize()];
+            wire::read_exact_timeout(&mut socket, &mut payload, TCP_READ_TIMEOUT).await?;
+            sender
+                .send(payload)
+                .await
+                .map_err(|_| TransportError::ChannelClosed)
+        }
+        .await;
+        self.release_inbound_role(&sender_role).await;
+        result
+    }
+
+    async fn admit_connection(&self, source_ip: IpAddr) -> TransportResult<()> {
+        {
+            let mut active_connections = mutex_lock!(self.active_connections);
+            if *active_connections >= TCP_MAX_CONNECTIONS {
+                return Err(TransportError::ReceiveFailed(format!(
+                    "max TCP connections exceeded: {TCP_MAX_CONNECTIONS}"
+                )));
+            }
+            *active_connections += 1;
+        }
+
+        let mut sources = mutex_lock!(self.source_limits);
+        let now = Instant::now();
+        let state = sources.entry(source_ip).or_insert(TcpSourceRateState {
+            window_start: now,
+            attempts: 0,
+            live_connections: 0,
+        });
+
+        if now.duration_since(state.window_start) > TCP_RECONNECT_WINDOW {
+            state.window_start = now;
+            state.attempts = 0;
+        }
+
+        if state.live_connections >= TCP_PER_SOURCE_CONNECTION_LIMIT {
+            drop(sources);
+            self.release_active_connection().await;
+            return Err(TransportError::ReceiveFailed(format!(
+                "source {source_ip} has too many live TCP connections"
+            )));
+        }
+        if state.attempts >= TCP_PER_SOURCE_RECONNECT_LIMIT {
+            drop(sources);
+            self.release_active_connection().await;
+            return Err(TransportError::ReceiveFailed(format!(
+                "source {source_ip} exceeded TCP reconnect limit"
+            )));
+        }
+
+        state.live_connections += 1;
+        state.attempts += 1;
+        Ok(())
+    }
+
+    async fn release_active_connection(&self) {
+        let mut active_connections = mutex_lock!(self.active_connections);
+        *active_connections = active_connections.saturating_sub(1);
+    }
+
+    async fn release_connection(&self, source_ip: IpAddr) {
+        self.release_active_connection().await;
+        let mut sources = mutex_lock!(self.source_limits);
+        if let Some(state) = sources.get_mut(&source_ip) {
+            state.live_connections = state.live_connections.saturating_sub(1);
+        }
+    }
+
+    async fn claim_inbound_role(&self, sender_role: &RoleName) -> TransportResult<()> {
+        let mut claimed = mutex_lock!(self.claimed_inbound_roles);
+        if !claimed.insert(sender_role.clone()) {
+            return Err(TransportError::DuplicatePeer(sender_role.clone()));
+        }
+        Ok(())
+    }
+
+    async fn release_inbound_role(&self, sender_role: &RoleName) {
+        mutex_lock!(self.claimed_inbound_roles).remove(sender_role);
     }
 
     async fn recv_from(&self, from_role: &RoleName) -> TransportResult<Vec<u8>> {
@@ -365,6 +493,22 @@ impl TcpRoleState {
             .ok_or_else(|| TransportError::UnknownRole(from_role.clone()))?;
         receiver.recv().await.ok_or(TransportError::ChannelClosed)
     }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+async fn acquire_tcp_payload_budget(
+    payload_budget: &Arc<Semaphore>,
+    bytes: usize,
+) -> TransportResult<OwnedSemaphorePermit> {
+    let permits =
+        u32::try_from(bytes).map_err(|err| TransportError::ReceiveFailed(err.to_string()))?;
+    Arc::clone(payload_budget)
+        .try_acquire_many_owned(permits)
+        .map_err(|_| {
+            TransportError::ReceiveFailed(
+                "global in-flight TCP payload byte cap reached".to_string(),
+            )
+        })
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -443,6 +587,7 @@ impl DocumentedTransportContract for TcpPeerTransport {
             tier: TransportContractTier::FirstPartyRuntime,
             semantics: TransportSemanticContract {
                 role_addressed_routing: true,
+                authenticated_peers: false,
                 per_peer_fifo_delivery: true,
                 fail_closed_unknown_role: true,
                 no_message_synthesis: true,
@@ -456,6 +601,7 @@ impl DocumentedTransportContract for TcpPeerTransport {
             },
             notes: vec![
                 "Single-peer runtime TCP transport used for loopback remote topology execution.",
+                "trusted-network only: peers are not cryptographically authenticated.",
             ],
         }
     }
@@ -476,10 +622,12 @@ impl Transport for TcpPeerTransport {
         })?;
         let mut stream = connect_with_retry(&endpoint).await?;
         let role_bytes = self.state.role.to_string().into_bytes();
-        stream.write_u32(role_bytes.len() as u32).await?;
-        stream.write_all(&role_bytes).await?;
-        stream.write_u32(message.len() as u32).await?;
-        stream.write_all(&message).await?;
+        let message_len = telltale_types::MessageLenBytes::try_from(message.len())
+            .map_err(|err| TransportError::SendFailed(err.to_string()))?;
+        wire::write_preamble(&mut stream, TCP_WRITE_TIMEOUT).await?;
+        wire::write_role_name(&mut stream, &role_bytes, TCP_WRITE_TIMEOUT).await?;
+        wire::write_payload_len(&mut stream, message_len, TCP_WRITE_TIMEOUT).await?;
+        wire::write_all_timeout(&mut stream, &message, TCP_WRITE_TIMEOUT).await?;
         stream.shutdown().await?;
         Ok(())
     }
@@ -514,6 +662,7 @@ impl DocumentedTransportContract for TcpRoleTransport {
             tier: TransportContractTier::FirstPartyRuntime,
             semantics: TransportSemanticContract {
                 role_addressed_routing: true,
+                authenticated_peers: false,
                 per_peer_fifo_delivery: true,
                 fail_closed_unknown_role: true,
                 no_message_synthesis: true,
@@ -527,6 +676,7 @@ impl DocumentedTransportContract for TcpRoleTransport {
             },
             notes: vec![
                 "Role-addressed runtime TCP transport used by the first-party topology helper.",
+                "trusted-network only: peers are not cryptographically authenticated.",
             ],
         }
     }
@@ -550,10 +700,12 @@ impl Transport for TcpRoleTransport {
             })?;
         let mut stream = connect_with_retry(&endpoint).await?;
         let role_bytes = self.state.role.to_string().into_bytes();
-        stream.write_u32(role_bytes.len() as u32).await?;
-        stream.write_all(&role_bytes).await?;
-        stream.write_u32(message.len() as u32).await?;
-        stream.write_all(&message).await?;
+        let message_len = telltale_types::MessageLenBytes::try_from(message.len())
+            .map_err(|err| TransportError::SendFailed(err.to_string()))?;
+        wire::write_preamble(&mut stream, TCP_WRITE_TIMEOUT).await?;
+        wire::write_role_name(&mut stream, &role_bytes, TCP_WRITE_TIMEOUT).await?;
+        wire::write_payload_len(&mut stream, message_len, TCP_WRITE_TIMEOUT).await?;
+        wire::write_all_timeout(&mut stream, &message, TCP_WRITE_TIMEOUT).await?;
         stream.shutdown().await?;
         Ok(())
     }
@@ -723,6 +875,7 @@ impl TransportType {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod tests {
     use super::*;
+    use std::net::SocketAddr;
 
     #[tokio::test]
     async fn test_in_memory_transport() {
@@ -834,5 +987,102 @@ mod tests {
                 .expect("remote recv"),
             b"hello remote".to_vec()
         );
+    }
+
+    async fn write_runtime_role_claim(addr: SocketAddr, role: &str) -> TcpStream {
+        let mut stream = TcpStream::connect(addr).await.expect("connect test client");
+        wire::write_preamble(&mut stream, TCP_WRITE_TIMEOUT)
+            .await
+            .expect("write wire preamble");
+        wire::write_role_name(&mut stream, role.as_bytes(), TCP_WRITE_TIMEOUT)
+            .await
+            .expect("write role name");
+        stream
+    }
+
+    #[tokio::test]
+    async fn runtime_tcp_rejects_duplicate_live_role_claim() {
+        let state = Arc::new(TcpRoleState::new(
+            RoleName::from_static("Alice"),
+            None,
+            [RoleName::from_static("Bob")],
+        ));
+        let bob = RoleName::from_static("Bob");
+
+        let first_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind first listener");
+        let first_addr = first_listener.local_addr().expect("first listener address");
+        let first_state = Arc::clone(&state);
+        let first_task = tokio::spawn(async move {
+            let (socket, _) = first_listener.accept().await.expect("accept first client");
+            first_state.handle_socket(socket).await
+        });
+        let first_client = write_runtime_role_claim(first_addr, "Bob").await;
+
+        tokio::time::timeout(Duration::from_secs(1), async {
+            loop {
+                if mutex_lock!(state.claimed_inbound_roles).contains(&bob) {
+                    break;
+                }
+                sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("first runtime role claim should become active");
+
+        let second_listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind second listener");
+        let second_addr = second_listener
+            .local_addr()
+            .expect("second listener address");
+        let second_state = Arc::clone(&state);
+        let second_task = tokio::spawn(async move {
+            let (socket, _) = second_listener
+                .accept()
+                .await
+                .expect("accept second client");
+            second_state.handle_socket(socket).await
+        });
+        let _second_client = write_runtime_role_claim(second_addr, "Bob").await;
+
+        let err = tokio::time::timeout(Duration::from_secs(1), second_task)
+            .await
+            .expect("duplicate runtime claim should finish promptly")
+            .expect("duplicate runtime handler should not panic")
+            .expect_err("duplicate runtime role claim must fail");
+        assert!(matches!(err, TransportError::DuplicatePeer(role) if role == bob));
+
+        drop(first_client);
+        let _ = tokio::time::timeout(Duration::from_secs(1), first_task)
+            .await
+            .expect("first runtime connection should close promptly")
+            .expect("first runtime handler should not panic");
+    }
+
+    #[tokio::test]
+    async fn runtime_tcp_rejects_unknown_role_claim() {
+        let state = Arc::new(TcpRoleState::new(
+            RoleName::from_static("Alice"),
+            None,
+            [RoleName::from_static("Bob")],
+        ));
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("test listener address");
+        let accept = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.expect("accept client");
+            state.handle_socket(socket).await
+        });
+
+        let _client = write_runtime_role_claim(addr, "Mallory").await;
+        let err = tokio::time::timeout(Duration::from_secs(1), accept)
+            .await
+            .expect("unknown role claim should finish promptly")
+            .expect("unknown role handler should not panic")
+            .expect_err("unknown role claim must fail closed");
+        assert!(matches!(err, TransportError::ReceiveFailed(_)));
     }
 }

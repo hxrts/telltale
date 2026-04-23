@@ -1,4 +1,5 @@
 import Distributed.Families.CRDT.Core.CoreModel
+import Distributed.Families.CRDT.Core.BoundaryCounterexamples
 import Distributed.Families.CRDT.Core.OpCoreErasure
 import Distributed.Families.CRDT.Core.FamilyDynamics
 import Distributed.Families.CRDT.Core.ExtensionsAndLimits

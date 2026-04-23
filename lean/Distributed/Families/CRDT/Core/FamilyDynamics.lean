@@ -208,39 +208,39 @@ theorem hcrdt_core_iff_semilattice_plus_op_context
 def semilatticeWithOpContextModel : Model Nat Unit Unit Nat Unit where
   observe := natUnitModel.observe
   distance := natUnitModel.distance
-  semilatticeCoreClass := True
-  opContextLayerClass := True
-  minimalOpStateEquivalenceAssumptions := True
-  canonicalConvergenceDistanceClass := True
-  mixingTimeControlledClass := True
-  hotspotSlowModesClass := True
-  driftDecayClass := True
-  sequenceSubclassClass := True
-  epochBarrierClass := True
-  boundedMetadataApproxClass := True
-  multiscaleObservablesClass := True
-  metadataTradeoffFrontierClass := True
-  gcCausalDominanceClass := True
-  stabilizationLowerBoundClass := True
+  semilatticeCoreClass := NatSemilatticeCoreLaw
+  opContextLayerClass := UnitOpContextLayerLaw
+  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
+  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
+  mixingTimeControlledClass := NatMixingControlLaw
+  hotspotSlowModesClass := NatHotspotSlowModeLaw
+  driftDecayClass := NatDriftDecayLaw
+  sequenceSubclassClass := NatSequenceSubclassLaw
+  epochBarrierClass := NatEpochBarrierLaw
+  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
+  multiscaleObservablesClass := NatMultiscaleObservableLaw
+  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
+  gcCausalDominanceClass := NatGCCausalDominanceLaw
+  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
 
 /-- Concrete model where semilattice core exists but op-context layer is absent. -/
 def semilatticeOnlyNoOpContextModel : Model Nat Unit Unit Nat Unit where
   observe := natUnitModel.observe
   distance := natUnitModel.distance
-  semilatticeCoreClass := True
+  semilatticeCoreClass := NatSemilatticeCoreLaw
   opContextLayerClass := False
-  minimalOpStateEquivalenceAssumptions := True
-  canonicalConvergenceDistanceClass := True
-  mixingTimeControlledClass := True
-  hotspotSlowModesClass := True
-  driftDecayClass := True
-  sequenceSubclassClass := True
-  epochBarrierClass := True
-  boundedMetadataApproxClass := True
-  multiscaleObservablesClass := True
-  metadataTradeoffFrontierClass := True
-  gcCausalDominanceClass := True
-  stabilizationLowerBoundClass := True
+  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
+  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
+  mixingTimeControlledClass := NatMixingControlLaw
+  hotspotSlowModesClass := NatHotspotSlowModeLaw
+  driftDecayClass := NatDriftDecayLaw
+  sequenceSubclassClass := NatSequenceSubclassLaw
+  epochBarrierClass := NatEpochBarrierLaw
+  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
+  multiscaleObservablesClass := NatMultiscaleObservableLaw
+  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
+  gcCausalDominanceClass := NatGCCausalDominanceLaw
+  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
 
 /-- Refutation witness: semilattice-only foundations do not imply op-context algebra. -/
 theorem semilattice_only_not_sufficient_for_op_context :
@@ -295,39 +295,39 @@ def CanonicalDConv
 def foundationModelDistance01 : Model Nat Unit Unit Nat Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := True
-  opContextLayerClass := True
-  minimalOpStateEquivalenceAssumptions := True
+  semilatticeCoreClass := NatSemilatticeCoreLaw
+  opContextLayerClass := UnitOpContextLayerLaw
+  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
   canonicalConvergenceDistanceClass := False
-  mixingTimeControlledClass := True
-  hotspotSlowModesClass := True
-  driftDecayClass := True
-  sequenceSubclassClass := True
-  epochBarrierClass := True
-  boundedMetadataApproxClass := True
-  multiscaleObservablesClass := True
-  metadataTradeoffFrontierClass := True
-  gcCausalDominanceClass := True
-  stabilizationLowerBoundClass := True
+  mixingTimeControlledClass := NatMixingControlLaw
+  hotspotSlowModesClass := NatHotspotSlowModeLaw
+  driftDecayClass := NatDriftDecayLaw
+  sequenceSubclassClass := NatSequenceSubclassLaw
+  epochBarrierClass := NatEpochBarrierLaw
+  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
+  multiscaleObservablesClass := NatMultiscaleObservableLaw
+  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
+  gcCausalDominanceClass := NatGCCausalDominanceLaw
+  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
 
 /-- Companion model with same observables and a different valid distance. -/
 def foundationModelDistance02 : Model Nat Unit Unit Nat Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 2
-  semilatticeCoreClass := True
-  opContextLayerClass := True
-  minimalOpStateEquivalenceAssumptions := True
+  semilatticeCoreClass := NatSemilatticeCoreLaw
+  opContextLayerClass := UnitOpContextLayerLaw
+  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
   canonicalConvergenceDistanceClass := False
-  mixingTimeControlledClass := True
-  hotspotSlowModesClass := True
-  driftDecayClass := True
-  sequenceSubclassClass := True
-  epochBarrierClass := True
-  boundedMetadataApproxClass := True
-  multiscaleObservablesClass := True
-  metadataTradeoffFrontierClass := True
-  gcCausalDominanceClass := True
-  stabilizationLowerBoundClass := True
+  mixingTimeControlledClass := NatMixingControlLaw
+  hotspotSlowModesClass := NatHotspotSlowModeLaw
+  driftDecayClass := NatDriftDecayLaw
+  sequenceSubclassClass := NatSequenceSubclassLaw
+  epochBarrierClass := NatEpochBarrierLaw
+  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
+  multiscaleObservablesClass := NatMultiscaleObservableLaw
+  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
+  gcCausalDominanceClass := NatGCCausalDominanceLaw
+  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
 
 /-! ## Foundation Refutation and Counterexample Theorems -/
 

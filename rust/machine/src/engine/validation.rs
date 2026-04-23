@@ -55,6 +55,68 @@ impl ProtocolMachine {
         &self.sessions
     }
 
+    /// Validate structural invariants after deserializing a persisted machine.
+    ///
+    /// This is intentionally conservative: it checks the decoded state against
+    /// configuration limits and internal ID consistency before the machine is
+    /// resumed.
+    ///
+    /// # Errors
+    ///
+    /// Returns a deterministic reason when decoded state violates runtime
+    /// invariants.
+    pub fn validate_post_decode(&self) -> Result<(), String> {
+        self.config.validate_invariants()?;
+        if self.coroutines.len() > self.config.max_coroutines {
+            return Err(format!(
+                "decoded coroutine count {} exceeds max_coroutines {}",
+                self.coroutines.len(),
+                self.config.max_coroutines
+            ));
+        }
+        let session_count = self.sessions.iter().count();
+        if session_count > self.config.max_sessions {
+            return Err(format!(
+                "decoded session count {session_count} exceeds max_sessions {}",
+                self.config.max_sessions
+            ));
+        }
+
+        let mut seen_coro_ids = BTreeSet::new();
+        for coro in &self.coroutines {
+            if !seen_coro_ids.insert(coro.id) {
+                return Err(format!("decoded duplicate coroutine id {}", coro.id));
+            }
+            if coro.id >= self.next_coro_id {
+                return Err(format!(
+                    "decoded coroutine id {} is not below next_coro_id {}",
+                    coro.id, self.next_coro_id
+                ));
+            }
+            if self.sessions.get(coro.session_id).is_none() {
+                return Err(format!(
+                    "decoded coroutine {} references missing session {}",
+                    coro.id, coro.session_id
+                ));
+            }
+        }
+
+        let mut seen_session_ids = BTreeSet::new();
+        for session in self.sessions.iter() {
+            if !seen_session_ids.insert(session.sid) {
+                return Err(format!("decoded duplicate session id {}", session.sid));
+            }
+            if session.sid >= self.next_session_id {
+                return Err(format!(
+                    "decoded session id {} is not below next_session_id {}",
+                    session.sid, self.next_session_id
+                ));
+            }
+        }
+
+        Ok(())
+    }
+
     /// Access the session store mutably.
     ///
     /// Runtime internals and test support use this surface directly. Public host

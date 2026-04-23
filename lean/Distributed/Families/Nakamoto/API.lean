@@ -19,31 +19,22 @@ structure SecurityProtocol where
   Party : Type w
   model : Model State Block Party
   assumptions : Assumptions model
-  premises : Premises model
-  probabilisticSafety :
-    ProbabilisticSafety model premises.AdmissibleRun premises.ε :=
-      probabilistic_safety_of_assumptions assumptions premises
-  settlementFinality :
-    SettlementDepthFinality model premises.AdmissibleRun premises.settlementDepth :=
-      settlement_finality_of_assumptions assumptions premises
-  livenessUnderChurn :
-    LivenessUnderChurn model premises.AdmissibleRun premises.churnBudget :=
-      liveness_under_churn_of_assumptions assumptions premises
 
 /-- Extract probabilistic-safety theorem from a certified protocol bundle. -/
 theorem probabilistic_safety_of_protocol (P : SecurityProtocol) :
-    ProbabilisticSafety P.model P.premises.AdmissibleRun P.premises.ε :=
-  P.probabilisticSafety
+    ProbabilisticSafety P.model P.assumptions.AdmissibleRun P.assumptions.ε :=
+  probabilistic_safety_of_assumptions P.assumptions
 
 /-- Extract settlement-finality theorem from a certified protocol bundle. -/
 theorem settlement_finality_of_protocol (P : SecurityProtocol) :
-    SettlementDepthFinality P.model P.premises.AdmissibleRun P.premises.settlementDepth :=
-  P.settlementFinality
+    SettlementDepthFinality
+      P.model P.assumptions.AdmissibleRun P.assumptions.settlementDepth :=
+  settlement_finality_of_assumptions P.assumptions
 
 /-- Extract churn-liveness theorem from a certified protocol bundle. -/
 theorem liveness_under_churn_of_protocol (P : SecurityProtocol) :
-    LivenessUnderChurn P.model P.premises.AdmissibleRun P.premises.churnBudget :=
-  P.livenessUnderChurn
+    LivenessUnderChurn P.model P.assumptions.AdmissibleRun P.assumptions.churnBudget :=
+  liveness_under_churn_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : SecurityProtocol) :

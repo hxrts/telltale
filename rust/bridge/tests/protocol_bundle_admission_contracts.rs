@@ -307,8 +307,12 @@ fn public_runtime_gate_matrix_matches_composed_runtime_admission() {
     assert!(default_profile
         .escalation_window_classes
         .contains(&ProtocolMachineEscalationWindowClass::ProtocolBridge));
-    admit_public_bundle(default_cfg, TheoremPackCapabilities::full(), None)
-        .expect("default public runtime path should admit without contracts");
+    admit_public_bundle(
+        default_cfg,
+        TheoremPackCapabilities::full(),
+        Some(RuntimeContracts::full()),
+    )
+    .expect("default public theorem path should admit with explicit transport contracts");
 
     let round_robin_cfg = ProtocolMachineConfig {
         sched_policy: SchedPolicy::RoundRobin,
@@ -363,8 +367,12 @@ fn mixed_determinism_profile_matrix_is_stable_across_public_surfaces() {
         enforce_protocol_machine_runtime_gates(&full_cfg, None),
         RuntimeGateResult::Admitted
     );
-    admit_public_bundle(full_cfg, TheoremPackCapabilities::full(), None)
-        .expect("full determinism should admit without runtime contracts");
+    admit_public_bundle(
+        full_cfg,
+        TheoremPackCapabilities::full(),
+        Some(RuntimeContracts::full()),
+    )
+    .expect("full determinism theorem path should admit with explicit transport contracts");
 
     let modulo_effects_cfg = ProtocolMachineConfig {
         sched_policy: SchedPolicy::RoundRobin,

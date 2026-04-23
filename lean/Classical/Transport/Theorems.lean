@@ -17,6 +17,8 @@ namespace Transport
 
 universe u
 
+variable [EntropyAPI.AnalysisLaws]
+
 theorem transported_foster_lyapunov {State : Type u} {ctx : TransportCtx State}
     (input : FosterInput State ctx) :
     FosterConclusion input := by
@@ -44,6 +46,11 @@ theorem transported_heavy_traffic (input : HeavyTrafficInput) :
   simpa [HeavyTrafficConclusion] using
     HeavyTrafficDiffusion.variance_scaling input.σ input.n
 
+/-- Runtime-facing heavy-traffic diffusion-scale law. -/
+theorem transported_heavy_traffic_diffusion_scale_law (input : HeavyTrafficInput) :
+    HeavyTrafficDiffusionScaleLaw input := by
+  exact transported_heavy_traffic input
+
 theorem transported_mixing (input : MixingInput) :
     MixingConclusion input := by
   intro n
@@ -58,14 +65,47 @@ theorem transported_concentration (input : ConcentrationInput) :
     ConcentrationConclusion input := by
   exact ConcentrationInequalities.at_zero_bound input.witness
 
+/-- Runtime-facing concentration theorem exposing the full sub-Gaussian tail. -/
+theorem transported_concentration_tail (input : ConcentrationInput) :
+    ConcentrationTailConclusion input := by
+  intro t ht
+  exact input.witness.tail_upper t ht
+
 theorem transported_littles_law (input : LittlesLawInput) :
     LittlesLawConclusion input := by
   exact LittlesLaw.queue_length input
 
+/-- Runtime-facing Little's-law wait-time corollary. -/
+theorem transported_littles_law_wait_time (input : LittlesLawInput) :
+    LittlesLawWaitTimeConclusion input := by
+  intro hlam
+  exact LittlesLaw.wait_time input hlam
+
+/-- Runtime-facing Little's-law throughput corollary. -/
+theorem transported_littles_law_throughput (input : LittlesLawInput) :
+    LittlesLawThroughputConclusion input := by
+  intro hW
+  exact LittlesLaw.throughput input hW
+
 theorem transported_functional_clt (input : FunctionalCLTInput) :
     FunctionalCLTConclusion input := by
-  simpa [FunctionalCLTConclusion] using
+  rw [FunctionalCLTConclusion, input.path_eq_const, input.mean_eq_const]
+  simpa using
     FunctionalCLT.scaled_process_const_zero input.c input.N input.t input.N_ne_zero
+
+/-- Runtime-facing functional-CLT scaled-process law. -/
+theorem transported_functional_clt_scaled_process_law (input : FunctionalCLTInput) :
+    FunctionalCLTScaledProcessLaw input := by
+  exact transported_functional_clt input
+
+theorem transported_spectral_gap_termination
+    {State : Type u} [Fintype State] [DecidableEq State]
+    (input : SpectralGapInput State) :
+    SpectralGapConclusion input := by
+  have hGap :
+      0 < SpectralGapTermination.spectralGap input.chain :=
+    SpectralGapTermination.spectral_gap_pos input.chain input.gap_pos
+  exact SpectralGapTermination.expected_termination_bound input.chain hGap input.termination
 
 /-! ## Naming-normalized theorem wrappers -/
 
@@ -122,6 +162,13 @@ theorem littles_law_conclusion_of_input (input : LittlesLawInput) :
 theorem functional_clt_conclusion_of_input (input : FunctionalCLTInput) :
     FunctionalCLTConclusion input :=
   transported_functional_clt input
+
+/-- Canonical spectral-gap termination wrapper: derive a conclusion from its input assumptions. -/
+theorem spectral_gap_conclusion_of_input
+    {State : Type u} [Fintype State] [DecidableEq State]
+    (input : SpectralGapInput State) :
+    SpectralGapConclusion input :=
+  transported_spectral_gap_termination input
 
 /-! ## Certificate Builders -/
 
@@ -197,6 +244,15 @@ def functionalCLT_certificate (input : FunctionalCLTInput) :
     Certificate FunctionalCLTInput FunctionalCLTConclusion :=
   { input := input
   , proof := functional_clt_conclusion_of_input input
+  }
+
+/-- Build a spectral-gap termination certificate from input assumptions. -/
+def spectralGap_certificate
+    {State : Type u} [Fintype State] [DecidableEq State]
+    (input : SpectralGapInput State) :
+    Certificate (SpectralGapInput State) SpectralGapConclusion :=
+  { input := input
+  , proof := spectral_gap_conclusion_of_input input
   }
 
 end Transport

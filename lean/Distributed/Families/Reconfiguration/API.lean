@@ -19,31 +19,21 @@ structure ReconfigurationProtocol where
   Certificate : Type w
   model : Model State Decision Certificate
   assumptions : Assumptions model
-  premises : Premises model
-  noSplitBrain :
-    NoSplitBrainAcrossReconfiguration model :=
-      no_split_brain_of_assumptions assumptions premises
-  safeHandoff :
-    SafeHandoff model :=
-      safe_handoff_of_assumptions assumptions premises
-  livenessPreserved :
-    LivenessPreserved model :=
-      liveness_preserved_of_assumptions assumptions premises
 
 /-- Extract no-split-brain theorem from a certified protocol bundle. -/
 theorem no_split_brain_of_protocol (P : ReconfigurationProtocol) :
     NoSplitBrainAcrossReconfiguration P.model :=
-  P.noSplitBrain
+  no_split_brain_of_assumptions P.assumptions
 
 /-- Extract safe-handoff theorem from a certified protocol bundle. -/
 theorem safe_handoff_of_protocol (P : ReconfigurationProtocol) :
     SafeHandoff P.model :=
-  P.safeHandoff
+  safe_handoff_of_assumptions P.assumptions
 
 /-- Extract liveness-preserved theorem from a certified protocol bundle. -/
 theorem liveness_preserved_of_protocol (P : ReconfigurationProtocol) :
     LivenessPreserved P.model :=
-  P.livenessPreserved
+  liveness_preserved_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : ReconfigurationProtocol) :

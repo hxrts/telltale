@@ -3,6 +3,7 @@
     clippy::missing_panics_doc,
     clippy::must_use_candidate
 )]
+#![cfg_attr(not(test), deny(clippy::unwrap_used, clippy::expect_used))]
 
 //! Public language and compiler-facing APIs.
 //!

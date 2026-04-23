@@ -58,6 +58,11 @@ The main direct dependency directions are:
 The important organizational change is that the shared frontend now lives in `telltale-language`.
 `telltale-runtime` is no longer the right crate to describe as the main DSL parser and projection layer.
 
+YAML is not a supported user configuration boundary today. If a future crate accepts
+user-provided YAML, the parser must cap input bytes and recursion depth before
+deserialization and should prefer `serde_yaml_ng` over the increasingly stale
+`serde_yaml` crate.
+
 ## Crate Responsibilities
 
 ### telltale-types
@@ -193,12 +198,12 @@ It also uses `telltale-theory` and `telltale-runtime` behind optional features a
 
 ### telltale-transport
 
-`telltale-transport` provides first-party production transport implementations.
+`telltale-transport` provides a first-party reference TCP transport implementation.
 Today it is centered on TCP transport support over the choreography-layer transport abstractions from `telltale-runtime`.
 It depends on `telltale-runtime` and `telltale-types`.
 
 This crate should be read as a transport implementation layer, not as the main protocol frontend or runtime semantic core.
-Its job is to realize transport contracts for deployed choreography-layer systems.
+Its job is to demonstrate how concrete transports realize runtime transport contracts for choreography-layer systems.
 
 ### telltale-lints
 

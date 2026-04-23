@@ -30,6 +30,7 @@ universe u v
 section
 
 variable {ν : Type u} [VerificationModel ν]
+variable [EntropyAPI.AnalysisLaws]
 
 /-! ## Semantic Object Artifact Family -/
 
@@ -198,11 +199,11 @@ structure PartialSynchronyArtifact where
   protocol : Distributed.PartialSynchrony.LivenessProtocol
   eventualDecision :
     Distributed.PartialSynchrony.TerminatesOnAllFairRuns
-      protocol.model protocol.premises.FairRun
+      protocol.model protocol.assumptions.FairRun
   boundedPostGST :
     Distributed.PartialSynchrony.BoundedTerminationAfterGST
-      protocol.model protocol.premises.FairRun
-      protocol.premises.gst protocol.premises.postGSTBound
+      protocol.model protocol.assumptions.FairRun
+      protocol.assumptions.gst protocol.assumptions.postGSTBound
 
 /-! ## Liveness and Responsiveness -/
 
@@ -211,24 +212,24 @@ structure ResponsivenessArtifact where
   protocol : Distributed.Responsiveness.ResponsiveProtocol
   eventualDecision :
     Distributed.Responsiveness.TerminatesOnAllFairRuns
-      protocol.model protocol.premises.FairRun
+      protocol.model protocol.assumptions.FairRun
   timeoutIndependentLatency :
     Distributed.Responsiveness.TimeoutIndependentLatencyBound
-      protocol.model protocol.premises.FairRun
-      protocol.premises.gst protocol.premises.optimisticBound
+      protocol.model protocol.assumptions.FairRun
+      protocol.assumptions.gst protocol.assumptions.optimisticBound
 
 /-- Packaged Nakamoto-security artifact. -/
 structure NakamotoArtifact where
   protocol : Distributed.Nakamoto.SecurityProtocol
   probabilisticSafety :
     Distributed.Nakamoto.ProbabilisticSafety
-      protocol.model protocol.premises.AdmissibleRun protocol.premises.ε
+      protocol.model protocol.assumptions.AdmissibleRun protocol.assumptions.ε
   settlementFinality :
     Distributed.Nakamoto.SettlementDepthFinality
-      protocol.model protocol.premises.AdmissibleRun protocol.premises.settlementDepth
+      protocol.model protocol.assumptions.AdmissibleRun protocol.assumptions.settlementDepth
   livenessUnderChurn :
     Distributed.Nakamoto.LivenessUnderChurn
-      protocol.model protocol.premises.AdmissibleRun protocol.premises.churnBudget
+      protocol.model protocol.assumptions.AdmissibleRun protocol.assumptions.churnBudget
 
 /-- Packaged reconfiguration artifact. -/
 structure ReconfigurationArtifact where
@@ -263,10 +264,10 @@ structure FailureDetectorsArtifact where
   protocol : Distributed.FailureDetectors.BoundaryProtocol
   solvabilityBoundary :
     Distributed.FailureDetectors.SolvableBoundary
-      protocol.model protocol.premises.detector
+      protocol.model protocol.detector
   impossibilityBoundary :
     Distributed.FailureDetectors.ImpossibilityBoundary
-      protocol.model protocol.premises.detector
+      protocol.model protocol.detector
 
 /-! ## Accountability and Failure Detectors -/
 
@@ -292,10 +293,10 @@ structure CALMArtifact where
   characterization :
     Distributed.Coordination.CoordinationCharacterization protocol.model
   coordinationFreeWhenMonotone :
-    ∀ hMono : protocol.model.monotoneUpdateClass,
+    ∀ hMono : Distributed.Coordination.MonotoneUpdates protocol.model,
       Distributed.Coordination.CoordinationFreeSafety protocol.model
   coordinationRequiredWhenNonMonotone :
-    ∀ hNonMono : ¬ protocol.model.monotoneUpdateClass,
+    ∀ hNonMono : ¬ Distributed.Coordination.MonotoneUpdates protocol.model,
       Distributed.Coordination.CoordinationRequired protocol.model
 
 /-! ## Data Availability and Coordination -/
@@ -349,12 +350,35 @@ structure CRDTMonotonicityArtifact where
   protocol : Distributed.CRDT.CRDTProtocol
   semilatticeCore : protocol.model.semilatticeCoreClass
   opContextLayer : protocol.model.opContextLayerClass
+  mergeInflationary :
+    Distributed.CRDT.MergeInflationary protocol.premises.stateSemantics
+  mergeMonotone :
+    Distributed.CRDT.MergeMonotone protocol.premises.stateSemantics
+  strongEventualConvergence :
+    Distributed.CRDT.StrongEventualConvergence protocol.premises.stateSemantics
+  finiteCausalDeliveryConverges :
+    Distributed.CRDT.FiniteCausalDeliveryConverges protocol.premises.stateSemantics
   approximationMonotonicity :
     Distributed.CRDT.ApproximationMonotoneUnderPolicyTightening
       protocol.model protocol.premises.approxPolicy protocol.premises.approxPolicy
       protocol.premises.horizon protocol.premises.epsilon
       protocol.premises.referenceRun protocol.premises.deployedRun
   hcrdtCore : Distributed.CRDT.HcrdtCore protocol.model
+
+/-- Packaged CRDT OpCore-erasure artifact. -/
+structure CRDTErasureArtifact where
+  protocol : Distributed.CRDT.CRDTErasureProtocol
+  weakestOpCoreErasure :
+    Distributed.CRDT.WeakestOpCoreErasureTheorem
+      protocol.model protocol.premises.evalRich protocol.premises.interp protocol.premises.erase
+  replayStable :
+    Distributed.CRDT.ReplayStableCoreEval protocol.premises.interp
+  serializationInvariant :
+    Distributed.CRDT.TransportSerializationInvariant
+      protocol.premises.encode protocol.premises.decode
+  conformanceGateIffLowered :
+    ∀ kr, Distributed.CRDT.conformanceGate protocol.premises.lower kr = true ↔
+      ∃ kc, protocol.premises.lower kr = some kc
 
 /-- Packaged triangle-of-forgetting impossibility artifact. -/
 structure TriangleOfForgettingArtifact where
@@ -582,8 +606,8 @@ structure TerminationArtifact {store₀ : SessionStore ν} where
 
 /-- Packaged output-condition soundness artifact. -/
 structure OutputConditionArtifact where
-  witness : OutputConditionWitness
-  soundness : ∀ claim, witness.verify claim = true → witness.accepted claim
+  condition : OutputConditionWitness
+  soundness : ∀ claim, condition.verify claim = true → condition.accepted claim
 
 end
 

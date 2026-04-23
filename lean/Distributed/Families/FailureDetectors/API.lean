@@ -18,23 +18,17 @@ structure BoundaryProtocol where
   Party : Type v
   model : Model State Party
   assumptions : Assumptions model
-  premises : Premises model
-  solvabilityBoundary :
-    SolvableBoundary model premises.detector :=
-      solvability_boundary_of_assumptions assumptions premises
-  impossibilityBoundary :
-    ImpossibilityBoundary model premises.detector :=
-      impossibility_boundary_of_assumptions assumptions premises
+  detector : DetectorClass
 
 /-- Extract solvability boundary theorem from a certified protocol bundle. -/
 theorem solvability_boundary_of_protocol (P : BoundaryProtocol) :
-    SolvableBoundary P.model P.premises.detector :=
-  P.solvabilityBoundary
+    SolvableBoundary P.model P.detector :=
+  solvability_boundary_of_assumptions P.assumptions P.detector
 
 /-- Extract impossibility boundary theorem from a certified protocol bundle. -/
 theorem impossibility_boundary_of_protocol (P : BoundaryProtocol) :
-    ImpossibilityBoundary P.model P.premises.detector :=
-  P.impossibilityBoundary
+    ImpossibilityBoundary P.model P.detector :=
+  impossibility_boundary_of_assumptions P.assumptions P.detector
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : BoundaryProtocol) :

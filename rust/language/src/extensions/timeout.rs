@@ -19,15 +19,15 @@ pub struct TimeoutGrammarExtension;
 impl GrammarExtension for TimeoutGrammarExtension {
     fn grammar_rules(&self) -> &'static str {
         r#"
-timeout_stmt = { "timeout" ~ timeout_duration ~ timeout_roles ~ "{" ~ protocol_body ~ "}" }
-timeout_duration = { integer ~ time_unit? }
-time_unit = { "ms" | "s" | "m" | "h" }
-timeout_roles = { "(" ~ role_list ~ ")" | role_ref }
+timeout_ext_stmt = { "timeout" ~ timeout_ext_duration ~ timeout_ext_roles ~ "{" ~ protocol_body ~ "}" }
+timeout_ext_duration = { integer ~ timeout_ext_time_unit? }
+timeout_ext_time_unit = { "ms" | "s" | "m" | "h" }
+timeout_ext_roles = { "(" ~ role_list ~ ")" | role_ref }
 "#
     }
 
     fn statement_rules(&self) -> Vec<&'static str> {
-        vec!["timeout_stmt"]
+        vec!["timeout_ext_stmt"]
     }
 
     fn priority(&self) -> u32 {
@@ -45,11 +45,11 @@ pub struct TimeoutStatementParser;
 
 impl StatementParser for TimeoutStatementParser {
     fn can_parse(&self, rule_name: &str) -> bool {
-        rule_name == "timeout_stmt"
+        rule_name == "timeout_ext_stmt"
     }
 
     fn supported_rules(&self) -> Vec<String> {
-        vec!["timeout_stmt".to_string()]
+        vec!["timeout_ext_stmt".to_string()]
     }
 
     fn parse_statement(
@@ -58,9 +58,9 @@ impl StatementParser for TimeoutStatementParser {
         _content: &str,
         context: &ParseContext,
     ) -> Result<Box<dyn ProtocolExtension>, ParseError> {
-        if rule_name != "timeout_stmt" {
+        if rule_name != "timeout_ext_stmt" {
             return Err(ParseError::InvalidSyntax {
-                details: format!("Expected timeout_stmt, got {}", rule_name),
+                details: format!("Expected timeout_ext_stmt, got {}", rule_name),
             });
         }
 
@@ -249,14 +249,14 @@ mod tests {
     fn test_timeout_grammar_extension() {
         let ext = TimeoutGrammarExtension;
         assert_eq!(ext.extension_id(), "timeout");
-        assert!(ext.statement_rules().contains(&"timeout_stmt"));
-        assert!(ext.grammar_rules().contains("timeout_stmt"));
+        assert!(ext.statement_rules().contains(&"timeout_ext_stmt"));
+        assert!(ext.grammar_rules().contains("timeout_ext_stmt"));
     }
 
     #[test]
     fn test_timeout_statement_parser() {
         let parser = TimeoutStatementParser;
-        assert!(parser.can_parse("timeout_stmt"));
+        assert!(parser.can_parse("timeout_ext_stmt"));
         assert!(!parser.can_parse("unknown_stmt"));
     }
 
@@ -306,6 +306,6 @@ mod tests {
         let mut registry = ExtensionRegistry::new();
         register_timeout_extension(&mut registry).expect("extension should register");
 
-        assert!(registry.can_handle("timeout_stmt"));
+        assert!(registry.can_handle("timeout_ext_stmt"));
     }
 }

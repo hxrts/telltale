@@ -17,22 +17,19 @@ universe u v
 
 /-- Full CAP-certified protocol package.
 
-`impossibility` has a default proof term, so users provide model assumptions
-and premises once, then receive the theorem automatically. -/
+Users provide model assumptions and premises once, then receive the theorem
+through `impossibility_of_protocol`. -/
 structure ImpossibilityProtocol where
   State : Type u
   Party : Type v
   model : Model State Party
   assumptions : Assumptions model
   premises : ImpossibilityPremises model
-  impossibility :
-    ¬ CAPGuarantee model premises.PartitionRun :=
-      impossibility_of_assumptions assumptions premises
 
 /-- Extract the full CAP impossibility theorem from a certified protocol bundle. -/
 theorem impossibility_of_protocol (P : ImpossibilityProtocol) :
     ¬ CAPGuarantee P.model P.premises.PartitionRun :=
-  P.impossibility
+  impossibility_of_assumptions P.assumptions P.premises
 
 /-- FLP-style summary: core CAP assumptions are validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : ImpossibilityProtocol) :

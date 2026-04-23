@@ -1,0 +1,21 @@
+name: Supply Chain
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 7 * * 2"
+
+jobs:
+  cargo-deny:
+    name: cargo-deny
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install cargo-deny
+        run: cargo install cargo-deny --version 0.19.4 --locked
+      - name: Run cargo-deny
+        run: cargo deny --locked check

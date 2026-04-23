@@ -121,7 +121,7 @@ def injectedByzantineModel : Model InjectedState (List String) Unit (List String
   certified s d _ := d = s.map eventClass
   committed s d := d = s.map eventClass
   conflicts d₁ d₂ := d₁ ≠ d₂
-  certificateWitness := by
+  certificateForCommit := by
     intro s d hCommitted
     exact ⟨(), hCommitted⟩
   commitmentFromCertificate := by
@@ -148,4 +148,3 @@ end InjectedConformance
 end ByzantineConformance
 end Tests
 end Distributed
-

@@ -2,6 +2,14 @@
 
 This document defines the protocol-machine architecture, scheduling semantics, and concurrency envelope. These surfaces are used by Rust runtime targets and Lean conformance surfaces.
 
+**Transport security boundary:** the runtime topology TCP helper is
+trusted-network-only. The reference `telltale-transport` crate supports
+pre-shared-key peer authentication and can export a semantic transport contract
+for theorem-pack admission, but it is still plaintext TCP. Use trusted-network
+TCP only on localhost, a trusted host network, or a trusted VPN unless a
+deployment provides an authenticated transport profile that satisfies the
+protocol machine's documented transport contract.
+
 ## Architecture Overview
 
 The protocol machine is the sole authority over semantic progression. It realizes structure conservation and authority conservation from the [Conservation Framework](102_conservation_framework.md). All protocol-visible truth is committed through the protocol machine. Handlers may stage and return effect outcomes, but they do not mutate semantic state directly.

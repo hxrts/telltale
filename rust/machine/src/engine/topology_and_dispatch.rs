@@ -181,7 +181,7 @@ impl ProtocolMachine {
     }
 
     fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), ProtocolMachineError> {
-        if !self.config.host_contract_assertions {
+        if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
         match &self.handler_identity_anchor {
@@ -203,7 +203,7 @@ impl ProtocolMachine {
         tick: u64,
         events: &[TopologyPerturbation],
     ) -> Result<(), ProtocolMachineError> {
-        if !self.config.host_contract_assertions {
+        if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
         for idx in 1..events.len() {
@@ -221,7 +221,7 @@ impl ProtocolMachine {
     }
 
     fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), ProtocolMachineError> {
-        if !self.config.host_contract_assertions {
+        if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
         for event in events {

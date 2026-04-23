@@ -113,6 +113,13 @@ def semanticAccepts
 
 /-! ## Triangle-Model Builders -/
 
+/-- Minimal asynchronous reachability law used by the generic causal-state adapter:
+every state can stutter while messages are delayed. -/
+def AsynchronousReachability
+    {Payload : Type uPayload} {Member : Type uMember}
+    (reachable : State Payload Member → State Payload Member → Prop) : Prop :=
+  ∀ s, reachable s s
+
 /-- Build a triangle-of-forgetting model over a generic causal state. -/
 def mkModel
     {Payload : Type uPayload} {Update : Type uUpdate} {Member : Type uMember}
@@ -132,7 +139,7 @@ def mkModel
   memberActive := State.activeMembers
   compromised := State.compromisedMembers
   accepts := accepts
-  asynchronous := True
+  asynchronous := AsynchronousReachability reachable
 
 /-- Specialization of `mkModel` that uses any CRDT model's `observe` map as the
 payload observer. -/
@@ -393,7 +400,7 @@ def assumptionsOfGenericModel
     (author : Update → Member)
     (accepts : AdmissionPolicy Payload Update Member := semanticAccepts updateEpoch author)
     (history : History Payload Update Member)
-    (hAsync : True := by trivial)
+    (hAsync : AsynchronousReachability reachable)
     (hLocalAcceptance :
       let M := mkModel reachable observePayload project updateEpoch author accepts
       ∀ ⦃observer s₁ s₂ u⦄,
@@ -407,8 +414,8 @@ def assumptionsOfGenericModel
       RecoveryPreservesVisibleCore reachable observePayload project updateEpoch author accepts) :
     Assumptions (mkModel reachable observePayload project updateEpoch author accepts) :=
   { asynchronous := by
-      -- The generic builder treats asynchrony as an explicit external parameter.
-      trivial
+      -- The generic builder treats stutter/delay reachability as explicit evidence.
+      exact hAsync
   , localAcceptance := hLocalAcceptance
   , dynamicMembershipProvidesRevocation := by
       -- The history bridge turns the leave half of dynamic membership into a revocation witness.

@@ -74,11 +74,6 @@ macro_rules! define_count {
             }
 
             #[must_use]
-            pub const fn new_unchecked(value: u32) -> Self {
-                Self(value)
-            }
-
-            #[must_use]
             pub const fn get(self) -> u32 {
                 self.0
             }

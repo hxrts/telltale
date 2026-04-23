@@ -114,6 +114,7 @@ ci-dry-run lane="fast":
     just book
     # WASM compilation checks
     just wasm-check
+    just reclaim-build-space-if-needed 30000
     just wasm-test-all
     # Golden file equivalence tests (fast, no Lean required)
     just test-golden
@@ -122,6 +123,7 @@ ci-dry-run lane="fast":
     just telltale-lean-check-failing
     just check-parity
     just check-capability-gates
+    just reclaim-build-space-if-needed 10000
     # Benchmark target compilation checks
     just bench-check
     if [[ "{{lane}}" == "full" ]]; then
@@ -165,6 +167,7 @@ check-pr-critical-core:
     just check-ownership-contracts
     just check-aura-borrowed-lints
     just check-capability-gates
+    just reclaim-build-space-if-needed 10000
     just check-release-conformance
     just verify-lean-protocol-machine-targets
     just verify-protocols
@@ -205,10 +208,12 @@ check-fast-structure:
     just check-verification-inventory
     just check-bridge-normalization
     just check-fail-closed-mutations
+    just check-ui-eval-safety
     just check-docs-as-contract
     just check-source-doc-snippets
     just check-lean-metrics-minimal-env
     just check-lean-metrics
+    ./scripts/lean/check-classical-proof-audit.sh
     just check-tooling-convergence
     just check-lean-prebuilt
     just check-lean-dependency-pins
@@ -333,9 +338,13 @@ reclaim-build-space-if-needed min_free_mb="2048":
     set -euo pipefail
     free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
     if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
-      echo "Low disk space (${free_mb}MB free); reclaiming Cargo build artifacts"
-      rm -rf .tmp target/capability-gates
-      cargo clean
+      echo "Low disk space (${free_mb}MB free); reclaiming auxiliary Cargo build artifacts"
+      rm -rf .tmp target/capability-gates target/tests
+      free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
+      if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
+        echo "Still low disk space (${free_mb}MB free); running cargo clean"
+        cargo clean
+      fi
     fi
 
 # Run the deterministic extension statement parsing/dispatch regression suites.
@@ -802,7 +811,9 @@ wasm-test-all:
     );
     EOF
     CARGO_TARGET_DIR="$machine_target" NODE_PATH="$shim_root" wasm-pack test --node rust/machine --features wasm -- --nocapture
+    rm -rf "$machine_target"
     CARGO_TARGET_DIR="$choreo_target" NODE_PATH="$shim_root" wasm-pack test --node rust/runtime --features "wasm _wasm_integration_tests" -- --nocapture
+    rm -rf "$choreo_target"
     cd examples/wasm
     CARGO_TARGET_DIR="$example_target" NODE_PATH="$shim_root" wasm-pack test --node
 
@@ -1062,6 +1073,9 @@ verify-properties:
     cargo test -p telltale-bridge --test proptest_projection
     cargo test -p telltale-bridge --test proptest_json_roundtrip
     cargo test -p telltale-bridge --test proptest_async_subtyping
+
+check-ui-eval-safety:
+    ./scripts/check-ui-eval-safety.sh
 
 # Generate normalized traces for bridge-level protocol machine correspondence fixtures.
 generate-test-traces:
