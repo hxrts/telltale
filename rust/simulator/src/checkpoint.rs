@@ -56,17 +56,9 @@ impl CheckpointStore {
             }
             let path = dir.join(format!("checkpoint_{tick}.cbor"));
             let persisted = PersistedReplayArtifact::checkpoint(checkpoint);
-            match persisted.to_cbor() {
-                Ok(bytes) => {
-                    if let Err(err) = std::fs::write(&path, bytes) {
-                        self.last_persist_error =
-                            Some(format!("failed to persist checkpoint {path:?}: {err}"));
-                    }
-                }
-                Err(err) => {
-                    self.last_persist_error =
-                        Some(format!("failed to encode checkpoint {path:?}: {err}"));
-                }
+            if let Err(err) = persisted.write_to_path(&path) {
+                self.last_persist_error =
+                    Some(format!("failed to persist checkpoint {path:?}: {err}"));
             }
         }
     }
