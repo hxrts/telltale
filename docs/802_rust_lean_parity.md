@@ -1,6 +1,6 @@
 # Rust-Lean Bridge and Parity
 
-This document defines the typed Rust↔Lean bridge surface and the parity contract enforced across that boundary for protocol-machine behavior, choreography projection, semantic-object schemas, and deviation governance.
+This document defines the typed Rust<->Lean bridge surface and the parity contract enforced across that boundary for protocol-machine behavior, choreography projection, semantic-object schemas, and deviation governance.
 
 ## Contract Levels
 
@@ -15,7 +15,7 @@ The bridge does not define protocol-machine semantics.
 Semantics remain in `telltale-machine`, `telltale-theory`, and Lean runtime modules.
 Host-runtime handlers also remain outside the bridge and re-enter through typed effect surfaces.
 
-The same reduced-fixture parity style now also applies to `telltale-search` for
+The same reduced-fixture parity style  also applies to `telltale-search` for
 the concurrency-critical slice. That lane covers:
 
 - canonical min-key batch extraction
@@ -111,7 +111,7 @@ It serializes `ProtocolMachineRunInput` to stdin and parses `ProtocolMachineRunO
 It also exposes `validate_trace()`, `run_reference_simulation()`, `validate_simulation_trace()`, `verify_invariants()`, and `compare_execution()`.
 
 `HeapParityRunner` invokes `lean/.lake/build/bin/heap_parity_runner`.
-It loads the published heap parity corpus and returns typed `HeapParityOutput` values for strict Rust↔Lean comparison.
+It loads the published heap parity corpus and returns typed `HeapParityOutput` values for strict Rust<->Lean comparison.
 
 ## Semantic Objects and Trace Normalization
 
@@ -150,8 +150,8 @@ The following shapes must remain aligned between Lean and Rust unless a deviatio
 
 | Area | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
-| `FlowPolicy` variants | `Runtime/ProtocolMachine/Model/Knowledge.lean` | `rust/machine/src/engine/` | Aligned |
-| `FlowPredicate` variants | `Runtime/ProtocolMachine/Model/Knowledge.lean` | `rust/machine/src/engine/` | Aligned |
+| `FlowPolicy` variants | `Runtime/ProtocolMachine/Model/Kledge.lean` | `rust/machine/src/engine/` | Aligned |
+| `FlowPredicate` variants | `Runtime/ProtocolMachine/Model/Kledge.lean` | `rust/machine/src/engine/` | Aligned |
 | `OutputConditionPolicy` | `Runtime/ProtocolMachine/Model/OutputCondition.lean` | `rust/machine/src/output_condition.rs` | Aligned |
 | Capability/finalization model (`FinalizationPath`, `FinalizationReadClass`, `FinalizationStage`, `RuntimeUpgradeArtifact`) | `lean/Runtime/Proofs/CapabilityModel.lean`, `Runtime/Tests/ProtocolMachineRunner.lean` | `rust/machine/src/semantic_objects.rs`, `rust/machine/src/composition.rs`, `rust/machine/src/capabilities.rs` | Aligned |
 | Runtime `Value` variants | `Protocol/Values.lean` | `rust/machine/src/coroutine.rs` | Aligned |
@@ -186,7 +186,7 @@ Their intended justification remains the existing protocol-machine `invoke` boun
 
 Typed effect requests and outcomes are part of the parity surface directly.
 Rust and Lean must agree on effect-interface metadata, request bodies, outcome statuses, and replay-visible effect exchanges.
-That now includes the internal `wal_sync` effect metadata and the shared durable recovery vocabulary used to classify checkpoint-plus-WAL resume decisions.
+Thatincludes the internal `wal_sync` effect metadata and the shared durable recovery vocabulary used to classify checkpoint-plus-WAL resume decisions.
 
 ## Effect Interface Justification
 
@@ -210,7 +210,7 @@ This is why the current language design is nominal-first:
 
 ### Durability Alignment
 
-The durability layer is now part of the documented Rust↔Lean correspondence boundary for runtime effects.
+The durability layer is  part of the documented Rust<->Lean correspondence boundary for runtime effects.
 
 - Rust `EffectRequestBody::WalSync` corresponds to Lean `walSyncMetadata` plus the shared `EffectRequestBody` / `EffectResponse` effect model in `lean/Runtime/ProtocolMachine/Model/Effects.lean`
 - Rust `DurableRecoveryAction` / `DurableRecoveryDecision` correspond to Lean `Runtime.ProtocolMachine.Model.DurableRecoveryAction` / `DurableRecoveryDecision`
@@ -250,7 +250,7 @@ Projection cross-validation is exercised through `rust/bridge/tests/projection_r
 
 ## Heap Parity Surface
 
-The runtime heap now has a focused Lean mirror for the parts of the contract that must remain cross-implementation stable.
+The runtime heap  has a focused Lean mirror for the parts of the contract that must remain cross-implementation stable.
 
 | Surface | Lean Surface | Rust Surface | Status |
 |---|---|---|---|
@@ -265,7 +265,7 @@ Instead, Lean reconstructs canonical bytes, tagged preimages, ordering, proof-pa
 
 The authoritative digest corpus remains the published heap vector set documented in [Resource Heap](602_resource_heap.md).
 `rust/runtime/tests/data/heap_vectors_v1.json` remains the minimal public digest vector file.
-`rust/runtime/tests/data/heap_lean_parity_v1.json` is the richer Rust↔Lean parity corpus.
+`rust/runtime/tests/data/heap_lean_parity_v1.json` is the richer Rust<->Lean parity corpus.
 
 ### Heap Enforcement
 
@@ -277,7 +277,7 @@ The Lean heap surface is split into three files:
 | Basic determinism lemmas | `lean/Runtime/Proofs/Heap.lean` |
 | Executable parity runner | `lean/Runtime/Tests/HeapParityRunner.lean` |
 
-The strict Rust↔Lean heap suite is `rust/bridge/tests/heap_lean_parity.rs`.
+The strict Rust<->Lean heap suite is `rust/bridge/tests/heap_lean_parity.rs`.
 It runs the Lean executable, recomputes the same values in Rust through public heap APIs, and checks that both sides match the published corpus exactly.
 
 This lane justifies a stronger statement than “heap behavior is only tested in Rust,” but it is still not a full theorem-backed digest proof.
@@ -321,7 +321,7 @@ Parity on these objects covers owner identity, phase/status, budget/invalidation
 Bridge-side execution comparison reports these handoff and invalidation surfaces separately from raw trace equivalence.
 This prevents stale-owner and late-result mismatches from hiding inside otherwise equivalent instruction traces.
 
-The same strict bridge layer now also compares the first-class
+The same strict bridge layer also compares the first-class
 capability/finalization/transition facade exported by
 `inspectCapabilityModel`. That lane checks canonical vs invalidated
 finalization paths and committed-cutover vs rolled-back runtime-upgrade
@@ -337,7 +337,7 @@ Canonical layout mapping for this family is:
   `rust/bridge/src/semantic_objects.rs`
   This bridge surface must re-export the machine semantic-object family rather than carrying a duplicate schema copy.
 
-`Region` is now part of the canonical protocol-machine semantic-object family.
+`Region` is  part of the canonical protocol-machine semantic-object family.
 It names the session-scoped locality and framing domain over operations,
 effects, authoritative reads, canonical handles, and publication events.
 
@@ -373,7 +373,7 @@ The same attachment points are exposed through `Runtime/Proofs/TheoremPack/Inven
 
 Source: `lean/Runtime/ProtocolMachine/Model/State.lean`
 
-`CoroutineState` contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `knowledgeSet`, `costBudget`, and `specState`.
+`CoroutineState` contains `id`, `programId`, `pc`, `regs`, `status`, `effectCtx`, `ownedEndpoints`, `progressTokens`, `kledgeSet`, `costBudget`, and `specState`.
 
 The Lean protocol-machine state structure (`ProtocolMachineState`) contains `config`, `programs`, `coroutines`, `sessions`, `monitor`, `sched`, `resourceStates`, `persistent`, `obsTrace`, failure/topology state fields, and output-condition state.
 
@@ -383,11 +383,11 @@ Source: `rust/machine/src/engine/`
 
 The Rust protocol-machine structure (`ProtocolMachine`, exported as an alias for `protocol machine`) contains `config`, `programs`, `code`, `coroutines`, `sessions`, `monitor`, `sched`, `resource_states`, `persistent`, `obs_trace`, symbol/clock counters, failure/topology state fields, and output-condition state.
 
-`Coroutine` in `rust/machine/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/knowledge sets, cost budget, speculation metadata, and effect context.
+`Coroutine` in `rust/machine/src/coroutine.rs` contains identity/program/pc/status, register file, ownership/progress/kledge sets, cost budget, speculation metadata, and effect context.
 
 ### Canonical Rust Runtime Object Inventory
 
-The Rust public runtime surface now exposes one canonical naming scheme:
+The Rust public runtime surface  exposes one canonical naming scheme:
 protocol-machine objects use `ProtocolMachine*`, guest-runtime objects use
 `GuestRuntime*`, and bridge execution objects use `ProtocolMachineRunner*`.
 No public `telltale_machine::vm::*`, `telltale_machine::threaded::*`,
@@ -446,7 +446,7 @@ On the Lean side, `TheoremPackCapabilityContract.semanticAttachmentPoints` provi
 ## Simulator Field Mirror
 
 Lean includes executable mirror dynamics for simulator field handlers under `lean/Runtime/Simulation/`. Rust field handlers live under `rust/simulator/src/field_handlers/`.
-The mirror now includes a Lean-native field-model boundary in `lean/Runtime/Simulation/Field.lean`, including built-in catalog dispatch and default initial-state derivation for shipped field families.
+The mirror  includes a Lean-native field-model boundary in `lean/Runtime/Simulation/Field.lean`, including built-in catalog dispatch and default initial-state derivation for shipped field families.
 It remains an executable parity layer, not a mirror of Rust trait objects or serde-based scenario parsing.
 
 Parity fixtures are enforced by:
@@ -497,103 +497,6 @@ Executable modules must not depend on placeholder proof definitions. Proof-only 
 Any intentional parity break must be recorded in the deviation table below before merge.
 Required fields include id, owner, status, reason, impact, alternatives considered, revisit date, and coverage scope.
 
-### Deviation Registry (Active)
-
-| ID | Status | Owner | Revisit | Summary |
-|----|--------|-------|---------|---------|
-| _none_ | _n/a_ | _n/a_ | _n/a_ | No active parity deviations |
-
-Resolved deviations move to history after one stable release cycle with no regressions on the covered surfaces.
-
-### Resolved Deviation History
-
-| ID | Status | Owner | Moved On | Summary |
-|----|--------|-------|----------|---------|
-| threaded-round-extension | resolved | protocol-machine-runtime | 2026-02-27 | Threaded backend defaults to canonical one-step rounds |
-| payload-hardening-extension | resolved | protocol-machine-runtime | 2026-02-27 | Lean and Rust now enforce payload-size admission on executable send/receive paths and strict-schema annotation rejection on annotationless send/receive shapes |
-| comm-replay-label-context | resolved | protocol-machine-runtime | 2026-02-27 | Rust receive replay identity now canonicalizes to the Lean-style typed-context label token when session payload annotation is available |
-| types-merge-payload-annotation | resolved | types-parity | 2026-02-27 | Lean canonical merge now enforces payload-annotation compatibility on overlapping send/recv labels and exposes matching soundness at the compatibility-gated entrypoint |
-| types-content-id-closedness | resolved | types-parity | 2026-02-27 | Lean now exposes explicit closed-only canonical identity and open-term template identity policy surfaces with proofs matching Rust `content_id`/`template_id` contract |
-| types-local-db-payload-retention | resolved | types-parity | 2026-02-27 | Lean payload-preserving DB conversion is promoted via parity surfaces with explicit success-equivalence bridge theorems to legacy erased conversion |
-| theory-async-subtyping-conservative | resolved | theory-parity | 2026-02-27 | Lean and Rust both expose conservative executable async-subtyping with cross-validation tests |
-| theory-orphan-free-conservative | resolved | theory-parity | 2026-02-27 | Lean and Rust both expose conservative executable orphan-freedom with cross-validation tests |
-
-### Deviation Details (Active)
-
-### Resolved Deviation Notes
-
-#### threaded-round-extension
-
-**Lean:** `Runtime/ProtocolMachine/Runtime/Runner.lean`
-**Rust:** `rust/machine/src/threaded.rs`
-
-**Resolution:** `ProtocolMachineConfig` exposes `threaded_round_semantics` and defaults to canonical one-step semantics aligned with Lean.
-
-**Covers:** `threaded.round.wave.parallelism`
-
-#### payload-hardening-extension
-
-**Lean:** `lean/Runtime/ProtocolMachine/Model/Config.lean`, `lean/Runtime/ProtocolMachine/Semantics/ExecComm.lean`
-**Rust:** `rust/machine/src/engine/`, `rust/machine/src/threaded.rs`, `rust/machine/tests/parity_fixtures_v2.rs`
-
-**Resolution:** Lean and Rust both expose executable payload-size admission controls. Lean now emits strict-schema annotation rejection on annotationless single-branch send/receive shapes. Parity fixtures cover oversized payload rejection behavior at canonical concurrency.
-
-**Covers:** `runtime.payload.admission`, `runtime.payload.size_bound`, `runtime.payload.strict_schema`
-
-#### comm-replay-label-context
-
-**Lean:** `Runtime/ProtocolMachine/Semantics/ExecComm.lean`, `Runtime/ProtocolMachine/Model/State.lean`
-**Rust:** `rust/machine/src/engine/instruction_effects.rs`, `rust/machine/src/threaded/instructions_send_recv.rs`, `rust/machine/src/communication_replay/identity.rs`
-
-**Resolution:** Rust receive replay identity now canonicalizes to typed-context replay labels (`recv:<ValType>`) when expected payload annotations are present, matching Lean receive identity construction.
-
-**Covers:** `comm.replay.identity.label_context`
-
-#### types-merge-payload-annotation
-
-**Lean:** `lean/Choreography/Projection/Erasure/Merge.lean`, `lean/Choreography/Projection/Erasure/PayloadCompat.lean`, `lean/Choreography/Projection/Erasure/MergeSoundness.lean`
-**Rust:** `rust/types/src/merge.rs`
-
-**Resolution:** Lean `merge` is now compatibility-gated directly via `payloadAnnotationsCompatible`. `mergeWithPayloadCompat` is a stable alias to canonical `merge`. `merge_with_payload_compat_sound` proves soundness at the compatibility-gated entrypoint.
-
-**Covers:** `types.merge.payload_annotation.compatibility`
-
-#### types-content-id-closedness
-
-**Lean:** `lean/SessionTypes/ContentIdentityPolicy.lean`
-**Rust:** `rust/types/src/contentable.rs`
-
-**Resolution:** Lean now exposes executable closed-only canonical identity surfaces (`globalToCanonicalIdentityBytes?`, `localToCanonicalIdentityBytes?`) and open-term template identity surfaces (`globalToTemplateIdentityBytes`, `localToTemplateIdentityBytes`). Proofs show that canonical identity is admitted iff terms are closed/all-bound.
-
-**Covers:** `types.content_id.closed_only`
-
-#### types-local-db-payload-retention
-
-**Lean:** `lean/SessionTypes/LocalTypeDB/Annotated.lean`, `lean/SessionTypes/LocalTypeConv.lean`, `lean/SessionTypes/LocalTypeConvProofs/PayloadParityBridge.lean`
-**Rust:** `rust/types/src/de_bruijn.rs`, `rust/types/src/contentable.rs`
-
-**Resolution:** Lean `LocalTypeDBAnn` is promoted via parity-facing conversion surfaces (`toDBParity?`, `fromDBParity`, `toDBParity_closed_safe`). Bridge theorems prove success/failure equivalence between payload-preserving and legacy erased conversion (`to_db_ann_is_some_eq_to_db_is_some`). Lift witnesses from erased-success to payload-preserving success are provided by `to_db_lifts_to_db_ann`.
-
-**Covers:** `types.local_db.payload_annotation.retention`
-
-#### theory-async-subtyping-conservative
-
-**Lean:** `lean/SessionTypes/LocalTypeR/AsyncSubtype.lean`, `lean/Choreography/Projection/Validator.lean`
-**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/bridge/src/runner_projection_export.rs`
-
-**Resolution:** Lean and Rust now expose matching conservative executable async-subtyping with parity tests.
-
-**Covers:** `theory.async_subtyping.conservative_subset`
-
-#### theory-orphan-free-conservative
-
-**Lean:** `lean/SessionTypes/LocalTypeR/AsyncSubtype.lean`, `lean/Choreography/Projection/Validator.lean`
-**Rust:** `rust/theory/src/subtyping/async.rs`, `rust/bridge/src/runner_projection_export.rs`
-
-**Resolution:** Lean and Rust now expose matching conservative executable orphan-freedom with parity tests.
-
-**Covers:** `theory.orphan_free.conservative_local_check`
-
 #### conservative-async-subtyping-contract
 
 Conservative async-subtyping (Lean and Rust) is intentionally phase- and tree-structural:
@@ -629,16 +532,6 @@ Any Rust PR that changes projection or merge semantics must include:
 2. The Lean module list reviewed for parity.
 3. New or updated cross-validation tests for the changed behavior.
 4. A parity note update in this document when scope or status changes.
-
-## Type-Level Parity Checklist
-
-Every Rust PR that changes type semantics must include this checklist in the PR description.
-
-1. List affected Rust modules under `rust/types/src/`.
-2. List corresponding Lean modules reviewed for parity.
-3. State whether behavior is aligned or intentionally divergent.
-4. If divergent, add or update a Deviation Registry entry in this document.
-5. Link tests that cover new behavior and edge cases.
 
 ## Naming Surface
 
@@ -707,15 +600,6 @@ These are canonical Lean proof/runtime packaging objects not expected to have di
 These are canonical Rust operational or embedding surfaces not expected to have direct Lean theorem peers.
 
 `GuestRuntime`, `ThreadedGuestRuntime`, `EffectHandler`, `ProtocolMachine`, `ProtocolMachineConfig`, `ProtocolMachineState`, `ProtocolMachineError`, `ProtocolMachineRunner`, `ProtocolMachineRunInput`, `ProtocolMachineRunOutput`, `ProtocolMachineReplayBundle`, `GuestRuntimeDeclaration`.
-
-### Name Parity Maintenance Rule
-
-When a shared semantic/runtime object is added, renamed, split, or removed:
-
-1. Update the Lean definition in `lean/Runtime/ProtocolMachine/Model/SemanticObjects/Core.lean`.
-2. Update the Rust definition in `rust/machine/src/semantic_objects.rs`.
-3. Update the bridge re-export surface in `rust/bridge/src/semantic_objects.rs`.
-4. Update this parity inventory in the same change.
 
 ## Related Docs
 
