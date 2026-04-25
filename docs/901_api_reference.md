@@ -299,7 +299,7 @@ Key exports:
 - Resolver and factory surfaces: `EnvResolver`, `StaticResolver`, `TcpTransportFactory`
 - Re-exported transport traits/types: `Transport`, `TransportError`, `TransportResult`, `RoleName`
 
-For the transport-contract boundary example, run `cargo run -p telltale-transport --example theorem_admission`. The example does not open sockets; it shows that pre-shared-key TCP exports an authenticated runtime contract and trusted-network TCP fails theorem admission on `authenticated_peers`.
+For the transport-contract boundary example, run `cargo run -p telltale-transport --example theorem_admission`. The example does not open sockets. It shows that pre-shared-key TCP exports an authenticated runtime contract and trusted-network TCP fails theorem admission on `authenticated_peers`.
 
 TLS is intentionally out of scope for this reference transport. Production deployments that require confidentiality or certificate-bound identity should wrap or replace it and export equivalent semantic contract evidence.
 

@@ -114,7 +114,7 @@ emit typed transition artifacts rather than relying on hidden host-local state.
 stability, deterministic topology-event ordering, and transfer-event audit
 coverage before those host-supplied facts are accepted into the machine. The
 `RelaxedTestOnly` mode is reserved for targeted tests that intentionally violate
-those contracts; it is rejected with `DeterminismMode::Full`.
+those contracts. It is rejected with `DeterminismMode::Full`.
 
 ## Lean and Bridge Surfaces
 
