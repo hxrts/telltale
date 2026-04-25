@@ -80,6 +80,14 @@ lean_lib Entropy where
     `IrisExtractionInstance.*
   ]
 
+/-- Finite-discrete Fisher information geometry boundary layers. -/
+lean_lib FisherInformation where
+  globs := #[
+    `FisherInformationAPI,
+    `FisherInformationInstance,
+    `FisherInformationInstance.*
+  ]
+
 /-- Linker args to silence macOS deployment target warnings for test executables. -/
 def macosLinkArgs : Array String :=
   -- Match the toolchain's minimum macOS version for system libraries.

@@ -255,7 +255,11 @@ theorem protocol_machine_transported_foster_lyapunov {ι γ π ε ν : Type u} [
     (h : ProtocolMachineFosterAssumptions step)
     (w : Runtime.Proofs.ClassicalTransportWitness (ProtocolMachineState ι γ π ε ν)) :
     Classical.Transport.FosterConclusion (protocolMachineFosterInput step h w) := by
-  exact Classical.Transport.transported_foster_lyapunov (input := protocolMachineFosterInput step h w)
+  -- Prove the transported conclusion directly to avoid leaving universe
+  -- metavariables from the polymorphic facade theorem in this wrapper.
+  intro s n
+  exact Classical.FosterLyapunovHarris.DriftSystem.iterate_nonincrease
+    (S := (protocolMachineFosterInput step h w).system) s n
 
 theorem r7_protocol_machine_potential_integration {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]

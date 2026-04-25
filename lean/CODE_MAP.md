@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-04-23
+**Last Updated:** 2026-04-25
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -18,17 +18,18 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 8. [Protocol](#protocol)
 9. [Runtime](#runtime)
 10. [Entropy](#entropy)
-11. [Build Configuration](#build-configuration)
-12. [Axiom Inventory](#axiom-inventory)
-13. [Proof Strategies](#proof-strategies)
-14. [Quick Navigation Guide](#quick-navigation-guide)
+11. [FisherInformation](#fisherinformation)
+12. [Build Configuration](#build-configuration)
+13. [Axiom Inventory](#axiom-inventory)
+14. [Proof Strategies](#proof-strategies)
+15. [Quick Navigation Guide](#quick-navigation-guide)
 
 ---
 
 ## Overview
 
 **Toolchain:** Lean 4 v4.26.0
-**Build:** Lake with 9 library targets
+**Build:** Lake with 10 library targets
 **Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
 
 <!-- GENERATED_OVERVIEW_TABLE:BEGIN -->
@@ -42,9 +43,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,152 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   199 |  39,280 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   199 |  39,284 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **701** | **141,606** |                                                            |
+| **Total**      | **701** | **141,610** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -57,6 +58,7 @@ Layer 4: Semantics        → Operational semantics, typing judgments, determini
 Layer 3: Choreography     → Projection, harmony, blindness, embedding, erasure
 Layer 2: SessionCoTypes   → Coinductive EQ2, bisimulation, duality, roundtrip bridge, async subtyping
 Layer 1: SessionTypes     → Global/local types, de Bruijn, participation
+Sidecar: FisherInformation → Finite-discrete information geometry API and instance boundary
 ```
 
 ---
@@ -882,11 +884,31 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 
 ---
 
+## FisherInformation
+
+**Root Modules:** `FisherInformationAPI.lean`, `FisherInformationInstance.lean`
+**Description:** Finite-discrete Fisher information geometry boundary, parallel
+to the entropy trust-boundary pattern. The API exposes families, natural and
+expectation coordinates, score functions, Fisher matrices, KL bridge hooks,
+Cramer-Rao/reachability law predicates, and worked finite examples.
+
+| File | Lines | Description |
+|------|------:|-------------|
+| FisherInformationAPI.lean | 891 | API: finite `Family`, density/log-partition, score, Fisher matrix, dual coordinates, KL/Fisher/Cramer-Rao/reachability laws |
+| FisherInformationInstance.lean | 4 | Re-export wrapper |
+| FisherInformationInstance/Models.lean | 35 | Public concrete model/law exports |
+| FisherInformationInstance/RealConcrete.lean | 179 | Mathlib-backed finite-discrete construction and checked unit-family laws |
+| FisherInformationInstance/Examples.lean | 209 | Bernoulli, categorical, binomial, truncated Poisson, and classifier examples |
+| FisherInformationInstance/TheoremPack.lean | 255 | Optional stretch theorem artifacts: tight KL remainder, Fisher IB, natural-gradient convergence, D-optimal design, BALD |
+| FisherInformationInstance/Tests.lean | 104 | Explicit acceptance checks for Bernoulli operations, theorem packs, and `[Laws]` access |
+
+---
+
 ## Build Configuration
 
 ### lakefile.lean
 
-Nine library targets with glob-based module discovery:
+Ten library targets with glob-based module discovery:
 
 ```
 telltale (package)
@@ -898,7 +920,8 @@ telltale (package)
 ├── Distributed      ← Distributed theorem families (FLP/CAP, quorum safety, liveness, ordering, DA, coordination)
 ├── Protocol         ← Async MPST, coherence, preservation, monitoring
 ├── Runtime          ← Protocol machine, Iris backend, WP, adequacy (default target)
-└── Entropy          ← Trust boundary: ClassicalAnalysis + IrisExtraction APIs and instances
+├── Entropy          ← Trust boundary: ClassicalAnalysis + IrisExtraction APIs and instances
+└── FisherInformation ← Trust boundary: finite-discrete Fisher information API and instances
 ```
 
 **Dependencies:** mathlib, paco-lean v0.1.3, iris-lean
@@ -1022,4 +1045,10 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **Configuration equivalence proofs?** → Runtime/Proofs/ProtocolMachine/InstrSpec/
 - **Iris extraction?** → IrisExtractionInstance/
 - **Classical analysis?** → ClassicalAnalysisInstance/
+- **Fisher information matrix?** → FisherInformationAPI.lean (`fisherInformation`, `fisherAt`)
+- **Cramér-Rao bound?** → FisherInformationAPI.lean (`CramerRaoBound`, `cramer_rao_bound`)
+- **Natural gradient?** → FisherInformationAPI.lean (`naturalGradientStep`, `NaturalGradientExists`)
+- **Fisher volume?** → FisherInformationAPI.lean (`fisherVolume`, `reachabilityRegion`)
+- **Legendre duality?** → FisherInformationAPI.lean (`dualPotential`, `LegendreDuality`)
+- **Fisher theorem packs / stretch goals?** → FisherInformationInstance/TheoremPack.lean
 - **Release conformance?** → Runtime/Proofs/TheoremPack/ReleaseConformance.lean

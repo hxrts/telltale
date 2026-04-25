@@ -15,7 +15,7 @@ Solution Structure.
 ## Trust Boundary
 
 This file and `ClassicalAnalysisInstance.lean` form the explicit trust boundary
-for all noncomputable real-analysis assumptions in the project. A reviewer can:
+for all real-analysis assumptions in the project. A reviewer can:
 1. Verify the laws stated here match standard information theory
 2. Check `ClassicalAnalysisInstance` proves each law from Mathlib
 3. Run `lake build` to confirm type-correctness

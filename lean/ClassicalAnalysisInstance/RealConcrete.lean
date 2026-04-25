@@ -12,14 +12,14 @@ Solution Structure.
 
 ## Trust Boundary
 
-This file provides the concrete noncomputable realizations of the abstract
+This file provides the concrete real-analysis realizations of the abstract
 `ClassicalAnalysisAPI` interface. Together with `ClassicalAnalysisAPI.lean`,
 it forms the explicit trust boundary for real-analysis assumptions.
 
-**Why noncomputable?** Real.log is defined via limits/integrals in Mathlib's
+**Why these definitions are not executable?** Real.log is defined via limits/integrals in Mathlib's
 classical real analysis. Computing logarithms to arbitrary precision requires
 infinite operations, so the kernel cannot evaluate these terms. The laws
-themselves are fully proved — noncomputability only means we cannot *execute*
+themselves are fully proved — this only means we cannot *execute*
 entropy calculations within Lean, but we can still *reason* about them.
 
 **Audit note**: All laws are proved from Mathlib foundations. No axioms or
