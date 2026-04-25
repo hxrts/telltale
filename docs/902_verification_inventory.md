@@ -18,7 +18,7 @@ The numeric rows in this section are source-derived and checked by
 | Metric | Value | Source |
 |---|---:|---|
 | Lean core-library files | 701 | `lean/CODE_MAP.md` total row |
-| Lean core-library lines | 141,606 | `lean/CODE_MAP.md` total row |
+| Lean core-library lines | 141,610 | `lean/CODE_MAP.md` total row |
 | Lean-backed search fairness inventory entries | 56 | `lean/Runtime/Proofs/Search/Inventory.lean` |
 | Ownership contract gate commands | 6 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
