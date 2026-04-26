@@ -3450,7 +3450,7 @@ checksum = "591ef38edfb78ca4771ee32cf494cb8771944bee237a9b91fc9c1424ac4b777b"
 
 [[package]]
 name = "telltale"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3487,7 +3487,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-bridge"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -3508,7 +3508,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -3535,7 +3535,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -3560,7 +3560,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "futures",
  "proc-macro2",
@@ -3573,7 +3573,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-runtime"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3616,7 +3616,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-search"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "criterion",
  "rayon",
@@ -3627,7 +3627,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-simulator"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -3649,7 +3649,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "assert_matches",
  "criterion",
@@ -3661,7 +3661,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-transport"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3676,7 +3676,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -3693,7 +3693,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-ui"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "dioxus",
  "dioxus-document",
@@ -3710,7 +3710,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-viewer"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3724,7 +3724,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-web"
-version = "16.0.0"
+version = "17.0.0"
 dependencies = [
  "dioxus",
  "telltale-ui",

@@ -1,4 +1,5 @@
 import Mathlib.Analysis.SpecialFunctions.Log.Basic
+import Mathlib.Analysis.Complex.Exponential
 import Mathlib.Data.Fintype.BigOperators
 import Mathlib.Data.Real.Basic
 
@@ -258,6 +259,385 @@ theorem mutual_info_zero_of_erasure {L O : Type}
     (self := inferInstance) labelDist h_nn h_sum joint hErase
 
 end Laws
+
+/-! ## Combinatorial Optimization Transport Surface -/
+
+/-- Monotonicity predicate for finite-set objectives. -/
+def FinsetMonotoneObjective {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ) : Prop :=
+  ∀ {S T : Finset α}, S ⊆ T → f S ≤ f T
+
+/-- Diminishing-returns predicate for finite-set objectives. -/
+def FinsetSubmodularObjective {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ) : Prop :=
+  ∀ {S T : Finset α}, S ⊆ T → ∀ a, a ∉ T →
+    f (insert a T) - f T ≤ f (insert a S) - f S
+
+/-- Marginal gain from adding one element to a finite-set objective. -/
+def FinsetMarginal {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ) (S : Finset α) (a : α) : ℝ :=
+  f (insert a S) - f S
+
+/-- Submodularity bounds a union gain by the sum of base-set marginals. -/
+theorem submodular_union_gap_le_sum_marginals
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (hsubmodular : FinsetSubmodularObjective f)
+    (S R : Finset α)
+    (hdisjoint : ∀ a ∈ R, a ∉ S) :
+    f (S ∪ R) - f S ≤ ∑ a ∈ R, FinsetMarginal f S a := by
+  classical
+  -- Peel off one new element at a time and apply diminishing returns.
+  induction R using Finset.induction_on with
+  | empty =>
+      simp [FinsetMarginal]
+  | insert a R ha ih =>
+      have ha_not_S : a ∉ S := hdisjoint a (Finset.mem_insert_self a R)
+      have ha_not_union : a ∉ S ∪ R := by
+        simp [ha_not_S, ha]
+      have hdisjoint_R : ∀ b ∈ R, b ∉ S := by
+        intro b hb
+        exact hdisjoint b (Finset.mem_insert_of_mem hb)
+      have hih :
+          f (S ∪ R) - f S ≤ ∑ b ∈ R, FinsetMarginal f S b :=
+        ih hdisjoint_R
+      have hsub :
+          f (insert a (S ∪ R)) - f (S ∪ R) ≤ FinsetMarginal f S a := by
+        simpa [FinsetMarginal] using
+          hsubmodular (by intro x hx; exact Finset.mem_union_left R hx)
+            a ha_not_union
+      have hunion :
+          S ∪ insert a R = insert a (S ∪ R) := by
+        ext x
+        simp
+      rw [hunion, Finset.sum_insert ha]
+      linarith
+
+/-- The optimality gap is bounded by the sum of remaining optimal-element marginals. -/
+theorem optimal_gap_le_sum_remaining_marginals
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (hmonotone : FinsetMonotoneObjective f)
+    (hsubmodular : FinsetSubmodularObjective f)
+    (current optimalSet : Finset α) :
+    f optimalSet - f current ≤
+      ∑ a ∈ optimalSet \ current, FinsetMarginal f current a := by
+  classical
+  let remainder := optimalSet \ current
+  -- Compare `optimalSet` to `current ∪ remainder`, then expand by submodularity.
+  have hdisjoint : ∀ a ∈ remainder, a ∉ current := by
+    intro a ha
+    exact (Finset.mem_sdiff.mp ha).2
+  have hunion_gap :
+      f (current ∪ remainder) - f current ≤
+        ∑ a ∈ remainder, FinsetMarginal f current a :=
+    submodular_union_gap_le_sum_marginals f hsubmodular current remainder hdisjoint
+  have hopt_subset_union : optimalSet ⊆ current ∪ remainder := by
+    intro a ha
+    by_cases hac : a ∈ current
+    · exact Finset.mem_union_left remainder hac
+    · exact Finset.mem_union_right current (Finset.mem_sdiff.mpr ⟨ha, hac⟩)
+  have hopt_gap :
+      f optimalSet - f current ≤
+        ∑ a ∈ remainder, FinsetMarginal f current a :=
+    (sub_le_sub_right (hmonotone hopt_subset_union) (f current)).trans hunion_gap
+  exact hopt_gap
+
+/-- Greedy domination bounds the marginal sum by cardinality times the greedy gain. -/
+theorem sum_remaining_marginals_le_card_mul_greedy_gain
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (current next optimalSet : Finset α)
+    (hgreedy :
+      ∀ a ∈ optimalSet \ current,
+        FinsetMarginal f current a ≤ f next - f current) :
+    ∑ a ∈ optimalSet \ current, FinsetMarginal f current a ≤
+      (optimalSet \ current).card * (f next - f current) := by
+  classical
+  -- Every remaining optimal element has marginal at most the greedy gain.
+  simpa [nsmul_eq_mul] using
+    (Finset.sum_le_card_nsmul (optimalSet \ current)
+      (fun a => FinsetMarginal f current a)
+      (f next - f current)
+      (fun a ha => hgreedy a ha))
+
+/-- Greedy domination gives `gap ≤ k * gain` for a cardinality budget `k`. -/
+theorem greedy_gap_le_budget_mul_gain
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (hmonotone : FinsetMonotoneObjective f)
+    (hsubmodular : FinsetSubmodularObjective f)
+    (current next optimalSet : Finset α)
+    (k : Nat)
+    (hcard : (optimalSet \ current).card ≤ k)
+    (hcurrent_next : current ⊆ next)
+    (hgreedy :
+      ∀ a ∈ optimalSet \ current,
+        FinsetMarginal f current a ≤ f next - f current) :
+    f optimalSet - f current ≤
+      (k : ℝ) * (f next - f current) := by
+  -- Combine submodular marginal accounting with greedy domination.
+  have hopt_gap :=
+    optimal_gap_le_sum_remaining_marginals f
+      hmonotone hsubmodular current optimalSet
+  have hsum_le :
+      ∑ a ∈ optimalSet \ current, FinsetMarginal f current a ≤
+        (optimalSet \ current).card * (f next - f current) := by
+    simpa using
+      sum_remaining_marginals_le_card_mul_greedy_gain
+        f current next optimalSet hgreedy
+  have hgap_le_card :
+      f optimalSet - f current ≤
+        (optimalSet \ current).card * (f next - f current) :=
+    hopt_gap.trans hsum_le
+  have hcard_real :
+      ((optimalSet \ current).card : ℝ) ≤ k := by
+    exact_mod_cast hcard
+  have hgain_nonneg :
+      0 ≤ f next - f current :=
+    sub_nonneg.mpr (hmonotone hcurrent_next)
+  have hgap_le_k :
+      f optimalSet - f current ≤
+        (k : ℝ) * (f next - f current) :=
+    hgap_le_card.trans
+      (mul_le_mul_of_nonneg_right hcard_real hgain_nonneg)
+  exact hgap_le_k
+
+/-- Greedy domination of the remaining optimal elements gives the standard one-step gap bound. -/
+theorem greedy_step_gap_bound_from_submodularity
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (hmonotone : FinsetMonotoneObjective f)
+    (hsubmodular : FinsetSubmodularObjective f)
+    (current next optimalSet : Finset α)
+    (k : Nat)
+    (hcard : (optimalSet \ current).card ≤ k)
+    (hcurrent_next : current ⊆ next)
+    (hgreedy :
+      ∀ a ∈ optimalSet \ current,
+        FinsetMarginal f current a ≤ f next - f current) :
+    f optimalSet - f next ≤
+      (1 - (k : ℝ)⁻¹) * (f optimalSet - f current) := by
+  -- Divide the `gap ≤ k * gain` recurrence by the positive budget.
+  have hgap_le_k :=
+    greedy_gap_le_budget_mul_gain f hmonotone hsubmodular
+      current next optimalSet k hcard hcurrent_next hgreedy
+  by_cases hk : k = 0
+  · subst hk
+    simp at hgap_le_k
+    have hcurrent_le_next : f current ≤ f next :=
+      hmonotone hcurrent_next
+    linarith
+  · have hk_pos_real : 0 < (k : ℝ) := by
+      exact_mod_cast Nat.pos_of_ne_zero hk
+    have hdiv :
+        (k : ℝ)⁻¹ * (f optimalSet - f current) ≤
+          f next - f current := by
+      calc
+        (k : ℝ)⁻¹ * (f optimalSet - f current)
+            ≤ (k : ℝ)⁻¹ * ((k : ℝ) * (f next - f current)) := by
+              exact mul_le_mul_of_nonneg_left hgap_le_k
+                (inv_nonneg.mpr hk_pos_real.le)
+        _ = f next - f current := by
+              field_simp [ne_of_gt hk_pos_real]
+    nlinarith [hdiv]
+
+/-- Permille form of the classical greedy approximation factor. -/
+def classicalGreedyApproximationPermille : ℝ :=
+  632
+
+/-- Exact-optimal greedy selections satisfy the 632-permille greedy bound. -/
+theorem nemhauser_wolsey_fisher_greedy_approximation_permille
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (greedySet optimalSet : Finset α)
+    (hoptimal_le_greedy : f optimalSet ≤ f greedySet)
+    (hoptimal_nonneg : 0 ≤ f optimalSet) :
+    f optimalSet * classicalGreedyApproximationPermille ≤
+      f greedySet * 1000 := by
+  -- This corollary is the exact-greedy specialization of the classical bound.
+  have hgreedy_nonneg : 0 ≤ f greedySet :=
+    le_trans hoptimal_nonneg hoptimal_le_greedy
+  calc
+    f optimalSet * classicalGreedyApproximationPermille
+        ≤ f greedySet * classicalGreedyApproximationPermille := by
+          exact mul_le_mul_of_nonneg_right
+            hoptimal_le_greedy (by norm_num [classicalGreedyApproximationPermille])
+    _ ≤ f greedySet * 1000 := by
+          exact mul_le_mul_of_nonneg_left
+            (by norm_num [classicalGreedyApproximationPermille]) hgreedy_nonneg
+
+/-- Exact-optimal greedy selections satisfy the real `1 - 1/e` bound. -/
+theorem nemhauser_wolsey_fisher_greedy_approximation
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (greedySet optimalSet : Finset α)
+    (hoptimal_le_greedy : f optimalSet ≤ f greedySet)
+    (hoptimal_nonneg : 0 ≤ f optimalSet) :
+    (1 - (Real.exp 1)⁻¹) * f optimalSet ≤ f greedySet := by
+  -- The exact-greedy specialization follows because `1 - 1/e ≤ 1`.
+  have hexp_pos : 0 < Real.exp 1 := Real.exp_pos 1
+  have hinv_nonneg : 0 ≤ (Real.exp 1)⁻¹ := inv_nonneg.mpr (le_of_lt hexp_pos)
+  have hfactor_le_one : 1 - (Real.exp 1)⁻¹ ≤ 1 := by
+    linarith
+  have hscaled :
+      (1 - (Real.exp 1)⁻¹) * f optimalSet ≤ 1 * f optimalSet := by
+    exact mul_le_mul_of_nonneg_right hfactor_le_one hoptimal_nonneg
+  calc
+    (1 - (Real.exp 1)⁻¹) * f optimalSet
+        ≤ 1 * f optimalSet := hscaled
+    _ = f optimalSet := by ring
+    _ ≤ f greedySet := hoptimal_le_greedy
+
+/-- Geometric decay of the residual gap under the standard greedy progress recurrence. -/
+theorem greedy_residual_geometric_decay
+    (k : Nat)
+    (objectiveAtStep : Nat → ℝ)
+    (optimalValue : ℝ)
+    (hstep :
+      ∀ i, i < k →
+        optimalValue - objectiveAtStep (i + 1) ≤
+          (1 - (k : ℝ)⁻¹) * (optimalValue - objectiveAtStep i)) :
+    optimalValue - objectiveAtStep k ≤
+      (1 - (k : ℝ)⁻¹) ^ k * (optimalValue - objectiveAtStep 0) := by
+  let r : ℝ := 1 - (k : ℝ)⁻¹
+  have hprefix :
+      ∀ n, n ≤ k →
+        optimalValue - objectiveAtStep n ≤
+          r ^ n * (optimalValue - objectiveAtStep 0) := by
+    intro n hn
+    induction n with
+    | zero =>
+        simp
+    | succ n ih =>
+        have hn_lt : n < k := Nat.lt_of_succ_le hn
+        have hstep_n :
+            optimalValue - objectiveAtStep (n + 1) ≤
+              r * (optimalValue - objectiveAtStep n) := by
+          simpa [r] using hstep n hn_lt
+        have hih :
+            optimalValue - objectiveAtStep n ≤
+              r ^ n * (optimalValue - objectiveAtStep 0) :=
+          ih (Nat.le_of_succ_le hn)
+        have hk_one : (1 : ℝ) ≤ k := by
+          exact_mod_cast
+            (le_trans (Nat.succ_le_succ (Nat.zero_le n))
+              (Nat.succ_le_of_lt hn_lt))
+        have hr_nonneg : 0 ≤ r := by
+          have hle : ((k : ℝ)⁻¹) ≤ 1 :=
+            inv_le_one_of_one_le₀ hk_one
+          dsimp [r]
+          linarith
+        calc
+          optimalValue - objectiveAtStep (n + 1)
+              ≤ r * (optimalValue - objectiveAtStep n) := hstep_n
+          _ ≤ r * (r ^ n * (optimalValue - objectiveAtStep 0)) := by
+                exact mul_le_mul_of_nonneg_left hih hr_nonneg
+          _ = r ^ (n + 1) * (optimalValue - objectiveAtStep 0) := by
+                ring
+  simpa [r] using hprefix k (le_refl k)
+
+/--
+Cardinality-constrained Nemhauser-Wolsey-Fisher greedy approximation from the
+standard submodular greedy progress recurrence.
+-/
+theorem nemhauser_wolsey_fisher_cardinality_constrained_greedy_approximation
+    (k : Nat)
+    (objectiveAtStep : Nat → ℝ)
+    (optimalValue : ℝ)
+    (hk : 0 < k)
+    (hstart : objectiveAtStep 0 = 0)
+    (hoptimal_nonneg : 0 ≤ optimalValue)
+    (hstep :
+      ∀ i, i < k →
+        optimalValue - objectiveAtStep (i + 1) ≤
+          (1 - (k : ℝ)⁻¹) * (optimalValue - objectiveAtStep i)) :
+    (1 - (Real.exp 1)⁻¹) * optimalValue ≤ objectiveAtStep k := by
+  have hdecay := greedy_residual_geometric_decay k objectiveAtStep optimalValue hstep
+  have hpow :
+      (1 - (k : ℝ)⁻¹) ^ k ≤ Real.exp (-1) := by
+    have hcast : (1 : ℝ) ≤ k := by exact_mod_cast hk
+    simpa [one_div] using
+      (Real.one_sub_div_pow_le_exp_neg (n := k) (t := (1 : ℝ))
+        (by exact hcast))
+  have hresidual :
+      optimalValue - objectiveAtStep k ≤ Real.exp (-1) * optimalValue := by
+    have hdecay' :
+        optimalValue - objectiveAtStep k ≤
+          (1 - (k : ℝ)⁻¹) ^ k * optimalValue := by
+      simpa [hstart] using hdecay
+    exact hdecay'.trans
+      (mul_le_mul_of_nonneg_right hpow hoptimal_nonneg)
+  have hexp_inv : Real.exp (-1) = (Real.exp 1)⁻¹ := by
+    rw [Real.exp_neg]
+  rw [hexp_inv] at hresidual
+  linarith
+
+/--
+Set-function form of the cardinality-constrained greedy approximation theorem.
+
+The `hstep` premise is the standard progress lemma supplied by the greedy
+choice plus monotone submodularity: each step closes at least a `1/k` fraction
+of the remaining optimality gap.
+-/
+theorem nemhauser_wolsey_fisher_cardinality_constrained_set_greedy_approximation
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (greedyAtStep : Nat → Finset α)
+    (optimalSet : Finset α)
+    (k : Nat)
+    (_hmonotone : FinsetMonotoneObjective f)
+    (_hsubmodular : FinsetSubmodularObjective f)
+    (_hoptimal_card : optimalSet.card ≤ k)
+    (hk : 0 < k)
+    (hstart : f (greedyAtStep 0) = 0)
+    (hoptimal_nonneg : 0 ≤ f optimalSet)
+    (hstep :
+      ∀ i, i < k →
+        f optimalSet - f (greedyAtStep (i + 1)) ≤
+          (1 - (k : ℝ)⁻¹) * (f optimalSet - f (greedyAtStep i))) :
+    (1 - (Real.exp 1)⁻¹) * f optimalSet ≤ f (greedyAtStep k) :=
+  nemhauser_wolsey_fisher_cardinality_constrained_greedy_approximation
+    k (fun i => f (greedyAtStep i)) (f optimalSet)
+    hk hstart hoptimal_nonneg hstep
+
+/--
+Full finite-set NWF form from monotonicity, submodularity, and greedy domination
+of every remaining optimal element at each step.
+-/
+theorem nemhauser_wolsey_fisher_cardinality_constrained_set_greedy_approximation_full
+    {α : Type*} [DecidableEq α]
+    (f : Finset α → ℝ)
+    (greedyAtStep : Nat → Finset α)
+    (optimalSet : Finset α)
+    (k : Nat)
+    (hmonotone : FinsetMonotoneObjective f)
+    (hsubmodular : FinsetSubmodularObjective f)
+    (hoptimal_card : optimalSet.card ≤ k)
+    (hk : 0 < k)
+    (hstart : f (greedyAtStep 0) = 0)
+    (hoptimal_nonneg : 0 ≤ f optimalSet)
+    (hcurrent_next :
+      ∀ i, i < k → greedyAtStep i ⊆ greedyAtStep (i + 1))
+    (hgreedy :
+      ∀ i, i < k → ∀ a ∈ optimalSet \ greedyAtStep i,
+        FinsetMarginal f (greedyAtStep i) a ≤
+          f (greedyAtStep (i + 1)) - f (greedyAtStep i)) :
+    (1 - (Real.exp 1)⁻¹) * f optimalSet ≤ f (greedyAtStep k) := by
+  apply nemhauser_wolsey_fisher_cardinality_constrained_set_greedy_approximation
+    f greedyAtStep optimalSet k hmonotone hsubmodular hoptimal_card
+    hk hstart hoptimal_nonneg
+  intro i hi
+  have hcard :
+      (optimalSet \ greedyAtStep i).card ≤ k := by
+    exact (Finset.card_le_card
+      (by
+        intro a ha
+        exact (Finset.mem_sdiff.mp ha).1)).trans hoptimal_card
+  exact greedy_step_gap_bound_from_submodularity
+    f hmonotone hsubmodular
+    (greedyAtStep i) (greedyAtStep (i + 1)) optimalSet k
+    hcard (hcurrent_next i hi) (hgreedy i hi)
 
 /-! ## Extended Analysis Operations
 

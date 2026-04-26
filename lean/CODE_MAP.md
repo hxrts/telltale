@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-04-25
+**Last Updated:** 2026-04-26
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -40,12 +40,12 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Choreography   |    89 |  19,361 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    17 |   2,439 | Transported theorems (queueing, large deviations, mixing)  |
-| ClassicalAnalysis |     3 |   1,128 | Real analysis concrete models for classical transport      |
+| ClassicalAnalysis |     3 |   1,508 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,152 | Async buffered MPST, coherence, preservation, monitoring   |
 | Runtime        |   199 |  39,284 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **701** | **141,610** |                                                            |
+| **Total**      | **701** | **141,990** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -868,10 +868,28 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| ClassicalAnalysisAPI.lean | 437 | Pure API: `EntropyAPI.Model`, `EntropyAPI.Laws` typeclasses for Shannon entropy, KL divergence, mutual information; `AnalysisModel`/`AnalysisLaws` for real/complex analysis |
+| ClassicalAnalysisAPI.lean | 817 | Pure API: `EntropyAPI.Model`, `EntropyAPI.Laws` typeclasses for Shannon entropy, KL divergence, mutual information; `AnalysisModel`/`AnalysisLaws` for real/complex analysis; finite-set monotone/submodular predicates and greedy approximation transport corollaries |
 | ClassicalAnalysisInstance.lean | 3 | Re-export wrapper |
 | ClassicalAnalysisInstance/Models.lean | 200 | Concrete model instances |
 | ClassicalAnalysisInstance/RealConcrete.lean | 491 | Concrete real analysis models via Mathlib |
+
+Key exported optimization surfaces:
+
+- `EntropyAPI.FinsetMonotoneObjective`: finite-set objective monotonicity.
+- `EntropyAPI.FinsetSubmodularObjective`: diminishing-returns submodularity.
+- `EntropyAPI.FinsetMarginal`: one-element marginal gain for finite-set objectives.
+- `EntropyAPI.classicalGreedyApproximationPermille`: 632-permille approximation factor.
+- `EntropyAPI.submodular_union_gap_le_sum_marginals`: submodular union-gap bound by base-set marginals.
+- `EntropyAPI.optimal_gap_le_sum_remaining_marginals`: optimality gap bounded by remaining optimal-element marginals.
+- `EntropyAPI.sum_remaining_marginals_le_card_mul_greedy_gain`: greedy domination bounds marginal sums by cardinality times the greedy gain.
+- `EntropyAPI.greedy_gap_le_budget_mul_gain`: one-step greedy progress precursor.
+- `EntropyAPI.greedy_step_gap_bound_from_submodularity`: one-step NWF recurrence from monotonicity, submodularity, and greedy domination.
+- `EntropyAPI.greedy_residual_geometric_decay`: standard residual recurrence for greedy progress.
+- `EntropyAPI.nemhauser_wolsey_fisher_cardinality_constrained_greedy_approximation`: `1 - 1/e` bound from the greedy progress recurrence.
+- `EntropyAPI.nemhauser_wolsey_fisher_cardinality_constrained_set_greedy_approximation`: finite-set cardinality-constrained set-function wrapper.
+- `EntropyAPI.nemhauser_wolsey_fisher_cardinality_constrained_set_greedy_approximation_full`: finite-set theorem deriving the recurrence from monotone submodularity and greedy domination.
+- `EntropyAPI.nemhauser_wolsey_fisher_greedy_approximation_permille`: exact-optimal specialization of the greedy approximation bound.
+- `EntropyAPI.nemhauser_wolsey_fisher_greedy_approximation`: real `1 - 1/e` exact-optimal specialization.
 
 ### Iris Extraction (Trust Boundary)
 
@@ -894,13 +912,48 @@ Cramer-Rao/reachability law predicates, and worked finite examples.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| FisherInformationAPI.lean | 891 | API: finite `Family`, density/log-partition, score, Fisher matrix, dual coordinates, KL/Fisher/Cramer-Rao/reachability laws |
+| FisherInformationAPI.lean | 1,492 | API: finite `Family`, density/log-partition, score, Fisher matrix, dual coordinates, KL/Fisher/Cramer-Rao/reachability laws, matrix log-det monotonicity/submodularity, weighted rank-one PSD increments, and certificate log-det objective laws |
 | FisherInformationInstance.lean | 4 | Re-export wrapper |
 | FisherInformationInstance/Models.lean | 35 | Public concrete model/law exports |
 | FisherInformationInstance/RealConcrete.lean | 179 | Mathlib-backed finite-discrete construction and checked unit-family laws |
 | FisherInformationInstance/Examples.lean | 209 | Bernoulli, categorical, binomial, truncated Poisson, and classifier examples |
 | FisherInformationInstance/TheoremPack.lean | 255 | Optional stretch theorem artifacts: tight KL remainder, Fisher IB, natural-gradient convergence, D-optimal design, BALD |
-| FisherInformationInstance/Tests.lean | 104 | Explicit acceptance checks for Bernoulli operations, theorem packs, and `[Laws]` access |
+| FisherInformationInstance/Tests.lean | 275 | Explicit acceptance checks for Bernoulli operations, theorem packs, matrix log-det monotonicity/submodularity, weighted rank-one increments, certificate log-det laws, greedy approximation exports, and `[Laws]` access |
+
+Key exported log-det surfaces:
+
+- `FisherInformationAPI.matrix_det_one_add_posSemidef_ge_one`: determinant lower bound for identity plus PSD matrices.
+- `FisherInformationAPI.matrix_det_monotone_under_psd_addition`: Loewner monotonicity of determinant under PSD addition.
+- `FisherInformationAPI.matrix_logdet_monotone_under_psd_addition`: Loewner monotonicity of log-det under PSD addition.
+- `FisherInformationAPI.matrix_logdet_monotone_under_psd_finset_sum`: log-det monotonicity for finite sums of PSD increments.
+- `FisherInformationAPI.weightedRankOnePSDIncrement`: weighted rank-one PSD increment `w • x xᵀ`.
+- `FisherInformationAPI.weightedRankOnePSDIncrement_posSemidef`: PSD proof for nonnegative weighted rank-one increments.
+- `FisherInformationAPI.matrix_inv_antitone_of_posDef_le`: inverse antitonicity for positive-definite matrices in Loewner order.
+- `FisherInformationAPI.det_add_weighted_rank_one`: matrix determinant lemma specialized to weighted rank-one updates.
+- `FisherInformationAPI.matrix_logdet_rank_one_marginal_antitone`: rank-one log-det marginals decrease as the base matrix grows.
+- `FisherInformationAPI.matrix_logdet_monotone_under_weighted_rank_one_sum`: log-det monotonicity for finite sums of weighted rank-one PSD increments.
+- `FisherInformationAPI.matrix_logdet_submodular_under_psd_increment`: finite-set diminishing returns for weighted rank-one matrix log-det objectives.
+- `FisherInformationAPI.CertificatePSDIncrement`: PSD certificate increment with checked nonnegative log-det gain.
+- `FisherInformationAPI.certificateInformationMatrix`: matrix-backed selected certificate information matrix.
+- `FisherInformationAPI.certificateMatrixLogdetObjective`: matrix-backed selected certificate log-det objective.
+- `FisherInformationAPI.certificateLogdetObjective`: additive certificate log-det finite-set objective.
+- `FisherInformationAPI.certificate_logdet_objective_monotone`: monotonicity of certificate log-det objective under set inclusion.
+- `FisherInformationAPI.certificate_matrix_logdet_objective_monotone`: monotonicity of the matrix-backed certificate log-det objective under set inclusion.
+- `FisherInformationAPI.certificate_logdet_objective_submodular`: diminishing returns for certificate log-det marginals.
+
+### Theorem Family Status
+
+| Family | Export | Status |
+|--------|--------|--------|
+| Matrix determinant monotonicity | `FisherInformationAPI.matrix_det_monotone_under_psd_addition` | Proved from Hermitian spectral diagonalization, identity-plus-PSD determinant lower bound, square-root conjugation, and determinant factorization; no axioms or `sorry` |
+| Matrix log-det monotonicity | `FisherInformationAPI.matrix_logdet_monotone_under_psd_addition`, `FisherInformationAPI.matrix_logdet_monotone_under_psd_finset_sum`, `FisherInformationAPI.matrix_logdet_monotone_under_weighted_rank_one_sum` | Proved from determinant monotonicity, finite PSD sums, weighted rank-one PSD increments, and positivity of positive-definite determinants; no axioms or `sorry` |
+| Matrix log-det diminishing returns | `FisherInformationAPI.matrix_logdet_submodular_under_psd_increment` | Proved for finite weighted rank-one matrix objectives from Schur-complement inverse antitonicity, the matrix determinant lemma, and `log` monotonicity; no axioms or `sorry` |
+| Certificate log-det monotonicity | `FisherInformationAPI.certificate_logdet_objective_monotone` | Proved for additive certificate increments with checked nonnegative gains |
+| Certificate log-det diminishing returns | `FisherInformationAPI.certificate_logdet_objective_submodular` | Proved for additive certificate increments with checked nonnegative gains |
+| Monotone/submodular objectives | `EntropyAPI.FinsetMonotoneObjective`, `EntropyAPI.FinsetSubmodularObjective` | API predicates exported |
+| Greedy approximation | `EntropyAPI.nemhauser_wolsey_fisher_cardinality_constrained_set_greedy_approximation_full` | Cardinality-constrained `1 - 1/e` set-function theorem from monotonicity, submodularity, greedy domination, residual geometric decay, and `Real.exp`; no axioms or `sorry` |
+| Greedy approximation, compatibility | `EntropyAPI.nemhauser_wolsey_fisher_greedy_approximation` | Exact-optimal specialization of the `1 - 1/e` bound; no axioms or `sorry` |
+| Greedy approximation, permille | `EntropyAPI.nemhauser_wolsey_fisher_greedy_approximation_permille` | 632-permille specialization for downstream integer encodings |
 
 ---
 
