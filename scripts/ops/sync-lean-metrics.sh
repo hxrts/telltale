@@ -201,7 +201,22 @@ done
 # ── Write Metrics to CODE_MAP.md ───────────────────────────────────────
 TODAY="$(TZ=UTC date +%F)"
 
-before_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
+ORIGINAL_CODE_MAP_FILE="$CODE_MAP_FILE"
+if (( CHECK_MODE == 1 )); then
+  # A check validates generated statistics without renewing editorial metadata
+  # or changing the source file, including on failure.
+  TODAY="$(sed -n 's/^\*\*Last Updated:\*\* \([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]\)$/\1/p' "$CODE_MAP_FILE")"
+  if [[ ! "$TODAY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+    echo "error: missing or malformed Lean metrics update date" >&2
+    exit 1
+  fi
+  check_tmp_root="${TMPDIR:-/tmp}"
+  [[ -d "$check_tmp_root" ]] || check_tmp_root=/tmp
+  check_tmp_dir="$(TMPDIR="$check_tmp_root" mktemp -d)"
+  trap 'rm -rf "$check_tmp_dir"' EXIT
+  CODE_MAP_FILE="$check_tmp_dir/CODE_MAP.md"
+  cp "$ORIGINAL_CODE_MAP_FILE" "$CODE_MAP_FILE"
+fi
 
 CODE_MAP_METRICS="**Last Updated:** ${TODAY}"
 
@@ -228,8 +243,7 @@ replace_block "$CODE_MAP_FILE" "<!-- GENERATED_OVERVIEW_TABLE:BEGIN -->" "<!-- G
 
 # ── Check Mode ─────────────────────────────────────────────────────────
 if (( CHECK_MODE == 1 )); then
-  after_code_map_hash="$(shasum -a 256 "$CODE_MAP_FILE" | awk '{print $1}')"
-  if [[ "$before_code_map_hash" != "$after_code_map_hash" ]]; then
+  if ! cmp -s "$ORIGINAL_CODE_MAP_FILE" "$CODE_MAP_FILE"; then
     echo "Lean metrics are stale. Run: ./scripts/ops/sync-lean-metrics.sh" >&2
     exit 1
   fi

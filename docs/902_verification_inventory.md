@@ -1,5 +1,10 @@
 # Verification Inventory
 
+Lean metrics check mode compares generated source counts without modifying the
+tracked code map or renewing its editorial date. The minimal-environment gate
+also exercises an unchanged historical date and actual source-count drift;
+failed checks must leave the original code map byte-for-byte unchanged.
+
 This page is the authoritative inventory for verification counts.
 Only counts that are stable enough to check automatically are tracked here.
 
