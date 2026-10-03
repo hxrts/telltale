@@ -39,7 +39,7 @@ impl ThreadedProtocolMachine {
     /// Deterministic lane assignment for a coroutine id.
     #[must_use]
     pub fn lane_of_coro(&self, coro_id: usize) -> Option<LaneId> {
-        self.coroutines.get(coro_id)?;
+        self.coroutine_by_id(coro_id)?;
         Some(self.assign_lane(coro_id))
     }
 
@@ -401,7 +401,7 @@ impl ThreadedProtocolMachine {
     fn try_unblock_senders(&mut self) {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {
-            let should_skip = self.coroutines.get(coro_id).is_some_and(|coro| {
+            let should_skip = self.coroutine_by_id(coro_id).is_some_and(|coro| {
                 let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
                 self.crashed_sites.contains(&guard.role)
                     || self.timed_out_sites.contains_key(&guard.role)
@@ -438,7 +438,7 @@ impl ThreadedProtocolMachine {
     fn try_unblock_receivers(&mut self) {
         let blocked_ids = self.scheduler.blocked_ids();
         for coro_id in blocked_ids {
-            let should_skip = self.coroutines.get(coro_id).is_some_and(|coro| {
+            let should_skip = self.coroutine_by_id(coro_id).is_some_and(|coro| {
                 let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
                 self.crashed_sites.contains(&guard.role)
                     || self.timed_out_sites.contains_key(&guard.role)
@@ -465,12 +465,13 @@ impl ThreadedProtocolMachine {
     fn planner_eligible(
         planner: &mut WavePlannerState,
         coros: &[Arc<Mutex<Coroutine>>],
+        indexes: &BTreeMap<usize, usize>,
         crashed_sites: &BTreeSet<SiteId>,
         paused_roles: &BTreeSet<SiteId>,
         timed_out_sites: &BTreeMap<SiteId, u64>,
         id: usize,
     ) -> bool {
-        let Some(coro) = coros.get(id) else {
+        let Some(coro) = indexes.get(&id).and_then(|index| coros.get(*index)) else {
             return false;
         };
         let coro_guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");
@@ -517,9 +518,7 @@ impl ThreadedProtocolMachine {
         coro_id: usize,
     ) -> Result<(), ProtocolMachineError> {
         let lane = coro_id % planner.lane_count;
-        let coro = self
-            .coroutines
-            .get(coro_id)
+        let coro = self.coroutine_by_id(coro_id)
             .cloned()
             .ok_or(ProtocolMachineError::Fault {
                 coro_id,
@@ -570,11 +569,12 @@ impl ThreadedProtocolMachine {
                 let coros = &self.coroutines;
                 ProtocolMachineKernel::select_ready_eligible(
                     &mut self.scheduler,
-                    |id| coro_has_progress(coros, id),
+                    |id| coro_has_progress(coros, &self.coroutine_indexes, id),
                     |id| {
                         Self::planner_eligible(
                             &mut planner,
                             coros,
+                            &self.coroutine_indexes,
                             &self.crashed_sites,
                             &self.paused_roles,
                             &self.timed_out_sites,

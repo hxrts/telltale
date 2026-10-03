@@ -77,6 +77,7 @@ fn run_check(args: &[String]) -> Result<()> {
         "release-recovery" => checks::release_recovery::run(&repo_root),
         "scale-budgets" => checks::scale_budgets::run(&repo_root),
         "search-fairness" => checks::search_fairness::run(&repo_root),
+        "session-disposal" => checks::session_disposal::run(&repo_root),
         "simulator-subsystem" => checks::simulator_subsystem::run(&repo_root, &extra),
         "tooling-convergence" => checks::tooling_convergence::run(&repo_root),
         "verification-inventory" => checks::verification_inventory::run(&repo_root),

@@ -159,6 +159,17 @@ A concern should stay host-only when any of the following hold:
 | Move into DSL | `case/of` pattern matching, unions and `type alias`, `let`-bound evidence values, `check` syntax, `effect`/`uses` declarations |
 | Keep host-only | UI/view/reduction architecture, frontend state taxonomies, storage/retry/transport internals, rendering-oriented observed state |
 
+## Host Runtime Disposal Boundary
+
+Targeted close and reap is an operation of the exclusively owned Rust runtime.
+Its acknowledgment proves retirement of execution custody after any owned worker
+scope completes. The compact summary grants no admission, ownership, evidence,
+or transition capability and cannot authorize a protocol outcome. Application
+owners retain their protocol terminal publication and authenticated evidence
+obligations. [Session Lifecycle](403_session_lifecycle.md) defines the runtime
+retirement contract; [Rust-Lean Parity](802_rust_lean_parity.md) records the
+host-lifecycle scope.
+
 ## Related Docs
 
 - [Capability Admission](702_capability_admission.md)

@@ -30,7 +30,7 @@ pub struct ClosedSessionSummary {
 }
 
 impl ClosedSessionSummary {
-    fn from_session(session: &SessionState) -> Self {
+    pub(crate) fn from_session(session: &SessionState) -> Self {
         Self {
             sid: session.sid,
             status: session.status.clone(),
@@ -656,4 +656,27 @@ pub struct TypeEntry {
     pub current: LocalTypeR,
     /// Original local type (for unfolding recursive variables).
     pub original: LocalTypeR,
+}
+
+/// Required targeted cooperative session disposal could not be validated.
+#[derive(Debug, thiserror::Error)]
+pub enum SessionDisposalError {
+    /// The requested live or archived session does not exist.
+    #[error("session {session} does not exist")]
+    MissingSession {
+        /// Actual session selector that failed residency validation.
+        session: SessionId,
+    },
+    /// Advancing the original session epoch would overflow.
+    #[error("session {session} epoch is exhausted")]
+    EpochExhausted {
+        /// Actual resident session with an exhausted epoch.
+        session: SessionId,
+    },
+    /// A coroutine id does not identify its actual resident array position.
+    #[error("coroutine index is inconsistent for {coroutine}")]
+    InvalidCoroutineIndex {
+        /// Actual coroutine whose ownership index failed validation.
+        coroutine: usize,
+    },
 }

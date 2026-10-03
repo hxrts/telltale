@@ -595,3 +595,160 @@
             other => panic!("unexpected error: {other:?}"),
         }
     }
+
+fn required_cooperative_loop_image() -> CodeImage {
+    CodeImage {
+        programs: BTreeMap::from([("A".into(), vec![Instr::Jump { target: 0 }])]),
+        global_type: GlobalType::End,
+        local_types: BTreeMap::from([("A".into(), LocalTypeR::End)]),
+    }
+}
+
+#[test]
+fn required_cooperative_reap_removes_target_and_preserves_other_sessions() {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let image = required_cooperative_loop_image();
+    let first = machine.load_choreography(&image).expect("target session");
+    let second = machine
+        .load_choreography(&image)
+        .expect("surviving same-role session");
+    let survivor = machine
+        .coroutines
+        .iter()
+        .find(|coro| coro.session_id == second)
+        .expect("actual survivor")
+        .id;
+    let summary = machine
+        .close_and_reap_session(first)
+        .expect("required target disposal");
+    assert_eq!(summary.sid, first);
+    assert!(machine.sessions.get(first).is_none());
+    assert!(!machine
+        .coroutines
+        .iter()
+        .any(|coro| coro.session_id == first));
+    assert!(machine
+        .sched
+        .ready_snapshot()
+        .iter()
+        .all(|id| *id == survivor));
+    machine
+        .step_round(&PassthroughHandler, 1)
+        .expect("surviving stable id dispatches");
+    let third = machine
+        .load_choreography(&image)
+        .expect("new session after compaction");
+    assert!(
+        machine
+            .coroutines
+            .iter()
+            .find(|coro| coro.session_id == third)
+            .expect("third coroutine")
+            .id
+            > survivor
+    );
+    machine
+        .step_round(&PassthroughHandler, 2)
+        .expect("survivor and new session dispatch");
+    assert_eq!(
+        machine
+            .close_and_reap_session(first)
+            .expect("idempotent actual archive"),
+        summary
+    );
+    assert_eq!(machine.sessions.active_count(), 2);
+}
+
+#[test]
+fn required_cooperative_reap_validates_deserialized_stable_ids() {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let image = required_cooperative_loop_image();
+    let first = machine.load_choreography(&image).expect("first session");
+    let second = machine.load_choreography(&image).expect("second session");
+    machine
+        .close_and_reap_session(first)
+        .expect("original target disposed");
+    // The current machine contains self-describing serde values. Exercise its
+    // real Deserialize contract with CBOR rather than bincode, which cannot
+    // decode deserialize_any values. Durable artifacts use this codec too.
+    let mut bytes = Vec::new();
+    ciborium::ser::into_writer(&machine, &mut bytes)
+        .expect("actual cooperative CBOR serialization");
+    let mut restored: ProtocolMachine = ciborium::de::from_reader(bytes.as_slice())
+        .expect("actual cooperative CBOR restoration");
+    assert!(
+        restored.coro_slots.is_empty(),
+        "derived index is absent on deserialize"
+    );
+    restored
+        .close_and_reap_session(second)
+        .expect("actual fallback validates original stable id");
+    assert!(restored.sessions.get(second).is_none());
+    assert!(restored.coroutines.is_empty());
+    let third = restored
+        .load_choreography(&image)
+        .expect("new session after recovery and disposal");
+    assert!(third > second);
+    restored
+        .step_round(&PassthroughHandler, 1)
+        .expect("new stable id dispatches");
+}
+
+#[test]
+fn required_cooperative_reap_preserves_natural_terminal_epoch() {
+    let locals = BTreeMap::from([("A".into(), LocalTypeR::End)]);
+    let mut image = CodeImage::from_local_types(&locals, &GlobalType::End);
+    image
+        .programs
+        .insert("A".into(), vec![Instr::Close { session: 0 }, Instr::Halt]);
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
+        .load_choreography(&image)
+        .expect("actual natural completion session");
+    machine
+        .run(&PassthroughHandler, 8)
+        .expect("actual protocol close and halt");
+    let original = machine
+        .sessions
+        .get(sid)
+        .expect("natural close retained until disposal");
+    assert_eq!(original.status, SessionStatus::Closed);
+    let epoch = original.epoch;
+    let summary = machine
+        .close_and_reap_session(sid)
+        .expect("required natural retirement");
+    assert_eq!(summary.epoch, epoch, "disposal cannot renew terminal epoch");
+    assert_eq!(
+        machine
+            .close_and_reap_session(sid)
+            .expect("repeated actual acknowledgment"),
+        summary
+    );
+    assert!(machine.sessions.get(sid).is_none());
+}
+
+#[test]
+fn required_cooperative_reap_rejects_active_epoch_exhaustion_before_mutation() {
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
+        .load_choreography(&required_cooperative_loop_image())
+        .expect("actual active session");
+    machine
+        .sessions
+        .get_mut(sid)
+        .expect("actual resident session")
+        .epoch = usize::MAX;
+    assert!(
+        matches!(machine.close_and_reap_session(sid), Err(crate::session::SessionDisposalError::EpochExhausted { session }) if session == sid)
+    );
+    assert_eq!(
+        machine
+            .sessions
+            .get(sid)
+            .expect("failure retains active session")
+            .status,
+        SessionStatus::Active
+    );
+    assert!(!machine.coroutines.is_empty());
+    assert!(machine.sessions.archived_closed().is_empty());
+}

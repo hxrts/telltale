@@ -284,6 +284,51 @@ impl ProtocolMachine {
         self.obs_trace.as_slice()
     }
 
+    /// Acknowledge targeted session disposal, including live or blocked
+    /// coroutines. Exclusive ownership prevents another scheduler step from
+    /// running through the target while its custody is removed. Other sessions
+    /// remain schedulable, and retained histories are diagnostics only.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed disposal error if the session is absent, the stable
+    /// coroutine index is inconsistent, or active closure exhausts its epoch.
+    pub fn close_and_reap_session(
+        &mut self,
+        sid: SessionId,
+    ) -> Result<ClosedSessionSummary, crate::session::SessionDisposalError> {
+        for (index, coroutine) in self.coroutines.iter().enumerate() {
+            if self.coro_index(coroutine.id) != Some(index) {
+                return Err(crate::session::SessionDisposalError::InvalidCoroutineIndex {
+                    coroutine: coroutine.id,
+                });
+            }
+        }
+        // Every fallible residency/epoch check completes before removing the
+        // actual target or changing scheduling ownership.
+        let summary = self.sessions.close_and_reap_required(sid)?;
+        for coroutine in self.coroutines.iter_mut().filter(|coro| coro.session_id == sid) {
+            coroutine.status = CoroStatus::Done;
+            self.sched.unregister(coroutine.id);
+            self.eligible_ready.remove(&coroutine.id);
+        }
+        self.monitor.remove_kind(sid);
+        self.resource_states.remove(&sid);
+        self.communication_consumption.prune_session(sid);
+        self.invalidate_outstanding_effects_for_session(sid, "required session disposal");
+        self.coroutines.retain(|coroutine| coroutine.session_id != sid);
+        self.rebuild_coroutine_indexes();
+        self.eligibility_dirty = true;
+        self.obs_trace.push(
+            ObsEvent::Closed {
+                tick: self.clock.tick,
+                session: sid,
+            },
+            &self.config.observability_retention,
+        );
+        Ok(summary)
+    }
+
     /// Reap closed sessions once all associated coroutines are terminal.
     pub fn reap_closed_sessions(&mut self) -> Vec<ClosedSessionSummary> {
         let eligible: Vec<SessionId> = self

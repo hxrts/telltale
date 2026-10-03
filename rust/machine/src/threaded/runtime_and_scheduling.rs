@@ -45,6 +45,8 @@ impl ThreadedProtocolMachine {
             edge_symbols: EdgeSymbolTable::new(),
             clock: SimClock::new(tick_duration),
             next_coro_id: 0,
+            coroutine_indexes: BTreeMap::new(),
+            reaped_sessions: BTreeMap::new(),
             non_terminal_coroutines: 0,
             pool,
             workers: worker_count,
@@ -150,6 +152,7 @@ impl ThreadedProtocolMachine {
             coro.regs[0] = Value::Endpoint(ep);
         }
         self.scheduler.add_ready(coro_id);
+        self.coroutine_indexes.insert(coro_id, self.coroutines.len());
         self.coroutines.push(Arc::new(Mutex::new(coro)));
         self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_add(1);
         Ok(())
@@ -505,7 +508,7 @@ impl ThreadedProtocolMachine {
             if !seen.insert(*coro_id) || !ready_before_pick.contains(coro_id) {
                 return false;
             }
-            let Some(coro) = self.coroutines.get(*coro_id) else {
+            let Some(coro) = self.coroutine_by_id(*coro_id) else {
                 return false;
             };
             let guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");

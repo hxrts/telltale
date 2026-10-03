@@ -14,6 +14,7 @@ pub mod release_conformance;
 pub mod release_recovery;
 pub mod scale_budgets;
 pub mod search_fairness;
+pub mod session_disposal;
 pub mod simulator_subsystem;
 pub mod tooling_convergence;
 pub mod verification_inventory;

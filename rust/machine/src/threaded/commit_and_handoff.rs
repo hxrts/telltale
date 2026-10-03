@@ -221,6 +221,7 @@ impl ThreadedProtocolMachine {
                     }
                 }
                 self.scheduler.add_ready(new_id);
+                self.coroutine_indexes.insert(new_id, self.coroutines.len());
                 self.coroutines.push(Arc::new(Mutex::new(child)));
                 self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_add(1);
 
@@ -344,14 +345,12 @@ impl ThreadedProtocolMachine {
         tick: u64,
     ) -> Result<(), Fault> {
         self.assert_delegation_handoff_owner(&endpoint, from_coro)?;
-        let source_arc = self
-            .coroutines
-            .get(from_coro)
+        let source_arc = self.coroutine_by_id(from_coro)
             .cloned()
             .ok_or(Fault::Transfer {
                 message: "transfer source coroutine not found".into(),
             })?;
-        let target_arc = self.coroutines.get(to_coro).cloned().ok_or(Fault::Transfer {
+        let target_arc = self.coroutine_by_id(to_coro).cloned().ok_or(Fault::Transfer {
             message: "target coroutine not found".into(),
         })?;
         {
@@ -413,8 +412,7 @@ impl ThreadedProtocolMachine {
         let endpoint = handoff.receipt.endpoint.clone();
         if handoff.from_coro == handoff.to_coro {
             let source_arc =
-                self.coroutines
-                    .get(handoff.from_coro)
+                self.coroutine_by_id(handoff.from_coro)
                     .cloned()
                     .ok_or(Fault::Transfer {
                         message: "transfer source coroutine not found".into(),
@@ -437,15 +435,13 @@ impl ThreadedProtocolMachine {
             }
         } else {
             let source_arc =
-                self.coroutines
-                    .get(handoff.from_coro)
+                self.coroutine_by_id(handoff.from_coro)
                     .cloned()
                     .ok_or(Fault::Transfer {
                         message: "transfer source coroutine not found".into(),
                     })?;
             let target_arc =
-                self.coroutines
-                    .get(handoff.to_coro)
+                self.coroutine_by_id(handoff.to_coro)
                     .cloned()
                     .ok_or(Fault::Transfer {
                         message: "target coroutine not found".into(),

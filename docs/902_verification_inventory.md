@@ -20,7 +20,7 @@ The numeric rows in this section are source-derived and checked by
 | Lean core-library files | 701 | `lean/CODE_MAP.md` total row |
 | Lean core-library lines | 141,990 | `lean/CODE_MAP.md` total row |
 | Lean-backed search fairness inventory entries | 56 | `lean/Runtime/Proofs/Search/Inventory.lean` |
-| Ownership contract gate commands | 6 | `just check-ownership-contracts` |
+| Ownership contract gate commands | 7 | `just check-ownership-contracts` |
 | Aura-derived boundary checks | 9 | `just check-aura-borrowed-lints` |
 | Explicit failure/timeout observable event kinds | 5 | `rust/machine/src/engine/protocol_machine_config.rs` (`ObsEvent`) |
 | Macro UI pass fixtures | 11 | `rust/macros/tests/macro_ui.rs` |
@@ -205,6 +205,18 @@ For the current claim:
   are outside both the current formal claim and that future proof-target subset
 
 ## Artifact Correspondence Claim
+
+The local release preflight checks its largest required disk reserve before
+expensive build lanes. An insufficient reserve fails the preflight without
+deleting build artifacts: Cargo targets may be shared with other workspaces or
+active builders. This resource failure is not a passing verification result;
+the preflight must be rerun after guarded cleanup by the artifact owner.
+
+The manually dispatched `Release Preflight` workflow runs the same complete
+`just ci-dry-run` command in the pinned Nix environment on an isolated runner.
+Its evidence records the checked commit and full command log. A successful
+focused machine suite or a failed resource check does not substitute for this
+complete preflight; publishing must use the exact checked source revision.
 
 For the current public claim, the shipped first-party crate artifacts are
 covered only by operational artifact correspondence, not by mechanized proof.
@@ -410,3 +422,11 @@ documented non-goals or for temporary regressions that are not yet executable.
 
 The inventory deliberately does not track raw unit-test totals, assertion
 counts, or line counts for tests.
+
+## Required Targeted Disposal Evidence
+
+`just check-session-disposal` validates ten named native lifecycle regressions
+through Rust AST inventory, actual Cargo harness discovery with `multi-thread`,
+and successful execution of every required name. Missing, ignored, nested
+conditional ignore, wrong-module, and zero-test outcomes fail the gate.
+`just check-ownership-contracts` includes this gate in the PR-critical lane.

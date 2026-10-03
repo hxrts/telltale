@@ -313,6 +313,13 @@ impl Scheduler {
         }
     }
 
+    /// Forget scheduling ownership of a reaped coroutine. Historical handoff
+    /// records remain diagnostics and cannot put this id back in a live queue.
+    pub(crate) fn unregister(&mut self, coro_id: usize) {
+        self.mark_done(coro_id);
+        self.lane_of.remove(&coro_id);
+    }
+
     /// Unblock a coroutine (move from blocked to ready).
     pub fn unblock(&mut self, coro_id: usize) {
         if self.blocked_set.remove(&coro_id).is_some() {

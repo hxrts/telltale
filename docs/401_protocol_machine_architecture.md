@@ -340,6 +340,16 @@ Rust uses executable certificate checking and parity fixtures as release guards.
 
 Release conformance surfaces are exported through theorem-pack APIs and enforced by `just check-release-conformance`. Parity and drift governance are enforced by `just check-parity --all`.
 
+## Targeted Runtime Retirement
+
+The exclusive machine owner can acknowledge targeted close and reap on either
+cooperative or threaded backends. Successful retirement removes the target's
+live execution and scheduler custody while preserving unrelated sessions and
+stable coroutine identifiers. Threaded acknowledgment follows completion of the
+owned worker scope. Required preflight faults return typed lifecycle errors
+before mutation. [Session Lifecycle](403_session_lifecycle.md) defines the
+terminal epoch, archival, and acknowledgment contracts.
+
 ## Related Docs
 
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)

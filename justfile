@@ -98,6 +98,8 @@ ci-dry-run lane="fast":
     # any broader build/test work.
     just check-doc-fast-fail
     cargo fmt --all -- --check
+    # Check the largest required reserve before starting expensive build lanes.
+    just reclaim-build-space-if-needed 30000
     # Then run the remaining canonical PR-critical verification surface before
     # the broader build/test lanes.
     just check-pr-critical-core
@@ -332,19 +334,16 @@ check-fail-closed-mutations:
     cargo test -p telltale-machine transported_theorem_boundary_fail_closes_ -- --nocapture
     just _local-check fail-closed-mutations
 
-# Reclaim build space when the local volume is close to exhaustion.
+# Check build space without deleting artifacts owned by another build or workspace.
 reclaim-build-space-if-needed min_free_mb="2048":
     #!/usr/bin/env bash
     set -euo pipefail
     free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
     if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
-      echo "Low disk space (${free_mb}MB free); reclaiming auxiliary Cargo build artifacts"
-      rm -rf .tmp target/capability-gates target/tests
-      free_mb="$(df -Pm . | awk 'NR==2 { print $4 }')"
-      if [[ "${free_mb}" -lt "{{min_free_mb}}" ]]; then
-        echo "Still low disk space (${free_mb}MB free); running cargo clean"
-        cargo clean
-      fi
+      echo "Insufficient build space: ${free_mb}MB free; {{min_free_mb}}MB required." >&2
+      echo "Free space using the owning workspace's guarded cleanup, then rerun." >&2
+      echo "Automatic cleanup is disabled because CARGO_TARGET_DIR may be shared or active." >&2
+      exit 1
     fi
 
 # Run the deterministic extension statement parsing/dispatch regression suites.
@@ -461,8 +460,13 @@ check-protocol-machine-placeholders:
 check-parity mode="--all":
     just _local-check cross-runtime-parity -- {{ mode }}
 
+# Required targeted retirement regressions for both supported native backends.
+check-session-disposal:
+    just _local-check session-disposal
+
 # Focused ownership-contract assertions, delegation negatives, and replay checks.
 check-ownership-contracts:
+    just check-session-disposal
     cargo test -p telltale-machine --lib ownership_
     cargo test -p telltale-machine --test ownership_contracts -- --nocapture
     cargo test -p telltale-machine --test serialization_replay ownership_transfer_ -- --nocapture

@@ -417,7 +417,7 @@ pub use session::{
     AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
     HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
     OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
-    SessionHostMutation, SessionId, SessionStore, SessionStoreMemoryUsage,
+    SessionDisposalError, SessionHostMutation, SessionId, SessionStore, SessionStoreMemoryUsage,
     SessionStoreRetainedBytes, TimeoutWitness,
 };
 pub use telltale_types::{
@@ -442,7 +442,7 @@ cfg_if! {
     if #[cfg(feature = "multi-thread")] {
         pub use threaded::ThreadedProtocolMachine as ThreadedProtocolMachine;
         pub use driver::NativeThreadedDriver as ThreadedGuestRuntime;
-        pub use threaded::{ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection};
+        pub use threaded::{ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedSessionLifecycleError};
     }
 }
 

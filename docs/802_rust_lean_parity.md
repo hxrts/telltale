@@ -175,6 +175,7 @@ These checks are automated by `just check-parity --types`.
 | Register bounds | Out-of-range register operands fail with `OutOfRegisters` (no unchecked panic paths) |
 | Load boundary | Runtime rejects malformed trusted image role/type shape before session open |
 | Explicit failure and timeout ordering | per-session trace preserves `TimeoutIssued`, `CancellationRequested`, `Cancelled`, `FailureBranchEntered`, and `SessionTerminal` ordering |
+| Host targeted retirement | Cooperative and threaded disposal share the required retirement contract; Lean host-lifecycle deviation is recorded as `rust-host-targeted-disposal` |
 
 These checks are automated by `just check-parity --suite`.
 
@@ -496,6 +497,18 @@ Executable modules must not depend on placeholder proof definitions. Proof-only 
 
 Any intentional parity break must be recorded in the deviation table below before merge.
 Required fields include id, owner, status, reason, impact, alternatives considered, revisit date, and coverage scope.
+
+### Deviation Registry
+
+| Id | Owner | Status | Reason | Impact | Alternatives considered | Revisit date | Coverage scope |
+|---|---|---|---|---|---|---|---|
+| rust-host-targeted-disposal | telltale-machine runtime maintainers | Active, runtime-only | Exclusive host disposal and scoped Rayon worker acknowledgment concern Rust execution custody outside the Lean small-step program | Adds targeted retirement APIs and typed preflight errors; no shared wire schema, instruction or capability shape changes; host retirement does not establish protocol success | Status-only close leaves runnable custody; whole-machine drop removes unrelated sessions | 2027-01-03 | Cooperative and threaded required-reap regressions cover surviving stable ids, actual worker acknowledgment, preflight faults, natural terminal epochs, repeated acknowledgment and cooperative deserialization; cross-backend disposal summary regression covers the common retirement contract |
+
+The Lean `Runtime/ProtocolMachine/Model/State.lean` session state and
+`Runtime/ProtocolMachine/Semantics/ExecSteps.lean` execution surfaces remain the
+reference for protocol steps. Targeted host disposal is not a new instruction,
+transition witness, or claim that Lean proves Rayon worker termination. Rust's
+exclusive owner and joined worker scope enforce that runtime obligation.
 
 #### conservative-async-subtyping-contract
 

@@ -203,9 +203,7 @@ fn prewarm_json_entrypoint(
     repo_root: &Path,
 ) -> Result<()> {
     println!("prewarm {name}");
-    let prewarm_tmp = repo_root.join(".tmp").join(
-        name.replace(' ', "-"),
-    );
+    let prewarm_tmp = repo_root.join(".tmp").join(name.replace(' ', "-"));
     fs::create_dir_all(&prewarm_tmp)?;
     let mut child = Command::new(script)
         .current_dir(repo_root)

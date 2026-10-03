@@ -705,3 +705,358 @@
             .expect_err("late timeout result must be rejected");
         assert!(err.to_string().contains("late result"));
     }
+
+fn lifecycle_loop_image(invoke: bool) -> CodeImage {
+    let instructions = if invoke {
+        vec![
+            Instr::Invoke {
+                action: crate::instr::InvokeAction::Named("step".into()),
+            },
+            Instr::Jump { target: 0 },
+        ]
+    } else {
+        vec![Instr::Jump { target: 0 }]
+    };
+    CodeImage {
+        programs: BTreeMap::from([("A".into(), instructions)]),
+        global_type: GlobalType::End,
+        local_types: BTreeMap::from([("A".into(), LocalTypeR::End)]),
+    }
+}
+
+#[test]
+fn required_threaded_reap_preserves_other_sessions_and_stable_ids() {
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    let image = lifecycle_loop_image(false);
+    let first = machine
+        .load_choreography(&image)
+        .expect("first actual session");
+    let second = machine
+        .load_choreography(&image)
+        .expect("second actual session");
+    let second_coro = machine.session_coroutines(second)[0].clone();
+    machine
+        .resource_states
+        .lock()
+        .expect("resource fixture")
+        .insert(first, ResourceState::default());
+    machine
+        .resource_states
+        .lock()
+        .expect("resource fixture")
+        .insert(second, ResourceState::default());
+    let summary = machine
+        .close_and_reap_session(first)
+        .expect("target disposal acknowledged");
+    assert_eq!(summary.sid, first);
+    assert!(machine.sessions.get(first).is_none());
+    assert!(machine.session_coroutines(first).is_empty());
+    assert!(machine.coroutine_by_id(second_coro.id).is_some());
+    assert_eq!(machine.session_coroutines(second)[0].pc, second_coro.pc);
+    assert!(machine
+        .resource_states
+        .lock()
+        .expect("resources")
+        .get(&first)
+        .is_none());
+    assert!(machine
+        .resource_states
+        .lock()
+        .expect("resources")
+        .get(&second)
+        .is_some());
+    machine
+        .step_round(&NoopHandler, 1)
+        .expect("surviving session dispatches after compaction");
+    let third = machine
+        .load_choreography(&image)
+        .expect("new session after reap");
+    let third_coro = machine.session_coroutines(third)[0].id;
+    assert!(third_coro > second_coro.id);
+    machine
+        .step_round(&NoopHandler, 2)
+        .expect("both stable ids dispatch");
+    assert_eq!(
+        machine
+            .close_and_reap_session(first)
+            .expect("idempotent archived acknowledgment"),
+        summary
+    );
+    assert_eq!(machine.sessions.active_count(), 2);
+}
+
+#[test]
+fn required_threaded_reap_rejects_epoch_and_index_faults_before_mutation() {
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+    let sid = machine
+        .load_choreography(&lifecycle_loop_image(false))
+        .expect("real session");
+    machine
+        .sessions
+        .get(sid)
+        .expect("session")
+        .lock()
+        .expect("session lock")
+        .epoch = usize::MAX;
+    assert!(
+        matches!(machine.close_and_reap_session(sid), Err(ThreadedSessionLifecycleError::EpochExhausted { session }) if session == sid)
+    );
+    assert_eq!(
+        machine
+            .sessions
+            .get(sid)
+            .expect("not removed")
+            .lock()
+            .expect("session")
+            .status,
+        SessionStatus::Active
+    );
+    machine
+        .sessions
+        .get(sid)
+        .expect("session")
+        .lock()
+        .expect("session lock")
+        .epoch = 0;
+    let coro = machine.session_coroutines(sid)[0].id;
+    machine.coroutine_indexes.insert(coro, usize::MAX);
+    assert!(
+        matches!(machine.close_and_reap_session(sid), Err(ThreadedSessionLifecycleError::InvalidCoroutineIndex { coroutine }) if coroutine == coro)
+    );
+    assert!(machine.sessions.get(sid).is_some());
+    assert!(machine.reaped_sessions.is_empty());
+}
+
+#[test]
+fn required_threaded_reap_preserves_actual_poison_failure() {
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+    let sid = machine
+        .load_choreography(&lifecycle_loop_image(false))
+        .expect("real session");
+    let target = machine.coroutines[0].clone();
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let _guard = target.lock().expect("initial unpoisoned fixture");
+        panic!("injected actual coroutine lock poison");
+    }));
+    assert!(result.is_err());
+    let error = machine
+        .close_and_reap_session(sid)
+        .expect_err("required lock failure cannot acknowledge reap");
+    assert!(matches!(
+        error,
+        ThreadedSessionLifecycleError::LockPoisoned {
+            component: "coroutine"
+        }
+    ));
+    assert!(machine.sessions.get(sid).is_some());
+    assert!(machine.reaped_sessions.is_empty());
+}
+
+struct LifecycleBlockingHandler {
+    target: SessionId,
+    first: std::sync::atomic::AtomicBool,
+    calls: std::sync::atomic::AtomicUsize,
+    entered: std::sync::mpsc::SyncSender<()>,
+    released: Arc<std::sync::Barrier>,
+}
+impl EffectHandler for LifecycleBlockingHandler {
+    fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
+        if request.session == Some(self.target) {
+            self.calls.fetch_add(1, Ordering::SeqCst);
+            if self.first.swap(false, Ordering::SeqCst) {
+                self.entered
+                    .send(())
+                    .expect("test observes actual worker entry");
+                self.released.wait();
+            }
+        }
+        NoopHandler.handle_effect(request)
+    }
+    fn handle_send(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[Value],
+    ) -> EffectResult<Value> {
+        NoopHandler.handle_send(role, partner, label, state)
+    }
+    fn handle_recv(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &mut Vec<Value>,
+        payload: &Value,
+    ) -> EffectResult<()> {
+        NoopHandler.handle_recv(role, partner, label, state, payload)
+    }
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[Value],
+    ) -> EffectResult<String> {
+        NoopHandler.handle_choose(role, partner, labels, state)
+    }
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
+        NoopHandler.step(role, state)
+    }
+}
+#[test]
+fn required_threaded_reap_acknowledges_completed_worker_scope() {
+    use std::sync::{
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+        mpsc, Barrier,
+    };
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    let image = lifecycle_loop_image(true);
+    let first = machine
+        .load_choreography(&image)
+        .expect("target actual session");
+    let second = machine
+        .load_choreography(&image)
+        .expect("surviving actual session");
+    let (entered_tx, entered_rx) = mpsc::sync_channel(1);
+    let (close_tx, close_rx) = mpsc::sync_channel(1);
+    let (ack_tx, ack_rx) = mpsc::sync_channel(1);
+    let released = Arc::new(Barrier::new(2));
+    let handler = LifecycleBlockingHandler {
+        target: first,
+        first: AtomicBool::new(true),
+        calls: AtomicUsize::new(0),
+        entered: entered_tx,
+        released: released.clone(),
+    };
+    std::thread::scope(|scope| {
+        let owner = scope.spawn(move || {
+            machine
+                .step_round(&handler, 2)
+                .expect("scoped worker round completes");
+            close_rx.recv().expect("owned disposal command");
+            let summary = machine
+                .close_and_reap_session(first)
+                .expect("required acknowledgment after worker scope");
+            let at_ack = handler.calls.load(Ordering::SeqCst);
+            ack_tx
+                .send(summary)
+                .expect("actual acknowledgment observer");
+            machine
+                .step_round(&handler, 1)
+                .expect("surviving session continues");
+            machine
+                .step_round(&handler, 1)
+                .expect("surviving invoke continues");
+            assert_eq!(
+                handler.calls.load(Ordering::SeqCst),
+                at_ack,
+                "target cannot execute after acknowledgment"
+            );
+            assert!(machine.sessions.get(second).is_some());
+        });
+        entered_rx
+            .recv()
+            .expect("actual target worker has entered handler");
+        close_tx
+            .send(())
+            .expect("request target disposal while worker is blocked");
+        assert!(
+            matches!(ack_rx.try_recv(), Err(mpsc::TryRecvError::Empty)),
+            "no acknowledgment before actual worker completion"
+        );
+        released.wait();
+        assert_eq!(
+            ack_rx.recv().expect("owned close acknowledgment").sid,
+            first
+        );
+        owner.join().expect("all test-owned threads joined");
+    });
+}
+
+#[test]
+fn required_threaded_reap_preserves_natural_terminal_epoch() {
+    let mut image = CodeImage::from_local_types(
+        &BTreeMap::from([("A".into(), LocalTypeR::End)]),
+        &GlobalType::End,
+    );
+    image
+        .programs
+        .insert("A".into(), vec![Instr::Close { session: 0 }, Instr::Halt]);
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    let sid = machine
+        .load_choreography(&image)
+        .expect("actual natural completion session");
+    machine
+        .run(&NoopHandler, 8)
+        .expect("actual protocol close and halt");
+    let target = machine
+        .sessions
+        .get(sid)
+        .expect("natural close retained until disposal");
+    let epoch = target.lock().expect("actual naturally closed state").epoch;
+    assert_eq!(
+        target.lock().expect("actual terminal status").status,
+        SessionStatus::Closed
+    );
+    let summary = machine
+        .close_and_reap_session(sid)
+        .expect("acknowledged naturally closed disposal");
+    assert_eq!(summary.epoch, epoch);
+    assert_eq!(
+        machine
+            .close_and_reap_session(sid)
+            .expect("repeated actual acknowledgment"),
+        summary
+    );
+    assert!(machine.sessions.get(sid).is_none());
+}
+
+#[test]
+fn required_disposal_cooperative_threaded_summaries_match() {
+    let image = lifecycle_loop_image(false);
+    let mut cooperative = crate::engine::ProtocolMachine::new(ProtocolMachineConfig::default());
+    let mut threaded = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    let cooperative_target = cooperative
+        .load_choreography(&image)
+        .expect("cooperative target");
+    let threaded_target = threaded.load_choreography(&image).expect("threaded target");
+    let cooperative_survivor = cooperative
+        .load_choreography(&image)
+        .expect("cooperative survivor");
+    let threaded_survivor = threaded
+        .load_choreography(&image)
+        .expect("threaded survivor");
+    let cooperative_ack = cooperative
+        .close_and_reap_session(cooperative_target)
+        .expect("cooperative required acknowledgment");
+    let threaded_ack = threaded
+        .close_and_reap_session(threaded_target)
+        .expect("threaded required acknowledgment");
+    assert_eq!(
+        cooperative_ack, threaded_ack,
+        "same initial state has the same terminal summary"
+    );
+    assert!(cooperative.sessions().get(cooperative_target).is_none());
+    assert!(threaded.sessions.get(threaded_target).is_none());
+    cooperative
+        .step_round(&NoopHandler, 1)
+        .expect("cooperative surviving stable id dispatches");
+    threaded
+        .step_round(&NoopHandler, 1)
+        .expect("threaded surviving stable id dispatches");
+    assert!(cooperative.sessions().get(cooperative_survivor).is_some());
+    assert!(threaded.sessions.get(threaded_survivor).is_some());
+    assert_eq!(
+        cooperative
+            .close_and_reap_session(cooperative_target)
+            .expect("cooperative repeated acknowledgment"),
+        cooperative_ack
+    );
+    assert_eq!(
+        threaded
+            .close_and_reap_session(threaded_target)
+            .expect("threaded repeated acknowledgment"),
+        threaded_ack
+    );
+}

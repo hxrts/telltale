@@ -115,6 +115,7 @@ include!("threaded/prelude.rs");
 include!("threaded/runtime_and_scheduling.rs");
 include!("threaded/semantic_state.rs");
 include!("threaded/runtime_introspection.rs");
+include!("threaded/session_lifecycle.rs");
 include!("threaded/topology_and_planner.rs");
 include!("threaded/commit_and_handoff.rs");
 include!("threaded/exec_and_validation.rs");

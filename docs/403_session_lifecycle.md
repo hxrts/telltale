@@ -26,6 +26,37 @@ Ownership fields are a runtime hardening contract rather than a theorem surface.
 
 `Draining` is currently a declared status only. The current `SessionStore::close` path sets `Closed` directly and clears buffers.
 
+## Required Targeted Disposal
+
+`ProtocolMachine::close_and_reap_session` and
+`ThreadedProtocolMachine::close_and_reap_session` acknowledge removal of exactly
+one resident session and its runnable or blocked coroutine custody. A successful
+return leaves no target-session coroutine in live storage or scheduler queues.
+Session resources, pending handoffs, and communication-consumption state are
+retired, and outstanding target effects are invalidated. Unrelated sessions and
+the shared worker pool remain available.
+
+The caller holds exclusive mutable machine ownership. Threaded rounds join every
+owned worker job before returning, so disposal acknowledges completed worker
+execution as well as removal of scheduling custody. This API neither interrupts
+an active handler from another thread nor creates an independent teardown worker.
+
+Residency, stable coroutine indices, required locks, terminal count and epoch
+checks precede mutation. Failures return `SessionDisposalError` or
+`ThreadedSessionLifecycleError`, without a successful acknowledgment or partial
+target removal. Active closure requires a checked epoch increment; an exhausted
+active epoch fails closed. Disposal preserves the existing epoch and status of a
+naturally Closed, Cancelled or Faulted session. Repeated acknowledgment returns
+the original compact archived summary. Reaped coroutine identifiers remain stable
+for surviving sessions and are never interpreted as compacted array positions.
+
+Compact summaries and historical observations follow the machine's existing
+lifetime archival policy. They are diagnostic history, not resumable sessions or
+protocol authority. Target disposal does not clear shared guard resources or
+establish successful protocol completion, authenticated cancellation, or
+application-level terminal publication. Those obligations remain with the owner
+that drives the protocol before disposal.
+
 ## Ownership Lifecycle
 
 Session ownership is tracked separately from capability admission.

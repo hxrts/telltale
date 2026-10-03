@@ -77,7 +77,7 @@ impl ThreadedProtocolMachine {
         start: usize,
         values: &[crate::coroutine::Value],
     ) -> Result<(), String> {
-        let Some(coro) = self.coroutines.get(coro_id) else {
+        let Some(coro) = self.coroutine_by_id(coro_id) else {
             return Err(format!("missing coroutine {coro_id}"));
         };
         let mut guard = coro.lock().expect("threaded ProtocolMachine lock poisoned");

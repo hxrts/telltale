@@ -894,6 +894,31 @@ impl SessionStore {
         Ok(())
     }
 
+    /// Remove exactly the selected session, preserving a compact terminal
+    /// summary under the store's existing explicit archival policy.
+    pub(crate) fn close_and_reap_required(
+        &mut self,
+        sid: SessionId,
+    ) -> Result<ClosedSessionSummary, SessionDisposalError> {
+        if let Some(summary) = self.archived_closed.iter().find(|summary| summary.sid == sid) {
+            return Ok(summary.clone());
+        }
+        let target = self.sessions.get(&sid)
+            .ok_or(SessionDisposalError::MissingSession { session: sid })?;
+        let already_terminal = matches!(target.status,
+            SessionStatus::Closed | SessionStatus::Cancelled | SessionStatus::Faulted { .. });
+        let next_epoch = if already_terminal { target.epoch } else {
+            target.epoch.checked_add(1).ok_or(SessionDisposalError::EpochExhausted { session: sid })?
+        };
+        let mut session = self.sessions.remove(&sid)
+            .ok_or(SessionDisposalError::MissingSession { session: sid })?;
+        if !already_terminal { session.status = SessionStatus::Closed; }
+        session.epoch = next_epoch;
+        let summary = ClosedSessionSummary::from_session(&session);
+        self.archived_closed.push(summary.clone());
+        Ok(summary)
+    }
+
     /// Closed/cancelled/faulted session identifiers still resident in the store.
     #[must_use]
     pub fn closed_session_ids(&self) -> Vec<SessionId> {

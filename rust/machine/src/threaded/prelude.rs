@@ -96,6 +96,8 @@ pub struct ThreadedProtocolMachine {
     config: ProtocolMachineConfig,
     programs: ProgramStore,
     coroutines: Vec<Arc<Mutex<Coroutine>>>,
+    coroutine_indexes: BTreeMap<usize, usize>,
+    reaped_sessions: BTreeMap<SessionId, crate::session::ClosedSessionSummary>,
     sessions: ThreadedSessionStore,
     scheduler: Scheduler,
     trace: Vec<ObsEvent>,
@@ -324,9 +326,8 @@ fn resolve_type_update(
     (resolved, update)
 }
 
-fn coro_has_progress(coros: &[Arc<Mutex<Coroutine>>], coro_id: usize) -> bool {
-    coros
-        .get(coro_id)
+fn coro_has_progress(coros: &[Arc<Mutex<Coroutine>>], indexes: &BTreeMap<usize, usize>, coro_id: usize) -> bool {
+    indexes.get(&coro_id).and_then(|index| coros.get(*index))
         .map(|coro| {
             !coro
                 .lock()
