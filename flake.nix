@@ -93,6 +93,7 @@
           mdbook-mermaid
           just
           git
+          ripgrep
           coreutils
           findutils
           gawk
