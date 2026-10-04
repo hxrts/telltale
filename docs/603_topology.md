@@ -240,3 +240,13 @@ execution, snapshot/restore, and bridge-mediated recovery runs.
 The Lean formalization for topology is in `lean/Protocol/Spatial.lean`. Projection correctness does not depend on topology data, so location checks are enforced during deployment instead of compilation.
 
 See [Choreographic DSL](202_choreographic_dsl.md) for role declarations and [Choreography Effect Handlers](301_effect_handlers.md) for choreography handler usage patterns.
+
+## Generated public-path validation
+
+Generated topology helpers use fully qualified public runtime types and import
+only their containing protocol's `Role` (plus the parent helper for named
+presets). Optional placement, region, capacity and role-family definitions do
+not produce unused imports in protocols that omit them. The generated topology
+public-path smoke compiles and executes both its temporary library and test
+under `#![deny(warnings)]`, including basic, branching and named presets. It
+retains the caller's Cargo flags so validation shares existing artifact settings.

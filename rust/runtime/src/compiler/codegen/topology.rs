@@ -58,14 +58,7 @@ pub fn generate_topology_integration(
     quote! {
         /// Topology integration for the #protocol_name_str protocol
         pub mod topology {
-            use super::*;
-            use ::telltale_runtime::topology::{
-                BranchRequirement, Location, Topology, TopologyBuilder, TopologyHandler,
-                TopologyMode,
-            };
-            use ::telltale_runtime::{
-                ChannelCapacity, Region, RoleFamilyConstraint, RoleName, TopologyEndpoint,
-            };
+            use super::Role;
 
             #handler_method
             #with_topology_method
@@ -186,8 +179,8 @@ fn generate_handler_method() -> TokenStream {
         /// ```ignore
         /// let handler = MyProtocol::handler(Role::Alice);
         /// ```
-        pub fn handler(role: Role) -> TopologyHandler {
-            TopologyHandler::local(role.role_name())
+        pub fn handler(role: Role) -> ::telltale_runtime::TopologyHandler {
+            ::telltale_runtime::TopologyHandler::local(role.role_name())
         }
     }
 }
@@ -199,7 +192,7 @@ fn generate_with_topology_method(
 ) -> TokenStream {
     let role_name_literals: Vec<TokenStream> = role_names
         .iter()
-        .map(|role| quote! { RoleName::from_static(#role) })
+        .map(|role| quote! { ::telltale_runtime::RoleName::from_static(#role) })
         .collect();
 
     let branch_requirement_literals: Vec<TokenStream> = branch_requirements
@@ -209,9 +202,9 @@ fn generate_with_topology_method(
             let receiver = &req.receiver;
             let label_count = req.label_count;
             quote! {
-                BranchRequirement::new(
-                    RoleName::from_static(#sender),
-                    RoleName::from_static(#receiver),
+                ::telltale_runtime::topology::BranchRequirement::new(
+                    ::telltale_runtime::RoleName::from_static(#sender),
+                    ::telltale_runtime::RoleName::from_static(#receiver),
                     #label_count
                 )
             }
@@ -232,22 +225,22 @@ fn generate_with_topology_method(
         /// # Example
         ///
         /// ```ignore
-        /// let topology = Topology::builder()
-        ///     .local_role(RoleName::from_static("Alice"))
+        /// let topology = ::telltale_runtime::Topology::builder()
+        ///     .local_role(::telltale_runtime::RoleName::from_static("Alice"))
         ///     .remote_role(
-        ///         RoleName::from_static("Bob"),
-        ///         TopologyEndpoint::new("192.168.1.10:8080").unwrap(),
+        ///         ::telltale_runtime::RoleName::from_static("Bob"),
+        ///         ::telltale_runtime::TopologyEndpoint::new("192.168.1.10:8080").unwrap(),
         ///     )
         ///     .build();
         ///
         /// let handler = MyProtocol::with_topology(topology, Role::Alice)?;
         /// ```
         pub fn with_topology(
-            topology: Topology,
+            topology: ::telltale_runtime::Topology,
             role: Role,
-        ) -> Result<TopologyHandler, String> {
+        ) -> Result<::telltale_runtime::TopologyHandler, String> {
             let roles = [#(#role_name_literals),*];
-            let branch_requirements: &[BranchRequirement] = &[#(#branch_requirement_literals),*];
+            let branch_requirements: &[::telltale_runtime::topology::BranchRequirement] = &[#(#branch_requirement_literals),*];
 
             // Validate topology against protocol roles
             let validation = topology.validate_with_branches(&roles, &branch_requirements);
@@ -255,7 +248,7 @@ fn generate_with_topology_method(
                 return Err(format!("Topology validation failed: {:?}", validation));
             }
 
-            Ok(TopologyHandler::new(topology, role.role_name()))
+            Ok(::telltale_runtime::TopologyHandler::new(topology, role.role_name()))
         }
     }
 }
@@ -281,12 +274,12 @@ fn generate_topology_constants(
 
             quote! {
                 /// Pre-configured topology: #const_name
-                pub fn #fn_name() -> Topology {
+                pub fn #fn_name() -> ::telltale_runtime::Topology {
                     #builder_calls
                 }
 
                 /// Get handler for the #const_name topology
-                pub fn #handler_fn_name(role: Role) -> Result<TopologyHandler, String> {
+                pub fn #handler_fn_name(role: Role) -> Result<::telltale_runtime::TopologyHandler, String> {
                     with_topology(#fn_name(), role)
                 }
             }
@@ -296,7 +289,7 @@ fn generate_topology_constants(
     quote! {
         /// Pre-configured topologies for this protocol
         pub mod topologies {
-            use super::*;
+            use super::{with_topology, Role};
 
             #(#constants)*
         }
@@ -338,11 +331,11 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
 
     if builder_calls.is_empty() {
         quote! {
-            TopologyBuilder::new().build()
+            ::telltale_runtime::TopologyBuilder::new().build()
         }
     } else {
         quote! {
-            TopologyBuilder::new()
+            ::telltale_runtime::TopologyBuilder::new()
                 #(#builder_calls)*
                 .build()
         }
@@ -351,7 +344,7 @@ fn generate_topology_builder(topology: &Topology, _role_names: &[String]) -> Tok
 
 fn generate_mode_builder_call(mode: &TopologyMode) -> TokenStream {
     match mode {
-        TopologyMode::Local => quote! { .mode(TopologyMode::Local) },
+        TopologyMode::Local => quote! { .mode(::telltale_runtime::TopologyMode::Local) },
     }
 }
 
@@ -361,13 +354,15 @@ fn generate_location_builder_call(
 ) -> TokenStream {
     let role_literal = role.as_str();
     match location {
-        Location::Local => quote! { .local_role(RoleName::from_static(#role_literal)) },
+        Location::Local => {
+            quote! { .local_role(::telltale_runtime::RoleName::from_static(#role_literal)) }
+        }
         Location::Remote(endpoint) => {
             let endpoint_literal = endpoint.as_str();
             quote! {
                 .remote_role(
-                    RoleName::from_static(#role_literal),
-                    TopologyEndpoint::new(#endpoint_literal).unwrap()
+                    ::telltale_runtime::RoleName::from_static(#role_literal),
+                    ::telltale_runtime::TopologyEndpoint::new(#endpoint_literal).unwrap()
                 )
             }
         }
@@ -375,8 +370,8 @@ fn generate_location_builder_call(
             let peer_literal = peer.as_str();
             quote! {
                 .colocated_role(
-                    RoleName::from_static(#role_literal),
-                    RoleName::from_static(#peer_literal)
+                    ::telltale_runtime::RoleName::from_static(#role_literal),
+                    ::telltale_runtime::RoleName::from_static(#peer_literal)
                 )
             }
         }
@@ -385,14 +380,14 @@ fn generate_location_builder_call(
 
 fn generate_pinned_location_expr(location: &Location) -> TokenStream {
     match location {
-        Location::Local => quote! { Location::Local },
+        Location::Local => quote! { ::telltale_runtime::Location::Local },
         Location::Remote(endpoint) => {
             let endpoint_literal = endpoint.as_str();
-            quote! { Location::Remote(TopologyEndpoint::new(#endpoint_literal).unwrap()) }
+            quote! { ::telltale_runtime::Location::Remote(::telltale_runtime::TopologyEndpoint::new(#endpoint_literal).unwrap()) }
         }
         Location::Colocated(peer) => {
             let peer_literal = peer.as_str();
-            quote! { Location::Colocated(RoleName::from_static(#peer_literal)) }
+            quote! { ::telltale_runtime::Location::Colocated(::telltale_runtime::RoleName::from_static(#peer_literal)) }
         }
     }
 }
@@ -404,8 +399,8 @@ fn generate_constraint_builder_call(constraint: &TopologyConstraint) -> TokenStr
             let r2_literal = r2.as_str();
             quote! {
                 .colocated(
-                    RoleName::from_static(#r1_literal),
-                    RoleName::from_static(#r2_literal)
+                    ::telltale_runtime::RoleName::from_static(#r1_literal),
+                    ::telltale_runtime::RoleName::from_static(#r2_literal)
                 )
             }
         }
@@ -414,23 +409,23 @@ fn generate_constraint_builder_call(constraint: &TopologyConstraint) -> TokenStr
             let r2_literal = r2.as_str();
             quote! {
                 .separated(
-                    RoleName::from_static(#r1_literal),
-                    RoleName::from_static(#r2_literal)
+                    ::telltale_runtime::RoleName::from_static(#r1_literal),
+                    ::telltale_runtime::RoleName::from_static(#r2_literal)
                 )
             }
         }
         TopologyConstraint::Pinned(role, location) => {
             let role_literal = role.as_str();
             let location_expr = generate_pinned_location_expr(location);
-            quote! { .pinned(RoleName::from_static(#role_literal), #location_expr) }
+            quote! { .pinned(::telltale_runtime::RoleName::from_static(#role_literal), #location_expr) }
         }
         TopologyConstraint::Region(role, region) => {
             let role_literal = role.as_str();
             let region_literal = region.as_str();
             quote! {
                 .region(
-                    RoleName::from_static(#role_literal),
-                    Region::new(#region_literal).unwrap()
+                    ::telltale_runtime::RoleName::from_static(#role_literal),
+                    ::telltale_runtime::Region::new(#region_literal).unwrap()
                 )
             }
         }
@@ -447,9 +442,9 @@ fn generate_channel_capacity_builder_call(
     let capacity_value = capacity.get();
     quote! {
         .channel_capacity(
-            RoleName::from_static(#sender_literal),
-            RoleName::from_static(#receiver_literal),
-            ChannelCapacity::try_new(#capacity_value)
+            ::telltale_runtime::RoleName::from_static(#sender_literal),
+            ::telltale_runtime::RoleName::from_static(#receiver_literal),
+            ::telltale_runtime::ChannelCapacity::try_new(#capacity_value)
                 .expect("generated channel capacity must be within declared bounds")
         )
     }
@@ -462,10 +457,10 @@ fn generate_role_family_constraint_builder_call(
     let min = constraint.min;
     match constraint.max {
         Some(max) => quote! {
-            .role_family_constraint(#family, RoleFamilyConstraint::bounded(#min, #max))
+            .role_family_constraint(#family, ::telltale_runtime::RoleFamilyConstraint::bounded(#min, #max))
         },
         None => quote! {
-            .role_family_constraint(#family, RoleFamilyConstraint::min_only(#min))
+            .role_family_constraint(#family, ::telltale_runtime::RoleFamilyConstraint::min_only(#min))
         },
     }
 }
