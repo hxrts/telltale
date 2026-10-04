@@ -167,7 +167,7 @@ scope completes. The compact summary grants no admission, ownership, evidence,
 or transition capability and cannot authorize a protocol outcome. Application
 owners retain their protocol terminal publication and authenticated evidence
 obligations. [Session Lifecycle](403_session_lifecycle.md) defines the runtime
-retirement contract; [Rust-Lean Parity](802_rust_lean_parity.md) records the
+retirement contract. [Rust-Lean Parity](802_rust_lean_parity.md) records the
 host-lifecycle scope.
 
 ## Related Docs

@@ -44,7 +44,7 @@ an active handler from another thread nor creates an independent teardown worker
 Residency, stable coroutine indices, required locks, terminal count and epoch
 checks precede mutation. Failures return `SessionDisposalError` or
 `ThreadedSessionLifecycleError`, without a successful acknowledgment or partial
-target removal. Active closure requires a checked epoch increment; an exhausted
+target removal. Active closure requires a checked epoch increment. An exhausted
 active epoch fails closed. Disposal preserves the existing epoch and status of a
 naturally Closed, Cancelled or Faulted session. Repeated acknowledgment returns
 the original compact archived summary. Reaped coroutine identifiers remain stable

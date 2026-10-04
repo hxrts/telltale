@@ -2,8 +2,8 @@
 
 Lean metrics check mode compares generated source counts without modifying the
 tracked code map or renewing its editorial date. The minimal-environment gate
-also exercises an unchanged historical date and actual source-count drift;
-failed checks must leave the original code map byte-for-byte unchanged.
+also exercises an unchanged historical date and actual source-count drift.
+Failed checks must leave the original code map byte-for-byte unchanged.
 
 The pinned Nix development shell provides ripgrep for the Lean proof-audit
 scripts in the canonical fast-structure lane. Release validation must not rely
@@ -218,14 +218,14 @@ For the current claim:
 The local release preflight checks its largest required disk reserve before
 expensive build lanes. An insufficient reserve fails the preflight without
 deleting build artifacts: Cargo targets may be shared with other workspaces or
-active builders. This resource failure is not a passing verification result;
-the preflight must be rerun after guarded cleanup by the artifact owner.
+active builders. This resource failure is not a passing verification result.
+The preflight must be rerun after guarded cleanup by the artifact owner.
 
 The manually dispatched `Release Preflight` workflow runs the same complete
 `just ci-dry-run` command in the pinned Nix environment on an isolated runner.
 Its evidence records the checked commit and full command log. A successful
 focused machine suite or a failed resource check does not substitute for this
-complete preflight; publishing must use the exact checked source revision.
+complete preflight. Publishing must use the exact checked source revision.
 
 For the current public claim, the shipped first-party crate artifacts are
 covered only by operational artifact correspondence, not by mechanized proof.
