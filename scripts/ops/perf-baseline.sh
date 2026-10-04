@@ -139,6 +139,16 @@ do_check() {
     echo "OK   threaded pass-rate present (${threaded_rate})"
   fi
 
+  if ! jq -e '
+    .canonical.total == 3 and .canonical.passed == 3 and
+    .canonical.pass_rate == 1 and
+    .threaded.total == 3 and .threaded.passed == 3 and
+    .threaded.pass_rate == 1
+  ' "${ARTIFACT_DIR}/conformance.json" >/dev/null; then
+    echo "FAIL baseline requires all six conformance targets to pass"
+    errors=$((errors + 1))
+  fi
+
   if (( errors > 0 )); then
     exit 1
   fi
@@ -174,7 +184,7 @@ do_freeze() {
       "cargo test -p telltale-machine --test differential_step_corpus"
     ],
     "threaded": [
-      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread --test threaded_feature_contract",
+      "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread --test threaded_contract",
       "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread --test threaded_equivalence",
       "TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread --test threaded_lane_runtime"
     ]
@@ -207,7 +217,7 @@ JSON
   done
 
   echo "-> running threaded conformance corpus"
-  for test_name in threaded_feature_contract threaded_equivalence threaded_lane_runtime; do
+  for test_name in threaded_contract threaded_equivalence threaded_lane_runtime; do
     threaded_total=$((threaded_total + 1))
     if run_test "${test_name}" env TT_EXPECT_MULTI_THREAD=1 cargo test -p telltale-machine --features multi-thread --test "${test_name}"; then
       threaded_pass=$((threaded_pass + 1))
@@ -233,6 +243,11 @@ JSON
   }
 }
 JSON
+
+  if (( canonical_pass != canonical_total || threaded_pass != threaded_total )); then
+    echo "error: conformance failures prevent freezing a successful baseline" >&2
+    return 1
+  fi
 
   local metrics_sha conformance_sha suite_sha
   metrics_sha="$(hash_file "${ARTIFACT_DIR}/metrics.json")"

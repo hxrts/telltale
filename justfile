@@ -161,6 +161,7 @@ check-pr-critical-core:
       export TMPDIR="/tmp"
     fi
     just check-fast-structure
+    bash scripts/ops/test-perf-baseline-contract.sh
     just check-focused-assurance
     just check-package-artifacts
     just check-arch-lean
