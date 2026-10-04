@@ -94,6 +94,7 @@
           just
           git
           ripgrep
+          jq
           coreutils
           findutils
           gawk
