@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::coroutine::Value;
 use crate::session::{Edge, SessionId};
-use crate::verification::{DefaultVerificationModel, Hash, HashTag, Nullifier, VerificationModel};
+use crate::verification::{Hash, HashModel, HashTag, Nullifier};
 
 include!("identity.rs");
 include!("model.rs");

@@ -682,6 +682,29 @@ def main : IO Unit := do
     | .error _ => false
   expect nullDuplicateRejected "comm replay nullifier mode accepted duplicate identity"
 
+  -- Test 41a: sequence-bound nullifier identity accepts identical content with a fresh seqNo.
+  let seqBoundResendOk :=
+    match commConsumeReceiveIdentity nullStart 0 (sampleCommIdentity 3) with
+    | .ok (_, nullNext) =>
+        match commConsumeReceiveIdentity nullNext 1 (sampleCommIdentity 4) with
+        | .ok _ => true
+        | .error _ => false
+    | .error _ => false
+  expect seqBoundResendOk "sequence-bound nullifier identity rejected fresh sequence number"
+
+  -- Test 41b: content-only nullifier identity rejects a resend with a fresh seqNo.
+  let contentStart :=
+    { nullStart with config :=
+        { nullStart.config with communicationNullifierIdentity := .contentOnly } }
+  let contentResendRejected :=
+    match commConsumeReceiveIdentity contentStart 0 (sampleCommIdentity 3) with
+    | .ok (_, contentNext) =>
+        match commConsumeReceiveIdentity contentNext 1 (sampleCommIdentity 4) with
+        | .error msg => msg = "comm_replay.duplicate"
+        | .ok _ => false
+    | .error _ => false
+  expect contentResendRejected "content-only nullifier identity accepted resent content"
+
   -- Test 42: payload size gate rejects oversized send payloads.
   let sidPayload := 0
   let epA : Endpoint := { sid := sidPayload, role := "A" }

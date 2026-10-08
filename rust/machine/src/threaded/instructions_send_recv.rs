@@ -320,7 +320,7 @@ fn consume_receive_replay_identity(
         CommunicationStepKind::Receive,
         replay_label,
     )
-    .build(val, sequence_no);
+    .build_with_model(val, sequence_no, ctx.config.communication_hash_model);
     let consume = {
         let mut model = ctx
             .communication_consumption

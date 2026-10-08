@@ -25,8 +25,8 @@ use crate::clock::SimClock;
 use crate::commit_common::{apply_output_condition_gate, effect_trace_entry_for_event};
 use crate::communication_replay::{
     CommunicationConsumeResult, CommunicationConsumption, CommunicationConsumptionArtifact,
-    CommunicationIdentity, CommunicationReplayError, CommunicationReplayMode,
-    CommunicationStepKind, DefaultCommunicationConsumption,
+    CommunicationIdentity, CommunicationNullifierIdentity, CommunicationReplayError,
+    CommunicationReplayMode, CommunicationStepKind, DefaultCommunicationConsumption,
 };
 use crate::coroutine::{
     BlockReason, CoroStatus, Coroutine, Fault, KnowledgeFact, ProgressToken, Value,
@@ -81,7 +81,7 @@ use crate::transfer_semantics::{
     decode_transfer_request, delegation_receipt, endpoint_owner_ids, move_endpoint_bundle,
     validate_delegation_coherence, DelegationAuditRecord, DelegationReceipt, DelegationStatus,
 };
-use crate::verification::{DefaultVerificationModel, VerificationModel};
+use crate::verification::{DefaultVerificationModel, HashModel, VerificationModel};
 
 include!("engine/runtime_state/mod.rs");
 include!("engine/protocol_machine_config.rs");

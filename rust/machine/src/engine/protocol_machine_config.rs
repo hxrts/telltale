@@ -101,6 +101,15 @@ pub struct ProtocolMachineConfig {
     /// Communication replay-consumption mode.
     #[serde(default)]
     pub communication_replay_mode: CommunicationReplayMode,
+    /// Identity fields that derive receive nullifiers in
+    /// [`CommunicationReplayMode::Nullifier`].
+    #[serde(default)]
+    pub communication_nullifier_identity: CommunicationNullifierIdentity,
+    /// Hash model for communication payload digests, nullifiers, and the
+    /// replay root. Defaults to the built-in pseudo-hash; security-sensitive
+    /// embedders should supply a cryptographic [`HashModel`].
+    #[serde(default)]
+    pub communication_hash_model: HashModel,
     /// Upper bound for ProtocolMachine payload values in estimated wire bytes.
     #[serde(default = "default_max_payload_bytes")]
     pub max_payload_bytes: usize,
@@ -142,6 +151,8 @@ impl Default for ProtocolMachineConfig {
             observability_retention: ObservabilityRetentionConfig::default(),
             payload_validation_mode: PayloadValidationMode::Structural,
             communication_replay_mode: CommunicationReplayMode::Off,
+            communication_nullifier_identity: CommunicationNullifierIdentity::SequenceBound,
+            communication_hash_model: HashModel::DEFAULT,
             max_payload_bytes: default_max_payload_bytes(),
             host_contract_assertions: default_host_contract_assertions(),
         }

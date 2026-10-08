@@ -34,7 +34,12 @@ pub enum HashTag {
 }
 
 impl HashTag {
-    fn domain_byte(self) -> u8 {
+    /// Stable domain-separation byte for this tag.
+    ///
+    /// Custom [`HashModel`] implementations should mix this byte into their
+    /// preimage so digests stay domain-separated.
+    #[must_use]
+    pub const fn domain_byte(self) -> u8 {
         match self {
             Self::Value => 0x01,
             Self::SignedValue => 0x02,
@@ -173,6 +178,117 @@ impl VerificationModel for DefaultVerificationModel {
             HashTag::Nullifier,
             &encode_value(payload),
         ))
+    }
+}
+
+/// Identifier of the built-in [`HashModel`] backed by [`DefaultVerificationModel`].
+pub const DEFAULT_HASH_MODEL_ID: &str = "telltale.default_pseudo_hash.v1";
+
+/// Runtime-selectable domain-separated hash function.
+///
+/// The protocol machine uses this model for communication replay-consumption
+/// digests: payload digests, receive nullifiers, and the replay-state root.
+/// The default is [`DefaultVerificationModel::hash`], a portable deterministic
+/// pseudo-hash that is **not** collision resistant. Security-sensitive
+/// embedders should supply a cryptographic hash (for example BLAKE3 or
+/// SHA-256) through [`HashModel::new`] or [`HashModel::from_verification_model`].
+///
+/// Serialization records only the model identifier. Deserialization accepts
+/// only [`DEFAULT_HASH_MODEL_ID`] and rejects every other identifier, so a
+/// persisted configuration or machine that used a custom model is never
+/// silently restored onto the default pseudo-hash. Custom models must be
+/// re-supplied programmatically.
+#[derive(Clone, Copy)]
+pub struct HashModel {
+    id: &'static str,
+    hash: fn(HashTag, &[u8]) -> Hash,
+}
+
+impl HashModel {
+    /// Built-in model backed by [`DefaultVerificationModel::hash`].
+    pub const DEFAULT: Self = Self {
+        id: DEFAULT_HASH_MODEL_ID,
+        hash: hash_bytes_with_tag,
+    };
+
+    /// Build a model from a stable identifier and a domain-separated hash function.
+    ///
+    /// `id` must be unique per hash function; it is the model's equality key.
+    #[must_use]
+    pub const fn new(id: &'static str, hash: fn(HashTag, &[u8]) -> Hash) -> Self {
+        Self { id, hash }
+    }
+
+    /// Build a model from a [`VerificationModel`] whose digests are [`Hash`].
+    #[must_use]
+    pub fn from_verification_model<V>(id: &'static str) -> Self
+    where
+        V: VerificationModel<Hash = Hash>,
+    {
+        Self::new(id, V::hash)
+    }
+
+    /// Stable model identifier.
+    #[must_use]
+    pub const fn id(&self) -> &'static str {
+        self.id
+    }
+
+    /// Whether this is the built-in default pseudo-hash model.
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        self.id == DEFAULT_HASH_MODEL_ID
+    }
+
+    /// Hash `bytes` under domain `tag`.
+    #[must_use]
+    pub fn hash(&self, tag: HashTag, bytes: &[u8]) -> Hash {
+        (self.hash)(tag, bytes)
+    }
+}
+
+impl Default for HashModel {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl std::fmt::Debug for HashModel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("HashModel").field(&self.id).finish()
+    }
+}
+
+impl PartialEq for HashModel {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+    }
+}
+
+impl Eq for HashModel {}
+
+impl Serialize for HashModel {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.id)
+    }
+}
+
+impl<'de> Deserialize<'de> for HashModel {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let id = String::deserialize(deserializer)?;
+        if id == DEFAULT_HASH_MODEL_ID {
+            Ok(Self::DEFAULT)
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "hash model `{id}` cannot be deserialized; supply custom hash models programmatically"
+            )))
+        }
     }
 }
 

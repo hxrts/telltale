@@ -313,9 +313,10 @@ pub use capabilities::{
 pub use clock::SimClock;
 pub use communication_replay::{
     CommunicationConsumeResult, CommunicationConsumption, CommunicationConsumptionArtifact,
-    CommunicationIdentity, CommunicationReplayError, CommunicationReplayMode,
-    CommunicationReplayState, CommunicationStepKind, DefaultCommunicationConsumption,
-    COMM_IDENTITY_DOMAIN_TAG, COMM_REPLAY_DUPLICATE_TAG, COMM_REPLAY_SEQUENCE_MISMATCH_TAG,
+    CommunicationIdentity, CommunicationNullifierIdentity, CommunicationReplayError,
+    CommunicationReplayMode, CommunicationReplayState, CommunicationStepKind,
+    DefaultCommunicationConsumption, COMM_IDENTITY_DOMAIN_TAG, COMM_REPLAY_DUPLICATE_TAG,
+    COMM_REPLAY_SEQUENCE_MISMATCH_TAG,
 };
 pub use composition::{
     ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
@@ -435,7 +436,8 @@ pub use transfer_semantics::{
 };
 pub use verification::{
     sign_value, verify_signed_value, AuthProof, AuthTree, Commitment, DefaultVerificationModel,
-    Hash, HashTag, Nullifier, Signature, SigningKey, VerificationModel, VerifyingKey,
+    Hash, HashModel, HashTag, Nullifier, Signature, SigningKey, VerificationModel, VerifyingKey,
+    DEFAULT_HASH_MODEL_ID,
 };
 
 cfg_if! {

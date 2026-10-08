@@ -315,6 +315,8 @@ where
         config.assert_invariants();
         let tick_duration = config.tick_duration;
         let communication_replay_mode = config.communication_replay_mode;
+        let communication_nullifier_identity = config.communication_nullifier_identity;
+        let communication_hash_model = config.communication_hash_model;
         let sched = Scheduler::new(config.sched_policy.clone());
         let mut guard_resources = BTreeMap::new();
         for layer in &config.guard_layers {
@@ -329,8 +331,10 @@ where
             persistence_model: PhantomData,
             persistent: P::PState::default(),
             verification: Nu::default(),
-            communication_consumption: DefaultCommunicationConsumption::new(
+            communication_consumption: DefaultCommunicationConsumption::with_models(
                 communication_replay_mode,
+                communication_nullifier_identity,
+                communication_hash_model,
             ),
             communication_consumption_artifacts: RetainedLog::default(),
             coroutines: Vec::new(),

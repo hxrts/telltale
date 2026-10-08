@@ -27,6 +27,8 @@ impl ThreadedProtocolMachine {
             })?;
         let tick_duration = config.tick_duration;
         let communication_replay_mode = config.communication_replay_mode;
+        let communication_nullifier_identity = config.communication_nullifier_identity;
+        let communication_hash_model = config.communication_hash_model;
         let scheduler = Scheduler::new(config.sched_policy.clone());
         let mut guard_resources = BTreeMap::new();
         for layer in &config.guard_layers {
@@ -53,8 +55,10 @@ impl ThreadedProtocolMachine {
             lane_count: worker_count,
             guard_resources: Arc::new(Mutex::new(guard_resources)),
             resource_states: Arc::new(Mutex::new(BTreeMap::new())),
-            communication_consumption: Arc::new(Mutex::new(DefaultCommunicationConsumption::new(
+            communication_consumption: Arc::new(Mutex::new(DefaultCommunicationConsumption::with_models(
                 communication_replay_mode,
+                communication_nullifier_identity,
+                communication_hash_model,
             ))),
             communication_consumption_artifacts: Arc::new(Mutex::new(Vec::new())),
             effect_trace: Vec::new(),

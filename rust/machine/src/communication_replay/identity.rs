@@ -49,6 +49,48 @@ pub enum CommunicationReplayMode {
     Nullifier,
 }
 
+/// Which identity fields derive a receive nullifier in
+/// [`CommunicationReplayMode::Nullifier`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CommunicationNullifierIdentity {
+    /// Full canonical identity, including the transport `sequence_no`.
+    ///
+    /// A re-sent message carrying a fresh sequence number derives a fresh
+    /// nullifier and is accepted.
+    #[default]
+    SequenceBound,
+    /// Content identity only: domain tag, `sid`, roles, step kind, label, and
+    /// payload digest. `sequence_no` is excluded.
+    ///
+    /// A re-sent message with identical content derives the same nullifier
+    /// and is rejected as a duplicate regardless of its sequence number.
+    /// Protocols that legitimately deliver identical content twice on the
+    /// same edge and label must distinguish those payloads.
+    ContentOnly,
+}
+
+impl CommunicationNullifierIdentity {
+    /// Derive the receive nullifier for `identity` under `model`.
+    #[must_use]
+    pub fn nullifier(self, identity: &CommunicationIdentity, model: HashModel) -> Nullifier {
+        let bytes = match self {
+            Self::SequenceBound => replay_binary_encode(identity),
+            Self::ContentOnly => replay_binary_encode(&(
+                0x31_u8,
+                &identity.domain_tag,
+                identity.sid,
+                &identity.sender,
+                &identity.receiver,
+                identity.step_kind,
+                &identity.label,
+                identity.payload_digest,
+            )),
+        };
+        Nullifier(model.hash(HashTag::Nullifier, &bytes))
+    }
+}
+
 /// Protocol step context used in canonical communication identities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -173,11 +215,22 @@ impl CommunicationIdentitySeed {
         }
     }
 
-    /// Build an identity by hashing the payload with canonical binary encoding.
+    /// Build an identity by hashing the payload with the default [`HashModel`].
     #[must_use]
     pub fn build(&self, payload: &Value, sequence_no: u64) -> CommunicationIdentity {
+        self.build_with_model(payload, sequence_no, HashModel::DEFAULT)
+    }
+
+    /// Build an identity by hashing the canonical payload encoding with `model`.
+    #[must_use]
+    pub fn build_with_model(
+        &self,
+        payload: &Value,
+        sequence_no: u64,
+        model: HashModel,
+    ) -> CommunicationIdentity {
         let payload_bytes = replay_binary_encode(payload);
-        let payload_digest = DefaultVerificationModel::hash(HashTag::Value, &payload_bytes);
+        let payload_digest = model.hash(HashTag::Value, &payload_bytes);
         self.build_with_digest(payload_digest, sequence_no)
     }
 }
@@ -197,15 +250,22 @@ pub struct CommunicationReplayState {
 }
 
 impl CommunicationReplayState {
-    /// Deterministic digest of replay-consumption state.
+    /// Deterministic digest of replay-consumption state under the default [`HashModel`].
     #[must_use]
     pub fn root(&self) -> Hash {
-        ReplayRootCache::from_state(self).root()
+        self.root_with(HashModel::DEFAULT)
+    }
+
+    /// Deterministic digest of replay-consumption state under `model`.
+    #[must_use]
+    pub fn root_with(&self, model: HashModel) -> Hash {
+        ReplayRootCache::from_state(self, model).root()
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ReplayRootCache {
+    model: HashModel,
     send_sequence_acc: Hash,
     send_sequence_len: usize,
     recv_sequence_acc: Hash,
@@ -214,9 +274,10 @@ struct ReplayRootCache {
     nullifier_len: usize,
 }
 
-impl Default for ReplayRootCache {
-    fn default() -> Self {
+impl ReplayRootCache {
+    fn empty(model: HashModel) -> Self {
         Self {
+            model,
             send_sequence_acc: zero_hash(),
             send_sequence_len: 0,
             recv_sequence_acc: zero_hash(),
@@ -234,41 +295,41 @@ impl Default for DefaultCommunicationConsumption {
 }
 
 impl ReplayRootCache {
-    fn from_state(state: &CommunicationReplayState) -> Self {
-        let mut cache = Self::default();
+    fn from_state(state: &CommunicationReplayState, model: HashModel) -> Self {
+        let mut cache = Self::empty(model);
         for (edge, sequence_no) in &state.next_send_sequence {
             cache.send_sequence_acc = xor_hash(
                 cache.send_sequence_acc,
-                hash_send_sequence_entry(edge, *sequence_no),
+                hash_send_sequence_entry(model, edge, *sequence_no),
             );
             cache.send_sequence_len = cache.send_sequence_len.saturating_add(1);
         }
         for (edge, sequence_no) in &state.next_recv_sequence {
             cache.recv_sequence_acc = xor_hash(
                 cache.recv_sequence_acc,
-                hash_recv_sequence_entry(edge, *sequence_no),
+                hash_recv_sequence_entry(model, edge, *sequence_no),
             );
             cache.recv_sequence_len = cache.recv_sequence_len.saturating_add(1);
         }
         for nullifier in &state.consumed_nullifiers {
-            cache.nullifier_acc = xor_hash(cache.nullifier_acc, hash_nullifier_entry(*nullifier));
+            cache.nullifier_acc = xor_hash(cache.nullifier_acc, hash_nullifier_entry(model, *nullifier));
             cache.nullifier_len = cache.nullifier_len.saturating_add(1);
         }
         cache
     }
 
-    fn component_root(prefix: u8, len: usize, acc: Hash) -> Hash {
-        DefaultVerificationModel::hash(
+    fn component_root(&self, prefix: u8, len: usize, acc: Hash) -> Hash {
+        self.model.hash(
             HashTag::Nullifier,
             &replay_binary_encode(&(prefix, len, acc)),
         )
     }
 
     fn root(&self) -> Hash {
-        let send_root = Self::component_root(0x11, self.send_sequence_len, self.send_sequence_acc);
-        let recv_root = Self::component_root(0x12, self.recv_sequence_len, self.recv_sequence_acc);
-        let nullifier_root = Self::component_root(0x13, self.nullifier_len, self.nullifier_acc);
-        DefaultVerificationModel::hash(
+        let send_root = self.component_root(0x11, self.send_sequence_len, self.send_sequence_acc);
+        let recv_root = self.component_root(0x12, self.recv_sequence_len, self.recv_sequence_acc);
+        let nullifier_root = self.component_root(0x13, self.nullifier_len, self.nullifier_acc);
+        self.model.hash(
             HashTag::Nullifier,
             &replay_binary_encode(&(send_root, recv_root, nullifier_root)),
         )
@@ -277,34 +338,34 @@ impl ReplayRootCache {
     fn update_send_sequence(&mut self, edge: &Edge, old: Option<u64>, new: u64) {
         if let Some(old) = old {
             self.send_sequence_acc =
-                xor_hash(self.send_sequence_acc, hash_send_sequence_entry(edge, old));
+                xor_hash(self.send_sequence_acc, hash_send_sequence_entry(self.model, edge, old));
         } else {
             self.send_sequence_len = self.send_sequence_len.saturating_add(1);
         }
         self.send_sequence_acc =
-            xor_hash(self.send_sequence_acc, hash_send_sequence_entry(edge, new));
+            xor_hash(self.send_sequence_acc, hash_send_sequence_entry(self.model, edge, new));
     }
 
     fn update_recv_sequence(&mut self, edge: &Edge, old: Option<u64>, new: u64) {
         if let Some(old) = old {
             self.recv_sequence_acc =
-                xor_hash(self.recv_sequence_acc, hash_recv_sequence_entry(edge, old));
+                xor_hash(self.recv_sequence_acc, hash_recv_sequence_entry(self.model, edge, old));
         } else {
             self.recv_sequence_len = self.recv_sequence_len.saturating_add(1);
         }
         self.recv_sequence_acc =
-            xor_hash(self.recv_sequence_acc, hash_recv_sequence_entry(edge, new));
+            xor_hash(self.recv_sequence_acc, hash_recv_sequence_entry(self.model, edge, new));
     }
 
     fn insert_nullifier(&mut self, nullifier: Nullifier) {
-        self.nullifier_acc = xor_hash(self.nullifier_acc, hash_nullifier_entry(nullifier));
+        self.nullifier_acc = xor_hash(self.nullifier_acc, hash_nullifier_entry(self.model, nullifier));
         self.nullifier_len = self.nullifier_len.saturating_add(1);
     }
 
     fn remove_send_sequence(&mut self, edge: &Edge, sequence_no: u64) {
         self.send_sequence_acc = xor_hash(
             self.send_sequence_acc,
-            hash_send_sequence_entry(edge, sequence_no),
+            hash_send_sequence_entry(self.model, edge, sequence_no),
         );
         self.send_sequence_len = self.send_sequence_len.saturating_sub(1);
     }
@@ -312,28 +373,28 @@ impl ReplayRootCache {
     fn remove_recv_sequence(&mut self, edge: &Edge, sequence_no: u64) {
         self.recv_sequence_acc = xor_hash(
             self.recv_sequence_acc,
-            hash_recv_sequence_entry(edge, sequence_no),
+            hash_recv_sequence_entry(self.model, edge, sequence_no),
         );
         self.recv_sequence_len = self.recv_sequence_len.saturating_sub(1);
     }
 }
 
-fn hash_send_sequence_entry(edge: &Edge, sequence_no: u64) -> Hash {
-    DefaultVerificationModel::hash(
+fn hash_send_sequence_entry(model: HashModel, edge: &Edge, sequence_no: u64) -> Hash {
+    model.hash(
         HashTag::Nullifier,
         &replay_binary_encode(&(0x21_u8, edge, sequence_no)),
     )
 }
 
-fn hash_recv_sequence_entry(edge: &Edge, sequence_no: u64) -> Hash {
-    DefaultVerificationModel::hash(
+fn hash_recv_sequence_entry(model: HashModel, edge: &Edge, sequence_no: u64) -> Hash {
+    model.hash(
         HashTag::Nullifier,
         &replay_binary_encode(&(0x22_u8, edge, sequence_no)),
     )
 }
 
-fn hash_nullifier_entry(nullifier: Nullifier) -> Hash {
-    DefaultVerificationModel::hash(
+fn hash_nullifier_entry(model: HashModel, nullifier: Nullifier) -> Hash {
+    model.hash(
         HashTag::Nullifier,
         &replay_binary_encode(&(0x23_u8, nullifier)),
     )

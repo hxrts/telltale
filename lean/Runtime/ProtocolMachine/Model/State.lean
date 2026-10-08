@@ -423,8 +423,15 @@ def setRestartAnchor {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π �
 
 def communicationIdentityPayloadDigest (v : Value) : String :=
   reprStr v
-def communicationIdentityNullifier (ident : CommunicationIdentity) : String :=
-  reprStr ident
+/-- Receive nullifier for `ident`. Rust hashes the same preimage with its configured
+`HashModel`; the model keeps the injective preimage string. -/
+def communicationIdentityNullifier (scope : CommunicationNullifierIdentity)
+    (ident : CommunicationIdentity) : String :=
+  match scope with
+  | .sequenceBound => reprStr ident
+  | .contentOnly =>
+      "content:" ++ reprStr (ident.domainTag, ident.sid, ident.sender, ident.receiver,
+        ident.stepKind, ident.label, ident.payloadDigest)
 def communicationReplayRoot {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
     (st : ProtocolMachineState ι γ π ε ν) : String :=
   reprStr (st.commNextSendSeq, st.commNextRecvSeq, st.commConsumedNullifiers)
@@ -482,7 +489,8 @@ def commConsumeReceiveIdentity {ι γ π ε ν : Type u} [ProtocolMachineDomain 
       else
         .error s!"comm_replay.sequence_mismatch: expected={expected}, actual={ident.seqNo}"
   | .nullifier =>
-      let nullifier := communicationIdentityNullifier ident
+      let nullifier :=
+        communicationIdentityNullifier st.config.communicationNullifierIdentity ident
       if nullifier ∈ st.commConsumedNullifiers then
         .error "comm_replay.duplicate"
       else

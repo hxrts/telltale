@@ -105,7 +105,7 @@ impl ProtocolMachine {
             CommunicationStepKind::Receive,
             replay_label,
         )
-        .build(val, sequence_no);
+        .build_with_model(val, sequence_no, self.config.communication_hash_model);
         self.consume_receive_identity(identity).map_err(|err| {
             let tag = err.tag();
             let message = match err {

@@ -138,6 +138,9 @@ impl<H: Hasher> Heap<H> {
     /// Remove a resource from the heap entirely (for cleanup).
     ///
     /// Unlike `consume`, this removes the resource from both maps.
+    /// Resource ids include the monotonic allocation counter, so a removed id
+    /// is never reissued by this heap. This nullifier set is independent of
+    /// protocol-machine communication replay nullifiers, which are never pruned.
     /// Returns an error if the resource doesn't exist.
     pub fn remove(&self, rid: &ResourceId<H>) -> Result<Heap<H>, HeapError<H>> {
         if !self.contains(rid) {

@@ -81,11 +81,24 @@ pub trait CommunicationConsumption {
 }
 
 /// Default replay-consumption implementation used by the ProtocolMachine.
+///
+/// The [`HashModel`] and [`CommunicationNullifierIdentity`] are fixed at
+/// construction because they determine the encoding of every consumed
+/// nullifier and of the incremental replay root. Consumed nullifiers are
+/// never pruned: [`CommunicationConsumption::prune_session`] drops only
+/// per-edge sequence counters, so closing a session cannot re-admit a
+/// previously consumed identity.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct DefaultCommunicationConsumption {
     /// Configured mode.
     #[serde(default)]
     pub mode: CommunicationReplayMode,
+    /// Identity fields that derive receive nullifiers.
+    #[serde(default)]
+    nullifier_identity: CommunicationNullifierIdentity,
+    /// Hash model for nullifiers and the replay root.
+    #[serde(default)]
+    hash_model: HashModel,
     /// Deterministic replay state.
     #[serde(default)]
     pub state: CommunicationReplayState,
@@ -95,16 +108,59 @@ pub struct DefaultCommunicationConsumption {
 }
 
 impl DefaultCommunicationConsumption {
-    /// Create a replay-consumption model in `mode`.
+    /// Create a replay-consumption model in `mode` with the default nullifier
+    /// identity and hash model.
     #[must_use]
     pub fn new(mode: CommunicationReplayMode) -> Self {
-        let mut model = Self {
+        Self::with_models(
             mode,
-            state: CommunicationReplayState::default(),
-            root_cache: ReplayRootCache::default(),
-        };
-        model.rebuild_root_cache();
-        model
+            CommunicationNullifierIdentity::default(),
+            HashModel::DEFAULT,
+        )
+    }
+
+    /// Create a replay-consumption model with an explicit nullifier identity
+    /// and hash model.
+    #[must_use]
+    pub fn with_models(
+        mode: CommunicationReplayMode,
+        nullifier_identity: CommunicationNullifierIdentity,
+        hash_model: HashModel,
+    ) -> Self {
+        Self::from_parts(
+            mode,
+            nullifier_identity,
+            hash_model,
+            CommunicationReplayState::default(),
+        )
+    }
+
+    fn from_parts(
+        mode: CommunicationReplayMode,
+        nullifier_identity: CommunicationNullifierIdentity,
+        hash_model: HashModel,
+        state: CommunicationReplayState,
+    ) -> Self {
+        let root_cache = ReplayRootCache::from_state(&state, hash_model);
+        Self {
+            mode,
+            nullifier_identity,
+            hash_model,
+            state,
+            root_cache,
+        }
+    }
+
+    /// Identity fields that derive receive nullifiers.
+    #[must_use]
+    pub fn nullifier_identity(&self) -> CommunicationNullifierIdentity {
+        self.nullifier_identity
+    }
+
+    /// Hash model for nullifiers and the replay root.
+    #[must_use]
+    pub fn hash_model(&self) -> HashModel {
+        self.hash_model
     }
 
     /// Deterministic replay root using the cached incremental path.
@@ -112,21 +168,16 @@ impl DefaultCommunicationConsumption {
     pub fn root(&self) -> Hash {
         self.root_cache.root()
     }
-
-    fn rebuild_root_cache(&mut self) {
-        self.root_cache = ReplayRootCache::from_state(&self.state);
-    }
-}
-
-fn identity_nullifier(identity: &CommunicationIdentity) -> Nullifier {
-    let bytes = replay_binary_encode(identity);
-    Nullifier(DefaultVerificationModel::hash(HashTag::Nullifier, &bytes))
 }
 
 #[derive(Debug, Deserialize)]
 struct DefaultCommunicationConsumptionSerde {
     #[serde(default)]
     mode: CommunicationReplayMode,
+    #[serde(default)]
+    nullifier_identity: CommunicationNullifierIdentity,
+    #[serde(default)]
+    hash_model: HashModel,
     #[serde(default)]
     state: CommunicationReplayState,
 }
@@ -137,13 +188,12 @@ impl<'de> Deserialize<'de> for DefaultCommunicationConsumption {
         D: serde::Deserializer<'de>,
     {
         let raw = DefaultCommunicationConsumptionSerde::deserialize(deserializer)?;
-        let mut model = Self {
-            mode: raw.mode,
-            state: raw.state,
-            root_cache: ReplayRootCache::default(),
-        };
-        model.rebuild_root_cache();
-        Ok(model)
+        Ok(Self::from_parts(
+            raw.mode,
+            raw.nullifier_identity,
+            raw.hash_model,
+            raw.state,
+        ))
     }
 }
 
@@ -210,7 +260,7 @@ impl CommunicationConsumption for DefaultCommunicationConsumption {
                 None
             }
             CommunicationReplayMode::Nullifier => {
-                let nullifier = identity_nullifier(identity);
+                let nullifier = self.nullifier_identity.nullifier(identity, self.hash_model);
                 if self.state.consumed_nullifiers.contains(&nullifier) {
                     return Err(CommunicationReplayError::DuplicateIdentity { nullifier });
                 }

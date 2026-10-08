@@ -217,6 +217,19 @@ Policy semantics:
 - `sequence`: requires exact next sequence number per edge.
 - `nullifier`: rejects duplicate canonical identities via consumed nullifier set.
 
+Nullifier identity (`ProtocolMachineConfig.communication_nullifier_identity`):
+
+- `sequence_bound` (default): the nullifier covers the full canonical identity, including `sequence_no`. A resent message with a fresh sequence number derives a fresh nullifier and is accepted.
+- `content_only`: the nullifier covers the domain tag, `sid`, sender, receiver, step kind, label, and payload digest. `sequence_no` is excluded, so a resend of identical content is rejected with `DuplicateIdentity`. Protocols that legitimately repeat identical content on one edge and label must distinguish those payloads.
+
+Hash model (`ProtocolMachineConfig.communication_hash_model`):
+
+- `HashModel::DEFAULT` uses the built-in portable pseudo-hash, which is deterministic but not collision resistant.
+- Security-sensitive embedders supply a cryptographic hash with `HashModel::new(id, hash_fn)` or `HashModel::from_verification_model::<V>(id)`. The model computes payload digests, receive nullifiers, and the replay root.
+- Serialized configs and machines record only the model id. Deserialization rejects any id other than the default, so a custom model is never silently replaced by the pseudo-hash. Re-supply custom models programmatically after restore.
+
+Consumed nullifiers are never pruned. Session close drops only per-edge sequence counters, so closing a session cannot re-admit a consumed identity.
+
 ## Close Path
 
 `Close` is executed by `protocol machine::step_close` and then `SessionStore::close`.
@@ -238,6 +251,7 @@ Opt-in guidance:
 
 - Local development: set `communication_replay_mode = sequence` to catch reorder/duplicate transport issues early.
 - Strict zk-oriented traces: set `communication_replay_mode = nullifier` to force one-time identity consumption checks.
+- Content replay protection: combine `nullifier` mode with `communication_nullifier_identity = content_only` and a cryptographic `communication_hash_model`.
 
 Why this matters for consensus protocols:
 

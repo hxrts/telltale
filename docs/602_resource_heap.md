@@ -97,6 +97,8 @@ Consumed resources still count toward that number because `consume(...)` keeps t
 `remove(...)` is the operation that actually deletes a resource from the heap.
 It also removes the resource from the nullifier set if it was already consumed.
 This makes `remove(...)` a cleanup operation rather than a normal consumption operation.
+Resource ids include the monotonic allocation counter, so a removed id is never reissued by the same heap.
+The heap nullifier set is independent of protocol-machine communication replay nullifiers, which `remove(...)` does not affect.
 
 ## Merkle Commitments
 

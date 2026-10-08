@@ -48,6 +48,14 @@ inductive CommunicationReplayMode where
   | nullifier
   deriving Repr, DecidableEq, Inhabited
 
+/-- Identity fields that derive a receive nullifier in `nullifier` replay mode.
+`sequenceBound` uses the full canonical identity; `contentOnly` excludes `seqNo`
+so a resent message with identical content is rejected. -/
+inductive CommunicationNullifierIdentity where
+  | sequenceBound
+  | contentOnly
+  deriving Repr, DecidableEq, Inhabited
+
 inductive PayloadValidationMode where
   | off
   | structural
@@ -71,6 +79,7 @@ structure ProtocolMachineRuntimeConfig (ι γ π ε ν : Type u) [ProtocolMachin
   payloadValidationMode : PayloadValidationMode := .structural
   maxPayloadBytes : Nat := 65536
   communicationReplayMode : CommunicationReplayMode := .off
+  communicationNullifierIdentity : CommunicationNullifierIdentity := .sequenceBound
   guardChain : GuardChain γ
   roleSigningKey : Role → VerificationModel.SigningKey ν
   outputCondition : OutputConditionConfig := {}
