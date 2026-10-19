@@ -549,15 +549,9 @@ impl SessionState {
 
     /// Read the current host/runtime ownership state.
     #[must_use]
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg(any(test, feature = "multi-thread"))]
     pub(crate) fn ownership(&self) -> &SessionOwnershipState {
         &self.ownership
-    }
-
-    /// Mutate the current host/runtime ownership state.
-    #[cfg(feature = "multi-thread")]
-    pub(crate) fn ownership_mut(&mut self) -> &mut SessionOwnershipState {
-        &mut self.ownership
     }
 }
 

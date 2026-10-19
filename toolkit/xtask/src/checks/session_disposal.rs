@@ -5,6 +5,7 @@ use syn::visit::Visit;
 
 struct RequiredSuite {
     source: &'static str,
+    target: &'static str,
     prefix: &'static str,
     filter: &'static str,
     names: &'static [&'static str],
@@ -13,6 +14,7 @@ struct RequiredSuite {
 const SUITES: &[RequiredSuite] = &[
     RequiredSuite {
         source: "rust/machine/tests/unit/protocol_machine/tests_runtime_progress.rs",
+        target: "lib",
         prefix: "engine::tests::",
         filter: "required_cooperative_reap",
         names: &[
@@ -24,6 +26,7 @@ const SUITES: &[RequiredSuite] = &[
     },
     RequiredSuite {
         source: "rust/machine/tests/unit/threaded_runtime_tests.rs",
+        target: "lib",
         prefix: "threaded::tests::",
         filter: "required_threaded_reap",
         names: &[
@@ -36,9 +39,48 @@ const SUITES: &[RequiredSuite] = &[
     },
     RequiredSuite {
         source: "rust/machine/tests/unit/threaded_runtime_tests.rs",
+        target: "lib",
         prefix: "threaded::tests::",
         filter: "required_disposal_cooperative_threaded_summaries_match",
         names: &["required_disposal_cooperative_threaded_summaries_match"],
+    },
+    RequiredSuite {
+        source: "rust/machine/src/session/ownership.rs",
+        target: "lib",
+        prefix: "session::ownership_preflight_tests::",
+        filter: "ownership_preflight_tests",
+        names: &[
+            "ownership_release_reclaim_never_reactivates_an_old_generation",
+            "ownership_scope_transfer_and_attenuation_cannot_escalate",
+            "ownership_identifier_exhaustion_is_preflight_only",
+            "ownership_witness_exhaustion_preserves_original_pending_owner",
+            "ownership_host_mutation_rejects_foreign_session_edges",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/src/threaded/owned.rs",
+        target: "lib",
+        prefix: "threaded::ownership_lock_tests::",
+        filter: "ownership_lock_tests",
+        names: &[
+            "ownership_poisoned_session_refuses_mutation_without_replacement",
+            "ownership_poisoned_audit_refuses_transition_before_state_mutation",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/owned_backend_parity.rs",
+        target: "owned_backend_parity",
+        prefix: "",
+        filter: "",
+        names: &[
+            "cooperative_owned_transactions_retain_real_audit_after_disposal",
+            "threaded_owned_transactions_match_cooperative_evidence",
+            "ownership_contract_error_retains_the_actual_typed_cause",
+            "cooperative_terminal_ownership_checks_current_handle_and_receipt",
+            "threaded_terminal_ownership_matches_cooperative_ordering",
+            "cooperative_failed_commit_preserves_unrelated_owner",
+            "threaded_failed_commit_matches_cooperative_terminal_evidence",
+        ],
     },
 ];
 
@@ -60,6 +102,24 @@ fn ignored(meta: &syn::Meta) -> bool {
     }
 }
 
+fn native_test_attribute(attribute: &syn::Attribute) -> bool {
+    if attribute.path().is_ident("test") {
+        return true;
+    }
+    let path: Vec<_> = attribute
+        .path()
+        .segments
+        .iter()
+        .map(|segment| segment.ident.to_string())
+        .collect();
+    if path != ["wasm_bindgen_test", "wasm_bindgen_test"] {
+        return false;
+    }
+    matches!(attribute.parse_args::<syn::Meta>(), Ok(syn::Meta::NameValue(value))
+        if value.path.is_ident("unsupported")
+        && matches!(value.value, syn::Expr::Path(ref expression) if expression.path.is_ident("test")))
+}
+
 fn require_source_tests(source: &str, required: &[&str]) -> Result<()> {
     struct Inventory {
         required: BTreeSet<String>,
@@ -69,10 +129,7 @@ fn require_source_tests(source: &str, required: &[&str]) -> Result<()> {
         fn visit_item_fn(&mut self, function: &'ast syn::ItemFn) {
             let name = function.sig.ident.to_string();
             if self.required.contains(&name)
-                && function
-                    .attrs
-                    .iter()
-                    .any(|attr| attr.path().is_ident("test"))
+                && function.attrs.iter().any(native_test_attribute)
                 && !function.attrs.iter().any(|attr| ignored(&attr.meta))
             {
                 self.observed.insert(name);
@@ -124,8 +181,9 @@ fn require_passed_tests(output: &str, suite: &RequiredSuite) -> Result<()> {
     Ok(())
 }
 
-fn cargo_output(root: &Path, tail: &[&str]) -> Result<String> {
-    let output = Command::new("cargo")
+fn cargo_output(root: &Path, target: &str, tail: &[&str]) -> Result<String> {
+    let mut command = Command::new("cargo");
+    command
         .current_dir(root)
         .env("CARGO_TERM_COLOR", "never")
         .args([
@@ -134,8 +192,13 @@ fn cargo_output(root: &Path, tail: &[&str]) -> Result<String> {
             "telltale-machine",
             "--features",
             "multi-thread",
-            "--lib",
-        ])
+        ]);
+    if target == "lib" {
+        command.arg("--lib");
+    } else {
+        command.args(["--test", target]);
+    }
+    let output = command
         .args(tail)
         .output()
         .context("run actual session disposal test harness")?;
@@ -158,15 +221,25 @@ pub fn run(root: &Path) -> Result<()> {
             .with_context(|| format!("read required tests {}", suite.source))?;
         require_source_tests(&source, suite.names)?;
     }
-    let listing = cargo_output(root, &["--", "--list", "--color", "never"])?;
-    for suite in SUITES {
-        require_harness_tests(&listing, suite)?;
+    let targets: BTreeSet<_> = SUITES.iter().map(|suite| suite.target).collect();
+    for target in targets {
+        let listing = cargo_output(root, target, &["--", "--list", "--color", "never"])?;
+        for suite in SUITES.iter().filter(|suite| suite.target == target) {
+            require_harness_tests(&listing, suite)?;
+        }
     }
     for suite in SUITES {
-        let output = cargo_output(root, &[suite.filter, "--", "--color", "never"])?;
+        let output = cargo_output(
+            root,
+            suite.target,
+            &[suite.filter, "--", "--color", "never"],
+        )?;
         require_passed_tests(&output, suite)?;
     }
-    println!("session-disposal: all ten required tests executed successfully");
+    println!(
+        "session-disposal: all {} required ownership/disposal tests executed successfully",
+        SUITES.iter().map(|suite| suite.names.len()).sum::<usize>()
+    );
     Ok(())
 }
 
@@ -177,7 +250,15 @@ mod tests {
     #[test]
     fn source_inventory_rejects_missing_ignored_nested_and_fabricated_tests() {
         assert!(require_source_tests("#[test] fn target() {}", &["target"]).is_ok());
+        assert!(require_source_tests(
+            "#[wasm_bindgen_test::wasm_bindgen_test(unsupported = test)] fn target() {}",
+            &["target"]
+        )
+        .is_ok());
         for source in [
+            "#[wasm_bindgen_test::wasm_bindgen_test] fn target() {}",
+            "#[fake::wasm_bindgen_test(unsupported = test)] fn target() {}",
+            "#[wasm_bindgen_test::wasm_bindgen_test(unsupported = bench)] fn target() {}",
             "#[test] fn other() {}",
             "#[test] #[ignore] fn target() {}",
             "#[test] #[cfg_attr(any(), ignore)] fn target() {}",
@@ -197,6 +278,7 @@ mod tests {
     fn harness_inventory_rejects_zero_missing_and_wrong_module_tests() {
         let suite = RequiredSuite {
             source: "fixture",
+            target: "lib",
             prefix: "owner::",
             filter: "target",
             names: &["target"],
@@ -215,6 +297,7 @@ mod tests {
     fn execution_inventory_rejects_missing_ignored_and_failed_results() {
         let suite = RequiredSuite {
             source: "fixture",
+            target: "lib",
             prefix: "owner::",
             filter: "target",
             names: &["target"],

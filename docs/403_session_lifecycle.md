@@ -20,6 +20,47 @@ The protocol machine also tracks communication replay-consumption state at runti
 
 Ownership fields are a runtime hardening contract rather than a theorem surface. They govern who may drive session-local host mutation and how ownership transfer is staged and audited.
 
+`OwnedSession` uses the sealed `owned::OwnedSessionMachine` interface for both
+cooperative and threaded machines. Its public operations require an actual issued
+`OwnedSession`, rather than serializable capability fields. Both storage adapters borrow the original
+resident `SessionState` and execute the same ownership transitions. Threaded
+entry is exclusive with respect to machine execution; no worker wave remains
+active across that mutable entry. Host code does not receive a raw mutable
+threaded session store.
+
+Owned commit, rollback, owner-death and abandoned-transfer operations validate
+the calling handle's live capability. Receipt operations also require the
+receipt's session to match the calling handle, so possession of an unrelated
+session's valid receipt cannot redirect an operation. Rollback removes only the
+matching staged claim and preserves its current owner. It does not undo a
+previously committed transfer or acknowledge application resource settlement.
+
+Scope attenuation and transfer may preserve or reduce the actual owner's scope;
+a fragment owner cannot recover session-wide authority or add other fragments.
+Session-local edge mutations reject an edge naming another session. Generations
+remain monotonic across release/reclaim, including restored ownership history.
+Generation, claim and witness counters fail before mutation when exhausted;
+owner-death and abandoned-transfer paths allocate their required witness before
+changing terminal state. Exhaustion therefore leaves the original owner and
+staged transfer available for explicit recovery.
+
+Authority records come from the canonical transition producer on both backends.
+The store-owned journal records actual cross-session emission order and stamps
+owned operations with the current machine tick. It retains genuine rejection
+records even when the attempted operation returns an error. Disposal order does
+not reorder that history. The threaded journal lock is acquired before mutation;
+poisoning it cannot commit an ownership change without its required audit.
+Older cooperative snapshots with only per-session observations retain that
+representation without inventing historical emission times or stronger evidence.
+Targeted disposal retains those records as historical audit evidence, including
+across cooperative snapshot restoration; repeated disposal does not duplicate
+them. Semantic objects, capability lifecycle exports and replay fragments include
+the retained records. They cannot reconstruct a live owner or resume a session.
+
+Owned-loader ownership failures retain `OwnershipError` as the source of
+`ProtocolMachineError::OwnershipContract`, rather than formatting the cause into
+a string. Existing callers matching that variant must handle the typed payload.
+
 ## Session Status Values
 
 `SessionStatus` includes `Active`, `Draining`, `Closed`, `Cancelled`, and `Faulted`.
@@ -274,3 +315,10 @@ Risk notes:
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)
+
+Required host integration coverage is part of `just check-session-disposal`: the
+Rust-native inventory requires all 24 nonignored declarations, actual harness
+discovery and successful execution across the two binary targets. The ownership
+aggregate reuses that gate. Opaque-handle and metadata-substitution compile-fail
+doctests additionally protect the public owned API. CI acceptance runs with
+`CARGO_INCREMENTAL=0`; this does not change the host's independent cleanup duties.

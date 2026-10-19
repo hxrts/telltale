@@ -14,7 +14,10 @@ impl ThreadedProtocolMachine {
     /// # Errors
     ///
     /// Returns [`ProtocolMachineError::ThreadPoolBuild`] if the Rayon thread pool cannot be created.
-    pub fn try_with_workers(config: ProtocolMachineConfig, workers: usize) -> Result<Self, ProtocolMachineError> {
+    pub fn try_with_workers(
+        config: ProtocolMachineConfig,
+        workers: usize,
+    ) -> Result<Self, ProtocolMachineError> {
         config
             .validate_invariants()
             .map_err(|reason| ProtocolMachineError::InvalidConfig { reason })?;
@@ -55,11 +58,13 @@ impl ThreadedProtocolMachine {
             lane_count: worker_count,
             guard_resources: Arc::new(Mutex::new(guard_resources)),
             resource_states: Arc::new(Mutex::new(BTreeMap::new())),
-            communication_consumption: Arc::new(Mutex::new(DefaultCommunicationConsumption::with_models(
-                communication_replay_mode,
-                communication_nullifier_identity,
-                communication_hash_model,
-            ))),
+            communication_consumption: Arc::new(Mutex::new(
+                DefaultCommunicationConsumption::with_models(
+                    communication_replay_mode,
+                    communication_nullifier_identity,
+                    communication_hash_model,
+                ),
+            )),
             communication_consumption_artifacts: Arc::new(Mutex::new(Vec::new())),
             effect_trace: Vec::new(),
             effect_exchanges: Vec::new(),
@@ -79,6 +84,7 @@ impl ThreadedProtocolMachine {
             handoff_trace_log: Vec::new(),
             next_handoff_id: 0,
             delegation_audit_log: Vec::new(),
+
             next_delegation_receipt_id: 0,
             contention_metrics: ContentionMetrics::default(),
             force_invalid_wave_certificate_once: false,
@@ -117,7 +123,9 @@ impl ThreadedProtocolMachine {
 
     fn bind_default_handlers_for_session(&mut self, sid: SessionId) {
         if let Some(session) = self.sessions.get(sid) {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             session_guard.default_handler = crate::session::DEFAULT_HANDLER_ID.to_string();
         }
         let _: StringId = self
@@ -156,7 +164,8 @@ impl ThreadedProtocolMachine {
             coro.regs[0] = Value::Endpoint(ep);
         }
         self.scheduler.add_ready(coro_id);
-        self.coroutine_indexes.insert(coro_id, self.coroutines.len());
+        self.coroutine_indexes
+            .insert(coro_id, self.coroutines.len());
         self.coroutines.push(Arc::new(Mutex::new(coro)));
         self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_add(1);
         Ok(())
@@ -173,7 +182,10 @@ impl ThreadedProtocolMachine {
     /// Panics if an internal threaded ProtocolMachine lock is poisoned.
     ///
     #[doc(hidden)]
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, ProtocolMachineError> {
+    pub fn load_choreography(
+        &mut self,
+        image: &CodeImage,
+    ) -> Result<SessionId, ProtocolMachineError> {
         self.ensure_session_capacity()?;
         image
             .validate_runtime_shape()
@@ -221,8 +233,8 @@ impl ThreadedProtocolMachine {
         let sid = self.load_choreography(image)?;
         let capability = self
             .sessions
-            .claim_ownership(sid, owner_id, OwnershipScope::Session)
-            .map_err(|err| ProtocolMachineError::OwnershipContract(format!("{err:?}")))?;
+            .claim_ownership(sid, owner_id, OwnershipScope::Session, self.clock.tick)
+            .map_err(ProtocolMachineError::OwnershipContract)?;
         Ok(OwnedSession::new(sid, capability))
     }
 
@@ -374,7 +386,8 @@ impl ThreadedProtocolMachine {
 
         let mut progressed = false;
         for (pick, result) in picks.into_iter().zip(results) {
-            progressed |= self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
+            progressed |=
+                self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
         }
         Ok(progressed)
     }
@@ -423,7 +436,10 @@ impl ThreadedProtocolMachine {
                             coro_id: pick.coro_id,
                             fault: fault.clone(),
                         });
-                        let mut coro = pick.coro.lock().expect("threaded ProtocolMachine lock poisoned");
+                        let mut coro = pick
+                            .coro
+                            .lock()
+                            .expect("threaded ProtocolMachine lock poisoned");
                         let was_terminal = coro.is_terminal();
                         coro.status = CoroStatus::Faulted(fault.clone());
                         self.note_status_transition(was_terminal, coro.is_terminal());
@@ -446,7 +462,10 @@ impl ThreadedProtocolMachine {
                     coro_id: pick.coro_id,
                     fault: fault.clone(),
                 });
-                let mut coro = pick.coro.lock().expect("threaded ProtocolMachine lock poisoned");
+                let mut coro = pick
+                    .coro
+                    .lock()
+                    .expect("threaded ProtocolMachine lock poisoned");
                 let was_terminal = coro.is_terminal();
                 coro.status = CoroStatus::Faulted(fault.clone());
                 self.note_status_transition(was_terminal, coro.is_terminal());

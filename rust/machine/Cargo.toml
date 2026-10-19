@@ -1,6 +1,6 @@
 [package]
 name = "telltale-machine"
-version = "18.0.0"
+version = "19.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
@@ -21,8 +21,8 @@ wasm = ["getrandom/js"]
 multi-thread = ["rayon"]
 
 [dependencies]
-telltale-types = { path = "../types", version = "=18.0.0" }
-telltale-theory = { path = "../theory", version = "=18.0.0" }
+telltale-types = { path = "../types", version = "=19.0.0" }
+telltale-theory = { path = "../theory", version = "=19.0.0" }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 ciborium = { workspace = true }
@@ -38,7 +38,7 @@ wasm-bindgen = { workspace = true }
 
 [dev-dependencies]
 blake3 = { workspace = true }
-telltale-theory = { path = "../theory", version = "=18.0.0" }
+telltale-theory = { path = "../theory", version = "=19.0.0" }
 assert_matches = { workspace = true }
 wasm-bindgen-test = "0.3"
 telltale-bridge = { path = "../bridge" }
