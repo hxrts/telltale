@@ -140,6 +140,7 @@ check-doc-fast-fail:
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
     fi
+    just check-doc-quality
     just check-doc-links-ci
     just check-docs-as-contract
     just check-docs-semantic-drift
@@ -205,6 +206,7 @@ check-fast-structure:
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
     fi
+    bash scripts/ops/test-doc-fast-fail-contract.sh
     just check-ci-assurance-lanes
     just check-formal-claim-scope
     just check-workflow-actions
