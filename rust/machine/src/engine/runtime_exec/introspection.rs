@@ -5,9 +5,7 @@ impl ProtocolMachine {
     /// # Errors
     ///
     /// Returns an error when the exported counts do not fit the bridge-safe `u64` schema.
-    pub fn refinement_slice(
-        &self,
-    ) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
+    pub fn refinement_slice(&self) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
         cooperative_refinement_slice(&self.coroutines, &self.sessions, &self.sched)
     }
 
@@ -82,18 +80,14 @@ impl ProtocolMachine {
 
     fn combined_authority_audit_log(&self) -> Vec<AuthorityAuditRecord> {
         let mut out = self.authority_audit_log.as_slice().to_vec();
-        for sid in self.sessions.session_ids() {
-            if let Some(records) = self.sessions.authority_audit_log(sid) {
-                out.extend_from_slice(records);
-            }
-        }
+        out.extend(self.sessions.ownership_audit_history());
         // Preserve source-log order within a tick so lifecycle exports retain
         // the exact linearization the runtime emitted.
         out.sort_by_key(|record| record.tick.unwrap_or(0));
         out
     }
 
-/// Approximate retained state for the protocol-machine runtime.
+    /// Approximate retained state for the protocol-machine runtime.
     #[must_use]
     pub fn memory_usage(&self) -> ProtocolMachineMemoryUsage {
         let session_store = self.sessions.memory_usage();
@@ -101,7 +95,11 @@ impl ProtocolMachine {
         ProtocolMachineMemoryUsage {
             session_store,
             coroutine_records: self.coroutines.len(),
-            terminal_coroutines: self.coroutines.iter().filter(|coro| coro.is_terminal()).count(),
+            terminal_coroutines: self
+                .coroutines
+                .iter()
+                .filter(|coro| coro.is_terminal())
+                .count(),
             program_count: self.programs.len(),
             program_instruction_count: self.programs.instruction_count(),
             obs_events: self.obs_trace.len(),
@@ -125,8 +123,9 @@ impl ProtocolMachine {
                 .saturating_add(serialized_byte_size(&self.effect_trace))
                 .saturating_add(serialized_byte_size(&self.delegation_audit_log))
                 .saturating_add(serialized_byte_size(&self.authority_audit_log)),
-            replay: serialized_byte_size(&self.communication_consumption)
-                .saturating_add(serialized_byte_size(&self.communication_consumption_artifacts)),
+            replay: serialized_byte_size(&self.communication_consumption).saturating_add(
+                serialized_byte_size(&self.communication_consumption_artifacts),
+            ),
             output_condition_checks: serialized_byte_size(&self.output_condition_checks),
             scheduler_and_control: serialized_byte_size(&self.sched)
                 .saturating_add(serialized_byte_size(&self.eligible_ready))
@@ -315,7 +314,11 @@ impl ProtocolMachine {
         self.semantic_objects()
             .require_authoritative_read(read_id)
             .cloned()
-            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| {
+                ProtocolMachineError::HandlerError(
+                    crate::effect::EffectFailure::contract_violation(message),
+                )
+            })
     }
 
     /// Require that one parity-critical path use a canonical handle.
@@ -330,7 +333,11 @@ impl ProtocolMachine {
         self.semantic_objects()
             .require_canonical_handle(handle_id)
             .cloned()
-            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| {
+                ProtocolMachineError::HandlerError(
+                    crate::effect::EffectFailure::contract_violation(message),
+                )
+            })
     }
 
     /// Deterministic communication replay-state root.

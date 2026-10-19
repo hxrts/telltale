@@ -1,5 +1,7 @@
 name: Check
 on: push
+env:
+  CARGO_INCREMENTAL: "0"
 jobs:
   cargo:
     name: Cargo

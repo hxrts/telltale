@@ -15,6 +15,7 @@ use crate::verification::{
 
 include!("overview.rs");
 include!("state.rs");
+include!("ownership.rs");
 include!("store.rs");
 #[cfg(test)]
 include!("tests.rs");

@@ -1,5 +1,8 @@
 name: Verify
 
+env:
+  CARGO_INCREMENTAL: "0"
+
 on:
   pull_request:
   workflow_dispatch:

@@ -1,5 +1,19 @@
 // Runtime introspection and snapshot queries for threaded mode.
 impl ThreadedProtocolMachine {
+    /// Actual authority records from resident and disposed sessions.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal threaded machine lock is poisoned.
+    #[must_use]
+    pub fn authority_audit_log(&self) -> Vec<AuthorityAuditRecord> {
+        self.sessions
+            .authority_audit_log
+            .lock()
+            .expect("threaded ProtocolMachine authority audit lock poisoned")
+            .clone()
+    }
+
     /// Snapshot all session states.
     ///
     /// # Panics
@@ -141,9 +155,7 @@ impl ThreadedProtocolMachine {
     /// # Errors
     ///
     /// Returns an error when the exported counts do not fit the bridge-safe `u64` schema.
-    pub fn refinement_slice(
-        &self,
-    ) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
+    pub fn refinement_slice(&self) -> Result<ProtocolMachineRefinementSlice, RefinementSliceError> {
         let coroutines = self.refinement_coroutines()?;
         let sessions = self.refinement_sessions()?;
         let scheduler = self.refinement_scheduler()?;
@@ -174,9 +186,11 @@ impl ThreadedProtocolMachine {
                             value: guard.session_id,
                         }
                     })?,
-                    pc: u64::try_from(guard.pc).map_err(|_| RefinementSliceError::CountOverflow {
-                        field: "coroutine.pc",
-                        value: guard.pc,
+                    pc: u64::try_from(guard.pc).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "coroutine.pc",
+                            value: guard.pc,
+                        }
                     })?,
                     status: coro_status_tag(&guard.status).to_string(),
                     owned_endpoints: u64::try_from(guard.owned_endpoints.len()).map_err(|_| {
@@ -203,22 +217,25 @@ impl ThreadedProtocolMachine {
             .expect("threaded ProtocolMachine lock poisoned")
             .values()
             .map(|session| {
-                let guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
-                let buffered_messages =
-                    guard.buffers.values().try_fold(0_u64, |acc, buffer| {
-                        Ok::<_, RefinementSliceError>(
-                            acc + u64::try_from(buffer.len()).map_err(|_| {
-                                RefinementSliceError::CountOverflow {
-                                    field: "session.buffered_messages",
-                                    value: buffer.len(),
-                                }
-                            })?,
-                        )
-                    })?;
+                let guard = session
+                    .lock()
+                    .expect("threaded ProtocolMachine lock poisoned");
+                let buffered_messages = guard.buffers.values().try_fold(0_u64, |acc, buffer| {
+                    Ok::<_, RefinementSliceError>(
+                        acc + u64::try_from(buffer.len()).map_err(|_| {
+                            RefinementSliceError::CountOverflow {
+                                field: "session.buffered_messages",
+                                value: buffer.len(),
+                            }
+                        })?,
+                    )
+                })?;
                 Ok::<_, RefinementSliceError>(SessionRefinementSlice {
-                    sid: u64::try_from(guard.sid).map_err(|_| RefinementSliceError::CountOverflow {
-                        field: "session.sid",
-                        value: guard.sid,
+                    sid: u64::try_from(guard.sid).map_err(|_| {
+                        RefinementSliceError::CountOverflow {
+                            field: "session.sid",
+                            value: guard.sid,
+                        }
                     })?,
                     role_count: u64::try_from(guard.roles.len()).map_err(|_| {
                         RefinementSliceError::CountOverflow {
@@ -343,7 +360,7 @@ impl ThreadedProtocolMachine {
     #[must_use]
     pub fn semantic_audit_log(&self) -> Vec<SemanticAuditRecord> {
         semantic_audit_log_v1(
-            &[],
+            &self.authority_audit_log(),
             &self.delegation_audit_log,
             &self.operation_instances,
             &self.trace,
@@ -358,7 +375,10 @@ impl ThreadedProtocolMachine {
     pub fn capability_lifecycle_audit_log(
         &self,
     ) -> Vec<crate::ProtocolCriticalCapabilityLifecycleRecord> {
-        crate::capability_lifecycle_audit_log_v1(&[], &self.delegation_audit_log)
+        crate::capability_lifecycle_audit_log_v1(
+            &self.authority_audit_log(),
+            &self.delegation_audit_log,
+        )
     }
 
     /// Get canonical semantic objects derived from handoff, effect, and
@@ -366,7 +386,7 @@ impl ThreadedProtocolMachine {
     #[must_use]
     pub fn semantic_objects(&self) -> ProtocolMachineSemanticObjects {
         protocol_machine_semantic_objects(
-            &[],
+            &self.authority_audit_log(),
             &self.delegation_audit_log,
             &self.operation_instances,
             &self.outstanding_effects,
@@ -424,7 +444,11 @@ impl ThreadedProtocolMachine {
         self.semantic_objects()
             .require_authoritative_read(read_id)
             .cloned()
-            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| {
+                ProtocolMachineError::HandlerError(
+                    crate::effect::EffectFailure::contract_violation(message),
+                )
+            })
     }
 
     /// Require that one parity-critical path use a canonical handle.
@@ -439,7 +463,11 @@ impl ThreadedProtocolMachine {
         self.semantic_objects()
             .require_canonical_handle(handle_id)
             .cloned()
-            .map_err(|message| ProtocolMachineError::HandlerError(crate::effect::EffectFailure::contract_violation(message)))
+            .map_err(|message| {
+                ProtocolMachineError::HandlerError(
+                    crate::effect::EffectFailure::contract_violation(message),
+                )
+            })
     }
 
     /// Deterministic communication replay-state root.
@@ -501,7 +529,7 @@ impl ThreadedProtocolMachine {
         canonical_replay_fragment_v1(
             &self.trace,
             &self.effect_trace,
-            &[],
+            &self.authority_audit_log(),
             &self.delegation_audit_log,
             &self.operation_instances,
             &self.outstanding_effects,

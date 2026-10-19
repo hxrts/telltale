@@ -189,7 +189,7 @@ pub struct SessionStoreMemoryUsage {
 pub struct SessionStoreRetainedBytes {
     /// Live session metadata excluding dedicated subsystems below.
     pub live_sessions: usize,
-    /// Archived closed-session summaries.
+    /// Archived closed-session summaries and their retained authority evidence.
     pub archived_closed: usize,
     /// Local type storage and endpoint bindings.
     pub local_types: usize,
@@ -335,6 +335,16 @@ pub enum OwnershipScope {
 }
 
 impl OwnershipScope {
+    /// Whether this scope grants no authority beyond the current scope.
+    #[must_use]
+    pub fn is_attenuation_of(&self, current: &Self) -> bool {
+        match (self, current) {
+            (_, Self::Session) => true,
+            (Self::Fragments(next), Self::Fragments(previous)) => next.is_subset(previous),
+            (Self::Session, Self::Fragments(_)) => false,
+        }
+    }
+
     /// Whether this scope authorizes full-session host mutation.
     #[must_use]
     pub fn allows_session_mutation(&self) -> bool {
@@ -510,6 +520,25 @@ pub enum OwnershipTerminalReason {
 /// Errors surfaced by the runtime ownership contract.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OwnershipError {
+    /// An authority identifier cannot advance without reusing an issued value.
+    CounterExhausted {
+        /// Session whose monotonic identifier is exhausted.
+        session_id: SessionId,
+        /// Name of the exhausted counter.
+        counter: String,
+    },
+    /// A session-local mutation names another session's resource.
+    SessionMismatch {
+        /// Actual owned session.
+        session_id: SessionId,
+        /// Session named by the mutation.
+        supplied_session_id: SessionId,
+    },
+    /// The original threaded session lock is poisoned; no transition occurred.
+    LockPoisoned {
+        /// Session whose custody lock failed.
+        session_id: SessionId,
+    },
     /// Session was not found.
     SessionNotFound {
         /// Session that was not found.
@@ -593,6 +622,14 @@ pub enum OwnershipError {
     },
 }
 
+impl std::fmt::Display for OwnershipError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(formatter, "{self:?}")
+    }
+}
+
+impl std::error::Error for OwnershipError {}
+
 /// Host-routed session-local mutation guarded by ownership.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionHostMutation {
@@ -627,6 +664,8 @@ pub(crate) struct SessionOwnershipState {
     pub(crate) current: Option<OwnershipCapability>,
     pub(crate) pending_transfer: Option<PendingOwnershipTransfer>,
     pub(crate) terminal_reason: Option<OwnershipTerminalReason>,
+    #[serde(default)]
+    pub(crate) last_generation: Option<OwnershipEpoch>,
     pub(crate) next_claim_id: OwnershipClaimId,
     pub(crate) next_witness_id: AuthorityWitnessId,
     pub(crate) issued_readiness: BTreeMap<AuthorityWitnessId, ReadinessWitness>,
@@ -640,6 +679,7 @@ impl Default for SessionOwnershipState {
             current: None,
             pending_transfer: None,
             terminal_reason: None,
+            last_generation: None,
             next_claim_id: 1,
             next_witness_id: 1,
             issued_readiness: BTreeMap::new(),

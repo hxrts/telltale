@@ -133,6 +133,7 @@ pub struct ThreadedProtocolMachine {
     handoff_trace_log: Vec<LaneHandoff>,
     next_handoff_id: u64,
     delegation_audit_log: Vec<DelegationAuditRecord>,
+
     next_delegation_receipt_id: u64,
     contention_metrics: ContentionMetrics,
     force_invalid_wave_certificate_once: bool,
@@ -172,6 +173,7 @@ impl SessionLock {
 
 #[derive(Debug, Default)]
 struct ThreadedSessionStore {
+    authority_audit_log: Mutex<Vec<AuthorityAuditRecord>>,
     sessions: RwLock<BTreeMap<SessionId, Arc<Mutex<SessionState>>>>,
     next_id: AtomicUsize,
 }
@@ -196,7 +198,10 @@ impl ThreadedSessionStore {
         let sid = self.next_id.fetch_add(1, Ordering::SeqCst);
         let state = SessionState::from_open_plan(sid, plan, buffer_config);
 
-        let mut sessions = self.sessions.write().expect("threaded ProtocolMachine lock poisoned");
+        let mut sessions = self
+            .sessions
+            .write()
+            .expect("threaded ProtocolMachine lock poisoned");
         sessions.insert(sid, Arc::new(Mutex::new(state)));
         sid
     }
@@ -210,13 +215,54 @@ impl ThreadedSessionStore {
     }
 
     fn active_count(&self) -> usize {
-        let sessions = self.sessions.read().expect("threaded ProtocolMachine lock poisoned");
+        let sessions = self
+            .sessions
+            .read()
+            .expect("threaded ProtocolMachine lock poisoned");
         sessions
             .values()
             .filter(|session| {
-                session.lock().expect("threaded ProtocolMachine lock poisoned").status == SessionStatus::Active
+                session
+                    .lock()
+                    .expect("threaded ProtocolMachine lock poisoned")
+                    .status
+                    == SessionStatus::Active
             })
             .count()
+    }
+
+    fn with_owned_session_at<T>(
+        &self,
+        sid: SessionId,
+        tick: Option<u64>,
+        operation: impl FnOnce(&mut SessionState) -> Result<T, OwnershipError>,
+    ) -> Result<T, OwnershipError> {
+        let session = self
+            .sessions
+            .read()
+            .map_err(|_| OwnershipError::LockPoisoned { session_id: sid })?
+            .get(&sid)
+            .cloned()
+            .ok_or(OwnershipError::SessionNotFound { session_id: sid })?;
+        let mut session = session
+            .lock()
+            .map_err(|_| OwnershipError::LockPoisoned { session_id: sid })?;
+        // Lock the journal before mutation so a poisoned audit owner cannot
+        // leave a committed transition without its genuine evidence.
+        let mut journal = self
+            .authority_audit_log
+            .lock()
+            .map_err(|_| OwnershipError::LockPoisoned { session_id: sid })?;
+        let start = session.ownership().audit_log.len();
+        let result = operation(&mut session);
+        let records = session.authority_records_since(start);
+        if let Some(tick) = tick {
+            for record in records.iter_mut() {
+                record.tick = Some(tick);
+            }
+        }
+        journal.extend_from_slice(records);
+        result
     }
 
     fn claim_ownership(
@@ -224,37 +270,11 @@ impl ThreadedSessionStore {
         sid: SessionId,
         owner_id: impl Into<String>,
         scope: OwnershipScope,
+        tick: u64,
     ) -> Result<OwnershipCapability, OwnershipError> {
-        let session = self
-            .get(sid)
-            .ok_or(OwnershipError::SessionNotFound { session_id: sid })?;
-        let mut session = session.lock().expect("threaded ProtocolMachine lock poisoned");
-        if let Some(reason) = session.ownership().terminal_reason.clone() {
-            return Err(OwnershipError::Terminal {
-                session_id: sid,
-                reason,
-            });
-        }
-        if let Some(current) = session.ownership().current.as_ref() {
-            return Err(OwnershipError::AlreadyClaimed {
-                session_id: sid,
-                current_owner_id: current.owner_id.clone(),
-            });
-        }
-        if let Some(pending) = session.ownership().pending_transfer.as_ref() {
-            return Err(OwnershipError::TransferPending {
-                session_id: sid,
-                claim_id: pending.receipt.claim_id,
-            });
-        }
-        let capability = OwnershipCapability {
-            session_id: sid,
-            owner_id: owner_id.into(),
-            generation: 0,
-            scope,
-        };
-        session.ownership_mut().current = Some(capability.clone());
-        Ok(capability)
+        self.with_owned_session_at(sid, Some(tick), |session| {
+            session.claim_ownership(sid, owner_id, scope)
+        })
     }
 }
 
@@ -326,8 +346,14 @@ fn resolve_type_update(
     (resolved, update)
 }
 
-fn coro_has_progress(coros: &[Arc<Mutex<Coroutine>>], indexes: &BTreeMap<usize, usize>, coro_id: usize) -> bool {
-    indexes.get(&coro_id).and_then(|index| coros.get(*index))
+fn coro_has_progress(
+    coros: &[Arc<Mutex<Coroutine>>],
+    indexes: &BTreeMap<usize, usize>,
+    coro_id: usize,
+) -> bool {
+    indexes
+        .get(&coro_id)
+        .and_then(|index| coros.get(*index))
         .map(|coro| {
             !coro
                 .lock()

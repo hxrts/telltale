@@ -461,7 +461,7 @@ check-protocol-machine-placeholders:
 check-parity mode="--all":
     just _local-check cross-runtime-parity -- {{ mode }}
 
-# Required targeted retirement regressions for both supported native backends.
+# Required discovered/executed retirement and owned-session regressions for both native backends.
 check-session-disposal:
     just _local-check session-disposal
 

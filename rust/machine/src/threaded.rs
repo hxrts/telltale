@@ -62,8 +62,9 @@ use crate::serialization::{
     SemanticAuditRecord,
 };
 use crate::session::{
-    unfold_if_var_with_scope, Edge, OwnershipCapability, OwnershipError, OwnershipScope, SessionId,
-    SessionOpenPlan, SessionState, SessionStatus,
+    unfold_if_var_with_scope, AuthorityAuditRecord, CancellationWitness, Edge, OwnershipCapability,
+    OwnershipError, OwnershipReceipt, OwnershipScope, ReadinessWitness, SessionHostMutation,
+    SessionId, SessionOpenPlan, SessionState, SessionStatus,
 };
 use crate::transfer_semantics::{
     decode_transfer_request, delegation_receipt, move_endpoint_bundle,
@@ -113,6 +114,7 @@ impl ThreadedExecFault {
 
 include!("threaded/prelude.rs");
 include!("threaded/runtime_and_scheduling.rs");
+include!("threaded/owned.rs");
 include!("threaded/semantic_state.rs");
 include!("threaded/runtime_introspection.rs");
 include!("threaded/session_lifecycle.rs");

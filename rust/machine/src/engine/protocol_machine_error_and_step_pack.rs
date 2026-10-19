@@ -56,7 +56,7 @@ pub enum ProtocolMachineError {
     },
     /// Ownership contract violation surfaced by a preferred host integration path.
     #[error("ownership contract error: {0}")]
-    OwnershipContract(String),
+    OwnershipContract(#[source] OwnershipError),
 }
 
 // ---- StepPack: atomic instruction result (matches Lean StepPack) ----

@@ -139,7 +139,7 @@ impl ProtocolMachine {
 
         let mut faulted = Vec::new();
         for coro in &mut self.coroutines {
-                if coro.role == site && !coro.is_terminal() {
+            if coro.role == site && !coro.is_terminal() {
                 let fault = Fault::Invoke {
                     failure: EffectFailure::topology_disruption(reason.clone()),
                 };
@@ -180,7 +180,10 @@ impl ProtocolMachine {
         }
     }
 
-    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), ProtocolMachineError> {
+    fn enforce_handler_identity_contract(
+        &mut self,
+        handler_identity: &str,
+    ) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
@@ -220,7 +223,10 @@ impl ProtocolMachine {
         Ok(())
     }
 
-    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), ProtocolMachineError> {
+    fn assert_delegation_events_audited(
+        &self,
+        events: &[ObsEvent],
+    ) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
@@ -318,7 +324,10 @@ impl ProtocolMachine {
         self.normalize_topology_state();
     }
 
-    fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), ProtocolMachineError> {
+    fn ingest_topology_events(
+        &mut self,
+        handler: &dyn EffectHandler,
+    ) -> Result<(), ProtocolMachineError> {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
@@ -327,7 +336,12 @@ impl ProtocolMachine {
             .map_err(ProtocolMachineError::HandlerError)?;
         let predicted_effect_id = self.next_effect_id;
         let topology_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &topology_outcome, &handler_identity, predicted_effect_id);
+        self.record_effect_exchange(
+            &request,
+            &topology_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        );
         let mut events = topology_outcome
             .into_topology()
             .unwrap_or_else(EffectResult::failure)
@@ -379,7 +393,12 @@ impl ProtocolMachine {
         sid: SessionId,
         owner_id: &str,
     ) -> Result<CancellationWitness, OwnershipError> {
-        let witness = self.sessions_mut().mark_owner_died(sid, owner_id)?;
+        let tick = self.clock.tick;
+        let witness = self
+            .sessions
+            .with_owned_session_at(sid, Some(tick), |session| {
+                session.mark_owner_died(sid, owner_id)
+            })?;
         self.invalidate_outstanding_effects_for_session(
             sid,
             &format!("ownership owner `{owner_id}` died"),
@@ -410,7 +429,12 @@ impl ProtocolMachine {
             owner_id: receipt.from_owner_id.clone(),
             claim_id: receipt.claim_id,
         };
-        let witness = self.sessions_mut().cancel_abandoned_transfer(receipt)?;
+        let tick = self.clock.tick;
+        let witness =
+            self.sessions
+                .with_owned_session_at(receipt.session_id, Some(tick), |session| {
+                    session.cancel_abandoned_transfer(receipt)
+                })?;
         self.invalidate_outstanding_effects_for_session(
             receipt.session_id,
             "ownership transfer abandoned",
@@ -461,8 +485,11 @@ impl ProtocolMachine {
         reason: impl Into<String>,
     ) -> Result<(), OwnershipError> {
         let reason = reason.into();
-        self.sessions_mut()
-            .fault_failed_transfer_commit(receipt, reason.clone())?;
+        let tick = self.clock.tick;
+        self.sessions
+            .with_owned_session_at(receipt.session_id, Some(tick), |session| {
+                session.fault_failed_transfer_commit(receipt, reason.clone())
+            })?;
         self.invalidate_outstanding_effects_for_session(receipt.session_id, &reason);
         self.obs_trace.push(
             ObsEvent::SessionTerminal {
@@ -711,7 +738,12 @@ impl ProtocolMachine {
             .map_err(|failure| Fault::Invoke { failure })?;
         let predicted_effect_id = self.next_effect_id;
         let send_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &send_outcome, &handler_identity, predicted_effect_id);
+        self.record_effect_exchange(
+            &request,
+            &send_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        );
         let decision = match send_outcome
             .into_send_decision()
             .unwrap_or_else(EffectResult::failure)
@@ -724,8 +756,7 @@ impl ProtocolMachine {
                     &handler_identity,
                     effect_inputs.clone(),
                 );
-                let failure =
-                    EffectFailure::contract_violation("send_decision returned blocked");
+                let failure = EffectFailure::contract_violation("send_decision returned blocked");
                 self.complete_runtime_effect(
                     effect_id,
                     OutstandingEffectStatus::Failed,
@@ -872,5 +903,4 @@ impl ProtocolMachine {
             }],
         })
     }
-
 }
