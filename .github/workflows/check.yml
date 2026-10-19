@@ -29,8 +29,9 @@ jobs:
           args: --all -- --check
       - name: Install just
         run: cargo install just --locked
-      - name: Run ingress and durable boundary contracts
+      - name: Run cheap documentation and boundary contracts
         run: |
+          just check-doc-quality
           just check-session-ingress-boundary
           just check-durable-boundaries
           cargo clippy -p telltale-lints --all-targets -- -D warnings
