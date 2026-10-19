@@ -55,13 +55,11 @@ fn exercise_witnesses_and_edge_scope(
     ));
 }
 
-fn exercise_transaction(
+fn exercise_foreign_receipt_refusal(
     machine: &mut impl OwnedSessionMachine,
     original: &OwnedSession,
     unrelated: &OwnedSession,
 ) {
-    exercise_witnesses_and_edge_scope(machine, original, unrelated);
-
     let other_receipt = unrelated
         .begin_transfer(machine, "other-next", OwnershipScope::Session)
         .unwrap();
@@ -77,6 +75,15 @@ fn exercise_transaction(
         .rollback_transfer(machine, &other_receipt)
         .unwrap();
     unrelated.apply_host_mutation(machine, mutation()).unwrap();
+}
+
+fn exercise_transaction(
+    machine: &mut impl OwnedSessionMachine,
+    original: &OwnedSession,
+    unrelated: &OwnedSession,
+) {
+    exercise_witnesses_and_edge_scope(machine, original, unrelated);
+    exercise_foreign_receipt_refusal(machine, original, unrelated);
 
     let receipt = original
         .begin_transfer(machine, "worker", OwnershipScope::Session)
