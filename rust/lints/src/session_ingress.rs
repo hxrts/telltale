@@ -12,20 +12,33 @@ use syn::{ExprMethodCall, ImplItemFn, ItemFn, ItemImpl, ItemMod, Meta};
 
 use crate::common::{display_path, file_matches_suffix, format_violation, is_test_like_path};
 
+// Files that implement the ownership boundary itself.
+const ALLOWED_SUFFIXES: &[&str] = &[
+    "rust/machine/src/owned.rs",
+    "rust/machine/src/session/store.rs",
+    "rust/machine/src/session/tests.rs",
+    "rust/machine/src/threaded/runtime_and_scheduling.rs",
+    "rust/machine/src/engine/topology_and_dispatch.rs",
+    "rust/machine/src/engine/validation.rs",
+];
+
+const RAW_METHODS: &[&str] = &[
+    "sessions_mut",
+    "claim_ownership",
+    "release_ownership",
+    "attenuate_ownership_scope",
+    "apply_owned_session_mutation",
+    "begin_ownership_transfer",
+    "commit_ownership_transfer",
+    "rollback_ownership_transfer",
+    "cancel_abandoned_transfer",
+    "fault_failed_transfer_commit",
+];
+
 /// Walk the AST looking for method calls that directly mutate
 /// session ownership state. Only a small set of files in the
 /// protocol machine crate are permitted to use these methods.
 pub(crate) fn scan(file: &Path, syntax: &syn::File) -> Vec<String> {
-    // Files that implement the ownership boundary itself.
-    const ALLOWED_SUFFIXES: &[&str] = &[
-        "rust/machine/src/owned.rs",
-        "rust/machine/src/session/store.rs",
-        "rust/machine/src/session/tests.rs",
-        "rust/machine/src/threaded/runtime_and_scheduling.rs",
-        "rust/machine/src/engine/topology_and_dispatch.rs",
-        "rust/machine/src/engine/validation.rs",
-    ];
-
     if test_only(&syntax.attrs)
         || is_test_like_path(&display_path(file))
         || file_matches_suffix(file, ALLOWED_SUFFIXES)
@@ -101,19 +114,6 @@ pub(crate) fn scan(file: &Path, syntax: &syn::File) -> Vec<String> {
             // These methods bypass the typed ownership API and operate
             // directly on the session store. Any call outside the
             // allowed files is a boundary violation.
-            const RAW_METHODS: &[&str] = &[
-                "sessions_mut",
-                "claim_ownership",
-                "release_ownership",
-                "attenuate_ownership_scope",
-                "apply_owned_session_mutation",
-                "begin_ownership_transfer",
-                "commit_ownership_transfer",
-                "rollback_ownership_transfer",
-                "cancel_abandoned_transfer",
-                "fault_failed_transfer_commit",
-            ];
-
             if RAW_METHODS.contains(&node.method.to_string().as_str()) {
                 self.push(
                     node.span(),
