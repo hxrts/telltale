@@ -502,7 +502,24 @@ check-doc-quality:
 
 # Reject raw session-store ownership mutation outside sanctioned entry points.
 check-session-ingress-boundary:
-    cargo run -q -p telltale-lints -- session-ingress rust/machine/src
+    #!/usr/bin/env bash
+    set -euo pipefail
+    listing="$(cargo test -p telltale-lints session_ingress::tests -- --list)"
+    printf '%s\n' "$listing"
+    for name in test_scopes_require_positive_predicates threaded_adapter_requires_exact_trait_receiver_and_item threaded_claim_requires_private_original_store_method actual_canonical_backend_and_preflight_sources_pass; do
+      grep -Fqx "session_ingress::tests::$name: test" <<< "$listing"
+    done
+    [[ "$(grep -c ': test$' <<< "$listing")" == 4 ]]
+    if cargo test -p telltale-lints session_ingress::tests; then :; else
+      result=$?
+      cargo test -p telltale-lints session_ingress::tests || true
+      exit "$result"
+    fi
+    if cargo run -q -p telltale-lints -- session-ingress rust/machine/src; then :; else
+      result=$?
+      cargo run -q -p telltale-lints -- session-ingress rust/machine/src || true
+      exit "$result"
+    fi
 
 # Reject raw wall-clock/timer usage in deterministic runtime paths.
 check-time-domain-boundaries:
