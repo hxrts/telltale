@@ -549,7 +549,7 @@ impl SessionState {
 
     /// Read the current host/runtime ownership state.
     #[must_use]
-    #[cfg(feature = "multi-thread")]
+    #[cfg(any(test, feature = "multi-thread"))]
     pub(crate) fn ownership(&self) -> &SessionOwnershipState {
         &self.ownership
     }
