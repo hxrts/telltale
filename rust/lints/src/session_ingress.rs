@@ -256,21 +256,25 @@ mod tests {
 
     #[test]
     fn actual_canonical_backend_and_preflight_sources_pass() {
-        for (file, source) in [
-            (
-                "rust/machine/src/threaded/owned.rs",
-                include_str!("../../machine/src/threaded/owned.rs"),
-            ),
-            (
-                "rust/machine/src/threaded/prelude.rs",
-                include_str!("../../machine/src/threaded/prelude.rs"),
-            ),
-            (
-                "rust/machine/src/session/ownership.rs",
-                include_str!("../../machine/src/session/ownership.rs"),
-            ),
+        // This repository audit reads the actual selected checkout at execution;
+        // it does not embed another crate's source in the lint binary.
+        let working = std::env::current_dir().expect("source audit working directory");
+        let root = working
+            .ancestors()
+            .find(|path| {
+                path.join("rust/lints/Cargo.toml").is_file()
+                    && path.join("rust/machine/Cargo.toml").is_file()
+                    && path.join("Cargo.lock").is_file()
+            })
+            .expect("source audit must run inside its Telltale checkout");
+        for file in [
+            "rust/machine/src/threaded/owned.rs",
+            "rust/machine/src/threaded/prelude.rs",
+            "rust/machine/src/session/ownership.rs",
         ] {
-            let found = violations(file, source);
+            let source = std::fs::read_to_string(root.join(file))
+                .unwrap_or_else(|error| panic!("source audit cannot read {file}: {error}"));
+            let found = violations(file, &source);
             assert!(found.is_empty(), "{file}: {found:?}");
         }
     }
