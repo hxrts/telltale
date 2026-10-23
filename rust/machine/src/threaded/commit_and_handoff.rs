@@ -6,13 +6,77 @@ impl ThreadedProtocolMachine {
         handler_identity: &str,
     ) {
         for observation in observations {
-            let predicted_effect_id = self.next_effect_id;
+            let predicted_effect_id = match &observation.request.body {
+                crate::effect::EffectRequestBody::NominalCommand { request } => request.invocation,
+                _ => self.next_effect_id,
+            };
             self.record_effect_exchange(
                 &observation.request,
                 &observation.outcome,
                 handler_identity,
                 predicted_effect_id,
             );
+            if let crate::effect::EffectRequestBody::NominalCommand { request } =
+                &observation.request.body
+            {
+                use crate::effect::EffectOutcomeStatus;
+                let validation = self
+                    .coroutine_indexes
+                    .get(&request.coroutine)
+                    .and_then(|index| self.coroutines.get(*index))
+                    .and_then(|coro| {
+                        coro.lock()
+                            .expect("threaded ProtocolMachine lock poisoned")
+                            .nominal_continuation
+                            .as_ref()
+                            .and_then(|pending| pending.validation_failure.clone())
+                    });
+                let accepted = observation
+                    .outcome
+                    .accepted_status(&observation.request.body);
+                let status = if validation.is_some() {
+                    Some(OutstandingEffectStatus::Failed)
+                } else {
+                    match &accepted {
+                        EffectOutcomeStatus::Failure { .. } => {
+                            Some(OutstandingEffectStatus::Failed)
+                        }
+                        EffectOutcomeStatus::Blocked if !request.declaration.may_block => {
+                            Some(OutstandingEffectStatus::Failed)
+                        }
+                        EffectOutcomeStatus::Blocked
+                            if self.outstanding_effects.iter().any(|effect| {
+                                effect.effect_id == predicted_effect_id
+                                    && effect.status == OutstandingEffectStatus::Pending
+                            }) =>
+                        {
+                            Some(OutstandingEffectStatus::Blocked)
+                        }
+                        _ => None,
+                    }
+                };
+                if let Some(status) = status {
+                    let outputs = if let Some(validation) = validation {
+                        match accepted {
+                            EffectOutcomeStatus::Failure { failure } => {
+                                json!({"status":"failure", "failure":failure, "independent_validation":validation, "raw_outcome":observation.outcome})
+                            }
+                            _ => {
+                                json!({"status":"failure", "failure":validation, "raw_outcome":observation.outcome})
+                            }
+                        }
+                    } else if matches!(&accepted, EffectOutcomeStatus::Blocked)
+                        && !request.declaration.may_block
+                    {
+                        json!({"status":"failure", "failure":EffectFailure::contract_violation("immediate nominal command returned Blocked"), "raw_outcome":observation.outcome})
+                    } else {
+                        serde_json::to_value(&observation.outcome)
+                            .expect("typed nominal outcome serializes")
+                    };
+                    self.complete_runtime_effect(predicted_effect_id, status, outputs)
+                        .expect("main owner retains the pre-issued live nominal occurrence during its worker wave");
+                }
+            }
         }
     }
 
@@ -56,7 +120,9 @@ impl ThreadedProtocolMachine {
         let Some(session) = self.sessions.get(sid) else {
             return;
         };
-        let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+        let session_guard = session
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
         let roles = session_guard.roles.clone();
         let default_handler = session_guard.default_handler.clone();
         let handler_bindings: Vec<(Edge, String)> = session_guard
@@ -86,7 +152,10 @@ impl ThreadedProtocolMachine {
         handler: &dyn EffectHandler,
         handler_identity: &str,
     ) -> Result<ExecOutcome, Fault> {
-        let coro_id = coro.lock().expect("threaded ProtocolMachine lock poisoned").id;
+        let coro_id = coro
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned")
+            .id;
         let sid = session
             .lock()
             .expect("threaded ProtocolMachine lock poisoned")
@@ -117,11 +186,7 @@ impl ThreadedProtocolMachine {
             && handler.supports_wal_sync()
         {
             let sync = self.current_wal_sync_request(Some(sid), coro_id);
-            let request = EffectRequest::wal_sync(
-                self.clock.tick,
-                sync.operation_id.clone(),
-                sync,
-            );
+            let request = EffectRequest::wal_sync(self.clock.tick, sync.operation_id.clone(), sync);
             self.ensure_effect_request_allowed(&request)
                 .map_err(|failure| Fault::Invoke { failure })?;
             let predicted_effect_id = self.next_effect_id;
@@ -150,6 +215,53 @@ impl ThreadedProtocolMachine {
             )?;
         }
 
+        if matches!(&pack.coro_update, CoroUpdate::CompleteNominal) {
+            // Last foreign identity observation occurs outside capsule locks,
+            // before either the accepted result or a derived success is published.
+            let final_handler_identity = handler.handler_identity();
+            self.validate_nominal_commit(coro, session, &final_handler_identity)?;
+            self.commit_nominal_result(coro, session, &final_handler_identity)?;
+        }
+
+        if let CoroUpdate::OperationLifecycle(action) = &pack.coro_update {
+            let mut original = coro.lock().expect("threaded ProtocolMachine lock poisoned");
+            let resident_session = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            let execution = crate::operation_lifecycle::execute_operation_action(
+                &mut original,
+                &resident_session,
+                &mut self.operation_instances,
+                &mut self.progress_contracts,
+                &mut self.outstanding_effects,
+                self.clock.tick,
+                action.clone(),
+            )
+            .map_err(crate::operation_lifecycle::transition_fault)?;
+            match execution {
+                crate::operation_lifecycle::OperationExecution::AwaitPending => {
+                    original.status = CoroStatus::Blocked(BlockReason::OperationAwait {
+                        operation_id: original
+                            .operation_continuation
+                            .as_ref()
+                            .expect("validated original operation")
+                            .operation_id
+                            .clone(),
+                    });
+                }
+                execution => {
+                    if let crate::operation_lifecycle::OperationExecution::Begun(record, progress) =
+                        execution
+                    {
+                        self.operation_instances.push(record);
+                        self.progress_contracts.push(progress);
+                    }
+                    original.pc += 1;
+                    original.status = CoroStatus::Ready;
+                }
+            }
+        }
+
         for ev in &pack.events {
             self.intern_obs_event(ev);
             if let ObsEvent::Opened { session, .. } = ev {
@@ -174,6 +286,7 @@ impl ThreadedProtocolMachine {
         let was_terminal = coro_guard.is_terminal();
 
         match pack.coro_update {
+            CoroUpdate::CompleteNominal | CoroUpdate::OperationLifecycle(_) => {}
             CoroUpdate::AdvancePc => {
                 coro_guard.pc += 1;
                 coro_guard.status = CoroStatus::Ready;
@@ -233,7 +346,9 @@ impl ThreadedProtocolMachine {
         self.note_status_transition(was_terminal, is_terminal);
 
         if let Some((ep, update)) = pack.type_update {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             match update {
                 TypeUpdate::Advance(lt) => {
                     if let Some(entry) = session_guard.local_types.get_mut(&ep) {
@@ -345,17 +460,25 @@ impl ThreadedProtocolMachine {
         tick: u64,
     ) -> Result<(), Fault> {
         self.assert_delegation_handoff_owner(&endpoint, from_coro)?;
-        let source_arc = self.coroutine_by_id(from_coro)
+        let source_arc = self
+            .coroutine_by_id(from_coro)
             .cloned()
             .ok_or(Fault::Transfer {
                 message: "transfer source coroutine not found".into(),
             })?;
-        let target_arc = self.coroutine_by_id(to_coro).cloned().ok_or(Fault::Transfer {
-            message: "target coroutine not found".into(),
-        })?;
+        let target_arc = self
+            .coroutine_by_id(to_coro)
+            .cloned()
+            .ok_or(Fault::Transfer {
+                message: "target coroutine not found".into(),
+            })?;
         {
-            let source = source_arc.lock().expect("threaded ProtocolMachine lock poisoned");
-            let target = target_arc.lock().expect("threaded ProtocolMachine lock poisoned");
+            let source = source_arc
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            let target = target_arc
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             validate_delegation_coherence(&source, &target, &endpoint, &source.role)?;
         }
         let from_lane = self.lane_of_coro(from_coro).ok_or(Fault::Transfer {

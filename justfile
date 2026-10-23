@@ -417,6 +417,9 @@ check-workspace-tests-split:
       telltale-web
       telltale-lints
     )
+    # The selected root DSL fixtures also require the default feature configuration.
+    # Keep this separate from the all-features run below; the configurations differ.
+    TMPDIR="$tmpdir" cargo test -p telltale --test dsl_runtime_semantics_tests -- --nocapture
     for pkg in "${packages[@]}"; do
       echo "==> cargo test -p ${pkg} --all-targets --all-features"
       if [[ "$pkg" == "telltale-bridge" ]]; then
@@ -1074,7 +1077,7 @@ verify-lean-full: lean-init
 
 # Targeted Lean protocol machine architecture modules for fast CI checks.
 verify-lean-protocol-machine-targets: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime
+    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime Runtime.Tests.NominalImageRunner Runtime.Tests.NominalCommandExecution Runtime.Tests.OperationLifecycleExecution Runtime.Tests.OperationReadinessExecution Runtime.Tests.OperationFailureExecution Runtime.Tests.InvokeOutcomeAcceptance
 
 # Cross-target runtime comparison lane.
 verify-cross-target-matrix:

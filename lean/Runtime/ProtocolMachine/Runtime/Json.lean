@@ -37,6 +37,14 @@ def valueToJson : Value → Json
       [("kind", Json.str "prod"), ("left", valueToJson a), ("right", valueToJson b)]
   | .chan ep => Json.mkObj
       [("kind", Json.str "chan"), ("session", Json.num ep.sid), ("role", Json.str ep.role)]
+  | .readiness witness => Json.mkObj
+      [("kind", Json.str "readiness"), ("witness_id", Json.num witness.witnessId),
+       ("session_id", Json.num witness.sessionId), ("owner_id", Json.str witness.ownerId),
+       ("generation", Json.num witness.generation), ("predicate_ref", Json.str witness.predicateRef),
+       ("scope", match witness.scope with
+         | .session => Json.str "Session"
+         | .fragments roles => Json.mkObj [("Fragments", Json.arr (roles.map Json.str).toArray)])]
+
 
 /-- Serialize an Edge to JSON. -/
 def edgeToJson (e : Edge) : Json :=

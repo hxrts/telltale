@@ -224,6 +224,7 @@ theorem has_type_val_weaken {v : Value} {T : ValType} {G : GEnv} :
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod h₁ h₂ =>
     exact HasTypeVal.prod (has_type_val_weaken h₁) (has_type_val_weaken h₂)
   | chan h =>
@@ -242,6 +243,7 @@ theorem has_type_val_update_g_weaken {G : GEnv} {e : Endpoint} {L : LocalType} {
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod h₁ h₂ =>
     exact HasTypeVal.prod (has_type_val_update_g_weaken h₁) (has_type_val_update_g_weaken h₂)
   | chan h =>

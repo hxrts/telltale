@@ -48,6 +48,9 @@ pub enum ProtocolMachineRunnerError {
         /// Standard error output.
         stderr: String,
     },
+    /// Original JSON codec error, retained for executable-image transport.
+    #[error("protocol-machine JSON codec failed: {0}")]
+    WireEncoding(#[from] serde_json::Error),
     /// Failed to parse Lean output or JSON.
     #[error("Failed to parse protocol-machine runner output: {0}")]
     ParseError(String),
@@ -534,8 +537,7 @@ impl ProtocolMachineRunner {
             "operation": operation,
             "payload": payload,
         });
-        let bytes = serde_json::to_vec(&input)
-            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
+        let bytes = serde_json::to_vec(&input).map_err(ProtocolMachineRunnerError::WireEncoding)?;
 
         let operation_binary = if Self::uses_validator(operation) {
             Self::get_validator_path().unwrap_or_else(|| self.binary_path.clone())
@@ -561,8 +563,7 @@ impl ProtocolMachineRunner {
                 stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
             });
         }
-        serde_json::from_slice(&output.stdout)
-            .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))
+        serde_json::from_slice(&output.stdout).map_err(ProtocolMachineRunnerError::WireEncoding)
     }
 
     /// Validate a semantic audit against Lean-side protocol-machine checks.

@@ -5,10 +5,10 @@ use std::collections::{HashMap, HashSet};
 use crate::ast::{AuthorityBindingMode, Role};
 
 use super::super::role::parse_role_ref;
-use super::super::statement::{parse_block, parse_duration, parse_statement};
+use super::super::statement::{parse_block, parse_duration};
 use super::super::types::{AuthorityExprSpec, CaseBranchSpec, CasePatternSpec, Statement};
 use super::super::Rule;
-use super::{next_required, syntax_error};
+use super::{next_required, parse_branch_body, syntax_error};
 
 fn parse_authority_expr(pair: pest::iterators::Pair<Rule>) -> Result<AuthorityExprSpec, String> {
     let pair = if pair.as_rule() == Rule::authority_expr {
@@ -116,36 +116,6 @@ fn parse_argument_list(pair: pest::iterators::Pair<Rule>) -> Result<Vec<String>,
     Ok(args)
 }
 
-fn parse_branch_body(
-    pair: pest::iterators::Pair<Rule>,
-    declared_roles: &HashSet<String>,
-    input: &str,
-    protocol_defs: &HashMap<String, Vec<Statement>>,
-) -> std::result::Result<Vec<Statement>, super::super::error::ParseError> {
-    let pair = if pair.as_rule() == Rule::branch_body {
-        let span = pair.as_span();
-        pair.into_inner()
-            .next()
-            .ok_or_else(|| syntax_error(span, input, "branch body is empty"))?
-    } else {
-        pair
-    };
-    match pair.as_rule() {
-        Rule::block => parse_block(pair, declared_roles, input, protocol_defs),
-        Rule::statement => Ok(vec![parse_statement(
-            pair,
-            declared_roles,
-            input,
-            protocol_defs,
-        )?]),
-        _ => Err(syntax_error(
-            pair.as_span(),
-            input,
-            "expected an indented branch body or compact statement body",
-        )),
-    }
-}
-
 pub(crate) fn parse_effect_call(
     pair: pest::iterators::Pair<Rule>,
 ) -> Result<(String, String, Vec<String>), String> {
@@ -174,7 +144,7 @@ pub(crate) fn parse_effect_call(
 
 fn parse_let_stmt_with_mode(
     pair: pest::iterators::Pair<Rule>,
-    _declared_roles: &HashSet<String>,
+    declared_roles: &HashSet<String>,
     input: &str,
     mode: AuthorityBindingMode,
 ) -> std::result::Result<Statement, super::super::error::ParseError> {
@@ -183,10 +153,24 @@ fn parse_let_stmt_with_mode(
     let name = next_required(&mut inner, span, input, "let binding is missing name")?
         .as_str()
         .to_string();
-    let expr = next_required(&mut inner, span, input, "let binding is missing expression")?;
+    let first = next_required(&mut inner, span, input, "let binding is missing expression")?;
+    let (execution_role, expr) = if first.as_rule() == Rule::binding_placement {
+        let placed = first
+            .into_inner()
+            .next()
+            .ok_or_else(|| syntax_error(span, input, "binding placement is missing role"))?;
+        let role = parse_role_ref(placed, declared_roles, input)?;
+        (
+            Some(role),
+            next_required(&mut inner, span, input, "let binding is missing expression")?,
+        )
+    } else {
+        (None, first)
+    };
     let expr = parse_authority_expr(expr).map_err(|message| syntax_error(span, input, message))?;
     validate_binding_mode(mode, &expr, span, input)?;
     Ok(Statement::Let {
+        execution_role,
         name,
         mode,
         expr,
@@ -235,12 +219,26 @@ fn parse_let_in_stmt_with_mode(
     let name = next_required(&mut inner, span, input, "let binding is missing name")?
         .as_str()
         .to_string();
-    let expr = next_required(&mut inner, span, input, "let binding is missing expression")?;
+    let first = next_required(&mut inner, span, input, "let binding is missing expression")?;
+    let (execution_role, expr) = if first.as_rule() == Rule::binding_placement {
+        let placed = first
+            .into_inner()
+            .next()
+            .ok_or_else(|| syntax_error(span, input, "binding placement is missing role"))?;
+        let role = parse_role_ref(placed, declared_roles, input)?;
+        (
+            Some(role),
+            next_required(&mut inner, span, input, "let binding is missing expression")?,
+        )
+    } else {
+        (None, first)
+    };
     let expr = parse_authority_expr(expr).map_err(|message| syntax_error(span, input, message))?;
     validate_binding_mode(mode, &expr, span, input)?;
     let body_pair = next_required(&mut inner, span, input, "let ... in is missing body")?;
     let body = parse_block(body_pair, declared_roles, input, protocol_defs)?;
     Ok(Statement::Let {
+        execution_role,
         name,
         mode,
         expr,

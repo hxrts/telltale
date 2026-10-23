@@ -359,12 +359,12 @@ and validated by `rust/bridge/tests/docs_contract_tests.rs`.
 | Fixture surface | Protocol-machine executable | Session-projectable | Theory-convertible | Authority theorem tier | Explicit blocker |
 |---|---|---|---|---|---|
 | `call` with plain communication | yes | yes | yes | `session_typed_coordination` | `none` |
-| `choice` with observational binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
-| counted `loop` with authoritative binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
-| recursion with authoritative binding | yes | yes | yes | `evidence_publication_semantic_objects` | `none` |
-| `par` with observational binding | yes | yes | no | `runtime_semantic_only` | `Parallel` |
-| `case/of` with authoritative binding | yes | yes | no | `runtime_semantic_only` | `Case` |
-| `timeout` with observational binding | yes | yes | no | `runtime_semantic_only` | `Timeout` |
+| `choice` with observational binding | yes | yes | no | `evidence_publication_semantic_objects` | `AuthorityBinding` |
+| counted `loop` with authoritative binding | yes | yes | no | `evidence_publication_semantic_objects` | `AuthorityBinding` |
+| recursion with authoritative binding | yes | yes | no | `evidence_publication_semantic_objects` | `AuthorityBinding` |
+| `par` with observational binding | yes | yes | no | `runtime_semantic_only` | `AuthorityBinding` |
+| `case/of` with authoritative binding | yes | yes | no | `runtime_semantic_only` | `AuthorityBinding` |
+| `timeout` with observational binding | yes | yes | no | `runtime_semantic_only` | `AuthorityBinding` |
 
 Explanatory prose below remains hand-written. The table above is the checked
 contract surface for the reviewed authority/control-flow subset.
@@ -442,3 +442,185 @@ This design does not create a second host/runtime bridge. The authoritative
 path is: declare a nominal `effect`, name it in `uses`, invoke it with
 `check Effect.op(...)`, lower it into the existing typed protocol-machine
 `invoke` boundary, and preserve its outcome in effect/audit/replay surfaces.
+
+## Communication Artifact Refusal
+
+Communication projection remains a type-level abstraction. Plain, non-linear
+identifier and constructor bindings have no invocation node and may project
+through to communication. Their identifier-only constructor payload grammar
+cannot contain an effect call. This does not evaluate a local value or grant
+authority. Calls are not presumed pure: a plain call can contain an effect-call
+argument and has no checked purity contract.
+
+Theory conversion and integration executable-artifact requests now reject
+explicit authoritative/observational modes, check/observe/transfer expressions,
+linear aliases, and unclassified calls instead of silently erasing them. The
+local artifact request checks the strongest original AST before consuming its
+already projected communication view. Scope shadowing cannot hide a preceding
+authority binding from that whole-AST check. The generated-effects entry point
+also refuses these bindings, including those nested in control flow.
+
+The table's protocol-machine-executable classification describes the existing
+AST semantic surface, not proof that these bindings lower through a
+communication-only CodeImage. Positive effect-preserving authority lowering is
+still unavailable on that path. The supported Lean semantic-object theorems do
+not supply the missing compiler correspondence.
+
+## Explicit Local Binding Placement Prerequisite
+
+A binding may spell its execution placement as `let value at Coordinator = expr`,
+with the same `at Role` clause after the binding name for authoritative and
+observational forms and for `let ... in`. The role reference must name a declared
+role. Indexed references retain the existing role-reference syntax. Placement is
+preserved in the AST, cloning and continuation composition. An omitted clause
+remains unplaced. It does not choose the first role or the next sender.
+
+This is a source representation prerequisite, not executable authority lowering.
+An explicitly placed binding requires effect-preserving lowering even when its
+expression is plain. Communication theory conversion, direct local projection
+and generated-effects artifact construction refuse it. Generic communication
+programs and `runtime.step` keep their existing semantics. Placement does not
+issue a session capability, resolve a role family to an original endpoint, name a
+nominal operation at runtime, or authorize a continuation.
+
+A future admitted nominal construct must bind this source placement to the
+actual coroutine's session endpoint and generation, declared operation and
+argument/result types, then retain one issued continuation through its accepted
+outcome. The existing communication-only LocalTypeR and total Lean
+EffectRuntime.exec contract cannot express that transaction. They are unchanged
+by the placement prerequisite. Positive nominal execution and correspondence
+proof remain required before authority bindings can be admitted.
+
+## First Nominal Command Execution Contract
+
+The selected-operation compiler admits an explicitly placed, declared Command
+with Unit input and `Result String Bool` output, followed immediately by an
+exhaustive Ok/Err case whose branches each send a distinct terminal label to the
+same peer. This is a command result, not authoritative evidence. Application
+Err, host Failure and a pending host outcome are distinct states.
+
+The enclosing operation retains its source-selected NoAgreement profile, owner
+role and named progress window. That window requires an explicit nonzero tick
+budget. Missing configuration and unsupported agreement or escalation semantics
+refuse admission. Model ticks do not replace a host's physical deadline.
+
+An executable nominal call requires an actually issued owned-session handle,
+the original session generation and role endpoint, its exact admitted nominal
+declaration and a live canonical effect/operation occurrence. The coroutine
+retains the original nonserialized continuation and any returned typed result
+through commit gates. A pending response resumes that same occurrence and
+progress owner, without resetting the window. Admission and result commit require
+`current_tick <= original_issued_tick + selected_budget`, with checked overflow
+refused before issuance. Multi-window progress escalation cannot extend this
+original endpoint even while its canonical effect still reports Blocked. A changed semantic handler
+identity, stale generation, invalidated occurrence or restored checkpoint without
+that original handle cannot invoke the callback or consume the continuation.
+Handler identity is a semantic contract identifier. Equality does not prove
+physical provider identity or host-future teardown.
+
+The compiler does not admit arbitrary expressions, authority-producing checks,
+readiness, publication, materialization, transfer or handoff by this command
+contract. Ordinary communication conversion continues to refuse explicitly
+placed authority expressions. Both backend producers and an executable nominal
+Lean transition are prepared source. Their fixtures and correspondence facts
+must be checked before any execution or parity claim. This is not full lowering
+of the remaining authority/evidence forms.
+
+## Executable Source Operation Continuations
+
+`begin`, `await`, `resolve`, and `invalidate` describe one original operation
+continuation on its actual executing coroutine. `begin` does not spawn another
+runtime, thread or task, and does not invoke an unspecified host callback. It
+selects the declared operation, explicit owner role, agreement profile and original
+logical progress window. Its live continuation retains the actual issued session
+owner. Serialized declaration fields cannot reconstruct it.
+
+A selected operation body retains the validated parent role scope and its original
+declaration. Its explicit owner must belong to that scope, and every referenced
+role must remain declared. An empty local operation need not invent communication
+for every parent role. Ordinary complete choreographies still require all declared
+roles to participate.
+
+The selected source compiler binds its declared nominal callbacks as explicit
+children in the existing operation/effect/progress records. Communication and
+control instructions remain on the actual coroutine continuation. Incidental
+observational exchanges are not invented as additional declared child slots. A child is identified
+by its original canonical occurrence, not by a later effect name, last trace row,
+or a newly constructed equal-valued request. `await` observes this admitted set.
+A missing, ambiguous or pruned admitted child refuses. It never counts as terminal
+success. Live children keep the same operation and PC pending. An operation with
+no admitted children may pass this child-quiescence condition, but this neither
+executes omitted work nor proves any required dependent work was performed.
+Original unsuccessful child outcomes remain typed failures on the continuation.
+
+`resolve` retains its proposed typed result before the final original-owner,
+window and child-completion gates. A refusal cannot substitute another result,
+reset the original window, or discard the original child failure. Duplicate
+resolution is rejected. An application `Success` status does not satisfy a
+selected proof requirement or create a publication, materialization proof or
+canonical handle. Those require their own genuine issuing/consuming transitions.
+
+`invalidate` revokes the original semantic continuation and its still-live child
+occurrences. Late results cannot commit through that continuation. Invalidation
+is not host-future cancellation or physical resource settlement. Those resources
+and their actual completion obligations remain under the original host owner.
+
+An executable `handoff` must transport this actual original continuation to an
+eligible target, including its child identities, selected original window,
+retained result and failure. Changing a session's host owner, moving an endpoint,
+or emitting a semantic record alone does not execute `handoff`. Static role names
+may identify a destination but cannot replace the original issued owner gate.
+
+### Prepared authoritative readiness command slice
+
+`compile_command_operation` additionally lowers an explicitly placed
+`authoritative let result at A = check Host.ready()` when the admitted nominal
+operation is `authoritative`, `class : authoritative`, `progress : may_block`,
+`region : session`, Unit input and `Result String ReadinessWitness` output.
+The existing explicit NoAgreement profile and selected named simulation-tick
+budget remain required. This bounded slice branches to terminal unit-message
+continuations. It does not implement witness transport, publication,
+materialization, or a general authority expression interpreter.
+
+The callback returns a typed `NominalCommandValue::Readiness`, distinct from
+`Bool`. The predicate is the exact source interface and operation joined by
+`.`. Before executing the success continuation, both backends consume the
+original registered witness using the retained issued session owner, after
+output and WAL admission and destination validation. The registry checks exact
+issuance, session, owner, generation, full-session scope and single use.
+A Boolean, copied serialized field set, stale owner, wrong predicate, or foreign
+session cannot replace that check. Gate refusal keeps the original callback
+result resident and leaves the witness unconsumed. Transfer/rollback remains
+the canonical session transaction. This lowering adds no transfer registry.
+
+These implementation and fixture declarations are source-only until their
+actual Rust harness discovery/execution and Lean elaboration succeed.
+
+
+### Prepared enclosing-operation executable slice
+
+`compile_operation_image` selects the checked original operation body. The
+current enclosing slice supports an explicit Begin and either an empty body or
+one placed nominal Bool/readiness command with distinct terminal unit-message
+branches. Each child branch retains its explicit Await/Resolve tail. The static
+manifest binds each required child to the complete installed typed call and PC.
+Role-image assembly and slicing relocate both, while the loader verifies them
+against the actual installed opcode. Skipping required work cannot produce
+empty-inventory success. A Halt cannot abandon an unresolved original parent.
+
+Begin, child invocation, result commit and explicit resolution retain one
+original issued owner and logical window. All nominal calls, including Bool
+commands, require that owner. Ordinary loading, checkpoint observations and a
+new registry generation cannot refresh a stale coroutine. Actual callback
+failure and independent output refusal retain the first typed execution fault
+and original returned outcome while revoking protocol commit. No revocation or
+application cancellation acknowledges physical host cleanup.
+
+In this same-coroutine slice, a Blocked nominal child retains its original call
+PC until that child returns. This is not evidence of a separately pending Await.
+The existing scheduler has original-child wake semantics, but the genuine
+cross-continuation dependent-work producer, executable handoff, general
+cancellation/timeout escalation, stronger agreement, publication and
+materialization remain required implementation work. Unsupported forms refuse.
+That refusal does not complete those requirements. The prepared source and
+model examples require actual compilation and execution before acceptance.

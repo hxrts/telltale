@@ -1,5 +1,40 @@
 // Thread-pool construction and scheduling for threaded mode.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+fn thread_pool_build_error(source: rayon::ThreadPoolBuildError) -> ProtocolMachineError {
+    ProtocolMachineError::ThreadPoolBuild {
+        message: source.to_string(),
+        source: Box::new(source),
+    }
+}
+
 impl ThreadedProtocolMachine {
+    /// Consume this machine and join every original private native worker.
+    ///
+    /// Returns the untouched original machine when called from its own native
+    /// worker. Retry from an external owning context; no teardown was requested.
+    /// This is a blocking host operation, not a cancellation-safe async wait. It acknowledges worker termination
+    /// only; callers must settle signed/session obligations before consuming it.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original machine if this caller is one of its native workers.
+    ///
+    /// Native join unwind returns its original payload and untouched worker
+    /// custody as Unproven. The consumed handle receives no settlement ACK.
+    #[must_use = "retain the original machine on refusal and inspect actual disposal"]
+    pub fn shutdown_worker_pool(
+        self,
+    ) -> Result<NativeWorkerPoolDisposal, NativeWorkerPoolShutdownFailure> {
+        if self.pool.is_original_worker() {
+            return Err(NativeWorkerPoolShutdownFailure::OriginalWorker(Box::new(
+                self,
+            )));
+        }
+        self.pool
+            .shutdown()
+            .map_err(NativeWorkerPoolShutdownFailure::Unproven)
+    }
+
     /// Create with thread pool sized to available OS parallelism.
     #[must_use]
     pub fn auto(config: ProtocolMachineConfig) -> Self {
@@ -22,12 +57,12 @@ impl ThreadedProtocolMachine {
             .validate_invariants()
             .map_err(|reason| ProtocolMachineError::InvalidConfig { reason })?;
         let worker_count = workers.max(1);
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(worker_count)
-            .build()
-            .map_err(|e| ProtocolMachineError::ThreadPoolBuild {
-                message: e.to_string(),
-            })?;
+        let pool = build_owned_native_pool(worker_count).map_err(|source| {
+            ProtocolMachineError::ThreadPoolBuild {
+                message: source.to_string(),
+                source: Box::new(source),
+            }
+        })?;
         let tick_duration = config.tick_duration;
         let communication_replay_mode = config.communication_replay_mode;
         let communication_nullifier_identity = config.communication_nullifier_identity;
@@ -235,14 +270,23 @@ impl ThreadedProtocolMachine {
             .sessions
             .claim_ownership(sid, owner_id, OwnershipScope::Session, self.clock.tick)
             .map_err(ProtocolMachineError::OwnershipContract)?;
-        Ok(OwnedSession::new(sid, capability))
+        let owner = OwnedSession::new(sid, capability);
+        for coroutine in &self.coroutines {
+            let mut coroutine = coroutine
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            if coroutine.session_id == sid {
+                coroutine.nominal_owner = Some(owner.clone());
+            }
+        }
+        Ok(owner)
     }
 
     /// Execute one scheduler round: advance up to `n` ready coroutines.
     ///
     /// # Errors
     ///
-    /// Returns a `ProtocolMachineError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` before round mutation if the original simulated clock is exhausted, or if any coroutine faults.
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
@@ -251,7 +295,7 @@ impl ThreadedProtocolMachine {
         if n == 0 {
             return Err(ProtocolMachineError::InvalidConcurrency { n });
         }
-        self.clock.advance();
+        self.clock.advance()?;
         let tick = self.clock.tick;
         if self.all_done() {
             return Ok(StepResult::AllDone);
@@ -263,6 +307,7 @@ impl ThreadedProtocolMachine {
         self.prune_expired_timeouts();
         self.try_unblock_senders();
         self.try_unblock_receivers();
+        self.try_unblock_operations();
         self.evaluate_progress_contracts()?;
 
         let mut progressed = false;
@@ -350,6 +395,12 @@ impl ThreadedProtocolMachine {
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
         self.contention_metrics.observe_wave_width(picks.len());
+        // Pre-dispatch issuance is ordered by the actual selected wave. No worker
+        // may invent an occurrence after a callback has already executed.
+        let admissions: Vec<_> = picks
+            .iter()
+            .map(|pick| self.prepare_nominal_pick(pick, &handler_identity, tick))
+            .collect();
         let step_ctx = ThreadedStepCtx {
             config: &self.config,
             guard_resources: &self.guard_resources,
@@ -372,7 +423,14 @@ impl ThreadedProtocolMachine {
             let Some(pick) = picks.into_iter().next() else {
                 return Ok(false);
             };
-            let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
+            let result = match admissions
+                .into_iter()
+                .next()
+                .expect("one selected admission")
+            {
+                Ok(()) => exec_instr(&pick.coro, &pick.session, &exec_ctx),
+                Err(fault) => Err(ThreadedExecFault::new(fault)),
+            };
             return self.commit_pick_result(&pick, result, tick, handler, &handler_identity);
         }
 
@@ -380,7 +438,11 @@ impl ThreadedProtocolMachine {
             self.pool.install(|| {
                 picks
                     .par_iter()
-                    .map(|pick| exec_instr(&pick.coro, &pick.session, &exec_ctx))
+                    .zip(admissions.par_iter())
+                    .map(|(pick, admission)| match admission {
+                        Ok(()) => exec_instr(&pick.coro, &pick.session, &exec_ctx),
+                        Err(fault) => Err(ThreadedExecFault::new(fault.clone())),
+                    })
                     .collect()
             });
 
@@ -441,6 +503,14 @@ impl ThreadedProtocolMachine {
                             .lock()
                             .expect("threaded ProtocolMachine lock poisoned");
                         let was_terminal = coro.is_terminal();
+                        crate::operation_lifecycle::fail_active_operation(
+                            &mut coro,
+                            &mut self.operation_instances,
+                            &mut self.progress_contracts,
+                            &mut self.outstanding_effects,
+                            &fault,
+                            tick,
+                        );
                         coro.status = CoroStatus::Faulted(fault.clone());
                         self.note_status_transition(was_terminal, coro.is_terminal());
                         self.scheduler.mark_done(pick.coro_id);
@@ -467,6 +537,14 @@ impl ThreadedProtocolMachine {
                     .lock()
                     .expect("threaded ProtocolMachine lock poisoned");
                 let was_terminal = coro.is_terminal();
+                crate::operation_lifecycle::fail_active_operation(
+                    &mut coro,
+                    &mut self.operation_instances,
+                    &mut self.progress_contracts,
+                    &mut self.outstanding_effects,
+                    &fault,
+                    tick,
+                );
                 coro.status = CoroStatus::Faulted(fault.clone());
                 self.note_status_transition(was_terminal, coro.is_terminal());
                 self.scheduler.mark_done(pick.coro_id);

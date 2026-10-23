@@ -25,6 +25,7 @@ fn fault_name(fault: &Fault) -> &'static str {
         Fault::Invoke { .. } => "invoke_fault",
         Fault::Acquire { .. } => "acquire_fault",
         Fault::Transfer { .. } => "transfer_fault",
+        Fault::OperationOwnership { .. } => "operation_ownership_fault",
         Fault::Speculation { .. } => "spec_fault",
         Fault::Close { .. } => "close_fault",
         Fault::FlowViolation { .. } => "flow_violation",

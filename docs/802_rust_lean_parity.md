@@ -505,6 +505,7 @@ Required fields include id, owner, status, reason, impact, alternatives consider
 | Id | Owner | Status | Reason | Impact | Alternatives considered | Revisit date | Coverage scope |
 |---|---|---|---|---|---|---|---|
 | rust-host-targeted-disposal | telltale-machine runtime maintainers | Active, runtime-only | Exclusive host disposal and scoped Rayon worker acknowledgment concern Rust execution custody outside the Lean small-step program | Adds targeted retirement APIs and typed preflight errors; no shared wire schema, instruction or capability shape changes; host retirement does not establish protocol success | Status-only close leaves runnable custody; whole-machine drop removes unrelated sessions | 2027-01-03 | Cooperative and threaded required-reap regressions cover surviving stable ids, actual worker acknowledgment, preflight faults, natural terminal epochs, repeated acknowledgment and cooperative deserialization; cross-backend disposal summary regression covers the common retirement contract |
+| rust-host-worker-pool-error-source | telltale-machine runtime maintainers | Active, runtime-only | Native worker construction and its original I/O cause are outside Lean protocol state and small-step execution | ThreadPoolBuild retains the actual Rayon error chain; diagnostic display is unchanged; no instruction, capability, wire format or successful protocol trace changes; constructor refusal supplies no worker-termination ACK | Stringifying native causes or treating constructor failure and pool Drop as acknowledged teardown | 2027-01-20 | Two native multi-thread fixtures declare first-spawn refusal and later-spawn refusal after an actual first-worker acknowledgment; the latter retains and joins original native handles before assertions; these tests do not establish production pool-join capability |
 | rust-host-owned-session-parity | telltale-machine runtime maintainers | Active, runtime-only | Host session mutation, staged ownership receipt validation and original Rust error sources are embedding contracts outside endpoint/coroutine small-step transfer | Both backends share resident-state ownership transitions; owned handles validate receipt/session association and current generation; transfer/attenuation cannot widen scope; release/reclaim generations remain monotonic; exhausted counters fail before mutation; the canonical journal preserves actual cross-session emission order and machine ticks across disposal; cooperative snapshots add a defaulted ordered journal and last-generation storage; OwnershipContract carries a typed source | Duplicated threaded ownership logic, bare-store mutation, saturating/reused authority ids, stringified causes, or reconstructing authority from audit records | 2027-01-19 | owned_backend_parity exercises both backends, claim-specific failed commit/rollback, foreign receipt refusal, witness consumption/rejection, stale and scoped handles, terminal ordering, typed causes and retained audit; ownership_preflight_tests covers release/reclaim restoration, scope escalation, counter exhaustion before terminal mutation and foreign edges; ownership_lock_tests exercises the original poisoned custody and audit locks before mutation |
 
 The Lean `Runtime/ProtocolMachine/Model/State.lean` session state and
@@ -623,3 +624,333 @@ These are canonical Rust operational or embedding surfaces not expected to have 
 - [Protocol-Machine Bytecode Instructions](402_bytecode_instructions.md)
 - [Lean Verification](801_lean_verification.md)
 - [Capability Admission](702_capability_admission.md)
+
+## Native worker-pool settlement deviation
+
+The Rust-only private worker-pool disposal API concerns real host thread custody,
+not a Lean instruction, session status, capability witness or machine-tick
+transition. Its opaque receipt is issued from actual native JoinHandle results.
+It cannot reconstruct protocol authority or certify signed-terminal success.
+
+Native join-operation unwind is distinct from a worker panic returned by a
+completed join. The original native custodian retains untouched handles,
+completed-join counts and chronological causes across that unwind. A consumed
+handle with unproven settlement permanently prevents whole-pool acknowledgment,
+even after same-original retry joins every remaining worker. This repairs host
+custody rather than adding a Lean instruction or protocol authority witness.
+Injected join-boundary tests establish this retention transaction, not an actual
+OS deadlock diagnosis or physical settlement of an uncertain consumed handle.
+
+| Id | Owner | Status | Reason | Impact | Alternatives considered | Revisit date | Coverage scope |
+|---|---|---|---|---|---|---|---|
+| rust-host-native-pool-settlement | telltale-machine runtime maintainers | Active, runtime-only | Native worker exit and join are outside Lean protocol small-step state | Consuming explicit machine teardown joins original workers; partial construction retains actual worker handles and Rayon source; no instruction, wire or successful trace change | Rayon Drop and targeted session receipt do not acknowledge private native-pool termination | 2027-01-20 | Eleven native source-declared component fixtures cover real worker TLS exit before ACK, original panic payload, actual machine pool, first spawn refusal and partial start followed by original joins, actual self-worker refusal returning the machine for external retry, join-operation unwind retaining untouched original workers and chronological causes, retained consumed-worker refusal after unwind, and observation during actual pending join; execution evidence remains required |
+
+## Authority Binding Artifact Boundary
+
+The communication-only theory artifact route cannot certify execution of an
+AST authority binding. It now rejects authority/observation modes, explicit
+check/observe/transfer expressions, linear aliases and unclassified calls rather
+than erasing those operations. Plain non-linear identifiers and constructors
+remain local communication abstractions. Their projection is not a value
+interpreter or authority witness.
+
+The existing authority semantic-object conservation and supported-slice Lean
+theorems remain unchanged. They do not prove that the DSL compiler emitted an
+Invoke, passed the original nominal effect request, preserved typed outcome
+branching or bound a continuation to the issued owner. Those compiler and
+execution correspondence obligations remain open. A positive communication
+machine run and an explicit authority-artifact refusal are separate evidence.
+
+In the current producer, a named Invoke action is recorded as action metadata,
+but step_invoke still submits the generic invokeStep request with role and
+register state. Renaming that action to a declared effect operation would not
+invoke that operation. Lean's corresponding invokeStep request has the same
+role/state boundary. A nominal request/typed-outcome and continuation contract
+must be established at this shared boundary before claiming positive lowering.
+
+## Typed Outcome Acceptance Prerequisite
+
+The Rust outcome adapters now separate raw status from accepted success. The
+same exact request/response-kind rule controls register updates, lifecycle
+publication and effect-composition success on cooperative and threaded paths.
+Recording and replay state adapters consume their actual returned outcome. They
+do not recover a state payload by rereading the latest shared trace entry.
+
+The pinned release19 Lean model has eight request/response families, while Rust
+also has WalSync as a ninth family. The new pure acceptedStatusFor and
+invokeStepState helpers cover the actual eight modeled families. Their examples
+are not an execution correspondence proof. Existing EffectAlgebra.succeeded
+still classifies raw status, and ExecGuardEffect.stepInvoke executes the abstract
+total EffectRuntime.exec without a typed outcome gate. Connecting those premises
+to accepted typed outcomes, updating composition proofs and modeling WalSync are
+open correspondence prerequisites. The earlier durability alignment description
+must not be read as proof that the pinned request enum already contains WalSync.
+
+Full nominal dispatch also remains open: the original declaration and uses
+admission, argument/result types, actual coroutine role and owner generation,
+result destination and success/failure continuation must be bound to one issued
+invocation. Late or duplicate completion must target that same live occurrence.
+No named audit string, post-hoc owner lookup or new side ledger establishes this
+contract. Host physical future and worker custody remain the embedding owner's
+separate responsibility.
+
+VM Invoke and Receive requests retain their actual configured register width as
+optional instruction context. All VM state-replacing responses, including branch
+Choose/Receive, must preserve that width before register replacement or effect-
+success publication. This enforces the canonical Rust `wf_coroutine_state`
+register-width invariant, not an inferred equal-length convention. Receive also
+retains its actual destination and requires that register to exist. Branch receive
+omits the destination because it performs no destination write, but retains width.
+Handler-only wrappers omit both instruction contexts. Missing fields on older
+serialized requests decode as absent and do not invent historical VM context. The original raw outcome remains observational evidence. This check
+is not rollback of earlier buffer dequeue, replay consumption, clock or type work.
+Optional observability retention cannot replace an original host failure: the
+canonical recorded exchange supplies lifecycle status without a second synthetic
+issue/complete cycle. Blocked remains a Blocked observation while the synchronous
+instruction reports its existing blocked-contract fault.
+The Lean request schema does not yet carry instruction width/destination context.
+Its pure family/status examples do not prove this Rust applicability rule. That
+schema and executable-semantics correspondence remain an explicit prerequisite.
+
+Host-response acceptance is distinct from whole-instruction commit. In particular,
+Invoke may apply its accepted register state and host-success observation before
+persistence-delta application faults. No rollback of that state, emitted events,
+or earlier communication work is implied by the response-kind/destination guard.
+The prior cooperative owner could evict live enforcement inputs under diagnostic
+retention, while the prior threaded owner used untrimmed vectors. The canonical
+live/resident retention rule below repairs that storage boundary in both existing
+owners. Response/error preservation alone was insufficient. Neither correction
+claims nominal authority, a disposal acknowledgment or a Lean correspondence proof.
+
+Serialized request context is an observation used to validate response shape, not
+proof of original request ownership or nominal authority. The replay handler
+selects by expected entry kind. It does not establish full incoming request
+identity. Actual VM producers attach current configured width before execution,
+including when replay supplies the response. Lean's abstract effect-context step
+and spawn register copying are not a proof of this concrete Rust register ABI.
+
+Canonical host exchanges also supply Acquire/Release/SendDecision outcome
+observations directly. Duplicate synthetic issue/complete cycles must not replace
+the original typed failure under optional diagnostic retention. Existing policy
+is preserved: cooperative Acquire Blocked waits on AcquireDenied, threaded Acquire
+Blocked reports its synchronous blocked-contract fault, and Release/SendDecision
+Blocked remain synchronous faults. The separate Send buffer WouldBlock producer
+retains its actual live capacity obligation: successful host decision is not queue
+admission, so that issue/complete pair is not a duplicate host outcome.
+
+## Canonical Live Effect Retention
+
+Cooperative and threaded owners retain active effect, operation and progress
+records independently of Disabled/Capped diagnostic history. Both use the same
+live/resident classification and retired terminal-history pruning rule. Actual blocked Acquire
+and next-round topology producers must retain the original owner/budget and
+progress/reentrancy enforcement. Targeted disposal permits terminal history to
+obey its configured bound. The pre-existing instruction policy for Blocked
+Acquire still differs (cooperative blocks, threaded faults). Paired retention
+fixtures do not claim that wider behavior is equivalent.
+
+Lean progress/reentrancy predicates concern retained semantic objects and their
+actual steps. They do not authorize observational eviction of an uncompleted
+operation. This Rust retention repair does not add a Rust/Lean correspondence
+proof, capture arbitrary asynchronous work, or equate invalidation with physical
+teardown. New fixture declarations require actual discovery and execution.
+
+The original terminal-only retention child was insufficient: actual
+current_wal_sync_request consumes terminal operation/publication records through
+semantic_objects. Both backends now additionally protect every canonical record
+of an actually resident session. Terminal history eligibility starts only after
+actual session retirement. A terminal lifecycle status is not proof of
+nonresidency or irrelevance. A shared real Invoke/commit/WalSync fixture compares
+the exact handler request, agreement state and evidence under all three modes.
+Full correspondence and physical teardown remain separate obligations.
+
+The composed required native ownership/disposal inventory contains 59 unique
+fixtures: the original 35 plus 17 strict-outcome/error, six live/resident retention
+and one cooperative full-queue/Disabled regression. The existing canonical checker
+requires their nonignored declarations, actual harness discovery and successful
+execution. Declarations alone are not passing evidence. Module filters can also
+execute required fixtures appearing in a narrower sub-suite, without changing the
+unique required count. Authority guard DSL/compiler/bridge fixtures and formal
+examples remain separate targets and obligations.
+
+## Explicit Placement Source Representation
+
+The optional `Protocol::Let.execution_role` field preserves an explicit `at Role`
+clause through parsing, clone and continuation append. AST Protocol is not a
+serde wire type: no CodeImage or effect trace schema changes here. Existing Rust
+literal constructors now explicitly supply None. This is a Rust source migration,
+not an implicit role reconstruction. Legacy DSL forms remain unplaced.
+
+Lean LocalTypeR contains communication and recursion only. CompileLocalTypeR
+cannot preserve a local typed authority binding. EffectRuntime.exec remains a
+total action/context transition. StepInvoke checks handler presence but has no
+nominal operation/generation/result-continuation transaction. Therefore no new
+Lean constructor, execution theorem or parity claim follows from source placement.
+The placed artifact refusal is deliberate until the actual shared model and
+Rust executable producers implement that transaction. Direct local
+projection of unplaced local expressions remains communication analysis, not
+proof that those expressions execute. This child does not change that existing
+analysis contract or classify its result as executable authority lowering.
+
+## Nominal Command Transaction Prerequisite
+
+The Rust selected-operation compiler produces a static nominal declaration and
+call plus existing communication continuations. The owned loader retains the
+issued OwnedSession in coroutine custody. Serde deliberately omits that handle
+and the live result continuation. Static descriptors, effect traces and restored
+ownership metadata do not reconstruct it. A source-selected agreement profile
+is explicit on the existing OperationInstance. Legacy instances deserialize to
+None and retain their previous derivation rules.
+
+Both Rust backends issue the canonical outstanding effect, operation and progress
+owner before the callback. The threaded path performs issuance before worker
+dispatch, retains the actual continuation on the original coroutine, and gates
+the main-thread result commit after the worker returns. The raw exchange remains
+separate from accepted status. Immediate Blocked is refused. MayBlock retains
+the selected original budget. Admission and commit use the inclusive original
+issued tick plus budget. Progress escalation never extends that endpoint.
+Semantic handler identity is observed before admission and once at final commit,
+with no subsequent identity callback after derived success publication. It is
+not proof of a physical provider identity or native-future settlement.
+
+The executable Lean path uses typed action classifiers and `invokeCommand`,
+with the original typed action supplied to sum composition. The default callback
+refuses. Parsing/classification alone never falls through to generic `exec`.
+Products retain nominal classification but have no admitted result-combination
+contract, so their default nominal callback/relocation refuses. Legacy models
+with no nominal classifiers keep the existing generic path.
+
+The model's canonical coroutine, outstanding-effect, operation and progress
+fields retain the same nominal occurrence through Blocked and output refusal.
+The original typed exchange is an observation. A returned value is held before
+post-callback validation. Output refusal retains that holder instead of rolling
+back to the pre-issuance state. Exact logical-window, ordering preservation and
+typed-branch commit theorem declarations accompany real loader/opcode/commit
+fixtures. These source declarations require actual Lean checking. They are not
+a completed Rust/compiler refinement theorem.
+
+Role entry PCs in Lean need not be zero. Static declarations apply only to the
+prefix of the actual role's executable chunk, and the loader fixes that role on
+the original coroutine. A declaration is a static manifest, not an executed
+capability grant. Typed result branches must stay in that chunk. Converting an
+executable image to a role map now slices and rebases its actual instructions.
+It never recompiles local communication types and discards nominal actions.
+Typed action relocation must preserve the exact rebased descriptor or refuse.
+Missing/lying adapters and cross-role targets have negative fixture declarations.
+
+Rust's issued `OwnedSession` and generation checks remain the additional host
+boundary described by `rust-host-owned-session-parity`. Lean endpoint/occurrence
+records do not reconstruct that handle or prove physical host cleanup. The
+source compiler, both backend fixtures and executable Lean relation are still
+uncompiled/unexecuted in this prepared child. Full source-to-model refinement,
+authoritative evidence/readiness, publication, materialization and transfer
+lowering remain required and open. No broader authority proof follows from this
+Command application-result slice.
+
+### Executable nominal bridge scope
+
+The existing protocol-machine runner has a separate `runNominalImage` operation.
+It installs the source compiler's actual tagged instructions through the checked
+role-image loader. Missing bytecode or typed outcomes cannot fall back to local
+communication-type recompilation. The legacy communication operation remains
+communication-only. The targeted Lean prerequisite builds this runner module and
+its nominal model fixtures explicitly before `lean --run` imports them.
+
+The comparison retains actual application outcomes, accepted statuses, semantic
+fault payloads, issuance and callback-observation ticks, operation/profile/proof
+requirements, registers, PCs, and readonly observations of the original pending
+continuation, staged result and independent refusal. These observations contain
+no `OwnedSession` and cannot restore authority. Unsupported typed responses and
+terminal fault families refuse rather than becoming absent payloads.
+
+The source-derived normalization ledger permits only the validated single
+original occurrence-ID relation and an exact original-or-plus-one reply relation.
+It does not equate arbitrary foreign IDs, normalize ticks, or erase retained
+results. Explicit local payload annotations and unsupported instructions remain
+outside this narrow image bridge and refuse. The fixture declarations include
+actual Blocked and output-denied executions plus omitted-holder, changed-result,
+changed-terminal-cause and foreign-ID controls. They require real Rust/Lean
+execution. No source-only preparation counts as correspondence acceptance or a
+full compiler-refinement theorem.
+
+### Finite simulation-counter admission
+
+Lean `Runtime/ProtocolMachine/Runtime/Runner.lean::runScheduled` and
+`ThreadedRunner.lean::runScheduledThreaded` advance the model clock by one before
+the round. Rust preserves that one-round increment over its representable domain.
+Its `u64` tick and `Duration` are finite, unlike the mathematical model clock.
+At either boundary, Rust returns a typed admission error before changing either
+counter or entering the round. This refuses an unrepresentable execution. It
+never saturates, wraps, advances per worker wave, or substitutes a physical clock.
+
+| Id | Owner | Status | Reason | Impact | Alternatives considered | Revisit date | Coverage scope |
+|---|---|---|---|---|---|---|---|
+| rust-finite-simclock-admission | telltale-machine runtime maintainers | Active, finite representation boundary | Rust tick and simulated duration have finite successors while Lean model arithmetic is unbounded | Typed atomic refusal before round mutation; all representable rounds retain one tick each; no authority or cleanup ACK | Wrapping, saturation, panic or partial tick mutation changes the selected model time | 2027-01-21 | Three direct clock declarations and two actual-round declarations per backend; source-only until discovered and executed |
+
+### Prepared readiness continuation and session authority state
+
+The typed nominal result now distinguishes Boolean application values from
+`ReadinessWitness` data. Both Rust backends use the existing canonical session
+issuer/consumer and the retained original `OwnedSession`. The witness is consumed
+only at gated commit. Lean adds owner/current-generation and issued/consumed
+readiness state to the same canonical `SessionState`, with explicit model owner
+admission and issuance independent of callback fields. The original model owner
+is retained in the nominal continuation. Model data is not an issued Rust host
+handle, and does not establish physical resource custody or asynchronous cleanup.
+
+`Value` and `ValType` readiness cases are appended, preserving prior enum order.
+Witness data keeps the original registry witness field order and scope shape.
+The previously unreleased nominal reply uses an explicitly tagged typed result
+(the Bool-only nominal draft shape is rejected). This is not claimed compatible
+with old draft nominal JSON/binary artifacts. Released v19 has no nominal reply
+surface. No canonical replay/trace v1 field or existing variant is reordered.
+Original owner/continuation serde skips are unchanged: decoding a register or
+witness never restores live authority. Both JSON and canonical binary roundtrips
+and old value/type tags have declared regressions. Broad source-to-model bridge
+normalization must explicitly handle the new typed result and cannot erase it.
+
+New Rust and Lean cases are uncompiled/unexecuted source. No static proof of
+physical custody, complete DSL authority lowering, or restoration follows.
+
+The prepared existing compiled-image bridge uses `nominal_image.v2` for explicit
+typed Boolean/readiness results and complete original owner/registry observations.
+Admission input carries only an owner intent and an after-Blocked scheduling
+choice. The actual original runtime/model session issues the witness between
+rounds after a genuine Blocked occurrence. Transported witness fields cannot mint
+authority. Commit uses the canonical store-owned audit adapter with the current
+SimClock tick. Observations include genuine issue, consumption and rejection.
+The single-original effect-id relation does not normalize witness ids, owner,
+session, generation, predicate, callback ticks, ordering or completion ticks.
+
+The canonical `OutstandingEffect.applyEvent` contract preserves the original
+ordering key for blocked/completed/timeout/cancellation/invalidation transitions.
+Only an explicit retry event replaces it. The prepared native producers now
+preserve that key, retain no terminal completion for a Blocked transition, and
+record the actual current tick for terminal settlement. Bridge output separates
+original request issuance, ordering key and completion tick. The existing model
+ordering-preservation theorem remains unchanged. This source correction and the
+actual Blocked-to-later-success regressions still require execution.
+
+
+### Prepared original source-operation correspondence
+
+The existing compiled-image bridge now preserves typed Begin/Await/Resolve/
+Invalidate opcodes and exact required-child manifests. It does not regenerate
+these actions from communication projections. Both native backends retain the
+same enclosing coroutine holder, distinct from the singleton `effect:id` child,
+and the executable model uses the same canonical coroutine, session ownership,
+operation, effect and progress fields. Every selected nominal call captures the
+original coroutine-held model owner through the canonical owning-load admission.
+Looking up the current registry owner is insufficient. Model owner data does not
+prove Rust opaque-handle issuance or native resource custody.
+
+Comparison includes the original enclosing declaration, admitted slots, actual
+child outcome, proposed resolution, typed first execution failure and canonical
+parent/progress records. The raw original parent id is retained. Its comparison
+relation validates the actual role entry and installed original PC before
+relating the role-local PC and derived occurrence id. It does not normalize
+ticks, generations, policy, values or failures. Child ids follow the existing
+validated single-original relation. Missing parent records or executable payload,
+unknown response families and unsupported fault observations refuse comparison.
+This is a prepared executable relation, not an elaborated compiler-refinement
+theorem or full authority-language proof. Required Rust/Lean execution is open.

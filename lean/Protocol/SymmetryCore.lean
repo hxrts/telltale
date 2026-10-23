@@ -55,6 +55,7 @@ def renameValTypePR (σ : ProtocolRenaming) : ValType → ValType
   | .bool => .bool
   | .nat => .nat
   | .string => .string
+  | .readiness => .readiness
   | .prod T₁ T₂ => .prod (renameValTypePR σ T₁) (renameValTypePR σ T₂)
   | .chan sid role => .chan sid (σ.roleMap role)
 

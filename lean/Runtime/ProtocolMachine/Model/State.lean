@@ -1,5 +1,6 @@
 import Std
 import Runtime.ProtocolMachine.Model.Core
+import Runtime.ProtocolMachine.Model.SemanticObjects.OutstandingEffects
 import Runtime.ProtocolMachine.Model.OutputCondition
 import Runtime.ProtocolMachine.Model.Config
 import Runtime.ProtocolMachine.Model.Domain
@@ -82,6 +83,7 @@ inductive BlockReason (γ : Type u) where
   | consensusWait (tag : Nat)
   | spawnWait
   | closeWait (sid : SessionId)
+  | operationAwait (operationId : String)
   deriving Repr
 inductive Fault (γ : Type u) where
   | typeViolation (expected actual : ValType)
@@ -90,6 +92,9 @@ inductive Fault (γ : Type u) where
   | invalidSignature (edge : Edge)
   | acquireFault (layer : NamespaceRef) (msg : String)
   | invokeFault (msg : String)
+  /-- Actual typed semantic host failure; distinct from an application Err. -/
+  | effectFault (kind message : String)
+  | outputCondition (predicateRef : String)
   | transferFault (msg : String)
   | closeFault (msg : String)
   | specFault (msg : String)
@@ -108,6 +113,8 @@ inductive CoroStatus (γ : Type u) where
 structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   id : CoroutineId
   programId : Nat
+  /-- Fixed role selected by the actual image entry; endpoint transfer does not change it. -/
+  role : Role := ""
   pc : PC
   regs : RegFile
   status : CoroStatus γ
@@ -117,6 +124,16 @@ structure CoroutineState (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] whe
   knowledgeSet : KnowledgeSet
   costBudget : Nat
   specState : Option SpeculationState
+  /-- Protocol occurrence only; Rust issued host handles remain runtime-only. -/
+  nominalContinuation : Option Runtime.ProtocolMachine.Model.NominalCommandContinuation := none
+  /-- Original owner admitted by the owning load boundary; current registry
+  data cannot reconstruct this coroutine-held grant after transfer. -/
+  issuedModelOwner : Option SessionTypes.ModelOwner := none
+  /-- Original enclosing source operation, distinct from its host-effect children. -/
+  operationContinuation : Option Runtime.ProtocolMachine.Model.OriginalOperationContinuation := none
+  /-- First actual typed source-operation execution failure; independent of
+  application resolution and retained even when semantic children are revoked. -/
+  operationFailure : Option (Fault γ) := none
 
 abbrev AuthorityWitnessId := Nat
 abbrev FragmentOwnerId := String
@@ -380,6 +397,13 @@ structure ProtocolMachineState (ι γ π ε ν : Type u) [ProtocolMachineDomain 
   partitionedEdges : List Edge
   checkpointLog : List CheckpointMeta := []
   restartAnchor : Option RestartAnchor := none
+  /-- The canonical semantic owners mirrored by both Rust backends. -/
+  outstandingEffects : List Runtime.ProtocolMachine.Model.OutstandingEffect := []
+  operationInstances : List Runtime.ProtocolMachine.Model.OperationInstance := []
+  progressContracts : List Runtime.ProtocolMachine.Model.ProgressContract := []
+  nextEffectId : Nat := 0
+  /-- Raw typed observations; never a reconstructed live host owner. -/
+  effectExchanges : List Runtime.ProtocolMachine.Model.EffectExchangeRecord := []
   nextEffectNonce : Nat := 0
   usedEffectNonces : List Nat := []
   needsReconciliation : Bool := false

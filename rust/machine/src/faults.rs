@@ -51,6 +51,7 @@ pub fn classify_fault(fault: &Fault) -> FaultClass {
             FaultClass::Verification
         }
         Fault::Invoke { .. } => FaultClass::Invoke,
+        Fault::OperationOwnership { .. } => FaultClass::Transfer,
         Fault::Acquire { .. } => FaultClass::Acquire,
         Fault::Transfer { .. } => FaultClass::Transfer,
         Fault::Speculation { .. } => FaultClass::Speculation,

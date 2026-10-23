@@ -96,6 +96,154 @@ impl CodeImage {
         if !self.global_type.well_formed() {
             return Err("code image global type is not well-formed".to_string());
         }
+        for (role, program) in &self.programs {
+            let mut declared = BTreeMap::new();
+            let mut executable = false;
+            for (pc, instruction) in program.iter().enumerate() {
+                match instruction {
+                    Instr::Invoke {
+                        action: crate::instr::InvokeAction::DeclareCommand(declaration),
+                    } => {
+                        if executable
+                            || declaration.interface.is_empty()
+                            || declaration.operation.is_empty()
+                        {
+                            return Err("nominal declarations must precede executable instructions and name an operation".into());
+                        }
+                        let key = (&declaration.interface, &declaration.operation);
+                        if declared.insert(key, declaration).is_some() {
+                            return Err("duplicate nominal declaration".into());
+                        }
+                    }
+                    Instr::Invoke {
+                        action: crate::instr::InvokeAction::OperationLifecycle(action),
+                    } => {
+                        use crate::operation_lifecycle::OperationAction;
+                        executable = true;
+                        let name = match action.as_ref() {
+                            OperationAction::Begin { declaration } => {
+                                let invalid_children = declaration.required_children.iter().any(|slot| {
+                                    slot.pc <= pc
+                                        || declaration.required_children.iter().filter(|other| other.pc == slot.pc).count() != 1
+                                        || slot.call.enclosing_operation != declaration.name
+                                        || slot.call.role != declaration.role
+                                        || slot.call.agreement_profile != declaration.agreement_profile
+                                        || slot.call.progress_contract != declaration.progress_contract
+                                        || slot.call.progress_window != declaration.progress_window
+                                        || slot.call.budget_ticks != declaration.budget_ticks
+                                        || !matches!(program.get(slot.pc), Some(Instr::Invoke {
+                                            action: crate::instr::InvokeAction::NominalCommand(actual)
+                                        }) if actual.as_ref() == &slot.call)
+                                });
+                                let has_terminal = program.iter().skip(pc + 1).any(|instruction| matches!(instruction,
+                                    Instr::Invoke { action: crate::instr::InvokeAction::OperationLifecycle(terminal) }
+                                    if matches!(terminal.as_ref(), OperationAction::Resolve { operation, .. }
+                                        | OperationAction::Invalidate { operation } if operation == &declaration.name)));
+                                if declaration.role != *role
+                                    || !declaration.supported()
+                                    || invalid_children
+                                    || !has_terminal
+                                {
+                                    return Err("invalid original operation role/policy".into());
+                                }
+                                continue;
+                            }
+                            OperationAction::Resolve {
+                                outcome: crate::operation_lifecycle::OperationResolution::Timeout(_),
+                                ..
+                            } => {
+                                return Err("timeout resolution requires actual original escalation lowering".into());
+                            }
+                            OperationAction::Await { operation }
+                            | OperationAction::Resolve { operation, .. }
+                            | OperationAction::Invalidate { operation } => operation,
+                        };
+                        if !program.iter().take(pc).any(|instruction| matches!(instruction,
+                            Instr::Invoke { action: crate::instr::InvokeAction::OperationLifecycle(prior) }
+                            if matches!(prior.as_ref(), OperationAction::Begin { declaration }
+                                if declaration.name == *name && declaration.role == *role))) {
+                            return Err("operation transition has no original static begin".into());
+                        }
+                    }
+                    Instr::Invoke {
+                        action: crate::instr::InvokeAction::NominalCommand(call),
+                    } => {
+                        executable = true;
+                        if declared
+                            .get(&(&call.declaration.interface, &call.declaration.operation))
+                            .copied()
+                            != Some(&call.declaration)
+                        {
+                            return Err(
+                                "nominal invocation has no exact admitted declaration".into()
+                            );
+                        }
+                        for instruction in program.iter().take(pc) {
+                            if let Instr::Invoke {
+                                action: crate::instr::InvokeAction::OperationLifecycle(action),
+                            } = instruction
+                            {
+                                if let crate::operation_lifecycle::OperationAction::Begin {
+                                    declaration,
+                                } = action.as_ref()
+                                {
+                                    if declaration.name == call.enclosing_operation
+                                        && declaration
+                                            .required_children
+                                            .iter()
+                                            .filter(|slot| slot.pc == pc && slot.call == **call)
+                                            .count()
+                                            != 1
+                                    {
+                                        return Err("source child is absent from the exact original operation manifest".into());
+                                    }
+                                }
+                            }
+                        }
+                        if !call.supported_agreement()
+                            || call.role != *role
+                            || call.result == 0
+                            || call.on_ok == call.on_err
+                            || call.enclosing_operation.is_empty()
+                            || call.progress_contract.is_empty()
+                            || call.progress_window.is_empty()
+                            || call.on_ok <= pc
+                            || call.on_err <= pc
+                        {
+                            return Err(
+                                "invalid nominal role, result destination or continuation".into()
+                            );
+                        }
+                        for target in [call.on_ok, call.on_err] {
+                            let tail = if matches!(program.get(target + 1), Some(Instr::Invoke {
+                                action: crate::instr::InvokeAction::OperationLifecycle(action)
+                            }) if matches!(action.as_ref(), crate::operation_lifecycle::OperationAction::Await { operation }
+                                if operation == &call.enclosing_operation))
+                            {
+                                target + 2
+                            } else {
+                                target + 1
+                            };
+                            let terminal = matches!(program.get(tail), Some(Instr::Halt))
+                                || (matches!(program.get(tail), Some(Instr::Invoke {
+                                    action: crate::instr::InvokeAction::OperationLifecycle(action)
+                                }) if matches!(action.as_ref(), crate::operation_lifecycle::OperationAction::Resolve { operation, .. }
+                                    if operation == &call.enclosing_operation))
+                                    && matches!(program.get(tail + 1), Some(Instr::Halt)));
+                            if !matches!(program.get(target), Some(Instr::Offer { chan: 0, .. }))
+                                || !terminal
+                            {
+                                return Err(
+                                    "first nominal slice requires terminal offer continuations"
+                                        .into(),
+                                );
+                            }
+                        }
+                    }
+                    _ => executable = true,
+                }
+            }
+        }
         let program_roles: Vec<&String> = self.programs.keys().collect();
         let type_roles: Vec<&String> = self.local_types.keys().collect();
         if program_roles != type_roles {

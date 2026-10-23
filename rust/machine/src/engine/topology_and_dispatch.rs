@@ -1,14 +1,30 @@
 // Topology event ingress, timeout management, and dispatch.
 impl ProtocolMachine {
-    fn next_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
+    fn require_timeout_witness_capacity(&self, count: u64) -> Result<(), ProtocolMachineError> {
+        self.next_authority_witness_id
+            .checked_add(count)
+            .ok_or_else(|| {
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                    "timeout witness counter exhausted",
+                ))
+            })?;
+        Ok(())
+    }
+
+    fn next_timeout_witness(
+        &mut self,
+        site: &str,
+        until_tick: u64,
+    ) -> Result<TimeoutWitness, ProtocolMachineError> {
+        self.require_timeout_witness_capacity(1)?;
         let witness = TimeoutWitness {
             witness_id: self.next_authority_witness_id,
             site: site.to_string(),
             issued_at_tick: self.clock.tick,
             until_tick,
         };
-        self.next_authority_witness_id = self.next_authority_witness_id.saturating_add(1);
-        witness
+        self.next_authority_witness_id += 1;
+        Ok(witness)
     }
 
     fn audit_issued_timeout_witness(&mut self, witness: &TimeoutWitness) {
@@ -143,6 +159,14 @@ impl ProtocolMachine {
                 let fault = Fault::Invoke {
                     failure: EffectFailure::topology_disruption(reason.clone()),
                 };
+                crate::operation_lifecycle::fail_active_operation(
+                    coro,
+                    self.operation_instances.as_mut_slice(),
+                    self.progress_contracts.as_mut_slice(),
+                    self.outstanding_effects.as_mut_slice(),
+                    &fault,
+                    self.clock.tick,
+                );
                 coro.status = CoroStatus::Faulted(fault.clone());
                 faulted.push((coro.id, fault));
             }
@@ -261,7 +285,10 @@ impl ProtocolMachine {
         Ok(())
     }
 
-    fn apply_topology_event(&mut self, event: &TopologyPerturbation) {
+    fn apply_topology_event(
+        &mut self,
+        event: &TopologyPerturbation,
+    ) -> Result<(), ProtocolMachineError> {
         match event {
             TopologyPerturbation::Crash { site } => {
                 self.crashed_sites.insert(site.clone());
@@ -291,7 +318,7 @@ impl ProtocolMachine {
                     .clock
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
-                let witness = self.next_timeout_witness(site, until_tick);
+                let witness = self.next_timeout_witness(site, until_tick)?;
                 if let Some(previous) = self.timed_out_sites.remove(site) {
                     self.authority_audit_log.push(
                         AuthorityAuditRecord {
@@ -322,6 +349,7 @@ impl ProtocolMachine {
             }
         }
         self.normalize_topology_state();
+        Ok(())
     }
 
     fn ingest_topology_events(
@@ -351,8 +379,22 @@ impl ProtocolMachine {
             .map_err(ProtocolMachineError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
+        // Refuse the whole admitted event batch before applying even a
+        // preceding non-timeout mutation when its witness IDs cannot fit.
+        let timeout_count = u64::try_from(
+            events
+                .iter()
+                .filter(|event| matches!(event, TopologyPerturbation::Timeout { .. }))
+                .count(),
+        )
+        .map_err(|_| {
+            ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                "timeout witness batch count exceeds u64",
+            ))
+        })?;
+        self.require_timeout_witness_capacity(timeout_count)?;
         for event in events {
-            self.apply_topology_event(&event);
+            self.apply_topology_event(&event)?;
             let effect_kind = "topology_event".to_string();
             let (effect_interface, effect_operation) =
                 infer_effect_interface_and_operation(&effect_kind);
@@ -750,46 +792,11 @@ impl ProtocolMachine {
         {
             EffectResult::Success(decision) => decision,
             EffectResult::Blocked => {
-                let effect_id = self.issue_runtime_effect(
-                    "send_decision",
-                    Some(sid),
-                    &handler_identity,
-                    effect_inputs.clone(),
-                );
-                let failure = EffectFailure::contract_violation("send_decision returned blocked");
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
+                return Err(Fault::Invoke {
+                    failure: EffectFailure::contract_violation("send_decision returned blocked"),
+                })
             }
-            EffectResult::Failure(failure) => {
-                let effect_id = self.issue_runtime_effect(
-                    "send_decision",
-                    Some(sid),
-                    &handler_identity,
-                    effect_inputs.clone(),
-                );
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
-            }
+            EffectResult::Failure(failure) => return Err(Fault::Invoke { failure }),
         };
 
         let edge = Edge::new(sid, role.to_string(), partner.clone());

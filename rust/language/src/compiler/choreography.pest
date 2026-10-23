@@ -193,12 +193,14 @@ resolve_timeout = { "Timeout" ~ ctor_value_payload? }
 resolve_cancelled = { "Cancelled" }
 invalidate_stmt = { "invalidate" ~ ident }
 
-authority_let_in_stmt = { "authoritative" ~ "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
-authority_let_stmt = { "authoritative" ~ "let" ~ ident ~ "=" ~ authority_expr }
-observe_let_in_stmt = { "observe" ~ "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
-observe_let_stmt = { "observe" ~ "let" ~ ident ~ "=" ~ authority_expr }
-let_in_stmt = { "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
-let_stmt = { "let" ~ ident ~ "=" ~ authority_expr }
+binding_placement = { "at" ~ role_ref }
+
+authority_let_in_stmt = { "authoritative" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr ~ "in" ~ block }
+authority_let_stmt = { "authoritative" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr }
+observe_let_in_stmt = { "observe" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr ~ "in" ~ block }
+observe_let_stmt = { "observe" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr }
+let_in_stmt = { "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr ~ "in" ~ block }
+let_stmt = { "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr }
 case_stmt = { "case" ~ authority_expr ~ "of" ~ case_block }
 case_block = { "{" ~ case_branch+ ~ "}" | "(" ~ case_branch+ ~ ")" }
 case_branch = { "|" ~ match_pattern ~ "=>" ~ branch_body }

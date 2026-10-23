@@ -390,6 +390,7 @@ pub(crate) fn block_reason_tag(reason: &BlockReason) -> &'static str {
         BlockReason::Recv { .. } => "recv_wait",
         BlockReason::Send { .. } => "send_wait",
         BlockReason::Invoke { .. } => "invoke_wait",
+        BlockReason::OperationAwait { .. } => "operation_await",
         BlockReason::AcquireDenied { .. } => "acquire_denied",
         BlockReason::Consensus { .. } => "consensus_wait",
         BlockReason::Spawn => "spawn_wait",

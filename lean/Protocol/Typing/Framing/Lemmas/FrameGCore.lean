@@ -40,6 +40,7 @@ theorem has_type_val_frame_left {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod h₁ h₂ =>
       exact HasTypeVal.prod (has_type_val_frame_left hDisj h₁) (has_type_val_frame_left hDisj h₂)
   | chan h =>

@@ -1,4 +1,5 @@
 import Protocol.LocalType
+import SessionTypes.Authority
 
 /-! # MPST Runtime Values
 
@@ -48,6 +49,8 @@ inductive Value where
   | string : String → Value
   | prod : Value → Value → Value
   | chan : Endpoint → Value  -- channel endpoint (sid, role)
+  /-- Exact typed evidence data. Typing does not prove registered issuance. -/
+  | readiness : SessionTypes.ReadinessWitness → Value
   deriving Repr, DecidableEq
 
 namespace Value
@@ -74,7 +77,8 @@ def isChan : Value → Bool
   | .chan _ => true
   | _ => false
 
-/-- Check if a session ID appears in a value. -/
+/-- Check live channel references in a value. Evidence metadata, like Nat and
+String metadata, does not itself own or expose a channel endpoint. -/
 def containsSid (sid : SessionId) : Value → Bool
   | .chan e => e.sid == sid
   | .prod v₁ v₂ => containsSid sid v₁ || containsSid sid v₂

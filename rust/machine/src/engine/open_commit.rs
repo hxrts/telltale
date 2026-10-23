@@ -84,14 +84,15 @@ impl ProtocolMachine {
             });
         }
 
-        let sid = self
-            .sessions
-            .open_with_sid_from_plan(self.sessions.next_session_id(), &plan, &self.config.buffer_config);
+        let sid = self.sessions.open_with_sid_from_plan(
+            self.sessions.next_session_id(),
+            &plan,
+            &self.config.buffer_config,
+        );
         self.next_session_id = self.sessions.next_session_id();
         for (_, sender, receiver) in plan.edge_blueprint() {
-            if let Some((_, handler_id)) = handlers
-                .iter()
-                .find(|((bound_sender, bound_receiver), _)| {
+            if let Some((_, handler_id)) =
+                handlers.iter().find(|((bound_sender, bound_receiver), _)| {
                     bound_sender == sender && bound_receiver == receiver
                 })
             {
@@ -102,9 +103,7 @@ impl ProtocolMachine {
             }
         }
         self.monitor.set_kind(sid, SessionKind::Peer);
-        self.resource_states
-            .entry(sid)
-            .or_default();
+        self.resource_states.entry(sid).or_default();
         self.apply_open_delta(sid).map_err(|e| Fault::Transfer {
             message: format!("open persistence delta failed: {e}"),
         })?;
@@ -165,11 +164,7 @@ impl ProtocolMachine {
             && handler.supports_wal_sync()
         {
             let sync = self.current_wal_sync_request(Some(sid), coro_id);
-            let request = EffectRequest::wal_sync(
-                self.clock.tick,
-                sync.operation_id.clone(),
-                sync,
-            );
+            let request = EffectRequest::wal_sync(self.clock.tick, sync.operation_id.clone(), sync);
             self.ensure_effect_request_allowed(&request)
                 .map_err(|failure| Fault::Invoke { failure })?;
             let predicted_effect_id = self.next_effect_id;
@@ -198,13 +193,36 @@ impl ProtocolMachine {
                     self.output_condition_checks
                         .push(check, &self.config.observability_retention)
                 },
-                |event| self.obs_trace.push(event, &self.config.observability_retention),
+                |event| {
+                    self.obs_trace
+                        .push(event, &self.config.observability_retention)
+                },
                 self.clock.tick,
                 output_hint,
             ) {
                 self.coroutines[coro_idx].status = CoroStatus::Faulted(fault.clone());
                 return Err(fault);
             }
+        }
+
+        // Validate the live occurrence before any derived nominal success observation.
+        // Gates above may suspend this commit; its returned result stays resident.
+        if matches!(&pack.coro_update, CoroUpdate::CompleteNominal) {
+            self.validate_source_operation_context(coro_idx)?;
+            let final_handler_identity = handler.handler_identity();
+            self.validate_nominal_continuation(coro_idx)
+                .map_err(|failure| Fault::Invoke { failure })?;
+            self.coroutines[coro_idx]
+                .nominal_continuation
+                .as_ref()
+                .expect("original validated")
+                .require_handler_identity(&final_handler_identity)
+                .map_err(|failure| Fault::Invoke { failure })?;
+            self.commit_nominal_result(coro_idx, &final_handler_identity)?;
+        }
+
+        if let CoroUpdate::OperationLifecycle(action) = &pack.coro_update {
+            self.commit_operation_lifecycle(coro_idx, action.clone())?;
         }
 
         for ev in &pack.events {
@@ -232,6 +250,7 @@ impl ProtocolMachine {
 
         // Apply coroutine update.
         match pack.coro_update {
+            CoroUpdate::CompleteNominal | CoroUpdate::OperationLifecycle(_) => {}
             CoroUpdate::AdvancePc => {
                 coro.pc += 1;
                 coro.status = CoroStatus::Ready;

@@ -11,7 +11,7 @@ use super::super::statement::{parse_block, parse_statement};
 use super::super::types::{ChoiceBranch, ChoiceGuardSpec, Statement};
 use super::super::Rule;
 use super::authority::parse_effect_call;
-use super::{next_required, parse_guard_predicate, syntax_error};
+use super::{next_required, parse_branch_body, parse_guard_predicate, syntax_error};
 
 fn parse_choice_branch(
     item: pest::iterators::Pair<Rule>,
@@ -111,36 +111,6 @@ fn parse_choice_branch(
         guard,
         statements,
     })
-}
-
-fn parse_branch_body(
-    pair: pest::iterators::Pair<Rule>,
-    declared_roles: &HashSet<String>,
-    input: &str,
-    protocol_defs: &HashMap<String, Vec<Statement>>,
-) -> Result<Vec<Statement>, ParseError> {
-    let pair = if pair.as_rule() == Rule::branch_body {
-        let span = pair.as_span();
-        pair.into_inner()
-            .next()
-            .ok_or_else(|| syntax_error(span, input, "branch body is empty".to_string()))?
-    } else {
-        pair
-    };
-    match pair.as_rule() {
-        Rule::block => parse_block(pair, declared_roles, input, protocol_defs),
-        Rule::statement => Ok(vec![parse_statement(
-            pair,
-            declared_roles,
-            input,
-            protocol_defs,
-        )?]),
-        _ => Err(syntax_error(
-            pair.as_span(),
-            input,
-            "expected an indented branch body or compact statement body".to_string(),
-        )),
-    }
 }
 
 fn collect_choice_branches(

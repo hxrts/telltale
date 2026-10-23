@@ -710,6 +710,44 @@ impl EffectRequest {
         }
     }
 
+    pub(crate) fn nominal_command(
+        tick: u64,
+        request: crate::nominal_command::NominalCommandRequest,
+        budget_ticks: u64,
+    ) -> Self {
+        let mut metadata = EffectInterfaceMetadata::for_effect_kind("invoke_step");
+        metadata.interface_name = request.declaration.interface.clone();
+        metadata.operation_name = request.declaration.operation.clone();
+        metadata.region_scope = EffectRegionScope::Session;
+        metadata.reentrancy_policy = EffectReentrancyPolicy::Allow;
+        metadata.totality = if request.declaration.may_block {
+            EffectTotality::MayBlock
+        } else {
+            EffectTotality::Immediate
+        };
+        metadata.timeout_policy = if request.declaration.may_block {
+            EffectTimeoutPolicy::Required {
+                budget_ticks: Some(budget_ticks),
+            }
+        } else {
+            EffectTimeoutPolicy::None
+        };
+        if request.declaration.readiness_predicate.is_some() {
+            metadata.authority_class = EffectAuthorityClass::Authoritative;
+            metadata.semantic_class = EffectSemanticClass::Authoritative;
+        }
+        let invocation = request.invocation;
+        let session = request.session;
+        Self {
+            effect_id: Some(invocation),
+            tick,
+            session: Some(session),
+            operation_id: Some(format!("effect:{invocation}")),
+            metadata,
+            body: EffectRequestBody::NominalCommand { request },
+        }
+    }
+
     #[must_use]
     pub fn send_decision(
         tick: u64,
@@ -758,8 +796,31 @@ impl EffectRequest {
                 label: label.into(),
                 state: state.to_vec(),
                 payload,
+                destination: None,
+                register_width: None,
             },
         )
+    }
+
+    /// Bind the actual Receive instruction's destination before handler execution.
+    pub(crate) fn with_receive_destination(mut self, destination: u16) -> Self {
+        if let EffectRequestBody::Receive {
+            destination: slot, ..
+        } = &mut self.body
+        {
+            *slot = Some(destination);
+        }
+        self
+    }
+
+    /// Bind the configured VM register width before handler execution.
+    pub(crate) fn with_register_width(mut self, width: u16) -> Self {
+        match &mut self.body {
+            EffectRequestBody::Receive { register_width, .. }
+            | EffectRequestBody::InvokeStep { register_width, .. } => *register_width = Some(width),
+            _ => {}
+        }
+        self
     }
 
     #[must_use]
@@ -802,6 +863,7 @@ impl EffectRequest {
             EffectRequestBody::InvokeStep {
                 role: role.into(),
                 state: state.to_vec(),
+                register_width: None,
             },
         )
     }
@@ -904,6 +966,10 @@ impl EffectRequest {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[allow(missing_docs)]
 pub enum EffectRequestBody {
+    /// A declared typed command request, distinct from generic InvokeStep.
+    NominalCommand {
+        request: crate::nominal_command::NominalCommandRequest,
+    },
     SendDecision {
         role: String,
         partner: String,
@@ -917,6 +983,12 @@ pub enum EffectRequestBody {
         label: String,
         state: Vec<Value>,
         payload: Value,
+        /// Actual instruction destination, absent for handler-only receive calls.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        destination: Option<u16>,
+        /// Actual VM register width, absent for handler-only calls.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        register_width: Option<u16>,
     },
     Choose {
         role: String,
@@ -927,6 +999,9 @@ pub enum EffectRequestBody {
     InvokeStep {
         role: String,
         state: Vec<Value>,
+        /// Actual VM register width, absent for handler-only calls.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        register_width: Option<u16>,
     },
     Acquire {
         role: String,
@@ -962,7 +1037,7 @@ pub enum EffectOutcomeStatus {
 }
 
 impl EffectOutcomeStatus {
-    /// Whether the outcome is successful.
+    /// Whether the raw host status claims success, before typed acceptance.
     #[must_use]
     pub fn is_success(&self) -> bool {
         matches!(self, Self::Success)
@@ -980,15 +1055,33 @@ impl EffectOutcomeStatus {
 #[serde(tag = "kind", rename_all = "snake_case")]
 #[allow(missing_docs)]
 pub enum EffectResponse {
-    SendDecision { decision: SendDecision },
-    Receive { state: Vec<Value> },
-    Choose { label: String },
-    InvokeStep { state: Vec<Value> },
-    Acquire { evidence: Value },
+    /// Application result bound to the original command occurrence.
+    NominalCommand {
+        reply: crate::nominal_command::NominalCommandReply,
+    },
+    SendDecision {
+        decision: SendDecision,
+    },
+    Receive {
+        state: Vec<Value>,
+    },
+    Choose {
+        label: String,
+    },
+    InvokeStep {
+        state: Vec<Value>,
+    },
+    Acquire {
+        evidence: Value,
+    },
     Release,
-    TopologyEvents { events: Vec<TopologyPerturbation> },
+    TopologyEvents {
+        events: Vec<TopologyPerturbation>,
+    },
     WalSync,
-    OutputConditionHint { hint: Option<OutputConditionHint> },
+    OutputConditionHint {
+        hint: Option<OutputConditionHint>,
+    },
 }
 
 /// One typed runtime effect outcome.
@@ -1001,7 +1094,177 @@ pub struct EffectOutcome {
     pub response: Option<EffectResponse>,
 }
 
+// Canonical response-kind compatibility for typed effect acceptance.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum EffectResponseKind {
+    NominalCommand,
+    SendDecision,
+    Receive,
+    Choose,
+    InvokeStep,
+    Acquire,
+    Release,
+    TopologyEvents,
+    WalSync,
+    OutputConditionHint,
+}
+
+impl EffectRequestBody {
+    fn response_kind(&self) -> EffectResponseKind {
+        match self {
+            Self::NominalCommand { .. } => EffectResponseKind::NominalCommand,
+            Self::SendDecision { .. } => EffectResponseKind::SendDecision,
+            Self::Receive { .. } => EffectResponseKind::Receive,
+            Self::Choose { .. } => EffectResponseKind::Choose,
+            Self::InvokeStep { .. } => EffectResponseKind::InvokeStep,
+            Self::Acquire { .. } => EffectResponseKind::Acquire,
+            Self::Release { .. } => EffectResponseKind::Release,
+            Self::TopologyEvents { .. } => EffectResponseKind::TopologyEvents,
+            Self::WalSync { .. } => EffectResponseKind::WalSync,
+            Self::OutputConditionHint { .. } => EffectResponseKind::OutputConditionHint,
+        }
+    }
+}
+
+impl EffectResponse {
+    fn require_kind(&self, expected: EffectResponseKind) -> Result<(), EffectFailure> {
+        let actual = match self {
+            Self::NominalCommand { .. } => EffectResponseKind::NominalCommand,
+            Self::SendDecision { .. } => EffectResponseKind::SendDecision,
+            Self::Receive { .. } => EffectResponseKind::Receive,
+            Self::Choose { .. } => EffectResponseKind::Choose,
+            Self::InvokeStep { .. } => EffectResponseKind::InvokeStep,
+            Self::Acquire { .. } => EffectResponseKind::Acquire,
+            Self::Release => EffectResponseKind::Release,
+            Self::TopologyEvents { .. } => EffectResponseKind::TopologyEvents,
+            Self::WalSync => EffectResponseKind::WalSync,
+            Self::OutputConditionHint { .. } => EffectResponseKind::OutputConditionHint,
+        };
+        if actual == expected {
+            Ok(())
+        } else {
+            Err(EffectFailure::contract_violation(
+                "effect response kind does not match the original request",
+            ))
+        }
+    }
+}
+
 impl EffectOutcome {
+    /// Derive lifecycle acceptance without changing the retained raw exchange.
+    /// Success requires the requested response family and actual VM applicability context.
+    /// This read-only observation does not issue a live operation, owner or continuation.
+    #[must_use]
+    pub fn accepted_status(&self, request: &EffectRequestBody) -> EffectOutcomeStatus {
+        match &self.status {
+            EffectOutcomeStatus::Success => match &self.response {
+                Some(response) => match response.require_kind(request.response_kind()) {
+                    Ok(()) => match (request, response) {
+                        (EffectRequestBody::NominalCommand { request }, EffectResponse::NominalCommand { reply })
+                            if request.invocation != reply.invocation => EffectOutcomeStatus::Failure {
+                                failure: EffectFailure::contract_violation("nominal reply belongs to a different invocation"),
+                            },
+(EffectRequestBody::NominalCommand { request }, EffectResponse::NominalCommand { reply }) => {
+    match &reply.result {
+        Ok(value) => match value.require_declaration(&request.declaration) {
+            Ok(()) => EffectOutcomeStatus::Success,
+            Err(failure) => EffectOutcomeStatus::Failure { failure },
+        },
+        Err(_) => EffectOutcomeStatus::Success,
+    }
+},
+                        (EffectRequestBody::Receive { register_width: Some(width), .. }, EffectResponse::Receive { state })
+                        | (EffectRequestBody::InvokeStep { register_width: Some(width), .. }, EffectResponse::InvokeStep { state })
+                            if state.len() != usize::from(*width) => EffectOutcomeStatus::Failure {
+                                failure: EffectFailure::contract_violation("effect response state does not match configured register width"),
+                            },
+                        (EffectRequestBody::Receive { destination: Some(destination), .. },
+                         EffectResponse::Receive { state }) if state.get(usize::from(*destination)).is_none() => {
+                            EffectOutcomeStatus::Failure { failure: EffectFailure::contract_violation(
+                                "receive response state has no instruction destination register",
+                            ) }
+                        }
+                        _ => EffectOutcomeStatus::Success,
+                    },
+                    Err(failure) => EffectOutcomeStatus::Failure { failure },
+                },
+                None => EffectOutcomeStatus::Failure {
+                    failure: EffectFailure::contract_violation(
+                        "successful effect outcome is missing response",
+                    ),
+                },
+            },
+            other => other.clone(),
+        }
+    }
+
+    /// Consume an InvokeStep result before any register mutation.
+    ///
+    /// # Errors
+    /// Returns the contract failure for a missing or wrong successful response.
+    pub fn into_invoke_state(self) -> Result<EffectResult<Vec<Value>>, EffectFailure> {
+        self.into_state(EffectResponseKind::InvokeStep)
+    }
+
+    /// Consume a Receive result before any register mutation.
+    ///
+    /// # Errors
+    /// Returns the contract failure for a missing or wrong successful response.
+    pub fn into_receive_state(self) -> Result<EffectResult<Vec<Value>>, EffectFailure> {
+        self.into_state(EffectResponseKind::Receive)
+    }
+
+    /// Consume Receive using actual instruction applicability before state replacement.
+    pub(crate) fn into_receive_state_for(
+        self,
+        request: &EffectRequestBody,
+    ) -> Result<EffectResult<Vec<Value>>, EffectFailure> {
+        self.into_state_for(request, EffectResponseKind::Receive)
+    }
+
+    /// Consume InvokeStep using the actual configured VM register width.
+    pub(crate) fn into_invoke_state_for(
+        self,
+        request: &EffectRequestBody,
+    ) -> Result<EffectResult<Vec<Value>>, EffectFailure> {
+        self.into_state_for(request, EffectResponseKind::InvokeStep)
+    }
+
+    fn into_state_for(
+        self,
+        request: &EffectRequestBody,
+        expected: EffectResponseKind,
+    ) -> Result<EffectResult<Vec<Value>>, EffectFailure> {
+        if let EffectOutcomeStatus::Failure { failure } = self.accepted_status(request) {
+            return match self.status {
+                EffectOutcomeStatus::Failure { failure } => Ok(EffectResult::Failure(failure)),
+                _ => Err(failure),
+            };
+        }
+        self.into_state(expected)
+    }
+
+    fn into_state(
+        self,
+        expected: EffectResponseKind,
+    ) -> Result<EffectResult<Vec<Value>>, EffectFailure> {
+        match self.status {
+            EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
+            EffectOutcomeStatus::Failure { failure } => Ok(EffectResult::Failure(failure)),
+            EffectOutcomeStatus::Success => {
+                let response = self.success_response()?;
+                response.require_kind(expected)?;
+                match response {
+                    EffectResponse::Receive { state } | EffectResponse::InvokeStep { state } => {
+                        Ok(EffectResult::Success(state))
+                    }
+                    _ => Err(EffectFailure::contract_violation(
+                        "effect state response required",
+                    )),
+                }
+            }
+        }
+    }
     /// Construct a successful typed effect outcome.
     #[must_use]
     pub fn success(response: EffectResponse) -> Self {
@@ -1071,21 +1334,21 @@ impl EffectOutcome {
         match self.status {
             EffectOutcomeStatus::Blocked => Ok(EffectResult::Blocked),
             EffectOutcomeStatus::Failure { failure } => Ok(EffectResult::Failure(failure)),
-            EffectOutcomeStatus::Success => match self.success_response()? {
-                EffectResponse::Receive { .. } | EffectResponse::Release => {
-                    Ok(EffectResult::Success(()))
-                }
-                EffectResponse::InvokeStep { .. } if expected_kind == "invoke_step" => {
-                    Ok(EffectResult::Success(()))
-                }
-                EffectResponse::WalSync if expected_kind == "wal_sync" => {
-                    Ok(EffectResult::Success(()))
-                }
-                other => Err(EffectFailure::contract_violation(format!(
-                    "effect outcome kind mismatch: expected {expected_kind}, got {:?}",
-                    other
-                ))),
-            },
+            EffectOutcomeStatus::Success => {
+                let expected = match expected_kind {
+                    "handle_recv" => EffectResponseKind::Receive,
+                    "invoke_step" => EffectResponseKind::InvokeStep,
+                    "handle_release" => EffectResponseKind::Release,
+                    "wal_sync" => EffectResponseKind::WalSync,
+                    _ => {
+                        return Err(EffectFailure::contract_violation(
+                            "unknown unit effect kind",
+                        ))
+                    }
+                };
+                self.success_response()?.require_kind(expected)?;
+                Ok(EffectResult::Success(()))
+            }
         }
     }
 
@@ -1190,10 +1453,12 @@ pub struct EffectExchangeRecord {
 }
 
 impl EffectExchangeRecord {
-    /// Whether this exchange completed successfully.
+    /// Whether this exchange has success status and a response applicable to its request.
     #[must_use]
     pub fn succeeded(&self) -> bool {
-        self.outcome.status.is_success()
+        self.outcome
+            .accepted_status(&self.request.body)
+            .is_success()
     }
 
     /// Whether this exchange reached a terminal outcome.
@@ -1229,9 +1494,7 @@ impl EffectCompositionPolicy {
     #[must_use]
     pub fn commitment_resolved(&self, records: &[EffectExchangeRecord]) -> bool {
         match self {
-            Self::All => {
-                !records.is_empty() && records.iter().all(EffectExchangeRecord::succeeded)
-            }
+            Self::All => !records.is_empty() && records.iter().all(EffectExchangeRecord::succeeded),
             Self::First => records.iter().any(EffectExchangeRecord::succeeded),
             Self::Threshold { required_successes } => {
                 *required_successes > 0
@@ -1623,11 +1886,7 @@ mod effect_contract_tests {
         ];
 
         for (label, policy, records, resolved, compatible) in cases {
-            assert_eq!(
-                policy.commitment_resolved(&records),
-                resolved,
-                "{label}"
-            );
+            assert_eq!(policy.commitment_resolved(&records), resolved, "{label}");
             assert_eq!(
                 policy.commitment_compatible(&records),
                 compatible,

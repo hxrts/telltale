@@ -325,32 +325,9 @@ pub enum SessionStatus {
     },
 }
 
-/// Current authority carried by a live ownership capability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum OwnershipScope {
-    /// Full-session authority.
-    Session,
-    /// Fragment/boundary-scoped authority.
-    Fragments(BTreeSet<String>),
-}
-
-impl OwnershipScope {
-    /// Whether this scope grants no authority beyond the current scope.
-    #[must_use]
-    pub fn is_attenuation_of(&self, current: &Self) -> bool {
-        match (self, current) {
-            (_, Self::Session) => true,
-            (Self::Fragments(next), Self::Fragments(previous)) => next.is_subset(previous),
-            (Self::Session, Self::Fragments(_)) => false,
-        }
-    }
-
-    /// Whether this scope authorizes full-session host mutation.
-    #[must_use]
-    pub fn allows_session_mutation(&self) -> bool {
-        matches!(self, Self::Session)
-    }
-}
+// Canonical evidence data lives below the machine; the live issuer registry
+// and capability checks remain in this module. Wire data alone is not authority.
+pub use telltale_types::{OwnershipScope, ReadinessWitness};
 
 /// Capability proving the caller is the current owner for one session.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -382,24 +359,6 @@ pub struct OwnershipReceipt {
     pub to_generation: OwnershipEpoch,
     /// Scope granted if the transfer commits.
     pub scope: OwnershipScope,
-}
-
-/// Witness proving a protocol-critical readiness check succeeded under the
-/// current owner capability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReadinessWitness {
-    /// Unique witness identifier within one session.
-    pub witness_id: AuthorityWitnessId,
-    /// Session whose readiness was proven.
-    pub session_id: SessionId,
-    /// Owner label that requested the witness.
-    pub owner_id: FragmentOwnerId,
-    /// Owner generation that must still be live when the witness is consumed.
-    pub generation: OwnershipEpoch,
-    /// Scope under which the witness was issued.
-    pub scope: OwnershipScope,
-    /// Predicate/check reference justified by this witness.
-    pub predicate_ref: String,
 }
 
 /// Witness proving a session transitioned to an explicit cancellation path.
@@ -719,4 +678,48 @@ pub enum SessionDisposalError {
         /// Actual coroutine whose ownership index failed validation.
         coroutine: usize,
     },
+}
+
+/// Read-only snapshot of canonical readiness custody, never an issued handle.
+/// There is deliberately no Deserialize implementation for this observation.
+///
+/// ```compile_fail
+/// use telltale_machine::ReadinessRegistryView;
+/// let _: ReadinessRegistryView = serde_json::from_str("{}").unwrap();
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ReadinessRegistryView {
+    /// Actual current semantic owner fields; not an OwnedSession.
+    pub current: Option<OwnershipCapability>,
+    /// A real staged transfer excludes readiness consumption.
+    pub transfer_pending: bool,
+    /// Exact original issued witnesses still resident in this session.
+    pub issued: Vec<ReadinessWitness>,
+    /// Actual canonical consumed witness identifiers.
+    pub consumed: Vec<AuthorityWitnessId>,
+    /// Canonical next witness counter, including prior issuance.
+    pub next_witness_id: AuthorityWitnessId,
+    /// Genuine readiness audit entries, including rejection chronology/ticks.
+    pub audit: Vec<AuthorityAuditRecord>,
+}
+
+impl SessionState {
+    /// Observe the actual session registry without issuing/restoring authority.
+    #[must_use]
+    pub fn readiness_registry_view(&self) -> ReadinessRegistryView {
+        ReadinessRegistryView {
+            current: self.ownership.current.clone(),
+            transfer_pending: self.ownership.pending_transfer.is_some(),
+            issued: self.ownership.issued_readiness.values().cloned().collect(),
+            consumed: self.ownership.consumed_witnesses.iter().copied().collect(),
+            next_witness_id: self.ownership.next_witness_id,
+            audit: self
+                .ownership
+                .audit_log
+                .iter()
+                .filter(|record| matches!(&record.artifact, AuthorityArtifact::Readiness(_)))
+                .cloned()
+                .collect(),
+        }
+    }
 }

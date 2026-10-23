@@ -47,11 +47,12 @@ impl ProtocolMachine {
             .ok_or_else(|| Fault::ChannelClosed {
                 endpoint: ep.clone(),
             })?;
-        let cached = session
-            .lookup_branch_resolution(ep, label)
-            .ok_or_else(|| Fault::UnknownLabel {
-                label: label.to_string(),
-            })?;
+        let cached =
+            session
+                .lookup_branch_resolution(ep, label)
+                .ok_or_else(|| Fault::UnknownLabel {
+                    label: label.to_string(),
+                })?;
         if cached.direction != crate::session::BranchDirection::Recv {
             return Err(Fault::TypeViolation {
                 expected: telltale_types::ValType::Unit,
@@ -137,14 +138,14 @@ impl ProtocolMachine {
         let sid = ep.sid;
 
         let partner = {
-            let local_type = self
-                .sessions
-                .lookup_type(&ep)
-                .ok_or_else(|| Fault::TypeViolation {
-                    expected: telltale_types::ValType::Unit,
-                    actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: no type registered"),
-                })?;
+            let local_type =
+                self.sessions
+                    .lookup_type(&ep)
+                    .ok_or_else(|| Fault::TypeViolation {
+                        expected: telltale_types::ValType::Unit,
+                        actual: telltale_types::ValType::Unit,
+                        message: format!("{role}: no type registered"),
+                    })?;
             let (partner, _) = Self::expect_recv_type(local_type, role)?;
             partner.to_string()
         };
@@ -184,22 +185,24 @@ impl ProtocolMachine {
             &label,
             &self.coroutines[coro_idx].regs,
             val.clone(),
-        );
+        )
+        .with_register_width(self.config.num_registers);
         self.ensure_effect_request_allowed(&request)
             .map_err(|failure| Fault::Invoke { failure })?;
         let predicted_effect_id = self.next_effect_id;
         let recv_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &recv_outcome, &handler.handler_identity(), predicted_effect_id);
-        if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
-            self.coroutines[coro_idx].regs = state;
-        }
-        recv_outcome
-            .into_unit("handle_recv")
+        self.record_effect_exchange(
+            &request,
+            &recv_outcome,
+            &handler.handler_identity(),
+            predicted_effect_id,
+        );
+        let state = recv_outcome
+            .into_receive_state_for(&request.body)
             .unwrap_or_else(EffectResult::failure)
-            .expect_success(|| {
-                EffectFailure::contract_violation("handle_recv returned blocked")
-            })
+            .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
             .map_err(|failure| Fault::Invoke { failure })?;
+        self.coroutines[coro_idx].regs = state;
 
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
         let (_resolved, type_update) = resolve_type_update(&continuation, original, &ep);

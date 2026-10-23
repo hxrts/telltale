@@ -106,6 +106,7 @@ impl EffectTraceTape {
             EffectRequestBody::SendDecision { .. } => "send_decision",
             EffectRequestBody::Receive { .. } => "handle_recv",
             EffectRequestBody::Choose { .. } => "handle_choose",
+            EffectRequestBody::NominalCommand { .. } => "nominal_command",
             EffectRequestBody::InvokeStep { .. } => "invoke_step",
             EffectRequestBody::Acquire { .. } => "handle_acquire",
             EffectRequestBody::Release { .. } => "handle_release",
@@ -179,6 +180,8 @@ impl EffectTraceTape {
 pub struct RecordingEffectHandler<'a> {
     inner: &'a dyn EffectHandler,
     tape: EffectTraceTape,
+    #[cfg(test)]
+    after_record: Option<&'a (dyn Fn(&EffectRequest) + Send + Sync)>,
 }
 
 impl<'a> RecordingEffectHandler<'a> {
@@ -188,6 +191,8 @@ impl<'a> RecordingEffectHandler<'a> {
         Self {
             inner,
             tape: EffectTraceTape::new(),
+            #[cfg(test)]
+            after_record: None,
         }
     }
 
@@ -261,11 +266,15 @@ impl<'a> ReplayEffectHandler<'a> {
             .cursor
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
-        self.entries.get(cursor).map(|entry| entry.handler_identity.clone())
+        self.entries
+            .get(cursor)
+            .map(|entry| entry.handler_identity.clone())
     }
 
     fn recorded_handler_identity(&self) -> Option<String> {
-        self.entries.first().map(|entry| entry.handler_identity.clone())
+        self.entries
+            .first()
+            .map(|entry| entry.handler_identity.clone())
     }
 
     fn next_entry(&self, expected_kind: &str) -> Result<EffectTraceEntry, String> {

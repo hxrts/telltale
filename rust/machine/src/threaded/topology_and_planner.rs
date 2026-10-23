@@ -151,7 +151,9 @@ impl ThreadedProtocolMachine {
             .expect("threaded ProtocolMachine lock poisoned");
         let mut faulted_sessions = Vec::new();
         for session in sessions.values() {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             if !session_guard.roles.iter().any(|role| role == site) {
                 continue;
             }
@@ -179,14 +181,20 @@ impl ThreadedProtocolMachine {
                 let fault = Fault::Invoke {
                     failure: EffectFailure::topology_disruption(reason.clone()),
                 };
+                crate::operation_lifecycle::fail_active_operation(
+                    &mut guard,
+                    &mut self.operation_instances,
+                    &mut self.progress_contracts,
+                    &mut self.outstanding_effects,
+                    &fault,
+                    self.clock.tick,
+                );
                 guard.status = CoroStatus::Faulted(fault.clone());
                 newly_terminal = newly_terminal.saturating_add(1);
                 faulted.push((guard.id, fault));
             }
         }
-        self.non_terminal_coroutines = self
-            .non_terminal_coroutines
-            .saturating_sub(newly_terminal);
+        self.non_terminal_coroutines = self.non_terminal_coroutines.saturating_sub(newly_terminal);
         for (coro_id, fault) in faulted {
             self.scheduler.mark_done(coro_id);
             self.trace.push(ObsEvent::Faulted {
@@ -268,7 +276,10 @@ impl ThreadedProtocolMachine {
         }
     }
 
-    fn enforce_handler_identity_contract(&mut self, handler_identity: &str) -> Result<(), ProtocolMachineError> {
+    fn enforce_handler_identity_contract(
+        &mut self,
+        handler_identity: &str,
+    ) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
@@ -308,7 +319,10 @@ impl ThreadedProtocolMachine {
         Ok(())
     }
 
-    fn assert_delegation_events_audited(&self, events: &[ObsEvent]) -> Result<(), ProtocolMachineError> {
+    fn assert_delegation_events_audited(
+        &self,
+        events: &[ObsEvent],
+    ) -> Result<(), ProtocolMachineError> {
         if !self.config.host_contract_assertions.is_enforced() {
             return Ok(());
         }
@@ -343,7 +357,10 @@ impl ThreadedProtocolMachine {
         Ok(())
     }
 
-    fn ingest_topology_events(&mut self, handler: &dyn EffectHandler) -> Result<(), ProtocolMachineError> {
+    fn ingest_topology_events(
+        &mut self,
+        handler: &dyn EffectHandler,
+    ) -> Result<(), ProtocolMachineError> {
         let tick = self.clock.tick;
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
@@ -422,7 +439,9 @@ impl ThreadedProtocolMachine {
                     continue;
                 }
                 let can_send = self.sessions.get(edge.sid).is_some_and(|session| {
-                    let session = session.lock().expect("threaded ProtocolMachine lock poisoned");
+                    let session = session
+                        .lock()
+                        .expect("threaded ProtocolMachine lock poisoned");
                     session
                         .buffers
                         .get(&edge)
@@ -449,7 +468,9 @@ impl ThreadedProtocolMachine {
             let reason = self.scheduler.block_reason(coro_id).cloned();
             if let Some(BlockReason::Recv { token, .. }) = reason {
                 if let Some(session) = self.sessions.get(token.sid) {
-                    let session = session.lock().expect("threaded ProtocolMachine lock poisoned");
+                    let session = session
+                        .lock()
+                        .expect("threaded ProtocolMachine lock poisoned");
                     let has_msg = session.roles.iter().any(|sender| {
                         sender != &token.endpoint.role
                             && session.has_message(sender, &token.endpoint.role)
@@ -518,7 +539,8 @@ impl ThreadedProtocolMachine {
         coro_id: usize,
     ) -> Result<(), ProtocolMachineError> {
         let lane = coro_id % planner.lane_count;
-        let coro = self.coroutine_by_id(coro_id)
+        let coro = self
+            .coroutine_by_id(coro_id)
             .cloned()
             .ok_or(ProtocolMachineError::Fault {
                 coro_id,

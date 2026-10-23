@@ -195,6 +195,18 @@ def serializeNat (v : Value) : List Nat :=
       let s2 := serializeNat v2
       4 :: s1.length :: s1 ++ s2
   | .chan e => 5 :: e.sid :: (e.role.toList.map Char.toNat)
+  | .readiness witness =>
+      let owner := witness.ownerId.toList.map Char.toNat
+      let predicate := witness.predicateRef.toList.map Char.toNat
+      let scope := match witness.scope with
+        | .session => [0]
+        | .fragments roles => 1 :: roles.length :: roles.flatMap (fun role =>
+            let encoded := role.toList.map Char.toNat
+            encoded.length :: encoded)
+      -- Reserved exact evidence-data tag. This transport decoder deliberately
+      -- refuses tag 6; witness transport is outside the terminal-unit slice.
+      [6, witness.witnessId, witness.sessionId, witness.generation, owner.length] ++
+        owner ++ [predicate.length] ++ predicate ++ scope
 
 def serialize (v : Value) : ByteArray :=
   -- Serialize into a byte array via UInt8 tags.

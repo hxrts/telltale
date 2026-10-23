@@ -154,11 +154,13 @@ fn step_choose(
     let partner = match &session
         .local_types
         .get(&ep)
-        .ok_or_else(|| ThreadedExecFault::new(Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: no type registered"),
-        }))?
+        .ok_or_else(|| {
+            ThreadedExecFault::new(Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: no type registered"),
+            })
+        })?
         .current
     {
         LocalTypeR::Recv { partner, .. } => partner.clone(),
@@ -213,11 +215,13 @@ fn step_choose(
     let current_type = &session
         .local_types
         .get(&ep)
-        .ok_or_else(|| ThreadedExecFault::new(Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: no type registered"),
-        }))?
+        .ok_or_else(|| {
+            ThreadedExecFault::new(Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: no type registered"),
+            })
+        })?
         .current;
     if !matches!(current_type, LocalTypeR::Recv { .. }) {
         return Err(ThreadedExecFault::new(Fault::TypeViolation {
@@ -228,9 +232,11 @@ fn step_choose(
     }
     let cached = session
         .lookup_branch_resolution(&ep, &label)
-        .ok_or_else(|| ThreadedExecFault::new(Fault::UnknownLabel {
-            label: label.clone(),
-        }))?;
+        .ok_or_else(|| {
+            ThreadedExecFault::new(Fault::UnknownLabel {
+                label: label.clone(),
+            })
+        })?;
     if cached.direction != crate::session::BranchDirection::Recv {
         return Err(ThreadedExecFault::new(Fault::TypeViolation {
             expected: telltale_types::ValType::Unit,
@@ -243,9 +249,11 @@ fn step_choose(
         .iter()
         .find(|(l, _)| *l == label)
         .map(|(_, pc)| *pc)
-        .ok_or_else(|| ThreadedExecFault::new(Fault::UnknownLabel {
-            label: label.clone(),
-        }))?;
+        .ok_or_else(|| {
+            ThreadedExecFault::new(Fault::UnknownLabel {
+                label: label.clone(),
+            })
+        })?;
 
     let request = EffectRequest::receive(
         ctx.tick,
@@ -256,21 +264,22 @@ fn step_choose(
         &label,
         &coro.regs,
         val.clone(),
-    );
+    )
+    .with_register_width(ctx.config.num_registers);
     let recv_outcome = ctx.handler.handle_effect(request.clone());
     let observation = EffectObservation {
-        request,
+        request: request.clone(),
         outcome: recv_outcome.clone(),
     };
-    if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
-        coro.regs = state;
-    }
-    recv_outcome
+    let state = recv_outcome
         .clone()
-        .into_unit("handle_recv")
+        .into_receive_state_for(&request.body)
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
-        .map_err(|failure| ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone()))?;
+        .map_err(|failure| {
+            ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone())
+        })?;
+    coro.regs = state;
 
     let original = session
         .local_types
@@ -323,25 +332,36 @@ fn step_offer(
     match &session
         .local_types
         .get(&ep)
-        .ok_or_else(|| ThreadedExecFault::new(Fault::TypeViolation {
-            expected: telltale_types::ValType::Unit,
-            actual: telltale_types::ValType::Unit,
-            message: format!("{role}: no type registered"),
-        }))?
+        .ok_or_else(|| {
+            ThreadedExecFault::new(Fault::TypeViolation {
+                expected: telltale_types::ValType::Unit,
+                actual: telltale_types::ValType::Unit,
+                message: format!("{role}: no type registered"),
+            })
+        })?
         .current
     {
         LocalTypeR::Send { partner, .. } => {
             let partner = partner.clone();
             let cached = session
                 .lookup_branch_resolution(&ep, label)
-                .ok_or_else(|| ThreadedExecFault::new(Fault::UnknownLabel {
-                    label: label.to_string(),
-                }))?;
+                .ok_or_else(|| {
+                    ThreadedExecFault::new(Fault::UnknownLabel {
+                        label: label.to_string(),
+                    })
+                })?;
             if cached.direction != crate::session::BranchDirection::Send {
                 return Err(ThreadedExecFault::new(Fault::TypeViolation {
                     expected: telltale_types::ValType::Unit,
                     actual: telltale_types::ValType::Unit,
-                    message: format!("{role}: Offer expects Send, got {:?}", session.local_types.get(&ep).expect("endpoint type exists").current),
+                    message: format!(
+                        "{role}: Offer expects Send, got {:?}",
+                        session
+                            .local_types
+                            .get(&ep)
+                            .expect("endpoint type exists")
+                            .current
+                    ),
                 }));
             }
             let expected_type = cached.expected_type.clone();
@@ -370,7 +390,12 @@ fn step_offer(
                 .expect_success(|| {
                     EffectFailure::contract_violation("send_decision returned blocked")
                 })
-                .map_err(|failure| ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone()))?;
+                .map_err(|failure| {
+                    ThreadedExecFault::with_observation(
+                        Fault::Invoke { failure },
+                        observation.clone(),
+                    )
+                })?;
             if let SendDecision::Deliver(payload) = &decision {
                 validate_payload(
                     ctx.config,
@@ -384,16 +409,16 @@ fn step_offer(
                 .map_err(|fault| ThreadedExecFault::with_observation(fault, observation.clone()))?;
             }
             let enqueue = match decision {
-                SendDecision::Deliver(payload) => session
-                    .send(role, &partner, payload)
-                    .map_err(|e| {
+                SendDecision::Deliver(payload) => {
+                    session.send(role, &partner, payload).map_err(|e| {
                         ThreadedExecFault::with_observation(
                             Fault::Invoke {
                                 failure: EffectFailure::invalid_input(e),
                             },
                             observation.clone(),
                         )
-                    })?,
+                    })?
+                }
                 SendDecision::Drop | SendDecision::Defer => EnqueueResult::Dropped,
             };
             match enqueue {
@@ -554,11 +579,12 @@ fn step_open(
         message: "open session missing after allocation".to_string(),
     })?;
     {
-        let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+        let mut session_guard = session
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
         for (_, sender, receiver) in plan.edge_blueprint() {
-            if let Some((_, handler_id)) = handlers
-                .iter()
-                .find(|((bound_sender, bound_receiver), _)| {
+            if let Some((_, handler_id)) =
+                handlers.iter().find(|((bound_sender, bound_receiver), _)| {
                     bound_sender == sender && bound_receiver == receiver
                 })
             {

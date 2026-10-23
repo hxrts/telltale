@@ -12,6 +12,11 @@ pub use merge::merge_local_types;
 
 /// Project a choreography to a local session type for a specific role
 pub fn project(choreography: &Choreography, role: &Role) -> Result<LocalType, ProjectionError> {
+    if choreography.protocol.contains_execution_placement() {
+        return Err(ProjectionError::UnsupportedAuthorityConstruct {
+            construct: "PlacedBinding",
+        });
+    }
     let mut context = ProjectionContext::new(choreography, role);
     context.project_protocol(&choreography.protocol)
 }
@@ -175,6 +180,12 @@ impl<'a> ProjectionContext<'a> {
                 ..
             } => self.project_choice(choice_role, branches),
 
+            Protocol::Let {
+                execution_role: Some(_),
+                ..
+            } => Err(ProjectionError::UnsupportedAuthorityConstruct {
+                construct: "PlacedBinding",
+            }),
             Protocol::Let { continuation, .. } => self.project_protocol(continuation),
 
             Protocol::Case { branches, .. } => self.project_case(branches),

@@ -49,6 +49,8 @@ structure StepPack (ι γ π ε ν : Type u)
   coro : CoroutineState γ ε
   st : ProtocolMachineState ι γ π ε ν
   res : ExecResult γ ε
+  /-- Consume the original retained nominal result only after the output gate. -/
+  nominalCommit : Bool := false
 
 /-! ## Buffer helpers -/
 
@@ -326,6 +328,7 @@ def valTypeOf (v : Value) : ValType :=
   | .bool _ => .bool
   | .nat _ => .nat
   | .string _ => .string
+  | .readiness _ => .readiness
   | .prod v1 v2 => .prod (valTypeOf v1) (valTypeOf v2)
   | .chan ep => .chan ep.sid ep.role
 

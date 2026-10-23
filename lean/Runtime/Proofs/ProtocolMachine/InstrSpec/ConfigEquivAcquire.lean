@@ -85,6 +85,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
         | bool => simp only [renameValType] at hT; nomatch hT
         | nat => simp only [renameValType] at hT; nomatch hT
         | string => simp only [renameValType] at hT; nomatch hT
+        | readiness => simp only [renameValType] at hT; nomatch hT
         | prod _ _ => simp only [renameValType] at hT; nomatch hT
 /- ## Structured Block 2 -/
       | send _ _ _ => simp only [renameLocalType] at hEq; nomatch hEq

@@ -64,6 +64,7 @@ def swapValTypeRole (s : SessionId) (A B : Role) : ValType → ValType
   | .bool => .bool
   | .nat => .nat
   | .string => .string
+  | .readiness => .readiness
   | .prod T₁ T₂ => .prod (swapValTypeRole s A B T₁) (swapValTypeRole s A B T₂)
   | .chan sid role =>
       if sid == s then

@@ -117,6 +117,7 @@ def concreteBlockReasonTag : BlockReason γ → String
   | .consensusWait _ => "consensus_wait"
   | .spawnWait => "spawn_wait"
   | .closeWait _ => "close_wait"
+  | .operationAwait _ => "operation_await"
 
 def projectConcreteCoroutineSlice (coro : CoroutineState γ ε) : ConcreteCoroutineSlice :=
   { coroId := coro.id
@@ -170,6 +171,8 @@ def concreteFaultTag : Fault γ → String
   | .invalidSignature edge => s!"invalid_signature:{edge.sender}->{edge.receiver}"
   | .acquireFault _ msg => s!"acquire_fault:{msg}"
   | .invokeFault msg => s!"invoke_fault:{msg}"
+  | .effectFault kind message => s!"invoke_fault:{kind}:{message}"
+  | .outputCondition predicate => s!"output_condition_fault:{predicate}"
   | .transferFault msg => s!"transfer_fault:{msg}"
   | .closeFault msg => s!"close_fault:{msg}"
   | .specFault msg => s!"spec_fault:{msg}"

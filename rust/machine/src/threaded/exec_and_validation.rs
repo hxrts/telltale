@@ -98,6 +98,14 @@ fn exec_instr(
     }
     coro_guard.cost_budget -= ctx.step.config.instruction_cost;
 
+    if let Instr::Invoke {
+        action: InvokeAction::NominalCommand(call),
+    } = &instr
+    {
+        drop(coro_guard);
+        return exec_nominal_instr(coro, session, call, &ctx.step);
+    }
+
     let (pack, effect_observations) = match instr {
         Instr::Send { chan, val } => {
             step_send(&mut coro_guard, session, &role, chan, val, &ctx.step)
@@ -106,7 +114,11 @@ fn exec_instr(
             step_recv(&mut coro_guard, session, &role, chan, dst, &ctx.step)
         }
         Instr::Halt => {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            crate::operation_lifecycle::require_operation_terminal(&coro_guard)
+                .map_err(ThreadedExecFault::new)?;
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             step_halt(&mut session_guard, &ep, ctx.step.tick)
                 .map(|pack| (pack, Vec::new()))
                 .map_err(ThreadedExecFault::new)
@@ -128,7 +140,9 @@ fn exec_instr(
             Vec::new(),
         )),
         Instr::Invoke { action } => {
-            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             step_invoke(
                 &mut coro_guard,
                 &session_guard,
@@ -136,6 +150,7 @@ fn exec_instr(
                 action,
                 ctx.step.handler,
                 ctx.step.tick,
+                ctx.step.config.num_registers,
             )
         }
         Instr::Acquire { layer, dst } => step_acquire(
@@ -240,7 +255,9 @@ fn exec_instr(
             ))
         }
         Instr::Choose { chan, ref table } => {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             step_choose(
                 &mut coro_guard,
                 &mut session_guard,
@@ -251,7 +268,9 @@ fn exec_instr(
             )
         }
         Instr::Offer { chan, ref label } => {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             step_offer(
                 &mut coro_guard,
                 &mut session_guard,
@@ -265,7 +284,9 @@ fn exec_instr(
         Instr::Close {
             session: session_reg,
         } => {
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             let close_ep =
                 endpoint_from_reg(&coro_guard, session_reg).map_err(ThreadedExecFault::new)?;
             if !coro_guard.owned_endpoints.contains(&close_ep) {
@@ -349,7 +370,9 @@ fn monitor_precheck(
     }
     match instr {
         Instr::Send { .. } | Instr::Offer { .. } => {
-            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -371,7 +394,9 @@ fn monitor_precheck(
             }
         }
         Instr::Receive { .. } => {
-            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             let local_type = session_guard
                 .local_types
                 .get(ep)
@@ -404,7 +429,9 @@ fn monitor_precheck(
                         .to_string(),
                 });
             }
-            let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             let local_type = session_guard
                 .local_types
                 .get(ep)

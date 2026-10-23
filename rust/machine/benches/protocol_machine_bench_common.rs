@@ -64,6 +64,11 @@ pub(crate) struct BenchHandler;
 impl EffectHandler for BenchHandler {
     fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
         match request.body {
+            EffectRequestBody::NominalCommand { .. } => {
+                EffectOutcome::failure(EffectFailure::unavailable(
+                    "this generic handler does not implement nominal commands",
+                ))
+            }
             EffectRequestBody::SendDecision { payload, .. } => {
                 EffectOutcome::success(EffectResponse::SendDecision {
                     decision: SendDecision::Deliver(payload.unwrap_or(Value::Unit)),

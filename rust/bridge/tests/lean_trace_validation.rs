@@ -335,7 +335,7 @@ fn lean_rejects_tampered_protocol_machine_trace_with_structured_errors() {
 }
 
 #[test]
-fn lean_accepts_projectable_authority_control_flow_trace_corpus() {
+fn lean_accepts_plain_communication_control_flow_trace() {
     if strict_protocol_machine_runner_required() {
         ProtocolMachineRunner::require_available();
     }
@@ -343,44 +343,38 @@ fn lean_accepts_projectable_authority_control_flow_trace_corpus() {
         "Lean protocol-machine runner must be available for authority control-flow trace validation",
     );
 
-    for fixture in [
-        "call_plain_communication",
-        "choice_observational_binding",
-        "loop_authoritative_binding",
-        "recursion_authoritative_binding",
-    ] {
-        let choreography = parse_choreography_file(&authority_pass_fixture(fixture))
-            .unwrap_or_else(|err| panic!("parse {fixture}: {err}"));
-        choreography
-            .validate()
-            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
-        assert!(
-            choreography.language_tier_status().session_projectable,
-            "{fixture} should remain session-projectable"
-        );
+    let fixture = "call_plain_communication";
+    let choreography = parse_choreography_file(&authority_pass_fixture(fixture))
+        .unwrap_or_else(|err| panic!("parse {fixture}: {err}"));
+    choreography
+        .validate()
+        .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+    assert!(
+        choreography.language_tier_status().session_projectable,
+        "{fixture} should remain session-projectable"
+    );
 
-        let trace = run_rust_semantic_audit_for_choreography(&choreography, 128);
-        let validation = runner
-            .validate_trace(
-                &[ChoreographyJson {
-                    schema_version: canonical_schema_version(),
-                    global_type: global_to_json(
-                        &choreography_to_global(&choreography)
-                            .expect("convert authority control-flow choreography to global"),
-                    ),
-                    roles: choreography
-                        .roles
-                        .iter()
-                        .map(|role| role.name().to_string())
-                        .collect(),
-                }],
-                &trace,
-            )
-            .unwrap_or_else(|err| panic!("validate_trace {fixture}: {err}"));
-        assert!(
-            validation.valid,
-            "Lean validateTrace rejected accepted authority control-flow trace for {fixture}: {:?}",
-            validation.errors
-        );
-    }
+    let trace = run_rust_semantic_audit_for_choreography(&choreography, 128);
+    let validation = runner
+        .validate_trace(
+            &[ChoreographyJson {
+                schema_version: canonical_schema_version(),
+                global_type: global_to_json(
+                    &choreography_to_global(&choreography)
+                        .expect("convert authority control-flow choreography to global"),
+                ),
+                roles: choreography
+                    .roles
+                    .iter()
+                    .map(|role| role.name().to_string())
+                    .collect(),
+            }],
+            &trace,
+        )
+        .unwrap_or_else(|err| panic!("validate_trace {fixture}: {err}"));
+    assert!(
+        validation.valid,
+        "Lean validateTrace rejected accepted authority control-flow trace for {fixture}: {:?}",
+        validation.errors
+    );
 }

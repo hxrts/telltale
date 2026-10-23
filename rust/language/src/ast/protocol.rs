@@ -92,6 +92,8 @@ pub enum Protocol {
 
     /// Local authority/evidence binding.
     Let {
+        /// Explicit source execution placement; absence does not select an ambient role.
+        execution_role: Option<Role>,
         /// Bound variable name.
         name: String,
         /// Whether the binding is authoritative, observational, or plain.
@@ -301,12 +303,14 @@ impl Clone for Protocol {
                 annotations: annotations.clone(),
             },
             Protocol::Let {
+                execution_role,
                 name,
                 mode,
                 expr,
                 linear,
                 continuation,
             } => Protocol::Let {
+                execution_role: execution_role.clone(),
                 name: name.clone(),
                 mode: *mode,
                 expr: expr.clone(),
@@ -473,6 +477,91 @@ pub enum Condition {
 }
 
 impl Protocol {
+    /// Whether this node binds authority, an observation, or a transfer receipt.
+    ///
+    /// An explicitly placed binding also requires execution-preserving lowering.
+    /// Unplaced plain identifier and constructor bindings remain local-only. Calls have
+    /// no purity contract, so they and effectful expressions require
+    /// explicit execution even when their binding mode is plain.
+    #[must_use]
+    pub fn is_authority_binding(&self) -> bool {
+        matches!(self, Self::Let { execution_role, mode, expr, linear, .. }
+            if execution_role.is_some() || *linear || *mode != AuthorityBindingMode::Plain
+                || matches!(expr, AuthorityExpr::Check { .. }
+                    | AuthorityExpr::Observe { .. } | AuthorityExpr::Transfer { .. } | AuthorityExpr::Call { .. }))
+    }
+
+    /// Find authority bindings that a communication-only generator cannot erase.
+    /// This is a syntax boundary, not evidence that a binding has executed.
+    #[must_use]
+    // RECURSION_SAFE: structural recursion over the finite protocol AST.
+    pub fn contains_authority_binding(&self) -> bool {
+        self.contains_binding_where(&Self::is_authority_binding)
+    }
+
+    /// Whether any source binding explicitly selects an execution role.
+    /// This does not bind an original runtime endpoint or generation.
+    #[must_use]
+    pub fn contains_execution_placement(&self) -> bool {
+        self.contains_binding_where(&|node| {
+            matches!(
+                node,
+                Self::Let {
+                    execution_role: Some(_),
+                    ..
+                }
+            )
+        })
+    }
+
+    // RECURSION_SAFE: structural recursion over the finite protocol AST.
+    fn contains_binding_where(&self, predicate: &impl Fn(&Self) -> bool) -> bool {
+        if predicate(self) {
+            return true;
+        }
+        match self {
+            Self::Begin { continuation, .. }
+            | Self::Await { continuation, .. }
+            | Self::Resolve { continuation, .. }
+            | Self::Invalidate { continuation, .. }
+            | Self::Send { continuation, .. }
+            | Self::Broadcast { continuation, .. }
+            | Self::Let { continuation, .. }
+            | Self::Publish { continuation, .. }
+            | Self::PublishAuthority { continuation, .. }
+            | Self::Materialize { continuation, .. }
+            | Self::Handoff { continuation, .. }
+            | Self::DependentWork { continuation, .. }
+            | Self::Extension { continuation, .. } => {
+                continuation.contains_binding_where(predicate)
+            }
+            Self::Choice { branches, .. } => branches
+                .iter()
+                .any(|b| b.protocol.contains_binding_where(predicate)),
+            Self::Case { branches, .. } => branches
+                .iter()
+                .any(|b| b.protocol.contains_binding_where(predicate)),
+            Self::Timeout {
+                body,
+                on_timeout,
+                on_cancel,
+                ..
+            } => {
+                body.contains_binding_where(predicate)
+                    || on_timeout.contains_binding_where(predicate)
+                    || on_cancel
+                        .as_deref()
+                        .is_some_and(|node| node.contains_binding_where(predicate))
+            }
+            Self::Loop { body, .. } | Self::Rec { body, .. } => {
+                body.contains_binding_where(predicate)
+            }
+            Self::Parallel { protocols } => protocols
+                .iter()
+                .any(|node| node.contains_binding_where(predicate)),
+            Self::Var(_) | Self::End => false,
+        }
+    }
     #[must_use]
     pub fn mentions_role(&self, role: &Role) -> bool {
         match self {
@@ -503,7 +592,16 @@ impl Protocol {
             Protocol::Choice {
                 role: r, branches, ..
             } => r.matches_family(role) || branches.iter().any(|b| b.protocol.mentions_role(role)),
-            Protocol::Let { continuation, .. } => continuation.mentions_role(role),
+            Protocol::Let {
+                execution_role,
+                continuation,
+                ..
+            } => {
+                execution_role
+                    .as_ref()
+                    .is_some_and(|placed| placed.matches_family(role))
+                    || continuation.mentions_role(role)
+            }
             Protocol::Case { branches, .. } => {
                 branches.iter().any(|b| b.protocol.mentions_role(role))
             }
@@ -575,7 +673,16 @@ impl Protocol {
                 validate_choice_branches(role, branches)?;
                 Ok(())
             }
-            Protocol::Let { continuation, .. } => continuation.validate(roles),
+            Protocol::Let {
+                execution_role,
+                continuation,
+                ..
+            } => {
+                if let Some(placed) = execution_role {
+                    ensure_declared_role(roles, placed)?;
+                }
+                continuation.validate(roles)
+            }
             Protocol::Case { branches, .. } => {
                 for branch in branches {
                     branch.protocol.validate(roles)?;

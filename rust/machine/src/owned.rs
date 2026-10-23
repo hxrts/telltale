@@ -238,7 +238,9 @@ impl ProtocolMachine {
                 session.claim_ownership(sid, owner_id, OwnershipScope::Session)
             })
             .map_err(ProtocolMachineError::OwnershipContract)?;
-        Ok(OwnedSession::new(sid, capability))
+        let owner = OwnedSession::new(sid, capability);
+        self.bind_nominal_owner(&owner);
+        Ok(owner)
     }
 }
 

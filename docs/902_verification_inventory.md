@@ -409,6 +409,7 @@ The rows in this table are source-derived and checked by
 | Surface | Normalization rule | Classification | Why permitted |
 |---|---|---|---|
 | semantic-audit tick normalization | Normalize only `tick`, and only per extracted session id | irreducible trusted comparison logic | Absolute cross-session scheduling order is not semantic protocol truth. Per-session observable order is. |
+| single nominal occurrence comparison | Relate only the validated original nominal occurrence ID and preserve exact original-or-plus-one reply relation/refusal; never normalize ticks, typed application results, lifecycle or continuation | irreducible trusted comparison logic | Rust also issues non-nominal observational effects, so its absolute counter namespace differs from the selected executable model. Each side must retain exactly one actual nominal occurrence with consistent operation/request references before the comparison relates that ID. Raw outputs are unchanged. |
 
 Enforcing artifacts:
 
@@ -439,3 +440,44 @@ through Rust AST inventory, actual Cargo harness discovery with `multi-thread`,
 and successful execution of every required name. Missing, ignored, nested
 conditional ignore, wrong-module, and zero-test outcomes fail the gate.
 `just check-ownership-contracts` includes this gate in the PR-critical lane.
+
+## Prepared readiness lowering inventory
+
+The authoritative nominal readiness child declares three portable machine codec/shape
+fixtures and six actual source/runtime fixture families for each backend in
+`rust/tests/nominal_command_runtime.rs`. Cooperative fixtures are portable, while
+threaded fixtures require `multi-thread` and non-WASM. They cover original registry single-use after
+actual rollback, real Blocked→between-round registry issuance→same-original retry, malformed/Boolean/predicate/reused evidence, genuine foreign
+session and committed transfer refusal, and actual callback-before-output-gate
+refusal with the witness still unconsumed. Same original native worker shutdown
+is explicit in the threaded fixtures. Discovery and execution remain required.
+Source declarations are not passing evidence.
+
+`NominalCommandExecution.lean` adds eight named readiness examples over the
+actual installed nominal opcode/canonical commit or direct canonical model
+owner/issuer/consumer, including stale installed original owner before issuance and changed generation before retained-result
+reuse. They remain unelaborated source. The general source-to-model bridge must
+adapt explicitly to the typed result before claiming readiness correspondence.
+The transport model deliberately refuses readiness decoding. Witness transport
+is outside this terminal-unit continuation slice. Neither model state nor
+serialized witness data reconstructs Rust host authority.
+
+
+## Prepared original-operation checkpoint inventory
+
+The existing `dsl_runtime_semantics_tests` target includes operation lifecycle,
+joint readiness, compiler-obligation refusal and central fault/Halt modules.
+Native threaded declarations require the root `multi-thread` feature. Same
+original worker disposal precedes final assertions. Existing bridge
+`protocol_machine_differential_steps` additionally declares actual source-parent
+Bool/result/Blocked/failure correspondence, parent/readiness output-gate
+correspondence and parent/child/window omission mutations. These use the existing
+required Lean runner and refuse its absence.
+
+The targeted model prerequisite explicitly builds `OperationLifecycleExecution`,
+`OperationReadinessExecution` and `OperationFailureExecution` alongside the
+existing nominal modules. Examples execute installed typed opcodes and canonical
+owner/issuer/commit producers. Declarations remain unelaborated and Rust
+fixtures undiscovered/unexecuted. Genuine dependent-work AwaitPending, handoff,
+timeout/cancellation escalation and complete authority-family proofs remain
+open. No source-only count is acceptance evidence.

@@ -108,7 +108,7 @@ pub struct ThreadedProtocolMachine {
     clock: SimClock,
     next_coro_id: usize,
     non_terminal_coroutines: usize,
-    pool: ThreadPool,
+    pool: OwnedNativeWorkerPool,
     workers: usize,
     lane_count: usize,
     guard_resources: Arc<Mutex<BTreeMap<String, Value>>>,
@@ -304,6 +304,10 @@ fn write_coro_reg(coro: &mut Coroutine, reg: u16, value: Value) -> Result<(), Fa
 
 /// How to update the coroutine after an instruction.
 enum CoroUpdate {
+    /// Consume the original typed result after main-thread commit gates.
+    CompleteNominal,
+    /// Apply explicit source lifecycle against actual main-owner canonical records.
+    OperationLifecycle(crate::operation_lifecycle::OperationAction),
     /// Advance PC by 1, status = Ready.
     AdvancePc,
     /// Set PC to target (for Jmp), status = Ready.

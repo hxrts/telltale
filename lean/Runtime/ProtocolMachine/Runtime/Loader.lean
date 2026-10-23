@@ -170,32 +170,35 @@ end
 
 private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (image : CodeImage γ ε) : Option String :=
-  let lookupLocalType :=
-    fun (roles : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) (role : Role) =>
-      (roles.find? (fun p => p.1 = role)).map Prod.snd
-  let entryRoles := image.program.entryPoints.map Prod.fst
-  let localRoles := image.program.localTypesR.map Prod.fst
-  if entryRoles.length ≠ localRoles.length then
-    some "entry/local role arity mismatch"
-  else if entryRoles.eraseDups.length ≠ entryRoles.length then
-    some "duplicate entry-point role"
-  else if localRoles.eraseDups.length ≠ localRoles.length then
-    some "duplicate local-type role"
-  else if !entryRoles.all (fun r => localRoles.contains r) then
-    some "entry/local role mismatch"
+  if !nominalProgramValid image.program then
+    some "invalid nominal declarations or result continuations"
   else
-    match entryRoles.find? (fun role =>
-      match lookupLocalType image.program.localTypesR role with
-      | none => true
-      | some claimed =>
-          let projected? := Choreography.Projection.Project.projectR? image.globalType role
-          match projected? with
-          | none => true
-          | some projected =>
-/- ## Structured Block 3 -/
-              !localTypeREq projected.1 claimed) with
-    | some role => some s!"projection mismatch for role {role}"
-    | none => none
+    let lookupLocalType :=
+      fun (roles : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) (role : Role) =>
+        (roles.find? (fun p => p.1 = role)).map Prod.snd
+    let entryRoles := image.program.entryPoints.map Prod.fst
+    let localRoles := image.program.localTypesR.map Prod.fst
+    if entryRoles.length ≠ localRoles.length then
+      some "entry/local role arity mismatch"
+    else if entryRoles.eraseDups.length ≠ entryRoles.length then
+      some "duplicate entry-point role"
+    else if localRoles.eraseDups.length ≠ localRoles.length then
+      some "duplicate local-type role"
+    else if !entryRoles.all (fun r => localRoles.contains r) then
+      some "entry/local role mismatch"
+    else
+      match entryRoles.find? (fun role =>
+        match lookupLocalType image.program.localTypesR role with
+        | none => true
+        | some claimed =>
+            let projected? := Choreography.Projection.Project.projectR? image.globalType role
+            match projected? with
+            | none => true
+            | some projected =>
+  /- ## Structured Block 3 -/
+                !localTypeREq projected.1 claimed) with
+      | some role => some s!"projection mismatch for role {role}"
+      | none => none
 
 -- # Core trusted loader path
 
@@ -239,8 +242,9 @@ private def loadChoreographyCore {ι γ π ε ν : Type u} [IdentityModel ι] [G
       let endpoint : Endpoint := { sid := sid, role := entry.1 }
       { id := nextId
       , programId := programId
+      , role := entry.1
       , pc := entry.2
-      , regs := (Array.replicate 8 .unit).set! 0 (.chan endpoint)
+      , regs := (Array.replicate st.config.numRegisters .unit).set! 0 (.chan endpoint)
       , status := .ready
       , effectCtx := default
       , ownedEndpoints := [endpoint]
@@ -304,3 +308,30 @@ def loadChoreography {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ
   | _ => (st, st.nextSessionId)
 
 /-! Proof-only loader lemmas are in `Runtime.Proofs.ProtocolMachine.LoadChoreography`. -/
+
+/-- Admit the original model owner for an actually loaded, active session and
+retain that same issued value on its installed coroutines. A later registry
+owner or serialized observation does not refresh stale coroutine authority.
+This models protocol authority, not a Rust host handle or host teardown. -/
+def admitLoadedSessionOwner {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) (ownerId : String) :
+    Except String (ProtocolMachineState ι γ π ε ν × SessionTypes.ModelOwner) := do
+  let session ← match st.sessions.lookup sid with
+    | none => .error "owning admission requires an actual loaded session"
+    | some session => .ok session
+  if ownerId.isEmpty then throw "owning admission requires a named original model owner"
+  match session.phase with
+  | .active => pure ()
+  | _ => throw "owning admission requires an active session"
+  let installed := st.coroutines.toList.filter (fun coroutine =>
+    coroutine.ownedEndpoints.any (fun endpoint => endpoint.sid == sid))
+  if installed.isEmpty || installed.any (fun coroutine => coroutine.issuedModelOwner.isSome) then
+    throw "owning admission requires unclaimed actual installed coroutines"
+  let (ownership, owner) ← session.ownership.claim sid ownerId
+  let admitted := { st with
+    sessions := st.sessions.map (fun entry =>
+      if entry.1 == sid then (entry.1, { entry.2 with ownership }) else entry),
+    coroutines := st.coroutines.map (fun coroutine =>
+      if coroutine.ownedEndpoints.any (fun endpoint => endpoint.sid == sid) then
+        { coroutine with issuedModelOwner := some owner } else coroutine) }
+  return (admitted, owner)
