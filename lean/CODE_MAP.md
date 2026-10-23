@@ -43,9 +43,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,508 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,192 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   202 |  40,714 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   202 |  40,750 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **705** | **143,574** |                                                            |
+| **Total**      | **705** | **143,610** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**

@@ -202,6 +202,42 @@ private def validateImage? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
       | some role => some s!"projection mismatch for role {role}"
       | none => none
 
+/-- Exact computation equation for the private image validator. This exposes
+its original pure checks to kernel proofs without making validation an owner
+admission API or registering a global simplification rule. -/
+theorem validateImage_eq {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+    (image : CodeImage γ ε) : validateImage? image =
+    (
+      if !nominalProgramValid image.program then
+        some "invalid nominal declarations or result continuations"
+      else
+        let lookupLocalType :=
+          fun (roles : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) (role : Role) =>
+            (roles.find? (fun p => p.1 = role)).map Prod.snd
+        let entryRoles := image.program.entryPoints.map Prod.fst
+        let localRoles := image.program.localTypesR.map Prod.fst
+        if entryRoles.length ≠ localRoles.length then
+          some "entry/local role arity mismatch"
+        else if entryRoles.eraseDups.length ≠ entryRoles.length then
+          some "duplicate entry-point role"
+        else if localRoles.eraseDups.length ≠ localRoles.length then
+          some "duplicate local-type role"
+        else if !entryRoles.all (fun r => localRoles.contains r) then
+          some "entry/local role mismatch"
+        else
+          match entryRoles.find? (fun role =>
+            match lookupLocalType image.program.localTypesR role with
+            | none => true
+            | some claimed =>
+                let projected? := Choreography.Projection.Project.projectR? image.globalType role
+                match projected? with
+                | none => true
+                | some projected =>
+                    !localTypeREq projected.1 claimed) with
+          | some role => some s!"projection mismatch for role {role}"
+          | none => none
+    ) := rfl
+
 -- # Core trusted loader path
 
 /-- Core trusted loader path used by checked and compatibility APIs. -/
