@@ -207,40 +207,39 @@ def CodeImage.fromLocalTypes {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
 classification is checked after the action model rebases it; a missing or
 inconsistent implementation refuses instead of erasing executable semantics. -/
 def mapExecutableTargets? {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (target : PC → Option PC) (instruction : Instr γ ε) : Option (Instr γ ε) := do
+    (target : PC → Option PC) (instruction : Instr γ ε) : Option (Instr γ ε) :=
   match instruction with
   | .choose channel table =>
-      let table' ← table.mapM fun entry => do
+      Option.bind (table.mapM fun entry => do
         let pc ← target entry.2
-        pure (entry.1, pc)
-      pure (.choose channel table')
-  | .jump pc => pure (.jump (← target pc))
-  | .spawn pc args => pure (.spawn (← target pc) args)
+        pure (entry.1, pc)) fun table' =>
+          some (.choose channel table')
+  | .jump pc => Option.bind (target pc) fun relocated => some (.jump relocated)
+  | .spawn pc args => Option.bind (target pc) fun relocated => some (.spawn relocated args)
   | .invoke action =>
       match EffectRuntime.operationAction action with
       | some operation =>
           if (EffectRuntime.commandDeclaration action).isSome || (EffectRuntime.commandCall action).isSome then none
-          else do
-            let relocated ← operation.mapTargets? target
-            let action' ← EffectRuntime.relocateOperation action relocated
-            if EffectRuntime.operationAction action' = some relocated ∧
+          else Option.bind (operation.mapTargets? target) fun relocated =>
+            Option.bind (EffectRuntime.relocateOperation action relocated) fun action' =>
+              if EffectRuntime.operationAction action' = some relocated ∧
                 EffectRuntime.commandDeclaration action' = none ∧ EffectRuntime.commandCall action' = none then
-              pure (.invoke action')
-            else none
+                some (.invoke action')
+              else none
       | none =>
           match EffectRuntime.commandDeclaration action, EffectRuntime.commandCall action with
           | some _, some _ => none
-          | _, none => pure instruction
+          | _, none => some instruction
           | none, some call =>
-              let ok ← target call.onOk
-              let err ← target call.onErr
-              let relocated := { call with onOk := ok, onErr := err }
-              let action' ← EffectRuntime.relocateCommand action relocated
-              if EffectRuntime.commandDeclaration action' = none ∧
-                  EffectRuntime.commandCall action' = some relocated then
-                pure (.invoke action')
-              else none
-  | _ => pure instruction
+              Option.bind (target call.onOk) fun okPc =>
+                Option.bind (target call.onErr) fun errPc =>
+                  let relocated := { call with onOk := okPc, onErr := errPc }
+                  Option.bind (EffectRuntime.relocateCommand action relocated) fun action' =>
+                    if EffectRuntime.commandDeclaration action' = none ∧
+                      EffectRuntime.commandCall action' = some relocated then
+                      some (.invoke action')
+                    else none
+  | _ => some instruction
 
 /-- Split the actual executable image at its actual role entries. This never
 recompiles communication types: typed actions and their targets must survive.
@@ -264,8 +263,10 @@ def CodeImage.toRoleCodeImage {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε
       | some code => pure code
       | none => throw "executable role target or typed action cannot be preserved"
     pure (acc.insert entry.1 code.toArray)) ({} : Std.HashMap Role (Bytecode γ ε))
-  pure { programs := programs, globalType := image.globalType,
-    localTypes := localTypeRMap image.program.localTypesR }
+  pure
+    { programs := programs
+    , globalType := image.globalType
+    , localTypes := localTypeRMap image.program.localTypesR }
 
 /-- Assemble actual per-role executable programs. Nominal action relocation is
 supplied by its typed action model and checked against the exact descriptor.
@@ -274,24 +275,34 @@ def RoleCodeImage.toCodeImage {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε
     (image : RoleCodeImage γ ε) (roles : List Role) : Except String (CodeImage γ ε) := do
   if roles.length != image.programs.size || roles.eraseDups.length != roles.length then
     throw "role order does not name each executable program exactly once"
-  let (code, entries) ← roles.foldlM (fun (acc : List (Instr γ ε) × List (Role × PC)) role => do
-    let original ← match image.programs[role]? with
+  let assembled : List (Instr γ ε) × List (Role × PC) ← roles.foldlM (fun (acc : List (Instr γ ε) × List (Role × PC)) role => do
+    let original : Bytecode γ ε ← match image.programs[role]? with
       | some code => pure code
       | none => throw "missing executable role program"
     if original.isEmpty then throw "empty executable role program"
     let offset := acc.1.length
     let target := fun pc => if pc < original.size then some (offset + pc) else none
-    let relocated ← match original.toList.mapM (mapExecutableTargets? (γ := γ) (ε := ε) target) with
+    let relocated : List (Instr γ ε) ← match original.toList.mapM (mapExecutableTargets? (γ := γ) (ε := ε) target) with
       | some code => pure code
       | none => throw "executable role target or typed action cannot be relocated"
-    pure (acc.1 ++ relocated, acc.2 ++ [(role, offset)])) ([], [])
-  let locals ← roles.mapM fun role => match image.localTypes[role]? with
-    | some local => pure (role, local)
-    | none => throw "missing executable role local type"
-  pure { program := { code := code.toArray, entryPoints := entries,
-      localTypes := locals.map fun entry => (entry.1, localTypeRToLocalType entry.2),
-      localTypesR := locals, handlerTypes := [], metadata := ProgramMeta.empty },
-    globalType := image.globalType }
+    pure ((acc.1 ++ relocated, acc.2 ++ [(role, offset)]) : List (Instr γ ε) × List (Role × PC))) ([], [])
+  let (code, entries) := assembled
+  let localsResult : Except String (List (Role × LocalTypeR)) :=
+    roles.mapM fun role => match image.localTypes[role]? with
+      | some localType => .ok (role, localType)
+      | none => .error "missing executable role local type"
+  match localsResult with
+  | .error reason => throw reason
+  | .ok locals =>
+      pure
+        { program :=
+            { code := code.toArray
+            , entryPoints := entries
+            , localTypes := locals.map fun entry => (entry.1, localTypeRToLocalType entry.2)
+            , localTypesR := locals
+            , handlerTypes := []
+            , metadata := ProgramMeta.empty }
+        , globalType := image.globalType }
 
 /-! ## Nominal command image admission
 Classification inspects typed EffectRuntime actions; no operation-name string is
