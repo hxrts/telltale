@@ -33,7 +33,7 @@ private def insertEdgeIfNew (edge : Edge) (edges : List Edge) : List Edge :=
     edges ++ [edge]
 
 mutual
-  private partial def collectProtocolEdges
+  private def collectProtocolEdges
       (sid : SessionId) (owner : Role) (lt : LocalType) (acc : List Edge) : List Edge :=
     match lt with
     | .send partner _ cont =>
@@ -66,8 +66,9 @@ mutual
         collectProtocolBranchEdges sid owner branches acc'
     | .mu body => collectProtocolEdges sid owner body acc
     | .var _ | .end_ => acc
+  termination_by structural lt
 
-  private partial def collectProtocolBranchEdges
+  private def collectProtocolBranchEdges
       (sid : SessionId) (owner : Role) (branches : List (Label × LocalType))
       (acc : List Edge) : List Edge :=
     match branches with
@@ -75,6 +76,7 @@ mutual
     | (_, cont) :: rest =>
         let acc' := collectProtocolEdges sid owner cont acc
         collectProtocolBranchEdges sid owner rest acc'
+  termination_by structural branches
 end
 
 private def protocolEdges

@@ -45,16 +45,20 @@ def originalOutputRefusal : Bool := (do
 
 theorem output_refusal_retains_original_fault_and_revokes_only_original_semantic_work :
     originalOutputRefusal = true := by
-  simp only [
-    image, roleImage, empty, ordinaryLoaded,
-    loaded, invokeInstalled, blocked, resumed,
-    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage, Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall, parentDeclaration,
-    jointRoleImage, jointBlocked, jointResumed, offerInstalled,
-    jointSettled, outputFaultRetained, originalOutputRefusal] <;> decide
+  simp +decide only [
+    image, roleImage, empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?,
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
+    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
+    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
+    parentDeclaration, jointRoleImage, jointBlocked, jointResumed, outputFaultRetained,
+    originalOutputRefusal, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
+    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte]
+  all_goals decide
 
 /-- The expired original Await executes its actual installed opcode. Its fault
 enters the central owner; no child or replacement endpoint is synthesized. -/
@@ -78,16 +82,20 @@ def originalExpiryRefusal : Bool := (do
 
 theorem expired_original_await_retains_first_fault_without_renewal_or_cleanup_ack :
     originalExpiryRefusal = true := by
-  simp only [
-    image, roleImage, empty, ordinaryLoaded,
-    loaded, invokeInstalled, blocked, resumed,
-    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage, Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall, parentDeclaration,
-    jointRoleImage, jointBlocked, jointResumed, offerInstalled,
-    jointSettled, outputFaultRetained, originalOutputRefusal, originalExpiryRefusal] <;> decide
+  simp +decide only [
+    image, roleImage, empty, ordinaryLoaded, loaded, invokeInstalled, RoleCodeImage.toCodeImage,
+    mapExecutableTargets?, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
+    Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
+    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
+    Runtime.Tests.OperationLifecycleExecution.sourceResolved, originalExpiryRefusal, List.mapM,
+    Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
+    List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure,
+    ↓reduceIte]
+  all_goals decide
 
 /-- A genuine installed Jump bypasses a still-present static Resolve. Runtime
 Halt must refuse rather than treating static presence as actual resolution. -/
@@ -121,16 +129,19 @@ def originalHaltRefusal : Bool := (do
 
 theorem actual_jump_cannot_halt_without_original_terminal_resolution :
     originalHaltRefusal = true := by
-  simp only [
-    image, roleImage, empty, ordinaryLoaded,
-    loaded, invokeInstalled, blocked, resumed,
-    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage, Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall, parentDeclaration,
-    jointRoleImage, jointBlocked, jointResumed, offerInstalled,
-    jointSettled, outputFaultRetained, originalOutputRefusal, originalExpiryRefusal,
-    originalHaltRefusal] <;> decide
+  simp +decide only [
+    image, roleImage, empty, ordinaryLoaded, loaded, invokeInstalled, RoleCodeImage.toCodeImage,
+    mapExecutableTargets?, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
+    Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
+    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
+    Runtime.Tests.OperationLifecycleExecution.sourceResolved, originalHaltRefusal, List.mapM,
+    Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
+    List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure,
+    ↓reduceIte]
+  all_goals decide
 
 end Runtime.Tests.OperationFailureExecution

@@ -74,16 +74,20 @@ theorem original_parent_owns_exact_blocked_readiness_child :
       st.outstandingEffects.any (fun effect => effect.status == .blocked &&
         effect.orderingKey == 0 && effect.completedAtTick.isNone) &&
       st.operationInstances.length == 2).getD false = true := by
-  simp only [
-    image, roleImage, empty, ordinaryLoaded,
-    loaded, invokeInstalled, blocked, resumed,
-    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+  simp +decide only [
+    image, roleImage, empty, ordinaryLoaded, loaded, invokeInstalled, blocked,
+    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage, Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall, parentDeclaration,
-    jointRoleImage, jointBlocked, jointResumed, offerInstalled,
-    jointSettled] <;> decide
+    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
+    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
+    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
+    parentDeclaration, jointRoleImage, jointBlocked, List.mapM, Except.bind, Option.bind,
+    Array.size, Nat.reduceAdd, List.nil_append, List.cons_append, List.length_cons,
+    List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure, ↓reduceIte]
+  all_goals decide
 
 theorem original_parent_resolves_after_actual_readiness_consumption :
     (jointSettled.map fun st =>
@@ -94,16 +98,20 @@ theorem original_parent_resolves_after_actual_readiness_consumption :
         effect.orderingKey == 0 && effect.completedAtTick == some 1) &&
       st.sessions.any (fun entry => entry.2.ownership.consumedWitnesses == [1]) &&
       st.operationInstances.all (fun operation => operation.phase == .succeeded)).getD false = true := by
-  simp only [
-    image, roleImage, empty, ordinaryLoaded,
-    loaded, invokeInstalled, blocked, resumed,
-    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage, Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall, parentDeclaration,
-    jointRoleImage, jointBlocked, jointResumed, offerInstalled,
-    jointSettled] <;> decide
+  simp +decide only [
+    image, roleImage, empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?,
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
+    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
+    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
+    parentDeclaration, jointRoleImage, jointBlocked, jointResumed, offerInstalled, jointSettled,
+    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
+    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
+    Except.pure, ↓reduceIte]
+  all_goals decide
 
 theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
     ((jointResumed false).map fun st =>
@@ -113,15 +121,18 @@ theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
         (match coro.status with | .faulted _ => true | _ => false)) &&
       st.sessions.all (fun entry => entry.2.ownership.consumedWitnesses.isEmpty) &&
       !st.operationInstances.any (fun operation => operation.phase == .succeeded)).getD false = true := by
-  simp only [
-    image, roleImage, empty, ordinaryLoaded,
-    loaded, invokeInstalled, blocked, resumed,
-    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage, Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall, parentDeclaration,
-    jointRoleImage, jointBlocked, jointResumed, offerInstalled,
-    jointSettled] <;> decide
+  simp +decide only [
+    image, roleImage, empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?,
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
+    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
+    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
+    parentDeclaration, jointRoleImage, jointBlocked, jointResumed, List.mapM, Except.bind,
+    Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append, List.length_cons,
+    List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure, ↓reduceIte]
+  all_goals decide
 
 end Runtime.Tests.OperationReadinessExecution
