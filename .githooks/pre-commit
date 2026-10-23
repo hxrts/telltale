@@ -106,8 +106,10 @@ else
     else
         fmt_failed=0
         for fmt_cmd in "${fmt_targets[@]}"; do
-            if ! eval "$fmt_cmd" >/dev/null 2>&1; then
-                fmt_failed=1
+            if eval "$fmt_cmd"; then
+                :
+            else
+                fmt_failed=$?
                 break
             fi
         done
@@ -116,7 +118,7 @@ else
         else
             echo -e "${RED}FAILED${NC}"
             echo "Run 'cargo fmt --all' to fix formatting"
-            exit 1
+            exit "$fmt_failed"
         fi
     fi
 fi
@@ -157,8 +159,10 @@ else
     else
         check_failed=0
         for check_cmd in "${check_targets[@]}"; do
-            if ! eval "$check_cmd" >/dev/null 2>&1; then
-                check_failed=1
+            if eval "$check_cmd"; then
+                :
+            else
+                check_failed=$?
                 break
             fi
         done
@@ -166,7 +170,7 @@ else
             echo -e "${GREEN}OK${NC}"
         else
             echo -e "${RED}FAILED${NC}"
-            exit 1
+            exit "$check_failed"
         fi
     fi
 fi
