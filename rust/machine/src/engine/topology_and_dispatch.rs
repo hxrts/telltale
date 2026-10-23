@@ -362,6 +362,8 @@ impl ProtocolMachine {
         let request = EffectRequest::topology_events(tick);
         self.ensure_effect_request_allowed(&request)
             .map_err(ProtocolMachineError::HandlerError)?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)
+            .map_err(ProtocolMachineError::HandlerError)?;
         let predicted_effect_id = self.next_effect_id;
         let topology_outcome = handler.handle_effect(request.clone());
         self.record_effect_exchange(
@@ -369,7 +371,8 @@ impl ProtocolMachine {
             &topology_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(ProtocolMachineError::HandlerError)?;
         let mut events = topology_outcome
             .into_topology()
             .unwrap_or_else(EffectResult::failure)
@@ -379,6 +382,13 @@ impl ProtocolMachine {
             .map_err(ProtocolMachineError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
+        let event_count = u64::try_from(events.len()).map_err(|_| {
+            ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                "topology effect batch count exceeds u64",
+            ))
+        })?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, event_count)
+            .map_err(ProtocolMachineError::HandlerError)?;
         // Refuse the whole admitted event batch before applying even a
         // preceding non-timeout mutation when its witness IDs cannot fit.
         let timeout_count = u64::try_from(
@@ -420,7 +430,11 @@ impl ProtocolMachine {
                 self.effect_trace
                     .push(entry, &self.config.observability_retention);
             }
-            self.next_effect_id = self.next_effect_id.saturating_add(1);
+            self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                    "canonical effect occurrence identifiers exhausted",
+                ))
+            })?;
         }
         Ok(())
     }
@@ -668,6 +682,11 @@ impl ProtocolMachine {
 
         // 1.5 Monitor precheck and deterministic cost charge.
         self.monitor_precheck(&monitor_ep, &role, &instr)?;
+        if self.coroutines[idx].cost_budget < self.config.instruction_cost {
+            return Err(Fault::OutOfCredits);
+        }
+        self.require_instruction_effect_capacity(idx, &instr)?;
+
         self.charge_instruction_cost(idx)?;
 
         // 2. Dispatch to per-instruction step function.
@@ -692,7 +711,8 @@ impl ProtocolMachine {
                         &outcome,
                         &handler_identity,
                         predicted_effect_id,
-                    );
+                    )
+                    .map_err(|failure| Fault::Invoke { failure })?;
                     outcome.into_output_condition_hint().ok().flatten()
                 }
                 Err(_) => None,
@@ -701,6 +721,24 @@ impl ProtocolMachine {
 
         // 3. Commit atomically.
         self.commit_pack(idx, pack, output_hint, handler, &handler_identity)
+    }
+
+    fn require_instruction_effect_capacity(&self, idx: usize, instr: &Instr) -> Result<(), Fault> {
+        // A retained nominal callback can settle Failure/Blocked without a fresh
+        // occurrence. Its publication hold is checked after retaining that result.
+        let existing_nominal = matches!(
+            instr,
+            Instr::Invoke {
+                action: InvokeAction::NominalCommand(_)
+            }
+        ) && self.coroutines[idx].nominal_continuation.is_some();
+        let capacity = if existing_nominal {
+            0
+        } else {
+            crate::commit_common::instruction_effect_capacity(instr, false)
+        };
+        crate::commit_common::require_effect_capacity(self.next_effect_id, capacity)
+            .map_err(|failure| Fault::Invoke { failure })
     }
 
     // ---- Per-instruction step functions (each owns its type logic) ----
@@ -785,7 +823,8 @@ impl ProtocolMachine {
             &send_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         let decision = match send_outcome
             .into_send_decision()
             .unwrap_or_else(EffectResult::failure)
@@ -863,12 +902,14 @@ impl ProtocolMachine {
         match enqueue {
             EnqueueResult::Ok => {}
             EnqueueResult::WouldBlock => {
-                let effect_id = self.issue_runtime_effect(
-                    "send_decision",
-                    Some(sid),
-                    &handler_identity,
-                    effect_inputs,
-                );
+                let effect_id = self
+                    .issue_runtime_effect(
+                        "send_decision",
+                        Some(sid),
+                        &handler_identity,
+                        effect_inputs,
+                    )
+                    .map_err(|failure| Fault::Invoke { failure })?;
                 self.complete_runtime_effect(
                     effect_id,
                     OutstandingEffectStatus::Blocked,

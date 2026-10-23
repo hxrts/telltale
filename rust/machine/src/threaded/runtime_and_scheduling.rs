@@ -386,21 +386,84 @@ impl ThreadedProtocolMachine {
         }))
     }
 
+    fn admit_selected_effect_capacity(
+        &mut self,
+        picks: &mut Vec<Picked>,
+    ) -> Result<(), ProtocolMachineError> {
+        // Hold the complete selected wave before the first issuance or worker.
+        // This does not consume IDs or make a second speculative scheduler pick.
+        let mut capacity = 0u64;
+        let mut first_nominal = None;
+        let mut capacity_overflow = false;
+        for (index, pick) in picks.iter().enumerate() {
+            let coro = pick
+                .coro
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            if let Some(instr) = self
+                .programs
+                .get(coro.program_id)
+                .and_then(|p| p.get(coro.pc))
+            {
+                let issued = coro.nominal_continuation.is_some();
+                if index == 0
+                    && matches!(
+                        instr,
+                        Instr::Invoke {
+                            action: InvokeAction::NominalCommand(_),
+                        }
+                    )
+                {
+                    first_nominal = Some(issued);
+                }
+                let additional = if coro.cost_budget < self.config.instruction_cost {
+                    0
+                } else {
+                    crate::commit_common::instruction_effect_capacity(instr, issued)
+                };
+                match capacity.checked_add(additional) {
+                    Some(total) => capacity = total,
+                    None => capacity_overflow = true,
+                }
+            }
+        }
+        if capacity_overflow
+            || crate::commit_common::require_effect_capacity(self.next_effect_id, capacity).is_err()
+        {
+            // Only the actual first nominal occurrence may perform a zero-fresh
+            // callback/settlement fallback. All other original picks are restored.
+            if first_nominal != Some(true) {
+                self.restore_picks_to_ready(picks);
+                return Err(ProtocolMachineError::HandlerError(
+                    EffectFailure::contract_violation(
+                        "canonical effect occurrence identifiers exhausted",
+                    ),
+                ));
+            }
+            let remaining = picks.split_off(1);
+            self.restore_picks_to_ready(&remaining);
+        }
+        Ok(())
+    }
+
     fn execute_picks(
         &mut self,
-        picks: Vec<Picked>,
+        mut picks: Vec<Picked>,
         handler: &dyn EffectHandler,
         tick: u64,
     ) -> Result<bool, ProtocolMachineError> {
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
         self.contention_metrics.observe_wave_width(picks.len());
+        self.admit_selected_effect_capacity(&mut picks)?;
         // Pre-dispatch issuance is ordered by the actual selected wave. No worker
         // may invent an occurrence after a callback has already executed.
         let admissions: Vec<_> = picks
             .iter()
             .map(|pick| self.prepare_nominal_pick(pick, &handler_identity, tick))
             .collect();
+        let nominal_publication_admitted =
+            crate::commit_common::require_effect_capacity(self.next_effect_id, 3).is_ok();
         let step_ctx = ThreadedStepCtx {
             config: &self.config,
             guard_resources: &self.guard_resources,
@@ -413,6 +476,7 @@ impl ThreadedProtocolMachine {
             timed_out_sites: &self.timed_out_sites,
             handler,
             tick,
+            nominal_publication_admitted,
         };
         let exec_ctx = ThreadedExecCtx {
             store: &self.sessions,
@@ -447,11 +511,23 @@ impl ThreadedProtocolMachine {
             });
 
         let mut progressed = false;
+        let mut first_error = None;
         for (pick, result) in picks.into_iter().zip(results) {
-            progressed |=
-                self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
+            match self.commit_pick_result(&pick, result, tick, handler, &handler_identity) {
+                Ok(did_progress) => progressed |= did_progress,
+                Err(error) => {
+                    // Every selected worker already returned. Consume its result
+                    // through the original gates while retaining the first fault.
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            }
         }
-        Ok(progressed)
+        match first_error {
+            Some(error) => Err(error),
+            None => Ok(progressed),
+        }
     }
 
     fn commit_pick_result(
@@ -526,7 +602,17 @@ impl ThreadedProtocolMachine {
                 fault,
                 effect_observations,
             }) => {
-                self.record_effect_observations(effect_observations, handler_identity);
+                self.record_effect_observations(effect_observations, handler_identity)
+                    .map_err(ProtocolMachineError::HandlerError)?;
+                if let Fault::Invoke { failure } = &fault {
+                    if failure
+                        == &EffectFailure::contract_violation(
+                            "canonical effect occurrence identifiers exhausted",
+                        )
+                    {
+                        self.settle_nominal_publication_failure(&pick.coro, failure)?;
+                    }
+                }
                 self.trace.push(ObsEvent::Faulted {
                     tick,
                     coro_id: pick.coro_id,

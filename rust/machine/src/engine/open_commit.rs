@@ -156,20 +156,32 @@ impl ProtocolMachine {
         let coro_id = self.coroutines[coro_idx].id;
         let sid = self.coroutines[coro_idx].session_id;
 
-        if !pack.events.is_empty()
+        let derived = crate::commit_common::derived_effect_count(&pack.events)
+            .map_err(|failure| Fault::Invoke { failure })?;
+        let needs_wal = !pack.events.is_empty()
             && !matches!(
                 self.config.output_condition_policy,
                 crate::output_condition::OutputConditionPolicy::Disabled
             )
-            && handler.supports_wal_sync()
-        {
+            && handler.supports_wal_sync();
+        let remaining = derived
+            .checked_add(u64::from(needs_wal))
+            .ok_or_else(|| Fault::Invoke {
+                failure: EffectFailure::contract_violation(
+                    "canonical effect occurrence identifiers exhausted",
+                ),
+            })?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, remaining)
+            .map_err(|failure| Fault::Invoke { failure })?;
+        if needs_wal {
             let sync = self.current_wal_sync_request(Some(sid), coro_id);
             let request = EffectRequest::wal_sync(self.clock.tick, sync.operation_id.clone(), sync);
             self.ensure_effect_request_allowed(&request)
                 .map_err(|failure| Fault::Invoke { failure })?;
             let predicted_effect_id = self.next_effect_id;
             let outcome = handler.handle_effect(request.clone());
-            self.record_effect_exchange(&request, &outcome, handler_identity, predicted_effect_id);
+            self.record_effect_exchange(&request, &outcome, handler_identity, predicted_effect_id)
+                .map_err(|failure| Fault::Invoke { failure })?;
             match outcome.into_unit("wal_sync") {
                 Ok(EffectResult::Success(())) => {}
                 Ok(EffectResult::Blocked) => {
@@ -242,7 +254,14 @@ impl ProtocolMachine {
                     self.effect_trace
                         .push(entry, &self.config.observability_retention);
                 }
-                self.next_effect_id = self.next_effect_id.saturating_add(1);
+                self.next_effect_id =
+                    self.next_effect_id
+                        .checked_add(1)
+                        .ok_or_else(|| Fault::Invoke {
+                            failure: EffectFailure::contract_violation(
+                                "canonical effect occurrence identifiers exhausted",
+                            ),
+                        })?;
             }
         }
 

@@ -321,6 +321,7 @@ fn threaded_recv_reports_verification_fault_for_tampered_signature() {
         timed_out_sites: &timed_out_sites,
         handler: &NoopHandler,
         tick: 1,
+        nominal_publication_admitted: true,
     };
     let err = match step_recv(&mut coro, &session, "B", 0, 1, &step_ctx) {
         Ok(_) => panic!("tampered signature must fault"),
@@ -663,12 +664,14 @@ fn delegation_handoff_rebinds_pending_effects_and_invalidates_blocked_effects() 
 fn progress_contracts_escalate_consistently_in_threaded_runtime() {
     let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
     machine.clock.tick = 1;
-    let effect_id = machine.issue_runtime_effect(
-        "invoke_step",
-        Some(7),
-        "host/runtime",
-        serde_json::json!({ "session": 7 }),
-    );
+    let effect_id = machine
+        .issue_runtime_effect(
+            "invoke_step",
+            Some(7),
+            "host/runtime",
+            serde_json::json!({ "session": 7 }),
+        )
+        .expect("unit fixture has fresh occurrence capacity");
 
     machine.clock.tick = 2;
     machine
@@ -1088,4 +1091,1174 @@ fn required_disposal_cooperative_threaded_summaries_match() {
             .expect("threaded repeated acknowledgment"),
         threaded_ack
     );
+}
+
+// Actual native multi-pick regression; outcomes are retained in checkpoint receipts.
+// Exercises actual two-pick native dispatch, not arbitrary injected Result values.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn returned_wave_preserves_later_fault_after_original_failure() {
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 2);
+    assert!(machine.config.instruction_cost > 0);
+    let image = lifecycle_loop_image(false);
+    let first_sid = machine
+        .load_choreography(&image)
+        .expect("first actual session");
+    let second_sid = machine
+        .load_choreography(&image)
+        .expect("second actual session");
+    let first = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == first_sid)
+        .cloned()
+        .expect("first resident coroutine handle");
+    let second = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == second_sid)
+        .cloned()
+        .expect("second resident coroutine handle");
+    let first_id = {
+        let mut coro = first.lock().expect("first original coroutine");
+        coro.pc = usize::MAX;
+        coro.id
+    };
+    let second_id = {
+        let mut coro = second.lock().expect("second original coroutine");
+        coro.cost_budget = 0;
+        coro.id
+    };
+    let tick = machine.clock.tick;
+    let picks = vec![
+        Picked {
+            coro_id: first_id,
+            sid: first_sid,
+            lane: 0,
+            coro: first,
+            session: machine
+                .sessions
+                .get(first_sid)
+                .expect("first resident session"),
+        },
+        Picked {
+            coro_id: second_id,
+            sid: second_sid,
+            lane: 1,
+            coro: second,
+            session: machine
+                .sessions
+                .get(second_sid)
+                .expect("second resident session"),
+        },
+    ];
+    let result = machine.execute_picks(picks, &NoopHandler, tick);
+    let faults: Vec<_> = machine
+        .trace
+        .iter()
+        .filter_map(|event| match event {
+            ObsEvent::Faulted {
+                tick,
+                coro_id,
+                fault,
+            } => Some((*tick, *coro_id, fault.clone())),
+            _ => None,
+        })
+        .collect();
+    let clock_after = machine.clock.tick;
+    // Consume actual original native worker handles before result assertions.
+    let disposal = machine
+        .shutdown_worker_pool()
+        .expect("original worker settlement");
+    assert_eq!(disposal.joined_workers(), 2);
+    assert!(disposal.worker_panics().is_empty());
+    assert!(matches!(result, Err(ProtocolMachineError::Fault {
+        coro_id, fault: Fault::PcOutOfBounds,
+    }) if coro_id == first_id));
+    assert_eq!(
+        clock_after, tick,
+        "dispatch cannot invent another scheduler tick"
+    );
+    assert_eq!(
+        faults,
+        vec![
+            (tick, first_id, Fault::PcOutOfBounds),
+            (tick, second_id, Fault::OutOfCredits),
+        ]
+    );
+}
+
+// Real native two-pick regression; checkpoint evidence records actual outcomes.
+#[cfg(not(target_arch = "wasm32"))]
+struct ReturnedGenericFailureHandler {
+    calls: Mutex<Vec<crate::effect::EffectRequest>>,
+    failure: EffectFailure,
+}
+#[cfg(not(target_arch = "wasm32"))]
+impl EffectHandler for ReturnedGenericFailureHandler {
+    fn handle_effect(&self, request: crate::effect::EffectRequest) -> crate::effect::EffectOutcome {
+        use crate::effect::{EffectOutcome, EffectRequestBody};
+        self.calls
+            .lock()
+            .expect("actual request owner")
+            .push(request.clone());
+        if matches!(&request.body, EffectRequestBody::InvokeStep { .. }) {
+            return EffectOutcome::failure(self.failure.clone());
+        }
+        NoopHandler.handle_effect(request)
+    }
+    fn handle_send(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[Value],
+    ) -> EffectResult<Value> {
+        NoopHandler.handle_send(role, partner, label, state)
+    }
+    fn handle_recv(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &mut Vec<Value>,
+        payload: &Value,
+    ) -> EffectResult<()> {
+        NoopHandler.handle_recv(role, partner, label, state, payload)
+    }
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[Value],
+    ) -> EffectResult<String> {
+        NoopHandler.handle_choose(role, partner, labels, state)
+    }
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
+        NoopHandler.step(role, state)
+    }
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+}
+// Actual native multi-pick regression; outcomes are retained in checkpoint receipts.
+// Exercises actual two-pick native dispatch, not arbitrary injected Result values.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn returned_wave_retains_independent_actual_generic_failure() {
+    let mut machine = ThreadedProtocolMachine::with_workers(
+        ProtocolMachineConfig {
+            output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+            ..ProtocolMachineConfig::default()
+        },
+        2,
+    );
+    assert!(machine.config.instruction_cost > 0);
+    let image = lifecycle_loop_image(true);
+    let first_sid = machine
+        .load_choreography(&image)
+        .expect("first actual session");
+    let second_sid = machine
+        .load_choreography(&image)
+        .expect("second actual session");
+    let first = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == first_sid)
+        .cloned()
+        .expect("first resident coroutine handle");
+    let second = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == second_sid)
+        .cloned()
+        .expect("second resident coroutine handle");
+    let first_id = {
+        let mut coro = first.lock().expect("first original coroutine");
+        coro.pc = usize::MAX;
+        coro.id
+    };
+    let second_id = {
+        let coro = second.lock().expect("second original coroutine");
+        assert!(coro.cost_budget >= machine.config.instruction_cost);
+        coro.id
+    };
+    let retained_second = second.clone();
+    let original_failure = EffectFailure::denied("actual independent callback refusal");
+    let handler = ReturnedGenericFailureHandler {
+        calls: Mutex::new(Vec::new()),
+        failure: original_failure.clone(),
+    };
+    let tick = machine.clock.tick;
+    let picks = vec![
+        Picked {
+            coro_id: first_id,
+            sid: first_sid,
+            lane: 0,
+            coro: first,
+            session: machine
+                .sessions
+                .get(first_sid)
+                .expect("first resident session"),
+        },
+        Picked {
+            coro_id: second_id,
+            sid: second_sid,
+            lane: 1,
+            coro: second,
+            session: machine
+                .sessions
+                .get(second_sid)
+                .expect("second resident session"),
+        },
+    ];
+    let result = machine.execute_picks(picks, &handler, tick);
+    let second_pc = retained_second
+        .lock()
+        .expect("actual returned coroutine")
+        .pc;
+    let exchanges = machine.effect_exchanges().to_vec();
+    let calls = handler.calls.lock().expect("real host calls").clone();
+    let faults = returned_generic_failure_faults(&machine);
+    let clock_after = machine.clock.tick;
+    // Consume actual original native worker handles before result assertions.
+    let disposal = machine
+        .shutdown_worker_pool()
+        .expect("original worker settlement");
+    assert_eq!(disposal.joined_workers(), 2);
+    assert!(disposal.worker_panics().is_empty());
+    assert!(matches!(result, Err(ProtocolMachineError::Fault {
+        coro_id, fault: Fault::PcOutOfBounds,
+    }) if coro_id == first_id));
+    assert_eq!(
+        clock_after, tick,
+        "dispatch cannot invent another scheduler tick"
+    );
+    assert_returned_generic_failure_custody(
+        &calls,
+        &exchanges,
+        second_sid,
+        second_pc,
+        &original_failure,
+    );
+    assert_returned_failure_order(&faults, tick, first_id, second_id, &original_failure);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_returned_generic_failure_custody(
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    second_sid: crate::session::SessionId,
+    second_pc: usize,
+    original_failure: &EffectFailure,
+) {
+    use crate::effect::EffectRequestBody;
+    assert_eq!(
+        second_pc, 0,
+        "later result cannot advance after primary failure"
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::InvokeStep { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::OutputConditionHint { .. }))
+            .count(),
+        0
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::WalSync { .. }))
+            .count(),
+        0,
+        "retaining returned work must not run a later WAL effect"
+    );
+    let invocation = calls
+        .iter()
+        .find(|r| matches!(&r.body, EffectRequestBody::InvokeStep { .. }))
+        .expect("actual callback reached before primary commit");
+    assert_eq!(invocation.session, Some(second_sid));
+    let retained = returned_wave_original_exchanges(exchanges, invocation);
+    assert_eq!(
+        retained.len(),
+        1,
+        "exact original callback observation reaches canonical custody once"
+    );
+    let outcome = retained[0]
+        .outcome
+        .clone()
+        .into_invoke_state_for(&invocation.body);
+    assert!(
+        matches!(outcome, Ok(EffectResult::Failure(failure)) if &failure == original_failure),
+        "retain actual typed original callback failure independently of the primary PC fault"
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_returned_failure_order(
+    faults: &[(u64, usize, Fault)],
+    tick: u64,
+    first: usize,
+    second: usize,
+    failure: &EffectFailure,
+) {
+    assert_eq!(
+        faults,
+        &[
+            (tick, first, Fault::PcOutOfBounds),
+            (
+                tick,
+                second,
+                Fault::Invoke {
+                    failure: failure.clone()
+                }
+            )
+        ]
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn returned_generic_failure_faults(machine: &ThreadedProtocolMachine) -> Vec<(u64, usize, Fault)> {
+    machine
+        .trace
+        .iter()
+        .filter_map(|event| match event {
+            ObsEvent::Faulted {
+                tick,
+                coro_id,
+                fault,
+            } => Some((*tick, *coro_id, fault.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+// Real native two-pick regression; checkpoint evidence records actual outcomes.
+#[cfg(not(target_arch = "wasm32"))]
+struct PublicReturnedGenericHandler {
+    calls: Mutex<Vec<crate::effect::EffectRequest>>,
+}
+#[cfg(not(target_arch = "wasm32"))]
+impl EffectHandler for PublicReturnedGenericHandler {
+    fn handle_effect(&self, request: crate::effect::EffectRequest) -> crate::effect::EffectOutcome {
+        use crate::effect::{EffectOutcome, EffectRequestBody, EffectResponse};
+        self.calls
+            .lock()
+            .expect("actual request owner")
+            .push(request.clone());
+        if let EffectRequestBody::InvokeStep { state, .. } = &request.body {
+            let mut state = state.clone();
+            state[0] = Value::Str("actual-later-result".into());
+            return EffectOutcome::success(EffectResponse::InvokeStep { state });
+        }
+        if matches!(&request.body, EffectRequestBody::WalSync { .. }) {
+            return EffectOutcome::success(EffectResponse::WalSync);
+        }
+        NoopHandler.handle_effect(request)
+    }
+    fn handle_send(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[Value],
+    ) -> EffectResult<Value> {
+        NoopHandler.handle_send(role, partner, label, state)
+    }
+    fn handle_recv(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &mut Vec<Value>,
+        payload: &Value,
+    ) -> EffectResult<()> {
+        NoopHandler.handle_recv(role, partner, label, state, payload)
+    }
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[Value],
+    ) -> EffectResult<String> {
+        NoopHandler.handle_choose(role, partner, labels, state)
+    }
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
+        NoopHandler.step(role, state)
+    }
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+}
+// Actual native multi-pick regression; outcomes are retained in checkpoint receipts.
+// Exercises actual two-pick native dispatch, not arbitrary injected Result values.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn public_wave_retains_first_fault_and_commits_independent_valid_result() {
+    let mut machine = ThreadedProtocolMachine::with_workers(
+        ProtocolMachineConfig {
+            threaded_round_semantics: crate::ThreadedRoundSemantics::WaveParallelExtension,
+            output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+            ..ProtocolMachineConfig::default()
+        },
+        2,
+    );
+    assert!(machine.config.instruction_cost > 0);
+    let image = lifecycle_loop_image(true);
+    let first_owner = machine
+        .load_choreography_owned(&image, "actual-first-owner")
+        .expect("first issued owner");
+    let second_owner = machine
+        .load_choreography_owned(&image, "actual-second-owner")
+        .expect("second issued owner");
+    let first_sid = first_owner.session_id();
+    let second_sid = second_owner.session_id();
+    let first = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == first_sid)
+        .cloned()
+        .expect("first resident coroutine handle");
+    let second = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == second_sid)
+        .cloned()
+        .expect("second resident coroutine handle");
+    let first_id = {
+        let mut coro = first.lock().expect("first original coroutine");
+        coro.pc = usize::MAX;
+        coro.id
+    };
+    let second_id = {
+        let coro = second.lock().expect("second original coroutine");
+        assert!(coro.cost_budget >= machine.config.instruction_cost);
+        coro.id
+    };
+    let retained_second = second.clone();
+    let handler = PublicReturnedGenericHandler {
+        calls: Mutex::new(Vec::new()),
+    };
+    let tick = machine
+        .clock
+        .tick
+        .checked_add(1)
+        .expect("original next round is representable");
+    let result = machine.step_round(&handler, 2);
+    let selected = machine.lane_trace().to_vec();
+    let second_pc = retained_second
+        .lock()
+        .expect("actual returned coroutine")
+        .pc;
+    let exchanges = machine.effect_exchanges().to_vec();
+    let calls = handler.calls.lock().expect("real host calls").clone();
+    let clock_after = machine.clock.tick;
+    // Consume actual original native worker handles before result assertions.
+    let disposal = machine
+        .shutdown_worker_pool()
+        .expect("original worker settlement");
+    assert_eq!(disposal.joined_workers(), 2);
+    assert!(disposal.worker_panics().is_empty());
+    assert!(matches!(result, Err(ProtocolMachineError::Fault {
+        coro_id, fault: Fault::PcOutOfBounds,
+    }) if coro_id == first_id));
+    assert_eq!(
+        clock_after, tick,
+        "dispatch cannot invent another scheduler tick"
+    );
+    assert_public_returned_generic_custody(&calls, &exchanges, second_sid, second_pc);
+    assert_public_returned_selection(&selected, first_id, second_id, tick);
+    assert!(calls.iter().all(|request| request.tick == tick));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_public_returned_generic_custody(
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    second_sid: crate::session::SessionId,
+    second_pc: usize,
+) {
+    use crate::effect::EffectRequestBody;
+    assert_eq!(
+        second_pc, 1,
+        "independent original result passes its own gates despite an unrelated local fault"
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::InvokeStep { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::OutputConditionHint { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::WalSync { .. }))
+            .count(),
+        1,
+        "independent original commit must run its actual WAL gate exactly once"
+    );
+    let invocation = calls
+        .iter()
+        .find(|r| matches!(&r.body, EffectRequestBody::InvokeStep { .. }))
+        .expect("actual callback reached before primary commit");
+    assert_eq!(invocation.session, Some(second_sid));
+    let retained = returned_wave_original_exchanges(exchanges, invocation);
+    assert_eq!(
+        retained.len(),
+        1,
+        "exact original callback observation reaches canonical custody once"
+    );
+    assert!(retained[0].succeeded());
+    let outcome = retained[0]
+        .outcome
+        .clone()
+        .into_invoke_state_for(&invocation.body);
+    assert!(
+        matches!(outcome, Ok(EffectResult::Success(state))
+        if state.first() == Some(&Value::Str("actual-later-result".into()))),
+        "retain actual typed returned state, without requiring live-register publication"
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_public_returned_selection(
+    selected: &[LaneSelection],
+    first: usize,
+    second: usize,
+    tick: u64,
+) {
+    assert_eq!(
+        selected.len(),
+        2,
+        "actual checked public wave selected both original coroutines"
+    );
+    assert_eq!(selected[0].coro_id, first);
+    assert_eq!(selected[1].coro_id, second);
+    assert_ne!(selected[0].session, selected[1].session);
+    assert_ne!(selected[0].lane, selected[1].lane);
+    assert!(selected
+        .iter()
+        .all(|pick| pick.wave == 0 && pick.tick == tick));
+}
+
+// Real native two-pick regression; checkpoint evidence records actual outcomes.
+#[cfg(not(target_arch = "wasm32"))]
+struct PublicReturnedWalFailureHandler {
+    calls: Mutex<Vec<crate::effect::EffectRequest>>,
+    failure: crate::effect::EffectFailure,
+}
+#[cfg(not(target_arch = "wasm32"))]
+impl EffectHandler for PublicReturnedWalFailureHandler {
+    fn handle_effect(&self, request: crate::effect::EffectRequest) -> crate::effect::EffectOutcome {
+        use crate::effect::{EffectOutcome, EffectRequestBody, EffectResponse};
+        self.calls
+            .lock()
+            .expect("actual request owner")
+            .push(request.clone());
+        if let EffectRequestBody::InvokeStep { state, .. } = &request.body {
+            let mut state = state.clone();
+            state[0] = Value::Str("actual-later-result".into());
+            return EffectOutcome::success(EffectResponse::InvokeStep { state });
+        }
+        if matches!(&request.body, EffectRequestBody::WalSync { .. }) {
+            return EffectOutcome::failure(self.failure.clone());
+        }
+        NoopHandler.handle_effect(request)
+    }
+    fn handle_send(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &[Value],
+    ) -> EffectResult<Value> {
+        NoopHandler.handle_send(role, partner, label, state)
+    }
+    fn handle_recv(
+        &self,
+        role: &str,
+        partner: &str,
+        label: &str,
+        state: &mut Vec<Value>,
+        payload: &Value,
+    ) -> EffectResult<()> {
+        NoopHandler.handle_recv(role, partner, label, state, payload)
+    }
+    fn handle_choose(
+        &self,
+        role: &str,
+        partner: &str,
+        labels: &[String],
+        state: &[Value],
+    ) -> EffectResult<String> {
+        NoopHandler.handle_choose(role, partner, labels, state)
+    }
+    fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
+        NoopHandler.step(role, state)
+    }
+    fn supports_wal_sync(&self) -> bool {
+        true
+    }
+}
+// Actual native multi-pick regression; outcomes are retained in checkpoint receipts.
+// Exercises actual two-pick native dispatch, not arbitrary injected Result values.
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn public_wave_retains_later_wal_refusal_after_first_fault() {
+    let mut machine = ThreadedProtocolMachine::with_workers(
+        ProtocolMachineConfig {
+            threaded_round_semantics: crate::ThreadedRoundSemantics::WaveParallelExtension,
+            output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+            ..ProtocolMachineConfig::default()
+        },
+        2,
+    );
+    assert!(machine.config.instruction_cost > 0);
+    let image = lifecycle_loop_image(true);
+    let first_owner = machine
+        .load_choreography_owned(&image, "actual-first-owner")
+        .expect("first issued owner");
+    let second_owner = machine
+        .load_choreography_owned(&image, "actual-second-owner")
+        .expect("second issued owner");
+    let first_sid = first_owner.session_id();
+    let second_sid = second_owner.session_id();
+    let first = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == first_sid)
+        .cloned()
+        .expect("first resident coroutine handle");
+    let second = machine
+        .coroutines
+        .iter()
+        .find(|original| original.lock().expect("resident coroutine").session_id == second_sid)
+        .cloned()
+        .expect("second resident coroutine handle");
+    let first_id = {
+        let mut coro = first.lock().expect("first original coroutine");
+        coro.pc = usize::MAX;
+        coro.id
+    };
+    let second_id = {
+        let coro = second.lock().expect("second original coroutine");
+        assert!(coro.cost_budget >= machine.config.instruction_cost);
+        coro.id
+    };
+    let retained_second = second.clone();
+    let original_failure = crate::effect::EffectFailure::denied("actual independent WAL refusal");
+    let handler = PublicReturnedWalFailureHandler {
+        calls: Mutex::new(Vec::new()),
+        failure: original_failure.clone(),
+    };
+    let tick = machine
+        .clock
+        .tick
+        .checked_add(1)
+        .expect("original next round is representable");
+    let result = machine.step_round(&handler, 2);
+    let selected = machine.lane_trace().to_vec();
+    let second_pc = retained_second
+        .lock()
+        .expect("actual returned coroutine")
+        .pc;
+    let exchanges = machine.effect_exchanges().to_vec();
+    let calls = handler.calls.lock().expect("real host calls").clone();
+    let clock_after = machine.clock.tick;
+    let faults = public_wal_returned_faults(&machine);
+    // Consume actual original native worker handles before result assertions.
+    let disposal = machine
+        .shutdown_worker_pool()
+        .expect("original worker settlement");
+    assert_eq!(disposal.joined_workers(), 2);
+    assert!(disposal.worker_panics().is_empty());
+    assert!(matches!(result, Err(ProtocolMachineError::Fault {
+        coro_id, fault: Fault::PcOutOfBounds,
+    }) if coro_id == first_id));
+    assert_eq!(
+        clock_after, tick,
+        "dispatch cannot invent another scheduler tick"
+    );
+    assert_public_wal_returned_generic_custody(&calls, &exchanges, second_sid, second_pc);
+    assert_public_wal_returned_selection(&selected, first_id, second_id, tick);
+    assert!(calls.iter().all(|request| request.tick == tick));
+    assert_eq!(
+        faults,
+        vec![
+            (tick, first_id, Fault::PcOutOfBounds),
+            (
+                tick,
+                second_id,
+                Fault::Invoke {
+                    failure: original_failure.clone()
+                }
+            ),
+        ]
+    );
+    assert_public_wal_refusal_custody(&calls, &exchanges, &original_failure, second_id, tick);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_public_wal_returned_generic_custody(
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    second_sid: crate::session::SessionId,
+    second_pc: usize,
+) {
+    use crate::effect::EffectRequestBody;
+    assert_eq!(
+        second_pc, 0,
+        "independent original result cannot advance after its own actual WAL refusal"
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::InvokeStep { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::OutputConditionHint { .. }))
+            .count(),
+        1
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|r| matches!(&r.body, EffectRequestBody::WalSync { .. }))
+            .count(),
+        1,
+        "independent original commit must run its actual WAL gate exactly once"
+    );
+    let invocation = calls
+        .iter()
+        .find(|r| matches!(&r.body, EffectRequestBody::InvokeStep { .. }))
+        .expect("actual callback reached before primary commit");
+    assert_eq!(invocation.session, Some(second_sid));
+    let retained = returned_wave_original_exchanges(exchanges, invocation);
+    assert_eq!(
+        retained.len(),
+        1,
+        "exact original callback observation reaches canonical custody once"
+    );
+    assert!(retained[0].succeeded());
+    let outcome = retained[0]
+        .outcome
+        .clone()
+        .into_invoke_state_for(&invocation.body);
+    assert!(
+        matches!(outcome, Ok(EffectResult::Success(state))
+        if state.first() == Some(&Value::Str("actual-later-result".into()))),
+        "retain actual typed returned state, without requiring live-register publication"
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_public_wal_returned_selection(
+    selected: &[LaneSelection],
+    first: usize,
+    second: usize,
+    tick: u64,
+) {
+    assert_eq!(
+        selected.len(),
+        2,
+        "actual checked public wave selected both original coroutines"
+    );
+    assert_eq!(selected[0].coro_id, first);
+    assert_eq!(selected[1].coro_id, second);
+    assert_ne!(selected[0].session, selected[1].session);
+    assert_ne!(selected[0].lane, selected[1].lane);
+    assert!(selected
+        .iter()
+        .all(|pick| pick.wave == 0 && pick.tick == tick));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_public_wal_refusal_custody(
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    original_failure: &crate::effect::EffectFailure,
+    second_id: usize,
+    tick: u64,
+) {
+    let request = calls
+        .iter()
+        .find(|request| {
+            matches!(
+                &request.body,
+                crate::effect::EffectRequestBody::WalSync { .. }
+            )
+        })
+        .expect("actual original WAL gate reached");
+    let crate::effect::EffectRequestBody::WalSync { sync } = &request.body else {
+        panic!("selected actual WAL request");
+    };
+    assert_eq!(sync.downstream_coroutine_id, format!("coro:{second_id}"));
+    assert_eq!(sync.tick, tick);
+    let retained = returned_wave_original_exchanges(exchanges, request);
+    assert_eq!(retained.len(), 1, "retain exact original WAL outcome once");
+    let outcome = retained[0].outcome.clone().into_unit("wal_sync");
+    assert!(
+        matches!(outcome,
+            Ok(EffectResult::Failure(failure)) if &failure == original_failure
+        ),
+        "retain actual independent WAL refusal, not an inferred error"
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn public_wal_returned_faults(machine: &ThreadedProtocolMachine) -> Vec<(u64, usize, Fault)> {
+    machine
+        .trace
+        .iter()
+        .filter_map(|event| match event {
+            ObsEvent::Faulted {
+                tick,
+                coro_id,
+                fault,
+            } => Some((*tick, *coro_id, fault.clone())),
+            _ => None,
+        })
+        .collect()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn returned_wave_original_exchanges<'a>(
+    exchanges: &'a [crate::effect::EffectExchangeRecord],
+    original: &crate::effect::EffectRequest,
+) -> Vec<&'a crate::effect::EffectExchangeRecord> {
+    assert_eq!(
+        original.effect_id, None,
+        "actual callback precedes canonical ID assignment"
+    );
+    let retained: Vec<_> = exchanges
+        .iter()
+        .filter(|record| {
+            let mut issued = original.clone();
+            issued.effect_id = Some(record.effect_id);
+            record.request == issued
+        })
+        .collect();
+    for record in &retained {
+        assert_eq!(record.request.effect_id, Some(record.effect_id));
+        assert_eq!(
+            exchanges
+                .iter()
+                .filter(|other| other.effect_id == record.effect_id)
+                .count(),
+            1,
+            "canonical assigned occurrence is unique across the complete exchange ledger"
+        );
+    }
+    retained
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn public_wave_effect_capacity_holds_the_whole_original_selection() {
+    for enough in [false, true] {
+        let mut machine = ThreadedProtocolMachine::with_workers(
+            ProtocolMachineConfig {
+                threaded_round_semantics: crate::ThreadedRoundSemantics::WaveParallelExtension,
+                output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+                ..ProtocolMachineConfig::default()
+            },
+            2,
+        );
+        let image = lifecycle_loop_image(true);
+        let first = machine
+            .load_choreography_owned(&image, "capacity-first-owner")
+            .unwrap();
+        let second = machine
+            .load_choreography_owned(&image, "capacity-second-owner")
+            .unwrap();
+        let handler = PublicReturnedGenericHandler {
+            calls: Mutex::new(Vec::new()),
+        };
+        machine.next_effect_id = if enough { u64::MAX - 9 } else { u64::MAX - 5 };
+        let original_roles: Vec<_> = machine
+            .coroutines()
+            .iter()
+            .map(|coro| (coro.session_id, coro.id))
+            .collect();
+        let ready = machine.scheduler.ready_set_snapshot();
+        let before = capacity_original_instructions(&machine);
+        let result = machine.step_round(&handler, 2);
+        let after = capacity_original_instructions(&machine);
+        let ready_after = machine.scheduler.ready_set_snapshot();
+        let exchanges = machine.effect_exchanges().to_vec();
+        let canonical = machine.outstanding_effects().to_vec();
+        let derived: Vec<_> = machine
+            .effect_trace()
+            .iter()
+            .filter(|entry| entry.effect_kind == "invoke_step")
+            .cloned()
+            .collect();
+
+        let publications = machine
+            .trace()
+            .iter()
+            .filter(|event| matches!(event, ObsEvent::Invoked { .. }))
+            .count();
+
+        let calls = handler.calls.into_inner().unwrap();
+        let counter = machine.next_effect_id;
+        let tick = machine.clock.tick;
+        let selection = machine.lane_trace().to_vec();
+        let disposal = machine.shutdown_worker_pool().unwrap();
+        assert_eq!(disposal.joined_workers(), 2);
+        assert!(disposal.worker_panics().is_empty());
+        assert_ne!(first.session_id(), second.session_id());
+        assert_eq!(tick, 1);
+        if enough {
+            assert!(result.is_ok());
+            assert_eq!(counter, u64::MAX);
+            assert_eq!(selection.len(), 2);
+            for sid in [first.session_id(), second.session_id()] {
+                let original = original_roles
+                    .iter()
+                    .find(|(session, _)| *session == sid)
+                    .unwrap()
+                    .1;
+                assert_eq!(
+                    selection
+                        .iter()
+                        .filter(|pick| pick.session == sid
+                            && pick.coro_id == original
+                            && pick.tick == tick)
+                        .count(),
+                    1
+                );
+                assert_capacity_public_owner_result(
+                    &calls, &exchanges, &derived, sid, original, tick,
+                );
+            }
+
+            assert!(after.iter().all(|(_, pc, _, _)| *pc == 1));
+        } else {
+            let error = result.unwrap_err();
+            assert_capacity_wave_refusal(&error, &calls, &exchanges, counter);
+            assert_eq!(before, after, "no instruction/register/cost mutation");
+            assert_eq!(ready, ready_after, "all original selections restored");
+        }
+        assert_capacity_wave_occurrences(
+            &calls,
+            &exchanges,
+            &canonical,
+            &derived,
+            publications,
+            tick,
+        );
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn capacity_original_instructions(
+    machine: &ThreadedProtocolMachine,
+) -> Vec<(usize, usize, Vec<Value>, usize)> {
+    machine
+        .coroutines()
+        .iter()
+        .map(|coro| (coro.id, coro.pc, coro.regs.clone(), coro.cost_budget))
+        .collect()
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_capacity_public_owner_result(
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    derived: &[crate::effect::EffectTraceEntry],
+    sid: crate::session::SessionId,
+    original: usize,
+    tick: u64,
+) {
+    use crate::effect::EffectRequestBody;
+    let original_derived: Vec<_> = derived
+        .iter()
+        .filter(|entry| {
+            entry
+                .inputs
+                .get("coro_id")
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|id| usize::try_from(id).ok())
+                == Some(original)
+        })
+        .collect();
+    assert_eq!(original_derived.len(), 1);
+    assert_eq!(original_derived[0].ordering_key, tick);
+    assert_eq!(original_derived[0].outputs, json!({"ok": true}));
+
+    let invokes: Vec<_> = calls
+        .iter()
+        .filter(|request| {
+            request.session == Some(sid)
+                && matches!(request.body, EffectRequestBody::InvokeStep { .. })
+        })
+        .collect();
+    assert_eq!(invokes.len(), 1);
+    let invocation = invokes[0];
+    assert_eq!(invocation.tick, tick);
+    let retained = returned_wave_original_exchanges(exchanges, invocation);
+    assert_eq!(retained.len(), 1);
+    let EffectRequestBody::InvokeStep { state, .. } = &invocation.body else {
+        unreachable!()
+    };
+    let mut expected = state.clone();
+    expected[0] = Value::Str("actual-later-result".into());
+    assert_eq!(
+        retained[0]
+            .outcome
+            .clone()
+            .into_invoke_state_for(&invocation.body)
+            .unwrap(),
+        EffectResult::Success(expected)
+    );
+    let hints: Vec<_> = calls
+        .iter()
+        .filter(|request| {
+            request.session == Some(sid)
+                && matches!(request.body, EffectRequestBody::OutputConditionHint { .. })
+        })
+        .collect();
+    assert_eq!(hints.len(), 1);
+    let retained_hint = returned_wave_original_exchanges(exchanges, hints[0]);
+    assert_eq!(retained_hint.len(), 1);
+    assert_eq!(
+        retained_hint[0]
+            .outcome
+            .clone()
+            .into_output_condition_hint()
+            .unwrap(),
+        None
+    );
+    let wals: Vec<_> = calls.iter().filter(|request| matches!(&request.body,
+        EffectRequestBody::WalSync { sync } if sync.downstream_coroutine_id == format!("coro:{original}")))
+        .collect();
+    assert_eq!(wals.len(), 1);
+    let EffectRequestBody::WalSync { sync } = &wals[0].body else {
+        unreachable!()
+    };
+    assert_eq!(
+        wals[0].session, None,
+        "canonical WAL envelope is operation-scoped"
+    );
+    assert_eq!(wals[0].tick, tick);
+    assert_eq!(sync.tick, tick);
+    assert_eq!(wals[0].operation_id.as_ref(), Some(&sync.operation_id));
+    if let Some(agreement) = &sync.agreement_state {
+        assert_eq!(agreement.session, Some(sid));
+    }
+    let retained_wal = returned_wave_original_exchanges(exchanges, wals[0]);
+    assert_eq!(retained_wal.len(), 1);
+    assert_eq!(
+        retained_wal[0]
+            .outcome
+            .clone()
+            .into_unit("wal_sync")
+            .unwrap(),
+        EffectResult::Success(())
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_capacity_wave_occurrences(
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    canonical: &[crate::semantic_objects::OutstandingEffect],
+    derived: &[crate::effect::EffectTraceEntry],
+    publications: usize,
+    tick: u64,
+) {
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|request| matches!(
+                request.body,
+                crate::effect::EffectRequestBody::InvokeStep { .. }
+            ))
+            .count(),
+        publications
+    );
+    assert_eq!(
+        calls
+            .iter()
+            .filter(|request| matches!(
+                request.body,
+                crate::effect::EffectRequestBody::WalSync { .. }
+            ))
+            .count(),
+        publications
+    );
+    assert!(exchanges.iter().all(|record| record.request.tick == tick));
+
+    let canonical_ids: BTreeSet<_> = canonical.iter().map(|effect| effect.effect_id).collect();
+    assert_eq!(canonical_ids.len(), canonical.len());
+    assert_eq!(canonical.len(), exchanges.len() + publications);
+    assert!(exchanges
+        .iter()
+        .all(|exchange| canonical_ids.contains(&exchange.effect_id)));
+    assert!(canonical_ids.iter().all(|id| *id < u64::MAX));
+
+    assert_eq!(derived.len(), publications);
+    let occurrence_ids: Vec<_> = exchanges
+        .iter()
+        .map(|record| record.effect_id)
+        .chain(derived.iter().map(|entry| entry.effect_id))
+        .collect();
+    let occurrence_set: BTreeSet<_> = occurrence_ids.iter().copied().collect();
+    assert_eq!(
+        occurrence_ids.len(),
+        occurrence_set.len(),
+        "callbacks and derived commits never alias"
+    );
+    assert!(occurrence_set.iter().all(|id| *id < u64::MAX));
+    let ids: BTreeSet<_> = exchanges.iter().map(|record| record.effect_id).collect();
+    assert_eq!(ids.len(), exchanges.len());
+    assert!(ids.iter().all(|id| *id < u64::MAX));
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn assert_capacity_wave_refusal(
+    error: &ProtocolMachineError,
+    calls: &[crate::effect::EffectRequest],
+    exchanges: &[crate::effect::EffectExchangeRecord],
+    counter: u64,
+) {
+    let ProtocolMachineError::HandlerError(actual) = error else {
+        panic!("expected complete-wave capacity refusal");
+    };
+    assert_eq!(
+        actual,
+        &EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+    );
+    assert_eq!(calls.len(), 1);
+    assert!(matches!(
+        calls[0].body,
+        crate::effect::EffectRequestBody::TopologyEvents { .. }
+    ));
+    assert_eq!(
+        exchanges.len(),
+        1,
+        "only admitted original poll, no worker issuance"
+    );
+    assert_eq!(counter, u64::MAX - 4);
 }

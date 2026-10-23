@@ -196,7 +196,8 @@ impl ProtocolMachine {
             &recv_outcome,
             &handler.handler_identity(),
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         let state = recv_outcome
             .into_receive_state_for(&request.body)
             .unwrap_or_else(EffectResult::failure)
@@ -293,7 +294,8 @@ impl ProtocolMachine {
                     &effect_outcome,
                     &handler.handler_identity(),
                     predicted_effect_id,
-                );
+                )
+                .map_err(|failure| Fault::Invoke { failure })?;
                 let decision = effect_outcome
                     .into_send_decision()
                     .unwrap_or_else(EffectResult::failure)

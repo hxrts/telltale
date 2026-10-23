@@ -1,5 +1,48 @@
 // Canonical nominal issuance belongs to the main owner before worker dispatch.
 // Workers borrow only the original coroutine holder and actual session state.
+impl ThreadedProtocolMachine {
+    // A previously returned value needs no new callback observation. Settle its
+    // original occurrence as well when publication capacity terminally refuses.
+    fn settle_nominal_publication_failure(
+        &mut self,
+        coroutine: &Arc<Mutex<Coroutine>>,
+        failure: &EffectFailure,
+    ) -> Result<(), ProtocolMachineError> {
+        let original = {
+            let coro = coroutine
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            coro.nominal_continuation.as_ref().and_then(|pending| {
+                if pending.validation_failure.as_ref() == Some(failure) {
+                    pending
+                        .returned
+                        .clone()
+                        .map(|value| (pending.invocation, value))
+                } else {
+                    None
+                }
+            })
+        };
+        let Some((invocation, returned)) = original else {
+            return Ok(());
+        };
+        if self.outstanding_effects.iter().any(|effect| {
+            effect.effect_id == invocation
+                && matches!(
+                    effect.status,
+                    OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                )
+        }) {
+            self.complete_runtime_effect(
+                invocation,
+                OutstandingEffectStatus::Failed,
+                json!({"status":"failure", "failure":failure, "retained_result":returned}),
+            )?;
+        }
+        Ok(())
+    }
+}
+
 fn validate_threaded_nominal_owner(
     coroutine: &Coroutine,
     session: &mut SessionState,
@@ -186,13 +229,15 @@ impl ThreadedProtocolMachine {
             call.budget_ticks.get(),
         );
         self.ensure_effect_request_allowed(&request).map_err(fail)?;
-        let invocation = self.issue_runtime_effect_with_budget(
-            "nominal_command",
-            Some(sid),
-            handler_identity,
-            serde_json::to_value(&request).expect("typed nominal request serializes"),
-            Some(call.budget_ticks.get()),
-        );
+        let invocation = self
+            .issue_runtime_effect_with_budget(
+                "nominal_command",
+                Some(sid),
+                handler_identity,
+                serde_json::to_value(&request).expect("typed nominal request serializes"),
+                Some(call.budget_ticks.get()),
+            )
+            .map_err(|failure| Fault::Invoke { failure })?;
         let effect = self
             .outstanding_effects
             .iter_mut()
@@ -442,12 +487,7 @@ fn exec_nominal_instr(
     } else {
         false
     };
-    Ok(finish_threaded_nominal_pack(
-        coroutine,
-        ctx,
-        blocked,
-        observations,
-    ))
+    finish_threaded_nominal_pack(coroutine, ctx, blocked, observations)
 }
 
 fn original_threaded_nominal_request(
@@ -563,7 +603,7 @@ fn finish_threaded_nominal_pack(
     ctx: &ThreadedStepCtx<'_>,
     blocked: bool,
     observations: Vec<EffectObservation>,
-) -> ThreadedExecSuccess {
+) -> Result<ThreadedExecSuccess, ThreadedExecFault> {
     let (pack, sid, role, registers) = {
         let coro = coroutine
             .lock()
@@ -587,6 +627,21 @@ fn finish_threaded_nominal_pack(
         };
         (pack, coro.session_id, coro.role.clone(), coro.regs.clone())
     };
+    if !blocked && !ctx.nominal_publication_admitted {
+        let failure =
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted");
+        coroutine
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned")
+            .nominal_continuation
+            .as_mut()
+            .expect("validated original retained")
+            .validation_failure = Some(failure.clone());
+        return Err(ThreadedExecFault {
+            fault: Fault::Invoke { failure },
+            effect_observations: observations,
+        });
+    }
     let output_observation = if pack.events.is_empty() {
         None
     } else {
@@ -607,9 +662,9 @@ fn finish_threaded_nominal_pack(
             hint: Some(hint),
         })
     };
-    ThreadedExecSuccess {
+    Ok(ThreadedExecSuccess {
         pack,
         effect_observations: observations,
         output_observation,
-    }
+    })
 }

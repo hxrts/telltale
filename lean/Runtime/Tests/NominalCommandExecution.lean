@@ -127,31 +127,121 @@ def invokeInstalled (st : State) (index : Nat) : Option State := do
       pure (commitPack st coro.id (stepInvoke st coro action)).1
   | _ => none
 
+/-! Proof staging. These normal forms are never used as loader or owner inputs
+without the exact producer equations below. In particular, `stageOwned` is model
+data whose equality is proved against `admitLoadedSessionOwner`, not host custody. -/
+private def stageImage (predicate : Option String) : CodeImage UnitGuard TestEffect :=
+  let declared := { declaration with readinessPredicate := predicate }
+  let selected := { call with declaration := declared, onOk := 4, onErr := 6 }
+  let branches := [({ name := "Ready" }, none, SessionTypes.LocalTypeR.LocalTypeR.end),
+    ({ name := "Denied" }, none, SessionTypes.LocalTypeR.LocalTypeR.end)]
+  { program := {
+      code := #[.choose 0 [("Ready", 1), ("Denied", 1)], .halt,
+        .invoke (.declaration declared), .invoke (.command selected),
+        .offer 0 "Ready", .halt, .offer 0 "Denied", .halt],
+      entryPoints := [("B", 0), ("A", 2)],
+      localTypes := [("B", .branch "A" [("Ready", .end_), ("Denied", .end_)]),
+        ("A", .select "B" [("Ready", .end_), ("Denied", .end_)])],
+      localTypesR := [("B", .recv "A" branches), ("A", .send "B" branches)],
+      handlerTypes := [], metadata := ProgramMeta.empty }, globalType := global }
+
+private def stageCoroutine (role : String) (id pc : Nat) : CoroutineState UnitGuard TestEffect :=
+  let endpoint : Endpoint := { sid := 0, role }
+  { id, programId := 0, role, pc,
+    regs := (Array.replicate config.numRegisters .unit).set! 0 (.chan endpoint),
+    status := .ready, effectCtx := default, ownedEndpoints := [endpoint],
+    progressTokens := [], knowledgeSet := [], costBudget := 100, specState := none }
+
+private def stageSession (predicate : Option String) : SessionState UnitVerify :=
+  let edge : Edge := { sid := 0, sender := "A", receiver := "B" }
+  { scope := { id := 0 }, sid := 0, roles := ["B", "A"],
+    endpoints := [{ sid := 0, role := "B" }, { sid := 0, role := "A" }],
+    localTypes := (stageImage predicate).program.localTypes.map
+      (fun entry => ({ sid := 0, role := entry.1 }, entry.2)),
+    traces := initDEnv 0 ["B", "A"], buffers := [(edge, [])],
+    handlers := [(edge, 0)], epoch := 0, phase := .active }
+
+private def stageInstalled (predicate : Option String) : State :=
+  let edge : Edge := { sid := 0, sender := "A", receiver := "B" }
+  { empty with programs := #[(stageImage predicate).program],
+    coroutines := #[stageCoroutine "B" 0 0, stageCoroutine "A" 1 2],
+    buffers := [(edge, [])], sessions := [(0, stageSession predicate)],
+    sched := { empty.sched with readyQueue := [0, 1] },
+    obsTrace := [{ tick := 0, event := .opened 0 ["B", "A"] }],
+    nextCoroId := 2, nextSessionId := 1 }
+
+private def stageOwner (name : String) : SessionTypes.ModelOwner :=
+  ⟨0, name, 0, .session⟩
+
+private def stageOwned (predicate : Option String) (name : String) : State :=
+  let owner := stageOwner name
+  let installed := stageInstalled predicate
+  { installed with sessions := [(0, { stageSession predicate with
+      ownership := { current := some owner } })],
+    coroutines := installed.coroutines.map
+      (fun coroutine => { coroutine with issuedModelOwner := some owner }) }
+
+private theorem stage_image_eq : image = .ok (stageImage none) := by
+  simp +decide [image, roleImage, declaration, call, global, stageImage,
+    RoleCodeImage.toCodeImage, mapExecutableTargets?,
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_insert, Std.HashMap.size_empty,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+
+private theorem stage_load_eq (readiness : Bool) :
+    loadChoreographyResult empty (stageImage (if readiness then some "Store.save" else none)) =
+      .ok (stageInstalled (if readiness then some "Store.save" else none)) 0 := by
+  -- Both actual declaration shapes are concrete; no arbitrary predicate equality
+  -- or subsequent invocation/owner observation is sent to the simplifier.
+  cases readiness <;> simp +decide only [loadChoreographyResult, validateImage_eq,
+    stageImage, declaration, call, global, empty, config,
+    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
+    Choreography.Projection.Trans.trans, Choreography.Projection.Trans.transBranches,
+    Choreography.Projection.Projectb.projectb,
+    Choreography.Projection.Projectb.projectbBranches,
+    List.find?_cons, List.find?_nil, List.map_cons, List.map_nil,
+    Option.map, Option.bind, ↓reduceIte, ↓reduceDIte]
+  -- The remaining private loader core is structurally reducible. Its complete
+  -- state, including endpoints, queues, trace and ownership defaults, must agree.
+  all_goals rfl
+
+private theorem stage_plain_load_eq :
+    loadChoreographyResult empty (stageImage none) = .ok (stageInstalled none) 0 :=
+  stage_load_eq false
+
+private theorem stage_ready_load_eq :
+    loadChoreographyResult empty (stageImage (some "Store.save")) =
+      .ok (stageInstalled (some "Store.save")) 0 :=
+  stage_load_eq true
+
+private theorem stage_admission_eq (predicate : Option String) (name : String)
+    (named : name.isEmpty = false) :
+    admitLoadedSessionOwner (stageInstalled predicate) 0 name =
+      .ok (stageOwned predicate name, stageOwner name) := by
+  simp [admitLoadedSessionOwner, stageInstalled, stageSession, stageCoroutine,
+    stageOwned, stageOwner, SessionTypes.ModelOwnershipState.claim, named]
+
+private theorem stage_ordinary_eq : ordinaryLoaded = some (stageInstalled none) := by
+  simp only [ordinaryLoaded, stage_image_eq, Except.toOption, Option.bind, stage_plain_load_eq]
+
+private theorem stage_loaded_eq : loaded = some (stageOwned none "original") := by
+  unfold loaded
+  rw [stage_ordinary_eq]
+  change (match admitLoadedSessionOwner (stageInstalled none) 0 "original" with
+    | .ok admitted => some admitted.1 | .error _ => none) = _
+  rw [stage_admission_eq none "original" (by decide)]
+  rfl
+
 theorem ordinary_nominal_loader_cannot_reconstruct_original_owner :
     ((ordinaryLoaded.bind (fun st => invokeInstalled st 1)).bind
       (fun st => invokeInstalled st 1) |>.map fun st =>
         st.outstandingEffects.isEmpty && st.operationInstances.isEmpty && st.nextEffectId == 0 &&
         st.coroutines[1]?.any (fun coro => coro.effectCtx.calls == 0 &&
           match coro.status with | .faulted _ => true | _ => false)).getD false = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, invokeInstalled,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 def blocked : Option State := do
   let st ← loaded
@@ -204,25 +294,8 @@ example : (match blocked with
         decide (effect.status = .blocked) && effect.orderingKey == 0
     | _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, blocked, view, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [blocked, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 example : (match resumed with
   | some st => match view st with
     | some (coro, effect, operation) => st.nextEffectId == 1 && coro.effectCtx.calls == 2 &&
@@ -231,25 +304,8 @@ example : (match resumed with
         st.effectExchanges.length == 2
     | _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, blocked, resumed, view, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [blocked, resumed, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 /-- Still-Blocked expiry refuses before another callback, without resetting the
 original occurrence or replacing its original progress/window. -/
@@ -260,25 +316,8 @@ example : (match blocked.bind (fun st => invokeInstalled { st with clock := 3 } 
         coro.nominalContinuation.isSome
     | _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, blocked, view, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [blocked, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 /-- A static declaration cannot be borrowed from another role's prefix. -/
 example : (match image with
@@ -305,25 +344,8 @@ example : (match blocked.bind (fun st => do
         coro.nominalContinuation.isSome
     | _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, blocked, view, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [blocked, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 /-- Set only the actual installed coroutine's selected test provider context. -/
 def prepared (context : Context) : Option State := do
@@ -341,25 +363,8 @@ example : (match (prepared { blockFirst := false, applicationError := true }).bi
         decide (operation.agreementProfile = some call.agreementProfile)
     | _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, view, prepared, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 /-- Host semantic Failure is distinct from a typed application Err branch and
 from an independent post-callback identity refusal. The raw original outcome
@@ -374,25 +379,8 @@ example : (match (prepared { blockFirst := false, fail := true, changeIdentity :
         decide (coro.regs[1]? = some .unit)
     | _, _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, view, prepared, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 example : (match (prepared { blockFirst := false, wrongReply := true }).bind
     (fun st => invokeInstalled st 1) with
@@ -404,25 +392,8 @@ example : (match (prepared { blockFirst := false, wrongReply := true }).bind
         decide (coro.regs[1]? = some .unit)
     | _, _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, view, prepared, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 /-- Actual output-gate refusal retains the issued occurrence and its genuine
 returned value without changing the result register or publishing success. -/
@@ -437,25 +408,8 @@ example : (match (prepared { blockFirst := false }).bind (fun st =>
         decide (coro.regs[1]? = some .unit) && st.effectExchanges.length == 1
     | _ => false
   | _ => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, image, config, empty, ordinaryLoaded, loaded,
-    invokeInstalled, view, prepared, RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
-    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
+  decide
 
 /-! A typed action adapter is required to preserve executable continuations;
 parser/classifier support alone cannot authorize a relocation. -/
@@ -525,6 +479,66 @@ def readinessPrepared (mutation : Nat := 0) : Option State := do
     coroutines := st.coroutines.set! 1 { coro with effectCtx := { blockFirst := false, readiness := some witness } } }
   invokeInstalled st 1
 
+private theorem stage_readiness_image_eq :
+    ({ roleImage with programs := roleImage.programs.insert "A"
+      #[.invoke (.declaration { declaration with readinessPredicate := some "Store.save" }),
+        .invoke (.command { call with declaration :=
+          { declaration with readinessPredicate := some "Store.save" } }),
+        .offer 0 "Ready", .halt, .offer 0 "Denied", .halt] }.toCodeImage ["B", "A"]) =
+      .ok (stageImage (some "Store.save")) := by
+  simp +decide [roleImage, declaration, call, global, stageImage,
+    RoleCodeImage.toCodeImage, mapExecutableTargets?,
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_insert, Std.HashMap.size_empty,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+
+/-- The unchanged post-admission issuer/consumer transaction. No witness is
+inferred from the normal-form owner or fabricated callback data. -/
+private def stageReadinessPrepared (mutation : Nat) : Option State := do
+  let st := stageOwned (some "Store.save") "original-owner"
+  let owner := stageOwner "original-owner"
+  let coro ← st.coroutines[1]?
+  let endpoint ← coro.ownedEndpoints.find? (fun endpoint => endpoint.role == "A")
+  let session ← st.sessions.lookup endpoint.sid
+  let (issued, original) ← (session.ownership.issueReadiness owner "Store.save").toOption
+  let witness := match mutation with
+    | 1 => { original with witnessId := original.witnessId + 1 }
+    | 2 => { original with predicateRef := "Other.ready" }
+    | _ => original
+  let ownership ← if mutation == 3 then (issued.consumeReadiness owner original).toOption else some issued
+  let st := { st with
+    sessions := st.sessions.map (fun (sid, current) =>
+      if sid == endpoint.sid then (sid, { current with ownership }) else (sid, current)),
+    coroutines := st.coroutines.set! 1 { coro with effectCtx := { blockFirst := false, readiness := some witness } } }
+  invokeInstalled st 1
+
+private theorem stage_readiness_eq (mutation : Nat) :
+    readinessPrepared mutation = stageReadinessPrepared mutation := by
+  simp only [readinessPrepared, stage_readiness_image_eq, Except.toOption,
+    Option.bind, stage_ready_load_eq]
+  -- Reduce only the original installed-coro/endpoint selection, then rewrite
+  -- actual admission before opening any callback, issued witness or observation.
+  change (do
+    let (st, owner) ← (admitLoadedSessionOwner
+      (stageInstalled (some "Store.save")) 0 "original-owner").toOption
+    let coro ← st.coroutines[1]?
+    let session ← st.sessions.lookup 0
+    let (issued, original) ← (session.ownership.issueReadiness owner "Store.save").toOption
+    let witness := match mutation with
+      | 1 => { original with witnessId := original.witnessId + 1 }
+      | 2 => { original with predicateRef := "Other.ready" }
+      | _ => original
+    let ownership ← if mutation == 3 then (issued.consumeReadiness owner original).toOption else some issued
+    invokeInstalled { st with
+      sessions := st.sessions.map (fun (sid, current) =>
+        if sid == 0 then (sid, { current with ownership }) else (sid, current)),
+      coroutines := st.coroutines.set! 1 { coro with effectCtx :=
+        { blockFirst := false, readiness := some witness } } } 1) = _
+  rw [stage_admission_eq (some "Store.save") "original-owner" (by decide)]
+  rfl
+
 /-- Real installed invocation consumes the exact session-issued witness once. -/
 theorem readiness_actual_commit_single_use :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled st 1) with
@@ -538,25 +552,8 @@ theorem readiness_actual_commit_single_use :
         | _, _ => false
       | _ => false
     | none => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, config, empty, invokeInstalled, view, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_readiness_eq]
+  decide
 
 /-- Forged payload, wrong predicate and replayed consumed evidence never branch. -/
 theorem readiness_actual_forgery_predicate_and_reuse_refused :
@@ -567,25 +564,8 @@ theorem readiness_actual_forgery_predicate_and_reuse_refused :
             (match coro.status with | .faulted _ => true | _ => false)
         | none => false
       | none => false)) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, config, empty, invokeInstalled, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_readiness_eq]
+  decide
 
 /-- Existing output refusal leaves actual returned witness and registry live. -/
 theorem readiness_actual_output_refusal_retains_original :
@@ -602,25 +582,8 @@ theorem readiness_actual_output_refusal_retains_original :
         | none => false
       | none => false
     | none => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, config, empty, invokeInstalled, view, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_readiness_eq]
+  decide
 
 def registeredReadiness : Option (SessionTypes.ModelOwnershipState × SessionTypes.ModelOwner × SessionTypes.ReadinessWitness) := do
   let (claimed, owner) ← (({} : SessionTypes.ModelOwnershipState).claim 7 "original").toOption
@@ -656,25 +619,8 @@ theorem readiness_actual_boolean_cannot_authorize :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, config, empty, invokeInstalled, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_readiness_eq]
+  decide
 
 theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled
@@ -693,25 +639,8 @@ theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, config, empty, invokeInstalled, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_readiness_eq]
+  decide
 
 
 /-- A new registry generation cannot refresh a stale installed coroutine owner. -/
@@ -730,24 +659,7 @@ theorem readiness_before_issuance_never_reconstructs_current_owner :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp +decide only [
-    declaration, call, global, roleImage, config, empty, invokeInstalled, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  all_goals decide
+  simp only [stage_readiness_eq]
+  decide
 
 end Runtime.Tests.NominalCommandExecution

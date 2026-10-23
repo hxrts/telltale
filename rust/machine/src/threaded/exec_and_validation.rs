@@ -38,6 +38,8 @@ struct ThreadedStepCtx<'a> {
     timed_out_sites: &'a BTreeMap<String, u64>,
     handler: &'a dyn EffectHandler,
     tick: u64,
+    // Arithmetic decision from this dispatch, not session authority.
+    nominal_publication_admitted: bool,
 }
 
 struct ThreadedExecCtx<'a> {

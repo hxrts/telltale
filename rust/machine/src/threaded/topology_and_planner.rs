@@ -367,6 +367,8 @@ impl ThreadedProtocolMachine {
         let request = EffectRequest::topology_events(tick);
         self.ensure_effect_request_allowed(&request)
             .map_err(ProtocolMachineError::HandlerError)?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)
+            .map_err(ProtocolMachineError::HandlerError)?;
         let predicted_effect_id = self.next_effect_id;
         let topology_outcome = handler.handle_effect(request.clone());
         self.record_effect_exchange(
@@ -374,7 +376,8 @@ impl ThreadedProtocolMachine {
             &topology_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(ProtocolMachineError::HandlerError)?;
         let mut events = topology_outcome
             .into_topology()
             .unwrap_or_else(EffectResult::failure)
@@ -384,6 +387,13 @@ impl ThreadedProtocolMachine {
             .map_err(ProtocolMachineError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
+        let event_count = u64::try_from(events.len()).map_err(|_| {
+            ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                "topology effect batch count exceeds u64",
+            ))
+        })?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, event_count)
+            .map_err(ProtocolMachineError::HandlerError)?;
         for event in events {
             self.apply_topology_event(&event);
             let effect_kind = "topology_event".to_string();
@@ -410,7 +420,11 @@ impl ThreadedProtocolMachine {
             if self.should_capture_effect_kind("topology_event") {
                 self.effect_trace.push(entry);
             }
-            self.next_effect_id = self.next_effect_id.saturating_add(1);
+            self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                    "canonical effect occurrence identifiers exhausted",
+                ))
+            })?;
         }
         Ok(())
     }

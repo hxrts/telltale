@@ -189,7 +189,8 @@ impl ProtocolMachine {
             &recv_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         match recv_outcome
             .into_receive_state_for(&request.body)
             .unwrap_or_else(EffectResult::failure)
@@ -364,7 +365,8 @@ impl ProtocolMachine {
             &step_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         match step_outcome
             .into_invoke_state_for(&request.body)
             .unwrap_or_else(EffectResult::failure)
@@ -452,7 +454,8 @@ impl ProtocolMachine {
             &acquire_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         let decision = acquire_outcome
             .into_value("acquire")
             .unwrap_or_else(EffectResult::failure);
@@ -535,7 +538,8 @@ impl ProtocolMachine {
             &release_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         match release_outcome
             .into_unit("handle_release")
             .unwrap_or_else(EffectResult::failure)

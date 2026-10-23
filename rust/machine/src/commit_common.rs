@@ -10,6 +10,91 @@ use crate::output_condition::{
     OutputConditionPolicy,
 };
 
+/// Check a complete dispatch's fresh occurrence bound without consuming IDs.
+/// `u64::MAX` remains the exhausted sentinel; zero-fresh settlement is valid there.
+pub(crate) fn require_effect_capacity(
+    next: u64,
+    additional: u64,
+) -> Result<(), crate::effect::EffectFailure> {
+    if additional <= u64::MAX - next {
+        Ok(())
+    } else {
+        Err(crate::effect::EffectFailure::contract_violation(
+            "canonical effect occurrence identifiers exhausted",
+        ))
+    }
+}
+
+/// Conservative fresh occurrence bound, before any instruction or host mutation.
+/// Unused capacity is never allocated, so ordinary occurrence order is unchanged.
+pub(crate) fn instruction_effect_capacity(
+    instr: &crate::instr::Instr,
+    nominal_already_issued: bool,
+) -> u64 {
+    use crate::instr::{Instr, InvokeAction};
+    match instr {
+        Instr::Send { .. }
+        | Instr::Receive { .. }
+        | Instr::Offer { .. }
+        | Instr::Choose { .. }
+        | Instr::Acquire { .. }
+        | Instr::Release { .. }
+        | Instr::Invoke {
+            action: InvokeAction::Named(_) | InvokeAction::Reg(_),
+        } => 4,
+        Instr::Invoke {
+            action: InvokeAction::NominalCommand(_),
+        } => {
+            if nominal_already_issued {
+                3
+            } else {
+                4
+            }
+        }
+        Instr::Open { .. }
+        | Instr::Close { .. }
+        | Instr::Fork { .. }
+        | Instr::Join
+        | Instr::Abort
+        | Instr::Transfer { .. }
+        | Instr::Tag { .. }
+        | Instr::Check { .. } => 2,
+        Instr::Set { .. }
+        | Instr::Move { .. }
+        | Instr::Jump { .. }
+        | Instr::Spawn { .. }
+        | Instr::Yield
+        | Instr::Halt
+        | Instr::Invoke {
+            action: InvokeAction::DeclareCommand(_) | InvokeAction::OperationLifecycle(_),
+        } => 0,
+    }
+}
+
+/// Count only events that the canonical trace producer turns into occurrences.
+pub(crate) fn derived_effect_count(
+    events: &[ObsEvent],
+) -> Result<u64, crate::effect::EffectFailure> {
+    u64::try_from(
+        events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event,
+                    ObsEvent::Sent { .. }
+                        | ObsEvent::Received { .. }
+                        | ObsEvent::Invoked { .. }
+                        | ObsEvent::Acquired { .. }
+                        | ObsEvent::Released { .. }
+                )
+            })
+            .count(),
+    )
+    .map_err(|_| {
+        crate::effect::EffectFailure::contract_violation("derived effect batch count exceeds u64")
+    })
+}
+
 /// Apply output-condition verification for a commit and record diagnostics.
 pub(crate) fn apply_output_condition_gate<RecordCheck, RecordEvent>(
     policy: &OutputConditionPolicy,

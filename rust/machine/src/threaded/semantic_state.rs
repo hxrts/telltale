@@ -46,7 +46,10 @@ impl ThreadedProtocolMachine {
         outcome: &EffectOutcome,
         handler_identity: &str,
         effect_id: u64,
-    ) {
+    ) -> Result<(), EffectFailure> {
+        let successor = effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let mut request = request.clone();
         request.effect_id = Some(effect_id);
         let exchange = EffectExchangeRecord {
@@ -71,7 +74,8 @@ impl ThreadedProtocolMachine {
         }
         self.sync_runtime_effect_from_exchange(&exchange);
         self.effect_exchanges.push(exchange);
-        self.next_effect_id = self.next_effect_id.max(effect_id.saturating_add(1));
+        self.next_effect_id = self.next_effect_id.max(successor);
+        Ok(())
     }
 
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<String> {
@@ -422,7 +426,7 @@ impl ThreadedProtocolMachine {
         session: Option<SessionId>,
         handler_identity: &str,
         inputs: serde_json::Value,
-    ) -> u64 {
+    ) -> Result<u64, EffectFailure> {
         self.issue_runtime_effect_with_budget(
             effect_kind,
             session,
@@ -439,9 +443,12 @@ impl ThreadedProtocolMachine {
         handler_identity: &str,
         inputs: serde_json::Value,
         budget_ticks: Option<u64>,
-    ) -> u64 {
+    ) -> Result<u64, EffectFailure> {
         let effect_id = self.next_effect_id;
-        self.next_effect_id = self.next_effect_id.saturating_add(1);
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)?;
+        self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let operation_id = Self::effect_operation_id(effect_id);
         let (effect_interface, effect_operation) =
             infer_effect_interface_and_operation(effect_kind);
@@ -487,7 +494,7 @@ impl ThreadedProtocolMachine {
             None,
             true,
         );
-        effect_id
+        Ok(effect_id)
     }
 
     fn sync_runtime_effect_from_trace_entry(&mut self, entry: &EffectTraceEntry) {

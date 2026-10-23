@@ -895,6 +895,46 @@ never saturates, wraps, advances per worker wave, or substitutes a physical cloc
 |---|---|---|---|---|---|---|---|
 | rust-finite-simclock-admission | telltale-machine runtime maintainers | Active, finite representation boundary | Rust tick and simulated duration have finite successors while Lean model arithmetic is unbounded | Typed atomic refusal before round mutation; all representable rounds retain one tick each; no authority or cleanup ACK | Wrapping, saturation, panic or partial tick mutation changes the selected model time | 2027-01-21 | Three direct clock declarations and two actual-round declarations per backend; source-only until discovered and executed |
 
+### Finite effect-occurrence admission
+
+Rust's canonical effect-occurrence counter is finite. Its exhausted sentinel is
+`u64::MAX`; an occurrence is allocated only below that value. Lean's natural
+number counter has no corresponding finite boundary. Correspondence requires
+capacity for the complete selected dispatch or dynamic topology batch. This
+premise is separate from simulation-clock admission and never renews an original
+operation's tick, deadline, owner or progress window.
+
+Both Rust backends check a conservative fresh-occurrence bound before instruction
+or host mutation. Threaded dispatch checks the sum before its first nominal
+issuance or worker. The check holds capacity without advancing the counter.
+Unused capacity creates no holes and ordinary occurrence order stays unchanged.
+A topology poll needs its own slot. Its actual outcome is retained before a
+second check covers every returned event, before the first topology mutation.
+Conservative bounds may refuse a smaller outcome that would have fit alone.
+Refusal is typed and does not acknowledge worker cleanup. Independent timeout
+witness capacity must also fit before a topology batch applies. Unlike atomic
+SimClock admission, effect-capacity refusal may follow the admitted round's tick
+increment and scheduler selection. A public round at `u64::MAX` refuses before
+its topology poll. Entering at `u64::MAX - 1` can admit that poll and leave the
+instruction boundary at exhaustion for zero-fresh original settlement.
+
+An already issued nominal callback can return Failure or Blocked with no fresh
+occurrence. It keeps its original invocation and selected window at exhaustion.
+Success and application Err retain their actual typed result before publication
+capacity is checked. If publication cannot fit, existing completion settles the
+same original canonical effect as Failed, including an unparented invocation,
+and updates its operation/progress state. The actual callback outcome remains
+unchanged and its typed returned result and independent refusal remain resident.
+No hint, WAL effect, readiness consumption or successful continuation is
+authorized. This is terminal refusal, not positive retry. A fresh
+nominal invocation must fit its complete bound before issuance. For a threaded
+fallback only the actual first, already issued nominal pick may run. Other
+original picks return to the existing scheduler.
+
+| Id | Owner | Status | Reason | Impact | Alternatives considered | Revisit date | Coverage scope |
+|---|---|---|---|---|---|---|---|
+| rust-finite-effect-occurrence-admission | telltale-machine runtime maintainers | Prepared finite representation boundary | Rust canonical occurrence IDs are finite while Lean model IDs are natural numbers | Complete-dispatch and topology-batch capacity premise, preserving zero-fresh original settlement | Saturation, wrapping, eager unused IDs, per-worker allocation, or replacing the original occurrence | 2027-01-21 | Source preparation, backend/nominal/topology/wave fixtures require actual discovery and execution |
+
 ### Prepared readiness continuation and session authority state
 
 The typed nominal result now distinguishes Boolean application values from

@@ -184,6 +184,35 @@ mod invoke_outcome_tests {
         )
     }
     include!("../tests/unit/invoke_outcome_atomicity.rs");
+    include!("../tests/unit/send_capacity_fixture.rs");
+    fn send_counter_dispatch_allocations() -> u64 {
+        1
+    }
+    fn send_counter_queue_state(machine: &FixtureMachine, sid: usize) -> serde_json::Value {
+        let resident = machine.sessions.get(sid).unwrap();
+        let session = resident.lock().unwrap();
+        let edge = Edge::new(sid, "A", "B");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".into(),
+        };
+        let queue = &session.buffers[&edge];
+        serde_json::to_value((
+            queue.len(),
+            queue.capacity(),
+            queue,
+            &session.local_types[&endpoint].current,
+        ))
+        .unwrap()
+    }
+    fn settle_send_counter_machine(machine: FixtureMachine) {
+        let disposal = machine
+            .shutdown_worker_pool()
+            .expect("join SAME original send counter pool");
+        assert_eq!(disposal.joined_workers(), 1);
+        assert!(disposal.worker_panics().is_empty());
+    }
+    include!("../tests/unit/send_capacity_counter.rs");
 }
 
 #[cfg(all(test, not(target_arch = "wasm32")))]
@@ -204,6 +233,7 @@ mod live_effect_retention_tests {
 #[cfg(all(test, not(target_arch = "wasm32")))]
 mod clock_admission_tests {
     use super::*;
+    use crate::ObservabilityRetentionConfig;
     fn make_clock_machine() -> ThreadedProtocolMachine {
         ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1)
     }
@@ -230,4 +260,24 @@ mod clock_admission_tests {
         .unwrap()
     }
     include!("../tests/unit/clock_admission.rs");
+    include!("../tests/unit/effect_capacity.rs");
+    type NominalCapacityMachine = ThreadedProtocolMachine;
+    fn make_nominal_capacity_machine(
+        retention: ObservabilityRetentionConfig,
+    ) -> NominalCapacityMachine {
+        let config = ProtocolMachineConfig {
+            observability_retention: retention,
+            output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+            ..ProtocolMachineConfig::default()
+        };
+        ThreadedProtocolMachine::with_workers(config, 1)
+    }
+    fn nominal_capacity_expected_original_exchanges(_: ObservabilityRetentionConfig) -> usize {
+        2 // This backend's actual diagnostic exchange stream is an unbounded Vec.
+    }
+    fn nominal_capacity_host_failure_outputs(failure: &EffectFailure) -> serde_json::Value {
+        serde_json::to_value(EffectOutcome::failure(failure.clone())).unwrap()
+    }
+    include!("../tests/unit/nominal_effect_capacity.rs");
+    include!("../tests/unit/nominal_effect_capacity_wave.rs");
 }

@@ -402,6 +402,25 @@ successor together. `ClockExhaustion` propagates as the source-bearing
 scheduler mutation or cooperative round-observation resets. Refusal changes
 neither original counter and does not acknowledge any pending operation.
 
+### Finite canonical effect-occurrence custody
+
+Fresh canonical effect IDs require complete capacity admission before their host
+work or mutation. The finite counter never allocates its exhausted `u64::MAX`
+sentinel. The same selected threaded wave holds its summed bound before issuance;
+actual producers retain deterministic allocation order. Already-issued original
+nominal Failure/Blocked observations use their original occurrence, while fresh
+issuance and positive publication retain their complete capacity obligations.
+Actual returned values and errors remain with the original continuation.
+
+A topology poll and its dynamically returned batch have separate boundaries:
+admit the poll before calling it, then retain its actual outcome and admit the
+whole event batch before applying its first mutation. Timeout-witness capacity
+is independently required. Capacity refusal does not undo an already admitted
+round's SimClock increment or scheduler selection. It is distinct from atomic
+clock-exhaustion admission above and supplies no asynchronous cleanup receipt.
+The prepared finite-representation deviation and executable acceptance scope are
+recorded in [Rust-Lean parity](802_rust_lean_parity.md#finite-effect-occurrence-admission).
+
 The bounded authoritative nominal readiness path retains its actual typed result
 in the original coroutine continuation. Output/WAL gates and destination checks
 precede the canonical same-session witness consumer. Success publication and

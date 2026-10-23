@@ -46,7 +46,10 @@ impl ProtocolMachine {
         outcome: &EffectOutcome,
         handler_identity: &str,
         effect_id: u64,
-    ) {
+    ) -> Result<(), EffectFailure> {
+        let successor = effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let mut request = request.clone();
         request.effect_id = Some(effect_id);
         let exchange = EffectExchangeRecord {
@@ -71,7 +74,8 @@ impl ProtocolMachine {
         self.sync_runtime_effect_from_exchange(&exchange);
         self.effect_exchanges
             .push(exchange, &self.config.observability_retention);
-        self.next_effect_id = self.next_effect_id.max(effect_id.saturating_add(1));
+        self.next_effect_id = self.next_effect_id.max(successor);
+        Ok(())
     }
 
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<FragmentOwnerId> {
@@ -420,7 +424,7 @@ impl ProtocolMachine {
         session: Option<SessionId>,
         handler_identity: &str,
         inputs: serde_json::Value,
-    ) -> u64 {
+    ) -> Result<u64, EffectFailure> {
         self.issue_runtime_effect_with_budget(
             effect_kind,
             session,
@@ -437,9 +441,12 @@ impl ProtocolMachine {
         handler_identity: &str,
         inputs: serde_json::Value,
         budget_ticks: Option<u64>,
-    ) -> u64 {
+    ) -> Result<u64, EffectFailure> {
         let effect_id = self.next_effect_id;
-        self.next_effect_id = self.next_effect_id.saturating_add(1);
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)?;
+        self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let operation_id = Self::effect_operation_id(effect_id);
         let (effect_interface, effect_operation) =
             infer_effect_interface_and_operation(effect_kind);
@@ -491,7 +498,7 @@ impl ProtocolMachine {
             None,
             true,
         );
-        effect_id
+        Ok(effect_id)
     }
 
     fn sync_runtime_effect_from_trace_entry(&mut self, entry: &EffectTraceEntry) {
@@ -1160,16 +1167,19 @@ mod runtime_effect_state_tests {
         fn issue_effect(&mut self) {
             let sid = self.session_id.expect("session must be opened");
             self.machine.clock.tick = self.machine.clock.tick.saturating_add(1);
-            let effect_id = self.machine.issue_runtime_effect(
-                "invoke_step",
-                Some(sid),
-                "host/runtime",
-                serde_json::json!({
-                    "session": sid,
-                    "seed": self.seed,
-                    "ordering_key": self.machine.clock.tick,
-                }),
-            );
+            let effect_id = self
+                .machine
+                .issue_runtime_effect(
+                    "invoke_step",
+                    Some(sid),
+                    "host/runtime",
+                    serde_json::json!({
+                        "session": sid,
+                        "seed": self.seed,
+                        "ordering_key": self.machine.clock.tick,
+                    }),
+                )
+                .expect("unit fixture has fresh occurrence capacity");
             let effect = self
                 .machine
                 .outstanding_effects
@@ -2406,12 +2416,14 @@ mod runtime_effect_state_tests {
     fn runtime_progress_contract_escalates_and_invalidates_late_results() {
         let mut machine = test_vm();
         machine.clock.tick = 1;
-        let effect_id = machine.issue_runtime_effect(
-            "invoke_step",
-            Some(7),
-            "host/runtime",
-            serde_json::json!({ "session": 7 }),
-        );
+        let effect_id = machine
+            .issue_runtime_effect(
+                "invoke_step",
+                Some(7),
+                "host/runtime",
+                serde_json::json!({ "session": 7 }),
+            )
+            .expect("unit fixture has fresh occurrence capacity");
 
         machine.clock.tick = 2;
         machine
@@ -2495,12 +2507,14 @@ mod runtime_effect_state_tests {
     fn runtime_progress_contract_requires_bounded_waits() {
         let mut machine = test_vm();
         machine.clock.tick = 1;
-        let effect_id = machine.issue_runtime_effect(
-            "invoke_step",
-            Some(9),
-            "host/runtime",
-            serde_json::json!({ "session": 9 }),
-        );
+        let effect_id = machine
+            .issue_runtime_effect(
+                "invoke_step",
+                Some(9),
+                "host/runtime",
+                serde_json::json!({ "session": 9 }),
+            )
+            .expect("unit fixture has fresh occurrence capacity");
         let operation_id = format!("effect:{effect_id}");
         machine
             .outstanding_effects

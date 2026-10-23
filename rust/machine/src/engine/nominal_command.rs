@@ -163,13 +163,15 @@ impl ProtocolMachine {
             call.budget_ticks.get(),
         );
         self.ensure_effect_request_allowed(&request).map_err(fail)?;
-        let invocation = self.issue_runtime_effect_with_budget(
-            "nominal_command",
-            Some(sid),
-            &handler.handler_identity(),
-            serde_json::to_value(&request).expect("typed nominal request serializes"),
-            Some(call.budget_ticks.get()),
-        );
+        let invocation = self
+            .issue_runtime_effect_with_budget(
+                "nominal_command",
+                Some(sid),
+                &handler.handler_identity(),
+                serde_json::to_value(&request).expect("typed nominal request serializes"),
+                Some(call.budget_ticks.get()),
+            )
+            .map_err(|failure| Fault::Invoke { failure })?;
         if let Some(effect) = self
             .outstanding_effects
             .as_mut_slice()
@@ -381,7 +383,8 @@ impl ProtocolMachine {
                 call.budget_ticks.get(),
             );
             let outcome = handler.handle_effect(request.clone());
-            self.record_effect_exchange(&request, &outcome, &original_handler_identity, invocation);
+            self.record_effect_exchange(&request, &outcome, &original_handler_identity, invocation)
+                .map_err(|failure| Fault::Invoke { failure })?;
             self.validate_nominal_callback_result(
                 coro_idx, &request, &outcome, invocation, handler,
             )?;
@@ -390,6 +393,23 @@ impl ProtocolMachine {
             {
                 return Ok(blocked);
             }
+        }
+        if let Err(failure) = crate::commit_common::require_effect_capacity(self.next_effect_id, 3)
+        {
+            let original = self.coroutines[coro_idx]
+                .nominal_continuation
+                .as_mut()
+                .expect("validated original retained");
+            original.validation_failure = Some(failure.clone());
+            let invocation = original.invocation;
+            let returned = original.returned.clone();
+            self.complete_runtime_effect(
+                invocation,
+                OutstandingEffectStatus::Failed,
+                json!({"status":"failure", "failure":failure, "retained_result":returned}),
+            )
+            .expect("publication refusal settles the same validated original occurrence");
+            return Err(fail(failure));
         }
         Ok(StepPack {
             coro_update: CoroUpdate::CompleteNominal,

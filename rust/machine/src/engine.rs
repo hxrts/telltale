@@ -146,6 +146,31 @@ mod invoke_outcome_tests {
         )
     }
     include!("../tests/unit/invoke_outcome_atomicity.rs");
+    include!("../tests/unit/send_capacity_fixture.rs");
+    fn send_counter_dispatch_allocations() -> u64 {
+        2
+    }
+    fn send_counter_queue_state(machine: &FixtureMachine, sid: usize) -> serde_json::Value {
+        let session = machine.sessions.get(sid).unwrap();
+        let edge = Edge::new(sid, "A", "B");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".into(),
+        };
+        let queue = &session.buffers[&edge];
+        serde_json::to_value((
+            queue.len(),
+            queue.capacity(),
+            queue,
+            &session.local_types[&endpoint].current,
+        ))
+        .unwrap()
+    }
+    fn settle_send_counter_machine(machine: FixtureMachine) {
+        drop(machine);
+    }
+    include!("../tests/unit/send_capacity_counter.rs");
+
     include!("../tests/unit/send_capacity_retention.rs");
 }
 
@@ -190,4 +215,29 @@ mod clock_admission_tests {
         .unwrap()
     }
     include!("../tests/unit/clock_admission.rs");
+    include!("../tests/unit/effect_capacity.rs");
+    type NominalCapacityMachine = ProtocolMachine;
+    fn make_nominal_capacity_machine(
+        retention: ObservabilityRetentionConfig,
+    ) -> NominalCapacityMachine {
+        let config = ProtocolMachineConfig {
+            observability_retention: retention,
+            output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+            ..ProtocolMachineConfig::default()
+        };
+        ProtocolMachine::new(config)
+    }
+    fn nominal_capacity_expected_original_exchanges(
+        retention: ObservabilityRetentionConfig,
+    ) -> usize {
+        match retention.mode {
+            ObservabilityRetentionMode::Full => 2,
+            ObservabilityRetentionMode::Disabled => 0,
+            ObservabilityRetentionMode::Capped => 2.min(retention.capacity),
+        }
+    }
+    fn nominal_capacity_host_failure_outputs(failure: &EffectFailure) -> serde_json::Value {
+        serde_json::json!({"status":"failure", "failure":failure})
+    }
+    include!("../tests/unit/nominal_effect_capacity.rs");
 }
