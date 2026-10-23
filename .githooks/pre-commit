@@ -47,11 +47,12 @@ echo -e "${GREEN}OK${NC}"
 # block simulator-only work.
 if cargo run --quiet --manifest-path toolkit/xtask/Cargo.toml -- check simulator-subsystem --repo-root . -- --applies-to-staged >/dev/null 2>&1; then
     echo -n "Checking simulator subsystem... "
-    if just check-simulator-subsystem-staged >/dev/null; then
+    if just check-simulator-subsystem-staged; then
         echo -e "${GREEN}OK${NC}"
     else
+        simulator_status=$?
         echo -e "${RED}FAILED${NC}"
-        exit 1
+        exit "$simulator_status"
     fi
 
     empty_dirs=$(find . -type d -empty -not -path './.git/*' -not -path '*/target/*' -not -path '*/node_modules/*' -not -path '*/.lake/*' 2>/dev/null)
