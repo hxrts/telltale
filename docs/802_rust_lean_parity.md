@@ -898,7 +898,7 @@ never saturates, wraps, advances per worker wave, or substitutes a physical cloc
 ### Finite effect-occurrence admission
 
 Rust's canonical effect-occurrence counter is finite. Its exhausted sentinel is
-`u64::MAX`; an occurrence is allocated only below that value. Lean's natural
+`u64::MAX`. An occurrence is allocated only below that value. Lean's natural
 number counter has no corresponding finite boundary. Correspondence requires
 capacity for the complete selected dispatch or dynamic topology batch. This
 premise is separate from simulation-clock admission and never renews an original

@@ -406,8 +406,8 @@ neither original counter and does not acknowledge any pending operation.
 
 Fresh canonical effect IDs require complete capacity admission before their host
 work or mutation. The finite counter never allocates its exhausted `u64::MAX`
-sentinel. The same selected threaded wave holds its summed bound before issuance;
-actual producers retain deterministic allocation order. Already-issued original
+sentinel. The same selected threaded wave holds its summed bound before issuance.
+Actual producers retain deterministic allocation order. Already-issued original
 nominal Failure/Blocked observations use their original occurrence, while fresh
 issuance and positive publication retain their complete capacity obligations.
 Actual returned values and errors remain with the original continuation.
