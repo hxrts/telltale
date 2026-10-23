@@ -87,10 +87,17 @@ theorem original_parent_owns_exact_blocked_readiness_child :
     parentDeclaration, jointRoleImage, jointBlocked, List.mapM, Except.bind, Option.bind,
     Array.size, Nat.reduceAdd, List.nil_append, List.cons_append, List.length_cons,
     List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure, ↓reduceIte,
+    Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
+    List.reverse_cons, List.reverse_nil]
+  simp +decide only [
     loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Trans.trans, Choreography.Projection.Trans.transBranches,
-    Choreography.Projection.Projectb.projectb, Choreography.Projection.Projectb.projectbBranches,
-    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
+    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 theorem original_parent_resolves_after_actual_readiness_consumption :
@@ -114,12 +121,17 @@ theorem original_parent_resolves_after_actual_readiness_consumption :
     parentDeclaration, jointRoleImage, jointBlocked, jointResumed, offerInstalled, jointSettled,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
@@ -142,10 +154,17 @@ theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
     parentDeclaration, jointRoleImage, jointBlocked, jointResumed, List.mapM, Except.bind,
     Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append, List.length_cons,
     List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure, ↓reduceIte,
+    Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
+    List.reverse_cons, List.reverse_nil]
+  simp +decide only [
     loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Trans.trans, Choreography.Projection.Trans.transBranches,
-    Choreography.Projection.Projectb.projectb, Choreography.Projection.Projectb.projectbBranches,
-    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
+    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 end Runtime.Tests.OperationReadinessExecution

@@ -140,12 +140,17 @@ theorem ordinary_nominal_loader_cannot_reconstruct_original_owner :
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 def blocked : Option State := do
@@ -206,12 +211,17 @@ example : (match blocked with
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 example : (match resumed with
   | some st => match view st with
@@ -228,12 +238,17 @@ example : (match resumed with
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- Still-Blocked expiry refuses before another callback, without resetting the
@@ -252,12 +267,17 @@ example : (match blocked.bind (fun st => invokeInstalled { st with clock := 3 } 
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- A static declaration cannot be borrowed from another role's prefix. -/
@@ -292,12 +312,17 @@ example : (match blocked.bind (fun st => do
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- Set only the actual installed coroutine's selected test provider context. -/
@@ -323,12 +348,17 @@ example : (match (prepared { blockFirst := false, applicationError := true }).bi
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- Host semantic Failure is distinct from a typed application Err branch and
@@ -351,12 +381,17 @@ example : (match (prepared { blockFirst := false, fail := true, changeIdentity :
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 example : (match (prepared { blockFirst := false, wrongReply := true }).bind
@@ -376,12 +411,17 @@ example : (match (prepared { blockFirst := false, wrongReply := true }).bind
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- Actual output-gate refusal retains the issued occurrence and its genuine
@@ -404,12 +444,17 @@ example : (match (prepared { blockFirst := false }).bind (fun st =>
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-! A typed action adapter is required to preserve executable continuations;
@@ -500,12 +545,17 @@ theorem readiness_actual_commit_single_use :
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- Forged payload, wrong predicate and replayed consumed evidence never branch. -/
@@ -524,12 +574,17 @@ theorem readiness_actual_forgery_predicate_and_reuse_refused :
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- Existing output refusal leaves actual returned witness and registry live. -/
@@ -554,12 +609,17 @@ theorem readiness_actual_output_refusal_retains_original :
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 def registeredReadiness : Option (SessionTypes.ModelOwnershipState × SessionTypes.ModelOwner × SessionTypes.ReadinessWitness) := do
@@ -598,17 +658,22 @@ theorem readiness_actual_boolean_cannot_authorize :
     | none => false) = true := by
   simp +decide only [
     declaration, call, global, roleImage, config, empty, invokeInstalled, readinessPrepared,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
-    List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    RoleCodeImage.toCodeImage, mapExecutableTargets?, Std.HashMap.size_insert,
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
+    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
@@ -635,12 +700,17 @@ theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 
@@ -667,12 +737,17 @@ theorem readiness_before_issuance_never_reconstructs_current_owner :
     Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
     List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
+    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 end Runtime.Tests.NominalCommandExecution

@@ -57,12 +57,17 @@ theorem output_refusal_retains_original_fault_and_revokes_only_original_semantic
     parentDeclaration, jointRoleImage, jointBlocked, jointResumed, outputFaultRetained,
     originalOutputRefusal, List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
-    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
+    Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- The expired original Await executes its actual installed opcode. Its fault
@@ -99,12 +104,17 @@ theorem expired_original_await_retains_first_fault_without_renewal_or_cleanup_ac
     Runtime.Tests.OperationLifecycleExecution.sourceResolved, originalExpiryRefusal, List.mapM,
     Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
     List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure,
-    ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
+    List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- A genuine installed Jump bypasses a still-present static Resolve. Runtime
@@ -151,12 +161,17 @@ theorem actual_jump_cannot_halt_without_original_terminal_resolution :
     Runtime.Tests.OperationLifecycleExecution.sourceResolved, originalHaltRefusal, List.mapM,
     Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
     List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure,
-    ↓reduceIte, loadChoreographyResult, validateImage_eq,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans,
+    ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
+    List.reverse_cons, List.reverse_nil]
+  simp +decide only [
+    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 end Runtime.Tests.OperationFailureExecution
