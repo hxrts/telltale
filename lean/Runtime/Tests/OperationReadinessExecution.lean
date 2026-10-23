@@ -73,7 +73,15 @@ theorem original_parent_owns_exact_blocked_readiness_child :
         coro.operationContinuation.any (fun original => original.children.length == 1)) &&
       st.outstandingEffects.any (fun effect => effect.status == .blocked &&
         effect.orderingKey == 0 && effect.completedAtTick.isNone) &&
-      st.operationInstances.length == 2).getD false = true := by decide
+      st.operationInstances.length == 2).getD false = true := by
+  simp [
+    image, roleImage, empty, ordinaryLoaded,
+    loaded, invokeInstalled, blocked, resumed,
+    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun, Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration,
+    readinessCall, parentDeclaration, jointRoleImage, jointBlocked,
+    jointResumed, offerInstalled, jointSettled] <;> decide
 
 theorem original_parent_resolves_after_actual_readiness_consumption :
     (jointSettled.map fun st =>
@@ -83,7 +91,15 @@ theorem original_parent_resolves_after_actual_readiness_consumption :
       st.outstandingEffects.any (fun effect => effect.status == .succeeded &&
         effect.orderingKey == 0 && effect.completedAtTick == some 1) &&
       st.sessions.any (fun entry => entry.2.ownership.consumedWitnesses == [1]) &&
-      st.operationInstances.all (fun operation => operation.phase == .succeeded)).getD false = true := by decide
+      st.operationInstances.all (fun operation => operation.phase == .succeeded)).getD false = true := by
+  simp [
+    image, roleImage, empty, ordinaryLoaded,
+    loaded, invokeInstalled, blocked, resumed,
+    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun, Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration,
+    readinessCall, parentDeclaration, jointRoleImage, jointBlocked,
+    jointResumed, offerInstalled, jointSettled] <;> decide
 
 theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
     ((jointResumed false).map fun st =>
@@ -92,6 +108,14 @@ theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
         coro.operationContinuation.any (fun original => !original.resolved) &&
         (match coro.status with | .faulted _ => true | _ => false)) &&
       st.sessions.all (fun entry => entry.2.ownership.consumedWitnesses.isEmpty) &&
-      !st.operationInstances.any (fun operation => operation.phase == .succeeded)).getD false = true := by decide
+      !st.operationInstances.any (fun operation => operation.phase == .succeeded)).getD false = true := by
+  simp [
+    image, roleImage, empty, ordinaryLoaded,
+    loaded, invokeInstalled, blocked, resumed,
+    prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
+    Runtime.Tests.OperationLifecycleExecution.sourceLoaded, Runtime.Tests.OperationLifecycleExecution.sourceBegun, Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration,
+    readinessCall, parentDeclaration, jointRoleImage, jointBlocked,
+    jointResumed, offerInstalled, jointSettled] <;> decide
 
 end Runtime.Tests.OperationReadinessExecution

@@ -163,6 +163,8 @@ check-pr-critical-core:
     fi
     just check-fast-structure
     bash scripts/ops/test-perf-baseline-contract.sh
+    just reclaim-build-space-if-needed 10000
+    just verify-lean-protocol-machine-targets
     just check-focused-assurance
     just check-package-artifacts
     just check-arch-lean
@@ -173,7 +175,6 @@ check-pr-critical-core:
     just check-capability-gates
     just reclaim-build-space-if-needed 10000
     just check-release-conformance
-    just verify-lean-protocol-machine-targets
     just verify-protocols
     just verify-track-a
 
