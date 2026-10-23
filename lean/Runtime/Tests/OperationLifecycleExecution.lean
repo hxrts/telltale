@@ -50,57 +50,67 @@ example : (sourceBegun.map fun st =>
       st.progressContracts.length == 1 && st.outstandingEffects.isEmpty &&
       st.coroutines[1]?.any (fun coro => coro.effectCtx.genericCalls == 0 &&
         coro.effectCtx.calls == 0 && coro.operationContinuation.isSome)).getD false = true := by
-  simp [
+  simp only [
     image, roleImage, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, sourceDeclaration, sourceRoleImage,
-    sourceLoaded, sourceBegun, sourceResolved] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    sourceDeclaration, sourceRoleImage, sourceLoaded, sourceBegun,
+    sourceResolved] <;> decide
 
 example : (sourceResolved.map fun st =>
     st.operationInstances.any (fun operation => decide (operation.phase = .succeeded) &&
       operation.requiresProof && operation.terminalPublication.isNone) &&
     st.coroutines[1]?.any (fun coro => coro.operationContinuation.any (fun original =>
       original.resolved && original.issuedAt == 0 && original.children.isEmpty))).getD false = true := by
-  simp [
+  simp only [
     image, roleImage, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, sourceDeclaration, sourceRoleImage,
-    sourceLoaded, sourceBegun, sourceResolved] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    sourceDeclaration, sourceRoleImage, sourceLoaded, sourceBegun,
+    sourceResolved] <;> decide
 
 /-- Ordinary loading alone does not authorize the installed source action. -/
 example : ((sourceLoaded false).bind (fun st => invokeInstalled st 1) |>.map fun st =>
     st.operationInstances.isEmpty && st.outstandingEffects.isEmpty &&
       st.coroutines[1]?.any (fun coro => coro.effectCtx.calls == 0 &&
         match coro.status with | .faulted _ => true | _ => false)).getD false = true := by
-  simp [
+  simp only [
     image, roleImage, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, sourceDeclaration, sourceRoleImage,
-    sourceLoaded, sourceBegun, sourceResolved] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    sourceDeclaration, sourceRoleImage, sourceLoaded, sourceBegun,
+    sourceResolved] <;> decide
 
 /-- Inclusive original endpoint succeeds; a later tick refuses without issuing
 another occurrence or resetting its original window. -/
 example : (sourceBegun.bind fun st => invokeInstalled { st with clock := 5 } 1 |>.map fun st =>
     st.coroutines[1]?.any (fun coro => match coro.status with | .ready => true | _ => false)).getD false = true := by
-  simp [
+  simp only [
     image, roleImage, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, sourceDeclaration, sourceRoleImage,
-    sourceLoaded, sourceBegun, sourceResolved] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    sourceDeclaration, sourceRoleImage, sourceLoaded, sourceBegun,
+    sourceResolved] <;> decide
 
 example : (sourceBegun.bind fun st => invokeInstalled { st with clock := 6 } 1 |>.map fun st =>
     st.operationInstances.length == 1 && st.coroutines[1]?.any (fun coro =>
       coro.operationContinuation.any (fun original => original.issuedAt == 0) &&
       match coro.status with | .faulted _ => true | _ => false)).getD false = true := by
-  simp [
+  simp only [
     image, roleImage, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     prepared, readinessPrepared, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, sourceDeclaration, sourceRoleImage,
-    sourceLoaded, sourceBegun, sourceResolved] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
+    sourceDeclaration, sourceRoleImage, sourceLoaded, sourceBegun,
+    sourceResolved] <;> decide
 
 end Runtime.Tests.OperationLifecycleExecution

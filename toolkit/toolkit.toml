@@ -63,7 +63,11 @@ forbidden_literals = []
 
 [[checks.ci_assurance_lanes.file_contracts]]
 path = ".github/workflows/check.yml"
-required_literals = ["run: just check-pr-critical"]
+required_literals = [
+  "run: just check-doc-fast-fail",
+  "run: just check-pr-critical-early-lean",
+  "run: just check-pr-critical-remaining",
+]
 forbidden_literals = []
 
 [[checks.ci_assurance_lanes.file_contracts]]

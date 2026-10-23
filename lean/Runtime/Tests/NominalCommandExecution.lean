@@ -133,11 +133,12 @@ theorem ordinary_nominal_loader_cannot_reconstruct_original_owner :
         st.outstandingEffects.isEmpty && st.operationInstances.isEmpty && st.nextEffectId == 0 &&
         st.coroutines[1]?.any (fun coro => coro.effectCtx.calls == 0 &&
           match coro.status with | .faulted _ => true | _ => false)).getD false = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 def blocked : Option State := do
   let st ← loaded
@@ -166,19 +167,21 @@ def view (st : State) : Option
   pure (coro, effect, operation)
 
 example : preservesExecutable = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 example : (match image with | .ok value => nominalProgramValid value.program | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 example : (match blocked with
   | some st => match view st with
     | some (coro, effect, _) => st.nextEffectId == 1 && st.outstandingEffects.length == 1 &&
@@ -186,12 +189,13 @@ example : (match blocked with
         decide (effect.status = .blocked) && effect.orderingKey == 0
     | _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 example : (match resumed with
   | some st => match view st with
     | some (coro, effect, operation) => st.nextEffectId == 1 && coro.effectCtx.calls == 2 &&
@@ -200,12 +204,13 @@ example : (match resumed with
         st.effectExchanges.length == 2
     | _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 /-- Still-Blocked expiry refuses before another callback, without resetting the
 original occurrence or replacing its original progress/window. -/
@@ -216,24 +221,26 @@ example : (match blocked.bind (fun st => invokeInstalled { st with clock := 3 } 
         coro.nominalContinuation.isSome
     | _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 /-- A static declaration cannot be borrowed from another role's prefix. -/
 example : (match image with
   | .ok executable => nominalProgramValid { executable.program with
       code := executable.program.code.set! 2 .yield }
   | _ => true) = false := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 /-- Host semantic identity changes refuse the same original occurrence rather
 than issuing a replacement or invoking the new handler contract. -/
@@ -247,12 +254,13 @@ example : (match blocked.bind (fun st => do
         coro.nominalContinuation.isSome
     | _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 /-- Set only the actual installed coroutine's selected test provider context. -/
 def prepared (context : Context) : Option State := do
@@ -270,12 +278,14 @@ example : (match (prepared { blockFirst := false, applicationError := true }).bi
         decide (operation.agreementProfile = some call.agreementProfile)
     | _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, RoleCodeImage.toCodeImage,
-    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil] <;> decide
 
 /-- Host semantic Failure is distinct from a typed application Err branch and
 from an independent post-callback identity refusal. The raw original outcome
@@ -290,12 +300,14 @@ example : (match (prepared { blockFirst := false, fail := true, changeIdentity :
         decide (coro.regs[1]? = some .unit)
     | _, _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, RoleCodeImage.toCodeImage,
-    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil] <;> decide
 
 example : (match (prepared { blockFirst := false, wrongReply := true }).bind
     (fun st => invokeInstalled st 1) with
@@ -307,12 +319,14 @@ example : (match (prepared { blockFirst := false, wrongReply := true }).bind
         decide (coro.regs[1]? = some .unit)
     | _, _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, RoleCodeImage.toCodeImage,
-    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil] <;> decide
 
 /-- Actual output-gate refusal retains the issued occurrence and its genuine
 returned value without changing the result register or publishing success. -/
@@ -327,12 +341,14 @@ example : (match (prepared { blockFirst := false }).bind (fun st =>
         decide (coro.regs[1]? = some .unit) && st.effectExchanges.length == 1
     | _ => false
   | _ => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, RoleCodeImage.toCodeImage,
-    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil] <;> decide
 
 /-! A typed action adapter is required to preserve executable continuations;
 parser/classifier support alone cannot authorize a relocation. -/
@@ -367,12 +383,14 @@ example : (match image with
         program := { executable.program with
         code := executable.program.code.set! 3 (.invoke (.command { call with onOk := 0, onErr := 6 })) } }
       (forged.toRoleCodeImage).toOption.isNone) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, RoleCodeImage.toCodeImage,
-    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
+    List.foldlM_nil] <;> decide
 
 /-- Model ownership is admitted independently before callback evidence exists. -/
 def readinessPrepared (mutation : Nat := 0) : Option State := do
@@ -414,12 +432,14 @@ theorem readiness_actual_commit_single_use :
         | _, _ => false
       | _ => false
     | none => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, readinessPrepared,
-    RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil] <;> decide
 
 /-- Forged payload, wrong predicate and replayed consumed evidence never branch. -/
 theorem readiness_actual_forgery_predicate_and_reuse_refused :
@@ -430,12 +450,14 @@ theorem readiness_actual_forgery_predicate_and_reuse_refused :
             (match coro.status with | .faulted _ => true | _ => false)
         | none => false
       | none => false)) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, readinessPrepared,
-    RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil] <;> decide
 
 /-- Existing output refusal leaves actual returned witness and registry live. -/
 theorem readiness_actual_output_refusal_retains_original :
@@ -452,12 +474,14 @@ theorem readiness_actual_output_refusal_retains_original :
         | none => false
       | none => false
     | none => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, readinessPrepared,
-    RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert] <;> decide
+    RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil] <;> decide
 
 def registeredReadiness : Option (SessionTypes.ModelOwnershipState × SessionTypes.ModelOwner × SessionTypes.ReadinessWitness) := do
   let (claimed, owner) ← (({} : SessionTypes.ModelOwnershipState).claim 7 "original").toOption
@@ -493,13 +517,14 @@ theorem readiness_actual_boolean_cannot_authorize :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, readinessPrepared,
     registeredReadiness, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
+    Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled
@@ -518,13 +543,14 @@ theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, readinessPrepared,
     registeredReadiness, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
+    Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 
 /-- A new registry generation cannot refresh a stale installed coroutine owner. -/
@@ -543,12 +569,13 @@ theorem readiness_before_issuance_never_reconstructs_current_owner :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp [
+  simp only [
     declaration, call, global, roleImage,
     image, config, empty, ordinaryLoaded,
     loaded, invokeInstalled, blocked, resumed,
     preservesExecutable, view, prepared, readinessPrepared,
     registeredReadiness, RoleCodeImage.toCodeImage, CodeImage.toRoleCodeImage, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert] <;> decide
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
+    Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil] <;> decide
 
 end Runtime.Tests.NominalCommandExecution

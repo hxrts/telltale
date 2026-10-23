@@ -155,6 +155,11 @@ check-pr-critical:
 # Canonical PR-critical verification lane minus the cheap doc/metadata fast-fail
 # checks, so local wrappers can run those first without duplication.
 check-pr-critical-core:
+    just check-pr-critical-early-lean
+    just check-pr-critical-remaining
+
+# Native CI exposes this original prefix as one positive Lean checkpoint.
+check-pr-critical-early-lean:
     #!/usr/bin/env bash
     set -euo pipefail
     tmp_root="${TMPDIR:-/tmp}"
@@ -165,6 +170,15 @@ check-pr-critical-core:
     bash scripts/ops/test-perf-baseline-contract.sh
     just reclaim-build-space-if-needed 10000
     just verify-lean-protocol-machine-targets
+
+# Continue the original assurance inventory after the early Lean checkpoint.
+check-pr-critical-remaining:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
     just check-focused-assurance
     just check-package-artifacts
     just check-arch-lean
