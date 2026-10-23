@@ -503,13 +503,16 @@ def runNominalImage (payload : Json) : Except String Json := do
       !(nominalRoles.all fun role => (scripts.map Prod.fst).contains role) then
     throw "nominal provider roles do not match executable command roles"
   let initial := emptyState registers
-  let initial := { initial with config := { initial.config with outputCondition :=
+  let initial := { initial with
+    config := { initial.config with
+    outputCondition :=
     { policy := if denyOutputs then .denyAll else .allowAll } } }
   let loaded ← match loadChoreographyResult initial image with
     | .ok st _ => pure st
     | .validationFailed reason => throw reason
     | _ => throw "nominal executable image capacity refusal"
-  let loaded := { loaded with coroutines := loaded.coroutines.map fun coro =>
+  let loaded := { loaded with
+    coroutines := loaded.coroutines.map fun coro =>
     { coro with effectCtx := { remaining := (scripts.lookup coro.role).getD [], identity := identity } } }
   let readiness := (payload.getObjVal? "readiness_admission").toOption
   let call ← match image.program.code.toList.filterMap (fun instruction => match instruction with

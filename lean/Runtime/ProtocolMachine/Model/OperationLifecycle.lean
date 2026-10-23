@@ -130,7 +130,8 @@ def admitChild (original : OriginalOperationContinuation) (pc : Nat)
       child.ownerId != some original.owner.ownerId ||
       !(child.status == .pending || child.status == .blocked) then
     .error "source child does not belong to the original admitted owner"
-  else .ok { original with children := original.children ++ [child.effectId],
+  else .ok { original with
+    children := original.children ++ [child.effectId],
     admittedSlots := original.admittedSlots ++ [pc] }
 
 def retainChildOutcome (original : OriginalOperationContinuation) (id : Nat)

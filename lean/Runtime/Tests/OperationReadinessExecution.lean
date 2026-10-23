@@ -11,7 +11,8 @@ open Runtime.Tests.NominalCommandExecution
 def readinessDeclaration : NominalCommandDeclaration :=
   { declaration with readinessPredicate := some "Store.save" }
 def readinessCall : NominalCommandCall :=
-  { call with declaration := readinessDeclaration, enclosingOperation := "Save",
+  { call with
+    declaration := readinessDeclaration, enclosingOperation := "Save",
     onOk := 3, onErr := 7 }
 def parentDeclaration : SourceOperationDeclaration :=
   { Runtime.Tests.OperationLifecycleExecution.sourceDeclaration with
@@ -44,7 +45,8 @@ def jointResumed (allowOutput : Bool) : Option State := do
   let session ← st.sessions.lookup endpoint.sid
   let owner ← coro.issuedModelOwner
   let (ownership, witness) ← (session.ownership.issueReadiness owner "Store.save" (some 1)).toOption
-  let st := { st with clock := 1,
+  let st := { st with
+    clock := 1,
     config := { st.config with outputCondition := { verify := fun _ => allowOutput } },
     sessions := st.sessions.map (fun entry => if entry.1 == endpoint.sid then
       (entry.1, { entry.2 with ownership }) else entry),

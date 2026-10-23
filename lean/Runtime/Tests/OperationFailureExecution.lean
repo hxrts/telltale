@@ -74,7 +74,8 @@ Halt must refuse rather than treating static presence as actual resolution. -/
 def originalHaltRefusal : Bool := (do
   let declaration := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration
   let roles := Runtime.Tests.OperationLifecycleExecution.sourceRoleImage
-  let roles := { roles with programs := roles.programs.insert "A"
+  let roles := { roles with
+    programs := roles.programs.insert "A"
     #[.invoke (.operation (.begin declaration)), .jump 3,
       .invoke (.operation (.resolve "Save" (.success none))), .halt] }
   let image ← (roles.toCodeImage ["B", "A"]).toOption

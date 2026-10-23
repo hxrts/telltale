@@ -39,7 +39,8 @@ private def sourceOperationBegin {ι γ π ε ν : Type u} [ProtocolMachineDomai
   if st.operationInstances.any (fun current => current.operationId == record.operationId) ||
       st.progressContracts.any (fun current => current.operationId == record.operationId) then
     return refuse "duplicate original source operation occurrence"
-  let issued := { st with operationInstances := st.operationInstances ++ [record],
+  let issued := { st with
+    operationInstances := st.operationInstances ++ [record],
     progressContracts := st.progressContracts ++ [progress] }
   return continuePack issued { coro with operationContinuation := some original, operationFailure := none } none
 
@@ -69,11 +70,13 @@ private def sourceOperationProgress : OperationPhase → ProgressState
 private def settleSourceOperation {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
     (st : ProtocolMachineState ι γ π ε ν) (original : OriginalOperationContinuation)
     (phase : OperationPhase) : ProtocolMachineState ι γ π ε ν :=
-  { st with operationInstances := st.operationInstances.map (fun record =>
+  { st with
+    operationInstances := st.operationInstances.map (fun record =>
       if record.operationId == original.operationId then { record with phase } else record),
     progressContracts := st.progressContracts.map (fun contract =>
       if contract.operationId == original.operationId then
-        { contract with state := sourceOperationProgress phase,
+        { contract with
+          state := sourceOperationProgress phase,
           lastProgressTick := if phase = .succeeded ∨ phase = .failed ∨ phase = .timedOut ∨ phase = .cancelled then
             some st.clock else contract.lastProgressTick } else contract) }
 
@@ -87,7 +90,8 @@ private def invalidateSourceOperation {ι γ π ε ν : Type u} [ProtocolMachine
       if contract.operationId == original.operationId then
         { contract with state := .failed, reason := some "explicit original operation invalidation" }
       else contract) }
-  { failed with outstandingEffects := failed.outstandingEffects.map (fun effect =>
+  { failed with
+    outstandingEffects := failed.outstandingEffects.map (fun effect =>
       if original.children.contains effect.effectId &&
           (effect.status == .pending || effect.status == .blocked) then
         { effect with status := .invalidated, completedAtTick := some st.clock }
@@ -205,11 +209,13 @@ def attachSourceOperationChild {ι γ π ε ν : Type u} [ProtocolMachineDomain 
         | [child] => .ok child
         | _ => .error "original issued source child absent or ambiguous"
       let attached ← original.admitChild coro.pc call child
-      let issued := { st with operationInstances := st.operationInstances.map (fun record =>
-        if record.operationId == original.operationId then
-          { record with effectIds := attached.children,
-            dependentOperationIds := record.dependentOperationIds ++ [child.operationId] }
-        else record) }
+      let issued := { st with
+        operationInstances := st.operationInstances.map (fun record =>
+          if record.operationId == original.operationId then
+            { record with
+              effectIds := attached.children,
+              dependentOperationIds := record.dependentOperationIds ++ [child.operationId] }
+          else record) }
       return (issued, { coro with operationContinuation := some attached })
 
 /-- Retain the actual child outcome on the same original holder before any
@@ -225,7 +231,8 @@ def retainSourceOperationOutcome {γ ε : Type u} [GuardLayer γ] [EffectRuntime
       | _ => match original.retainChildOutcome id outcome with
         | .ok retained => { coro with operationContinuation := some retained }
         | .error reason =>
-            { coro with operationContinuation := some
+            { coro with
+              operationContinuation := some
               { original with validationFailure := original.validationFailure.or (some reason) } }
 
 /-- Existing scheduler unblocking observes the same original child set. It never
@@ -262,7 +269,8 @@ def retainSourceOperationFailure {ι γ π ε ν : Type u} [ProtocolMachineDomai
               { record with phase := .failed } else record),
           progressContracts := pack'.st.progressContracts.map (fun contract =>
             if contract.operationId == original.operationId then
-              { contract with state := match contract.state with
+              { contract with
+                state := match contract.state with
                   | .succeeded | .failed | .cancelled | .timedOut | .handedOff => contract.state
                   | _ => .failed,
                 reason := some "original source operation execution failed" }
@@ -272,7 +280,8 @@ def retainSourceOperationFailure {ι γ π ε ν : Type u} [ProtocolMachineDomai
                 (effect.status == .pending || effect.status == .blocked) then
               { effect with status := .invalidated, completedAtTick := some pack'.st.clock }
             else effect) }
-        { pack' with st, coro := { pack'.coro with
+        { pack' with
+            st, coro := { pack'.coro with
             operationContinuation := some { original with invalidated := true },
             operationFailure := pack'.coro.operationFailure.or (some fault) } }
   | _, _ => pack'

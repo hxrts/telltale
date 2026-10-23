@@ -120,7 +120,8 @@ private def issueNominal {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ 
     { operationId := operationId, session := some endpoint.sid, state := .pending,
       lastOrderingKey := some st.clock, bounded := true, budgetTicks := some call.budgetTicks,
       lastProgressTick := some st.clock, escalatedAtTick := none, reason := none }
-  ({ st with nextEffectId := id + 1,
+  ({ st with
+      nextEffectId := id + 1,
       outstandingEffects := st.outstandingEffects ++ [effect],
       operationInstances := st.operationInstances ++ [operation],
       progressContracts := st.progressContracts ++ [progress] },
@@ -140,12 +141,14 @@ private def settleNominal {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ
   { st with
     outstandingEffects := st.outstandingEffects.map fun effect =>
       if effect.effectId == original.invocation then
-        { effect with status := status, outputs := output,
+        { effect with
+          status := status, outputs := output,
           completedAtTick := if terminal then some st.clock else effect.completedAtTick }
       else effect,
     operationInstances := st.operationInstances.map fun operation =>
       if operation.operationId == operationId then
-        { operation with phase := phase,
+        { operation with
+          phase := phase,
           terminalPublication := if status = .succeeded then some "effect.succeeded" else operation.terminalPublication }
       else operation,
     progressContracts := st.progressContracts.map fun contract =>
@@ -172,8 +175,9 @@ private def consumeNominalReadiness {ι γ π ε ν : Type u} [ProtocolMachineDo
           if owner.sessionId != endpoint.sid then (st, .error "readiness owner belongs to another session")
           else
             let (ownership, result) := session.ownership.attemptConsumeReadiness owner witness (some st.clock)
-            ({ st with sessions := st.sessions.map (fun (sid, current) =>
-              if sid == endpoint.sid then (sid, { current with ownership := ownership }) else (sid, current)) }, result)
+            ({ st with
+              sessions := st.sessions.map (fun (sid, current) =>
+                if sid == endpoint.sid then (sid, { current with ownership := ownership }) else (sid, current)) }, result)
       | _, _ => (st, .error "missing original readiness owner or endpoint")
 
 /-- Consume the original typed result after the existing output gate. -/
@@ -259,7 +263,8 @@ def stepNominalCommand {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π
                         let (outcome, context) := EffectRuntime.invokeCommand action request resident.effectCtx
                         let resident := retainSourceOperationOutcome
                           { resident with effectCtx := context } original.invocation outcome
-                        let issued := { issued with effectExchanges := issued.effectExchanges ++
+                        let issued := { issued with
+                            effectExchanges := issued.effectExchanges ++
                           [{ effectId := original.invocation, handlerIdentity := original.handlerIdentity,
                             orderingKey := original.issuedAt, request := nominalRequest original request,
                             outcome := outcome, observedAt := some issued.clock }] }
@@ -271,7 +276,8 @@ def stepNominalCommand {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π
                           | _, _ => original
                         let resident := { resident with nominalContinuation := some returned }
                         if !nominalOriginalValid issued resident call returned then
-                          let refused := { returned with validationFailure := some
+                          let refused := { returned with
+                            validationFailure := some
                             ("contract_violation", "original occurrence refused after callback") }
                           let resident := { resident with nominalContinuation := some refused }
                           let (primaryKind, primary) := match accepted with

@@ -35,7 +35,7 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 <!-- GENERATED_OVERVIEW_TABLE:BEGIN -->
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
-| SessionTypes   |    49 |  10,152 | Global/local type definitions, de Bruijn, participation    |
+| SessionTypes   |    49 |  10,153 | Global/local type definitions, de Bruijn, participation    |
 | SessionCoTypes |    78 |  16,302 | Coinductive EQ2, bisimulation, duality, async subtyping    |
 | Choreography   |    89 |  19,362 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
@@ -43,9 +43,9 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | ClassicalAnalysis |     3 |   1,508 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,189 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   202 |  40,659 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   202 |  40,675 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **705** | **143,515** |                                                            |
+| **Total**      | **705** | **143,532** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**

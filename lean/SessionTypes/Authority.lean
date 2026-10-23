@@ -70,7 +70,8 @@ def issueReadiness (state : ModelOwnershipState) (owner : ModelOwner) (predicate
   else
     let witness : ReadinessWitness :=
       ⟨state.nextWitnessId, owner.sessionId, owner.ownerId, owner.generation, owner.scope, predicate⟩
-    .ok ({ state with issuedReadiness := witness :: state.issuedReadiness,
+    .ok ({ state with
+      issuedReadiness := witness :: state.issuedReadiness,
       nextWitnessId := state.nextWitnessId + 1,
       readinessAudit := state.readinessAudit ++ [⟨witness, "Issued", tick, none⟩] }, witness)
 
