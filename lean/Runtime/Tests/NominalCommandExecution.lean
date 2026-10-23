@@ -85,8 +85,11 @@ def config : ProtocolMachineConfig UnitIdentity UnitGuard UnitPersist TestEffect
     complianceProof := fun _ => ((), ()), maxCoroutines := 1024, maxSessions := 256,
     monitorMode := .sessionTypePrecheck, guardChain := unitGuardChain,
     proofConfig := { guardChainWf := unitGuardChainWf }, roleSigningKey := fun _ => (),
-    costModel := { stepCost := fun _ => 1, minCost := 1, defaultBudget := 100,
-      hMinCost := by intro _ _; exact Nat.le_refl 1, hMinPos := by exact Nat.le_refl 1 },
+    costModel := {
+      stepCost := fun _ => 1, minCost := 1, defaultBudget := 100,
+      hMinCost := by intro _ _; exact Nat.le_refl 1,
+      hMinPos := by exact Nat.le_refl 1
+    },
     speculationEnabled := false }
 abbrev State := ProtocolMachineState UnitIdentity UnitGuard UnitPersist TestEffect UnitVerify
 
@@ -123,7 +126,7 @@ def invokeInstalled (st : State) (index : Nat) : Option State := do
       pure (commitPack st coro.id (stepInvoke st coro action)).1
   | _ => none
 
-example ordinary_nominal_loader_cannot_reconstruct_original_owner :
+theorem ordinary_nominal_loader_cannot_reconstruct_original_owner :
     ((ordinaryLoaded.bind (fun st => invokeInstalled st 1)).bind
       (fun st => invokeInstalled st 1) |>.map fun st =>
         st.outstandingEffects.isEmpty && st.operationInstances.isEmpty && st.nextEffectId == 0 &&
@@ -145,7 +148,7 @@ def preservesExecutable : Bool := match image with
     | .error _ => false
     | .ok restored => match restored.programs["A"]? with
       | some code => match code[1]? with
-        | some (.invoke (.command actual)) => decide (actual = call) && code.size == 6
+        | some (.invoke (Action.command actual)) => decide (actual = call) && code.size == 6
         | _ => false
       | _ => false
 
@@ -196,7 +199,7 @@ example : (match blocked.bind (fun st => do
     let coro ← st.coroutines[1]?
     invokeInstalled { st with
       coroutines := st.coroutines.set! 1
-      { coro with effectCtx := { coro.effectCtx with identity := "foreign" } } } 1) with
+        { coro with effectCtx := { coro.effectCtx with identity := "foreign" } } } 1) with
   | some st => match view st with
     | some (coro, _, _) => coro.effectCtx.calls == 1 && st.nextEffectId == 1 &&
         coro.nominalContinuation.isSome
@@ -279,9 +282,9 @@ instance : EffectRuntime LyingRelocation where
   relocateCommand := fun original _ => some original
 
 example : (mapExecutableTargets? (γ := UnitGuard) (ε := MissingRelocation)
-    (fun pc => some (pc + 7)) (.invoke (.command call))).isNone = true := by decide
+    (fun pc => some (pc + 7)) (.invoke (Action.command call))).isNone = true := by decide
 example : (mapExecutableTargets? (γ := UnitGuard) (ε := LyingRelocation)
-    (fun pc => some (pc + 7)) (.invoke (.command call))).isNone = true := by decide
+    (fun pc => some (pc + 7)) (.invoke (Action.command call))).isNone = true := by decide
 
 /-- A real cross-role continuation cannot become an in-role target by slicing
 or silently recompiling the local communication type. -/
@@ -291,7 +294,7 @@ example : (match image with
       let forged := { executable with
         program := { executable.program with
         code := executable.program.code.set! 3 (.invoke (.command { call with onOk := 0, onErr := 6 })) } }
-      (forged.toRoleCodeImage).isError) = true := by decide
+      (forged.toRoleCodeImage).toOption.isNone) = true := by decide
 
 /-- Model ownership is admitted independently before callback evidence exists. -/
 def readinessPrepared (mutation : Nat := 0) : Option State := do
@@ -299,8 +302,8 @@ def readinessPrepared (mutation : Nat := 0) : Option State := do
   let readinessCall := { call with declaration := readinessDeclaration }
   let roles := { roleImage with
     programs := roleImage.programs.insert "A"
-    #[.invoke (.declaration readinessDeclaration), .invoke (.command readinessCall),
-      .offer 0 "Ready", .halt, .offer 0 "Denied", .halt] }
+      #[.invoke (.declaration readinessDeclaration), .invoke (.command readinessCall),
+        .offer 0 "Ready", .halt, .offer 0 "Denied", .halt] }
   let executable ← (roles.toCodeImage ["B", "A"]).toOption
   let st ← match loadChoreographyResult empty executable with | .ok st _ => some st | _ => none
   let coro ← st.coroutines[1]?
@@ -316,16 +319,16 @@ def readinessPrepared (mutation : Nat := 0) : Option State := do
   let ownership ← if mutation == 3 then (issued.consumeReadiness owner original).toOption else some issued
   let st := { st with
     sessions := st.sessions.map (fun (sid, current) =>
-    if sid == endpoint.sid then (sid, { current with ownership := ownership }) else (sid, current)),
+      if sid == endpoint.sid then (sid, { current with ownership := ownership }) else (sid, current)),
     coroutines := st.coroutines.set! 1 { coro with effectCtx := { blockFirst := false, readiness := some witness } } }
   invokeInstalled st 1
 
 /-- Real installed invocation consumes the exact session-issued witness once. -/
-example readiness_actual_commit_single_use :
+theorem readiness_actual_commit_single_use :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled st 1) with
     | some st => match view st with
       | some (coro, effect, _) => match coro.regs[1]?, coro.ownedEndpoints.head? with
-        | some (.readiness witness), some endpoint => match st.sessions.lookup endpoint.sid with
+        | some (Value.readiness witness), some endpoint => match st.sessions.lookup endpoint.sid with
           | some session => session.ownership.consumedWitnesses.contains witness.witnessId &&
               session.ownership.issuedReadiness.isEmpty && coro.pc == 4 &&
               decide (effect.status = .succeeded) && coro.effectCtx.calls == 1
@@ -335,7 +338,7 @@ example readiness_actual_commit_single_use :
     | none => false) = true := by decide
 
 /-- Forged payload, wrong predicate and replayed consumed evidence never branch. -/
-example readiness_actual_forgery_predicate_and_reuse_refused :
+theorem readiness_actual_forgery_predicate_and_reuse_refused :
     ([1, 2, 3].all (fun mutation =>
       match (readinessPrepared mutation).bind (fun st => invokeInstalled st 1) with
       | some st => match st.coroutines[1]? with
@@ -345,7 +348,7 @@ example readiness_actual_forgery_predicate_and_reuse_refused :
       | none => false)) = true := by decide
 
 /-- Existing output refusal leaves actual returned witness and registry live. -/
-example readiness_actual_output_refusal_retains_original :
+theorem readiness_actual_output_refusal_retains_original :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled
       { st with config := { st.config with outputCondition := { verify := fun _ => false } } } 1) with
     | some st => match view st with
@@ -365,7 +368,7 @@ def registeredReadiness : Option (SessionTypes.ModelOwnershipState × SessionTyp
   let (issued, witness) ← (claimed.issueReadiness owner "Store.save").toOption
   pure (issued, owner, witness)
 
-example readiness_model_exact_owner_generation_session_scope :
+theorem readiness_model_exact_owner_generation_session_scope :
     (match registeredReadiness with
     | some (state, owner, witness) =>
       [ { witness with sessionId := 8 }, { witness with ownerId := "foreign" },
@@ -373,7 +376,7 @@ example readiness_model_exact_owner_generation_session_scope :
           (fun changed => (state.consumeReadiness owner changed).toOption.isNone)
     | none => false) = true := by decide
 
-example readiness_model_pending_and_changed_owner_refuse_before_consumption :
+theorem readiness_model_pending_and_changed_owner_refuse_before_consumption :
     (match registeredReadiness with
     | some (state, owner, witness) =>
       let pending := { state with transferPending := true }
@@ -383,19 +386,19 @@ example readiness_model_pending_and_changed_owner_refuse_before_consumption :
       state.issuedReadiness.length == 1 && state.consumedWitnesses.isEmpty
     | none => false) = true := by decide
 
-example readiness_actual_boolean_cannot_authorize :
+theorem readiness_actual_boolean_cannot_authorize :
     (match (readinessPrepared 0).bind (fun st => do
       let coro ← st.coroutines[1]?
       invokeInstalled { st with
         coroutines := st.coroutines.set! 1
-        { coro with effectCtx := { coro.effectCtx with readiness := none } } } 1) with
+          { coro with effectCtx := { coro.effectCtx with readiness := none } } } 1) with
     | some st => match st.coroutines[1]? with
       | some coro => decide (coro.regs[1]? = some .unit) && coro.effectCtx.calls == 1 &&
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by decide
 
-example readiness_retained_result_rechecks_changed_generation_before_reuse :
+theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled
       { st with config := { st.config with outputCondition := { verify := fun _ => false } } } 1) |>.bind (fun st => do
         let coro ← st.coroutines[1]?
@@ -415,7 +418,7 @@ example readiness_retained_result_rechecks_changed_generation_before_reuse :
 
 
 /-- A new registry generation cannot refresh a stale installed coroutine owner. -/
-example readiness_before_issuance_never_reconstructs_current_owner :
+theorem readiness_before_issuance_never_reconstructs_current_owner :
     (match (readinessPrepared 0).bind (fun st => do
         let coro ← st.coroutines[1]?
         let endpoint ← coro.ownedEndpoints.head?

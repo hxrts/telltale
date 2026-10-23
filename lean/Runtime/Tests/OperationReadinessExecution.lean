@@ -66,7 +66,7 @@ def jointSettled : Option State := do
   let st ← invokeInstalled st 1
   invokeInstalled st 1
 
-example original_parent_owns_exact_blocked_readiness_child :
+theorem original_parent_owns_exact_blocked_readiness_child :
     (jointBlocked.map fun st =>
       st.coroutines[1]?.any (fun coro =>
         coro.effectCtx.calls == 1 && coro.nominalContinuation.isSome &&
@@ -75,7 +75,7 @@ example original_parent_owns_exact_blocked_readiness_child :
         effect.orderingKey == 0 && effect.completedAtTick.isNone) &&
       st.operationInstances.length == 2).getD false = true := by decide
 
-example original_parent_resolves_after_actual_readiness_consumption :
+theorem original_parent_resolves_after_actual_readiness_consumption :
     (jointSettled.map fun st =>
       st.coroutines[1]?.any (fun coro =>
         coro.effectCtx.calls == 2 && coro.nominalContinuation.isNone &&
@@ -85,7 +85,7 @@ example original_parent_resolves_after_actual_readiness_consumption :
       st.sessions.any (fun entry => entry.2.ownership.consumedWitnesses == [1]) &&
       st.operationInstances.all (fun operation => operation.phase == .succeeded)).getD false = true := by decide
 
-example output_refusal_cannot_spend_witness_or_resolve_original_parent :
+theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
     ((jointResumed false).map fun st =>
       st.coroutines[1]?.any (fun coro =>
         coro.effectCtx.calls == 2 && coro.nominalContinuation.any (fun original => original.returned.isSome) &&

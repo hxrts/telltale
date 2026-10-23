@@ -43,7 +43,7 @@ def originalOutputRefusal : Bool := (do
     after.sessions.all (fun entry => entry.2.ownership.consumedWitnesses.isEmpty)
   ).getD false
 
-example output_refusal_retains_original_fault_and_revokes_only_original_semantic_work :
+theorem output_refusal_retains_original_fault_and_revokes_only_original_semantic_work :
     originalOutputRefusal = true := by decide
 
 /-- The expired original Await executes its actual installed opcode. Its fault
@@ -66,7 +66,7 @@ def originalExpiryRefusal : Bool := (do
       | _, _ => false)
   ).getD false
 
-example expired_original_await_retains_first_fault_without_renewal_or_cleanup_ack :
+theorem expired_original_await_retains_first_fault_without_renewal_or_cleanup_ack :
     originalExpiryRefusal = true := by decide
 
 /-- A genuine installed Jump bypasses a still-present static Resolve. Runtime
@@ -99,7 +99,7 @@ def originalHaltRefusal : Bool := (do
       | _, _ => false)
   ).getD false
 
-example actual_jump_cannot_halt_without_original_terminal_resolution :
+theorem actual_jump_cannot_halt_without_original_terminal_resolution :
     originalHaltRefusal = true := by decide
 
 end Runtime.Tests.OperationFailureExecution
