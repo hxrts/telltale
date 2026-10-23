@@ -151,8 +151,8 @@ inductive AwaitResult where
 
 private def observeChild (original : OriginalOperationContinuation)
     (effects : List OutstandingEffect) (id : Nat) : Except String AwaitResult := do
-  let matches := effects.filter (fun effect => effect.effectId == id)
-  let child ← match matches with
+  let matchingChildren := effects.filter (fun effect => effect.effectId == id)
+  let child ← match matchingChildren with
     | [child] => .ok child
     | _ => .error "original admitted child missing or ambiguous"
   if child.session != some original.owner.sessionId || child.ownerId != some original.owner.ownerId then

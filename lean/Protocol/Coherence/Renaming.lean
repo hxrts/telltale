@@ -176,6 +176,7 @@ theorem has_type_val_rename (ρ : SessionRenaming) (G : GEnv) (v : Value) (T : V
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod _ _ ih1 ih2 => exact HasTypeVal.prod ih1 ih2
   | @chan e L hLookup =>
     have hLookup' :
