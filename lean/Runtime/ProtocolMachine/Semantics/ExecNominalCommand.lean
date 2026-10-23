@@ -211,7 +211,8 @@ private def nominalRequest (original : NominalCommandContinuation)
     (request : NominalCommandRequest) : EffectRequest :=
   { effectId := some original.invocation, tick := original.issuedAt,
     session := some request.session, operationId := some s!"effect:{original.invocation}",
-    metadata := { interfaceName := request.declaration.interfaceName,
+    metadata := {
+      interfaceName := request.declaration.interfaceName,
       operationName := request.declaration.operationName, authorityClass := if request.declaration.readinessPredicate.isSome then .authoritative else .command,
       semanticClass := if request.declaration.readinessPredicate.isSome then .authoritative else .bestEffort, admissibility := .declaredUseOnly,
       totality := if request.declaration.mayBlock then .mayBlock else .mustTerminate,
@@ -264,10 +265,14 @@ def stepNominalCommand {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π
                         let resident := retainSourceOperationOutcome
                           { resident with effectCtx := context } original.invocation outcome
                         let issued := { issued with
-                            effectExchanges := issued.effectExchanges ++
-                          [{ effectId := original.invocation, handlerIdentity := original.handlerIdentity,
-                            orderingKey := original.issuedAt, request := nominalRequest original request,
-                            outcome := outcome, observedAt := some issued.clock }] }
+                          effectExchanges := issued.effectExchanges ++
+                            [{
+                              effectId := original.invocation,
+                              handlerIdentity := original.handlerIdentity,
+                              orderingKey := original.issuedAt,
+                              request := nominalRequest original request,
+                              outcome := outcome,
+                              observedAt := some issued.clock }] }
                         -- Retain the genuine typed result before an independent
                         -- post-callback refusal; never invoke the callback again.
                         let accepted := outcome.acceptedStatusFor (.nominalCommand request)
@@ -278,7 +283,7 @@ def stepNominalCommand {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π
                         if !nominalOriginalValid issued resident call returned then
                           let refused := { returned with
                             validationFailure := some
-                            ("contract_violation", "original occurrence refused after callback") }
+                              ("contract_violation", "original occurrence refused after callback") }
                           let resident := { resident with nominalContinuation := some refused }
                           let (primaryKind, primary) := match accepted with
                             | .failure kind message => (kind, message)
