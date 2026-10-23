@@ -79,8 +79,11 @@ def config (registers : Nat) : ProtocolMachineConfig UnitIdentity UnitGuard Unit
     maxCoroutines := 1024, maxSessions := 256,
     monitorMode := .sessionTypePrecheck, guardChain := unitGuardChain,
     proofConfig := { guardChainWf := unitGuardChainWf }, roleSigningKey := fun _ => (),
-    costModel := { stepCost := fun _ => 1, minCost := 1, defaultBudget := 18446744073709551615,
-      hMinCost := by intro _ _; exact Nat.le_refl 1, hMinPos := by exact Nat.le_refl 1 },
+    costModel := {
+      stepCost := fun _ => 1, minCost := 1, defaultBudget := 18446744073709551615,
+      hMinCost := by intro _ _; exact Nat.le_refl 1,
+      hMinPos := by exact Nat.le_refl 1
+    },
     speculationEnabled := false }
 
 def emptyState (registers : Nat) : State :=
@@ -122,7 +125,8 @@ def parseCall (value : Json) : Except String NominalCommandCall := do
   let ok ← value.getObjValAs? Nat "on_ok"
   let err ← value.getObjValAs? Nat "on_err"
   if budget == 0 || budget > 18446744073709551615 then throw "invalid selected nominal tick budget"
-  pure { declaration := declaration, enclosingOperation := operation,
+  pure {
+    declaration := declaration, enclosingOperation := operation,
     agreementProfile := ⟨name, .immediate, .noAgreement, .none, .none, .witness⟩,
     role := role, progressContract := progress, progressWindow := window,
     budgetTicks := budget, result := result, onOk := ok, onErr := err }
@@ -155,7 +159,7 @@ private def parseOperationDeclaration (value : Json) : Except String SourceOpera
   return declaration
 
 private def parseOperationResolution (value : Json) : Except String SourceOperationResolution := do
-  if value = Json.str "Cancelled" then return .cancelled
+  if value.getStr?.toOption == some "Cancelled" then return .cancelled
   let fields ← value.getObj?
   if fields.toList.length != 1 then throw "ambiguous source operation resolution"
   let register := fun field => match field with
@@ -173,8 +177,10 @@ private def parseOperationAction (value : Json) : Except String OperationAction 
   match ← value.getObjValAs? String "operation_lifecycle" with
   | "begin" => return .begin (← parseOperationDeclaration (← value.getObjVal? "declaration"))
   | "await" => return .await (← value.getObjValAs? String "operation")
-  | "resolve" => return .resolve (← value.getObjValAs? String "operation")
-      (← parseOperationResolution (← value.getObjVal? "outcome"))
+  | "resolve" => do
+      let operation ← value.getObjValAs? String "operation"
+      let outcome ← parseOperationResolution (← value.getObjVal? "outcome")
+      return .resolve operation outcome
   | "invalidate" => return .invalidate (← value.getObjValAs? String "operation")
   | _ => throw "unsupported actual source operation action"
 
@@ -210,7 +216,7 @@ def parseImage (value : Json) : Except String (CodeImage UnitGuard ScriptEffect)
   let locals ← value.getObjValAs? (Array Json) "local_types"
   let locals ← locals.toList.mapM fun entry => do
     match (← entry.getArr?).toList with
-    | [role, local] => pure ((← role.getStr?), (← localTypeRFromJson local))
+    | [role, localType] => pure ((← role.getStr?), (← localTypeRFromJson localType))
     | _ => throw "invalid original role type"
   if (programs.map Prod.fst).eraseDups.length != programs.length ||
       (locals.map Prod.fst).eraseDups.length != locals.length then throw "duplicate executable role"
@@ -340,12 +346,12 @@ private def callJson (start : Nat) (call : NominalCommandCall) : Json :=
     ("agreement_profile", profileJson call.agreementProfile),
     ("progress_contract", Json.str call.progressContract), ("progress_window", Json.str call.progressWindow),
     ("budget_ticks", Json.num call.budgetTicks), ("result", Json.num call.result),
-    ("on_ok", Json.num (call.onOk - start)), ("on_err", Json.num (call.onErr - start))]
+    ("on_ok", Json.num (call.onOk - start : Nat)), ("on_err", Json.num (call.onErr - start : Nat))]
 private def continuationJson (start : Nat) (holder : Option NominalCommandContinuation) : Json :=
   match holder with
   | none => Json.null
   | some original => Json.mkObj [("invocation", Json.num original.invocation),
-      ("original_pc", Json.num (original.pc - start)), ("call", callJson start original.call),
+      ("original_pc", Json.num (original.pc - start : Nat)), ("call", callJson start original.call),
       ("issued_at", Json.num original.issuedAt), ("handler_identity", Json.str original.handlerIdentity),
       ("returned", (original.returned.map resultJson).getD Json.null),
       ("original_owner", (original.originalOwner.map ownerJson).getD Json.null),
@@ -379,7 +385,7 @@ private def sourceDeclarationJson (start : Nat) (declaration : SourceOperationDe
     ("progress_window", Json.str declaration.progressWindow), ("budget_ticks", Json.num declaration.budgetTicks),
     ("requires_proof", Json.bool declaration.requiresProof),
     ("required_children", Json.arr (declaration.requiredChildren.map (fun child =>
-      Json.mkObj [("pc", Json.num (child.pc - start)), ("call", callJson start child.call)])).toArray)]
+      Json.mkObj [("pc", Json.num (child.pc - start : Nat)), ("call", callJson start child.call)])).toArray)]
 
 private def sourceOutcomeJson : SourceOperationOutcome → Json
   | .success value => Json.mkObj [("kind", "success"), ("value", value.map valueToJson |>.getD Json.null)]
@@ -432,9 +438,9 @@ private def sourceOperationJson (st : State) (start : Nat)
       ("session", Json.num original.owner.sessionId), ("entry_pc", Json.num start),
       ("operation_id", Json.str original.operationId), ("owner", ownerJson original.owner),
       ("declaration", sourceDeclarationJson start original.declaration),
-      ("original_pc", Json.num (original.originalPc - start)), ("runtime_original_pc", Json.num original.originalPc),
+      ("original_pc", Json.num (original.originalPc - start : Nat)), ("runtime_original_pc", Json.num original.originalPc),
       ("issued_at", Json.num original.issuedAt), ("children", Json.arr (original.children.map Json.num).toArray),
-      ("admitted_slots", Json.arr (original.admittedSlots.map (fun pc => Json.num (pc - start))).toArray),
+      ("admitted_slots", Json.arr (original.admittedSlots.map (fun pc => Json.num (pc - start : Nat))).toArray),
       ("completed_children", Json.arr completed.toArray),
       ("outcome", original.outcome.map sourceOutcomeJson |>.getD Json.null),
       ("resolved", Json.bool original.resolved), ("invalidated", Json.bool original.invalidated),
@@ -503,7 +509,7 @@ def runNominalImage (payload : Json) : Except String Json := do
       !(nominalRoles.all fun role => (scripts.map Prod.fst).contains role) then
     throw "nominal provider roles do not match executable command roles"
   let initial := emptyState registers
-  let initial := { initial with
+  let initial : State := { initial with
     config := { initial.config with
     outputCondition :=
     { policy := if denyOutputs then .denyAll else .allowAll } } }
@@ -511,7 +517,7 @@ def runNominalImage (payload : Json) : Except String Json := do
     | .ok st _ => pure st
     | .validationFailed reason => throw reason
     | _ => throw "nominal executable image capacity refusal"
-  let loaded := { loaded with
+  let loaded : State := { loaded with
     coroutines := loaded.coroutines.map fun coro =>
     { coro with effectCtx := { remaining := (scripts.lookup coro.role).getD [], identity := identity } } }
   let readiness := (payload.getObjVal? "readiness_admission").toOption
@@ -532,7 +538,7 @@ def runNominalImage (payload : Json) : Except String Json := do
   let coroutines ← st.coroutines.toList.mapM fun coro => do
     let start := (image.program.entryPoints.lookup coro.role).getD 0
     let fault ← faultJson coro.status
-    pure (Json.mkObj [("coro_id", Json.num coro.id), ("role", Json.str coro.role), ("pc", Json.num (coro.pc - start)),
+    pure (Json.mkObj [("coro_id", Json.num coro.id), ("role", Json.str coro.role), ("pc", Json.num (coro.pc - start : Nat)),
       ("status", Json.str (coroStatus coro.status)), ("fault", fault),
       ("continuation", continuationJson start coro.nominalContinuation), ("exchange_count", Json.num ((st.effectExchanges.filter fun exchange =>
         match exchange.request.body with
