@@ -404,8 +404,21 @@ def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
         match coro.ownedEndpoints with
         | ep :: _ => { st with sessions := SessionStore.removeType st.sessions ep }
         | [] => st
-  let coro' := advancePc { coro with status := .done }
+  let coro' := { coro with status := .done }
   pack coro' st' (mkRes .halted none)
+
+/-- Halt marks the original coroutine done at its actual halt instruction,
+matching both Rust committers rather than advancing past the terminal opcode. -/
+theorem haltPack_preserves_pc {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) :
+    (haltPack st coro).coro.pc = coro.pc := by
+  rfl
+
+/-- Terminal status does not require a new instruction or continuation. -/
+theorem haltPack_marks_done {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) :
+    (haltPack st coro).coro.status = .done := by
+  rfl
 
 /-! ## Result helpers: cost accounting -/
 

@@ -382,7 +382,7 @@ fn actual_pending_and_output_refusal_retain_original_typed_continuation() {
     let runner = ProtocolMachineRunner::new().expect("required executable Lean runner");
     let image = image();
     for (outcomes, rounds, deny) in [
-        (vec![NominalHostOutcome::Blocked], 2_usize, false),
+        (vec![NominalHostOutcome::Blocked], 3_usize, false),
         (
             vec![NominalHostOutcome::Success {
                 result: Ok(true),
@@ -412,6 +412,17 @@ fn actual_pending_and_output_refusal_retain_original_typed_continuation() {
                 "same original holder must remain resident"
             );
             assert_eq!(owner["continuation"]["returned"].is_null(), !deny);
+            let exchange = &actual["exchanges"][0];
+            let effect = &actual["effects"][0];
+            assert_eq!(owner["continuation"]["invocation"], effect["effect_id"]);
+            assert_eq!(owner["continuation"]["issued_at"], exchange["issued_at"]);
+            assert_eq!(effect["budget_ticks"], json!(64));
+            if !deny {
+                assert_eq!(exchange["issued_at"], json!(3));
+                assert_eq!(effect["status"], json!("blocked"));
+                assert_eq!(owner["pc"], json!(1));
+            }
+
             let mut erased = actual.clone();
             let index = erased["coroutines"]
                 .as_array()
@@ -434,8 +445,11 @@ fn actual_pending_and_output_refusal_retain_original_typed_continuation() {
                     .expect("terminal cause comparison"));
             }
         }
-        assert!(nominal_executions_equivalent(&cooperative, &lean)
-            .expect("pending/refusal co-op correspondence"));
+        assert!(
+            nominal_executions_equivalent(&cooperative, &lean)
+                .expect("pending/refusal co-op correspondence"),
+            "actual Rust={cooperative} Lean={lean}"
+        );
         assert!(nominal_executions_equivalent(&threaded, &lean)
             .expect("pending/refusal threaded correspondence"));
     }
@@ -574,8 +588,11 @@ fn actual_readiness_source_registry_and_retained_commit_match_existing_lean_runn
             .expect("actual compiled opcode plus canonical model admission/issuer");
         assert!(nominal_executions_equivalent(&cooperative, &threaded)
             .expect("actual backend registry correspondence"));
-        assert!(nominal_executions_equivalent(&cooperative, &lean)
-            .expect("actual model registry/continuation correspondence"));
+        assert!(
+            nominal_executions_equivalent(&cooperative, &lean)
+                .expect("actual model registry/continuation correspondence"),
+            "actual Rust={cooperative} Lean={lean}"
+        );
         let registry = &cooperative["readiness"];
         assert_eq!(registry["audit"][0]["event"], json!("Issued"));
         assert!(registry["audit"][0]["tick"].as_u64().is_some());
@@ -718,8 +735,11 @@ fn compiled_original_parent_and_child_match_both_backends_and_executable_model()
             .expect("execute actual source-operation opcodes and original typed outcomes");
         assert!(nominal_executions_equivalent(&cooperative, &threaded)
             .expect("same parent/backend transaction"));
-        assert!(nominal_executions_equivalent(&cooperative, &lean)
-            .expect("actual enclosing operation correspondence"));
+        assert!(
+            nominal_executions_equivalent(&cooperative, &lean)
+                .expect("actual enclosing operation correspondence"),
+            "actual Rust={cooperative} Lean={lean}"
+        );
         assert_eq!(
             cooperative["source_operations"]
                 .as_array()
@@ -761,8 +781,11 @@ fn compiled_parent_readiness_retains_original_result_and_revocation_at_output_ga
             .expect("actual parent plus canonical readiness issuer");
         assert!(nominal_executions_equivalent(&cooperative, &threaded)
             .expect("actual same-owner backend result"));
-        assert!(nominal_executions_equivalent(&cooperative, &lean)
-            .expect("actual model owner/result/parent relation"));
+        assert!(
+            nominal_executions_equivalent(&cooperative, &lean)
+                .expect("actual model owner/result/parent relation"),
+            "actual Rust={cooperative} Lean={lean}"
+        );
         let parent = &cooperative["source_operations"][0];
         assert_eq!(parent["resolved"], json!(!deny));
         assert_eq!(parent["invalidated"], json!(deny));

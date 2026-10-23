@@ -829,6 +829,14 @@ typed-branch commit theorem declarations accompany real loader/opcode/commit
 fixtures. These source declarations require actual Lean checking. They are not
 a completed Rust/compiler refinement theorem.
 
+Canonical Halt keeps the program counter at the actual terminal instruction
+while marking the coroutine done and removing its active endpoint type. Both
+Rust backends and the executable Lean transition use this same terminal PC.
+The pending nominal bridge case runs through declaration, the peer's blocked
+choice, and the first invocation at logical tick three. It checks that actual
+original occurrence and its selected budget before testing retained authority.
+This does not change the scheduler clock or extend the original window.
+
 Role entry PCs in Lean need not be zero. Static declarations apply only to the
 prefix of the actual role's executable chunk, and the loader fixes that role on
 the original coroutine. A declaration is a static manifest, not an executed
