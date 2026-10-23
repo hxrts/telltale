@@ -83,7 +83,7 @@ private def settleSourceOperation {ι γ π ε ν : Type u} [ProtocolMachineDoma
 private def invalidateSourceOperation {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
     (st : ProtocolMachineState ι γ π ε ν) (original : OriginalOperationContinuation) :
     ProtocolMachineState ι γ π ε ν :=
-  let failed := { st with
+  let failed : ProtocolMachineState ι γ π ε ν := { st with
     operationInstances := st.operationInstances.map (fun record =>
       if record.operationId == original.operationId then { record with phase := .failed } else record),
     progressContracts := st.progressContracts.map (fun contract =>
@@ -205,18 +205,20 @@ def attachSourceOperationChild {ι γ π ε ν : Type u} [ProtocolMachineDomain 
       if original.resolved then return (st, coro)
       if !sourceOperationChildContextValid st coro call then
         throw "source child lost original owner/continuation/window"
-      let child ← match st.outstandingEffects.filter (fun effect => effect.effectId == id) with
+      let childResult : Except String OutstandingEffect :=
+        match st.outstandingEffects.filter (fun effect => effect.effectId == id) with
         | [child] => .ok child
         | _ => .error "original issued source child absent or ambiguous"
-      let attached ← original.admitChild coro.pc call child
-      let issued := { st with
-        operationInstances := st.operationInstances.map (fun record =>
-          if record.operationId == original.operationId then
-            { record with
-              effectIds := attached.children,
-              dependentOperationIds := record.dependentOperationIds ++ [child.operationId] }
-          else record) }
-      return (issued, { coro with operationContinuation := some attached })
+      Except.bind childResult fun child =>
+        Except.bind (original.admitChild coro.pc call child) fun attached =>
+          let issued := { st with
+            operationInstances := st.operationInstances.map (fun record =>
+              if record.operationId == original.operationId then
+                { record with
+                  effectIds := attached.children,
+                  dependentOperationIds := record.dependentOperationIds ++ [child.operationId] }
+              else record) }
+          .ok (issued, { coro with operationContinuation := some attached })
 
 /-- Retain the actual child outcome on the same original holder before any
 post-callback validation can refuse its result. This is not callback cleanup. -/
@@ -233,7 +235,7 @@ def retainSourceOperationOutcome {γ ε : Type u} [GuardLayer γ] [EffectRuntime
         | .error reason =>
             { coro with
               operationContinuation := some
-              { original with validationFailure := original.validationFailure.or (some reason) } }
+                { original with validationFailure := original.validationFailure.or (some reason) } }
 
 /-- Existing scheduler unblocking observes the same original child set. It never
 polls a callback, reissues a child, or creates a new progress endpoint. -/

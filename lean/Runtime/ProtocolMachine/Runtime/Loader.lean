@@ -315,23 +315,24 @@ owner or serialized observation does not refresh stale coroutine authority.
 This models protocol authority, not a Rust host handle or host teardown. -/
 def admitLoadedSessionOwner {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
     (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) (ownerId : String) :
-    Except String (ProtocolMachineState ι γ π ε ν × SessionTypes.ModelOwner) := do
-  let session ← match st.sessions.lookup sid with
-    | none => .error "owning admission requires an actual loaded session"
-    | some session => .ok session
-  if ownerId.isEmpty then throw "owning admission requires a named original model owner"
-  match session.phase with
-  | .active => pure ()
-  | _ => throw "owning admission requires an active session"
-  let installed := st.coroutines.toList.filter (fun coroutine =>
-    coroutine.ownedEndpoints.any (fun endpoint => endpoint.sid == sid))
-  if installed.isEmpty || installed.any (fun coroutine => coroutine.issuedModelOwner.isSome) then
-    throw "owning admission requires unclaimed actual installed coroutines"
-  let (ownership, owner) ← session.ownership.claim sid ownerId
-  let admitted := { st with
-    sessions := st.sessions.map (fun entry =>
-      if entry.1 == sid then (entry.1, { entry.2 with ownership }) else entry),
-    coroutines := st.coroutines.map (fun coroutine =>
-      if coroutine.ownedEndpoints.any (fun endpoint => endpoint.sid == sid) then
-        { coroutine with issuedModelOwner := some owner } else coroutine) }
-  return (admitted, owner)
+    Except String (ProtocolMachineState ι γ π ε ν × SessionTypes.ModelOwner) :=
+  match st.sessions.lookup sid with
+  | none => .error "owning admission requires an actual loaded session"
+  | some session =>
+      if ownerId.isEmpty then .error "owning admission requires a named original model owner"
+      else match session.phase with
+      | .active =>
+          let installed := st.coroutines.toList.filter (fun coroutine =>
+            coroutine.ownedEndpoints.any (fun endpoint => endpoint.sid == sid))
+          if installed.isEmpty || installed.any (fun coroutine => coroutine.issuedModelOwner.isSome) then
+            .error "owning admission requires unclaimed actual installed coroutines"
+          else
+            Except.bind (session.ownership.claim sid ownerId) fun (ownership, owner) =>
+              let admitted := { st with
+                sessions := st.sessions.map (fun entry =>
+                  if entry.1 == sid then (entry.1, { entry.2 with ownership }) else entry),
+                coroutines := st.coroutines.map (fun coroutine =>
+                  if coroutine.ownedEndpoints.any (fun endpoint => endpoint.sid == sid) then
+                    { coroutine with issuedModelOwner := some owner } else coroutine) }
+              .ok (admitted, owner)
+      | _ => .error "owning admission requires an active session"
