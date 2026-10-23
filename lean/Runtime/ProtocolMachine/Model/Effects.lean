@@ -5,6 +5,9 @@ set_option autoImplicit false
 
 namespace Runtime.ProtocolMachine.Model
 
+-- Retained result equality compares the original error or success constructor.
+deriving instance DecidableEq for Except
+
 inductive EffectAuthorityClass where
   | authoritative
   | command

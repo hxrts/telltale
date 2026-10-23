@@ -83,6 +83,7 @@ theorem rename_val_type_pr_inj (σ : ProtocolRenaming) :
           cases h
       | nat =>
           cases h
+      | readiness => cases h
       | prod _ _ =>
           cases h
       | chan _ _ =>

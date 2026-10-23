@@ -231,6 +231,7 @@ theorem rename_val_type_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
       | string =>
           cases h
           rfl
+      | readiness => cases h
       | prod _ _ => cases h
       | chan _ _ => cases h
   -- ValType Injectivity: Product and Channel Cases
