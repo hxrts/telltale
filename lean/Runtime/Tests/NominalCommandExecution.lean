@@ -565,6 +565,15 @@ private theorem stage_readiness_eq (mutation : Nat) :
     readinessPrepared mutation = stageReadinessPrepared mutation := by
   simp only [readinessPrepared, stage_readiness_image_eq,
     Bind.bind, Pure.pure, Except.toOption, Option.bind, stage_ready_load_eq]
+  have installed_coro :
+      (stageInstalled (some "Store.save")).coroutines[1]? =
+        some (stageCoroutine "A" 1 2) := rfl
+  have installed_endpoint :
+      (stageCoroutine "A" 1 2).ownedEndpoints.find?
+          (fun endpoint => endpoint.role == "A") =
+        some ({ sid := 0, role := "A" } : Endpoint) := by
+    simp only [stageCoroutine, List.find?_cons, beq_self_eq_true, ↓reduceIte]
+  simp only [installed_coro, installed_endpoint, Option.bind]
   -- Reduce only the original installed-coro/endpoint selection, then rewrite
   -- actual admission before opening any callback, issued witness or observation.
   change (do
@@ -586,7 +595,14 @@ private theorem stage_readiness_eq (mutation : Nat) :
         if sid == 0 then (sid, { current with ownership }) else (sid, current)),
       coroutines := st.coroutines.set! 1 { coro with effectCtx :=
         { blockFirst := false, readiness := some witness } } } : State) 1) = _
-  rw [stage_admission_eq (some "Store.save") "original-owner" (by decide)] <;> rfl
+  have owned_coro :
+      (stageOwned (some "Store.save") "original-owner").coroutines[1]? =
+        some ({ stageCoroutine "A" 1 2 with
+          issuedModelOwner := some (stageOwner "original-owner") }) := by
+    simp only [stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil] <;> rfl
+  rw [stage_admission_eq (some "Store.save") "original-owner" (by decide)] <;>
+    simp only [stageReadinessPrepared, owned_coro, installed_endpoint,
+      Bind.bind, Pure.pure, Option.bind] <;> rfl
 
 /-- Real installed invocation consumes the exact session-issued witness once. -/
 theorem readiness_actual_commit_single_use :

@@ -10,7 +10,7 @@ use telltale_bridge::nominal_image::{
     capture_nominal_execution, nominal_executions_equivalent, NominalExecutableImage,
     NominalHostOutcome, NominalImageRunInput, NOMINAL_IMAGE_SCHEMA,
 };
-use telltale_bridge::ProtocolMachineRunner;
+use telltale_bridge::{ProtocolMachineRunner, ProtocolMachineRunnerError};
 use telltale_machine::model::effects::{
     EffectFailure, EffectHandler, EffectOutcome, EffectRequest, EffectRequestBody, EffectResult,
 };
@@ -666,11 +666,34 @@ fn readiness_bridge_refuses_erased_original_issuer_and_semantic_field_mutations(
         NominalHostOutcome::Blocked,
         NominalHostOutcome::Readiness { reply_offset: 0 },
     ];
-    let absent_original = input(&image, &outcomes);
-    assert!(
-        runner.run_nominal_image(&absent_original).is_err(),
-        "serialized descriptors do not admit an original model owner"
-    );
+    let mut absent_original = input(&image, &outcomes);
+    absent_original.deny_outputs = true;
+    let mut admitted_original = absent_original.clone();
+    admitted_original.readiness_admission =
+        Some(telltale_bridge::nominal_image::NominalReadinessAdmission {
+            owner_id: "original".into(),
+            issue_after_blocked: true,
+        });
+    let admitted = runner
+        .run_nominal_image(&admitted_original)
+        .expect("same actual runner admits original owner, Blocked issuer and retained result");
+    assert!(nominal_executions_equivalent(&original, &admitted)
+        .expect("same actual denied-output registry and continuation control"));
+    let refusal = runner
+        .run_nominal_image(&absent_original)
+        .expect_err("removing only original admission must refuse the actual source declaration");
+    match refusal {
+        ProtocolMachineRunnerError::ProcessFailed { code, stderr } => {
+            assert_eq!(code, 1, "canonical uncaught Lean IO.userError exit");
+            assert!(
+                stderr.contains(
+                    "nominal executable image refused: readiness setup does not match the actual source declaration"
+                ),
+                "actual canonical absent-admission refusal required: {stderr}"
+            );
+        }
+        other => panic!("absent admission must reach the canonical Lean refusal: {other}"),
+    }
 }
 
 fn parent_image(authoritative: bool) -> CodeImage {
