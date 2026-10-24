@@ -136,8 +136,6 @@ pub(super) fn assert_empty_ingress_operations(
     objects: &telltale_machine::semantic_objects::ProtocolMachineSemanticObjects,
     exchanges: &[telltale_machine::model::effects::EffectExchangeRecord],
 ) {
-    use telltale_machine::model::effects::EffectRequestBody;
-    use telltale_machine::semantic_objects::OutstandingEffectStatus;
     assert!(
         !exchanges.is_empty(),
         "actual scheduler ingress was observed"
@@ -163,47 +161,56 @@ pub(super) fn assert_empty_ingress_operations(
         .collect();
     assert_eq!(ids.len(), exchanges.len());
     for exchange in exchanges {
-        assert!(matches!(
-            exchange.request.body,
-            EffectRequestBody::TopologyEvents { .. }
-        ));
-        assert_eq!(exchange.request.effect_id, Some(exchange.effect_id));
-        assert_eq!(exchange.request.session, None);
-        assert_eq!(
-            exchange.outcome.clone().into_topology().unwrap(),
-            EffectResult::success(Vec::new())
-        );
-        let effects: Vec<_> = objects
-            .outstanding_effects
-            .iter()
-            .filter(|effect| effect.effect_id == exchange.effect_id)
-            .collect();
-        assert_eq!(effects.len(), 1);
-        let effect = effects[0];
-        assert_eq!(effect.effect_kind, "topology_events");
-        assert_eq!(effect.status, OutstandingEffectStatus::Succeeded);
-        let records: Vec<_> = objects
-            .operation_instances
-            .iter()
-            .filter(|record| record.operation_id == effect.operation_id)
-            .collect();
-        assert_eq!(records.len(), 1);
-        let record = records[0];
-        assert_eq!(record.effect_ids, vec![exchange.effect_id]);
-        assert_eq!(exchange.request.metadata.operation_name, "topologyEvents");
-        assert_eq!(record.kind, exchange.request.metadata.operation_name);
-        assert_eq!(record.phase, OperationPhase::Succeeded);
-        assert_eq!(record.session, exchange.request.session);
-        assert!(record.owner_id.is_none() && !record.requires_proof);
-        let progress: Vec<_> = objects
-            .progress_contracts
-            .iter()
-            .filter(|progress| progress.operation_id == effect.operation_id)
-            .collect();
-        assert_eq!(progress.len(), 1);
-        assert_eq!(progress[0].session, exchange.request.session);
-        assert_eq!(progress[0].last_ordering_key, Some(exchange.ordering_key));
+        assert_empty_ingress_exchange(objects, exchange);
     }
+}
+
+fn assert_empty_ingress_exchange(
+    objects: &telltale_machine::semantic_objects::ProtocolMachineSemanticObjects,
+    exchange: &telltale_machine::model::effects::EffectExchangeRecord,
+) {
+    use telltale_machine::model::effects::EffectRequestBody;
+    use telltale_machine::semantic_objects::OutstandingEffectStatus;
+    assert!(matches!(
+        exchange.request.body,
+        EffectRequestBody::TopologyEvents { .. }
+    ));
+    assert_eq!(exchange.request.effect_id, Some(exchange.effect_id));
+    assert_eq!(exchange.request.session, None);
+    assert_eq!(
+        exchange.outcome.clone().into_topology().unwrap(),
+        EffectResult::success(Vec::new())
+    );
+    let effects: Vec<_> = objects
+        .outstanding_effects
+        .iter()
+        .filter(|effect| effect.effect_id == exchange.effect_id)
+        .collect();
+    assert_eq!(effects.len(), 1);
+    let effect = effects[0];
+    assert_eq!(effect.effect_kind, "topology_events");
+    assert_eq!(effect.status, OutstandingEffectStatus::Succeeded);
+    let records: Vec<_> = objects
+        .operation_instances
+        .iter()
+        .filter(|record| record.operation_id == effect.operation_id)
+        .collect();
+    assert_eq!(records.len(), 1);
+    let record = records[0];
+    assert_eq!(record.effect_ids, vec![exchange.effect_id]);
+    assert_eq!(exchange.request.metadata.operation_name, "topologyEvents");
+    assert_eq!(record.kind, exchange.request.metadata.operation_name);
+    assert_eq!(record.phase, OperationPhase::Succeeded);
+    assert_eq!(record.session, exchange.request.session);
+    assert!(record.owner_id.is_none() && !record.requires_proof);
+    let progress: Vec<_> = objects
+        .progress_contracts
+        .iter()
+        .filter(|progress| progress.operation_id == effect.operation_id)
+        .collect();
+    assert_eq!(progress.len(), 1);
+    assert_eq!(progress[0].session, exchange.request.session);
+    assert_eq!(progress[0].last_ordering_key, Some(exchange.ordering_key));
 }
 
 #[test]

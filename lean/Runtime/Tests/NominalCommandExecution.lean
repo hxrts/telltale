@@ -194,7 +194,8 @@ private theorem stage_image_eq : image = .ok (stageImage none) := by
     Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
     Array.isEmpty, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.map_cons, List.map_nil, decide_true, decide_false,
+    List.reverse_cons, List.reverse_nil, List.map_cons, List.map_nil,
+    decide_true, decide_false,
     Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches,
     localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
@@ -238,21 +239,17 @@ private theorem stage_admission_eq (predicate : Option String) (name : String)
     (named : name.isEmpty = false) :
     admitLoadedSessionOwner (stageInstalled predicate) 0 name =
       .ok (stageOwned predicate name, stageOwner name) := by
-  change
-    (if name.isEmpty then
-      .error "owning admission requires a named original model owner"
-    else
-      Except.bind (({} : SessionTypes.ModelOwnershipState).claim 0 name)
-        (fun claimed =>
-          .ok
-            ({ stageInstalled predicate with
-                sessions := [(0, { stageSession predicate with
-                  ownership := claimed.1 })],
-                coroutines := (stageInstalled predicate).coroutines.map
-                  (fun coroutine => { coroutine with issuedModelOwner := some claimed.2 }) },
-              claimed.2))) =
-      .ok (stageOwned predicate name, stageOwner name)
-  rw [named] <;> rfl
+  -- Reduce the ACTUAL installed-session lookup, nonempty/unclaimed-coro
+  -- guard, conditional endpoint map and registry claim; do not omit them in
+  -- an asserted normal form of an arbitrary state.
+  simp +decide only [admitLoadedSessionOwner, stageInstalled, stageSession,
+    stageCoroutine, stageOwned, stageOwner, List.lookup, List.filter,
+    List.any, List.isEmpty, List.map_cons, List.map_nil,
+    Array.toList, List.map_toArray, beq_self_eq_true, SessionTypes.ModelOwnershipState.claim,
+    named, Bind.bind, Pure.pure, Except.bind, Except.pure,
+    Bool.false_or, Bool.or_false, Bool.false_eq_true,
+    ↓reduceIte, ↓reduceDIte]
+  all_goals rfl
 
 private theorem stage_ordinary_eq : ordinaryLoaded = some (stageInstalled none) := by
   simp only [ordinaryLoaded, stage_image_eq, Bind.bind, Pure.pure,
@@ -528,7 +525,8 @@ private theorem stage_readiness_image_eq :
     Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
     Array.isEmpty, Array.size, Nat.reduceAdd,
     List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.map_cons, List.map_nil, decide_true, decide_false,
+    List.reverse_cons, List.reverse_nil, List.map_cons, List.map_nil,
+    decide_true, decide_false,
     Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
     Choreography.Projection.Trans.transBranches,
     localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
@@ -561,8 +559,10 @@ private theorem stage_readiness_eq (mutation : Nat) :
   -- Reduce only the original installed-coro/endpoint selection, then rewrite
   -- actual admission before opening any callback, issued witness or observation.
   change (do
-    let (st, owner) ← (admitLoadedSessionOwner
+    let admitted ← (admitLoadedSessionOwner
       (stageInstalled (some "Store.save")) 0 "original-owner").toOption
+    let st : State := admitted.1
+    let owner : SessionTypes.ModelOwner := admitted.2
     let coro ← st.coroutines[1]?
     let session ← st.sessions.lookup 0
     let (issued, original) ← (session.ownership.issueReadiness owner "Store.save").toOption
@@ -571,11 +571,11 @@ private theorem stage_readiness_eq (mutation : Nat) :
       | 2 => { original with predicateRef := "Other.ready" }
       | _ => original
     let ownership ← if mutation == 3 then (issued.consumeReadiness owner original).toOption else some issued
-    invokeInstalled { st with
+    invokeInstalled ({ st with
       sessions := st.sessions.map (fun (sid, current) =>
         if sid == 0 then (sid, { current with ownership }) else (sid, current)),
       coroutines := st.coroutines.set! 1 { coro with effectCtx :=
-        { blockFirst := false, readiness := some witness } } } 1) = _
+        { blockFirst := false, readiness := some witness } } } : State) 1) = _
   rw [stage_admission_eq (some "Store.save") "original-owner" (by decide)] <;> rfl
 
 /-- Real installed invocation consumes the exact session-issued witness once. -/

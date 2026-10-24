@@ -220,7 +220,7 @@ fn select_command_binding<'a>(
     else {
         return Err(unsupported("expected one explicitly placed command check"));
     };
-    if role.name().to_string() != operation.owner_role
+    if *role.name() != operation.owner_role
         || role.is_parameterized()
         || role.is_indexed()
         || !args.is_empty()

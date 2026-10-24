@@ -443,7 +443,7 @@ fn original_progress_invalidation_prevents_late_nominal_callback_and_commit() {
         block_for: usize::MAX,
     };
     for _ in 0..32 {
-        let _ = machine.step(&handler);
+        drop(machine.step(&handler));
         if machine
             .semantic_objects()
             .outstanding_effects
@@ -470,7 +470,7 @@ fn original_progress_invalidation_prevents_late_nominal_callback_and_commit() {
         "must exercise actual Blocked callback before invalidation"
     );
     for _ in 0..4 {
-        let _ = machine.step(&handler);
+        drop(machine.step(&handler));
     }
     assert_eq!(handler.calls.lock().expect("calls").len(), calls);
     let coroutine = machine
@@ -715,7 +715,7 @@ fn expired_original_window_refuses_while_effect_is_still_blocked() {
     let calls = handler.calls.lock().expect("calls").len();
     assert!(calls > 0);
     for _ in 0..2 {
-        let _ = machine.step(&handler);
+        drop(machine.step(&handler));
     }
     assert_eq!(handler.calls.lock().expect("calls").len(), calls);
 }
