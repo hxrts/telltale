@@ -276,10 +276,14 @@ Current runtime-semantic-only authority surfaces:
 - `dependent work`
 - explicit commitment lifecycle forms such as `begin`, `await`, `resolve`, and `invalidate`
 
-These runtime-semantic-only forms are still executable and still covered by the
-protocol-machine conservation theorems. The important limit is narrower: they
-are not currently claimed as part of the smallest authority-specific theorem
-slice.
+These forms name protocol-machine semantic obligations. Concrete executable
+lowering is entry-point-specific, as described in the
+[source-derived support matrix](#source-derived-support-matrix) and
+[prepared enclosing-operation slice](#prepared-enclosing-operation-executable-slice).
+Parser acceptance, generated metadata and communication projection do not
+establish that an authority obligation is executed. Protocol-machine conservation
+theorems retain their declared premises and do not supply a missing source-to-machine
+lowering. These forms remain outside the smallest authority-specific theorem slice.
 
 ## Effect Declarations and Uses
 

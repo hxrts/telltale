@@ -319,6 +319,20 @@ fn actual_source_nominal_opcodes_and_typed_outcomes_match_executable_lean() {
     }
 }
 
+fn assert_nominal_process_refusal(actual: Result<Value, ProtocolMachineRunnerError>, reason: &str) {
+    match actual.expect_err("malformed input must reach the canonical Lean refusal") {
+        ProtocolMachineRunnerError::ProcessFailed { code, stderr } => {
+            assert_eq!(code, 1, "canonical uncaught Lean IO.userError exit");
+            let expected = format!("nominal executable image refused: {reason}");
+            assert!(
+                stderr.contains(&expected),
+                "actual canonical refusal required ({expected}): {stderr}"
+            );
+        }
+        other => panic!("input must reach the canonical Lean refusal: {other}"),
+    }
+}
+
 #[test]
 fn nominal_correspondence_refuses_erased_payload_outcomes_and_continuations() {
     let runner = ProtocolMachineRunner::new().expect("required actual Lean runner");
@@ -333,21 +347,33 @@ fn nominal_correspondence_refuses_erased_payload_outcomes_and_continuations() {
     let original = runner
         .run_nominal_image(&configured)
         .expect("genuine positive executable control");
+    assert!(nominal_executions_equivalent(&original, &original)
+        .expect("same actual runner produces a valid positive execution"));
     for field in ["image", "outcomes"] {
         let mut erased = serde_json::to_value(&configured).expect("actual input");
-        erased.as_object_mut().expect("input object").remove(field);
-        assert!(
-            runner
-                .run_validation_operation("runNominalImage", &erased)
-                .is_err(),
-            "missing {field} must not use communication reconstruction"
+        erased
+            .as_object_mut()
+            .expect("input object")
+            .remove(field)
+            .expect("positive input contains the exact field being removed");
+        assert_nominal_process_refusal(
+            runner.run_validation_operation("runNominalImage", &erased),
+            &format!("property not found: {field}"),
         );
     }
     let mut missing_code = serde_json::to_value(&configured).expect("actual input");
+    assert!(
+        !missing_code["image"]["local_types"]
+            .as_array()
+            .expect("positive image has the actual role types")
+            .is_empty(),
+        "erasing only programs must leave original role types to mismatch"
+    );
     missing_code["image"]["programs"] = json!([]);
-    assert!(runner
-        .run_validation_operation("runNominalImage", &missing_code)
-        .is_err());
+    assert_nominal_process_refusal(
+        runner.run_validation_operation("runNominalImage", &missing_code),
+        "executable/type role mismatch",
+    );
     for field in [
         "exchanges",
         "effects",
@@ -679,21 +705,10 @@ fn readiness_bridge_refuses_erased_original_issuer_and_semantic_field_mutations(
         .expect("same actual runner admits original owner, Blocked issuer and retained result");
     assert!(nominal_executions_equivalent(&original, &admitted)
         .expect("same actual denied-output registry and continuation control"));
-    let refusal = runner
-        .run_nominal_image(&absent_original)
-        .expect_err("removing only original admission must refuse the actual source declaration");
-    match refusal {
-        ProtocolMachineRunnerError::ProcessFailed { code, stderr } => {
-            assert_eq!(code, 1, "canonical uncaught Lean IO.userError exit");
-            assert!(
-                stderr.contains(
-                    "nominal executable image refused: readiness setup does not match the actual source declaration"
-                ),
-                "actual canonical absent-admission refusal required: {stderr}"
-            );
-        }
-        other => panic!("absent admission must reach the canonical Lean refusal: {other}"),
-    }
+    assert_nominal_process_refusal(
+        runner.run_nominal_image(&absent_original),
+        "readiness setup does not match the actual source declaration",
+    );
 }
 
 fn parent_image(authoritative: bool) -> CodeImage {

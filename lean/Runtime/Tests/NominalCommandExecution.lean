@@ -574,27 +574,7 @@ private theorem stage_readiness_eq (mutation : Nat) :
         some ({ sid := 0, role := "A" } : Endpoint) := by
     simp only [stageCoroutine, List.find?_cons, beq_self_eq_true, ↓reduceIte]
   simp only [installed_coro, installed_endpoint, Option.bind]
-  -- Reduce only the original installed-coro/endpoint selection, then rewrite
-  -- actual admission before opening any callback, issued witness or observation.
-  change (do
-    let admitted ← (admitLoadedSessionOwner
-      (stageInstalled (some "Store.save")) 0 "original-owner").toOption
-    let st : State := admitted.1
-    let owner : SessionTypes.ModelOwner := admitted.2
-    let coro ← st.coroutines[1]?
-    let session ← st.sessions.lookup 0
-    let (issued, original) ← (session.ownership.issueReadiness owner "Store.save").toOption
-    let witness := match mutation with
-      | 1 => { original with witnessId := original.witnessId + 1 }
-      | 2 => { original with predicateRef := "Other.ready" }
-      | _ => original
-    let ownership ← if mutation == 3 then (issued.consumeReadiness owner original).toOption else some issued
-    invokeInstalled ({ st with
-      sessions := st.sessions.map (fun (entry : SessionId × SessionState UnitVerify) =>
-        let (sid, current) := entry
-        if sid == 0 then (sid, { current with ownership }) else (sid, current)),
-      coroutines := st.coroutines.set! 1 { coro with effectCtx :=
-        { blockFirst := false, readiness := some witness } } } : State) 1) = _
+  -- Rewrite the actual exposed admission without restating its monadic tail.
   have owned_coro :
       (stageOwned (some "Store.save") "original-owner").coroutines[1]? =
         some ({ stageCoroutine "A" 1 2 with
