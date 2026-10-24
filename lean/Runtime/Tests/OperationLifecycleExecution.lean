@@ -100,7 +100,9 @@ theorem source_stage_image_eq :
     Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
     Array.isEmpty, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
     List.length_cons, List.length_nil, List.reverse_cons, List.reverse_nil,
-    List.map_cons, List.map_nil, decide_true, decide_false, ↓reduceIte, ↓reduceDIte]
+    List.map_cons, List.map_nil, decide_true, decide_false,
+    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
+    ↓reduceIte, ↓reduceDIte]
 
 theorem source_stage_load_eq (jumpToHalt : Bool) :
     loadChoreographyResult Runtime.Tests.NominalCommandExecution.empty (sourceStageImage jumpToHalt) =
@@ -140,13 +142,13 @@ theorem source_loaded_eq (claimOwner : Bool) :
     sourceLoaded claimOwner = some (if claimOwner then sourceStageOwned false else sourceStageInstalled false) := by
   cases claimOwner <;>
     simp only [sourceLoaded, source_stage_image_eq, source_stage_load_eq,
-      Bind.bind, Pure.pure, Except.toOption, Option.bind, Bool.not_false, Bool.not_true,
+      Bind.bind, Pure.pure, Except.toOption, Option.bind, Bool.not_false, Bool.not_true, Bool.false_eq_true, ite_false,
       ↓reduceIte, source_stage_coro_eq, source_stage_endpoint_eq, source_stage_admission_eq]
 
 theorem source_halt_image_eq :
-    ({ sourceRoleImage with programs := sourceRoleImage.programs.insert "A"
-      #[.invoke (.operation (.begin sourceDeclaration)), .jump 3,
-        .invoke (.operation (.resolve "Save" (.success none))), .halt] } :
+    ({ sourceRoleImage with
+      programs := (sourceRoleImage.programs.insert "A" #[.invoke (.operation (.begin sourceDeclaration)),
+        .jump 3, .invoke (.operation (.resolve "Save" (.success none))), .halt]) } :
       RoleCodeImage UnitGuard TestEffect).toCodeImage ["B", "A"] =
       .ok (sourceStageImage true) := by
   simp +decide only [sourceRoleImage, sourceStageImage, sourceDeclaration,
@@ -159,7 +161,9 @@ theorem source_halt_image_eq :
     Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
     Array.isEmpty, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
     List.length_cons, List.length_nil, List.reverse_cons, List.reverse_nil,
-    List.map_cons, List.map_nil, decide_true, decide_false, ↓reduceIte, ↓reduceDIte]
+    List.map_cons, List.map_nil, decide_true, decide_false,
+    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
+    ↓reduceIte, ↓reduceDIte]
 
 example : (sourceBegun.map fun st =>
     st.nextEffectId == 0 && st.operationInstances.length == 1 &&
