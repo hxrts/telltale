@@ -66,6 +66,124 @@ def jointSettled : Option State := do
   let st ← invokeInstalled st 1
   invokeInstalled st 1
 
+/-! Producer stages for THIS joint declaration and relocated child image. -/
+def jointStageCall : NominalCommandCall := { readinessCall with onOk := 5, onErr := 9 }
+def jointStageDeclaration : SourceOperationDeclaration :=
+  { parentDeclaration with requiredChildren := [{ pc := 4, call := jointStageCall }] }
+
+def jointStageImage : CodeImage UnitGuard TestEffect :=
+  let branches := [({ name := "Ready" }, none, SessionTypes.LocalTypeR.LocalTypeR.end),
+    ({ name := "Denied" }, none, SessionTypes.LocalTypeR.LocalTypeR.end)]
+  { program := {
+      code := #[.choose 0 [("Ready", 1), ("Denied", 1)], .halt,
+        .invoke (.declaration readinessDeclaration), .invoke (.operation (.begin jointStageDeclaration)),
+        .invoke (.command jointStageCall), .offer 0 "Ready", .invoke (.operation (.await "Save")),
+        .invoke (.operation (.resolve "Save" (.success none))), .halt,
+        .offer 0 "Denied", .invoke (.operation (.await "Save")),
+        .invoke (.operation (.resolve "Save" (.failure none))), .halt],
+      entryPoints := [("B", 0), ("A", 2)],
+      localTypes := [("B", .branch "A" [("Ready", .end_), ("Denied", .end_)]),
+        ("A", .select "B" [("Ready", .end_), ("Denied", .end_)])],
+      localTypesR := [("B", .recv "A" branches), ("A", .send "B" branches)],
+      handlerTypes := [], metadata := ProgramMeta.empty }, globalType := global }
+
+def jointStageCoroutine (role : String) (id pc : Nat) : CoroutineState UnitGuard TestEffect :=
+  let endpoint : Endpoint := { sid := 0, role }
+  { id, programId := 0, role, pc,
+    regs := (Array.replicate Runtime.Tests.NominalCommandExecution.config.numRegisters .unit).set! 0 (.chan endpoint),
+    status := .ready, effectCtx := default, ownedEndpoints := [endpoint],
+    progressTokens := [], knowledgeSet := [], costBudget := 100, specState := none }
+
+def jointStageSession : SessionState UnitVerify :=
+  let edge : Edge := { sid := 0, sender := "A", receiver := "B" }
+  { scope := { id := 0 }, sid := 0, roles := ["B", "A"],
+    endpoints := [{ sid := 0, role := "B" }, { sid := 0, role := "A" }],
+    localTypes := jointStageImage.program.localTypes.map
+      (fun entry => ({ sid := 0, role := entry.1 }, entry.2)),
+    traces := initDEnv 0 ["B", "A"], buffers := [(edge, [])],
+    handlers := [(edge, 0)], epoch := 0, phase := .active }
+
+def jointStageInstalled : State :=
+  let edge : Edge := { sid := 0, sender := "A", receiver := "B" }
+  { Runtime.Tests.NominalCommandExecution.empty with
+    programs := #[jointStageImage.program],
+    coroutines := #[jointStageCoroutine "B" 0 0, jointStageCoroutine "A" 1 2],
+    buffers := [(edge, [])], sessions := [(0, jointStageSession)],
+    sched := { Runtime.Tests.NominalCommandExecution.empty.sched with readyQueue := [0, 1] },
+    obsTrace := [{ tick := 0, event := .opened 0 ["B", "A"] }],
+    nextCoroId := 2, nextSessionId := 1 }
+
+def jointStageOwner : SessionTypes.ModelOwner := ⟨0, "original-owner", 0, .session⟩
+def jointStageOwned : State :=
+  { jointStageInstalled with
+    sessions := [(0, { jointStageSession with ownership := { current := some jointStageOwner } })],
+    coroutines := #[{ jointStageCoroutine "B" 0 0 with issuedModelOwner := some jointStageOwner },
+      { jointStageCoroutine "A" 1 2 with issuedModelOwner := some jointStageOwner }] }
+
+theorem joint_stage_image_eq :
+    jointRoleImage.toCodeImage ["B", "A"] = .ok jointStageImage := by
+  simp +decide only [jointRoleImage, jointStageImage, jointStageCall, jointStageDeclaration,
+    parentDeclaration, readinessCall, readinessDeclaration, roleImage, declaration, call, global,
+    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    RoleCodeImage.toCodeImage, mapExecutableTargets?, OperationAction.mapTargets?,
+    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
+    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand,
+    Std.HashMap.size_insert, Std.HashMap.size_empty, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil, List.mapM, List.mapM.loop,
+    Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
+    Array.isEmpty, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
+    List.length_cons, List.length_nil, List.reverse_cons, List.reverse_nil,
+    List.map_cons, List.map_nil, decide_true, decide_false,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, ↓reduceIte, ↓reduceDIte]
+
+theorem joint_stage_load_eq :
+    loadChoreographyResult Runtime.Tests.NominalCommandExecution.empty jointStageImage =
+      .ok jointStageInstalled 0 := by
+  simp +decide only [loadChoreographyResult, validateImage_eq,
+    jointStageImage, jointStageCall, jointStageDeclaration, parentDeclaration,
+    readinessCall, readinessDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    declaration, call, global, Runtime.Tests.NominalCommandExecution.empty,
+    Runtime.Tests.NominalCommandExecution.config,
+    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
+    Choreography.Projection.Trans.trans, Choreography.Projection.Trans.transBranches,
+    Choreography.Projection.Projectb.projectb, Choreography.Projection.Projectb.projectbBranches,
+    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
+    List.find?_cons, List.find?_nil, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption, Option.map, Option.bind,
+    decide_true, decide_false, nextFreshSessionId, sessionIdAvailable, existingSessionIds,
+    ↓reduceIte, ↓reduceDIte]
+  all_goals
+    apply congrArg (fun state : State => ChoreographyLoadResult.ok state 0)
+    rfl
+
+theorem joint_stage_admission_eq :
+    admitLoadedSessionOwner jointStageInstalled 0 "original-owner" =
+      .ok (jointStageOwned, jointStageOwner) := by
+  simp only [admitLoadedSessionOwner, jointStageInstalled, jointStageSession,
+    jointStageCoroutine, jointStageOwned, jointStageOwner, List.lookup, List.filter,
+    List.any, List.isEmpty, List.map_cons, List.map_nil, Array.toList,
+    List.map_toArray, beq_self_eq_true, SessionTypes.ModelOwnershipState.claim,
+    Bind.bind, Pure.pure, Except.bind, Except.pure,
+    Bool.false_or, Bool.or_false, Bool.false_eq_true, ↓reduceIte, ↓reduceDIte]
+  all_goals rfl
+
+theorem joint_stage_coro_eq :
+    jointStageInstalled.coroutines[1]? = some (jointStageCoroutine "A" 1 2) := rfl
+
+theorem joint_stage_endpoint_eq :
+    (jointStageCoroutine "A" 1 2).ownedEndpoints.head? = some ({ sid := 0, role := "A" } : Endpoint) := rfl
+
+theorem joint_blocked_eq : jointBlocked = (do
+    let declared ← invokeInstalled jointStageOwned 1
+    let begun ← invokeInstalled declared 1
+    invokeInstalled begun 1) := by
+  simp only [jointBlocked, joint_stage_image_eq, joint_stage_load_eq,
+    joint_stage_coro_eq, joint_stage_endpoint_eq, joint_stage_admission_eq,
+    Bind.bind, Pure.pure, Except.toOption, Option.bind]
+
 theorem original_parent_owns_exact_blocked_readiness_child :
     (jointBlocked.map fun st =>
       st.coroutines[1]?.any (fun coro =>
@@ -74,46 +192,26 @@ theorem original_parent_owns_exact_blocked_readiness_child :
       st.outstandingEffects.any (fun effect => effect.status == .blocked &&
         effect.orderingKey == 0 && effect.completedAtTick.isNone) &&
       st.operationInstances.length == 2).getD false = true := by
-  simp +decide only [
-    image, roleImage, Runtime.Tests.NominalCommandExecution.empty, ordinaryLoaded, loaded, invokeInstalled, blocked,
-    RoleCodeImage.toCodeImage, mapExecutableTargets?, OperationAction.mapTargets?,
-    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
-    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand, Std.HashMap.size_insert,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty, Std.HashMap.size_empty,
-    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
-    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
-    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
-    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
-    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
-    parentDeclaration, jointRoleImage, jointBlocked, List.mapM, Except.bind, Option.bind,
-    Array.size, Nat.reduceAdd, List.nil_append, List.cons_append, List.length_cons,
-    List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure, ↓reduceIte,
-    Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
-    List.reverse_cons, List.reverse_nil]
+  simp only [jointSettled, jointResumed, joint_blocked_eq, Bind.bind, Pure.pure, Except.toOption, Option.bind,
+    Bool.not_false, Bool.not_true, ↓reduceIte]
   all_goals
-    simp +decide only [
-      loadChoreographyResult, validateImage_eq, Runtime.Tests.NominalCommandExecution.config,
-      nextFreshSessionId, sessionIdAvailable, existingSessionIds,
-      Choreography.Projection.Project.projectR?,
-      Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-      Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-      Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-      localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-      Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-      List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-      List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  -- Normalize the actual owning admission and its mapped coroutines only after
-  -- the actual assembled-image validation and loader equations are exposed.
-  all_goals
-    simp +decide only [
-      admitLoadedSessionOwner, SessionTypes.ModelOwnershipState.claim,
-      List.lookup, List.filter, List.any, List.isEmpty, Array.toList,
-      Array.map_eq_foldl, List.map_cons, List.map_nil, List.find?_cons, List.find?_nil,
-      Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
-      Option.bind, Option.map, Option.getD, Option.any, beq_self_eq_true,
-      Bool.false_or, Bool.or_false, Bool.false_eq_true, decide_true, decide_false,
-      ↓reduceIte, ↓reduceDIte]
+    simp only [Runtime.Tests.OperationLifecycleExecution.sourceStageOwned,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageInstalled,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageSession,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageCoroutine,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageImage,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageOwner,
+      Runtime.Tests.OperationReadinessExecution.jointStageOwned,
+      Runtime.Tests.OperationReadinessExecution.jointStageInstalled,
+      Runtime.Tests.OperationReadinessExecution.jointStageSession,
+      Runtime.Tests.OperationReadinessExecution.jointStageCoroutine,
+      Runtime.Tests.OperationReadinessExecution.jointStageImage,
+      Runtime.Tests.OperationReadinessExecution.jointStageCall,
+      Runtime.Tests.OperationReadinessExecution.jointStageDeclaration,
+      Runtime.Tests.OperationReadinessExecution.jointStageOwner,
+      invokeInstalled, offerInstalled,
+      Bind.bind, Pure.pure, Except.toOption, Option.bind, Option.map, Option.getD, Option.any,
+      List.map_cons, List.map_nil, Array.map_eq_foldl, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 theorem original_parent_resolves_after_actual_readiness_consumption :
@@ -125,45 +223,26 @@ theorem original_parent_resolves_after_actual_readiness_consumption :
         effect.orderingKey == 0 && effect.completedAtTick == some 1) &&
       st.sessions.any (fun entry => entry.2.ownership.consumedWitnesses == [1]) &&
       st.operationInstances.all (fun operation => operation.phase == .succeeded)).getD false = true := by
-  simp +decide only [
-    image, roleImage, Runtime.Tests.NominalCommandExecution.empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?, OperationAction.mapTargets?,
-    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
-    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
-    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
-    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
-    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
-    parentDeclaration, jointRoleImage, jointBlocked, jointResumed, offerInstalled, jointSettled,
-    List.mapM, Except.bind, Option.bind, Array.size, Nat.reduceAdd, List.nil_append,
-    List.cons_append, List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure,
-    Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons,
-    List.map_nil, List.reverse_cons, List.reverse_nil]
+  simp only [jointSettled, jointResumed, joint_blocked_eq, Bind.bind, Pure.pure, Except.toOption, Option.bind,
+    Bool.not_false, Bool.not_true, ↓reduceIte]
   all_goals
-    simp +decide only [
-      loadChoreographyResult, validateImage_eq, Runtime.Tests.NominalCommandExecution.config,
-      nextFreshSessionId, sessionIdAvailable, existingSessionIds,
-      Choreography.Projection.Project.projectR?,
-      Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-      Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-      Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-      localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-      Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-      List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-      List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  -- Normalize the actual owning admission and its mapped coroutines only after
-  -- the actual assembled-image validation and loader equations are exposed.
-  all_goals
-    simp +decide only [
-      admitLoadedSessionOwner, SessionTypes.ModelOwnershipState.claim,
-      List.lookup, List.filter, List.any, List.isEmpty, Array.toList,
-      Array.map_eq_foldl, List.map_cons, List.map_nil, List.find?_cons, List.find?_nil,
-      Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
-      Option.bind, Option.map, Option.getD, Option.any, beq_self_eq_true,
-      Bool.false_or, Bool.or_false, Bool.false_eq_true, decide_true, decide_false,
-      ↓reduceIte, ↓reduceDIte]
+    simp only [Runtime.Tests.OperationLifecycleExecution.sourceStageOwned,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageInstalled,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageSession,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageCoroutine,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageImage,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageOwner,
+      Runtime.Tests.OperationReadinessExecution.jointStageOwned,
+      Runtime.Tests.OperationReadinessExecution.jointStageInstalled,
+      Runtime.Tests.OperationReadinessExecution.jointStageSession,
+      Runtime.Tests.OperationReadinessExecution.jointStageCoroutine,
+      Runtime.Tests.OperationReadinessExecution.jointStageImage,
+      Runtime.Tests.OperationReadinessExecution.jointStageCall,
+      Runtime.Tests.OperationReadinessExecution.jointStageDeclaration,
+      Runtime.Tests.OperationReadinessExecution.jointStageOwner,
+      invokeInstalled, offerInstalled,
+      Bind.bind, Pure.pure, Except.toOption, Option.bind, Option.map, Option.getD, Option.any,
+      List.map_cons, List.map_nil, Array.map_eq_foldl, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
@@ -174,45 +253,26 @@ theorem output_refusal_cannot_spend_witness_or_resolve_original_parent :
         (match coro.status with | .faulted _ => true | _ => false)) &&
       st.sessions.all (fun entry => entry.2.ownership.consumedWitnesses.isEmpty) &&
       !st.operationInstances.any (fun operation => operation.phase == .succeeded)).getD false = true := by
-  simp +decide only [
-    image, roleImage, Runtime.Tests.NominalCommandExecution.empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?, OperationAction.mapTargets?,
-    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
-    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand,
-    Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
-    Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
-    List.foldlM_nil, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
-    Runtime.Tests.OperationLifecycleExecution.sourceRoleImage,
-    Runtime.Tests.OperationLifecycleExecution.sourceLoaded,
-    Runtime.Tests.OperationLifecycleExecution.sourceBegun,
-    Runtime.Tests.OperationLifecycleExecution.sourceResolved, readinessDeclaration, readinessCall,
-    parentDeclaration, jointRoleImage, jointBlocked, jointResumed, List.mapM, Except.bind,
-    Option.bind, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append, List.length_cons,
-    List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure, ↓reduceIte,
-    Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
-    List.reverse_cons, List.reverse_nil]
+  simp only [jointSettled, jointResumed, joint_blocked_eq, Bind.bind, Pure.pure, Except.toOption, Option.bind,
+    Bool.not_false, Bool.not_true, ↓reduceIte]
   all_goals
-    simp +decide only [
-      loadChoreographyResult, validateImage_eq, Runtime.Tests.NominalCommandExecution.config,
-      nextFreshSessionId, sessionIdAvailable, existingSessionIds,
-      Choreography.Projection.Project.projectR?,
-      Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-      Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-      Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-      localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-      Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-      List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-      List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
-  -- Normalize the actual owning admission and its mapped coroutines only after
-  -- the actual assembled-image validation and loader equations are exposed.
-  all_goals
-    simp +decide only [
-      admitLoadedSessionOwner, SessionTypes.ModelOwnershipState.claim,
-      List.lookup, List.filter, List.any, List.isEmpty, Array.toList,
-      Array.map_eq_foldl, List.map_cons, List.map_nil, List.find?_cons, List.find?_nil,
-      Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
-      Option.bind, Option.map, Option.getD, Option.any, beq_self_eq_true,
-      Bool.false_or, Bool.or_false, Bool.false_eq_true, decide_true, decide_false,
-      ↓reduceIte, ↓reduceDIte]
+    simp only [Runtime.Tests.OperationLifecycleExecution.sourceStageOwned,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageInstalled,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageSession,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageCoroutine,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageImage,
+      Runtime.Tests.OperationLifecycleExecution.sourceStageOwner,
+      Runtime.Tests.OperationReadinessExecution.jointStageOwned,
+      Runtime.Tests.OperationReadinessExecution.jointStageInstalled,
+      Runtime.Tests.OperationReadinessExecution.jointStageSession,
+      Runtime.Tests.OperationReadinessExecution.jointStageCoroutine,
+      Runtime.Tests.OperationReadinessExecution.jointStageImage,
+      Runtime.Tests.OperationReadinessExecution.jointStageCall,
+      Runtime.Tests.OperationReadinessExecution.jointStageDeclaration,
+      Runtime.Tests.OperationReadinessExecution.jointStageOwner,
+      invokeInstalled, offerInstalled,
+      Bind.bind, Pure.pure, Except.toOption, Option.bind, Option.map, Option.getD, Option.any,
+      List.map_cons, List.map_nil, Array.map_eq_foldl, ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 end Runtime.Tests.OperationReadinessExecution
