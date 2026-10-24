@@ -10,7 +10,7 @@ open Runtime.Tests.NominalCommandExecution
 open Runtime.Tests.OperationReadinessExecution
 
 private def outputFaultRetained (st : State) : Bool :=
-  st.coroutines[1]?.any (fun coro =>
+  st.coroutines[1]?.any (fun (coro : CoroutineState UnitGuard TestEffect) =>
     match coro.status, coro.operationFailure with
     | .faulted (.outputCondition current), some (.outputCondition original) => current == original
     | _, _ => false)
@@ -24,9 +24,9 @@ def originalOutputRefusal : Bool := (do
   let current ← after.coroutines[1]?
   let original ← previous.operationContinuation
   let revoked ← current.operationContinuation
-  let parent ← after.operationInstances.find? (fun row => row.operationId == original.operationId)
-  let progress ← after.progressContracts.find? (fun row => row.operationId == original.operationId)
-  let child ← after.outstandingEffects.find? (fun row => original.children.contains row.effectId)
+  let parent ← after.operationInstances.find? (fun (row : OperationInstance) => row.operationId == original.operationId)
+  let progress ← after.progressContracts.find? (fun (row : ProgressContract) => row.operationId == original.operationId)
+  let child ← after.outstandingEffects.find? (fun (row : OutstandingEffect) => original.children.contains row.effectId)
   let reobserved := (execAtPC after current.id current).1
   return outputFaultRetained after && outputFaultRetained reobserved &&
     revoked.invalidated && !revoked.resolved && revoked.outcome.isNone &&
@@ -39,13 +39,13 @@ def originalOutputRefusal : Bool := (do
     progress.lastOrderingKey == some original.issuedAt &&
     progress.budgetTicks == some original.declaration.budgetTicks &&
     child.status == .invalidated && child.completedAtTick == some 1 &&
-    current.nominalContinuation.any (fun nominal => nominal.returned.isSome) &&
-    after.sessions.all (fun entry => entry.2.ownership.consumedWitnesses.isEmpty)
+    current.nominalContinuation.any (fun (nominal : NominalCommandContinuation) => nominal.returned.isSome) &&
+    after.sessions.all (fun (entry : SessionId × SessionState UnitVerify) => entry.2.ownership.consumedWitnesses.isEmpty)
   ).getD false
 
 theorem output_refusal_retains_original_fault_and_revokes_only_original_semantic_work :
     originalOutputRefusal = true := by
-  simp only [originalOutputRefusal, originalExpiryRefusal, originalHaltRefusal,
+  simp only [originalOutputRefusal,
     Runtime.Tests.OperationLifecycleExecution.sourceBegun, Runtime.Tests.OperationLifecycleExecution.sourceResolved, Runtime.Tests.OperationLifecycleExecution.source_loaded_eq,
     jointSettled, jointResumed, Runtime.Tests.OperationReadinessExecution.joint_blocked_eq,
     Runtime.Tests.OperationLifecycleExecution.source_halt_image_eq, Runtime.Tests.OperationLifecycleExecution.source_stage_load_eq,
@@ -81,7 +81,7 @@ def originalExpiryRefusal : Bool := (do
   let after ← invokeInstalled { before with clock := 6 } 1
   let current ← after.coroutines[1]?
   let revoked ← current.operationContinuation
-  let parent ← after.operationInstances.find? (fun row => row.operationId == original.operationId)
+  let parent ← after.operationInstances.find? (fun (row : OperationInstance) => row.operationId == original.operationId)
   return revoked.invalidated && !revoked.resolved &&
     revoked.issuedAt == original.issuedAt && decide (revoked.owner = original.owner) &&
     revoked.declaration.budgetTicks == original.declaration.budgetTicks &&
@@ -94,7 +94,7 @@ def originalExpiryRefusal : Bool := (do
 
 theorem expired_original_await_retains_first_fault_without_renewal_or_cleanup_ack :
     originalExpiryRefusal = true := by
-  simp only [originalOutputRefusal, originalExpiryRefusal, originalHaltRefusal,
+  simp only [originalExpiryRefusal,
     Runtime.Tests.OperationLifecycleExecution.sourceBegun, Runtime.Tests.OperationLifecycleExecution.sourceResolved, Runtime.Tests.OperationLifecycleExecution.source_loaded_eq,
     jointSettled, jointResumed, Runtime.Tests.OperationReadinessExecution.joint_blocked_eq,
     Runtime.Tests.OperationLifecycleExecution.source_halt_image_eq, Runtime.Tests.OperationLifecycleExecution.source_stage_load_eq,
@@ -127,9 +127,8 @@ def originalHaltRefusal : Bool := (do
   let declaration := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration
   let roles := Runtime.Tests.OperationLifecycleExecution.sourceRoleImage
   let roles := { roles with
-    programs := roles.programs.insert "A"
-    #[.invoke (.operation (.begin declaration)), .jump 3,
-      .invoke (.operation (.resolve "Save" (.success none))), .halt] }
+    programs := (roles.programs.insert "A" #[.invoke (.operation (.begin declaration)),
+      .jump 3, .invoke (.operation (.resolve "Save" (.success none))), .halt]) }
   let image ← (roles.toCodeImage ["B", "A"]).toOption
   let loaded ← match loadChoreographyResult empty image with
     | .ok st _ => some st | _ => none
@@ -144,7 +143,7 @@ def originalHaltRefusal : Bool := (do
   let current ← refused.coroutines[1]?
   let original ← current.operationContinuation
   return original.invalidated && !original.resolved && original.children.isEmpty &&
-    refused.operationInstances.any (fun parent => parent.operationId == original.operationId && parent.phase == .failed) &&
+    refused.operationInstances.any (fun (parent : OperationInstance) => parent.operationId == original.operationId && parent.phase == .failed) &&
     (match current.status, current.operationFailure with
       | .faulted (.effectFault kind message), some (.effectFault originalKind originalMessage) =>
           kind == originalKind && message == originalMessage
@@ -153,7 +152,7 @@ def originalHaltRefusal : Bool := (do
 
 theorem actual_jump_cannot_halt_without_original_terminal_resolution :
     originalHaltRefusal = true := by
-  simp only [originalOutputRefusal, originalExpiryRefusal, originalHaltRefusal,
+  simp only [originalHaltRefusal,
     Runtime.Tests.OperationLifecycleExecution.sourceBegun, Runtime.Tests.OperationLifecycleExecution.sourceResolved, Runtime.Tests.OperationLifecycleExecution.source_loaded_eq,
     jointSettled, jointResumed, Runtime.Tests.OperationReadinessExecution.joint_blocked_eq,
     Runtime.Tests.OperationLifecycleExecution.source_halt_image_eq, Runtime.Tests.OperationLifecycleExecution.source_stage_load_eq,
