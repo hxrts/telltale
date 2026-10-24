@@ -268,8 +268,9 @@ theorem ordinary_nominal_loader_cannot_reconstruct_original_owner :
         st.outstandingEffects.isEmpty && st.operationInstances.isEmpty && st.nextEffectId == 0 &&
         st.coroutines[1]?.any (fun coro => coro.effectCtx.calls == 0 &&
           match coro.status with | .faulted _ => true | _ => false)).getD false = true := by
-  simp only [stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 def blocked : Option State := do
   let st ← loaded
@@ -322,8 +323,9 @@ example : (match blocked with
         decide (effect.status = .blocked) && effect.orderingKey == 0
     | _ => false
   | _ => false) = true := by
-  simp only [blocked, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [blocked, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 example : (match resumed with
   | some st => match view st with
     | some (coro, effect, operation) => st.nextEffectId == 1 && coro.effectCtx.calls == 2 &&
@@ -332,8 +334,9 @@ example : (match resumed with
         st.effectExchanges.length == 2
     | _ => false
   | _ => false) = true := by
-  simp only [blocked, resumed, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [blocked, resumed, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- Still-Blocked expiry refuses before another callback, without resetting the
 original occurrence or replacing its original progress/window. -/
@@ -344,8 +347,9 @@ example : (match blocked.bind (fun st => invokeInstalled { st with clock := 3 } 
         coro.nominalContinuation.isSome
     | _ => false
   | _ => false) = true := by
-  simp only [blocked, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [blocked, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- A static declaration cannot be borrowed from another role's prefix. -/
 example : (match image with
@@ -372,8 +376,9 @@ example : (match blocked.bind (fun st => do
         coro.nominalContinuation.isSome
     | _ => false
   | _ => false) = true := by
-  simp only [blocked, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [blocked, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- Set only the actual installed coroutine's selected test provider context. -/
 def prepared (context : Context) : Option State := do
@@ -391,8 +396,9 @@ example : (match (prepared { blockFirst := false, applicationError := true }).bi
         decide (operation.agreementProfile = some call.agreementProfile)
     | _ => false
   | _ => false) = true := by
-  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- Host semantic Failure is distinct from a typed application Err branch and
 from an independent post-callback identity refusal. The raw original outcome
@@ -407,8 +413,9 @@ example : (match (prepared { blockFirst := false, fail := true, changeIdentity :
         decide (coro.regs[1]? = some .unit)
     | _, _ => false
   | _ => false) = true := by
-  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 example : (match (prepared { blockFirst := false, wrongReply := true }).bind
     (fun st => invokeInstalled st 1) with
@@ -420,8 +427,9 @@ example : (match (prepared { blockFirst := false, wrongReply := true }).bind
         decide (coro.regs[1]? = some .unit)
     | _, _ => false
   | _ => false) = true := by
-  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- Actual output-gate refusal retains the issued occurrence and its genuine
 returned value without changing the result register or publishing success. -/
@@ -436,8 +444,9 @@ example : (match (prepared { blockFirst := false }).bind (fun st =>
         decide (coro.regs[1]? = some .unit) && st.effectExchanges.length == 1
     | _ => false
   | _ => false) = true := by
-  simp only [prepared, stage_loaded_eq, stage_ordinary_eq, Option.bind]
-  decide
+  simp only [prepared, stage_loaded_eq, stage_ordinary_eq,
+    stageOwned, stageInstalled, List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-! A typed action adapter is required to preserve executable continuations;
 parser/classifier support alone cannot authorize a relocation. -/
@@ -572,7 +581,8 @@ private theorem stage_readiness_eq (mutation : Nat) :
       | _ => original
     let ownership ← if mutation == 3 then (issued.consumeReadiness owner original).toOption else some issued
     invokeInstalled ({ st with
-      sessions := st.sessions.map (fun (sid, current) =>
+      sessions := st.sessions.map (fun (entry : SessionId × SessionState UnitVerify) =>
+        let (sid, current) := entry
         if sid == 0 then (sid, { current with ownership }) else (sid, current)),
       coroutines := st.coroutines.set! 1 { coro with effectCtx :=
         { blockFirst := false, readiness := some witness } } } : State) 1) = _
@@ -591,8 +601,9 @@ theorem readiness_actual_commit_single_use :
         | _, _ => false
       | _ => false
     | none => false) = true := by
-  simp only [stage_readiness_eq]
-  decide
+  simp only [stage_readiness_eq, stageReadinessPrepared, stageOwned, stageInstalled,
+    List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- Forged payload, wrong predicate and replayed consumed evidence never branch. -/
 theorem readiness_actual_forgery_predicate_and_reuse_refused :
@@ -603,8 +614,9 @@ theorem readiness_actual_forgery_predicate_and_reuse_refused :
             (match coro.status with | .faulted _ => true | _ => false)
         | none => false
       | none => false)) = true := by
-  simp only [stage_readiness_eq]
-  decide
+  simp only [stage_readiness_eq, stageReadinessPrepared, stageOwned, stageInstalled,
+    List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 /-- Existing output refusal leaves actual returned witness and registry live. -/
 theorem readiness_actual_output_refusal_retains_original :
@@ -621,8 +633,9 @@ theorem readiness_actual_output_refusal_retains_original :
         | none => false
       | none => false
     | none => false) = true := by
-  simp only [stage_readiness_eq]
-  decide
+  simp only [stage_readiness_eq, stageReadinessPrepared, stageOwned, stageInstalled,
+    List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 def registeredReadiness : Option (SessionTypes.ModelOwnershipState × SessionTypes.ModelOwner × SessionTypes.ReadinessWitness) := do
   let (claimed, owner) ← (({} : SessionTypes.ModelOwnershipState).claim 7 "original").toOption
@@ -658,8 +671,9 @@ theorem readiness_actual_boolean_cannot_authorize :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp only [stage_readiness_eq]
-  decide
+  simp only [stage_readiness_eq, stageReadinessPrepared, stageOwned, stageInstalled,
+    List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
     (match (readinessPrepared 0).bind (fun st => invokeInstalled
@@ -678,8 +692,9 @@ theorem readiness_retained_result_rechecks_changed_generation_before_reuse :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp only [stage_readiness_eq]
-  decide
+  simp only [stage_readiness_eq, stageReadinessPrepared, stageOwned, stageInstalled,
+    List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 
 /-- A new registry generation cannot refresh a stale installed coroutine owner. -/
@@ -698,7 +713,8 @@ theorem readiness_before_issuance_never_reconstructs_current_owner :
           (match coro.status with | .faulted _ => true | _ => false)
       | none => false
     | none => false) = true := by
-  simp only [stage_readiness_eq]
-  decide
+  simp only [stage_readiness_eq, stageReadinessPrepared, stageOwned, stageInstalled,
+    List.map_toArray, List.map_cons, List.map_nil,
+    Bind.bind, Pure.pure, Option.bind, Option.map, Option.getD] <;> decide
 
 end Runtime.Tests.NominalCommandExecution
