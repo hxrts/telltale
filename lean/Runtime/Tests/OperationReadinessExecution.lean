@@ -12,7 +12,13 @@ def readinessDeclaration : NominalCommandDeclaration :=
   { declaration with readinessPredicate := some "Store.save" }
 def readinessCall : NominalCommandCall :=
   { call with
-    declaration := readinessDeclaration, enclosingOperation := "Save",
+    declaration := readinessDeclaration,
+    enclosingOperation := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration.name,
+    role := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration.role,
+    agreementProfile := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration.agreementProfile,
+    progressContract := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration.progressContract,
+    progressWindow := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration.progressWindow,
+    budgetTicks := Runtime.Tests.OperationLifecycleExecution.sourceDeclaration.budgetTicks,
     onOk := 3, onErr := 7 }
 def parentDeclaration : SourceOperationDeclaration :=
   { Runtime.Tests.OperationLifecycleExecution.sourceDeclaration with
@@ -27,6 +33,21 @@ def jointRoleImage : RoleCodeImage UnitGuard TestEffect :=
         .offer 0 "Denied", .invoke (.operation (.await "Save")),
         .invoke (.operation (.resolve "Save" (.failure none))), .halt]
       |>.insert "B" #[.choose 0 [("Ready", 1), ("Denied", 1)], .halt] }
+
+/-- The old never-admitted parent5/child2 fixture, retained as a rejection control.
+Both the required manifest and installed child carry that SAME malformed call. -/
+def malformedJointCall : NominalCommandCall :=
+  { readinessCall with budgetTicks := call.budgetTicks }
+def malformedJointParent : SourceOperationDeclaration :=
+  { parentDeclaration with requiredChildren := [{ pc := 2, call := malformedJointCall }] }
+def malformedJointRoleImage : RoleCodeImage UnitGuard TestEffect :=
+  { jointRoleImage with
+    programs := (jointRoleImage.programs.insert "A" #[.invoke (.declaration readinessDeclaration),
+      .invoke (.operation (.begin malformedJointParent)), .invoke (.command malformedJointCall),
+      .offer 0 "Ready", .invoke (.operation (.await "Save")),
+      .invoke (.operation (.resolve "Save" (.success none))), .halt,
+      .offer 0 "Denied", .invoke (.operation (.await "Save")),
+      .invoke (.operation (.resolve "Save" (.failure none))), .halt]) }
 
 def jointBlocked : Option State := do
   let image ← (jointRoleImage.toCodeImage ["B", "A"]).toOption
@@ -87,6 +108,20 @@ def jointStageImage : CodeImage UnitGuard TestEffect :=
       localTypesR := [("B", .recv "A" branches), ("A", .send "B" branches)],
       handlerTypes := [], metadata := ProgramMeta.empty }, globalType := global }
 
+def malformedJointStageCall : NominalCommandCall :=
+  { jointStageCall with budgetTicks := call.budgetTicks }
+def malformedJointStageDeclaration : SourceOperationDeclaration :=
+  { jointStageDeclaration with requiredChildren := [{ pc := 4, call := malformedJointStageCall }] }
+def malformedJointStageImage : CodeImage UnitGuard TestEffect :=
+  { jointStageImage with
+    program := { jointStageImage.program with
+      code := #[.choose 0 [("Ready", 1), ("Denied", 1)], .halt,
+        .invoke (.declaration readinessDeclaration), .invoke (.operation (.begin malformedJointStageDeclaration)),
+        .invoke (.command malformedJointStageCall), .offer 0 "Ready", .invoke (.operation (.await "Save")),
+        .invoke (.operation (.resolve "Save" (.success none))), .halt,
+        .offer 0 "Denied", .invoke (.operation (.await "Save")),
+        .invoke (.operation (.resolve "Save" (.failure none))), .halt] } }
+
 def jointStageCoroutine (role : String) (id pc : Nat) : CoroutineState UnitGuard TestEffect :=
   let endpoint : Endpoint := { sid := 0, role }
   { id, programId := 0, role, pc,
@@ -139,6 +174,27 @@ theorem joint_stage_image_eq :
     Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
     localTypeRToLocalTypeAux, localTypeRBranchesToChoices, ↓reduceIte, ↓reduceDIte]
 
+theorem malformed_joint_stage_image_eq :
+    malformedJointRoleImage.toCodeImage ["B", "A"] = .ok malformedJointStageImage := by
+  simp +decide only [malformedJointRoleImage, malformedJointCall, malformedJointParent,
+    malformedJointStageImage, malformedJointStageCall, malformedJointStageDeclaration,
+    jointRoleImage, jointStageImage, jointStageCall, jointStageDeclaration,
+    parentDeclaration, readinessCall, readinessDeclaration, roleImage, declaration, call, global,
+    Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    RoleCodeImage.toCodeImage, mapExecutableTargets?, OperationAction.mapTargets?,
+    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
+    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand,
+    Std.HashMap.size_insert, Std.HashMap.size_empty, Std.HashMap.getElem?_insert,
+    Std.HashMap.getElem?_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil, List.mapM, List.mapM.loop,
+    Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
+    Array.isEmpty, Array.size, Nat.reduceAdd, List.nil_append, List.cons_append,
+    List.length_cons, List.length_nil, List.reverse_cons, List.reverse_nil,
+    List.map_cons, List.map_nil, decide_true, decide_false,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
+    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, ↓reduceIte, ↓reduceDIte]
+
 theorem joint_stage_load_eq :
     loadChoreographyResult Runtime.Tests.NominalCommandExecution.empty jointStageImage =
       .ok jointStageInstalled 0 := by
@@ -158,6 +214,30 @@ theorem joint_stage_load_eq :
   all_goals
     apply congrArg (fun state : State => ChoreographyLoadResult.ok state 0)
     rfl
+
+/-- The valid same-fixture load equation above is the positive control. Only the
+joint child's selected budget is changed back to the old standalone2; the actual
+assembler still succeeds and the public checked loader refuses BEFORE admission. -/
+theorem malformed_joint_budget_is_refused_before_owner_admission :
+    ((malformedJointRoleImage.toCodeImage ["B", "A"]).toOption.map
+      (loadChoreographyResult Runtime.Tests.NominalCommandExecution.empty)) =
+      some (.validationFailed "invalid nominal declarations or result continuations") := by
+  simp only [malformed_joint_stage_image_eq, Except.toOption, Option.map]
+  simp +decide only [loadChoreographyResult, validateImage_eq,
+    malformedJointStageImage, malformedJointStageCall, malformedJointStageDeclaration,
+    jointStageImage, jointStageCall, jointStageDeclaration, parentDeclaration,
+    readinessCall, readinessDeclaration, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
+    declaration, call, global, Bind.bind, Pure.pure, Except.bind, Except.pure,
+    decide_true, decide_false, ↓reduceIte, ↓reduceDIte]
+
+theorem malformed_joint_retains_exact_other_policy_fields :
+    malformedJointCall = { readinessCall with budgetTicks := call.budgetTicks } ∧
+      malformedJointCall = { call with
+        declaration := readinessDeclaration,
+        enclosingOperation := "Save", onOk := 3, onErr := 7 } ∧
+      parentDeclaration.budgetTicks = 5 ∧ readinessCall.budgetTicks = 5 ∧
+      malformedJointCall.budgetTicks = 2 := by
+  decide
 
 theorem joint_stage_admission_eq :
     admitLoadedSessionOwner jointStageInstalled 0 "original-owner" =
