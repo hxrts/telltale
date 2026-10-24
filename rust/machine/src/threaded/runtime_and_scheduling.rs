@@ -260,6 +260,10 @@ impl ThreadedProtocolMachine {
     /// # Errors
     ///
     /// Returns a `ProtocolMachineError` if the choreography cannot be loaded or claimed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a loaded coroutine mutex is poisoned while attaching the issued owner.
     pub fn load_choreography_owned(
         &mut self,
         image: &CodeImage,
@@ -569,31 +573,7 @@ impl ThreadedProtocolMachine {
                         }
                     },
                     Err(fault) => {
-                        self.trace.push(ObsEvent::Faulted {
-                            tick,
-                            coro_id: pick.coro_id,
-                            fault: fault.clone(),
-                        });
-                        let mut coro = pick
-                            .coro
-                            .lock()
-                            .expect("threaded ProtocolMachine lock poisoned");
-                        let was_terminal = coro.is_terminal();
-                        crate::operation_lifecycle::fail_active_operation(
-                            &mut coro,
-                            &mut self.operation_instances,
-                            &mut self.progress_contracts,
-                            &mut self.outstanding_effects,
-                            &fault,
-                            tick,
-                        );
-                        coro.status = CoroStatus::Faulted(fault.clone());
-                        self.note_status_transition(was_terminal, coro.is_terminal());
-                        self.scheduler.mark_done(pick.coro_id);
-                        return Err(ProtocolMachineError::Fault {
-                            coro_id: pick.coro_id,
-                            fault,
-                        });
+                        return Err(self.commit_pick_fault(pick, fault, tick));
                     }
                 }
                 Ok(true)
@@ -613,32 +593,41 @@ impl ThreadedProtocolMachine {
                         self.settle_nominal_publication_failure(&pick.coro, failure)?;
                     }
                 }
-                self.trace.push(ObsEvent::Faulted {
-                    tick,
-                    coro_id: pick.coro_id,
-                    fault: fault.clone(),
-                });
-                let mut coro = pick
-                    .coro
-                    .lock()
-                    .expect("threaded ProtocolMachine lock poisoned");
-                let was_terminal = coro.is_terminal();
-                crate::operation_lifecycle::fail_active_operation(
-                    &mut coro,
-                    &mut self.operation_instances,
-                    &mut self.progress_contracts,
-                    &mut self.outstanding_effects,
-                    &fault,
-                    tick,
-                );
-                coro.status = CoroStatus::Faulted(fault.clone());
-                self.note_status_transition(was_terminal, coro.is_terminal());
-                self.scheduler.mark_done(pick.coro_id);
-                Err(ProtocolMachineError::Fault {
-                    coro_id: pick.coro_id,
-                    fault,
-                })
+                Err(self.commit_pick_fault(pick, fault, tick))
             }
+        }
+    }
+
+    fn commit_pick_fault(
+        &mut self,
+        pick: &Picked,
+        fault: Fault,
+        tick: u64,
+    ) -> ProtocolMachineError {
+        self.trace.push(ObsEvent::Faulted {
+            tick,
+            coro_id: pick.coro_id,
+            fault: fault.clone(),
+        });
+        let mut coro = pick
+            .coro
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
+        let was_terminal = coro.is_terminal();
+        crate::operation_lifecycle::fail_active_operation(
+            &mut coro,
+            &mut self.operation_instances,
+            &mut self.progress_contracts,
+            &mut self.outstanding_effects,
+            &fault,
+            tick,
+        );
+        coro.status = CoroStatus::Faulted(fault.clone());
+        self.note_status_transition(was_terminal, coro.is_terminal());
+        self.scheduler.mark_done(pick.coro_id);
+        ProtocolMachineError::Fault {
+            coro_id: pick.coro_id,
+            fault,
         }
     }
 

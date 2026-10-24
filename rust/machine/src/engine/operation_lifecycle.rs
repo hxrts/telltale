@@ -36,7 +36,8 @@ impl ProtocolMachine {
                     CoroStatus::Blocked(BlockReason::OperationAwait { operation_id });
                 false
             }
-            OperationExecution::Begun(record, progress) => {
+            OperationExecution::Begun(begun) => {
+                let (record, progress) = *begun;
                 self.operation_instances
                     .push_canonical(record, &self.config.observability_retention);
                 self.progress_contracts
@@ -64,7 +65,7 @@ impl ProtocolMachine {
                 .coroutines
                 .iter()
                 .find(|coroutine| coroutine.id == id)
-                .is_none_or(|coroutine| {
+                .map_or(true, |coroutine| {
                     crate::operation_lifecycle::await_should_wake(
                         coroutine.operation_continuation.as_ref(),
                         &operation_id,
@@ -92,7 +93,7 @@ impl ProtocolMachine {
             && coroutine
                 .operation_continuation
                 .as_ref()
-                .is_none_or(|original| original.resolved || original.invalidated)
+                .map_or(true, |original| original.resolved || original.invalidated)
         {
             return Err(Fault::Invoke {
                 failure: EffectFailure::contract_violation(

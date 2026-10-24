@@ -141,19 +141,7 @@ fn assert_send_counter_observations(
         EffectOutcome::success(EffectResponse::TopologyEvents { events: vec![] })
     );
     let (request, outcome) = &calls[1];
-    assert_eq!(request.tick, tick);
-    assert_eq!(request.session, Some(sid));
-    assert_eq!(request.effect_id, None);
-    assert!(
-        matches!(&request.body, EffectRequestBody::SendDecision { role, partner, label, payload, .. }
-        if role == "A" && partner == "B" && label == "m" && payload == &Some(Value::Unit))
-    );
-    assert_eq!(
-        outcome,
-        &EffectOutcome::success(EffectResponse::SendDecision {
-            decision: SendDecision::Deliver(Value::Unit)
-        })
-    );
+    assert_send_counter_decision(request, outcome, sid, tick);
     assert_eq!(
         records.len(),
         usize::try_from(send_counter_dispatch_allocations()).unwrap()
@@ -184,4 +172,25 @@ fn assert_send_counter_observations(
             serde_json::json!({"status":"blocked","reason":"buffer would block"})
         );
     }
+}
+
+fn assert_send_counter_decision(
+    request: &EffectRequest,
+    outcome: &EffectOutcome,
+    sid: usize,
+    tick: u64,
+) {
+    assert_eq!(request.tick, tick);
+    assert_eq!(request.session, Some(sid));
+    assert_eq!(request.effect_id, None);
+    assert!(
+        matches!(&request.body, EffectRequestBody::SendDecision { role, partner, label, payload, .. }
+        if role == "A" && partner == "B" && label == "m" && payload == &Some(Value::Unit))
+    );
+    assert_eq!(
+        outcome,
+        &EffectOutcome::success(EffectResponse::SendDecision {
+            decision: SendDecision::Deliver(Value::Unit)
+        })
+    );
 }

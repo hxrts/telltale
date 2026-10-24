@@ -120,7 +120,7 @@ impl ThreadedProtocolMachine {
             && coroutine
                 .operation_continuation
                 .as_ref()
-                .is_none_or(|original| original.resolved || original.invalidated)
+                .map_or(true, |original| original.resolved || original.invalidated)
         {
             return Err(fail(EffectFailure::contract_violation(
                 "source child has no actual original enclosing continuation",
@@ -295,7 +295,7 @@ impl ThreadedProtocolMachine {
             && coroutine
                 .operation_continuation
                 .as_ref()
-                .is_none_or(|original| original.resolved || original.invalidated)
+                .map_or(true, |original| original.resolved || original.invalidated)
         {
             return Err(EffectFailure::contract_violation(
                 "source commit has no actual original enclosing continuation",
@@ -481,7 +481,7 @@ fn exec_nominal_instr(
     let mut observations = Vec::new();
     let blocked = if let Some(request) = request {
         let (observation, blocked) =
-            invoke_original_threaded_nominal(coroutine, session, call, ctx, request)?;
+            invoke_original_threaded_nominal(coroutine, session, call, ctx, &request)?;
         observations.push(observation);
         blocked
     } else {
@@ -534,7 +534,7 @@ fn invoke_original_threaded_nominal(
     session: &Arc<Mutex<SessionState>>,
     call: &crate::nominal_command::NominalCommandCall,
     ctx: &ThreadedStepCtx<'_>,
-    request: EffectRequest,
+    request: &EffectRequest,
 ) -> Result<(EffectObservation, bool), ThreadedExecFault> {
     use crate::effect::{EffectOutcomeStatus, EffectResponse};
     let outcome = ctx.handler.handle_effect(request.clone());

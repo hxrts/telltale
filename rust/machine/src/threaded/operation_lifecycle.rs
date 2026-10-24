@@ -8,7 +8,7 @@ impl ThreadedProtocolMachine {
             else {
                 continue;
             };
-            let wake = self.coroutine_by_id(id).is_none_or(|coroutine| {
+            let wake = self.coroutine_by_id(id).map_or(true, |coroutine| {
                 let original = coroutine
                     .lock()
                     .expect("threaded ProtocolMachine lock poisoned");

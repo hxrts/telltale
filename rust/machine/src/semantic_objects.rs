@@ -1424,7 +1424,7 @@ fn agreement_level_rank(level: AgreementLevel) -> u8 {
 
 fn operation_visibility(operation: &OperationInstance) -> OperationVisibility {
     if let Some(profile) = &operation.agreement_profile {
-        return profile.visibility.clone();
+        return profile.visibility;
     }
     if operation.requires_proof {
         OperationVisibility::BlockedUntilFinalized
@@ -1469,7 +1469,7 @@ fn agreement_profile_name(operation: &OperationInstance) -> String {
 
 fn required_agreement_evidence_kind(operation: &OperationInstance) -> AgreementEvidenceKind {
     if let Some(profile) = &operation.agreement_profile {
-        return profile.required_evidence_kind.clone();
+        return profile.required_evidence_kind;
     }
     if operation.requires_proof || operation.terminal_publication.is_some() {
         AgreementEvidenceKind::Publication
@@ -1480,7 +1480,7 @@ fn required_agreement_evidence_kind(operation: &OperationInstance) -> AgreementE
 
 fn usable_agreement_level(operation: &OperationInstance) -> AgreementLevel {
     if let Some(profile) = &operation.agreement_profile {
-        return profile.usable_at.clone();
+        return profile.usable_at;
     }
     match operation_visibility(operation) {
         OperationVisibility::Immediate => AgreementLevel::None,
@@ -1491,7 +1491,7 @@ fn usable_agreement_level(operation: &OperationInstance) -> AgreementLevel {
 
 fn finalized_agreement_level(operation: &OperationInstance) -> AgreementLevel {
     if let Some(profile) = &operation.agreement_profile {
-        return profile.finalized_at.clone();
+        return profile.finalized_at;
     }
     match operation_visibility(operation) {
         OperationVisibility::Immediate => AgreementLevel::None,

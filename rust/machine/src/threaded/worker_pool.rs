@@ -336,7 +336,7 @@ impl std::fmt::Debug for NativeWorkerPoolShutdownFailure {
 /// real join handles until an explicit cleanup call joins them.
 pub struct NativeWorkerPoolBuildFailure {
     source: rayon::ThreadPoolBuildError,
-    settlement: NativeWorkerPoolSettlement,
+    settlement: Box<NativeWorkerPoolSettlement>,
 }
 impl std::fmt::Debug for NativeWorkerPoolBuildFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -415,7 +415,7 @@ fn build_owned_native_pool_with_spawn(
         }),
         Err(source) => Err(NativeWorkerPoolBuildFailure {
             source,
-            settlement: NativeWorkerPoolSettlement::new(original),
+            settlement: Box::new(NativeWorkerPoolSettlement::new(original)),
         }),
     }
 }

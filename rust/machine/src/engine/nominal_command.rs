@@ -72,15 +72,15 @@ impl ProtocolMachine {
         &mut self,
         coro_idx: usize,
         role: &str,
-        call: crate::nominal_command::NominalCommandCall,
+        call: &crate::nominal_command::NominalCommandCall,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
         self.validate_source_operation_context(coro_idx)?;
-        let owner = self.nominal_invocation_owner(coro_idx, role, &call)?;
+        let owner = self.nominal_invocation_owner(coro_idx, role, call)?;
         if self.coroutines[coro_idx].nominal_continuation.is_none() {
-            self.issue_original_nominal_command(coro_idx, role, &call, owner, handler)?;
+            self.issue_original_nominal_command(coro_idx, role, call, owner, handler)?;
         }
-        self.poll_original_nominal_command(coro_idx, role, &call, handler)
+        self.poll_original_nominal_command(coro_idx, role, call, handler)
     }
 
     fn nominal_invocation_owner(

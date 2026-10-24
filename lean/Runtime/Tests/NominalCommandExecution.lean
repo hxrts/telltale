@@ -163,7 +163,8 @@ private def stageSession (predicate : Option String) : SessionState UnitVerify :
 
 private def stageInstalled (predicate : Option String) : State :=
   let edge : Edge := { sid := 0, sender := "A", receiver := "B" }
-  { empty with programs := #[(stageImage predicate).program],
+  { empty with
+    programs := #[(stageImage predicate).program],
     coroutines := #[stageCoroutine "B" 0 0, stageCoroutine "A" 1 2],
     buffers := [(edge, [])], sessions := [(0, stageSession predicate)],
     sched := { empty.sched with readyQueue := [0, 1] },
@@ -176,36 +177,53 @@ private def stageOwner (name : String) : SessionTypes.ModelOwner :=
 private def stageOwned (predicate : Option String) (name : String) : State :=
   let owner := stageOwner name
   let installed := stageInstalled predicate
-  { installed with sessions := [(0, { stageSession predicate with
+  { installed with
+    sessions := [(0, { stageSession predicate with
       ownership := { current := some owner } })],
     coroutines := installed.coroutines.map
       (fun coroutine => { coroutine with issuedModelOwner := some owner }) }
 
 private theorem stage_image_eq : image = .ok (stageImage none) := by
-  simp +decide [image, roleImage, declaration, call, global, stageImage,
+  simp +decide only [
+    image, roleImage, stageImage, declaration, call, global,
     RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
     Std.HashMap.size_insert, Std.HashMap.size_empty,
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil, List.mapM, List.mapM.loop,
+    Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
+    Array.isEmpty, Array.size, Nat.reduceAdd,
+    List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.map_cons, List.map_nil, decide_true, decide_false,
     Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    Choreography.Projection.Trans.transBranches,
+    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
+    ↓reduceIte, ↓reduceDIte]
 
 private theorem stage_load_eq (readiness : Bool) :
     loadChoreographyResult empty (stageImage (if readiness then some "Store.save" else none)) =
       .ok (stageInstalled (if readiness then some "Store.save" else none)) 0 := by
-  -- Both actual declaration shapes are concrete; no arbitrary predicate equality
-  -- or subsequent invocation/owner observation is sent to the simplifier.
-  cases readiness <;> simp +decide only [loadChoreographyResult, validateImage_eq,
+  cases readiness <;> simp +decide only [
+    loadChoreographyResult, validateImage_eq,
     stageImage, declaration, call, global, empty, config,
-    Choreography.Projection.Project.projectR?, Choreography.Projection.Project.trans,
-    Choreography.Projection.Trans.trans, Choreography.Projection.Trans.transBranches,
+    Choreography.Projection.Project.projectR?,
+    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+    Choreography.Projection.Trans.transBranches,
     Choreography.Projection.Projectb.projectb,
     Choreography.Projection.Projectb.projectbBranches,
     List.find?_cons, List.find?_nil, List.map_cons, List.map_nil,
-    Option.map, Option.bind, ↓reduceIte, ↓reduceDIte]
-  -- The remaining private loader core is structurally reducible. Its complete
-  -- state, including endpoints, queues, trace and ownership defaults, must agree.
-  all_goals rfl
+    Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
+    Option.map, Option.bind, decide_true, decide_false,
+    nextFreshSessionId, sessionIdAvailable, existingSessionIds,
+    ↓reduceIte, ↓reduceDIte]
+  all_goals
+    -- This can apply only after ACTUAL validation/capacity/fresh-ID branches
+    -- have reduced to the actual ok(core state, 0) constructor. Any unresolved
+    -- validation match must remain a failed producer proof here.
+    apply congrArg (fun state : State => ChoreographyLoadResult.ok state 0)
+    -- Compare the real private loadChoreographyCore output to stageInstalled.
+    -- Its edge collectors are structural; no new equality axiom/API is needed.
+    rfl
 
 private theorem stage_plain_load_eq :
     loadChoreographyResult empty (stageImage none) = .ok (stageInstalled none) 0 :=
@@ -220,19 +238,32 @@ private theorem stage_admission_eq (predicate : Option String) (name : String)
     (named : name.isEmpty = false) :
     admitLoadedSessionOwner (stageInstalled predicate) 0 name =
       .ok (stageOwned predicate name, stageOwner name) := by
-  simp [admitLoadedSessionOwner, stageInstalled, stageSession, stageCoroutine,
-    stageOwned, stageOwner, SessionTypes.ModelOwnershipState.claim, named]
+  change
+    (if name.isEmpty then
+      .error "owning admission requires a named original model owner"
+    else
+      Except.bind (({} : SessionTypes.ModelOwnershipState).claim 0 name)
+        (fun claimed =>
+          .ok
+            ({ stageInstalled predicate with
+                sessions := [(0, { stageSession predicate with
+                  ownership := claimed.1 })],
+                coroutines := (stageInstalled predicate).coroutines.map
+                  (fun coroutine => { coroutine with issuedModelOwner := some claimed.2 }) },
+              claimed.2))) =
+      .ok (stageOwned predicate name, stageOwner name)
+  rw [named] <;> rfl
 
 private theorem stage_ordinary_eq : ordinaryLoaded = some (stageInstalled none) := by
-  simp only [ordinaryLoaded, stage_image_eq, Except.toOption, Option.bind, stage_plain_load_eq]
+  simp only [ordinaryLoaded, stage_image_eq, Bind.bind, Pure.pure,
+    Except.toOption, Option.bind, stage_plain_load_eq]
 
 private theorem stage_loaded_eq : loaded = some (stageOwned none "original") := by
   unfold loaded
   rw [stage_ordinary_eq]
   change (match admitLoadedSessionOwner (stageInstalled none) 0 "original" with
     | .ok admitted => some admitted.1 | .error _ => none) = _
-  rw [stage_admission_eq none "original" (by decide)]
-  rfl
+  rw [stage_admission_eq none "original" (by decide)] <;> rfl
 
 theorem ordinary_nominal_loader_cannot_reconstruct_original_owner :
     ((ordinaryLoaded.bind (fun st => invokeInstalled st 1)).bind
@@ -480,19 +511,28 @@ def readinessPrepared (mutation : Nat := 0) : Option State := do
   invokeInstalled st 1
 
 private theorem stage_readiness_image_eq :
-    ({ roleImage with programs := roleImage.programs.insert "A"
-      #[.invoke (.declaration { declaration with readinessPredicate := some "Store.save" }),
-        .invoke (.command { call with declaration :=
-          { declaration with readinessPredicate := some "Store.save" } }),
-        .offer 0 "Ready", .halt, .offer 0 "Denied", .halt] }.toCodeImage ["B", "A"]) =
+    ({ roleImage with
+      programs := roleImage.programs.insert "A"
+        #[.invoke (.declaration { declaration with readinessPredicate := some "Store.save" }),
+          .invoke (.command { call with declaration :=
+            { declaration with readinessPredicate := some "Store.save" } }),
+          .offer 0 "Ready", .halt, .offer 0 "Denied", .halt] }.toCodeImage ["B", "A"]) =
       .ok (stageImage (some "Store.save")) := by
-  simp +decide [roleImage, declaration, call, global, stageImage,
+  simp +decide only [
+    roleImage, stageImage, declaration, call, global,
     RoleCodeImage.toCodeImage, mapExecutableTargets?,
-    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
     Std.HashMap.size_insert, Std.HashMap.size_empty,
+    Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
+    Std.HashMap.mem_insert, Std.HashMap.not_mem_empty,
+    List.foldlM_cons, List.foldlM_nil, List.mapM, List.mapM.loop,
+    Bind.bind, Pure.pure, Except.bind, Except.pure, Option.bind,
+    Array.isEmpty, Array.size, Nat.reduceAdd,
+    List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+    List.map_cons, List.map_nil, decide_true, decide_false,
     Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices]
+    Choreography.Projection.Trans.transBranches,
+    localTypeRToLocalType, localTypeRToLocalTypeAux, localTypeRBranchesToChoices,
+    ↓reduceIte, ↓reduceDIte]
 
 /-- The unchanged post-admission issuer/consumer transaction. No witness is
 inferred from the normal-form owner or fabricated callback data. -/
@@ -516,8 +556,8 @@ private def stageReadinessPrepared (mutation : Nat) : Option State := do
 
 private theorem stage_readiness_eq (mutation : Nat) :
     readinessPrepared mutation = stageReadinessPrepared mutation := by
-  simp only [readinessPrepared, stage_readiness_image_eq, Except.toOption,
-    Option.bind, stage_ready_load_eq]
+  simp only [readinessPrepared, stage_readiness_image_eq,
+    Bind.bind, Pure.pure, Except.toOption, Option.bind, stage_ready_load_eq]
   -- Reduce only the original installed-coro/endpoint selection, then rewrite
   -- actual admission before opening any callback, issued witness or observation.
   change (do
@@ -536,8 +576,7 @@ private theorem stage_readiness_eq (mutation : Nat) :
         if sid == 0 then (sid, { current with ownership }) else (sid, current)),
       coroutines := st.coroutines.set! 1 { coro with effectCtx :=
         { blockFirst := false, readiness := some witness } } } 1) = _
-  rw [stage_admission_eq (some "Store.save") "original-owner" (by decide)]
-  rfl
+  rw [stage_admission_eq (some "Store.save") "original-owner" (by decide)] <;> rfl
 
 /-- Real installed invocation consumes the exact session-issued witness once. -/
 theorem readiness_actual_commit_single_use :

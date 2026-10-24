@@ -265,9 +265,9 @@ impl ThreadedProtocolMachine {
                     });
                 }
                 execution => {
-                    if let crate::operation_lifecycle::OperationExecution::Begun(record, progress) =
-                        execution
+                    if let crate::operation_lifecycle::OperationExecution::Begun(begun) = execution
                     {
+                        let (record, progress) = *begun;
                         self.operation_instances.push(record);
                         self.progress_contracts.push(progress);
                     }

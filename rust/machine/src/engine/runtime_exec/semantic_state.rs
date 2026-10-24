@@ -2305,10 +2305,7 @@ mod runtime_effect_state_tests {
         assert!(err.to_string().contains("late result"));
     }
 
-    #[test]
-    fn runtime_regions_preserve_locality_across_handoff_structure() {
-        let mut machine = test_vm();
-        machine.clock.tick = 7;
+    fn seed_blocked_locality_handoff(machine: &mut ProtocolMachine) {
         machine.outstanding_effects.push(
             OutstandingEffect {
                 effect_id: 21,
@@ -2347,6 +2344,13 @@ mod runtime_effect_state_tests {
             },
             &machine.config.observability_retention,
         );
+    }
+
+    #[test]
+    fn runtime_regions_preserve_locality_across_handoff_structure() {
+        let mut machine = test_vm();
+        machine.clock.tick = 7;
+        seed_blocked_locality_handoff(&mut machine);
 
         let receipt = delegation_receipt(
             8,

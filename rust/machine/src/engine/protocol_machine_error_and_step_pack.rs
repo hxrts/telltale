@@ -276,7 +276,7 @@ pub(crate) fn prune_terminal_effect_history<T: LiveEffectRecord>(
         ObservabilityRetentionMode::Capped => retention.capacity,
     };
     let protected =
-        |record: &T| record.is_live() || record.retained_session().is_some_and(|sid| resident(sid));
+        |record: &T| record.is_live() || record.retained_session().is_some_and(&resident);
     let mut discard = records
         .iter()
         .filter(|record| !protected(record))

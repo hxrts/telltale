@@ -280,7 +280,7 @@ impl OriginalOperationContinuation {
             || self
                 .issued_at
                 .checked_add(self.declaration.budget_ticks.get())
-                .is_none_or(|end| tick > end)
+                .map_or(true, |end| tick > end)
         {
             return Err(OperationTransitionError::Contract(
                 "original operation window expired or validation was refused",
@@ -534,7 +534,7 @@ impl OriginalOperationContinuation {
 pub(crate) enum OperationExecution {
     Advance,
     AwaitPending,
-    Begun(OperationInstance, ProgressContract),
+    Begun(Box<(OperationInstance, ProgressContract)>),
 }
 
 fn begin_source_operation(
@@ -595,7 +595,7 @@ fn begin_source_operation(
         ));
     }
     coroutine.operation_continuation = Some(original);
-    Ok(OperationExecution::Begun(record, contract))
+    Ok(OperationExecution::Begun(Box::new((record, contract))))
 }
 
 fn read_operation_resolution(
@@ -755,7 +755,7 @@ pub(crate) fn await_should_wake(
         || original
             .issued_at
             .checked_add(original.declaration.budget_ticks.get())
-            .is_none_or(|end| tick > end)
+            .map_or(true, |end| tick > end)
     {
         return true;
     }

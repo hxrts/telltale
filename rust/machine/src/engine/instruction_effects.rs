@@ -320,7 +320,7 @@ impl ProtocolMachine {
                 })
             }
             InvokeAction::NominalCommand(call) => {
-                return self.step_nominal_command(coro_idx, role, *call, handler)
+                return self.step_nominal_command(coro_idx, role, &call, handler)
             }
             other => other,
         };

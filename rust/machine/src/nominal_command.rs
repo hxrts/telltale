@@ -61,7 +61,7 @@ impl NominalCommandCall {
         self.declaration
             .readiness_predicate
             .as_ref()
-            .is_none_or(|predicate| {
+            .map_or(true, |predicate| {
                 predicate
                     == &format!(
                         "{}.{}",
