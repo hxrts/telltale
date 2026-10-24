@@ -392,19 +392,54 @@ fn blocked_command_reuses_original_issued_occurrence() {
 #[test]
 fn ordinary_loader_never_invokes_nominal_callback_without_issued_owner() {
     let image = compile_command_operation(SOURCE, "Check", &windows()).expect("compile");
-    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-    machine
-        .load_choreography(&image)
-        .expect("static image load");
-    let handler = Reply {
+    let reply = || Reply {
         identity: "H1",
         wrong_occurrence: false,
         calls: Mutex::new(Vec::new()),
         result: Ok(true),
         block_for: 0,
     };
-    assert!(machine.run(&handler, 64).is_err());
-    assert!(handler.calls.lock().expect("calls").is_empty());
+    let mut admitted = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owner = admitted
+        .load_choreography_owned(&image, "original-owner")
+        .expect("same actual image admits an issued owner");
+    let positive_handler = reply();
+    let positive = admitted.run(&positive_handler, 64);
+    let positive_calls = positive_handler.calls.lock().expect("actual calls").clone();
+    admitted
+        .close_and_reap_session(owner.session_id())
+        .expect("actual positive session disposal");
+    assert_eq!(
+        positive.expect("same source completes with actual owner"),
+        telltale_machine::RunStatus::AllDone
+    );
+    assert_eq!(
+        positive_calls.len(),
+        1,
+        "the positive control reaches the actual callback"
+    );
+
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let session = machine
+        .load_choreography(&image)
+        .expect("same static image load");
+    let handler = reply();
+    let rejected = machine.run(&handler, 64);
+    let calls = handler.calls.lock().expect("actual calls").clone();
+    machine
+        .close_and_reap_session(session)
+        .expect("actual rejected session disposal");
+    let telltale_machine::ProtocolMachineError::Fault { fault, .. } =
+        rejected.expect_err("ordinary loading cannot supply an issued owner")
+    else {
+        panic!("the actual nominal owner gate must produce an execution fault");
+    };
+    assert_eq!(fault, telltale_machine::coroutine::Fault::Invoke {
+        failure: telltale_machine::model::effects::EffectFailure::contract_violation(
+            "nominal invocation requires an issued opaque owner; checkpoint metadata cannot recreate it"
+        ),
+    });
+    assert!(calls.is_empty());
 }
 
 #[test]

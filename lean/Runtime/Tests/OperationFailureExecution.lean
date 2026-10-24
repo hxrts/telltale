@@ -46,7 +46,9 @@ def originalOutputRefusal : Bool := (do
 theorem output_refusal_retains_original_fault_and_revokes_only_original_semantic_work :
     originalOutputRefusal = true := by
   simp +decide only [
-    image, roleImage, empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?,
+    image, roleImage, Runtime.Tests.NominalCommandExecution.empty, invokeInstalled, RoleCodeImage.toCodeImage, mapExecutableTargets?, OperationAction.mapTargets?,
+    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
+    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand,
     Std.HashMap.size_insert, Std.HashMap.getElem?_insert, Std.HashMap.getElem?_empty,
     Std.HashMap.size_empty, Std.HashMap.mem_insert, Std.HashMap.not_mem_empty, List.foldlM_cons,
     List.foldlM_nil, Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
@@ -59,15 +61,29 @@ theorem output_refusal_retains_original_fault_and_revokes_only_original_semantic
     List.nil_append, List.cons_append, List.length_cons, List.length_nil, List.mapM.loop,
     Bind.bind, Pure.pure, Except.pure, ↓reduceIte, Except.toOption, Option.map, Option.getD,
     Option.any, List.map_cons, List.map_nil, List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
+  all_goals
+    simp +decide only [
+      loadChoreographyResult, validateImage_eq, Runtime.Tests.NominalCommandExecution.config,
+      nextFreshSessionId, sessionIdAvailable, existingSessionIds,
+      Choreography.Projection.Project.projectR?,
+      Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+      Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
+      Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
+      localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+      Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+      List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+      List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
+  -- Normalize the actual owning admission and its mapped coroutines only after
+  -- the actual assembled-image validation and loader equations are exposed.
+  all_goals
+    simp +decide only [
+      admitLoadedSessionOwner, SessionTypes.ModelOwnershipState.claim,
+      List.lookup, List.filter, List.any, List.isEmpty, Array.toList,
+      Array.map_eq_foldl, List.map_cons, List.map_nil, List.find?_cons, List.find?_nil,
+      Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
+      Option.bind, Option.map, Option.getD, Option.any, beq_self_eq_true,
+      Bool.false_or, Bool.or_false, Bool.false_eq_true, decide_true, decide_false,
+      ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- The expired original Await executes its actual installed opcode. Its fault
@@ -93,8 +109,10 @@ def originalExpiryRefusal : Bool := (do
 theorem expired_original_await_retains_first_fault_without_renewal_or_cleanup_ack :
     originalExpiryRefusal = true := by
   simp +decide only [
-    image, roleImage, empty, ordinaryLoaded, loaded, invokeInstalled, RoleCodeImage.toCodeImage,
-    mapExecutableTargets?, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    image, roleImage, Runtime.Tests.NominalCommandExecution.empty, ordinaryLoaded, loaded, invokeInstalled, RoleCodeImage.toCodeImage,
+    mapExecutableTargets?, OperationAction.mapTargets?,
+    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
+    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
     Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
     Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
@@ -106,15 +124,29 @@ theorem expired_original_await_retains_first_fault_without_renewal_or_cleanup_ac
     List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure,
     ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
     List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
+  all_goals
+    simp +decide only [
+      loadChoreographyResult, validateImage_eq, Runtime.Tests.NominalCommandExecution.config,
+      nextFreshSessionId, sessionIdAvailable, existingSessionIds,
+      Choreography.Projection.Project.projectR?,
+      Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+      Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
+      Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
+      localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+      Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+      List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+      List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
+  -- Normalize the actual owning admission and its mapped coroutines only after
+  -- the actual assembled-image validation and loader equations are exposed.
+  all_goals
+    simp +decide only [
+      admitLoadedSessionOwner, SessionTypes.ModelOwnershipState.claim,
+      List.lookup, List.filter, List.any, List.isEmpty, Array.toList,
+      Array.map_eq_foldl, List.map_cons, List.map_nil, List.find?_cons, List.find?_nil,
+      Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
+      Option.bind, Option.map, Option.getD, Option.any, beq_self_eq_true,
+      Bool.false_or, Bool.or_false, Bool.false_eq_true, decide_true, decide_false,
+      ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 /-- A genuine installed Jump bypasses a still-present static Resolve. Runtime
@@ -150,8 +182,10 @@ def originalHaltRefusal : Bool := (do
 theorem actual_jump_cannot_halt_without_original_terminal_resolution :
     originalHaltRefusal = true := by
   simp +decide only [
-    image, roleImage, empty, ordinaryLoaded, loaded, invokeInstalled, RoleCodeImage.toCodeImage,
-    mapExecutableTargets?, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
+    image, roleImage, Runtime.Tests.NominalCommandExecution.empty, ordinaryLoaded, loaded, invokeInstalled, RoleCodeImage.toCodeImage,
+    mapExecutableTargets?, OperationAction.mapTargets?,
+    EffectRuntime.operationAction, EffectRuntime.relocateOperation,
+    EffectRuntime.commandDeclaration, EffectRuntime.commandCall, EffectRuntime.relocateCommand, Std.HashMap.size_insert, Std.HashMap.getElem?_insert,
     Std.HashMap.getElem?_empty, Std.HashMap.size_empty, Std.HashMap.mem_insert,
     Std.HashMap.not_mem_empty, List.foldlM_cons, List.foldlM_nil,
     Runtime.Tests.OperationLifecycleExecution.sourceDeclaration,
@@ -163,15 +197,29 @@ theorem actual_jump_cannot_halt_without_original_terminal_resolution :
     List.length_cons, List.length_nil, List.mapM.loop, Bind.bind, Pure.pure, Except.pure,
     ↓reduceIte, Except.toOption, Option.map, Option.getD, Option.any, List.map_cons, List.map_nil,
     List.reverse_cons, List.reverse_nil]
-  simp +decide only [
-    loadChoreographyResult, validateImage_eq, Choreography.Projection.Project.projectR?,
-    Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
-    Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
-    Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
-    localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
-    Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
-    List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
-    List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
+  all_goals
+    simp +decide only [
+      loadChoreographyResult, validateImage_eq, Runtime.Tests.NominalCommandExecution.config,
+      nextFreshSessionId, sessionIdAvailable, existingSessionIds,
+      Choreography.Projection.Project.projectR?,
+      Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans,
+      Choreography.Projection.Trans.transBranches, Choreography.Projection.Projectb.projectb,
+      Choreography.Projection.Projectb.projectbBranches, localTypeRToLocalType,
+      localTypeRToLocalTypeAux, localTypeRBranchesToChoices, Except.toOption, Option.bind,
+      Option.map, Option.getD, Option.any, List.map_cons, List.map_nil, List.reverse_cons,
+      List.reverse_nil, List.nil_append, List.cons_append, List.length_cons, List.length_nil,
+      List.find?_cons, List.find?_nil, ↓reduceIte, ↓reduceDIte]
+  -- Normalize the actual owning admission and its mapped coroutines only after
+  -- the actual assembled-image validation and loader equations are exposed.
+  all_goals
+    simp +decide only [
+      admitLoadedSessionOwner, SessionTypes.ModelOwnershipState.claim,
+      List.lookup, List.filter, List.any, List.isEmpty, Array.toList,
+      Array.map_eq_foldl, List.map_cons, List.map_nil, List.find?_cons, List.find?_nil,
+      Bind.bind, Pure.pure, Except.bind, Except.pure, Except.toOption,
+      Option.bind, Option.map, Option.getD, Option.any, beq_self_eq_true,
+      Bool.false_or, Bool.or_false, Bool.false_eq_true, decide_true, decide_false,
+      ↓reduceIte, ↓reduceDIte]
   all_goals decide
 
 end Runtime.Tests.OperationFailureExecution

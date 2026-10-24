@@ -344,17 +344,31 @@ fn original_begin_without_static_terminal_is_refused_before_owning_admission() {
     use telltale_machine::instr::{Instr, InvokeAction};
     use telltale_machine::operation_lifecycle::OperationAction;
     let mut image = image(EMPTY_SOURCE);
+    let mut positive = ProtocolMachine::new(Default::default());
+    let owner = positive
+        .load_choreography_owned(&image, "original/owner")
+        .expect("unchanged source has a valid static terminal and actual owned admission");
+    positive
+        .close_and_reap_session(owner.session_id())
+        .expect("actual positive session disposal");
+    let mut erased = 0;
     for instruction in image.programs.get_mut("A").unwrap() {
         if matches!(instruction, Instr::Invoke { action: InvokeAction::OperationLifecycle(action) }
             if matches!(action.as_ref(), OperationAction::Resolve { .. }))
         {
             *instruction = Instr::Halt;
+            erased += 1;
         }
     }
+    assert_eq!(erased, 1, "remove the actual single source terminal only");
     let mut machine = ProtocolMachine::new(Default::default());
-    assert!(machine
+    let error = machine
         .load_choreography_owned(&image, "original/owner")
-        .is_err());
+        .expect_err("erasing the actual terminal must refuse before admission");
+    assert!(
+        matches!(error, ProtocolMachineError::InvalidCodeImage { reason }
+        if reason == "invalid original operation role/policy")
+    );
     assert!(machine.operation_instances().is_empty());
     assert!(machine.effect_trace().is_empty());
 }
