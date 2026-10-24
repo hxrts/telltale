@@ -34,11 +34,11 @@ def originalOutputRefusal : Bool := (do
     decide (revoked.declaration = original.declaration) &&
     revoked.issuedAt == original.issuedAt && revoked.originalPc == original.originalPc &&
     revoked.children == original.children && revoked.completedChildren.length == 1 &&
-    parent.phase == .failed && parent.effectIds == original.children &&
-    parent.terminalPublication.isNone && progress.state == .failed &&
+    parent.phase == OperationPhase.failed && parent.effectIds == original.children &&
+    parent.terminalPublication.isNone && progress.state == ProgressState.failed &&
     progress.lastOrderingKey == some original.issuedAt &&
     progress.budgetTicks == some original.declaration.budgetTicks &&
-    child.status == .invalidated && child.completedAtTick == some 1 &&
+    child.status == OutstandingEffectStatus.invalidated && child.completedAtTick == some 1 &&
     current.nominalContinuation.any (fun (nominal : NominalCommandContinuation) => nominal.returned.isSome) &&
     after.sessions.all (fun (entry : SessionId × SessionState UnitVerify) => entry.2.ownership.consumedWitnesses.isEmpty)
   ).getD false
@@ -85,7 +85,7 @@ def originalExpiryRefusal : Bool := (do
   return revoked.invalidated && !revoked.resolved &&
     revoked.issuedAt == original.issuedAt && decide (revoked.owner = original.owner) &&
     revoked.declaration.budgetTicks == original.declaration.budgetTicks &&
-    parent.phase == .failed && after.outstandingEffects.isEmpty &&
+    parent.phase == OperationPhase.failed && after.outstandingEffects.isEmpty &&
     (match current.status, current.operationFailure with
       | .faulted (.effectFault kind message), some (.effectFault originalKind originalMessage) =>
           kind == originalKind && message == originalMessage
@@ -143,7 +143,7 @@ def originalHaltRefusal : Bool := (do
   let current ← refused.coroutines[1]?
   let original ← current.operationContinuation
   return original.invalidated && !original.resolved && original.children.isEmpty &&
-    refused.operationInstances.any (fun (parent : OperationInstance) => parent.operationId == original.operationId && parent.phase == .failed) &&
+    refused.operationInstances.any (fun (parent : OperationInstance) => parent.operationId == original.operationId && parent.phase == OperationPhase.failed) &&
     (match current.status, current.operationFailure with
       | .faulted (.effectFault kind message), some (.effectFault originalKind originalMessage) =>
           kind == originalKind && message == originalMessage
