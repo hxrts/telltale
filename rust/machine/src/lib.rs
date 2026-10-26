@@ -271,7 +271,7 @@ pub mod runtime {
         };
         pub use crate::kernel::ProtocolMachineKernel;
         pub use crate::nested::NestedProtocolMachineHandler;
-        pub use crate::owned::OwnedSession;
+        pub use crate::owned::{OwnedSession, OwnedSessionEnqueueError};
         #[cfg(target_arch = "wasm32")]
         pub use crate::wasm::WasmProtocolMachine;
     }
@@ -375,7 +375,7 @@ pub use output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
 };
-pub use owned::OwnedSession;
+pub use owned::{OwnedSession, OwnedSessionEnqueueError};
 pub use persistence::{NoopPersistence, PersistenceModel};
 pub use refinement::{
     ClaimedRuntimeCoreBundle, CoroutineRefinementSlice, ProtocolMachineRefinementSlice,

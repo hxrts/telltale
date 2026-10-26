@@ -3865,3 +3865,6 @@ mod selected_operation_scope_tests;
 
 #[cfg(test)]
 mod compact_branch_body_tests;
+
+#[cfg(test)]
+mod constructor_pair_tests;

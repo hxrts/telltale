@@ -28,6 +28,21 @@ entry is exclusive with respect to machine execution. No worker wave remains
 active across that mutable entry. Host code does not receive a raw mutable
 threaded session store.
 
+Owned host-frame ingress uses `OwnedSession::inject_message_with_sequence`.
+Both backends validate the live capability and full-session mutation scope in
+the same resident-session entry that signs and enqueues the frame. The supplied
+edge sequence is preserved. A stale, terminal, missing or fragment-scoped owner
+cannot enqueue through this boundary. Ownership rejections retain their typed
+source and the existing authority journal. Ownership and enqueue refusals remain
+distinct variants of `OwnedSessionEnqueueError`. Backpressure or drop results
+retain their actual `EnqueueResult`. This new API does not extend the existing exhaustive
+`ProtocolMachineError` enum.
+This entry does not advance endpoint local types, manufacture send-completion
+evidence, issue authority or acknowledge host-resource cleanup. It adds a host
+adapter for the existing signed-buffer operation, not a choreography instruction
+or a new Lean ownership theorem. The raw simulation injection API remains a
+separate testing surface.
+
 Owned commit, rollback, owner-death and abandoned-transfer operations validate
 the calling handle's live capability. Receipt operations also require the
 receipt's session to match the calling handle, so possession of an unrelated

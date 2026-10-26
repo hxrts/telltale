@@ -12,6 +12,23 @@ use crate::session::{
     ReadinessWitness, SessionHostMutation, SessionId, SessionState,
 };
 
+/// Failure from an issued owner's sequence-preserving host-frame enqueue.
+///
+/// Ownership refusal retains its concrete native cause. Enqueue refusal keeps
+/// the resident session's existing diagnostic, without inventing a native source.
+#[derive(Debug, thiserror::Error)]
+pub enum OwnedSessionEnqueueError {
+    /// The resident session rejected the issued owner before enqueue.
+    #[error("host message ownership rejected: {0}")]
+    Ownership(#[source] OwnershipError),
+    /// The resident signed-buffer enqueue rejected the frame.
+    #[error("host message enqueue failed: {message}")]
+    Enqueue {
+        /// Original diagnostic from the existing session enqueue producer.
+        message: String,
+    },
+}
+
 /// Capability-bearing handle returned by the preferred owned open path.
 ///
 /// Serializable ownership metadata cannot construct an issued handle:
@@ -58,6 +75,36 @@ impl OwnedSession {
     #[must_use]
     pub fn capability(&self) -> &OwnershipCapability {
         &self.capability
+    }
+
+    /// Deliver one host frame with its original edge sequence.
+    ///
+    /// The resident session validates the issued owner and session-wide scope
+    /// in the same exclusive entry that signs and enqueues the frame.
+    ///
+    /// # Errors
+    ///
+    /// Rejects stale, terminal, missing or insufficient ownership before enqueue.
+    /// Returns the original enqueue refusal without reporting delivery success.
+    /// Raw capability fields cannot replace the issued handle:
+    ///
+    /// ```compile_fail,E0308
+    /// use telltale_machine::{ProtocolMachine, ProtocolMachineConfig, OwnershipCapability, OwnershipScope};
+    /// use telltale_machine::coroutine::Value;
+    /// use telltale_machine::owned::OwnedSessionMachine;
+    /// let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    /// let fields = OwnershipCapability { session_id: 0, owner_id: "owner".into(), generation: 0, scope: OwnershipScope::Session };
+    /// machine.inject_owned_message_with_sequence(&fields, "A", "B", Value::Unit, 0).unwrap();
+    /// ```
+    pub fn inject_message_with_sequence(
+        &self,
+        machine: &mut impl OwnedSessionMachine,
+        from: &str,
+        to: &str,
+        value: crate::coroutine::Value,
+        sequence_no: u64,
+    ) -> Result<crate::buffer::EnqueueResult, OwnedSessionEnqueueError> {
+        machine.inject_owned_message_with_sequence(self, from, to, value, sequence_no)
     }
 
     /// Apply one session-local host mutation through the ownership gate.
@@ -265,6 +312,20 @@ mod private {
 /// machine.apply_owned_session_mutation(&fields, SessionHostMutation::SetDefaultHandler { handler: "replacement".into() }).unwrap();
 /// ```
 pub trait OwnedSessionMachine: private::Sealed {
+    /// Validate the issued owner and enqueue its frame under one resident borrow.
+    ///
+    /// # Errors
+    ///
+    /// Returns concrete ownership rejection or the actual enqueue refusal.
+    fn inject_owned_message_with_sequence(
+        &mut self,
+        owner: &OwnedSession,
+        from: &str,
+        to: &str,
+        value: crate::coroutine::Value,
+        sequence_no: u64,
+    ) -> Result<crate::buffer::EnqueueResult, OwnedSessionEnqueueError>;
+
     /// Admit an owned operation and retain actual capability-rejection evidence.
     ///
     /// # Errors
@@ -389,6 +450,23 @@ pub trait OwnedSessionMachine: private::Sealed {
     ) -> Result<CancellationWitness, OwnershipError>;
 }
 impl OwnedSessionMachine for ProtocolMachine {
+    fn inject_owned_message_with_sequence(
+        &mut self,
+        owner: &OwnedSession,
+        from: &str,
+        to: &str,
+        value: crate::coroutine::Value,
+        sequence_no: u64,
+    ) -> Result<crate::buffer::EnqueueResult, OwnedSessionEnqueueError> {
+        let tick = self.clock().tick;
+        self.sessions_mut()
+            .with_owned_session_at(owner.session_id(), Some(tick), |session| {
+                session.send_owned_with_sequence(owner.capability(), from, to, value, sequence_no)
+            })
+            .map_err(OwnedSessionEnqueueError::Ownership)?
+            .map_err(|message| OwnedSessionEnqueueError::Enqueue { message })
+    }
+
     fn validate_owned_operation(&mut self, owner: &OwnedSession) -> Result<(), OwnershipError> {
         let tick = self.clock().tick;
         self.sessions_mut()

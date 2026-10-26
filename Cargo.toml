@@ -218,7 +218,7 @@ exclude = ["examples/wasm", "external-demo", "external-demo-macros"]
 [workspace.dependencies]
 # Core async/concurrency
 futures = "0.3"
-tokio = { version = "1.35", default-features = false, features = ["macros", "rt", "rt-multi-thread", "sync", "time", "net", "io-util"] }
+tokio = { version = "1.53.3", default-features = false, features = ["macros", "rt", "rt-multi-thread", "sync", "time", "net", "io-util"] }
 async-trait = "0.1"
 async-recursion = "1.0"
 
