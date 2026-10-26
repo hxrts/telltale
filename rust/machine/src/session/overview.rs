@@ -208,6 +208,37 @@ pub struct SessionStoreRetainedBytes {
 /// Session identifier. Each session gets a unique ID within the ProtocolMachine.
 pub type SessionId = usize;
 
+/// Refusal to allocate a fresh finite session identifier.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, thiserror::Error)]
+pub enum SessionAllocationError {
+    /// The maximum identifier is reserved as the exhausted high-water mark.
+    #[error("session identifier space exhausted")]
+    Exhausted,
+    /// The requested identifier is resident or precedes the original high-water mark.
+    #[error("session identifier {session_id} is not fresh (next {next_session_id})")]
+    NotFresh {
+        /// Requested identifier.
+        session_id: SessionId,
+        /// Original next identifier; refusal does not advance it.
+        next_session_id: SessionId,
+    },
+}
+
+/// Shared finite admission rule; callers commit under their existing store borrow/lock.
+pub(crate) fn admit_session_id(
+    sid: SessionId,
+    next: SessionId,
+    occupied: bool,
+) -> Result<SessionId, SessionAllocationError> {
+    if sid < next || occupied {
+        return Err(SessionAllocationError::NotFresh {
+            session_id: sid,
+            next_session_id: next,
+        });
+    }
+    sid.checked_add(1).ok_or(SessionAllocationError::Exhausted)
+}
+
 /// Stable host/runtime owner identifier for one session capability.
 pub type FragmentOwnerId = String;
 

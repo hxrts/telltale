@@ -166,6 +166,17 @@ impl ProtocolMachine {
 
         self.validate_payload(role, "receive", &label, expected_type.as_ref(), &val, true)?;
 
+        // Preserve the VM register fault before any host receive mutation. Signature,
+        // replay and payload checks above retain their existing fault precedence.
+        if dst_reg >= self.config.num_registers
+            || self.coroutines[coro_idx]
+                .regs
+                .get(usize::from(dst_reg))
+                .is_none()
+        {
+            return Err(Fault::OutOfRegisters);
+        }
+
         // Process via handler.
         let handler_identity = handler.handler_identity();
         let request = EffectRequest::receive(

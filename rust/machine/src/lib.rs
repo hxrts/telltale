@@ -191,8 +191,9 @@ pub mod model {
             AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
             HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
             OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessRegistryView,
-            ReadinessWitness, SessionHostMutation, SessionId, SessionState, SessionStatus,
-            SessionStore, SessionStoreMemoryUsage, SessionStoreRetainedBytes, TimeoutWitness,
+            ReadinessWitness, SessionAllocationError, SessionHostMutation, SessionId, SessionState,
+            SessionStatus, SessionStore, SessionStoreMemoryUsage, SessionStoreRetainedBytes,
+            TimeoutWitness,
         };
         pub use crate::session::{unfold_if_var, unfold_mu};
     }
@@ -420,8 +421,8 @@ pub use session::{
     AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
     HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
     OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessRegistryView,
-    ReadinessWitness, SessionDisposalError, SessionHostMutation, SessionId, SessionStore,
-    SessionStoreMemoryUsage, SessionStoreRetainedBytes, TimeoutWitness,
+    ReadinessWitness, SessionAllocationError, SessionDisposalError, SessionHostMutation, SessionId,
+    SessionStore, SessionStoreMemoryUsage, SessionStoreRetainedBytes, TimeoutWitness,
 };
 pub use telltale_types::{
     CanonicalPublicationContinuity, PendingEffectTreatment, RuntimeUpgradeArtifact,

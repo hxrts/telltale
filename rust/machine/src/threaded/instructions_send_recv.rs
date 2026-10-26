@@ -408,6 +408,12 @@ fn step_recv(
     )
     .map_err(ThreadedExecFault::new)?;
 
+    // Match the cooperative VM fault before invoking a host receive effect while
+    // retaining signature, replay and payload validation precedence above.
+    if dst_reg >= ctx.config.num_registers || coro.regs.get(usize::from(dst_reg)).is_none() {
+        return Err(ThreadedExecFault::new(Fault::OutOfRegisters));
+    }
+
     let request = EffectRequest::receive(
         ctx.tick,
         Some(prepared.sid),

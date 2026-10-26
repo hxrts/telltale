@@ -219,6 +219,11 @@ pub enum Fault {
     },
     /// Coroutine exhausted its deterministic execution budget.
     OutOfCredits,
+    /// Finite Rust session admission failed; the actual typed cause is retained.
+    SessionAllocation {
+        /// Original exhausted or non-fresh allocation refusal.
+        error: crate::session::SessionAllocationError,
+    },
 }
 
 impl std::fmt::Display for Fault {
@@ -253,6 +258,7 @@ impl std::fmt::Display for Fault {
             }
             Self::Transfer { message } => write!(f, "transfer fault: {message}"),
             Self::Speculation { message } => write!(f, "speculation fault: {message}"),
+            Self::SessionAllocation { error } => write!(f, "session allocation fault: {error}"),
             Self::Close { message } => write!(f, "close fault: {message}"),
             Self::FlowViolation { message } => write!(f, "flow violation: {message}"),
             Self::NoProgressToken { edge } => write!(

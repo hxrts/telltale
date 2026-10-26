@@ -574,7 +574,9 @@ fn step_open(
         });
     }
 
-    let sid = store.open_from_plan(&plan, buffer_config);
+    let sid = store
+        .open_from_plan(&plan, buffer_config)
+        .map_err(|error| Fault::SessionAllocation { error })?;
     let session = store.get(sid).ok_or_else(|| Fault::Close {
         message: "open session missing after allocation".to_string(),
     })?;

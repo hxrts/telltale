@@ -16,6 +16,13 @@ pub enum ProtocolMachineError {
         /// The fault.
         fault: Fault,
     },
+    /// Fresh session allocation was refused before insertion.
+    #[error("session allocation failed: {0}")]
+    SessionAllocation(
+        #[from]
+        #[source]
+        crate::session::SessionAllocationError,
+    ),
     /// Session limit exceeded.
     #[error("max sessions ({max}) exceeded")]
     TooManySessions {

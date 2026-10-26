@@ -59,11 +59,13 @@ fn test_session_active_to_closed() {
 #[test]
 fn test_session_active_to_closed_clears_pending_buffers() {
     let mut store = SessionStore::new();
-    let sid = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &simple_send_recv_types(),
-    );
+    let sid = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &simple_send_recv_types(),
+        )
+        .expect("fresh fixture session allocation");
 
     // Put a message in the buffer.
     let session = store.get_mut(sid).unwrap();
@@ -79,21 +81,27 @@ fn test_session_active_to_closed_clears_pending_buffers() {
 #[test]
 fn test_session_ids_monotonic() {
     let mut store = SessionStore::new();
-    let sid1 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &simple_send_recv_types(),
-    );
-    let sid2 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &simple_send_recv_types(),
-    );
-    let sid3 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &BTreeMap::new(),
-    );
+    let sid1 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &simple_send_recv_types(),
+        )
+        .expect("fresh fixture session allocation");
+    let sid2 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &simple_send_recv_types(),
+        )
+        .expect("fresh fixture session allocation");
+    let sid3 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        )
+        .expect("fresh fixture session allocation");
 
     assert!(sid1 < sid2);
     assert!(sid2 < sid3);
@@ -104,18 +112,22 @@ fn test_active_count_tracks_sessions() {
     let mut store = SessionStore::new();
     assert_eq!(store.active_count(), 0);
 
-    let sid1 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &BTreeMap::new(),
-    );
+    let sid1 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        )
+        .expect("fresh fixture session allocation");
     assert_eq!(store.active_count(), 1);
 
-    let _sid2 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &BTreeMap::new(),
-    );
+    let _sid2 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        )
+        .expect("fresh fixture session allocation");
     assert_eq!(store.active_count(), 2);
 
     store.close(sid1).unwrap();
@@ -487,16 +499,20 @@ fn test_two_sessions_independent_types() {
 #[test]
 fn test_two_sessions_independent_buffers() {
     let mut store = SessionStore::new();
-    let sid1 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &simple_send_recv_types(),
-    );
-    let sid2 = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &simple_send_recv_types(),
-    );
+    let sid1 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &simple_send_recv_types(),
+        )
+        .expect("fresh fixture session allocation");
+    let sid2 = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &simple_send_recv_types(),
+        )
+        .expect("fresh fixture session allocation");
 
     // Send in session 1.
     store

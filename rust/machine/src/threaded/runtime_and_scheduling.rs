@@ -233,7 +233,7 @@ impl ThreadedProtocolMachine {
             roles.clone(),
             &self.config.buffer_config,
             &image.local_types,
-        );
+        )?;
         self.bind_default_handlers_for_session(sid);
         self.intern_session_runtime_symbols(sid);
         self.resource_states

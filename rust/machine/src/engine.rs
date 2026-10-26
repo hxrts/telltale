@@ -241,3 +241,9 @@ mod clock_admission_tests {
     }
     include!("../tests/unit/nominal_effect_capacity.rs");
 }
+
+#[cfg(test)]
+mod session_allocation_tests {
+    use super::*;
+    include!("../tests/unit/session_allocation.rs");
+}

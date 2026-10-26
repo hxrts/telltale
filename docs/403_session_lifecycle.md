@@ -429,7 +429,7 @@ success publication. This enforces the canonical Rust `wf_coroutine_state`
 register-width invariant, not an inferred equal-length convention. Receive also
 retains its actual destination and requires that register to exist. Branch receive
 omits the destination because it performs no destination write, but retains width.
-Handler-only wrappers omit both instruction contexts. Missing fields on older
+After existing signature, replay and payload validation, both VM receive backends reject an out-of-range instruction destination with `OutOfRegisters` before invoking the host receive handler. This preserves the VM fault taxonomy and prevents host receive mutation for that invalid destination. It does not roll back earlier dequeue or replay work. Handler-only wrappers omit both instruction contexts. Missing fields on older
 serialized requests decode as absent and do not invent historical VM context. The original raw outcome remains observational evidence. This check
 is not rollback of earlier buffer dequeue, replay consumption, clock or type work.
 Optional observability retention cannot replace an original host failure: the
@@ -523,3 +523,30 @@ path currently records timeout horizons without issuing these TimeoutWitness
 objects. This correction does not invent threaded witness parity or new
 physical-time behavior. SimClock admission and original timeout horizons remain
 unchanged.
+
+## Finite session-identifier admission
+
+Rust session identifiers are finite `usize` values. Fresh open reserves the maximum
+value as its exhausted high-water mark, and rejects that boundary before inserting
+a session or replacing an existing resident. Explicit-id open is fresh allocation,
+not restoration: it rejects an id below the original high-water mark or already in
+the resident map. Restore/resume retains the original complete store and counter.
+It must not replay fresh open with a previous session id.
+
+Both stores use the same checked admission rule. The cooperative exclusive borrow
+and threaded existing map write lock cover counter admission plus insertion.
+Failure preserves the original counter, resident session, capability and original
+outcomes. Host loading returns the typed `SessionAllocationError`. Source `Open`
+retains it in `Fault::SessionAllocation`, classified under the existing close fault
+category and propagated through the canonical fault/trace path. No external handler
+is called by this allocation boundary. Existing arity, role and handler checks
+precede allocation as before. A public round can already have advanced its selected
+clock and run topology ingress before dispatch. This refusal does not rewind those
+actual observations. No `Opened` occurrence is produced for a refused allocation.
+
+`OwnedSession` private construction prevents callers from fabricating a handle,
+but its resident capability check is not an independent per-machine nonce. Fresh
+session ids must therefore remain fresh. Resetting a session by overwriting its id
+could reset its resident ownership generation, and must not be treated as a safe
+way to retire or restore original custody. This finite-admission preparation is not
+a proof of arbitrary serialized snapshot provenance or cross-machine owner scope.

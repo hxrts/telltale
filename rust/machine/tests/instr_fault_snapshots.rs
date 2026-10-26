@@ -27,7 +27,7 @@ fn fault_name(fault: &Fault) -> &'static str {
         Fault::Transfer { .. } => "transfer_fault",
         Fault::OperationOwnership { .. } => "operation_ownership_fault",
         Fault::Speculation { .. } => "spec_fault",
-        Fault::Close { .. } => "close_fault",
+        Fault::Close { .. } | Fault::SessionAllocation { .. } => "close_fault",
         Fault::FlowViolation { .. } => "flow_violation",
         Fault::NoProgressToken { .. } => "no_progress_token",
         Fault::OutputCondition { .. } => "output_condition_fault",

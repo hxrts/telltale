@@ -268,11 +268,13 @@ fn threaded_recv_reports_verification_fault_for_tampered_signature() {
     );
 
     let store = ThreadedSessionStore::new();
-    let sid = store.open(
-        vec!["A".to_string(), "B".to_string()],
-        &BufferConfig::default(),
-        &local_types,
-    );
+    let sid = store
+        .open(
+            vec!["A".to_string(), "B".to_string()],
+            &BufferConfig::default(),
+            &local_types,
+        )
+        .expect("fresh fixture session allocation");
     {
         let session = store.get(sid).expect("session exists");
         let mut session = session.lock().expect("session lock poisoned");
@@ -2261,4 +2263,159 @@ fn assert_capacity_wave_refusal(
         "only admitted original poll, no worker issuance"
     );
     assert_eq!(counter, u64::MAX - 4);
+}
+
+#[test]
+fn threaded_finite_session_ids_refuse_max_and_collision_before_replacement() {
+    use crate::session::SessionAllocationError;
+    let store = ThreadedSessionStore::new();
+    let roles = vec!["A".to_string()];
+    let types = BTreeMap::from([("A".to_string(), LocalTypeR::End)]);
+    let config = BufferConfig::default();
+    store.next_id.store(usize::MAX - 1, Ordering::SeqCst);
+    assert_eq!(
+        store.open(roles.clone(), &config, &types),
+        Ok(usize::MAX - 1)
+    );
+    let original = store
+        .get(usize::MAX - 1)
+        .expect("actual last fresh resident");
+    let before = crate::serialization::binary_encode(&*original.lock().unwrap()).unwrap();
+    assert_eq!(
+        store.open(roles.clone(), &config, &types),
+        Err(SessionAllocationError::Exhausted)
+    );
+    assert_eq!(store.next_id.load(Ordering::SeqCst), usize::MAX);
+    assert!(Arc::ptr_eq(&original, &store.get(usize::MAX - 1).unwrap()));
+    assert_eq!(
+        crate::serialization::binary_encode(&*original.lock().unwrap()).unwrap(),
+        before
+    );
+    store.next_id.store(usize::MAX - 1, Ordering::SeqCst);
+    assert_eq!(
+        store.open(roles, &config, &types),
+        Err(SessionAllocationError::NotFresh {
+            session_id: usize::MAX - 1,
+            next_session_id: usize::MAX - 1
+        })
+    );
+    assert_eq!(store.next_id.load(Ordering::SeqCst), usize::MAX - 1);
+    assert!(Arc::ptr_eq(&original, &store.get(usize::MAX - 1).unwrap()));
+    assert_eq!(
+        crate::serialization::binary_encode(&*original.lock().unwrap()).unwrap(),
+        before
+    );
+}
+
+#[test]
+fn threaded_open_instruction_refuses_exhaustion_before_endpoint_or_event() {
+    let store = ThreadedSessionStore::new();
+    let mut coro = Coroutine::new(0, 0, 0, "A".to_string(), 2, usize::MAX);
+    let config = BufferConfig::default();
+    let types = [("A".to_string(), LocalTypeR::End)];
+    let roles = ["A".to_string()];
+    let dsts = [("A".to_string(), 0)];
+    store.next_id.store(usize::MAX - 1, Ordering::SeqCst);
+    let pack = step_open(
+        &mut coro,
+        "A",
+        &store,
+        &config,
+        &roles,
+        &types,
+        &[],
+        &dsts,
+        7,
+    )
+    .expect("last fresh source open");
+    assert!(
+        matches!(pack.events.as_slice(), [ObsEvent::Opened { tick: 7, session, .. }] if *session == usize::MAX - 1)
+    );
+    let before = crate::serialization::binary_encode(&coro).unwrap();
+    let error = match step_open(
+        &mut coro,
+        "A",
+        &store,
+        &config,
+        &roles,
+        &types,
+        &[],
+        &dsts,
+        7,
+    ) {
+        Err(error) => error,
+        Ok(_) => panic!("exhausted source open must refuse"),
+    };
+    assert_eq!(
+        error,
+        Fault::SessionAllocation {
+            error: crate::session::SessionAllocationError::Exhausted
+        }
+    );
+    assert_eq!(crate::serialization::binary_encode(&coro).unwrap(), before);
+    assert_eq!(store.sessions.read().unwrap().len(), 1);
+    assert_eq!(store.next_id.load(Ordering::SeqCst), usize::MAX);
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn threaded_owned_loader_exhaustion_preserves_original_owner_and_workers() {
+    let image = lifecycle_loop_image(false);
+    let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+    machine
+        .sessions
+        .next_id
+        .store(usize::MAX - 1, Ordering::SeqCst);
+    let owner = machine
+        .load_choreography_owned(&image, "original")
+        .expect("last fresh owned load");
+    let sid = owner.session_id();
+    let original = machine.sessions.get(sid).unwrap();
+    let before = crate::serialization::binary_encode(&*original.lock().unwrap()).unwrap();
+    let trace = machine.trace.clone();
+    let coroutines = machine.coroutines.len();
+    let tick = machine.clock.tick;
+    let failure = machine.load_choreography_owned(&image, "original");
+    let source_is_exhausted = failure
+        .as_ref()
+        .err()
+        .and_then(|error| std::error::Error::source(error))
+        .and_then(|source| source.downcast_ref::<crate::session::SessionAllocationError>())
+        == Some(&crate::session::SessionAllocationError::Exhausted);
+    let still_owned =
+        crate::owned::OwnedSessionMachine::validate_owned_operation(&mut machine, &owner);
+    let same = Arc::ptr_eq(&original, &machine.sessions.get(sid).unwrap());
+    let unchanged =
+        crate::serialization::binary_encode(&*original.lock().unwrap()).unwrap() == before;
+    let observations = machine.trace == trace
+        && machine.coroutines.len() == coroutines
+        && machine.clock.tick == tick;
+    let closed = machine.close_and_reap_session(owner.session_id());
+    let joined = machine.shutdown_worker_pool();
+    // Original session disposition and worker join are requested before result
+    // assertions, so an unexpected refusal cannot skip the original cleanup.
+    assert!(
+        closed.is_ok(),
+        "original session cleanup: {closed:?}; refusal: {failure:?}"
+    );
+    let joined = joined
+        .unwrap_or_else(|error| panic!("original worker cleanup: {error:?}; refusal: {failure:?}"));
+    assert_eq!(joined.joined_workers(), 1);
+    assert!(
+        joined.worker_panics().is_empty(),
+        "original worker panics; refusal: {failure:?}"
+    );
+    assert!(
+        source_is_exhausted,
+        "missing original allocation source: {failure:?}"
+    );
+    assert!(matches!(
+        failure,
+        Err(ProtocolMachineError::SessionAllocation(
+            crate::session::SessionAllocationError::Exhausted
+        ))
+    ));
+    assert_eq!(sid, usize::MAX - 1);
+    assert!(still_owned.is_ok());
+    assert!(same && unchanged && observations);
 }

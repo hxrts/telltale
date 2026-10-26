@@ -84,11 +84,11 @@ impl ProtocolMachine {
             });
         }
 
-        let sid = self.sessions.open_with_sid_from_plan(
-            self.sessions.next_session_id(),
-            &plan,
-            &self.config.buffer_config,
-        );
+        let next_sid = self.sessions.next_session_id();
+        let sid = self
+            .sessions
+            .open_with_sid_from_plan(next_sid, &plan, &self.config.buffer_config)
+            .map_err(|error| Fault::SessionAllocation { error })?;
         self.next_session_id = self.sessions.next_session_id();
         for (_, sender, receiver) in plan.edge_blueprint() {
             if let Some((_, handler_id)) =

@@ -4,6 +4,7 @@
 
 use cfg_if::cfg_if;
 use std::collections::BTreeMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use proptest::prelude::*;
 use telltale_machine::coroutine::Fault;
@@ -15,11 +16,14 @@ use telltale_types::{GlobalType, Label, LocalTypeR};
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        use telltale_machine::ThreadedGuestRuntime;
+        use telltale_machine::ThreadedProtocolMachine;
     }
 }
 
-struct NoopHandler;
+#[derive(Default)]
+struct NoopHandler {
+    receive_calls: AtomicUsize,
+}
 
 impl EffectHandler for NoopHandler {
     fn handle_send(
@@ -40,6 +44,7 @@ impl EffectHandler for NoopHandler {
         _state: &mut Vec<telltale_machine::Value>,
         _payload: &telltale_machine::Value,
     ) -> EffectResult<()> {
+        self.receive_calls.fetch_add(1, Ordering::SeqCst);
         EffectResult::success(())
     }
 
@@ -64,7 +69,10 @@ impl EffectHandler for NoopHandler {
 fn assert_out_of_registers(result: Result<RunStatus, ProtocolMachineError>) {
     match result {
         Err(ProtocolMachineError::Fault { fault, .. }) => {
-            assert!(matches!(fault, Fault::OutOfRegisters))
+            assert!(
+                matches!(fault, Fault::OutOfRegisters),
+                "expected OutOfRegisters, got {fault:?}"
+            )
         }
         other => panic!("expected OutOfRegisters fault, got {other:?}"),
     }
@@ -85,7 +93,7 @@ fn single_role_move_image(src: u16) -> CodeImage {
     }
 }
 
-fn recv_oob_image(dst: u16) -> CodeImage {
+fn recv_image(dst: u16) -> CodeImage {
     let mut programs = BTreeMap::new();
     programs.insert(
         "A".to_string(),
@@ -118,16 +126,18 @@ proptest! {
         let image = single_role_move_image(src);
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
         machine.load_choreography(&image).expect("load choreography");
-        assert_out_of_registers(machine.run(&NoopHandler, 8));
+        assert_out_of_registers(machine.run(&NoopHandler::default(), 8));
     }
 
     #[test]
     fn cooperative_receive_dst_oob_register_faults(offset in 0u16..256) {
         let dst = 16u16.saturating_add(offset);
-        let image = recv_oob_image(dst);
+        let image = recv_image(dst);
         let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
         machine.load_choreography(&image).expect("load choreography");
-        assert_out_of_registers(machine.run(&NoopHandler, 16));
+        let handler = NoopHandler::default();
+        assert_out_of_registers(machine.run(&handler, 16));
+        assert_eq!(handler.receive_calls.load(Ordering::SeqCst), 0);
     }
 }
 
@@ -138,21 +148,78 @@ cfg_if! {
             fn threaded_move_oob_register_faults(offset in 0u16..256) {
                 let src = 16u16.saturating_add(offset);
                 let image = single_role_move_image(src);
-                let mut machine = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
-                machine.load_choreography_owned(&image, "tests/register_bounds")
+                let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+                let owner = machine.load_choreography_owned(&image, "tests/register_bounds")
                     .expect("load choreography");
-                assert_out_of_registers(machine.run(&NoopHandler, 8));
+                let result = machine.run(&NoopHandler::default(), 8);
+                let closed = machine.close_and_reap_session(owner.session_id());
+                let disposal = machine.shutdown_worker_pool();
+                assert!(closed.is_ok(), "original session cleanup failed: {closed:?}; run: {result:?}");
+                let disposal = disposal.unwrap_or_else(|failure| panic!("original worker cleanup failed: {failure:?}; run: {result:?}"));
+                assert_eq!(disposal.joined_workers(), 1);
+                assert!(disposal.worker_panics().is_empty());
+                assert_out_of_registers(result);
             }
 
             #[test]
             fn threaded_receive_dst_oob_register_faults(offset in 0u16..256) {
                 let dst = 16u16.saturating_add(offset);
-                let image = recv_oob_image(dst);
-                let mut machine = ThreadedGuestRuntime::with_workers(ProtocolMachineConfig::default(), 1);
-                machine.load_choreography_owned(&image, "tests/register_bounds")
+                let image = recv_image(dst);
+                let mut machine = ThreadedProtocolMachine::with_workers(ProtocolMachineConfig::default(), 1);
+                let owner = machine.load_choreography_owned(&image, "tests/register_bounds")
                     .expect("load choreography");
-                assert_out_of_registers(machine.run(&NoopHandler, 16));
+                let handler = NoopHandler::default();
+                let result = machine.run(&handler, 16);
+                let receive_calls = handler.receive_calls.load(Ordering::SeqCst);
+                let closed = machine.close_and_reap_session(owner.session_id());
+                let disposal = machine.shutdown_worker_pool();
+                assert!(closed.is_ok(), "original session cleanup failed: {closed:?}; run: {result:?}");
+                let disposal = disposal.unwrap_or_else(|failure| panic!("original worker cleanup failed: {failure:?}; run: {result:?}"));
+                assert_eq!(disposal.joined_workers(), 1);
+                assert!(disposal.worker_panics().is_empty());
+                assert_out_of_registers(result);
+                assert_eq!(receive_calls, 0);
             }
         }
     }
+}
+
+#[test]
+fn cooperative_receive_valid_destination_invokes_host_once() {
+    let config = ProtocolMachineConfig::default();
+    let image = recv_image(config.num_registers - 1);
+    let mut machine = ProtocolMachine::new(config);
+    machine
+        .load_choreography(&image)
+        .expect("load valid receive choreography");
+    let handler = NoopHandler::default();
+    assert!(matches!(machine.run(&handler, 16), Ok(RunStatus::AllDone)));
+    assert_eq!(handler.receive_calls.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(feature = "multi-thread")]
+#[test]
+fn threaded_receive_valid_destination_invokes_host_once() {
+    let config = ProtocolMachineConfig::default();
+    let image = recv_image(config.num_registers - 1);
+    let mut machine = ThreadedProtocolMachine::with_workers(config, 1);
+    let owner = machine
+        .load_choreography_owned(&image, "tests/register_bounds")
+        .expect("load valid receive choreography");
+    let handler = NoopHandler::default();
+    let result = machine.run(&handler, 16);
+    let receive_calls = handler.receive_calls.load(Ordering::SeqCst);
+    let closed = machine.close_and_reap_session(owner.session_id());
+    let disposal = machine.shutdown_worker_pool();
+    assert!(
+        closed.is_ok(),
+        "original session cleanup failed: {closed:?}; run: {result:?}"
+    );
+    let disposal = disposal.unwrap_or_else(|failure| {
+        panic!("original worker cleanup failed: {failure:?}; run: {result:?}")
+    });
+    assert_eq!(disposal.joined_workers(), 1);
+    assert!(disposal.worker_panics().is_empty());
+    assert!(matches!(result, Ok(RunStatus::AllDone)), "run: {result:?}");
+    assert_eq!(receive_calls, 1);
 }

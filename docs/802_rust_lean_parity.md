@@ -701,7 +701,7 @@ success publication. This enforces the canonical Rust `wf_coroutine_state`
 register-width invariant, not an inferred equal-length convention. Receive also
 retains its actual destination and requires that register to exist. Branch receive
 omits the destination because it performs no destination write, but retains width.
-Handler-only wrappers omit both instruction contexts. Missing fields on older
+After existing signature, replay and payload validation, both VM receive backends reject an out-of-range instruction destination with `OutOfRegisters` before invoking the host receive handler. This preserves the VM fault taxonomy and prevents host receive mutation for that invalid destination. It does not roll back earlier dequeue or replay work. Handler-only wrappers omit both instruction contexts. Missing fields on older
 serialized requests decode as absent and do not invent historical VM context. The original raw outcome remains observational evidence. This check
 is not rollback of earlier buffer dequeue, replay consumption, clock or type work.
 Optional observability retention cannot replace an original host failure: the
@@ -1002,3 +1002,22 @@ validated single-original relation. Missing parent records or executable payload
 unknown response families and unsupported fault observations refuse comparison.
 This is a prepared executable relation, not an elaborated compiler-refinement
 theorem or full authority-language proof. Required Rust/Lean execution is open.
+
+### Finite session-identifier representation
+
+Lean's session ids are natural numbers. `WFVMState` requires every resident sid to
+be below `nextSessionId`. Source `Open` advances that natural-number counter, and
+the public loader's `nextFreshSessionId` avoids resident ids even for noncanonical
+input. Rust's shared checked session-open admission retains this freshness within
+its finite representable range and explicitly refuses exhausted or non-fresh ids.
+It never wraps, saturates into reuse, replaces a resident, or reconstructs an owner.
+The new typed Rust allocation fault has no corresponding exhausted-Nat Lean case.
+Parity therefore requires the finite fresh-allocation premise. It does not assert
+that Lean's unbounded execution takes a finite host refusal step.
+
+The existing finite-effect occurrence admission remains a separate counter family.
+Session allocation uses the original session-store high-water mark and exclusive
+store transaction, not an effect occurrence, extra allocator, nonce registry or
+new authority. Source and backend boundary tests in this preparation still require
+actual harness discovery and execution, native/default/WASM configuration checks,
+strict lint and the required full final-source model/CI/release gates.
