@@ -552,3 +552,7 @@ fn tier2_step_indexed_correspondence() {
     let fixture = test_choreographies::tier2_control_flow::binary_choice();
     assert_step_indexed_equivalence(&fixture, 320, &runner);
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[path = "support/nominal_image_correspondence.rs"]
+mod nominal_image_correspondence;

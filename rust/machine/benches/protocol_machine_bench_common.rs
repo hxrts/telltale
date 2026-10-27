@@ -64,6 +64,11 @@ pub(crate) struct BenchHandler;
 impl EffectHandler for BenchHandler {
     fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
         match request.body {
+            EffectRequestBody::NominalCommand { .. } => {
+                EffectOutcome::failure(EffectFailure::unavailable(
+                    "this generic handler does not implement nominal commands",
+                ))
+            }
             EffectRequestBody::SendDecision { payload, .. } => {
                 EffectOutcome::success(EffectResponse::SendDecision {
                     decision: SendDecision::Deliver(payload.unwrap_or(Value::Unit)),
@@ -472,7 +477,9 @@ pub(crate) fn session_open_allocation_count(num_roles: usize) -> usize {
         .collect();
     let (_, allocations) = count_allocations(|| {
         let mut store = SessionStore::new();
-        store.open_with_sid(0, roles, &BufferConfig::default(), &local_types)
+        store
+            .open_with_sid(0, roles, &BufferConfig::default(), &local_types)
+            .expect("fresh fixture session allocation")
     });
     allocations
 }

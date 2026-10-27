@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    rust-overlay.url = "github:oxalica/rust-overlay";
+    rust-overlay.url = "github:oxalica/rust-overlay/62e3b8aedabc240e5b0cc9fae003bc9edfebbc9b";
     flake-utils.url = "github:numtide/flake-utils";
     toolkit = {
       url = "github:hxrts/toolkit?ref=v0.4.1";
@@ -31,7 +31,7 @@
         };
         toolkitSupport = toolkit.lib.${system}.consumerShellSupport;
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+        rustToolchain = pkgs.rust-bin.stable."1.95.0".default.override {
           extensions = [
             "rust-src"
             "rust-analyzer"

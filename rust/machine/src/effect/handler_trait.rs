@@ -15,6 +15,17 @@
 ///   ownership capability such as `OwnedSession`, not through ad hoc access to
 ///   the session store while handlers are executing.
 pub trait EffectHandler: Send + Sync {
+    /// Execute the declared Unit -> Result String Bool command. Unknown operations
+    /// refuse by default; generic step is never a nominal implementation.
+    fn handle_nominal_command(
+        &self,
+        _request: &crate::nominal_command::NominalCommandRequest,
+    ) -> EffectResult<crate::nominal_command::NominalCommandReply> {
+        EffectResult::failure(EffectFailure::unavailable(
+            "nominal operation is not implemented by this handler",
+        ))
+    }
+
     /// Stable identifier for effect-trace attribution.
     fn handler_identity(&self) -> String {
         crate::session::DEFAULT_HANDLER_ID.to_string()
@@ -36,6 +47,15 @@ pub trait EffectHandler: Send + Sync {
         }
 
         match request.body {
+            EffectRequestBody::NominalCommand { request } => {
+                match self.handle_nominal_command(&request) {
+                    EffectResult::Success(reply) => {
+                        EffectOutcome::success(EffectResponse::NominalCommand { reply })
+                    }
+                    EffectResult::Blocked => EffectOutcome::blocked(),
+                    EffectResult::Failure(failure) => EffectOutcome::failure(failure),
+                }
+            }
             EffectRequestBody::SendDecision {
                 role,
                 partner,
@@ -69,6 +89,7 @@ pub trait EffectHandler: Send + Sync {
                 label,
                 state,
                 payload,
+                ..
             } => {
                 let mut state = state;
                 match self.handle_recv(&role, &partner, &label, &mut state, &payload) {
@@ -91,7 +112,7 @@ pub trait EffectHandler: Send + Sync {
                 EffectResult::Blocked => EffectOutcome::blocked(),
                 EffectResult::Failure(failure) => EffectOutcome::failure(failure),
             },
-            EffectRequestBody::InvokeStep { role, state } => {
+            EffectRequestBody::InvokeStep { role, state, .. } => {
                 let mut state = state;
                 match self.step(&role, &mut state) {
                     EffectResult::Success(()) => {

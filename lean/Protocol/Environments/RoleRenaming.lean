@@ -39,6 +39,7 @@ def renameValTypeRole (s : SessionId) (A B : Role) : ValType → ValType
   | .bool => .bool
   | .nat => .nat
   | .string => .string
+  | .readiness => .readiness
   | .prod T₁ T₂ => .prod (renameValTypeRole s A B T₁) (renameValTypeRole s A B T₂)
   | .chan sid role =>
       if sid == s then
@@ -103,6 +104,7 @@ theorem rename_val_type_rename_val_type_role_comm (ρ : SessionRenaming) (s : Se
   | bool => rfl
   | nat => rfl
   | string => rfl
+  | readiness => rfl
   | prod T₁ T₂ ih₁ ih₂ =>
     simp only [renameValType, renameValTypeRole, ih₁, ih₂]
   | chan sid role =>

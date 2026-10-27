@@ -1,5 +1,21 @@
 // Both backends delegate ownership transitions to SessionState.
 impl crate::owned::OwnedSessionMachine for ThreadedProtocolMachine {
+    fn inject_owned_message_with_sequence(
+        &mut self,
+        owner: &OwnedSession,
+        from: &str,
+        to: &str,
+        value: Value,
+        sequence_no: u64,
+    ) -> Result<EnqueueResult, crate::owned::OwnedSessionEnqueueError> {
+        self.sessions
+            .with_owned_session_at(owner.session_id(), Some(self.clock.tick), |session| {
+                session.send_owned_with_sequence(owner.capability(), from, to, value, sequence_no)
+            })
+            .map_err(crate::owned::OwnedSessionEnqueueError::Ownership)?
+            .map_err(|message| crate::owned::OwnedSessionEnqueueError::Enqueue { message })
+    }
+
     fn validate_owned_operation(&mut self, owner: &OwnedSession) -> Result<(), OwnershipError> {
         let capability = owner.capability();
         self.sessions.with_owned_session_at(
@@ -226,14 +242,30 @@ mod ownership_lock_tests {
             panic!("poison the actual original session custody lock");
         })
         .join();
+        let mutation = owner.apply_host_mutation(
+            &mut machine,
+            SessionHostMutation::SetDefaultHandler {
+                handler: "never-applied".into(),
+            },
+        );
+        let ingress = owner.inject_message_with_sequence(&mut machine, "A", "B", Value::Unit, 0);
+        let retained = machine.sessions.get(owner.session_id()).unwrap();
+        let unchanged =
+            original.lock().unwrap_err().into_inner().default_handler != "never-applied";
+        let workers = machine
+            .shutdown_worker_pool()
+            .expect("same actual original pool joined")
+            .joined_workers();
+        assert_eq!(workers, 1);
         assert!(joined.is_err());
         assert!(
-            matches!(owner.apply_host_mutation(&mut machine, SessionHostMutation::SetDefaultHandler { handler: "never-applied".into() }), Err(OwnershipError::LockPoisoned { session_id }) if session_id == owner.session_id())
+            matches!(mutation, Err(OwnershipError::LockPoisoned { session_id }) if session_id == owner.session_id())
         );
-        let retained = machine.sessions.get(owner.session_id()).unwrap();
+        assert!(
+            matches!(ingress, Err(crate::owned::OwnedSessionEnqueueError::Ownership(OwnershipError::LockPoisoned { session_id })) if session_id == owner.session_id())
+        );
         assert!(Arc::ptr_eq(&original, &retained));
-        let guard = original.lock().unwrap_err().into_inner();
-        assert_ne!(guard.default_handler, "never-applied");
+        assert!(unchanged);
     }
     #[test]
     fn ownership_poisoned_audit_refuses_transition_before_state_mutation() {
@@ -256,15 +288,23 @@ mod ownership_lock_tests {
                 })
                 .join()
         });
+        let transfer = owner.begin_transfer(&mut machine, "next", OwnershipScope::Session);
+        let ingress = owner.inject_message_with_sequence(&mut machine, "A", "B", Value::Unit, 0);
+        let retained = machine.sessions.get(owner.session_id()).unwrap();
+        let after = original.lock().unwrap().ownership().clone();
+        let workers = machine
+            .shutdown_worker_pool()
+            .expect("same actual original pool joined")
+            .joined_workers();
+        assert_eq!(workers, 1);
         assert!(joined.is_err());
         assert!(
-            matches!(owner.begin_transfer(&mut machine, "next", OwnershipScope::Session), Err(OwnershipError::LockPoisoned { session_id }) if session_id == owner.session_id())
+            matches!(transfer, Err(OwnershipError::LockPoisoned { session_id }) if session_id == owner.session_id())
         );
-        assert!(Arc::ptr_eq(
-            &original,
-            &machine.sessions.get(owner.session_id()).unwrap()
-        ));
-        let after = original.lock().unwrap();
-        assert_eq!(&before, after.ownership());
+        assert!(
+            matches!(ingress, Err(crate::owned::OwnedSessionEnqueueError::Ownership(OwnershipError::LockPoisoned { session_id })) if session_id == owner.session_id())
+        );
+        assert!(Arc::ptr_eq(&original, &retained));
+        assert_eq!(before, after);
     }
 }

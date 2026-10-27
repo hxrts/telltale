@@ -255,9 +255,12 @@ pub enum ObservabilityRetentionMode {
     /// Retain all recorded artifacts.
     #[default]
     Full,
-    /// Retain only the most recent `capacity` artifacts per stream.
+    /// Retain at most `capacity` retired terminal records per canonical effect stream,
+    /// plus live obligations and all records of resident sessions; diagnostic-only
+    /// streams retain their usual cap.
     Capped,
-    /// Disable retention entirely while preserving runtime behavior.
+    /// Disable diagnostic and retired-history retention while preserving live
+    /// canonical obligations and canonical records of resident sessions.
     Disabled,
 }
 

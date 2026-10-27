@@ -120,6 +120,7 @@ pub(crate) fn runtime_value_val_type(value: &Value) -> ValType {
         Value::Nat(_) => ValType::Nat,
         Value::Bool(_) => ValType::Bool,
         Value::Str(_) => ValType::String,
+        Value::Readiness(_) => ValType::Readiness,
         Value::Prod(left, right) => ValType::Prod(
             Box::new(runtime_value_val_type(left)),
             Box::new(runtime_value_val_type(right)),
@@ -138,6 +139,23 @@ pub(crate) fn runtime_value_wire_size_bytes(value: &Value) -> usize {
         Value::Nat(_) => 8,
         Value::Bool(_) => 1,
         Value::Str(text) => 8_usize.saturating_add(text.len()),
+        Value::Readiness(witness) => {
+            // Structural wire-size policy, matching other scalar/string values.
+            let scope = match &witness.scope {
+                crate::session::OwnershipScope::Session => 1,
+                crate::session::OwnershipScope::Fragments(roles) => {
+                    roles.iter().fold(9_usize, |size, role| {
+                        size.saturating_add(8).saturating_add(role.len())
+                    })
+                }
+            };
+            24_usize
+                .saturating_add(8)
+                .saturating_add(witness.owner_id.len())
+                .saturating_add(8)
+                .saturating_add(witness.predicate_ref.len())
+                .saturating_add(scope)
+        }
         Value::Prod(left, right) => 1_usize
             .saturating_add(runtime_value_wire_size_bytes(left))
             .saturating_add(runtime_value_wire_size_bytes(right)),
@@ -154,6 +172,7 @@ pub(crate) fn runtime_value_matches_val_type(value: &Value, expected: &ValType) 
         (Value::Nat(_), ValType::Nat) => true,
         (Value::Bool(_), ValType::Bool) => true,
         (Value::Str(_), ValType::String) => true,
+        (Value::Readiness(_), ValType::Readiness) => true,
         (Value::Prod(left, right), ValType::Prod(expected_left, expected_right)) => {
             runtime_value_matches_val_type(left, expected_left)
                 && runtime_value_matches_val_type(right, expected_right)

@@ -56,6 +56,11 @@ fn generate_effect_metadata_from_annotations(protocol: &Protocol, _role: &Role) 
 /// Generate effect-based protocol implementation
 #[must_use]
 pub fn generate_effects_protocol(choreography: &Choreography) -> TokenStream {
+    if choreography.protocol.contains_authority_binding() {
+        return quote! {
+            compile_error!("authority bindings require effect-preserving lowering; communication-only effect generation cannot erase them");
+        };
+    }
     let protocol_name = &choreography.name;
     let roles = generate_role_enum(&choreography.roles);
     let labels = generate_label_type(&choreography.protocol);

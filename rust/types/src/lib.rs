@@ -21,6 +21,7 @@
 //! - "Precise Subtyping for Asynchronous Multiparty Sessions" (Ghilezan et al., POPL 2021)
 
 mod action;
+mod authority;
 pub mod content_id;
 pub mod content_store;
 pub mod contentable;
@@ -37,6 +38,7 @@ pub mod units;
 mod val_type;
 
 pub use action::{Action, LocalAction};
+pub use authority::{OwnershipScope, ReadinessWitness};
 pub use content_id::{
     Blake3Hasher, ContentId, ContentIdBlake3, DefaultContentHasher, DefaultContentId, Hasher,
 };

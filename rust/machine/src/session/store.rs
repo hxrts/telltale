@@ -105,7 +105,10 @@ impl SessionStore {
 
     /// Open a new session with an externally supplied session id.
     ///
-    /// Callers should source ids from `SessionStore::next_session_id()`.
+    /// This is fresh allocation, not restore/resume. Older ids cannot be reissued.
+    ///
+    /// # Errors
+    /// Rejects resident/previous ids or exhaustion before mutation.
     #[allow(clippy::needless_pass_by_value)]
     pub fn open_with_sid(
         &mut self,
@@ -113,39 +116,46 @@ impl SessionStore {
         roles: Vec<String>,
         buffer_config: &BufferConfig,
         initial_types: &BTreeMap<String, LocalTypeR>,
-    ) -> SessionId {
+    ) -> Result<SessionId, SessionAllocationError> {
         let plan = SessionOpenPlan::new(&roles, initial_types);
         self.open_with_sid_from_plan(sid, &plan, buffer_config)
     }
 
     /// Open a new session from a reusable precomputed open plan.
+    ///
+    /// # Errors
+    /// Rejects resident/previous ids or exhaustion before mutation.
     pub fn open_with_sid_from_plan(
         &mut self,
         sid: SessionId,
         plan: &SessionOpenPlan,
         buffer_config: &BufferConfig,
-    ) -> SessionId {
+    ) -> Result<SessionId, SessionAllocationError> {
+        let next = admit_session_id(sid, self.next_id, self.sessions.contains_key(&sid))?;
         let state = SessionState::from_open_plan(sid, plan, buffer_config);
         self.sessions.insert(sid, state);
-        self.next_id = self.next_id.max(sid.saturating_add(1));
-        sid
+        self.next_id = next;
+        Ok(sid)
     }
 
     /// Open a new session with the given roles, buffer config, and initial local types.
     ///
     /// Returns the session ID. Endpoints are constructed as `Endpoint { sid, role }`.
+    ///
+    /// # Errors
+    /// Rejects a non-fresh next id or exhaustion before mutation.
     #[allow(clippy::needless_pass_by_value)]
     pub fn open(
         &mut self,
         roles: Vec<String>,
         buffer_config: &BufferConfig,
         initial_types: &BTreeMap<String, LocalTypeR>,
-    ) -> SessionId {
+    ) -> Result<SessionId, SessionAllocationError> {
         let sid = self.next_id;
         self.open_with_sid(sid, roles, buffer_config, initial_types)
     }
 
-    /// Next session identifier that will be allocated by `open`.
+    /// Next session high-water mark. `usize::MAX` denotes exhausted allocation.
     #[must_use]
     pub fn next_session_id(&self) -> SessionId {
         self.next_id

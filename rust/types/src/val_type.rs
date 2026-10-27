@@ -20,4 +20,6 @@ pub enum ValType {
         sid: usize,
         role: std::string::String,
     },
+    /// Typed readiness evidence data; live issuance is checked by the session owner.
+    Readiness,
 }

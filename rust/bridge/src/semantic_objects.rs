@@ -51,6 +51,7 @@ mod tests {
         let payload = ProtocolMachineSemanticObjects {
             schema_version: canonical_semantic_objects_schema_version(),
             operation_instances: vec![OperationInstance {
+                agreement_profile: None,
                 operation_id: "effect:1".to_string(),
                 session: Some(1),
                 owner_id: None,
@@ -111,7 +112,7 @@ mod tests {
                 reason: None,
             }],
             authoritative_reads: vec![AuthoritativeRead {
-                read_id: "readiness:1:Issued".to_string(),
+                read_id: "authority_read:content:1:S1:1S13:runtime/ownerS9:readinessS6:issuedS13:session.readyS1:1S1:0N".to_string(),
                 session: Some(1),
                 owner_id: Some("runtime/owner".to_string()),
                 kind: AuthoritativeReadKind::Readiness,
@@ -220,7 +221,7 @@ mod tests {
                 scope: OwnershipScope::Session,
                 operation_ids: vec!["effect:1".to_string()],
                 effect_ids: vec![1],
-                authoritative_read_ids: vec!["readiness:1:Issued".to_string()],
+                authoritative_read_ids: vec!["authority_read:content:1:S1:1S13:runtime/ownerS9:readinessS6:issuedS13:session.readyS1:1S1:0N".to_string()],
                 handle_ids: Vec::new(),
                 publication_ids: Vec::new(),
             }],

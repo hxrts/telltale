@@ -85,6 +85,13 @@ impl CompiledChoreography {
     pub fn try_local_type_r_map(
         &self,
     ) -> Result<BTreeMap<String, crate::ast::LocalTypeR>, ConversionError> {
+        if self.choreography.protocol.contains_authority_binding() {
+            return Err(ConversionError::UnsupportedFeature {
+                feature: "AuthorityBinding".to_string(),
+                hint: "Communication projection cannot supply an executable authority artifact"
+                    .to_string(),
+            });
+        }
         let mut out = BTreeMap::new();
         for (role, local_type) in &self.local_types {
             out.insert(role.name().to_string(), local_to_local_r(local_type)?);

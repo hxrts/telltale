@@ -22,7 +22,8 @@ fn fault_name(err: &ProtocolMachineError) -> Option<&'static str> {
             telltale_machine::coroutine::Fault::UnknownLabel { .. } => "unknown_label",
             telltale_machine::coroutine::Fault::Transfer { .. } => "transfer_fault",
             telltale_machine::coroutine::Fault::OutOfRegisters => "out_of_registers",
-            telltale_machine::coroutine::Fault::Close { .. } => "close_fault",
+            telltale_machine::coroutine::Fault::Close { .. }
+            | telltale_machine::coroutine::Fault::SessionAllocation { .. } => "close_fault",
             telltale_machine::coroutine::Fault::Speculation { .. } => "spec_fault",
             _ => "other_fault",
         }),

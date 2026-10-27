@@ -359,3 +359,73 @@ terminal epoch, archival, and acknowledgment contracts.
 - [Effect Handlers and Session Types](303_effect_session_bridge.md)
 - [Lean Verification](801_lean_verification.md)
 - [Capability Admission](702_capability_admission.md)
+
+## Live Effect Custody and History Retention
+
+The existing outstanding-effect, operation-instance and progress-contract fields
+are canonical resident state used by reentrancy and bounded progress enforcement.
+They retain all live records independently of optional diagnostic retention on
+both backends. Disabled retention removes retired terminal history, and Capped retention
+keeps at most its configured number of terminal records per stream while
+preserving live obligations and all records of resident sessions. Oldest eligible
+retired terminal records are pruned first.
+A live obligation is never evicted merely because a later topology exchange or
+other observation was recorded. Total resident records can exceed the history
+cap. That cap is not semantic admission control.
+
+Actual completion, timeout/invalidation, targeted session disposal and ownership
+handoff update the same original fields before terminal history pruning. These
+are protocol-machine lifecycle transitions. They do not acknowledge teardown of
+an arbitrary host future or native worker, and audit serialization cannot
+reconstruct live authority. The shared actual-producer tests exercise owned
+Acquire, subsequent topology ingress, reentrancy/progress and targeted settlement
+with Capped1 and Disabled. Declarations alone are not execution evidence.
+
+Terminal status alone does not make a record diagnostic: the actual commit path
+uses resident operation/publication records to derive the next `WalSyncRequest`.
+All three canonical streams therefore also retain every record associated with
+an actually resident session, including terminal effects and operations. Only
+after the original session store acknowledges its removal can terminal records
+become history eligible for pruning. Ordinary closed-but-resident sessions keep
+that evidence. This retains the original records, not a reconstructed summary or
+parallel WAL ledger. A busy/poisoned threaded registry cannot prove nonresidency,
+so pruning conservatively leaves records resident.
+
+### Finite simulated-clock admission
+
+The original `SimClock` advances once per admitted scheduler round, including a
+round that then observes all coroutines terminal. This is simulated model time.
+Worker waves do not create extra ticks and physical host time is not substituted.
+Both Rust backends preflight the tick successor and simulated `Duration`
+successor together. `ClockExhaustion` propagates as the source-bearing
+`ProtocolMachineError::ClockExhausted` before ingress, callbacks, progress,
+scheduler mutation or cooperative round-observation resets. Refusal changes
+neither original counter and does not acknowledge any pending operation.
+
+### Finite canonical effect-occurrence custody
+
+Fresh canonical effect IDs require complete capacity admission before their host
+work or mutation. The finite counter never allocates its exhausted `u64::MAX`
+sentinel. The same selected threaded wave holds its summed bound before issuance.
+Actual producers retain deterministic allocation order. Already-issued original
+nominal Failure/Blocked observations use their original occurrence, while fresh
+issuance and positive publication retain their complete capacity obligations.
+Actual returned values and errors remain with the original continuation.
+
+A topology poll and its dynamically returned batch have separate boundaries:
+admit the poll before calling it, then retain its actual outcome and admit the
+whole event batch before applying its first mutation. Timeout-witness capacity
+is independently required. Capacity refusal does not undo an already admitted
+round's SimClock increment or scheduler selection. It is distinct from atomic
+clock-exhaustion admission above and supplies no asynchronous cleanup receipt.
+The prepared finite-representation deviation and executable acceptance scope are
+recorded in [Rust-Lean parity](802_rust_lean_parity.md#finite-effect-occurrence-admission).
+
+The bounded authoritative nominal readiness path retains its actual typed result
+in the original coroutine continuation. Output/WAL gates and destination checks
+precede the canonical same-session witness consumer. Success publication and
+branch installation follow that consumer without a foreign callback or clock
+admission. Registry issuance and live original owner/generation/scope checks are
+mandatory even when register data has a readiness type. The Lean session model
+stores the corresponding semantic owner and issued/consumed evidence in its
+canonical session record. This is not a Rust host-resource proof.

@@ -13,6 +13,25 @@ struct RequiredSuite {
 
 const SUITES: &[RequiredSuite] = &[
     RequiredSuite {
+        source: "rust/machine/src/threaded/worker_pool.rs",
+        target: "lib",
+        prefix: "threaded::worker_pool::tests::",
+        filter: "threaded::worker_pool::tests::",
+        names: &[
+            "first_worker_refusal_retains_actual_source_and_zero_worker_settlement",
+            "partial_worker_refusal_retains_actual_worker_until_explicit_original_join",
+            "normal_pool_shutdown_joins_every_original_worker_before_acknowledgment",
+            "original_worker_panic_payload_survives_acknowledged_join",
+            "machine_shutdown_consumes_actual_private_pool_and_issues_join_receipt",
+            "shutdown_from_actual_original_worker_returns_untouched_machine_for_external_retry",
+            "normal_pool_join_unwind_retains_untouched_handles_without_acknowledgment",
+            "failed_constructor_join_unwind_retains_prior_causes_and_pending_original_retry",
+            "resident_settlement_refuses_actual_original_worker_before_consuming_handles",
+            "pending_join_allows_original_worker_observation_and_reentrant_refusal",
+            "unproven_consumed_original_worker_is_refused_before_untouched_retry",
+        ],
+    },
+    RequiredSuite {
         source: "rust/machine/tests/unit/protocol_machine/tests_runtime_progress.rs",
         target: "lib",
         prefix: "engine::tests::",
@@ -81,6 +100,82 @@ const SUITES: &[RequiredSuite] = &[
             "cooperative_failed_commit_preserves_unrelated_owner",
             "threaded_failed_commit_matches_cooperative_terminal_evidence",
         ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/effect_outcome_acceptance.rs",
+        target: "lib",
+        prefix: "effect::outcome_acceptance_tests::",
+        filter: "effect::outcome_acceptance_tests::",
+        names: &[
+            "all_nine_request_kinds_require_their_exact_success_response",
+            "typed_state_extraction_preserves_original_failure_before_attached_response",
+            "unit_conversion_cannot_accept_a_different_unit_like_response",
+            "replay_state_updates_require_the_original_successful_response",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/effect_outcome_acceptance.rs",
+        target: "lib",
+        prefix: "effect::outcome_acceptance_tests::concurrent_recording::",
+        filter: "effect::outcome_acceptance_tests::concurrent_recording::",
+        names: &["actual_interleaved_recording_never_substitutes_the_other_returned_state"],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/invoke_outcome_atomicity.rs",
+        target: "lib",
+        prefix: "engine::invoke_outcome_tests::",
+        filter: "engine::invoke_outcome_tests::",
+        names: &[
+            "valid_invoke_commits_exact_state_and_advances_only_original_continuation",
+            "invalid_invoke_never_mutates_original_registers_or_unrelated_continuation",
+            "actual_receive_state_and_continuation_require_exact_success",
+            "disabled_observability_never_replaces_original_failure_or_blocked_behavior",
+            "all_vm_state_replacers_require_actual_configured_width_before_publication",
+            "original_guard_and_send_outcomes_survive_every_retention_policy",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/invoke_outcome_atomicity.rs",
+        target: "lib",
+        prefix: "threaded::invoke_outcome_tests::",
+        filter: "threaded::invoke_outcome_tests::",
+        names: &[
+            "valid_invoke_commits_exact_state_and_advances_only_original_continuation",
+            "invalid_invoke_never_mutates_original_registers_or_unrelated_continuation",
+            "actual_receive_state_and_continuation_require_exact_success",
+            "disabled_observability_never_replaces_original_failure_or_blocked_behavior",
+            "all_vm_state_replacers_require_actual_configured_width_before_publication",
+            "original_guard_and_send_outcomes_survive_every_retention_policy",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/live_effect_retention.rs",
+        target: "lib",
+        prefix: "engine::live_effect_retention_tests::",
+        filter: "engine::live_effect_retention_tests::",
+        names: &[
+            "actual_blocked_acquire_survives_topology_and_preserves_enforcement",
+            "actual_session_settlement_prunes_only_terminal_history",
+            "actual_wal_sync_keeps_original_resident_terminal_evidence_across_retention_modes",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/live_effect_retention.rs",
+        target: "lib",
+        prefix: "threaded::live_effect_retention_tests::",
+        filter: "threaded::live_effect_retention_tests::",
+        names: &[
+            "actual_blocked_acquire_survives_topology_and_preserves_enforcement",
+            "actual_session_settlement_prunes_only_terminal_history",
+            "actual_wal_sync_keeps_original_resident_terminal_evidence_across_retention_modes",
+        ],
+    },
+    RequiredSuite {
+        source: "rust/machine/tests/unit/send_capacity_retention.rs",
+        target: "lib",
+        prefix: "engine::invoke_outcome_tests::",
+        filter: "actual_full_send_queue_keeps_original_capacity_obligation_with_disabled_history",
+        names: &["actual_full_send_queue_keeps_original_capacity_obligation_with_disabled_history"],
     },
 ];
 
@@ -246,6 +341,117 @@ pub fn run(root: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn composite_outcome_retention_inventory_requires_all_twenty_four_actual_names() {
+        let new_sources = [
+            "rust/machine/tests/unit/effect_outcome_acceptance.rs",
+            "rust/machine/tests/unit/invoke_outcome_atomicity.rs",
+            "rust/machine/tests/unit/live_effect_retention.rs",
+            "rust/machine/tests/unit/send_capacity_retention.rs",
+        ];
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let suites: Vec<_> = SUITES
+            .iter()
+            .filter(|suite| new_sources.contains(&suite.source))
+            .collect();
+        assert_eq!(
+            suites.iter().map(|suite| suite.names.len()).sum::<usize>(),
+            24
+        );
+        assert_eq!(
+            SUITES.iter().map(|suite| suite.names.len()).sum::<usize>(),
+            59
+        );
+        let all: BTreeSet<_> = SUITES
+            .iter()
+            .flat_map(|suite| {
+                suite
+                    .names
+                    .iter()
+                    .map(move |name| format!("{}{name}", suite.prefix))
+            })
+            .collect();
+        assert_eq!(all.len(), 59, "no duplicate required canonical names");
+        for suite in suites {
+            assert_eq!(suite.target, "lib");
+            let source = fs::read_to_string(root.join(suite.source)).unwrap();
+            assert!(require_source_tests(&source, suite.names).is_ok());
+            let listing = suite
+                .names
+                .iter()
+                .map(|name| format!("{}{name}: test\n", suite.prefix))
+                .collect::<String>();
+            let output = suite
+                .names
+                .iter()
+                .map(|name| format!("test {}{name} ... ok\n", suite.prefix))
+                .collect::<String>();
+            assert!(require_harness_tests(&listing, suite).is_ok());
+            assert!(require_passed_tests(&output, suite).is_ok());
+            assert!(require_harness_tests("0 tests, 0 benchmarks", suite).is_err());
+            assert!(require_passed_tests("test result: ok. 0 passed", suite).is_err());
+            for name in suite.names {
+                let ignored =
+                    source.replace(&format!("fn {name}("), &format!("#[ignore] fn {name}("));
+                assert!(require_source_tests(&ignored, suite.names).is_err());
+                let missing = output.replace(&format!("test {}{name} ... ok\n", suite.prefix), "");
+                assert!(require_passed_tests(&missing, suite).is_err());
+            }
+        }
+    }
+
+    #[test]
+    fn native_worker_pool_inventory_requires_actual_source_and_all_eleven_harness_outcomes() {
+        let suite = SUITES
+            .iter()
+            .find(|suite| suite.source == "rust/machine/src/threaded/worker_pool.rs")
+            .expect("canonical required native worker-pool suite");
+        assert_eq!(suite.names.len(), 11);
+        assert_eq!(suite.target, "lib");
+        assert_eq!(suite.prefix, "threaded::worker_pool::tests::");
+        assert_eq!(suite.filter, suite.prefix);
+        let source = include_str!("../../../../rust/machine/src/threaded/worker_pool.rs");
+        assert!(require_source_tests(source, suite.names).is_ok());
+        let listing = suite
+            .names
+            .iter()
+            .map(|name| format!("{}{name}: test\n", suite.prefix))
+            .collect::<String>();
+        let execution = suite
+            .names
+            .iter()
+            .map(|name| format!("test {}{name} ... ok\n", suite.prefix))
+            .collect::<String>();
+        assert!(require_harness_tests(&listing, suite).is_ok());
+        assert!(require_passed_tests(&execution, suite).is_ok());
+        assert!(require_harness_tests("0 tests, 0 benchmarks", suite).is_err());
+        assert!(
+            require_passed_tests("test result: ok. 0 passed; 0 failed; 0 ignored", suite).is_err()
+        );
+        assert!(require_harness_tests(&listing.replace(suite.prefix, "foreign::"), suite).is_err());
+        for name in suite.names {
+            let ignored_source =
+                source.replace(&format!("fn {name}("), &format!("#[ignore] fn {name}("));
+            assert!(
+                require_source_tests(&ignored_source, suite.names).is_err(),
+                "source ignore must refuse {name}"
+            );
+            let ignored_execution = execution.replace(
+                &format!("test {}{name} ... ok", suite.prefix),
+                &format!("test {}{name} ... ignored", suite.prefix),
+            );
+            assert!(
+                require_passed_tests(&ignored_execution, suite).is_err(),
+                "ignored harness must refuse {name}"
+            );
+            let missing_listing = listing.replace(&format!("{}{name}: test\n", suite.prefix), "");
+            assert!(
+                require_harness_tests(&missing_listing, suite).is_err(),
+                "missing actual name must refuse {name}"
+            );
+        }
+    }
 
     #[test]
     fn source_inventory_rejects_missing_ignored_nested_and_fabricated_tests() {

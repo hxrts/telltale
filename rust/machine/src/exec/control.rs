@@ -42,8 +42,12 @@ pub(crate) fn step_yield() -> StepPack {
 }
 
 /// Execute `halt`.
-pub(crate) fn step_halt(machine: &ProtocolMachine, ep: &Endpoint) -> Result<StepPack, Fault> {
-    machine.step_halt(ep)
+pub(crate) fn step_halt(
+    machine: &ProtocolMachine,
+    coro_idx: usize,
+    ep: &Endpoint,
+) -> Result<StepPack, Fault> {
+    machine.step_halt(coro_idx, ep)
 }
 
 /// Execute `spawn`.

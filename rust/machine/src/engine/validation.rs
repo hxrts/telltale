@@ -101,6 +101,10 @@ impl ProtocolMachine {
             }
         }
 
+        if self.next_session_id != self.sessions.next_session_id() {
+            return Err("decoded session allocation counters disagree".to_string());
+        }
+
         let mut seen_session_ids = BTreeSet::new();
         for session in self.sessions.iter() {
             if !seen_session_ids.insert(session.sid) {

@@ -71,6 +71,59 @@ pub fn parse_choreography_str(input: &str) -> std::result::Result<Choreography, 
         .map(|(choreo, _)| choreo)
 }
 
+/// Parse the actual selected operation body under its original declarations.
+/// This preserves the original role/effect/profile scope; it does not issue
+/// runtime authority or resolve a named progress window to a numeric budget.
+pub fn parse_declared_operation(
+    parent: &Choreography,
+    name: &str,
+) -> Result<(crate::ast::OperationDeclaration, Choreography), ParseError> {
+    let invalid = |message: String| ParseError::Syntax {
+        span: ErrorSpan::from_line_col(1, 1, name),
+        message,
+    };
+    parent
+        .validate()
+        .map_err(|error| invalid(error.to_string()))?;
+    let operation = parent
+        .operation_declarations()
+        .into_iter()
+        .find(|operation| operation.name == name)
+        .ok_or_else(|| invalid(format!("unknown operation `{name}`")))?;
+    let source = &operation.body_source;
+    let mut pairs = ChoreographyParser::parse(Rule::protocol_body, source).map_err(Box::new)?;
+    let body = pairs
+        .next()
+        .ok_or_else(|| invalid("operation body is empty".to_string()))?;
+    if body.as_span().end() != source.len() {
+        return Err(invalid(
+            "operation body has trailing unparsed input".to_string(),
+        ));
+    }
+    let declared_roles = parent
+        .roles
+        .iter()
+        .map(|role| role.name().to_string())
+        .collect();
+    let parsed = parse_protocol_body(body, &declared_roles, source, &HashMap::new(), false)?;
+    let statements = inline_calls(&parsed.statements, &HashMap::new(), source)?;
+    validate_linear_vm_assets(&statements, source)?;
+    validate_authority_surface(&statements, source)?;
+    let operation_ident = syn::parse_str::<syn::Ident>(&operation.name)
+        .map_err(|error| invalid(format!("invalid operation name: {error}")))?;
+    let choreography = Choreography {
+        name: operation_ident,
+        namespace: parent.namespace.clone(),
+        roles: parent.roles.clone(),
+        protocol: convert_statements_to_protocol(&statements, &parent.roles),
+        attrs: parent.attrs.clone(),
+    };
+    choreography
+        .validate_selected_operation(&operation)
+        .map_err(|error| invalid(error.to_string()))?;
+    Ok((operation, choreography))
+}
+
 /// Parse a choreographic protocol from a string with extension support
 pub fn parse_choreography_str_with_extensions(
     input: &str,
@@ -547,12 +600,14 @@ fn append_protocol(left: Protocol, right: Protocol) -> Protocol {
             from_annotations,
         },
         Protocol::Let {
+            execution_role,
             name,
             mode,
             expr,
             linear,
             continuation,
         } => Protocol::Let {
+            execution_role,
             name,
             mode,
             expr,
@@ -3665,3 +3720,151 @@ protocol CommitLifecycle under Replay =
         }
     }
 }
+
+#[cfg(test)]
+mod placement_tests {
+    use super::*;
+    use crate::ast::AuthorityBindingMode;
+
+    fn source(binding: &str) -> String {
+        format!("protocol Placed =\n  roles A, B\n  {binding}\n  A -> B : Commit\n")
+    }
+
+    #[test]
+    fn explicit_binding_role_survives_parse_clone_and_appended_continuation() {
+        for binding in [
+            "let value at B = Nothing",
+            "let value at B = Nothing in\n    A -> B : Commit",
+        ] {
+            let choreography = parse_choreography_str(&source(binding)).unwrap();
+            let cloned = choreography.protocol.clone();
+            let Protocol::Let {
+                execution_role: Some(role),
+                mode,
+                continuation,
+                ..
+            } = &cloned
+            else {
+                panic!("placed binding lost");
+            };
+            assert_eq!(role.name().to_string(), "B");
+            assert_eq!(*mode, AuthorityBindingMode::Plain);
+            assert!(cloned.mentions_role(role));
+            assert!(matches!(continuation.as_ref(), Protocol::Send { .. }));
+            assert!(cloned.is_authority_binding());
+            for projected_role in &choreography.roles {
+                assert!(
+                    crate::compiler::projection::project(&choreography, projected_role).is_err()
+                );
+            }
+            assert!(crate::ast::choreography_to_global(&choreography).is_err());
+            assert!(crate::compile_choreography(&source(binding)).is_err());
+            assert!(
+                !choreography
+                    .language_tier_status()
+                    .protocol_machine_executable
+            );
+            let generated = crate::generate_protocol_module(&choreography, &source(binding))
+                .unwrap()
+                .to_string();
+            assert!(generated.contains("PROTOCOL_MACHINE_EXECUTABLE : bool = false"));
+            assert!(generated.contains("SESSION_PROJECTABLE : bool = false"));
+        }
+    }
+
+    #[test]
+    fn undeclared_binding_role_refuses_before_artifact_generation() {
+        assert!(
+            matches!(parse_choreography_str(&source("let value at Foreign = Nothing")), Err(ParseError::UndefinedRole { role, .. }) if role == "Foreign")
+        );
+        assert!(parse_choreography_str(&source("let value at = Nothing")).is_err());
+    }
+
+    #[test]
+    fn all_binding_modes_preserve_explicit_placement_and_declared_roles() {
+        let declarations = "effect Runtime\n  authoritative ready : Session -> ReadyWitness\n  {\n    class : authoritative\n    progress : may_block\n    region : session\n    agreement_use : forbidden\n    reentrancy : allow\n  }\n  observe watch : Session -> PresenceView\n  {\n    class : observational\n    progress : immediate\n    region : session\n    agreement_use : forbidden\n    reentrancy : allow\n  }\n\n";
+        for (binding, expected) in [
+            ("let value at B = Nothing", AuthorityBindingMode::Plain),
+            (
+                "authoritative let value at B = check Runtime.ready(session)",
+                AuthorityBindingMode::Authoritative,
+            ),
+            (
+                "observe let value at B = observe Runtime.watch(session)",
+                AuthorityBindingMode::Observe,
+            ),
+        ] {
+            for suffix in ["", " in\n    A -> B : Commit"] {
+                let source = format!("{declarations}protocol Placed uses Runtime =\n  roles A, B\n  {binding}{suffix}\n  A -> B : Commit\n");
+                let parsed = parse_choreography_str(&source).unwrap();
+                let Protocol::Let {
+                    execution_role: Some(role),
+                    mode,
+                    ..
+                } = &parsed.protocol
+                else {
+                    panic!("placement lost");
+                };
+                assert_eq!(role.name().to_string(), "B");
+                assert_eq!(*mode, expected);
+                assert!(parsed.validate().is_ok());
+                assert!(!parsed.language_tier_status().protocol_machine_executable);
+            }
+        }
+    }
+
+    #[test]
+    fn constructed_ast_cannot_bypass_declared_placement_validation() {
+        let mut parsed = parse_choreography_str(&source("let value at B = Nothing")).unwrap();
+        let Protocol::Let { execution_role, .. } = &mut parsed.protocol else {
+            panic!("binding lost");
+        };
+        *execution_role = Some(crate::ast::Role::new(quote::format_ident!("Foreign")).unwrap());
+        assert!(
+            matches!(parsed.validate(), Err(crate::ast::ValidationError::UndefinedRole(role)) if role == "Foreign")
+        );
+    }
+
+    #[test]
+    fn placement_inside_zero_iteration_body_cannot_bypass_artifact_refusal() {
+        for condition in [
+            crate::ast::Condition::Count(0),
+            crate::ast::Condition::Fuel(0),
+            crate::ast::Condition::YieldAfter(0),
+        ] {
+            let mut parsed = parse_choreography_str(&source("let value at B = Nothing")).unwrap();
+            parsed.protocol = Protocol::Loop {
+                condition: Some(condition),
+                body: Box::new(parsed.protocol),
+            };
+            assert!(parsed.protocol.contains_execution_placement());
+            assert!(crate::ast::choreography_to_global(&parsed).is_err());
+            for role in &parsed.roles {
+                assert!(crate::compiler::projection::project(&parsed, role).is_err());
+            }
+            assert!(!parsed.language_tier_status().protocol_machine_executable);
+        }
+    }
+
+    #[test]
+    fn legacy_unplaced_binding_has_no_implicit_execution_role() {
+        let choreography = parse_choreography_str(&source("let value = Nothing")).unwrap();
+        assert!(matches!(
+            &choreography.protocol,
+            Protocol::Let {
+                execution_role: None,
+                ..
+            }
+        ));
+        assert!(crate::ast::choreography_to_global(&choreography).is_ok());
+    }
+}
+
+#[cfg(test)]
+mod selected_operation_scope_tests;
+
+#[cfg(test)]
+mod compact_branch_body_tests;
+
+#[cfg(test)]
+mod constructor_pair_tests;

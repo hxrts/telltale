@@ -48,6 +48,7 @@ inductive ValType where
   | string : ValType
   | prod : ValType → ValType → ValType
   | chan : SessionId → Role → ValType  -- channel endpoint for (sid, role)
+  | readiness : ValType -- typed evidence data; registry admission remains separate
   deriving Repr, DecidableEq
 
 namespace ValType

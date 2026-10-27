@@ -53,7 +53,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -64,7 +64,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -1395,7 +1395,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2002,7 +2002,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2390,7 +2390,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3050,7 +3050,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3356,7 +3356,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3450,12 +3450,13 @@ checksum = "591ef38edfb78ca4771ee32cf494cb8771944bee237a9b91fc9c1424ac4b777b"
 
 [[package]]
 name = "telltale"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.21.7",
  "bincode",
+ "ciborium",
  "criterion",
  "futures",
  "getrandom 0.2.17",
@@ -3487,7 +3488,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-bridge"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "anyhow",
  "bpaf",
@@ -3496,6 +3497,7 @@ dependencies = [
  "proptest",
  "serde",
  "serde_json",
+ "telltale",
  "telltale-language",
  "telltale-machine",
  "telltale-runtime",
@@ -3508,7 +3510,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -3535,7 +3537,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "assert_matches",
  "bincode",
@@ -3561,7 +3563,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "futures",
  "proc-macro2",
@@ -3574,7 +3576,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-runtime"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3617,7 +3619,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-search"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "criterion",
  "rayon",
@@ -3628,7 +3630,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-simulator"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -3650,7 +3652,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "assert_matches",
  "criterion",
@@ -3662,7 +3664,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-transport"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "async-trait",
  "blake3",
@@ -3677,7 +3679,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "assert_matches",
  "blake3",
@@ -3694,7 +3696,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-ui"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "dioxus",
  "dioxus-document",
@@ -3711,7 +3713,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-viewer"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3725,7 +3727,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-web"
-version = "19.0.0"
+version = "20.0.0"
 dependencies = [
  "dioxus",
  "telltale-ui",
@@ -3743,7 +3745,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3872,9 +3874,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.52.1"
+version = "1.53.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b67dee974fe86fd92cc45b7a95fdd2f99a36a6d7b0d431a231178d3d670bbcc6"
+checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
 dependencies = [
  "bytes",
  "libc",
@@ -4596,7 +4598,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

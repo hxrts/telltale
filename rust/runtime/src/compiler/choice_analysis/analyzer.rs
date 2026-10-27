@@ -520,12 +520,21 @@ impl ChoiceAnalyzer {
             Protocol::Rec { body, .. } => {
                 self.collect_roles_from_protocol(body, roles);
             }
+            Protocol::Let {
+                execution_role,
+                continuation,
+                ..
+            } => {
+                if let Some(role) = execution_role {
+                    roles.insert(role.name().to_string());
+                }
+                self.collect_roles_from_protocol(continuation, roles);
+            }
             Protocol::Begin { continuation, .. }
             | Protocol::Await { continuation, .. }
             | Protocol::Resolve { continuation, .. }
             | Protocol::Invalidate { continuation, .. }
             | Protocol::Extension { continuation, .. }
-            | Protocol::Let { continuation, .. }
             | Protocol::Publish { continuation, .. }
             | Protocol::PublishAuthority { continuation, .. }
             | Protocol::Materialize { continuation, .. }

@@ -85,6 +85,8 @@ pub mod intern;
 pub mod kernel;
 mod loader;
 mod nested;
+pub mod nominal_command;
+pub mod operation_lifecycle;
 pub mod output_condition;
 pub mod owned;
 pub mod persistence;
@@ -188,9 +190,10 @@ pub mod model {
             decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
             AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
             HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
-            OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
-            SessionHostMutation, SessionId, SessionState, SessionStatus, SessionStore,
-            SessionStoreMemoryUsage, SessionStoreRetainedBytes, TimeoutWitness,
+            OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessRegistryView,
+            ReadinessWitness, SessionAllocationError, SessionHostMutation, SessionId, SessionState,
+            SessionStatus, SessionStore, SessionStoreMemoryUsage, SessionStoreRetainedBytes,
+            TimeoutWitness,
         };
         pub use crate::session::{unfold_if_var, unfold_mu};
     }
@@ -269,7 +272,7 @@ pub mod runtime {
         };
         pub use crate::kernel::ProtocolMachineKernel;
         pub use crate::nested::NestedProtocolMachineHandler;
-        pub use crate::owned::OwnedSession;
+        pub use crate::owned::{OwnedSession, OwnedSessionEnqueueError};
         #[cfg(target_arch = "wasm32")]
         pub use crate::wasm::WasmProtocolMachine;
     }
@@ -373,7 +376,7 @@ pub use output_condition::{
     verify_output_condition, OutputConditionCheck, OutputConditionHint, OutputConditionMeta,
     OutputConditionPolicy,
 };
-pub use owned::OwnedSession;
+pub use owned::{OwnedSession, OwnedSessionEnqueueError};
 pub use persistence::{NoopPersistence, PersistenceModel};
 pub use refinement::{
     ClaimedRuntimeCoreBundle, CoroutineRefinementSlice, ProtocolMachineRefinementSlice,
@@ -417,9 +420,9 @@ pub use session::{
     decode_edge_json, AuthorityArtifact, AuthorityAuditEvent, AuthorityAuditRecord,
     AuthorityWitnessId, CancellationWitness, ClosedSessionSummary, Edge, FragmentOwnerId,
     HandlerId, OwnershipCapability, OwnershipClaimId, OwnershipEpoch, OwnershipError,
-    OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessWitness,
-    SessionDisposalError, SessionHostMutation, SessionId, SessionStore, SessionStoreMemoryUsage,
-    SessionStoreRetainedBytes, TimeoutWitness,
+    OwnershipReceipt, OwnershipScope, OwnershipTerminalReason, ReadinessRegistryView,
+    ReadinessWitness, SessionAllocationError, SessionDisposalError, SessionHostMutation, SessionId,
+    SessionStore, SessionStoreMemoryUsage, SessionStoreRetainedBytes, TimeoutWitness,
 };
 pub use telltale_types::{
     CanonicalPublicationContinuity, PendingEffectTreatment, RuntimeUpgradeArtifact,
@@ -442,7 +445,7 @@ pub use verification::{
 
 cfg_if! {
     if #[cfg(feature = "multi-thread")] {
-        pub use threaded::ThreadedProtocolMachine as ThreadedProtocolMachine;
+        pub use threaded::{ThreadedProtocolMachine, NativeWorkerPanic, NativeWorkerPoolBuildFailure, NativeWorkerPoolDisposal, NativeWorkerPoolSettlement, NativeWorkerPoolSettlementProgress, NativeWorkerPoolSettlementCause, NativeWorkerPoolShutdownFailure};
         pub use driver::NativeThreadedDriver as ThreadedGuestRuntime;
         pub use threaded::{ContentionMetrics, LaneHandoff, LaneId, LaneSchedulerState, LaneSelection, ThreadedSessionLifecycleError};
     }

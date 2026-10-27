@@ -121,7 +121,7 @@ fn semantic_objects_roundtrip_preserves_schema_version() {
             "reason": null
         }],
         "authoritative_reads": [{
-            "read_id": "readiness:1:Issued",
+            "read_id": "authority_read:content:1:S1:1S13:runtime/ownerS9:readinessS6:issuedS13:session.readyS1:1S1:0N",
             "session": 1,
             "owner_id": "runtime/owner",
             "kind": "readiness",

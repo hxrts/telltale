@@ -51,4 +51,8 @@ def stepInstr {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | .jump target => stepJump st coro target
   | .spawn target args => stepSpawn st coro target args
   | .yield => stepYield st coro
-  | .halt => haltPack st coro
+  | .halt =>
+      if coro.operationContinuation.any (fun original => !original.resolved && !original.invalidated) then
+        faultPack st coro (.effectFault "contract_violation"
+          "source operation reached halt without original resolution or invalidation") "unresolved source operation"
+      else haltPack st coro

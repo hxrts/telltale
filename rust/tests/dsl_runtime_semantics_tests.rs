@@ -833,45 +833,39 @@ fn assert_transition_metadata(
 }
 
 #[test]
-fn projectable_authority_control_flow_surfaces_lower_to_runtime_semantic_objects() {
-    for fixture in [
-        "call_plain_communication",
-        "choice_observational_binding",
-        "loop_authoritative_binding",
-        "recursion_authoritative_binding",
-    ] {
-        let choreography =
-            parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
-        choreography
-            .validate()
-            .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
-        assert!(
-            choreography.language_tier_status().session_projectable,
-            "{fixture} should remain session-projectable"
-        );
+fn plain_communication_control_flow_loads_real_machine() {
+    let fixture = "call_plain_communication";
+    let choreography =
+        parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
+    choreography
+        .validate()
+        .unwrap_or_else(|err| panic!("validate {fixture}: {err}"));
+    assert!(
+        choreography.language_tier_status().session_projectable,
+        "{fixture} should remain session-projectable"
+    );
 
-        let image = code_image_from_choreography(&choreography);
-        let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
-        machine
-            .load_choreography(&image)
-            .unwrap_or_else(|err| panic!("load {fixture}: {err}"));
-        machine
-            .run(&NoopHandler, 128)
-            .unwrap_or_else(|err| panic!("run {fixture}: {err}"));
+    let image = code_image_from_choreography(&choreography);
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    machine
+        .load_choreography(&image)
+        .unwrap_or_else(|err| panic!("load {fixture}: {err}"));
+    machine
+        .run(&NoopHandler, 128)
+        .unwrap_or_else(|err| panic!("run {fixture}: {err}"));
 
-        let semantic_objects = machine.semantic_objects();
-        assert!(
-            semantic_objects.parity_critical_operations_have_progress_contracts(),
-            "{fixture} should preserve parity-critical progress contracts after lowering"
-        );
-        assert!(
-            semantic_objects
-                .publication_events
-                .iter()
-                .any(|publication| publication.publication == "effect.succeeded"),
-            "{fixture} should emit canonical effect publications after lowering"
-        );
-    }
+    let semantic_objects = machine.semantic_objects();
+    assert!(
+        semantic_objects.parity_critical_operations_have_progress_contracts(),
+        "{fixture} should preserve parity-critical progress contracts after lowering"
+    );
+    assert!(
+        semantic_objects
+            .publication_events
+            .iter()
+            .any(|publication| publication.publication == "effect.succeeded"),
+        "{fixture} should emit canonical effect publications after lowering"
+    );
 }
 
 #[test]
@@ -898,8 +892,8 @@ fn parallel_authority_control_flow_surface_projects_and_converts_locals() {
 #[test]
 fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theory_conversion() {
     for (fixture, expected_feature) in [
-        ("case_authoritative_binding", "Case"),
-        ("timeout_observational_binding", "Timeout"),
+        ("case_authoritative_binding", "AuthorityBinding"),
+        ("timeout_observational_binding", "AuthorityBinding"),
     ] {
         let choreography =
             parse_choreography_file(&authority_pass_fixture(fixture)).expect("parse fixture");
@@ -942,12 +936,15 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
             choreography.language_tier_status().session_projectable,
             "{fixture} should remain session-projectable"
         );
-        assert!(
-            choreography.language_tier_status().theory_convertible,
-            "{fixture} should remain theory-convertible"
-        );
-        choreography_to_global(&choreography)
-            .unwrap_or_else(|err| panic!("convert {fixture} to GlobalType: {err}"));
+        if fixture == "call_plain_communication" {
+            assert!(choreography.language_tier_status().theory_convertible);
+            choreography_to_global(&choreography).expect("plain communication conversion");
+        } else {
+            assert!(!choreography.language_tier_status().theory_convertible);
+            let error =
+                choreography_to_global(&choreography).expect_err("authority cannot be erased");
+            assert!(error.to_string().contains("AuthorityBinding"));
+        }
     }
 
     let choreography =
@@ -974,8 +971,8 @@ fn authority_control_flow_support_matrix_is_explicit_across_projection_and_theor
     let err = choreography_to_global(&choreography)
         .expect_err("parallel fixture should remain outside theory conversion");
     assert!(
-        err.to_string().contains("Parallel"),
-        "parallel theory-conversion blocker should remain explicit, got {err}"
+        err.to_string().contains("AuthorityBinding"),
+        "authority theory-conversion blocker should remain explicit, got {err}"
     );
 }
 
@@ -1218,3 +1215,18 @@ fn structure_surface_remains_fail_closed_in_projection() {
             .unwrap_or_else(|err| panic!("project {}: {err}", role.name()));
     }
 }
+
+#[path = "nominal_command_runtime.rs"]
+mod nominal_command_runtime;
+
+#[path = "operation_lifecycle_runtime.rs"]
+mod operation_lifecycle_runtime;
+
+#[path = "operation_readiness_runtime.rs"]
+mod operation_readiness_runtime;
+
+#[path = "operation_obligation_refusals.rs"]
+mod operation_obligation_refusals;
+
+#[path = "operation_failure_runtime.rs"]
+mod operation_failure_runtime;
