@@ -55,13 +55,13 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          just check-pr-critical 2>&1 | tee artifacts/check-pr-critical.log
+          just check-pr-critical | tee artifacts/check-pr-critical.log
 
       - name: Run parity gate
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          just check-parity 2>&1 | tee artifacts/check-parity.log
+          just check-parity | tee artifacts/check-parity.log
 
       - name: Upload fast-lane artifacts
         if: always()
@@ -116,19 +116,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          just check-pr-critical 2>&1 | tee artifacts/check-pr-critical.log
+          just check-pr-critical | tee artifacts/check-pr-critical.log
 
       - name: Run parity gate
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          just check-parity 2>&1 | tee artifacts/check-parity.log
+          just check-parity | tee artifacts/check-parity.log
 
       - name: Run scheduled deep-assurance lane
         run: |
           set -euo pipefail
           mkdir -p artifacts
-          just check-deep-assurance 2>&1 | tee artifacts/check-deep-assurance.log
+          just check-deep-assurance | tee artifacts/check-deep-assurance.log
 
       - name: Upload heavy-lane artifacts
         if: always()

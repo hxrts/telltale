@@ -36,6 +36,13 @@ END { flush(); if (count != 5) exit 1 }
 ' "$workflow"
 [[ $(grep -c 'sudo apt-get update && sudo apt-get install -y ripgrep' "$workflow") == 2 ]] || exit 1
 [[ $(awk '/- name: Upload .*artifacts/ { getline; if ($0 == "        if: always()") n++ } END { print n+0 }' "$workflow") == 2 ]] || exit 1
+# Preserve the canonical command literals consumed by the pinned toolkit policy.
+# Child stderr stays in the enclosing GitHub command log, not stdout-only tee.
+for command in \
+  'just check-pr-critical | tee artifacts/check-pr-critical.log' \
+  'just check-deep-assurance | tee artifacts/check-deep-assurance.log'; do
+  grep -Fq "$command" "$workflow" || exit 1
+done
 for step in 1 2 3 4 5; do
   mkdir "$fixture/run-$step"
   status=0
@@ -43,9 +50,9 @@ for step in 1 2 3 4 5; do
     "$BASH" -e "$fixture/step-$step.sh") > "$fixture/failure-$step.log" 2>&1 || status=$?
   [[ "$status" == 17 ]] || exit 1
   grep -q 'original .* failure' "$fixture/run-$step"/artifacts/*.log
-  grep -q 'original .* diagnostic' "$fixture/run-$step"/artifacts/*.log
+  grep -q 'original .* diagnostic' "$fixture/failure-$step.log"
   (cd "$fixture/run-$step"; PATH="$fixture/bin:$PATH" VERIFY_FIXTURE_STATUS=0 \
     "$BASH" -e "$fixture/step-$step.sh") > "$fixture/success-$step.log" 2>&1
-  printf 'Verify pipeline %s: original17 retained, stdout+stderr artifact retained, success0\n' "$step"
+  printf 'Verify pipeline %s: original17 retained, stdout artifact and command stderr retained, success0\n' "$step"
 done
 printf 'Verify: five strict pipelines; both jobs install rg; both failure uploads always run\n'
