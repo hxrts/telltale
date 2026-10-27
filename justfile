@@ -222,6 +222,7 @@ check-fast-structure:
       export TMPDIR="/tmp"
     fi
     bash scripts/ops/test-doc-fast-fail-contract.sh
+    bash scripts/ops/test-verify-pipeline-contract.sh
     just check-ci-assurance-lanes
     just check-formal-claim-scope
     just check-workflow-actions
