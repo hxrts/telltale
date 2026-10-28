@@ -17,7 +17,7 @@ package telltale where
 
 -- Paco provides parametrized coinduction for EQ2 proofs.
 require paco from git
-  "https://github.com/hxrts/paco-lean" @ "aa5ba5ed1b021fbe78009dcc34de7d686aa5ec01"
+  "https://github.com/hxrts/paco-lean" @ "v0.2.0"
 
 -- Iris separation logic framework (revision-pinned for drift control).
 require iris from git

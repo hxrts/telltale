@@ -46,7 +46,7 @@
    "rev": "aa5ba5ed1b021fbe78009dcc34de7d686aa5ec01",
    "name": "paco",
    "manifestFile": "lake-manifest.json",
-   "inputRev": "aa5ba5ed1b021fbe78009dcc34de7d686aa5ec01",
+   "inputRev": "v0.2.0",
    "inherited": false,
    "configFile": "lakefile.lean"
   },
