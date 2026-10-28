@@ -26,6 +26,10 @@
         overlays = [
           (import rust-overlay)
         ];
+        # lean/lean-toolchain is the single source of truth for the Lean release.
+        leanToolchain =
+          pkgs.lib.strings.removeSuffix "\n" (builtins.readFile ./lean/lean-toolchain);
+
         pkgs = import nixpkgs {
           inherit system overlays;
         };
@@ -121,6 +125,23 @@
 
           shellHook = ''
             ${toolkitSupport.shellHook}
+            export ELAN_TOOLCHAIN="${leanToolchain}"
+
+            # Default Lake's artifact cache on and keep cached artifacts
+            # materialized under .lake/build; a caller's explicit value wins.
+            export LAKE_ARTIFACT_CACHE="''${LAKE_ARTIFACT_CACHE:-true}"
+            export LAKE_RESTORE_ARTIFACTS="''${LAKE_RESTORE_ARTIFACTS:-true}"
+
+            # Let Lake restore prebuilt mathlib artifacts from the shared cache
+            # before mathlib's post-update hook downloads them again.
+            export MATHLIB_NO_CACHE_ON_UPDATE="''${MATHLIB_NO_CACHE_ON_UPDATE:-1}"
+
+            # Join the machine-local shared artifact cache when a sibling
+            # lean-builder checkout provides one. Absent for other contributors,
+            # who then get Lake's own default cache.
+            if [ -f ../lean-builder/env.sh ]; then
+              . ../lean-builder/env.sh
+            fi
             [[ -r "$HOME/.local/state/secrets/cargo-registry-token" ]] && export CARGO_REGISTRY_TOKEN="$(cat "$HOME/.local/state/secrets/cargo-registry-token")"
 
             # Install cargo-based dev tools if missing or outdated
@@ -135,7 +156,7 @@
 
             echo "Telltale development environment"
             echo "Rust: $(rustc --version)"
-            echo "Lean: $(elan show 2>/dev/null | head -1 || echo 'run: elan default leanprover/lean4:v4.25.0')"
+            echo "Lean: ${leanToolchain}"
             echo "WASM: $(rustc --print target-list | grep wasm32-unknown-unknown || echo 'available')"
             echo "Toolkit: ''${TOOLKIT_ROOT:-unavailable}"
           '';

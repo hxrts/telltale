@@ -11,7 +11,6 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 LEAN_DIR="${ROOT_DIR}/lean"
-IRIS_LINTER_ARGS='moreLeanArgs = ["-Dlinter.unusedSectionVars=false", "-Dlinter.unusedVariables=false"]'
 
 if [[ ! -f "${LEAN_DIR}/lakefile.lean" ]]; then
   echo "error: missing ${LEAN_DIR}/lakefile.lean" >&2
@@ -22,35 +21,6 @@ if ! command -v lake >/dev/null 2>&1; then
   echo "error: lake not on PATH — run this script from inside 'nix develop'" >&2
   exit 2
 fi
-
-ensure_iris_linter_config() {
-  local config_path="$1"
-  local config_dir
-  local config_name
-
-  config_dir="$(dirname "${config_path}")"
-  config_name="$(basename "${config_path}")"
-
-  if [[ ! -f "${config_path}" ]]; then
-    echo "error: missing iris package config: ${config_path}" >&2
-    exit 1
-  fi
-
-  if ! grep -Fq "${IRIS_LINTER_ARGS}" "${config_path}"; then
-    perl -0pi -e '
-      my $line = qq{'"${IRIS_LINTER_ARGS}"'\n};
-      if ($_ !~ /moreLeanArgs = \["-Dlinter\.unusedSectionVars=false", "-Dlinter\.unusedVariables=false"\]/) {
-        if (!s/\n\[\[require\]\]/\n$line\n[[require]]/) {
-          $_ .= "\n$line";
-        }
-      }
-    ' "${config_path}"
-  fi
-
-  if [[ -d "${config_dir}/.git" ]]; then
-    git -C "${config_dir}" update-index --assume-unchanged "${config_name}"
-  fi
-}
 
 package_config_path() {
   local package_name="$1"
@@ -108,11 +78,15 @@ if ! package_config_path "mathlib" >/dev/null 2>&1; then
   fi
 fi
 
-ensure_iris_linter_config "${iris_config_path}"
 
 # Step 2: fetch prebuilt Mathlib oleans from cache.leanprover.community.
 # The cache key is the exact mathlib commit pinned in lake-manifest.json.
 MATHLIB_MARKER=".lake/packages/mathlib/.lake/build/lib/lean/Mathlib.olean"
+if [[ ! -f "${MATHLIB_MARKER}" ]]; then
+  # Restore from Lake's configured artifact cache (lean-builder when present)
+  # before downloading; --no-build never compiles mathlib.
+  lake build Mathlib --no-build >/dev/null 2>&1 || true
+fi
 if [[ ! -f "${MATHLIB_MARKER}" ]]; then
   echo "== lake exe cache get (fetching prebuilt Mathlib oleans) =="
   lake exe cache get

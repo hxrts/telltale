@@ -3,6 +3,17 @@
 
 lean_threads := "3"
 
+# `lean/lean-toolchain` is the single source of truth, so every recipe runs the
+# Lean and Lake that file names even when the shell selected another.
+export ELAN_TOOLCHAIN := `tr -d '\r\n' < lean/lean-toolchain`
+
+# Worker count for a degraded, uncoordinated run. When a sibling lean-builder
+# coordinator is available it grants the count instead.
+export LEAN_NUM_THREADS := env_var_or_default("LEAN_NUM_THREADS", lean_threads)
+
+# Every Lean build enters through the project launcher (lean-builder or fallback).
+lean_build := "python3 tools/run_lean_build.py"
+
 # Default task
 default: book
 
@@ -365,14 +376,14 @@ check-handler-contracts:
 
 # Run the Lean-backed regular-fragment deadlock automation suites.
 check-deadlock-automation:
-    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     cargo test -p telltale-types test_reaches_communication_matches_practical_fragment_intent -- --nocapture
     TELLTALE_REQUIRE_LEAN_PROJECTION_RUNNER=1 cargo test -p telltale-bridge --test regular_practical_fragment_checks -- --nocapture
     cargo test --test dsl_runtime_semantics_tests generated_proof_status_exposes_ -- --nocapture
 
 # Run the explicit authority-metatheory theorem slice and runtime support-matrix suites.
 check-authority-metatheory:
-    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build Runtime.Proofs.AuthorityMetatheory
+    {{lean_build}} --label "telltale build Runtime.Proofs.AuthorityMetatheory" -- lake --dir lean build Runtime.Proofs.AuthorityMetatheory
     cargo test --test dsl_runtime_semantics_tests authority_metatheory_ -- --nocapture
 
 # Run deterministic larger-corpus structural budget suites.
@@ -557,7 +568,7 @@ check-concrete-refinement:
 
 # Keep the transported-theorem admission boundary explicit across Lean, Rust, and bridge artifacts.
 check-transported-theorem-boundary:
-    LEAN_NUM_THREADS="{{lean_threads}}" lake --dir lean build Runtime.Proofs.TheoremPack.AdmissionBoundary
+    {{lean_build}} --label "telltale build Runtime.Proofs.TheoremPack.AdmissionBoundary" -- lake --dir lean build Runtime.Proofs.TheoremPack.AdmissionBoundary
     test -x scripts/lean/protocol-machine-runner.sh
     cargo test -p telltale-machine transported_theorem_boundary_ -- --nocapture
     cargo test -p telltale-bridge --test invariant_verification test_verify_protocol_bundle_emits_transported_theorem_boundary_inventory -- --exact --nocapture
@@ -989,7 +1000,7 @@ telltale-lean-check: lean-init
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role Chef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-chef.json
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role SousChef --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-sous.json
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-sample.tell --role Baker --choreography-out lean/artifacts/lean-sample-choreography.json --program-out lean/artifacts/lean-sample-program-baker.json
-    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-chef.json --log lean/artifacts/runner-chef.log --json-log lean/artifacts/runner-chef.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-sous.json --log lean/artifacts/runner-sous.log --json-log lean/artifacts/runner-sous.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-sample-choreography.json --program lean/artifacts/lean-sample-program-baker.json --log lean/artifacts/runner-baker.log --json-log lean/artifacts/runner-baker.json
@@ -1000,19 +1011,19 @@ telltale-lean-check-extended: lean-init
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-extended.tell --role Chef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-chef.json
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-extended.tell --role SousChef --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-sous.json
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-extended.tell --role Baker --choreography-out lean/artifacts/lean-extended-choreography.json --program-out lean/artifacts/lean-extended-program-baker.json
-    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-chef.json --log lean/artifacts/runner-extended-chef.log --json-log lean/artifacts/runner-extended-chef.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-sous.json --log lean/artifacts/runner-extended-sous.log --json-log lean/artifacts/runner-extended-sous.json
     ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-extended-choreography.json --program lean/artifacts/lean-extended-program-baker.json --log lean/artifacts/runner-extended-baker.log --json-log lean/artifacts/runner-extended-baker.json
 
 # Regenerate golden files from Lean (requires Lean build)
 regenerate-golden: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     cargo run -p telltale-bridge --bin golden --features golden -- regenerate
 
 # Check for golden file drift (fails if golden files are outdated)
 check-golden-drift: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     cargo run -p telltale-bridge --bin golden --features golden -- check
 
 # List all golden test cases
@@ -1025,7 +1036,7 @@ test-golden:
 
 # Run live Lean equivalence tests (requires Lean build)
 test-live-equivalence: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     cargo test -p telltale-bridge --test live_equivalence_tests
 
 # Intentional failure fixture: labels mismatch.
@@ -1034,7 +1045,7 @@ telltale-lean-check-failing: lean-init
     cargo run -p telltale-bridge --features exporter --bin lean-bridge-exporter -- --input rust/bridge/fixtures/lean-failing.tell --role Chef --choreography-out lean/artifacts/lean-failing-choreography.json --program-out lean/artifacts/lean-failing-program-chef.json
     # Corrupt the exported program to introduce a label mismatch
     perl -0pi -e 's/"name": "Pong"/"name": "WrongLabel"/' lean/artifacts/lean-failing-program-chef.json
-    LEAN_NUM_THREADS={{ lean_threads }} lake --dir lean build telltale_validator
+    {{lean_build}} --label "telltale build telltale_validator" -- lake --dir lean build telltale_validator
     ! ./lean/.lake/build/bin/telltale_validator --choreography lean/artifacts/lean-failing-choreography.json --program lean/artifacts/lean-failing-program-chef.json --log lean/artifacts/runner-failing-chef.log --json-log lean/artifacts/runner-failing-chef.json
 
 # Emit protocol-bundle artifacts by running the bridge bundle tests.
@@ -1070,11 +1081,11 @@ verify-track-b:
 
 # Full Lean build gate for nightly/scheduled validation.
 verify-lean-full: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build
+    {{lean_build}} --label "telltale build" -- lake --dir lean build
 
 # Targeted Lean protocol machine architecture modules for fast CI checks.
 verify-lean-protocol-machine-targets: lean-init
-    LEAN_NUM_THREADS={{ lean_threads }} elan run leanprover/lean4:v4.26.0 lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime
+    {{lean_build}} --label "telltale build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime" -- lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime
 
 # Cross-target runtime comparison lane.
 verify-cross-target-matrix:

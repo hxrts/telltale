@@ -1,12 +1,12 @@
 import Iris.Instances.IProp.Instance
-import Iris.BaseLogic.Lib.Wsat
-import Iris.BaseLogic.Lib.FancyUpdates
-import Iris.BaseLogic.Lib.Invariants
-import Iris.BaseLogic.Lib.CancelableInvariants
+import Iris.Instances.Lib.WSat
+import Iris.Instances.Lib.FUpd
+import Iris.Instances.Lib.Invariants
+import Iris.Instances.Lib.CInvariants
 import Iris.BI.BigOp
-import Iris.BaseLogic.Lib.GhostVar
-import Iris.BaseLogic.Lib.GhostMap
-import Iris.BaseLogic.Lib.SavedProp
+import Iris.Instances.Lib.GhostVar
+import Iris.Instances.Lib.GhostMap
+import Iris.Instances.Lib.SavedProp
 import Iris.ProgramLogic.Language
 
 /-! # IrisExtractionAPI
