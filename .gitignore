@@ -78,3 +78,6 @@ subject_reduction/
 # Mutation testing artifacts
 mutants.out/
 mutants.out.old/
+
+# lean-builder bookkeeping when checks run from the repo root
+/.lake/
