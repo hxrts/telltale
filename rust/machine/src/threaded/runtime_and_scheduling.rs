@@ -1,4 +1,11 @@
 // Thread-pool construction and scheduling for threaded mode.
+fn thread_pool_build_error(source: rayon::ThreadPoolBuildError) -> ProtocolMachineError {
+    ProtocolMachineError::ThreadPoolBuild {
+        message: source.to_string(),
+        source: Box::new(source),
+    }
+}
+
 impl ThreadedProtocolMachine {
     /// Create with thread pool sized to available OS parallelism.
     #[must_use]
@@ -25,9 +32,7 @@ impl ThreadedProtocolMachine {
         let pool = ThreadPoolBuilder::new()
             .num_threads(worker_count)
             .build()
-            .map_err(|e| ProtocolMachineError::ThreadPoolBuild {
-                message: e.to_string(),
-            })?;
+            .map_err(thread_pool_build_error)?;
         let tick_duration = config.tick_duration;
         let communication_replay_mode = config.communication_replay_mode;
         let communication_nullifier_identity = config.communication_nullifier_identity;

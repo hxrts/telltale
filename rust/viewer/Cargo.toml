@@ -1,9 +1,9 @@
 [package]
 name = "telltale-viewer"
-version = "19.0.0"
+version = "20.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.95"
 description = "Pure artifact, query, and command models for the Telltale simulator webapp"
 readme = "../../README.md"
 repository = "https://github.com/hxrts/telltale"
@@ -17,11 +17,11 @@ bench = false
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-telltale-macros = { path = "../macros", version = "19.0.0" }
-telltale-search = { path = "../search", version = "19.0.0" }
+telltale-macros = { path = "../macros", version = "20.0.0" }
+telltale-search = { path = "../search", version = "20.0.0" }
 toml = { workspace = true }
-telltale-simulator = { path = "../simulator", version = "19.0.0" }
-telltale-machine = { path = "../machine", version = "19.0.0" }
+telltale-simulator = { path = "../simulator", version = "20.0.0" }
+telltale-machine = { path = "../machine", version = "20.0.0" }
 
 [dev-dependencies]
 tempfile = { workspace = true }

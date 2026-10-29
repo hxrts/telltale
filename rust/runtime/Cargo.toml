@@ -1,10 +1,10 @@
 [package]
 name = "telltale-runtime"
-version = "19.0.0"
+version = "20.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
-rust-version = "1.75"
+rust-version = "1.95"
 description = "Choreographic programming for Telltale - effect-based distributed protocols"
 readme = "../../README.md"
 repository = "https://github.com/hxrts/telltale"
@@ -16,11 +16,11 @@ categories = ["asynchronous", "concurrency"]
 bench = false
 
 [dependencies]
-telltale = { path = "../..", version = "19.0.0" }
-telltale-macros = { path = "../macros", version = "19.0.0" }
-telltale-language = { path = "../language", version = "19.0.0" }
-telltale-types = { path = "../types", version = "19.0.0" }
-telltale-theory = { path = "../theory", version = "19.0.0" }
+telltale = { path = "../..", version = "20.0.0" }
+telltale-macros = { path = "../macros", version = "20.0.0" }
+telltale-language = { path = "../language", version = "20.0.0" }
+telltale-types = { path = "../types", version = "20.0.0" }
+telltale-theory = { path = "../theory", version = "20.0.0" }
 futures = { workspace = true }
 async-trait = { workspace = true }
 async-recursion = { workspace = true }

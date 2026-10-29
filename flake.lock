@@ -54,8 +54,25 @@
       "inputs": {
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs",
+        "rust-nixpkgs": "rust-nixpkgs",
         "rust-overlay": "rust-overlay",
         "toolkit": "toolkit"
+      }
+    },
+    "rust-nixpkgs": {
+      "locked": {
+        "lastModified": 1760878510,
+        "narHash": "sha256-K5Osef2qexezUfs0alLvZ7nQFTGS9DL2oTVsIXsqLgs=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "5e2a59a5b1a82f89f2c7e598302a9cacebb72a67",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "5e2a59a5b1a82f89f2c7e598302a9cacebb72a67",
+        "type": "github"
       }
     },
     "rust-overlay": {
@@ -63,11 +80,11 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1767408057,
-        "narHash": "sha256-0TD2PNTt6olOonFgcvZJcNGiU3x5cX+RMzrfWfHB9Jw=",
+        "lastModified": 1793086596,
+        "narHash": "sha256-ObKS44vw4IIVpQ69YJzUGjZ0IwnpWoUlwjJSY7gefdo=",
         "owner": "oxalica",
         "repo": "rust-overlay",
-        "rev": "294198315a13d6d130565ad08e97685df7b0d458",
+        "rev": "c7e9d512653a35ef4d5879c3df4d44d7b78d0e6d",
         "type": "github"
       },
       "original": {
@@ -99,21 +116,24 @@
         "nixpkgs": [
           "nixpkgs"
         ],
+        "rust-nixpkgs": [
+          "rust-nixpkgs"
+        ],
         "rust-overlay": [
           "rust-overlay"
         ]
       },
       "locked": {
-        "lastModified": 1776863713,
-        "narHash": "sha256-XVAOlt6swBOHbY+uURRSQCDyCrDCpFsdSZoy6fDDcI0=",
+        "lastModified": 1793115221,
+        "narHash": "sha256-sslNjOF3jYQB/xH/O1Ste0W1wByLHPEpPqPBL2xkdTk=",
         "owner": "hxrts",
         "repo": "toolkit",
-        "rev": "fc1da8ea412882319e79eacfeb070cc62d7dd9a1",
+        "rev": "26f3b6b91205246ac17df043aa6f87aa8b181c48",
         "type": "github"
       },
       "original": {
         "owner": "hxrts",
-        "ref": "v0.4.1",
+        "ref": "v0.4.2",
         "repo": "toolkit",
         "type": "github"
       }

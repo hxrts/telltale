@@ -61,6 +61,20 @@ Owned-loader ownership failures retain `OwnershipError` as the source of
 `ProtocolMachineError::OwnershipContract`, rather than formatting the cause into
 a string. Existing callers matching that variant must handle the typed payload.
 
+## Native worker-pool construction failures
+
+Threaded construction preserves the original Rayon failure and its native I/O
+source in ProtocolMachineError::ThreadPoolBuild. Diagnostic text does not replace
+the original error chain. This host-construction error precedes admitted protocol
+sessions and changes no instruction, capability or protocol outcome.
+
+A failed pool constructor can follow partial native worker startup. Rayon requests
+termination on failure but returns no worker-join acknowledgment. Retaining its
+error therefore proves neither resource-free failure nor completed teardown.
+Targeted session disposal also leaves the shared pool available. It is a separate
+acknowledgment. Tests that retain and join actual worker handles establish only
+their own host-owned settlement, not a stronger production constructor contract.
+
 ## Session Status Values
 
 `SessionStatus` includes `Active`, `Draining`, `Closed`, `Cancelled`, and `Faulted`.

@@ -27,7 +27,7 @@ jobs:
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.1
 
       - name: Install Lean toolchain
         run: |
@@ -82,7 +82,7 @@ jobs:
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.1
 
       - name: Install Lean toolchain
         run: |

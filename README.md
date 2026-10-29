@@ -66,3 +66,11 @@ just artifact-check
 ## License
 
 Licensed under the MIT [license](LICENSE).
+
+## Rust compiler selection
+
+Canonical Rust development and CI select exact Rust 1.99.1 in Nix,
+`rust-toolchain` and hosted compiler jobs. Scoped Cargo/Clippy dispatch keeps
+Cargo-home plugins from changing that selection. The older manifest MSRV is
+a separate compatibility claim; current-toolchain validation does not prove
+it. Lean retains its independent `lean-toolchain` pin.

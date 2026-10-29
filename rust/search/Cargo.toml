@@ -1,9 +1,9 @@
 [package]
 name = "telltale-search"
-version = "19.0.0"
+version = "20.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
-rust-version = "1.75"
+rust-version = "1.95"
 description = "Deterministic weighted-graph search substrate for Telltale"
 readme = "../../README.md"
 repository = "https://github.com/hxrts/telltale"

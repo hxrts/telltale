@@ -47,6 +47,9 @@ pub enum ProtocolMachineError {
     ThreadPoolBuild {
         /// Build error details.
         message: String,
+        /// Original native pool-construction failure, including its I/O source.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// Code image failed runtime validation checks.
     #[error("invalid code image: {reason}")]

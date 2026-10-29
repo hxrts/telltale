@@ -3,12 +3,15 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    # Match Aura's compiler derivation without upgrading unrelated packages.
+    rust-nixpkgs.url = "github:NixOS/nixpkgs/5e2a59a5b1a82f89f2c7e598302a9cacebb72a67";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     toolkit = {
-      url = "github:hxrts/toolkit?ref=v0.4.1";
+      url = "github:hxrts/toolkit?ref=v0.4.2";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.rust-overlay.follows = "rust-overlay";
+      inputs.rust-nixpkgs.follows = "rust-nixpkgs";
       inputs.flake-utils.follows = "flake-utils";
     };
   };
@@ -17,6 +20,7 @@
       self,
       nixpkgs,
       rust-overlay,
+      rust-nixpkgs,
       flake-utils,
       toolkit,
     }:
@@ -31,13 +35,30 @@
         };
         toolkitSupport = toolkit.lib.${system}.consumerShellSupport;
 
-        rustToolchain = pkgs.rust-bin.stable.latest.default.override {
+        compilerPkgs = import rust-nixpkgs {
+          inherit system overlays;
+        };
+        rustToolchain = compilerPkgs.rust-bin.stable."1.99.1".default.override {
           extensions = [
             "rust-src"
             "rust-analyzer"
+            "clippy"
           ];
           targets = [ "wasm32-unknown-unknown" ];
         };
+
+        # Cargo searches Cargo-home plugins before PATH. Keep Clippy on the
+        # same exact stable compiler as ordinary builds.
+        telltaleCargo = pkgs.writeShellScriptBin "cargo" ''
+          set -euo pipefail
+          export RUSTC="${rustToolchain}/bin/rustc"
+          export RUSTDOC="${rustToolchain}/bin/rustdoc"
+          export CARGO="${rustToolchain}/bin/cargo"
+          if [ "''${1:-}" = clippy ]; then
+            exec ${rustToolchain}/bin/cargo-clippy "$@"
+          fi
+          exec ${rustToolchain}/bin/cargo "$@"
+        '';
 
         wasmPack = pkgs.rustPlatform.buildRustPackage rec {
           pname = "wasm-pack";
@@ -84,6 +105,7 @@
         };
 
         nativeBuildInputs = with pkgs; [
+          telltaleCargo
           rustToolchain
           pkg-config
           gnuplot
@@ -141,7 +163,10 @@
           '';
         };
 
-        packages.default = pkgs.rustPlatform.buildRustPackage {
+        packages.default = (pkgs.makeRustPlatform {
+          cargo = rustToolchain;
+          rustc = rustToolchain;
+        }).buildRustPackage {
           pname = "telltale";
           version = "0.1.1-aura";
 
@@ -149,6 +174,10 @@
 
           cargoLock = {
             lockFile = ./Cargo.lock;
+            outputHashes = {
+              "dioxus-primitives-0.0.1" = "sha256-JrFrhy34UnR1x0qMaT/+x3RoIsOXhAdBj2m8SKNfHug=";
+              "dioxus-shadcn-0.3.0" = "sha256-vL/eYDly3uhBr5M5lPCl2uiLTXEOTVJI0MchxicIN0Q=";
+            };
           };
 
           inherit nativeBuildInputs buildInputs;

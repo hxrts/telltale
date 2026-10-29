@@ -129,3 +129,8 @@ include!("threaded/instructions_choice.rs");
 mod tests {
     include!("../tests/unit/threaded_runtime_tests.rs");
 }
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod thread_pool_error_tests {
+    include!("../tests/unit/thread_pool_error_tests.rs");
+}

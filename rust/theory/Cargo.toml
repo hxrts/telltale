@@ -1,10 +1,10 @@
 [package]
 name = "telltale-theory"
-version = "19.0.0"
+version = "20.0.0"
 authors = ["Sam Hart"]
 edition = "2021"
 autobenches = false
-rust-version = "1.75"
+rust-version = "1.95"
 description = "Session type theory algorithms - projection, merge, subtyping"
 readme = "../../README.md"
 repository = "https://github.com/hxrts/telltale"
@@ -16,7 +16,7 @@ categories = ["algorithms"]
 bench = false
 
 [dependencies]
-telltale-types = { path = "../types", version = "=19.0.0" }
+telltale-types = { path = "../types", version = "=20.0.0" }
 thiserror = { workspace = true }
 
 [dev-dependencies]
