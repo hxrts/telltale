@@ -13,10 +13,12 @@ and deployment is `Unit`. On `Unit`, all erased runs coincide, so every
 envelope equivalence holds by `funext`; no proof holes or axioms are used. This is
 evidence for the trivial instance only, not for any non-trivial protocol.
 
-The envelope-admission profile is *not* attached: its premise bundle is
-uninhabited for every `State`/`Obs` (`admissionPremises_uninhabited`), because
-the diagnostics soundness and completeness fields quantify over all `DUser`
-with a `failedObligation` predicate that cannot depend on the user. -/
+The envelope-admission profile uses containment in the inferred capability as
+runtime compliance and `canonicalFailedObligation` for diagnostics, so all
+three envelope keys export `true`. Before the failed-obligation predicates were
+indexed by `DUser`, the admission premise bundle was uninhabited for every
+`State`/`Obs`.
+-/
 
 set_option autoImplicit false
 
@@ -115,36 +117,63 @@ def unitBridgeProfile : Adapters.ProtocolEnvelopeBridgeProfile :=
   { Protocol := Unit, Placement := Unit, Deployment := Unit, State := Unit, Obs := Unit
   , bundle := { premises := unitBridgePremises } }
 
-/-! ## Envelope Admission Obstruction -/
+/-! ## Envelope Admission Profile -/
 
-/-- The envelope-admission premise bundle has no inhabitant: a user with
-`maxRequestedDiff` beyond the local capability forces
-`failedObligation .withinMaxDiff` (diagnostics soundness), while the
-permissive user has no rejection reasons, so completeness refutes it. -/
-theorem admissionPremises_uninhabited {State : Type} {Obs : Type}
-    (p : ProtocolMachineEnvelopeAdmissionPremises State Obs) : False := by
-  let overUser : DUser :=
-    { maxRequestedDiff := (DProg_local p.input).maxDiff + 1
-    , eqSafeOnly := false, requiredProfiles := [] }
-  let permissive : DUser :=
-    { maxRequestedDiff := 0, eqSafeOnly := false, requiredProfiles := [] }
-  have hFailed : p.failedObligation .withinMaxDiff :=
-    p.diagnosticsSoundnessLocal overUser .maxDiffExceeded
-      (by simp [admissionRejectionReasons, overUser])
-  obtain ⟨r, hr, _⟩ := p.diagnosticsCompletenessLocal permissive _ hFailed
-  simp [admissionRejectionReasons, permissive] at hr
+/-- Capability input with no determinism profiles and zero diff bounds. -/
+def unitCapabilityInput : ProgramCapabilityInput :=
+  { localMaxDiff := 0, shardedMaxDiff := 0 }
+
+/-- Principal capability: the inferred capability is the strongest precise one. -/
+theorem unit_principalCapability (dProg : CertifiedEnvelopeCapability) :
+    PrincipalCapabilityProperty dProg
+      (fun c => CapabilityStrengthens dProg c ∧ CapabilityStrengthens c dProg) :=
+  ⟨⟨capabilityStrengthens_refl _, capabilityStrengthens_refl _⟩, fun _ h => h.1⟩
+
+/-- Admission premises over `Unit`. Runtime compliance is containment in the
+inferred capability, and failed obligations are the canonical diagnostics. -/
+def unitAdmissionPremises : ProtocolMachineEnvelopeAdmissionPremises Unit Unit :=
+  { input := unitCapabilityInput
+  , localHypotheses := unitLocalHypotheses
+  , shardedHypotheses := unitShardedHypotheses
+  , runtimeComplianceLocal := fun d => dUserContained d (DProg_local unitCapabilityInput) = true
+  , runtimeComplianceSharded := fun d => dUserContained d (DProg_shard unitCapabilityInput) = true
+  , failedObligationLocal := fun d => canonicalFailedObligation d (DProg_local unitCapabilityInput)
+  , failedObligationSharded := fun d => canonicalFailedObligation d (DProg_shard unitCapabilityInput)
+  , localInferenceSoundnessWitness := fun _ _ r i _ _ => unit_eqEnvLocal _ r i
+  , shardedInferenceSoundnessWitness := fun _ _ r i _ _ => unit_eqEnvShard _ r i
+  , localPrincipalCapabilityWitness := unit_principalCapability _
+  , shardedPrincipalCapabilityWitness := unit_principalCapability _
+  , localAdmissionSoundnessWitness := fun _ h => h
+  , shardedAdmissionSoundnessWitness := fun _ h => h
+  , localAdmissionCompletenessWitness := fun _ => Iff.rfl
+  , shardedAdmissionCompletenessWitness := fun _ => Iff.rfl
+  , diagnosticsSoundnessLocal := fun d => canonicalFailedObligation_soundness d _
+  , diagnosticsSoundnessSharded := fun d => canonicalFailedObligation_soundness d _
+  , diagnosticsCompletenessLocal := fun d => canonicalFailedObligation_completeness d _
+  , diagnosticsCompletenessSharded := fun d => canonicalFailedObligation_completeness d _
+  , decidabilityWitness := fun _ => (inferInstance, inferInstance)
+  , complexityBound := 0
+  , complexityBoundWitness := Nat.le_refl 0
+  , conservativeExtensionWitness := fun _ h => h ▸ ⟨rfl, rfl⟩
+  , necessityMinimalityWitness := fun _ =>
+      ⟨⟨"unit", "dropping this hypothesis is not exercised by the Unit instance"⟩, by decide⟩ }
+
+/-- Concrete envelope-admission profile (all derived fields use defaults). -/
+def unitAdmissionProfile : Adapters.ProtocolMachineEnvelopeAdmissionProfile :=
+  { State := Unit, Obs := Unit, premises := unitAdmissionPremises }
 
 /-! ## Concrete Pack and Inventory -/
 
 /-- Empty session store over the unit verification model. -/
 def unitStore : SessionStore UnitVerify := []
 
-/-- Invariant space with only the provable envelope profiles attached. -/
+/-- Invariant space with all three envelope profiles attached. -/
 noncomputable def envelopeEvidenceSpace : ProtocolMachineInvariantSpaceWithProfiles unitStore Unit :=
   (ProtocolMachineInvariantSpaceWithProfiles.mk
     (Adapters.ProtocolMachineInvariantSpaceWithDistributedProfiles.mk
       (ProtocolMachineInvariantSpace.mk none none none none) {}) {}
   ).withProtocolMachineEnvelopeAdherence unitAdherenceProfile
+   |>.withProtocolMachineEnvelopeAdmission unitAdmissionProfile
    |>.withProtocolEnvelopeBridge unitBridgeProfile
 
 /-- Theorem pack built from `envelopeEvidenceSpace`. -/
@@ -179,7 +208,7 @@ def envelopeEvidenceInventory : List (String × Bool) :=
   , ("consensus_envelope", false)
   , ("failure_envelope", false)
   , ("protocol_machine_envelope_adherence", true)
-  , ("protocol_machine_envelope_admission", false)
+  , ("protocol_machine_envelope_admission", true)
   , ("protocol_envelope_bridge", true)
   , ("effect_interface_bridge", true)
   , ("classical_foster", false)
@@ -210,7 +239,7 @@ def envelopeEvidenceInventory : List (String × Bool) :=
   , ("metadata_progress_contracts_premise_supplied", false)
   , ("metadata_replay_failure_exactness_premise_supplied", false)
   , ("metadata_envelope_adherence_premise_supplied", true)
-  , ("metadata_envelope_admission_premise_supplied", false)
+  , ("metadata_envelope_admission_premise_supplied", true)
   , ("metadata_envelope_bridge_premise_supplied", true)
   , ("metadata_adherence_or_admission_premise_supplied", true)
   , ("metadata_adherence_and_bridge_premise_supplied", true)
@@ -223,14 +252,14 @@ theorem envelopeEvidenceInventory_eq :
 
 example : envelopeEvidencePack.{0, 0}.protocolMachineEnvelopeAdherence?.isSome = true := rfl
 example : envelopeEvidencePack.{0, 0}.protocolEnvelopeBridge?.isSome = true := rfl
-example : envelopeEvidencePack.{0, 0}.protocolMachineEnvelopeAdmission?.isSome = false := rfl
+example : envelopeEvidencePack.{0, 0}.protocolMachineEnvelopeAdmission?.isSome = true := rfl
 
 -- The JSON export encodes exactly the inventory.
 #guard inventoryJsonMatches envelopeEvidenceInventory (inventoryToJson envelopeEvidenceInventory)
 
 #guard envelopeEvidenceInventory.lookup "protocol_machine_envelope_adherence" == some true
 #guard envelopeEvidenceInventory.lookup "protocol_envelope_bridge" == some true
-#guard envelopeEvidenceInventory.lookup "protocol_machine_envelope_admission" == some false
+#guard envelopeEvidenceInventory.lookup "protocol_machine_envelope_admission" == some true
 
 end Examples
 end Proofs

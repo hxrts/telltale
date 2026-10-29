@@ -151,6 +151,24 @@ def ConservativeExtension
     DProg_local baseline = DProg_local strengthened ∧
     DProg_shard baseline = DProg_shard strengthened
 
+/-- E4: canonical failed-obligation predicate: an obligation failed iff some
+rejection reason for this user/capability pair maps to it. -/
+def canonicalFailedObligation
+    (dUser : DUser) (dProg : CertifiedEnvelopeCapability) (o : AdmissionObligation) : Prop :=
+  ∃ r, r ∈ admissionRejectionReasons dUser dProg ∧ rejectionReasonObligation r = o
+
+/-- E4: the canonical failed-obligation predicate satisfies diagnostics soundness. -/
+theorem canonicalFailedObligation_soundness
+    (dUser : DUser) (dProg : CertifiedEnvelopeCapability) :
+    DiagnosticsSoundness dUser dProg (canonicalFailedObligation dUser dProg) :=
+  fun r hr => ⟨r, hr, rfl⟩
+
+/-- E4: the canonical failed-obligation predicate satisfies diagnostics completeness. -/
+theorem canonicalFailedObligation_completeness
+    (dUser : DUser) (dProg : CertifiedEnvelopeCapability) :
+    DiagnosticsCompleteness dUser dProg (canonicalFailedObligation dUser dProg) :=
+  fun _ h => h
+
 /-! ## Hypothesis Necessity Skeleton -/
 
 /-- E4: major hypotheses tracked for necessity/minimality analysis. -/
@@ -290,7 +308,8 @@ structure ProtocolMachineEnvelopeAdmissionPremises (State : Type u) (Obs : Type 
   shardedHypotheses : ProtocolMachineShardedEnvelopeHypotheses State Obs
   runtimeComplianceLocal : DUser → Prop
   runtimeComplianceSharded : DUser → Prop
-  failedObligation : AdmissionObligation → Prop
+  failedObligationLocal : DUser → AdmissionObligation → Prop
+  failedObligationSharded : DUser → AdmissionObligation → Prop
   localInferenceSoundnessWitness :
     DProgInferenceSoundness_local input localHypotheses
   shardedInferenceSoundnessWitness :
@@ -312,13 +331,13 @@ structure ProtocolMachineEnvelopeAdmissionPremises (State : Type u) (Obs : Type 
   shardedAdmissionCompletenessWitness :
     AdmissionCompleteness (DProg_shard input) runtimeComplianceSharded
   diagnosticsSoundnessLocal :
-    ∀ dUser, DiagnosticsSoundness dUser (DProg_local input) failedObligation
+    ∀ dUser, DiagnosticsSoundness dUser (DProg_local input) (failedObligationLocal dUser)
   diagnosticsSoundnessSharded :
-    ∀ dUser, DiagnosticsSoundness dUser (DProg_shard input) failedObligation
+    ∀ dUser, DiagnosticsSoundness dUser (DProg_shard input) (failedObligationSharded dUser)
   diagnosticsCompletenessLocal :
-    ∀ dUser, DiagnosticsCompleteness dUser (DProg_local input) failedObligation
+    ∀ dUser, DiagnosticsCompleteness dUser (DProg_local input) (failedObligationLocal dUser)
   diagnosticsCompletenessSharded :
-    ∀ dUser, DiagnosticsCompleteness dUser (DProg_shard input) failedObligation
+    ∀ dUser, DiagnosticsCompleteness dUser (DProg_shard input) (failedObligationSharded dUser)
   decidabilityWitness :
     ∀ dUser, InferenceAdmissionDecidable input dUser
   complexityBound : Nat

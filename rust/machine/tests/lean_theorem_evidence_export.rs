@@ -59,6 +59,7 @@ fn lean_exported_inventory_drives_envelope_admission() {
 
     for key in LEAN_ENVELOPE_EVIDENCE_KEYS {
         let flag = *raw.get(key).expect("envelope key exported by Lean");
+        assert!(flag, "concrete Lean pack carries the {key} profile");
         assert_eq!(evidence.admits(key), flag, "admission for {key}");
     }
 
