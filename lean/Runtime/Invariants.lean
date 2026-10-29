@@ -27,7 +27,7 @@ Per-session cancelable invariant for session coherence and buffer typing.
 ## Definitions
 
 - `sessionNs sid` — namespace per session
-- `session_inv γ sid ct` — cancelable invariant body
+- `session_inv γs sid ct` — cancelable invariant body
 - `session_ns_disjoint`
 - `session_inv_alloc` / `session_inv_open` / `session_inv_close`
 - `Participation` — per-endpoint lifecycle token
@@ -72,36 +72,42 @@ def knowledge_inv (γ : GhostName) (sid : SessionId) (e : Endpoint) : iProp :=
   -- Endpoint-specific knowledge invariant.
   knows γ (knowledge_fact sid e)
 
-def knowledge_inv_all_schematic (_γ : GhostName) (_sid : SessionId) (_G : SessionMap) : iProp :=
-  -- Schematic layer: map traversal is intentionally omitted in V1.
-  iProp.emp
-
-abbrev knowledge_inv_all := knowledge_inv_all_schematic
+/-- Knowledge invariant over the whole session map: the authoritative
+knowledge map registers the per-endpoint fact of every endpoint in `G`, so
+any `knowledge_inv` fragment is backed by a live session endpoint. -/
+def knowledge_inv_all (γ : GhostName) (sid : SessionId) (G : SessionMap) : iProp :=
+  iProp.exist fun (K : GhostMap Unit) =>
+    iProp.sep (ghost_map_auth γ K)
+      (iProp.pure
+        (∀ e L, GMap.lookup G e = some L →
+          Iris.Std.get? K (encodeKnowledge (knowledge_fact sid e)) = some ()))
 
 /-! ## Cancelable session invariant -/
 
-def session_inv_body (γ : GhostName) (sid : SessionId) : iProp :=
-  -- Session invariant body with coherence, buffers, and progress.
+/-- Session invariant body: coherence, buffer typing, the authoritative session
+map, the progress-token supply, speculation bounds, and knowledge registration,
+each at its own ghost name. -/
+def session_inv_body (γs : SessionGhostNames) (sid : SessionId) : iProp :=
   iProp.exist fun G =>
     iProp.exist fun D =>
       iProp.exist fun bufs =>
         iProp.sep (session_coherent sid G D)
           (iProp.sep (buffers_typed sid G D bufs)
-            (iProp.sep (session_auth γ G)
+            (iProp.sep (session_auth γs.session G)
               (iProp.sep (head_coherent sid G D)
-                (iProp.sep (session_progress_supply γ sid)
-                  (iProp.sep (speculation_session_inv γ sid)
-                    (knowledge_inv_all_schematic γ sid G))))))
+                (iProp.sep (session_progress_supply γs.progress sid)
+                  (iProp.sep (speculation_session_inv γs.speculation sid)
+                    (knowledge_inv_all γs.knowledge sid G))))))
 
 def sessionNs (sid : SessionId) : Namespace :=
   -- Namespace for a session invariant.
   Namespace.append_nat Namespace.root sid
 
-def session_inv (_γ : GhostName) (sid : SessionId) (ct : CancelToken) : iProp :=
+def session_inv (γs : SessionGhostNames) (sid : SessionId) (ct : CancelToken) : iProp :=
   -- Session invariant ties coherence, buffers, progress, and knowledge.
-  cinv (sessionNs sid) ct (session_inv_body _γ sid)
+  cinv (sessionNs sid) ct (session_inv_body γs sid)
 
-def session_ns_disjoint (sid₁ sid₂ : SessionId)
+theorem session_ns_disjoint (sid₁ sid₂ : SessionId)
     (hNs : sessionNs sid₁ ≠ sessionNs sid₂) :
   Mask.disjoint (namespace_to_mask (sessionNs sid₁)) (namespace_to_mask (sessionNs sid₂)) :=
   -- Namespaces for distinct session ids are disjoint.
@@ -112,14 +118,13 @@ def session_ns_disjoint (sid₁ sid₂ : SessionId)
       simp [sessionNs, hEq]
     simpa [sessionNs] using namespace_disjoint Namespace.root sid₁ sid₂ hSid
 
-def session_inv_alloc (γ : GhostName) (sid : SessionId) (E : Mask) :
-  (∀ E' : Iris.GSet, ∃ i, ¬E'.mem i ∧ (namespace_to_mask (sessionNs sid)) i) →
+theorem session_inv_alloc (γ : SessionGhostNames) (sid : SessionId) (E : Mask) :
   iProp.entails (iProp.later (session_inv_body γ sid))
     (fupd E E (iProp.exist fun ct => iProp.sep (session_inv γ sid ct) (cancel_token_own ct))) :=
   -- Allocate a fresh cancelable invariant for a session.
   cinv_alloc (sessionNs sid) E (session_inv_body γ sid)
 
-def session_inv_open (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E : Mask)
+theorem session_inv_open (γ : SessionGhostNames) (sid : SessionId) (ct : CancelToken) (E : Mask)
     (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
   iProp.entails (iProp.sep (session_inv γ sid ct) (cancel_token_own ct))
     (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid)))
@@ -130,48 +135,71 @@ def session_inv_open (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E : 
   -- Open the session invariant under mask difference.
   cinv_acc (sessionNs sid) E ct (session_inv_body γ sid) hSub
 
-def session_inv_close (γ : GhostName) (sid : SessionId) (ct : CancelToken) (E : Mask)
-    (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
-  iProp.entails (iProp.sep (session_inv γ sid ct) (cancel_token_own ct))
-    (fupd E (Mask.diff E (namespace_to_mask (sessionNs sid)))
-      (iProp.sep (iProp.later (session_inv_body γ sid))
-        (iProp.sep (cancel_token_own ct)
-          (iProp.wand (iProp.later (session_inv_body γ sid))
-            (fupd (Mask.diff E (namespace_to_mask (sessionNs sid))) E (iProp.pure True)))))) :=
-  -- Cancel the session invariant with the cancel token.
+/-- Close (cancel) the session invariant: consuming the full cancel token
+permanently gives up the invariant and returns its body `▷ session_inv_body`
+to the caller. Unlike `session_inv_open`, no closing obligation remains. -/
+theorem session_inv_close (γ : SessionGhostNames) (sid : SessionId) (ct : CancelToken)
+    (E : Mask) (hSub : Mask.subseteq (namespace_to_mask (sessionNs sid)) E) :
+    iProp.entails (iProp.sep (session_inv γ sid ct) (cancel_token_own ct))
+      (fupd E E (iProp.later (session_inv_body γ sid))) :=
   cinv_cancel (sessionNs sid) E ct (session_inv_body γ sid) hSub
 
-/-! ## Conservation invariants -/
+/-! ## Conservation invariants
 
-def conservation_inv (_γ : GhostName) (_sid : SessionId)
+A conserved quantity `proj : Endpoint → M` summed over a duplicate-free cover of
+the session's endpoints. The lemmas below prove the two algebraic shapes every
+session operation must take to preserve it: joining/leaving with a zero
+contribution, and a transfer between two endpoints that keeps their combined
+contribution. They do not yet connect to the machine's `open`/`send`/`recv`/
+`close` step functions; that connection is the remaining obligation. -/
+
+/-- Sum of the conserved quantity over an endpoint cover. -/
+def coverSum {M : Type} [AddCommMonoid M] (proj : Endpoint → M) (eps : List Endpoint) : M :=
+  (eps.map proj).sum
+
+def conservation_inv (sid : SessionId)
     {M : Type} [AddCommMonoid M]
-    (_proj : Endpoint → M) (_total : M) : iProp :=
-  -- Conservation holds when a finite endpoint cover sums to the total.
+    (proj : Endpoint → M) (total : M) : iProp :=
+  -- Conservation holds when a duplicate-free cover of the session sums to the total.
   iProp.exist fun (eps : List Endpoint) =>
-    iProp.pure
-      (eps.all (fun e => e.sid = _sid) ∧
-        eps.foldl (fun acc e => acc + _proj e) 0 = _total)
-
-def conservation_inv_preserved (_γ : GhostName) (_sid : SessionId)
-    {M : Type} [AddCommMonoid M]
-    (_proj : Endpoint → M) (_total : M) : Prop :=
-  -- Joining with zero projection preserves the conservation sum.
-  ∀ (eps : List Endpoint) (e₀ : Endpoint),
-    e₀.sid = _sid →
-    _proj e₀ = 0 →
-    eps.foldl (fun acc e => acc + _proj e) 0 = _total →
-      (e₀ :: eps).foldl (fun acc e => acc + _proj e) 0 = _total
+    iProp.pure (eps.Nodup ∧ (∀ e ∈ eps, e.sid = sid) ∧ coverSum proj eps = total)
 
 omit [Telltale.TelltaleIris] [GhostMapSlot Unit] [GhostMapSlot Nat]
     [GhostMapSlot LocalType] in
-theorem conservation_inv_preserved_holds (_γ : GhostName) (_sid : SessionId)
-    {M : Type} [AddCommMonoid M]
-    (_proj : Endpoint → M) (_total : M) :
-    conservation_inv_preserved _γ _sid _proj _total := by
-  intro eps e₀ _ hProj hSum
-  show eps.foldl (fun acc e => acc + _proj e) (0 + _proj e₀) = _total
-  rw [hProj, add_zero]
-  exact hSum
+/-- Joining an endpoint whose contribution is zero preserves the sum. -/
+theorem conservation_join_zero {M : Type} [AddCommMonoid M]
+    (proj : Endpoint → M) (eps : List Endpoint) (e₀ : Endpoint) (h : proj e₀ = 0) :
+    coverSum proj (e₀ :: eps) = coverSum proj eps := by
+  simp [coverSum, h]
+
+omit [Telltale.TelltaleIris] [GhostMapSlot Unit] [GhostMapSlot Nat]
+    [GhostMapSlot LocalType] in
+/-- Helper: split off two distinct members of a duplicate-free cover. -/
+theorem coverSum_split2 {M : Type} [AddCommMonoid M] (proj : Endpoint → M)
+    {eps : List Endpoint} {a b : Endpoint} (ha : a ∈ eps) (hb : b ∈ eps) (hab : a ≠ b) :
+    coverSum proj eps = proj a + (proj b + coverSum proj ((eps.erase a).erase b)) := by
+  have hb' : b ∈ eps.erase a := List.mem_erase_of_ne (Ne.symm hab) |>.2 hb
+  unfold coverSum
+  rw [← List.sum_map_erase _ ha, ← List.sum_map_erase _ hb']
+
+omit [Telltale.TelltaleIris] [GhostMapSlot Unit] [GhostMapSlot Nat]
+    [GhostMapSlot LocalType] in
+/-- A transfer between two distinct endpoints that keeps their combined
+contribution (and leaves all others unchanged) preserves the cover sum. -/
+theorem conservation_transfer {M : Type} [AddCommMonoid M]
+    (proj proj' : Endpoint → M) {eps : List Endpoint} {a b : Endpoint}
+    (hNodup : eps.Nodup) (ha : a ∈ eps) (hb : b ∈ eps) (hab : a ≠ b)
+    (hFrame : ∀ e, e ≠ a → e ≠ b → proj' e = proj e)
+    (hPair : proj' a + proj' b = proj a + proj b) :
+    coverSum proj' eps = coverSum proj eps := by
+  rw [coverSum_split2 proj ha hb hab, coverSum_split2 proj' ha hb hab]
+  have hRest : coverSum proj' ((eps.erase a).erase b) = coverSum proj ((eps.erase a).erase b) := by
+    unfold coverSum
+    congr 1
+    refine List.map_congr_left (fun e he => hFrame e ?_ ?_)
+    · exact (hNodup.mem_erase_iff.1 (List.mem_of_mem_erase he)).1
+    · exact ((hNodup.erase a).mem_erase_iff.1 he).1
+  rw [hRest, ← add_assoc, ← add_assoc, hPair]
 
 /-! ## Participation and lifecycle events -/
 

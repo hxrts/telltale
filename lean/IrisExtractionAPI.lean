@@ -8,6 +8,8 @@ import Iris.Instances.Lib.GhostVar
 import Iris.Instances.Lib.GhostMap
 import Iris.Instances.Lib.SavedProp
 import Iris.ProgramLogic.Language
+import Iris.ProgramLogic.WeakestPre
+import Iris.ProgramLogic.Adequacy
 
 /-! # IrisExtractionAPI
 
@@ -55,10 +57,10 @@ concurrent program correctness, not a runtime data structure.
 
 ## Expose
 
-- `Telltale.TelltaleIris`: Parameter bundle for Iris infrastructure
+- `Telltale.TelltaleIris`: Ghost-functor bundle with upstream Iris resource classes
 - `Telltale.iProp`, `Telltale.GhostName`, `Telltale.Mask`, `Telltale.Namespace`
 - `Telltale.GhostVarSlot`, `Telltale.SavedPropSlot`, `Telltale.GhostMapSlot`
-- `Telltale.wsatGS`
+- `Telltale.Positive`, `Telltale.GhostMapCarrier`
 
 Runtime erasure mappings are attached in `IrisExtractionInstance`.
 -/
@@ -67,107 +69,73 @@ set_option autoImplicit false
 
 namespace Telltale
 
-open Iris Iris.Algebra Iris.Std Iris.BI Iris.BaseLogic COFE
+open Iris Iris.Std
 
 /-! ## Parameter Bundle
 
-The `TelltaleIris` class bundles all Iris infrastructure parameters needed by
-the verification. This includes:
-- Ghost functors (`GF`) for the recursive domain equation
-- Finite map type (`M`) for heap-like structures
-- Fraction type (`F`) for fractional permissions
-- World satisfaction ghost state (`W`)
+The `TelltaleIris` class fixes the global ghost-functor bundle `GF` and the
+upstream Iris resource classes Telltale needs on it:
+- `InvGS` — world satisfaction, later credits, and fancy updates
+- `CInvG` — cancelable invariants
+- `SavedPropG` — saved propositions
 -/
 
 /-- Bundle of Iris infrastructure parameters for Telltale verification.
 
-This typeclass collects all the Iris-level parameters needed to instantiate
-the separation logic. Downstream modules add `[TelltaleIris]` to access
-ghost state, invariants, and fancy updates. -/
+Downstream modules add `[TelltaleIris]` to access ghost state, invariants,
+and fancy updates over a single ghost-functor bundle. -/
 class TelltaleIris where
   GF : BundledGFunctors
-  M : Type _ → Type _
-  F : Type _
-  instUFraction : UFraction F
-  instFiniteMap : FiniteMap Positive M
-  instFiniteMapLaws : FiniteMapLaws Positive M
-  instHeapFiniteMap : HeapFiniteMap Positive M
-  instElemG_CoPsetDisj : ElemG GF (COFE.constOF CoPsetDisj)
-  instElemG_GSetDisj : ElemG GF (COFE.constOF GSetDisj)
-  instElemG_Inv : ElemG GF (InvF GF M F)
-  instElemG_Cinv : ElemG GF (COFE.constOF (Iris.BaseLogic.CinvR F))
-  W : WsatGS GF
+  instInvGS : InvGS GF
+  instCInvG : CInvG GF
+  instSavedPropG : SavedPropG GF
 
-attribute [instance] TelltaleIris.instUFraction
-attribute [instance] TelltaleIris.instFiniteMap
-attribute [instance] TelltaleIris.instFiniteMapLaws
-attribute [instance] TelltaleIris.instHeapFiniteMap
-attribute [instance] TelltaleIris.instElemG_CoPsetDisj
-attribute [instance] TelltaleIris.instElemG_GSetDisj
-attribute [instance] TelltaleIris.instElemG_Inv
-attribute [instance] TelltaleIris.instElemG_Cinv
+attribute [instance] TelltaleIris.instInvGS
+attribute [instance] TelltaleIris.instCInvG
+attribute [instance] TelltaleIris.instSavedPropG
 
 /-! ## Core Type Aliases -/
 
 variable [ti : TelltaleIris]
 
-abbrev iProp : Type _ := IProp ti.GF
+abbrev iProp : Type := IProp ti.GF
 abbrev GhostName := GName
-abbrev Mask := Iris.Set Positive
-abbrev Namespace := Iris.Namespace
+/-- Masks are upstream Iris `CoPset`s of positive invariant names. -/
+abbrev Mask := CoPset
+abbrev Namespace := _root_.Namespace
+/-- Positive binary naturals used as ghost-map keys. -/
+abbrev Positive := _root_.Pos
 
 /-! ## Dispatch Typeclasses for Ghost State
 
-These "slot" typeclasses register types for use with Iris ghost state primitives.
-Each slot bundles the OFE (step-indexed equivalence) instances and ghost functor
-membership proofs needed to use a type with the corresponding ghost construct.
-
-**Why slots?** Iris ghost state is parameterized by resource algebras. The slot
-pattern lets application code declare which types can be stored as ghost
-variables/maps/props, with the necessary algebraic structure bundled together.
+These "slot" typeclasses register types for use with Iris ghost state
+primitives. Each slot carries the ghost-functor membership needed to use a
+type with the corresponding ghost construct.
 -/
 
-/-- Slot for ghost variables of type `α`.
+/-- Carrier for ghost maps keyed by positives. -/
+abbrev GhostMapCarrier := fun (V : Type) => _root_.Std.ExtTreeMap _root_.Pos V compare
 
-Registers `α` (wrapped as `LeibnizO α`) for use with `ghost_var`. Provides
-the OFE structure and ghost functor membership needed by the ghost variable
-resource algebra. -/
+/-- Slot for ghost variables of type `α`. -/
 class GhostVarSlot (α : Type) where
-  instOFE : OFE (LeibnizO α)
-  instDiscrete : OFE.Discrete (LeibnizO α)
-  instLeibniz : OFE.Leibniz (LeibnizO α)
-  instElemG : ElemG ti.GF (GhostVarF ti.F (LeibnizO α))
+  instG : GhostVarG ti.GF α
 
-attribute [instance] GhostVarSlot.instOFE
-attribute [instance] GhostVarSlot.instDiscrete
-attribute [instance] GhostVarSlot.instLeibniz
-attribute [instance] GhostVarSlot.instElemG
+attribute [instance] GhostVarSlot.instG
 
-class SavedPropSlot where
-  instElemG : ElemG ti.GF (SavedPropF ti.GF ti.F)
+/-- Slot for saved propositions (always available through `TelltaleIris`). -/
+class SavedPropSlot : Prop where
 
-attribute [instance] SavedPropSlot.instElemG
+instance : SavedPropSlot := {}
 
 /-- Slot for ghost maps with value type `V`. -/
 class GhostMapSlot (V : Type) where
-  instOFE : OFE (LeibnizO V)
-  instDiscrete : OFE.Discrete (LeibnizO V)
-  instLeibniz : OFE.Leibniz (LeibnizO V)
-  instElemG : ElemG ti.GF (GhostMapF ti.GF ti.M ti.F (LeibnizO V))
+  instG : GhostMapG ti.GF _root_.Pos V GhostMapCarrier
 
-attribute [instance] GhostMapSlot.instOFE
-attribute [instance] GhostMapSlot.instDiscrete
-attribute [instance] GhostMapSlot.instLeibniz
-attribute [instance] GhostMapSlot.instElemG
-
-/-! ## Internal Alias -/
-
-def wsatGS : WsatGS ti.GF := ti.W
+attribute [instance] GhostMapSlot.instG
 
 end Telltale
 
 /-! ## Root Exports -/
 
-export Telltale (iProp GhostName GhostVarSlot GhostMapSlot SavedPropSlot)
-export Iris (Positive)
-export Telltale (Mask Namespace)
+export Telltale (iProp GhostName GhostVarSlot GhostMapSlot SavedPropSlot Positive)
+export Telltale (Mask)

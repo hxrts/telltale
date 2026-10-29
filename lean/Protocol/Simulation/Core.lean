@@ -146,7 +146,7 @@ def stepBaseDecide (C : Config) : Option Config :=
 -- Recursive Step Driver Helpers
 
 /-- Coarse size measure for well-founded recursion on processes. -/
-private def procSize : Process → Nat
+def procSize : Process → Nat
   | .skip => 0
   | .seq P Q => procSize P + procSize Q + 1
   | .par _ _ P Q => procSize P + procSize Q + 1
@@ -157,18 +157,18 @@ private def procSize : Process → Nat
   | .newSession _ _ _ => 1
   | .assign _ _ => 0
 
-private lemma proc_size_lt_seq_left (P Q : Process) : procSize P < procSize (.seq P Q) := by
+lemma proc_size_lt_seq_left (P Q : Process) : procSize P < procSize (.seq P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
   simp [procSize, Nat.add_assoc]
 
-private lemma proc_size_lt_par_left (nS nG : Nat) (P Q : Process) :
+lemma proc_size_lt_par_left (nS nG : Nat) (P Q : Process) :
     procSize P < procSize (.par nS nG P Q) := by
   have hpos : 0 < procSize Q + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_right (n := procSize P) hpos
   simp [procSize, Nat.add_assoc]
 
-private lemma proc_size_lt_par_right (nS nG : Nat) (P Q : Process) :
+lemma proc_size_lt_par_right (nS nG : Nat) (P Q : Process) :
     procSize Q < procSize (.par nS nG P Q) := by
   have hpos : 0 < procSize P + 1 := Nat.succ_pos _
   have h := Nat.lt_add_of_pos_left (n := procSize Q) hpos
@@ -181,7 +181,7 @@ private lemma proc_size_lt_par_right (nS nG : Nat) (P Q : Process) :
 For seq and par, we recursively try to step the subprocesses.
 -/
 /- ## Structured Block 2 -/
-private def stepDecideAux (proc : Process) (C : Config) : Option Config :=
+noncomputable def stepDecideAux (proc : Process) (C : Config) : Option Config :=
   match proc with
   | .skip => none
 
@@ -219,7 +219,7 @@ decreasing_by
       | simpa using proc_size_lt_par_left _ _ _ _
       | simpa using proc_size_lt_par_right _ _ _ _
 
-def stepDecide (C : Config) : Option Config :=
+noncomputable def stepDecide (C : Config) : Option Config :=
   stepDecideAux C.proc C
 
 -- Multi-Step Execution
@@ -230,7 +230,7 @@ Stops early if:
 - The process terminates (becomes skip)
 - The configuration is stuck (stepDecide returns none)
 -/
-def runSteps (C : Config) (n : Nat) : Config :=
+noncomputable def runSteps (C : Config) (n : Nat) : Config :=
   if n = 0 then C
   else if C.proc = .skip then C
   else
@@ -243,7 +243,7 @@ termination_by n
 
 Returns a list of configurations from initial to final.
 -/
-def traceSteps (C : Config) (n : Nat) : List Config :=
+noncomputable def traceSteps (C : Config) (n : Nat) : List Config :=
   if n = 0 then [C]
   else if C.proc = .skip then [C]
   else
@@ -253,16 +253,16 @@ def traceSteps (C : Config) (n : Nat) : List Config :=
 termination_by n
 
 /-- Check if a configuration can step. -/
-def canStep (C : Config) : Bool :=
+noncomputable def canStep (C : Config) : Bool :=
 /- ## Structured Block 3 -/
   (stepDecide C).isSome
 
 /-- Check if a configuration is terminated. -/
-def isTerminated (C : Config) : Bool :=
+noncomputable def isTerminated (C : Config) : Bool :=
   C.proc == .skip
 
 /-- Check if a configuration is stuck (not terminated but can't step). -/
-def isStuck (C : Config) : Bool :=
+noncomputable def isStuck (C : Config) : Bool :=
   !isTerminated C && !canStep C
 
 

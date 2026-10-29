@@ -1,4 +1,5 @@
 import Choreography.Projection.Project.ImplBase
+import Choreography.Projection.DelegateFree
 
 /-! # Choreography.Projection.Project.ImplConstructors.Base
 
@@ -121,7 +122,7 @@ theorem size_of_snd_lt_comm_head_mul3 (sender receiver : String)
 private theorem c_project_end_trans_end_end (role : String)
     (_ : CProject .end role .end) : trans .end role = .end := by
   -- Base case: trans .end is definitionally .end.
-  simp [trans]
+  simp [trans, Choreography.Projection.Trans.trans]
 
 /-- Helper: `.var` cannot project to `.end`. -/
 private theorem c_project_end_trans_end_var (v : String) (role : String)
@@ -144,7 +145,7 @@ private theorem c_project_end_trans_end_mu (t : String) (body : GlobalType) (rol
   -- The .end candidate forces the unguarded branch.
   have htrans_guard : (trans body role).isGuarded t = false :=
     c_project_unguarded_trans hbody hne_body hguard
-  simp [trans, htrans_guard]
+  simp [trans, Choreography.Projection.Trans.trans, htrans_guard]
 
 /-- Helper: sender role cannot project a comm to .end. -/
 private theorem c_project_end_trans_end_comm_sender_contra
@@ -209,7 +210,7 @@ decreasing_by
     all_goals
       simpa [hg] using size_of_snd_lt_comm_head_mul3 sender receiver first rest
 
-/-! ## End Constructor Agreement: Comm Case -/
+/- ## End Constructor Agreement: Comm Case -/
 
 /-- Helper: comm case for end projection agreement. -/
 private theorem c_project_end_trans_end_comm (sender receiver : String)
@@ -237,7 +238,7 @@ decreasing_by
     all_goals
       simp [hgb, GlobalType.comm.sizeOf_spec]
 
-/-! ## End Constructor Agreement: Main Theorem -/
+/- ## End Constructor Agreement: Main Theorem -/
 
 /-- If CProject g role .end, then trans g role = .end.
       Proved by well-founded induction on g. -/
@@ -257,10 +258,22 @@ theorem c_project_end_trans_end (g : GlobalType) (role : String)
         simpa [hg] using
           (c_project_end_trans_end_comm sender receiver gbs role
             (by simpa [hg] using h) (by simpa [hg] using hne))
+    | delegate p q sid r cont =>
+        have h' : CProject (.delegate p q sid r cont) role .end := by simpa [hg] using h
+        have hf := c_project_destruct h'
+        have hnp : role ≠ p := by intro e; subst e; simp [CProjectF] at hf
+        have hnq : role ≠ q := by intro e; subst e; simp [CProjectF, hnp] at hf
+        simp only [CProjectF, hnp, hnq, if_false] at hf
+        have ih := c_project_end_trans_end cont role hf
+          (by simpa [hg, GlobalType.allCommsNonEmpty] using hne)
+        have hp' : (role == p) = false := by simpa using hnp
+        have hq' : (role == q) = false := by simpa using hnq
+        simp [trans, Choreography.Projection.Trans.trans, hp', hq']
+        exact ih
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec]
+      simp [hg, GlobalType.comm.sizeOf_spec] <;> omega
 end
 
 /-! ## Var constructor agreement -/
@@ -279,7 +292,7 @@ private theorem c_project_var_trans_var_var (v v' role : String)
   -- CProjectF forces v' = v, then trans is definitional.
   have hf := c_project_destruct h
   simp [CProjectF] at hf
-  simpa [trans, hf]
+  simpa [trans, Choreography.Projection.Trans.trans, hf]
 
 /-- Helper: `.mu` cannot project to `.var`. -/
 private theorem c_project_var_trans_var_mu (t : String) (body : GlobalType) (role v : String)
@@ -353,7 +366,7 @@ decreasing_by
     all_goals
       simpa [hg] using size_of_snd_lt_comm_head_mul3 sender receiver first rest
 
-/-! ## Var Constructor Agreement: Comm Case -/
+/- ## Var Constructor Agreement: Comm Case -/
 
 /-- Helper: comm case for var projection agreement. -/
 private theorem c_project_var_trans_var_comm (sender receiver : String)
@@ -381,7 +394,7 @@ decreasing_by
     all_goals
       simp [hgb, GlobalType.comm.sizeOf_spec]
 
-/-! ## Var Constructor Agreement: Main Theorem -/
+/- ## Var Constructor Agreement: Main Theorem -/
 
 /-- If CProject g role (.var v) and g has non-empty branches, then trans g role = .var v.
       Proved by well-founded induction on g.
@@ -401,10 +414,22 @@ theorem c_project_var_trans_var (g : GlobalType) (role : String) (v : String)
         simpa [hg] using
           (c_project_var_trans_var_comm sender receiver gbs role v
             (by simpa [hg] using h) (by simpa [hg] using hwf))
+    | delegate p q sid r cont =>
+        have h' : CProject (.delegate p q sid r cont) role (.var v) := by simpa [hg] using h
+        have hf := c_project_destruct h'
+        have hnp : role ≠ p := by intro e; subst e; simp [CProjectF] at hf
+        have hnq : role ≠ q := by intro e; subst e; simp [CProjectF, hnp] at hf
+        simp only [CProjectF, hnp, hnq, if_false] at hf
+        have ih := c_project_var_trans_var cont role v hf
+          (by simpa [hg, GlobalType.allCommsNonEmpty] using hwf)
+        have hp' : (role == p) = false := by simpa using hnp
+        have hq' : (role == q) = false := by simpa using hnq
+        simp [trans, Choreography.Projection.Trans.trans, hp', hq']
+        exact ih
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec]
+      simp [hg, GlobalType.comm.sizeOf_spec] <;> omega
 end
 
 /-! ## CProject-to-Trans structure extraction
@@ -419,7 +444,7 @@ theorem c_project_send_implies_trans_send_end (role partner : String)
     (hproj : CProject .end role (.send partner lbs)) :
     ∃ gbs', trans .end role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- CProjectF forbids .end → .send.
   have hf := c_project_destruct hproj
   have : False := by simpa [CProjectF] using hf
@@ -431,7 +456,7 @@ theorem c_project_send_implies_trans_send_var (v role partner : String)
     (hproj : CProject (.var v) role (.send partner lbs)) :
     ∃ gbs', trans (.var v) role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- CProjectF forbids .var → .send.
   have hf := c_project_destruct hproj
   have : False := by simpa [CProjectF] using hf
@@ -443,7 +468,7 @@ theorem c_project_send_implies_trans_send_mu (t : String) (body : GlobalType)
     (hproj : CProject (.mu t body) role (.send partner lbs)) :
     ∃ gbs', trans (.mu t body) role = .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- CProjectF forbids .mu → .send.
   have hf := c_project_destruct hproj
   have : False := by simpa [CProjectF] using hf

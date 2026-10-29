@@ -95,7 +95,7 @@ Each wave is checked against a `WaveCertificate`. If certificate validation fail
 | Invalid wave certificate | Mandatory fallback to canonical one-step | `threaded_lane_runtime.rs` |
 | Undocumented deviation | Active deviation coverage required | `just check-parity --types` |
 
-The regression lane validates both regimes. The test `canonical_parity_is_exact_at_concurrency_one` enforces exact equality. The test `envelope_bounded_parity_holds_for_n_gt_1` enforces envelope-bounded behavior.
+The regression lane validates both regimes. The Rust test `canonical_parity_is_exact_at_concurrency_one` in `rust/machine/tests/parity_fixtures_v2.rs` enforces exact equality. The Rust test `envelope_bounded_parity_holds_for_n_gt_1` in the same file enforces envelope-bounded behavior. These are executable regression tests, not Lean theorems.
 
 ## Runtime Gates
 

@@ -98,7 +98,7 @@ theorem delegation_step_other_sessions_g_renaming (ρ : SessionRenaming)
       rw [hLookupG'] at hContra
       simp only [Option.map_some] at hContra
       rw [hLookup] at hContra
-      exact Option.noConfusion hContra
+      first | exact Option.noConfusion hContra | cases hContra | simp at hContra
   | some L =>
     obtain ⟨ep', _, hEpEq, hL, hLookupG⟩ := lookup_g_rename_inv ρ G ep L hLookup
     have hSid' : ep'.sid ≠ s := endpoint_preimage_sid_ne ρ ep ep' s hSid hEpEq

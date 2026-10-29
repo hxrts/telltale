@@ -367,7 +367,9 @@ structure Premises
   ImplRun : Run State → Prop
   envelopeBudget : DiffBudget
   inferredBudget : DiffBudget
-  implementationMatchesReference :
+  /-- Refinement hypothesis (not derived): every reference/implementation run
+  pair agrees on safety-visible observations at every step. -/
+  refinementHypothesis :
     ∀ ref impl n, RefRun ref → ImplRun impl →
       Eq_safe_consensus observe (ref n) (impl n)
   realizableWhenMatches :
@@ -386,7 +388,7 @@ theorem exact_envelope_consensus_of_premises
     ExactEnvelopeCharacterization_consensus observe p.RefRun p.ImplRun := by
   constructor
   · intro ref impl hRef hImpl n
-    exact p.implementationMatchesReference ref impl n hRef hImpl
+    exact p.refinementHypothesis ref impl n hRef hImpl
   constructor
   · intro ref impl hRef hEnvelope
     exact p.realizableWhenMatches ref impl hRef hEnvelope
@@ -395,14 +397,17 @@ theorem exact_envelope_consensus_of_premises
 
 /-! ## Derived Theorems: Adequacy and Bounds -/
 
-/-- Observational adequacy follows directly from consensus envelope premises. -/
-theorem adequacy_consensus_of_premises
+/-- Conditional adequacy: observational adequacy is exactly the premise
+`refinementHypothesis`. `RefRun`/`ImplRun` here are abstract predicates with no
+step relation; for step-relation models see `adequacy_consensus_of_simulation`
+in `Distributed.Model.ConsensusEnvelopeAdequacy`. -/
+theorem adequacy_consensus_of_refinement_hypothesis
     {State : Type u} {Obs : Type v}
     {observe : State → Obs}
     (p : Premises observe) :
     ObservationalAdequacyModuloEnvelope_consensus observe p.RefRun p.ImplRun := by
   intro abs rt hAbs hRt n
-  exact p.implementationMatchesReference abs rt n hAbs hRt
+  exact p.refinementHypothesis abs rt n hAbs hRt
 
 /-- `d_int` lower/upper bound witness extraction from consensus premises. -/
 theorem d_int_bounds_of_premises
@@ -426,10 +431,10 @@ theorem exact_envelope_of_protocol (P : ConsensusEnvelopeProtocol) :
     ExactEnvelopeCharacterization_consensus P.observe P.premises.RefRun P.premises.ImplRun :=
   exact_envelope_consensus_of_premises P.premises
 
-/-- Extract consensus-envelope adequacy from a certified bundle. -/
-theorem adequacy_of_protocol (P : ConsensusEnvelopeProtocol) :
+/-- Conditional adequacy extracted from the bundle's `refinementHypothesis`. -/
+theorem adequacy_of_refinement_hypothesis (P : ConsensusEnvelopeProtocol) :
     ObservationalAdequacyModuloEnvelope_consensus P.observe P.premises.RefRun P.premises.ImplRun :=
-  adequacy_consensus_of_premises P.premises
+  adequacy_consensus_of_refinement_hypothesis P.premises
 
 /-- Extract principal capability from a certified consensus-envelope bundle. -/
 theorem principal_capability_of_protocol (P : ConsensusEnvelopeProtocol) :

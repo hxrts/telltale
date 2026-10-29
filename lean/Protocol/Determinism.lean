@@ -11,9 +11,9 @@ This is essential for predictable execution and reasoning about protocol behavio
 
 Solution Structure. We prove:
 1. `uniqueBranchLabels`: branch labels must be distinct
-2. `stepBase_det`: base step determinism (same process → same result)
+2. `step_base_det_*`: per-constructor base step determinism
 3. `IndependentActions`: predicate for actions on disjoint sessions
-4. `diamond_independent`: independent actions commute (diamond property)
+4. `step_base_deterministic_strong`: every base step has a unique result
 -/
 
 
@@ -28,9 +28,9 @@ to a unique next configuration. This is crucial for:
 ## Key Theorems
 
 - `uniqueBranchLabels`: predicate ensuring branch labels are distinct
-- `stepBase_det`: base step determinism (same process → same result)
+- `step_base_det_*`: per-constructor base step determinism
 - `IndependentActions`: predicate for actions on disjoint sessions
-- `diamond_independent`: diamond property for independent actions
+- `step_base_deterministic_strong`: every base step has a unique result
 
 Ported from Telltale.Proofs.Safety.Determinism.
 -/
@@ -156,102 +156,22 @@ def IndependentConfigs (C₁ C₂ : Config) : Prop :=
   | some s₁, some s₂ => s₁ ≠ s₂
   | _, _ => True
 
-/-! ## Diamond Property
+/-! ## Base Step Determinism
 
-For independent actions, the diamond property holds: executing them in
-either order reaches the same final configuration.
+`StepBase` acts only on the head of `C.proc`, so a configuration has at most one
+base successor. Consequently two base steps from the same configuration can never
+act on two *distinct* sessions: the base relation admits no nontrivial diamond.
+Genuine commutation of independent actions on disjoint sessions is proved at the
+global-type level in `Semantics.Determinism.Diamond` (`diamond_independent`); a
+contextual (`Step`, through `par`) diamond for this process calculus is not yet
+formalized here.
 -/
 
-/-- Independent steps commute: if C can step to C₁ via one action and to C₂ via
-    an independent action, then either the steps are deterministic (C₁ = C₂)
-    or there exists C₃ reachable from both.
-
-For communication steps, `IndependentConfigs C C` checks `stepSessionId C ≠ stepSessionId C`,
-which is always `False` when `stepSessionId C = some s`. This gives us the right disjunct
-via `False.elim`.
-
-For non-communication steps (assign, seq2, par_skip_*), `IndependentConfigs C C = True`,
-and the steps are deterministic, so C₁ = C₂ (left disjunct).
--/
-theorem diamond_independent_sessions {C C₁ C₂ : Config}
-    (hStep₁ : StepBase C C₁)
-    (hStep₂ : StepBase C C₂)
-    (hInd : IndependentConfigs C C) :
-    C₁ = C₂ ∨ ∃ C₃, ∃ (_ : StepBase C₁ C₃) (_ : StepBase C₂ C₃), True := by
-  -- Diamond Case Split: Communication Prefixes
-  cases hStep₁ with
-  | send hProc hk _ =>
-    -- Communication step: IndependentConfigs C C = (s ≠ s) = False
-    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
-    exact absurd rfl hInd
-  | recv hProc hk _ =>
-    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
-    exact absurd rfl hInd
-  | select hProc hk =>
-    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
-    exact absurd rfl hInd
-  | branch hProc hk _ _ _ =>
-    simp only [IndependentConfigs, stepSessionId, hProc, hk] at hInd
-    exact absurd rfl hInd
-  | newSession hProc =>
-    simp only [IndependentConfigs, stepSessionId, hProc] at hInd
-    exact absurd rfl hInd
-  -- Diamond Case Split: Deterministic Structural Steps
-  | assign hProc =>
-    -- Non-communication: deterministic, so C₁ = C₂
-    -- Both steps match on same C.proc, so x and v are the same
-    left
-    cases hStep₂ with
-    | assign hProc' =>
-      -- hProc : C.proc = .assign x v, hProc' : C.proc = .assign x' v'
-      -- By transitivity: .assign x v = .assign x' v', hence x = x', v = v'
-      have heq : Process.assign _ _ = Process.assign _ _ := hProc.symm.trans hProc'
-      simp only [Process.assign.injEq] at heq
-      obtain ⟨hx_eq, hv_eq⟩ := heq
-      simp only [hx_eq, hv_eq]
-    | _ => simp_all
-  | seq2 hProc =>
-    left
-    cases hStep₂ with
-    | seq2 hProc' =>
-      have heq : Process.seq _ _ = Process.seq _ _ := hProc.symm.trans hProc'
-      simp only [Process.seq.injEq] at heq
-      obtain ⟨_, hQ_eq⟩ := heq
-      simp only [hQ_eq]
-    | _ => simp_all
-  -- Diamond Case Split: Parallel Skip Cases
-  | par_skip_left hProc =>
-    left
-    cases hStep₂ with
-    | par_skip_left hProc' =>
-      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
-      simp only [Process.par.injEq] at heq
-      rcases heq with ⟨_, ⟨_, ⟨_, hQ_eq⟩⟩⟩
-      simp only [hQ_eq]
-    | par_skip_right hProc' =>
-      -- par skip Q = par P skip means skip = P and Q = skip
-      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
-      simp only [Process.par.injEq] at heq
-/- ## Structured Block 1 -/
-      rcases heq with ⟨_, ⟨_, ⟨hskip_P, hQ_skip⟩⟩⟩
-      -- hskip_P : skip = P, hQ_skip : Q = skip
-      -- C₁.proc = Q = skip, C₂.proc = P = skip
-      simp only [← hskip_P, ← hQ_skip]
-    | _ => simp_all
-  | par_skip_right hProc =>
-    left
-    cases hStep₂ with
-    | par_skip_right hProc' =>
-      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
-      simp only [Process.par.injEq] at heq
-      rcases heq with ⟨_, ⟨_, ⟨hP_eq, _⟩⟩⟩
-      simp only [hP_eq]
-    | par_skip_left hProc' =>
-      have heq : Process.par _ _ _ _ = Process.par _ _ _ _ := hProc.symm.trans hProc'
-      simp only [Process.par.injEq] at heq
-      rcases heq with ⟨_, ⟨_, ⟨hP_skip, hskip_Q⟩⟩⟩
-      simp only [hP_skip, ← hskip_Q]
-    | _ => simp_all
+/-- Every base step is deterministic: a configuration has at most one
+    `StepBase` successor. -/
+theorem step_base_deterministic_strong {C C₁ C₂ : Config}
+    (h₁ : StepBase C C₁) (h₂ : StepBase C C₂) : C₁ = C₂ := by
+  cases h₁ <;> cases h₂ <;> simp_all
 
 /-! ## Local Type Step Determinism
 
@@ -359,18 +279,13 @@ structure DeterminismClaims where
     (lbl, cont₁) ∈ branches →
     (lbl, cont₂) ∈ branches →
     cont₁ = cont₂
-  /-- Diamond property for independent sessions.
-      Either the steps are deterministic (C₁ = C₂) or there exists a common successor. -/
-  diamond : ∀ {C C₁ C₂ : Config},
-    StepBase C C₁ →
-    StepBase C C₂ →
-    IndependentConfigs C C →
-    C₁ = C₂ ∨ ∃ C₃, ∃ (_hStep₁' : StepBase C₁ C₃) (_hStep₂' : StepBase C₂ C₃), True
+  /-- Base steps are deterministic (no two distinct base successors). -/
+  base_det : ∀ {C C₁ C₂ : Config}, StepBase C C₁ → StepBase C C₂ → C₁ = C₂
 
 /-- Construct the determinism claims bundle. -/
 def determinismClaims : DeterminismClaims where
   send_det := fun hProc hk hx hG hC₁ hC₂ => by rw [hC₁, hC₂]
   branch_unique := mem_branch_unique_label
-  diamond := diamond_independent_sessions
+  base_det := step_base_deterministic_strong
 
 end

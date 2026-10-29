@@ -127,18 +127,10 @@ theorem head_coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
         active_edge_of_endpoints hSenderLeft hLeft
       have hHeadLeft := hHead1 e hActiveLeft
 /- ## Structured Block 3 -/
-      have hHeadLeft' : match some Lrecv with
-        | some (LocalType.recv a T a_1) =>
-          match lookupD D₁ e with
-          | [] => True
-          | T' :: tail => T = T'
-        | some (LocalType.branch a a_1) =>
-          match lookupD D₁ e with
-          | [] => True
-          | T' :: tail => T' = ValType.string
-        | x => True := by
-          simpa [HeadCoherent, hLeft] using hHeadLeft
-      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
+      dsimp only at hHeadLeft ⊢
+      rw [hLeft] at hHeadLeft
+      rw [hGrecv, hTraceEq]
+      exact hHeadLeft
   -- HeadCoherent Merge: Right-side Receiver Case
   | inr hRight =>
       have hSid : e.sid ∈ SessionsOf G₂ :=
@@ -162,18 +154,10 @@ theorem head_coherent_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} :
       have hActiveRight : ActiveEdge G₂ e :=
         active_edge_of_endpoints hSenderRight hRight.2
       have hHeadRight := hHead2 e hActiveRight
-      have hHeadRight' : match some Lrecv with
-        | some (LocalType.recv a T a_1) =>
-          match lookupD D₂ e with
-          | [] => True
-          | T' :: tail => T = T'
-        | some (LocalType.branch a a_1) =>
-          match lookupD D₂ e with
-          | [] => True
-          | T' :: tail => T' = ValType.string
-        | x => True := by
-          simpa [HeadCoherent, hRight.2] using hHeadRight
-      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadRight'
+      dsimp only at hHeadRight ⊢
+      rw [hRight.2] at hHeadRight
+      rw [hGrecv, hTraceEq]
+      exact hHeadRight
 
 -- TypedStep HeadCoherent Preservation
 theorem typed_step_preserves_headcoherent
@@ -188,7 +172,7 @@ theorem typed_step_preserves_headcoherent
   | send hk hx hG hxT hv hRecvReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e target T L v sendEdge G' D' bufs'
       subst hEdge hGout hDout
-      simpa [hBufsOut] using
+      simpa [hBufsOut, appendD] using
         (head_coherent_send_preserved G D e target T L hHead hCoh hG hRecvReady)
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
@@ -198,7 +182,7 @@ theorem typed_step_preserves_headcoherent
   | select hk hG hFind hReady hEdge hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k ℓ e target bs L selectEdge G' D' bufs'
       subst hEdge hGout hDout
-      simpa [hBufsOut] using
+      simpa [hBufsOut, appendD] using
         (head_coherent_select_preserved G D e target bs ℓ L hHead hCoh hG hFind hReady)
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'

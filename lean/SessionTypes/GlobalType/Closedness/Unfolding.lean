@@ -58,6 +58,7 @@ theorem GlobalType.mu_height_non_mu :
 
 theorem GlobalType.full_unfold_iter_mu_height_zero {g : GlobalType} (hmu : g.muHeight = 0) :
     GlobalType.fullUnfoldIter g = g := by
-  simp [GlobalType.fullUnfoldIter, hmu]
+  simp only [GlobalType.fullUnfoldIter, hmu]
+  rfl
 
 end SessionTypes.GlobalType

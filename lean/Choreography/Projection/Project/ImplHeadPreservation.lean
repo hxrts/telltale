@@ -30,7 +30,7 @@ open SessionTypes.Participation
 theorem c_project_trans_rel_source_end {b : LocalTypeR}
     (h : CProjectTransRel .end b) : b = .end := by
   -- Unpack the projection witness and use the end preservation lemma.
-  rcases h with ⟨g, role, hproj, htrans, hwf⟩
+  rcases h with ⟨g, role, hproj, htrans, hwf, hdf⟩
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
@@ -41,7 +41,7 @@ theorem c_project_trans_rel_source_end {b : LocalTypeR}
 theorem c_project_trans_rel_source_var {v : String} {b : LocalTypeR}
     (h : CProjectTransRel (.var v) b) : b = .var v := by
   -- Reduce to the variable trans lemma.
-  rcases h with ⟨g, role, hproj, htrans, hwf⟩
+  rcases h with ⟨g, role, hproj, htrans, hwf, hdf⟩
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
@@ -52,9 +52,9 @@ theorem c_project_trans_rel_source_var {v : String} {b : LocalTypeR}
 theorem c_project_trans_rel_source_send {p : String} {bs : List BranchR} {b : LocalTypeR}
     (h : CProjectTransRel (.send p bs) b) : ∃ cs, b = .send p cs := by
   -- Pull out the trans witnesses and reconstruct the send branches.
-  rcases h with ⟨g, role, hproj, htrans, hwf⟩
+  rcases h with ⟨g, role, hproj, htrans, hwf, hdf⟩
   obtain ⟨gbs', htrans_send, _, _⟩ :=
-    c_project_send_implies_trans_send g role p bs hproj hwf
+    c_project_send_implies_trans_send g role p bs hproj hwf hdf
   refine ⟨transBranches gbs' role, ?_⟩
   simpa [htrans_send] using htrans
 
@@ -62,9 +62,9 @@ theorem c_project_trans_rel_source_send {p : String} {bs : List BranchR} {b : Lo
 theorem c_project_trans_rel_source_recv {p : String} {bs : List BranchR} {b : LocalTypeR}
     (h : CProjectTransRel (.recv p bs) b) : ∃ cs, b = .recv p cs := by
   -- Pull out the trans witnesses and reconstruct the recv branches.
-  rcases h with ⟨g, role, hproj, htrans, hwf⟩
+  rcases h with ⟨g, role, hproj, htrans, hwf, hdf⟩
   obtain ⟨gbs', htrans_recv, _, _⟩ :=
-    c_project_recv_implies_trans_recv g role p bs hproj hwf
+    c_project_recv_implies_trans_recv g role p bs hproj hwf hdf
   refine ⟨transBranches gbs' role, ?_⟩
   simpa [htrans_recv] using htrans
 
@@ -72,7 +72,7 @@ theorem c_project_trans_rel_source_recv {p : String} {bs : List BranchR} {b : Lo
 theorem c_project_trans_rel_source_mu {v : String} {body : LocalTypeR} {b : LocalTypeR}
     (h : CProjectTransRel (.mu v body) b) : ∃ body', b = .mu v body' := by
   -- Use the mu trans lemma to expose the projected body.
-  rcases h with ⟨g, role, hproj, htrans, hwf⟩
+  rcases h with ⟨g, role, hproj, htrans, hwf, hdf⟩
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
@@ -97,6 +97,8 @@ private theorem GlobalType.well_formed_unfold (g : GlobalType)
   | var t =>
       simpa [GlobalType.unfold] using hwf
   | comm sender receiver branches =>
+      simpa [GlobalType.unfold] using hwf
+  | delegate _ _ _ _ _ =>
       simpa [GlobalType.unfold] using hwf
 
 /-- Iterated unfold preserves wellFormedness. -/
@@ -142,7 +144,7 @@ private theorem well_formed_unfold_rec (g : GlobalType) (n : Nat) (hwf : g.wellF
 
 /-! ## Unfold commuting for trans -/
 
-/-- Helper: guarded mu case for trans_unfold_EQ2. -/
+/-- Helper: guarded mu case for trans_unfold_eq2. -/
 private theorem trans_unfold_eq2_mu_guarded
     (t : String) (body : GlobalType) (role : String)
     (hproj' : trans (body.substitute t (.mu t body)) role =
@@ -152,7 +154,7 @@ private theorem trans_unfold_eq2_mu_guarded
       ((trans (.mu t body) role).unfold) := by
   -- Guarded trans produces a mu, so unfold is a substitution.
   have htrans_mu : trans (.mu t body) role = .mu t (trans body role) := by
-    simp [trans, hguard]
+    simp [trans, hguard, Choreography.Projection.Trans.trans]
   have hleft : trans (body.substitute t (.mu t body)) role =
       (trans body role).substitute t (.mu t (trans body role)) := by
     simpa [htrans_mu] using hproj'
@@ -162,7 +164,7 @@ private theorem trans_unfold_eq2_mu_guarded
   simpa [GlobalType.unfold, hleft, hright] using
     (eq2_refl ((trans body role).substitute t (.mu t (trans body role))))
 
-/-- Helper: unguarded mu case for trans_unfold_EQ2. -/
+/-- Helper: unguarded mu case for trans_unfold_eq2. -/
 private theorem trans_unfold_eq2_mu_unguarded
     (t : String) (body : GlobalType) (role : String)
     (hproj' : trans (body.substitute t (.mu t body)) role =
@@ -172,7 +174,7 @@ private theorem trans_unfold_eq2_mu_unguarded
       ((trans (.mu t body) role).unfold) := by
   -- Unguarded trans collapses to end; use the unguarded substitution lemma.
   have htrans_end : trans (.mu t body) role = .end := by
-    simp [trans, hguard]
+    simp [trans, hguard, Choreography.Projection.Trans.trans]
   have hleft : trans (body.substitute t (.mu t body)) role =
       (trans body role).substitute t .end := by
     simpa [htrans_end] using hproj'
@@ -185,7 +187,7 @@ private theorem trans_unfold_eq2_mu_unguarded
 
 /-! ## Mu Unfold Core Case -/
 
-/-- Helper: mu case for trans_unfold_EQ2. -/
+/-- Helper: mu case for trans_unfold_eq2. -/
 private theorem trans_unfold_eq2_mu (t : String) (body : GlobalType) (role : String)
     (hwf : (GlobalType.mu t body).wellFormed = true) :
     EQ2 (trans (GlobalType.unfold (.mu t body)) role) ((trans (.mu t body) role).unfold) := by
@@ -215,18 +217,22 @@ private theorem trans_unfold_eq2 (g : GlobalType) (role : String)
   | «end» =>
       -- unfold is identity; trans returns .end.
       have h := eq2_unfold_right (eq2_refl (trans (.end) role))
-      simpa [GlobalType.unfold, trans, LocalTypeR.unfold] using h
+      simpa [GlobalType.unfold, trans, LocalTypeR.unfold, Choreography.Projection.Trans.trans] using h
   | var t =>
       -- unfold is identity; trans returns .var t.
       have h := eq2_unfold_right (eq2_refl (trans (.var t) role))
-      simpa [GlobalType.unfold, trans, LocalTypeR.unfold] using h
+      simpa [GlobalType.unfold, trans, LocalTypeR.unfold, Choreography.Projection.Trans.trans] using h
   | comm sender receiver branches =>
       -- unfold is identity; trans never produces a mu for comm.
       have h := eq2_unfold_right (eq2_refl (trans (.comm sender receiver branches) role))
-      simpa [GlobalType.unfold, trans, LocalTypeR.unfold] using h
+      simpa [GlobalType.unfold, trans, LocalTypeR.unfold, Choreography.Projection.Trans.trans] using h
   | mu t body =>
       -- Delegate the mu case to the specialized helper.
       exact trans_unfold_eq2_mu t body role hwf
+  | delegate p q sid r cont =>
+      -- unfold is identity on delegate.
+      simpa [GlobalType.unfold] using
+        eq2_unfold_right (eq2_refl (trans (.delegate p q sid r cont) role))
 
 /-- trans after unfold is EQ2 to trans without unfold. -/
 private theorem trans_unfold_to_trans (g : GlobalType) (role : String)
@@ -375,7 +381,7 @@ theorem eq2_c_project_trans_rel_eq2_compose
     EQ2F (EQ2_closure CProjectTransRelComp) a c := by
   -- Use trans_eq_of_c_project to collapse the middle CProjectTransRel witness
   have hWFb : LocalTypeR.WellFormed b := c_project_trans_rel_wf_left hrel
-  rcases hrel with ⟨g, role, hproj, htrans, hwf⟩
+  rcases hrel with ⟨g, role, hproj, htrans, hwf, hdf⟩
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
@@ -390,7 +396,7 @@ theorem eq2_c_project_trans_rel_eq2_compose
 
 /-! ## Mu-Compose Case Split Helpers -/
 
-/-- Helper: mu/mu target case for CProjectTransRel_EQ2_compose_through_mu. -/
+/-- Helper: mu/mu target case for c_project_trans_rel_eq2_compose_through_mu. -/
 private theorem c_project_trans_rel_eq2_compose_through_mu_mu_mu
     {av v cv : String} {abody body cbody : LocalTypeR}
     (hmid_left :
@@ -422,7 +428,7 @@ private theorem c_project_trans_rel_eq2_compose_through_mu_mu_mu
 
 /-! ## Mu-Compose Non-Mu Target Helper -/
 
-/-- Helper: mu/non-mu target case for CProjectTransRel_EQ2_compose_through_mu. -/
+/-- Helper: mu/non-mu target case for c_project_trans_rel_eq2_compose_through_mu. -/
 private theorem c_project_trans_rel_eq2_compose_through_mu_mu_nonmu
     {av v : String} {abody body c : LocalTypeR}
     (hmid_left :
@@ -438,7 +444,7 @@ private theorem c_project_trans_rel_eq2_compose_through_mu_mu_nonmu
 
 /-! ## Mu-Compose Source Helper -/
 
-/-- Helper: mu source case for CProjectTransRel_EQ2_compose_through_mu. -/
+/-- Helper: mu source case for c_project_trans_rel_eq2_compose_through_mu. -/
 private theorem c_project_trans_rel_eq2_compose_through_mu_mu
     {av : String} {abody : LocalTypeR} {v : String} {body : LocalTypeR} {c : LocalTypeR}
     (hrel : CProjectTransRel (.mu av abody) (.mu v body))

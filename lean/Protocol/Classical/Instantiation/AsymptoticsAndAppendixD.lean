@@ -62,7 +62,7 @@ def mkProtocolMixingInputFromModel (m : ProtocolMixingModel) : MixingInput :=
 /-- Geometric convergence to steady state. -/
 theorem protocol_mixing_geometric_convergence (m : ProtocolMixingModel) :
     ∀ n, m.d (n + 1) ≤ Classical.MixingTimeBounds.geometricEnvelope m.C m.ρ n := by
-  simpa [mkProtocolMixingInputFromModel, protocolMixingWitness] using
+  exact
     transport_mixing (input := mkProtocolMixingInputFromModel m)
 
 /-! ## Fluid-Limit Instantiation -/
@@ -97,7 +97,7 @@ theorem protocol_fluid_energy_nonincreasing (m : ProtocolFluidModel) :
     ∀ n,
       Classical.FluidLimitStability.energy m.x (n + 1) ≤
         Classical.FluidLimitStability.energy m.x n := by
-  simpa [mkProtocolFluidInputFromModel, protocolFluidWitness] using
+  exact
     transport_fluid_limit (input := mkProtocolFluidInputFromModel m)
 
 /-! ## Concentration Instantiation -/
@@ -137,7 +137,7 @@ theorem protocol_concentration_tail_bounds (m : ProtocolConcentrationModel) :
 /-- Instantiate concentration input and call transported concentration theorem. -/
 theorem protocol_transported_concentration (m : ProtocolConcentrationModel) :
     m.p 0 ≤ 2 := by
-  simpa [mkProtocolConcentrationInputFromModel, protocolConcentrationWitness] using
+  exact
     transport_concentration (input := mkProtocolConcentrationInputFromModel m)
 
 /-! ## Little's Law Instantiation -/
@@ -159,7 +159,7 @@ def mkProtocolLittleInput (m : ProtocolLittleModel) : LittlesLawInput :=
 /-- Prove `L = λW` for coherent steady-state protocol configurations. -/
 theorem protocol_littles_law (m : ProtocolLittleModel) :
     m.L = m.lam * m.W := by
-  simpa [mkProtocolLittleInput] using
+  exact
     transport_littles_law (input := mkProtocolLittleInput m)
 
 /-- Capacity-planning and monitoring readiness derived from Little's law. -/
@@ -197,7 +197,7 @@ def mkProtocolFunctionalCLTInput
 /-- Centering-at-mean for the protocol scaled process. -/
 theorem protocol_functional_clt_centering (m : ProtocolFunctionalCLTModel) :
     protocolScaledProcess m = 0 := by
-  simpa [protocolScaledProcess, mkProtocolFunctionalCLTInput] using
+  exact
     transport_functional_clt (input := mkProtocolFunctionalCLTInput m)
 
 /-! ## Mean-Field Instantiation -/
@@ -274,12 +274,22 @@ theorem appendix_d_mean_field_discharge
     Classical.Transport.MeanFieldConclusion input := by
   exact transport_mean_field input
 
-/-- Aggregate marker that the current Appendix D shortlist has discharge theorems. -/
+/-- Conjunction of the four Appendix D discharge obligations: transported
+    Foster-Lyapunov-Harris, MaxWeight, mixing-time, and mean-field conclusions. -/
 def AppendixDDischargeSetReady : Prop :=
-  True
+  (∀ (fw : TransportFramework)
+      (system : Classical.FosterLyapunovHarris.DriftSystem CoherenceState)
+      (hStep : system.step = fw.step),
+      Classical.Transport.FosterConclusion (mkFosterInput fw system hStep)) ∧
+  (∀ {ι : Type} [Fintype ι] (input : MaxWeightInput ι),
+      Classical.Transport.MaxWeightConclusion input) ∧
+  (∀ (input : MixingInput), Classical.Transport.MixingConclusion input) ∧
+  (∀ {n : Nat} (input : MeanFieldInput n), Classical.Transport.MeanFieldConclusion input)
 
-theorem appendix_d_discharge_set_ready : AppendixDDischargeSetReady := by
-  trivial
+/-- All Appendix D discharge obligations hold. -/
+theorem appendix_d_discharge_set_ready : AppendixDDischargeSetReady :=
+  ⟨appendix_d_foster_discharge, fun input => appendix_d_max_weight_discharge input,
+    appendix_d_mixing_discharge, fun input => appendix_d_mean_field_discharge input⟩
 
 end ProtocolClassical
 

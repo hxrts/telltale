@@ -217,9 +217,12 @@ def TriangleGuarantee
 
 /-! ## Assumptions and Validation -/
 
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
+/-- Constant `true`: this validator performs no runtime check. It only reports
+that the `Assumptions` bundle passed to it carries a proof of each field, which
+the type of the bundle already guarantees. The family model has no concrete
+parameters over which an assumption could be decided. -/
+def proofCarriedNoRuntimeCheck : Bool :=
+  true
 
 /-- Reusable core triangle-of-forgetting assumption bundle. -/
 structure Assumptions
@@ -270,27 +273,27 @@ def validateAssumption
   match h with
   | .asynchronous =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Asynchrony assumption is provided."
       }
   | .localAcceptance =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Local acceptance depends only on the observer-visible view."
       }
   | .dynamicMembershipProvidesRevocation =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Dynamic membership exposes a revocation witness."
       }
   | .revocationCreatesAmbiguity =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Revocation witnesses induce late-vs-invalid ambiguity."
       }
   | .recoveryWitnessCreatesAmbiguity =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Recovery witnesses induce compromise/recovery ambiguity."
       }
 

@@ -203,7 +203,9 @@ theorem valid_labels_preserved_frame_left
         valid_labels_send_preserved (G:=G ++ Gfr) (D:=D ++ Dfr) (bufs:=bufs)
           (senderEp:=e) (receiverRole:=target) (T:=T) (L:=L) (v:=v)
           hValid hCoh hBT hG' hRecvReady'
-      simpa [update_g_append_left_hit hG, enqueueBuf, List.append_assoc] using hValid'
+      dsimp only at hValid'
+      rw [update_g_append_left_hit hG, hLookupD, update_d_append_left] at hValid'
+      simpa [appendD, enqueueBuf, List.append_assoc] using hValid'
   -- ValidLabels Framing Preservation: Recv Case
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'

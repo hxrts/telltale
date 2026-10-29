@@ -14,6 +14,8 @@ import Runtime.ProgramLogic.SessionWP
 import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
+import Runtime.Adequacy.CommTraceAdequacy
+import Runtime.Adequacy.CompileRefines
 import Runtime.Proofs.Concurrency
 import Runtime.Proofs.ConcurrencyThreaded
 import Runtime.Proofs.ProgressApi

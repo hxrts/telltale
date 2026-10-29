@@ -419,7 +419,7 @@ theorem iterate_unfold_bounded_contractive (k : Nat) (e : LocalTypeR)
           have hsubst_h : (body.substitute t (.mu t body)).muHeight ≤ k := by
             have hle' : (body.substitute t (.mu t body)).muHeight ≤ body.muHeight :=
               mu_height_substitute_guarded t body (.mu t body) hguarded
-            exact le_trans hle' hle
+            exact Nat.le_trans hle' hle
           have ih' := ih (e := body.substitute t (.mu t body)) hsubst_contr hsubst_closed hsubst_h
           -- unfold^[k+1] (.mu t body) = unfold^[k] (body.substitute t (.mu t body))
           simpa [LocalTypeR.unfold, Function.iterate_succ_apply] using ih'

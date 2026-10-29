@@ -1,4 +1,5 @@
 import Choreography.Projection.Project.ImplBase
+import Choreography.Projection.DelegateFree
 
 /-! # Choreography.Projection.Project.ImplU.EQ2Closure
 
@@ -31,8 +32,13 @@ open SessionTypes.Participation
 This is the Coq-style path: project on fully-unfolded global/local types.
 It avoids requiring exact constructor matching on the raw candidate. -/
 
+/-- EQ2-closure witness for `CProjectU`. Delegation is excluded (`g.delegateFree`), and the
+    candidate is either payload-free or itself a `CProjectU` output, so its branches carry no
+    payload annotations (as `BranchesProjRel` requires). The delegation case of EQ2 transfer
+    is not covered. -/
 def CProjectUEQ2Rel : ProjRel := fun g role cand =>
-  ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0 ∧ LocalTypeR.WellFormed cand
+  ∃ e0, CProjectU g role e0 ∧ EQ2 e0 cand ∧ LocalTypeR.WellFormed e0 ∧ LocalTypeR.WellFormed cand ∧
+    g.delegateFree = true ∧ (PayloadFree cand ∨ CProjectU g role cand)
 
 /-! ## Branch Witness Utilities -/
 
@@ -53,7 +59,8 @@ theorem branches_proj_rel_lift_eq2_u
     (heq : BranchesRel EQ2 lbs0 lbs1)
     (hwf0 : ∀ lb ∈ lbs0, LocalTypeR.WellFormed lb.2.2)
     (hwf1 : ∀ lb ∈ lbs1, LocalTypeR.WellFormed lb.2.2)
-    (hvt1 : ∀ lb ∈ lbs1, lb.2.1 = none) :
+    (hdf : ∀ gb ∈ gbs, gb.2.delegateFree = true)
+    (hpay : BranchesPayloadFree lbs1 ∨ BranchesProjRel CProjectU gbs role lbs1) :
     BranchesProjRel CProjectUEQ2Rel gbs role lbs1 := by
   -- Lift each branch pointwise through EQ2, preserving well-formedness.
   induction hproj generalizing lbs1 with
@@ -63,13 +70,21 @@ theorem branches_proj_rel_lift_eq2_u
       cases heq with
       | cons hpair' heq_rest =>
           rename_i lb1 lbs1'
-          constructor
-          · constructor
-            · exact hpair.1.trans hpair'.1
-            · exact hvt1 lb1 (by simp)
-            · exact ⟨lb0.2.2, hpair.2.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp)⟩
-            · exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
-                (fun lb hmem => hvt1 lb (by simp [hmem]))
+          have hhead : lb1.2.1 = none ∧ (PayloadFree lb1.2.2 ∨ CProjectU gb.2 role lb1.2.2) ∧
+              (BranchesPayloadFree lbs1' ∨ BranchesProjRel CProjectU gbs' role lbs1') := by
+            rcases hpay with hp | hp
+            · obtain ⟨l, vt, c⟩ := lb1
+              simp only [BranchesPayloadFree] at hp
+              exact ⟨hp.1, Or.inl hp.2.1, Or.inl hp.2.2⟩
+            · have hp' : List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ lb.2.1 = none ∧
+                  CProjectU gb.2 role lb.2.2) (gb :: gbs') (lb1 :: lbs1') := hp
+              cases hp' with
+              | cons h1 h2 => exact ⟨h1.2.1, Or.inr h1.2.2, Or.inr h2⟩
+          refine List.Forall₂.cons ⟨hpair.1.trans hpair'.1, hhead.1,
+            ⟨lb0.2.2, hpair.2.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp),
+              hdf gb (by simp), hhead.2.1⟩⟩ ?_
+          exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
+            (fun g hmem => hdf g (by simp [hmem])) hhead.2.2
 
 /-! ## Full-Unfold Shape: End -/
 
@@ -263,8 +278,8 @@ theorem eq2_full_unfold_to_full_unfold
   have heq_full_cand : EQ2 e0.fullUnfold cand :=
     eq2_trans_wf (eq2_symm heq_full) heq hWF_full hWF hWFcand
   have heq_cand_full : EQ2 cand cand.fullUnfold := by
-  have hiter := (eq2_unfold_right_iter (a := cand) (b := cand) (eq2_refl cand)) cand.muHeight
-  simpa [LocalTypeR.fullUnfold] using hiter
+    have hiter := (eq2_unfold_right_iter (a := cand) (b := cand) (eq2_refl cand)) cand.muHeight
+    simpa [LocalTypeR.fullUnfold] using hiter
   exact eq2_trans_wf heq_full_cand heq_cand_full hWF_full hWFcand hWFcand_full
 
 /-! ## Nonparticipant Branch Lifting -/
@@ -275,12 +290,17 @@ private theorem all_branches_proj_lift_eq2_u
     (heq_full_cand_full : EQ2 e0_full cand_full)
     (hWF_full : LocalTypeR.WellFormed e0_full)
     (hWFcand_full : LocalTypeR.WellFormed cand_full)
-    (hall : AllBranchesProj CProjectU gbs role e0_full) :
+    (hall : AllBranchesProj CProjectU gbs role e0_full)
+    (hdf : ∀ gb ∈ gbs, gb.2.delegateFree = true)
+    (hpay : PayloadFree cand_full ∨ AllBranchesProj CProjectU gbs role cand_full) :
     AllBranchesProj CProjectUEQ2Rel gbs role cand_full := by
   -- Lift each branch witness through EQ2 to CProjectUEQ2Rel.
   intro gb hgb
   have hproj' : CProjectU gb.2 role e0_full := hall gb hgb
-  exact ⟨e0_full, hproj', heq_full_cand_full, hWF_full, hWFcand_full⟩
+  refine ⟨e0_full, hproj', heq_full_cand_full, hWF_full, hWFcand_full, hdf gb hgb, ?_⟩
+  rcases hpay with hp | hp
+  · exact Or.inl hp
+  · exact Or.inr (hp gb hgb)
 
 /-! ## Comm Nonparticipant Closure -/
 
@@ -291,11 +311,13 @@ theorem c_project_ueq2_rel_comm_nonpart
     (hWF_full : LocalTypeR.WellFormed e0_full)
     (hWFcand_full : LocalTypeR.WellFormed cand_full)
     (hcore_nonpart :
-      (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧ AllBranchesProj CProjectU gbs role e0_full) :
+      (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧ AllBranchesProj CProjectU gbs role e0_full)
+    (hdf : ∀ gb ∈ gbs, gb.2.delegateFree = true)
+    (hpay : PayloadFree cand_full ∨ AllBranchesProj CProjectU gbs role cand_full) :
     (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧ AllBranchesProj CProjectUEQ2Rel gbs role cand_full := by
   -- Preserve the non-participant constraint and lift AllBranchesProj.
   rcases hcore_nonpart with ⟨hpart_all, hall⟩
-  have hall' := all_branches_proj_lift_eq2_u heq_full_cand_full hWF_full hWFcand_full hall
+  have hall' := all_branches_proj_lift_eq2_u heq_full_cand_full hWF_full hWFcand_full hall hdf hpay
   exact ⟨hpart_all, hall'⟩
 
 /-! ## Postfix End Case -/
@@ -368,7 +390,8 @@ theorem c_project_ueq2_rel_postfix_mu_end_case
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
     (hWFproj : ∀ g role cand, CProjectU g role cand → LocalTypeR.WellFormed cand)
-    (he0 : LocalTypeR.fullUnfold e0 = .end) :
+    (he0 : LocalTypeR.fullUnfold e0 = .end)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- Mu with end local: either non-participant end or unguarded mu case.
   have hcand : cand.fullUnfold = .end :=
@@ -385,7 +408,8 @@ theorem c_project_ueq2_rel_postfix_mu_end_case
       rcases hmu with ⟨candBody, hbody_proj, hguard⟩
       have hWFcandBody : LocalTypeR.WellFormed candBody := hWFproj _ _ _ hbody_proj
       have hrel : CProjectUEQ2Rel body role candBody :=
-        ⟨candBody, hbody_proj, eq2_refl candBody, hWFcandBody, hWFcandBody⟩
+        ⟨candBody, hbody_proj, eq2_refl candBody, hWFcandBody, hWFcandBody,
+          by simpa [hg] using hdfg, Or.inr hbody_proj⟩
       exact Or.inr (by
         simpa [CProjectF_unfold_core, CProjectF, hg, he0] using
           ⟨candBody, hrel, Or.inr ⟨hguard, hcand⟩⟩)

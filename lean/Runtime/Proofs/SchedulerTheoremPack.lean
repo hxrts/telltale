@@ -60,7 +60,7 @@ structure ProtocolMachineSchedulerArtifact (st₀ : ProtocolMachineState ι γ �
   policy : SchedPolicy
   profile : SchedulerPolicyProfile
   policyPinned : SchedulerPolicyPinned st₀ policy
-  scheduleConfluence : schedule_confluence st₀
+  scheduleDeterministic : schedule_deterministic st₀
   starvationFree : starvation_free st₀
   cooperativeRefinement : cooperative_refines_concurrent st₀
   roundRobin? : Option (RoundRobinPolicyArtifact (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀)
@@ -124,7 +124,7 @@ def buildProtocolMachineSchedulerArtifact {st₀ : ProtocolMachineState ι γ π
   { policy := bundle.policy
   , profile := bundle.profile
   , policyPinned := scheduler_policy_pinned_from_bundle bundle
-  , scheduleConfluence := scheduler_confluence_from_bundle bundle
+  , scheduleDeterministic := scheduler_deterministic_from_bundle bundle
   , starvationFree := scheduler_starvation_free_from_bundle bundle
   , cooperativeRefinement := scheduler_cooperative_refinement_from_bundle bundle
   , roundRobin? := roundRobin?
@@ -141,7 +141,8 @@ structure ProtocolMachineProofSpace (store₀ : SessionStore ν) where
   st₀ : ProtocolMachineState ι γ π ε ν
   store_eq : st₀.sessions = store₀
   scheduler : ProtocolMachineSchedulerBundle st₀
-  profiles : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ (ProtocolMachineState ι γ π ε ν)
+  profiles : ProtocolMachineInvariantSpaceWithProfiles.{0, 0, 0, 0} (ν := ν) store₀
+    (ProtocolMachineState ι γ π ε ν)
 
 /-- Combined proof pack: scheduler artifact + profile-derived theorem pack. -/
 structure ProtocolMachineProofPack
@@ -153,7 +154,7 @@ structure ProtocolMachineProofPack
 
 /-- Build a combined protocol proof pack from one proof space. -/
 /- ## Structured Block 3 -/
-def buildProtocolMachineProofPack
+noncomputable def buildProtocolMachineProofPack
     {store₀ : SessionStore ν}
     (proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀) :
     ProtocolMachineProofPack (proofSpace := proofSpace) :=
@@ -164,7 +165,7 @@ def buildProtocolMachineProofPack
 -- Combined Inventory and Iris Bridge
 
 /-- Compact inventory for the combined proof pack. -/
-def protocolProofInventory
+noncomputable def protocolProofInventory
     {store₀ : SessionStore ν}
     {proofSpace : ProtocolMachineProofSpace (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) store₀}
     (pack : ProtocolMachineProofPack (proofSpace := proofSpace)) : List (String × Bool) :=

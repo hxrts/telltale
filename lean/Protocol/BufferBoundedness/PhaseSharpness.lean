@@ -109,7 +109,8 @@ theorem recv_step_nonincrease_max_buffer_occupancy
             exact max_buffer_occupancy_update_buf_le_of_le C
               recvEdge (lookupBuf C.bufs recvEdge).tail hTailLe
           -- Simplify recvStep at this non-empty buffer.
-          simpa [recvStep, dequeueBuf, recvEdge, hBuf] using hLeUpdate
+          refine le_trans (le_of_eq ?_) hLeUpdate
+          simp [recvStep, dequeueBuf, recvEdge, hBuf, maxBufferOccupancy]
       | send hProc _ _ _ =>
           exact False.elim (by simpa [hProcRecv] using hProc)
       | select hProc _ _ _ =>

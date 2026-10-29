@@ -703,10 +703,10 @@ theorem concrete_recv_slice_preserves_coherent
     Coherent G' D' :=
   recv_spec_preserves_coherent hSpec hCoh
 
-theorem concrete_scheduler_slice_confluent
+theorem concrete_scheduler_slice_deterministic
     (st : ProtocolMachineState ι γ π ε ν) :
-    schedule_confluence st :=
-  schedule_confluence_holds st
+    schedule_deterministic st :=
+  schedule_deterministic_holds st
 
 theorem concrete_scheduler_slice_cooperative_refines_concurrent
     (st : ProtocolMachineState ι γ π ε ν) :

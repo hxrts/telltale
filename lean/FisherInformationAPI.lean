@@ -44,6 +44,7 @@ set_option autoImplicit false
 namespace FisherInformationAPI
 
 open scoped BigOperators Matrix MatrixOrder
+open Asymptotics
 
 noncomputable section
 
@@ -301,15 +302,27 @@ abbrev KLZeroIffEqualParameters (M : Model) : Prop :=
   isMinimal M.family →
     ∀ θ₁ θ₂, klClosedForm M θ₁ θ₂ = 0 ↔ θ₁ = θ₂
 
-/-- Law: KL has Fisher metric as its second-order leading term. -/
+/-- The natural parameter `θ + t • δ` along a direction `δ`. -/
+def perturbParameter {d : ℕ} (θ : naturalParameter d) (t : ℝ)
+    (δ : Fin d → ℝ) : naturalParameter d :=
+  ⟨fun i => θ i + t * δ i⟩
+
+/-- Law: KL has the Fisher metric as its second-order leading term.
+
+Along every direction `δ`,
+`KL(p_θ ‖ p_{θ+tδ}) = (t²/2) · δᵀ I(θ) δ + o(t²)` as `t → 0`, where KL is the
+exponential-family closed form (which uses the model's expectation map). -/
 abbrev KLSecondOrderTaylor (M : Model) : Prop :=
-  ∀ θ δ : naturalParameter M.family.d, True
+  ∀ (θ : naturalParameter M.family.d) (δ : Fin M.family.d → ℝ),
+    (fun t : ℝ => klClosedForm M θ (perturbParameter θ t δ) -
+        t ^ 2 / 2 * fisherMetric M θ δ δ) =o[nhds 0] (fun t : ℝ => t ^ 2)
 
 /-- Law-backed second-order KL/Fisher leading-term theorem. -/
 theorem kl_second_order_taylor_of_law
     (M : Model) (hTaylor : KLSecondOrderTaylor M)
-    (θ δ : naturalParameter M.family.d) :
-    True := by
+    (θ : naturalParameter M.family.d) (δ : Fin M.family.d → ℝ) :
+    (fun t : ℝ => klClosedForm M θ (perturbParameter θ t δ) -
+        t ^ 2 / 2 * fisherMetric M θ δ δ) =o[nhds 0] (fun t : ℝ => t ^ 2) := by
   -- The analytic statement is supplied by the selected law witness.
   exact hTaylor θ δ
 
@@ -328,11 +341,18 @@ def MatrixPSDLe {d : ℕ}
     (A B : Matrix (Fin d) (Fin d) ℝ) : Prop :=
   MatrixPSD (fun i j => B i j - A i j)
 
-/-- An estimator is unbiased for the natural parameter at `θ`. -/
+/-- An estimator is locally unbiased for the natural parameter at `θ`.
+
+Its mean is `θ`, and to first order it tracks parameter changes:
+`∂_j E_θ[g_i] = E_θ[g_i · s_j] = δ_ij` (score identity for exponential
+families). Mean-unbiasedness at the single point `θ` alone would admit the
+constant estimator `g ≡ θ` of zero variance, for which Cramer-Rao is false. -/
 def unbiasedEstimator (M : Model)
     (θ : naturalParameter M.family.d)
     (g : M.family.Ω → Fin M.family.d → ℝ) : Prop :=
-  ∀ i, expectationOf M.family θ (fun ω => g ω i) = θ i
+  (∀ i, expectationOf M.family θ (fun ω => g ω i) = θ i) ∧
+    ∀ i j, expectationOf M.family θ (fun ω => g ω i * score M.family θ ω j) =
+      if i = j then 1 else 0
 
 /-- Covariance matrix of an estimator around the target natural parameter. -/
 def estimatorCovariance (M : Model)
@@ -360,52 +380,81 @@ theorem cramer_rao_bound
 
 /-! ## Fisher Volume And Reachability -/
 
-/-- Fisher volume of a region in natural-parameter space.
-
-The abstract API exposes the operation shape; concrete integration is supplied
-behind the instance boundary. -/
+/-- Fisher (Jeffreys) volume of a region in natural-parameter space:
+`∫_{region} √(det I(θ)) dθ` against Lebesgue measure on the coordinates. -/
 def fisherVolume (M : Model)
     (region : Set (naturalParameter M.family.d)) : ENNReal :=
-  0
+  ∫⁻ x in {x : Fin M.family.d → ℝ | (⟨x⟩ : naturalParameter M.family.d) ∈ region},
+    ENNReal.ofReal (Real.sqrt (M.fisherAt ⟨x⟩).det)
 
 /-- Fisher volume is nonnegative as an extended nonnegative real. -/
 theorem fisherVolume_nonneg (M : Model)
     (region : Set (naturalParameter M.family.d)) :
     0 ≤ fisherVolume M region := by
   -- The codomain `ℝ≥0∞` is ordered above zero.
-  exact zero_le _
+  exact bot_le
 
 /-- The empty region has zero Fisher volume. -/
 theorem fisherVolume_zero_of_empty (M : Model) :
     fisherVolume M (∅ : Set (naturalParameter M.family.d)) = 0 := by
-  -- The API-level volume is currently the zero concrete operation.
-  rfl
+  -- The coordinate preimage of the empty region is empty.
+  simp [fisherVolume]
 
-/-- Parameters reachable from `start` within a bounded number of abstract moves. -/
+/-- Parameters reachable from `start` in at most `steps` moves, each changing
+every natural coordinate by at most `stepBudget`: the sup-norm box of radius
+`steps * stepBudget` around `start` (empty when the radius is negative). -/
 def reachabilityRegion (M : Model)
     (start : naturalParameter M.family.d)
     (steps : ℕ)
     (stepBudget : ℝ) :
     Set (naturalParameter M.family.d) :=
-  {θ | θ = start ∨ ∃ n : ℕ, n ≤ steps ∧ 0 ≤ stepBudget}
+  {θ | ∀ i, |θ i - start i| ≤ steps * stepBudget}
 
-/-- Law: reachability volume is bounded by the selected capacity expression. -/
+/-- Law: reachable Fisher volume grows at most like the reachable coordinate
+volume `(2 · steps · stepBudget)^d`, up to a model constant `C` bounding
+`√(det I)` (bounded statistics give bounded Fisher information). -/
 abbrev ReachabilityVolumeBound (M : Model) : Prop :=
-  ∀ start steps stepBudget,
+  ∃ C : ℝ, 0 ≤ C ∧ ∀ start steps stepBudget,
     fisherVolume M (reachabilityRegion M start steps stepBudget) ≤
-      ENNReal.ofReal (stepBudget ^ M.family.d)
+      ENNReal.ofReal C *
+        ENNReal.ofReal (2 * (steps * stepBudget)) ^ M.family.d
 
-/-- Simple discrete-step reachability bound for the API-level zero volume. -/
-theorem reachability_volume_bound_simple
-    (M : Model)
-    (start : naturalParameter M.family.d)
-    (steps : ℕ)
-    (stepBudget : ℝ) :
-    fisherVolume M (reachabilityRegion M start steps stepBudget) ≤
-      ENNReal.ofReal (stepBudget ^ M.family.d) := by
-  -- The current abstract volume operation is zero, so every nonnegative
-  -- extended-real bound is immediate.
-  simp [fisherVolume]
+/-- Coordinate preimage of a reachability region is a closed coordinate box. -/
+theorem reachabilityRegion_preimage (M : Model)
+    (start : naturalParameter M.family.d) (steps : ℕ) (stepBudget : ℝ) :
+    {x : Fin M.family.d → ℝ |
+        (⟨x⟩ : naturalParameter M.family.d) ∈ reachabilityRegion M start steps stepBudget} =
+      Set.Icc (fun i => start i - steps * stepBudget)
+        (fun i => start i + steps * stepBudget) := by
+  -- Pointwise `|x i - s i| ≤ r` is `s i - r ≤ x i ≤ s i + r`.
+  ext x
+  simp only [reachabilityRegion, Set.mem_setOf_eq, Set.mem_Icc, Pi.le_def, abs_le]
+  change (∀ i, _ ∧ _) ↔ _
+  constructor
+  · intro h
+    exact ⟨fun i => by linarith [(h i).1], fun i => by linarith [(h i).2]⟩
+  · intro h i
+    exact ⟨by linarith [h.1 i], by linarith [h.2 i]⟩
+
+/-- A uniform bound `√(det I) ≤ C` yields the reachability volume law. -/
+theorem reachabilityVolumeBound_of_sqrt_det_le (M : Model) (C : ℝ) (hC : 0 ≤ C)
+    (hbound : ∀ θ, Real.sqrt (M.fisherAt θ).det ≤ C) :
+    ReachabilityVolumeBound M := by
+  -- Bound the integrand by `C`, then compute the Lebesgue volume of the box.
+  refine ⟨C, hC, fun start steps stepBudget => ?_⟩
+  unfold fisherVolume
+  rw [reachabilityRegion_preimage]
+  calc _ ≤ ∫⁻ _ in Set.Icc (fun i => start i - steps * stepBudget)
+          (fun i => start i + steps * stepBudget), ENNReal.ofReal C :=
+        MeasureTheory.setLIntegral_mono measurable_const
+          (fun x _ => ENNReal.ofReal_le_ofReal (hbound _))
+    _ = _ := by
+        rw [MeasureTheory.setLIntegral_const, Real.volume_Icc_pi]
+        congr 1
+        rw [Finset.prod_congr rfl (fun i _ => congrArg ENNReal.ofReal
+          (show start i + steps * stepBudget - (start i - steps * stepBudget) =
+            2 * (steps * stepBudget) by ring)),
+          Finset.prod_const, Finset.card_univ, Fintype.card_fin]
 
 /-- Matrix-vector product for finite coordinate vectors. -/
 def matrixVecMul {d : ℕ}
@@ -631,12 +680,7 @@ theorem matrix_det_one_add_posSemidef_ge_one
         1 + D = Matrix.diagonal (fun i => 1 + hB.1.eigenvalues i) := by
       simp [D, ← Matrix.diagonal_one]
     rw [hdiag, Matrix.det_diagonal]
-    simpa using
-      (Finset.prod_le_prod (s := Finset.univ)
-        (f := fun _ : Fin d => (1 : ℝ))
-        (g := fun i : Fin d => 1 + hB.1.eigenvalues i)
-        (by intro i _hi; norm_num)
-        (by intro i _hi; linarith [hB.eigenvalues_nonneg i]))
+    exact Finset.one_le_prod₀ (fun i _hi => by linarith [hB.eigenvalues_nonneg i])
   calc
     (1 : ℝ) ≤ (1 + D).det := hdet_diag
     _ = (1 + B).det := by
@@ -678,8 +722,8 @@ theorem matrix_det_monotone_under_psd_addition
   have hS_self : S.conjTranspose = S := by
     simpa [Matrix.star_eq_conjTranspose] using
       (IsSelfAdjoint.of_nonneg (CFC.sqrt_nonneg A⁻¹)).star_eq
-  have hS_transpose : S.transpose = S := by
-    simpa [Matrix.conjTranspose] using hS_self
+  have hS_transpose : S.transpose = S :=
+    (Matrix.conjTranspose_eq_transpose_of_trivial S).symm.trans hS_self
   have hBpsd : B.PosSemidef := by
     have hconj := hΔ.mul_mul_conjTranspose_same S
     simpa [B, hS_transpose] using hconj
@@ -852,10 +896,6 @@ theorem det_add_weighted_rank_one
   rw [Matrix.det_unique]
   simp [Matrix.mul_apply, Matrix.replicateCol, Matrix.replicateRow,
     dotProduct, Matrix.vecMul]
-  rw [Finset.mul_sum]
-  apply Finset.sum_congr rfl
-  intro j _hj
-  ring
 
 /-- The determinant-lemma factor is positive for PSD rank-one updates. -/
 theorem weighted_rank_one_factor_pos
@@ -1306,29 +1346,9 @@ theorem bernoulli_sigmoid_logit
     (by simpa [bernoulliIndex] using h0)
     (by simpa [bernoulliIndex] using h1)
 
-/-- Bernoulli log-partition reduces to `log (1 + exp θ)`. -/
-theorem bernoulli_logPartition_eq (θ : naturalParameter bernoulliFamily.d) :
-    logPartition bernoulliFamily θ =
-      Real.log (1 + Real.exp (θ ⟨0, by norm_num [bernoulliFamily]⟩)) := by
-  -- Finite simplification expands the two outcomes and the one coordinate.
-  simp [logPartition, partitionSum, partitionTerm, bernoulliFamily, dot]
-
-/-- Bernoulli Fisher information is the Bernoulli variance `σ(θ)(1-σ(θ))`. -/
-theorem bernoulli_fisherInformation_eq_variance
-    (θ : naturalParameter bernoulliFamily.d) :
-    fisherInformation bernoulliFamily θ bernoulliIndex bernoulliIndex =
-      bernoulliSigmoid θ * (1 - bernoulliSigmoid θ) := by
-  -- Expand the two-point family, normalize by positivity, and close by field algebra.
-  have hpos_any (i : Fin bernoulliFamily.d) : 0 < 1 + Real.exp (θ i) := by
-    nlinarith [Real.exp_pos (θ i)]
-  have hne_any (i : Fin bernoulliFamily.d) : 1 + Real.exp (θ i) ≠ 0 :=
-    ne_of_gt (hpos_any i)
-  simp [fisherInformation, expectationOf, score, gradientLogPartition, expectedStatistic,
-    density, partitionTerm, logPartition, partitionSum, bernoulliFamily, dot,
-    bernoulliSigmoid, bernoulliIndex]
-  rw [Real.exp_log (hpos_any _)]
-  field_simp [hne_any]
-  ring
+-- `bernoulli_logPartition_eq` is proved in `FisherInformationInstance.BernoulliCalculus`.
+-- `bernoulli_fisherInformation_eq_variance` is proved in
+-- `FisherInformationInstance.BernoulliCalculus` from explicit density lemmas.
 
 /-- Explicit Bernoulli KL formula in probability coordinates. -/
 def bernoulliKlExplicit

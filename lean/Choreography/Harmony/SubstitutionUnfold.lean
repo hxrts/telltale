@@ -37,7 +37,7 @@ private theorem trans_substitute_unfold_guarded
         ((projTrans (GlobalType.mu t body) role).unfold) := by
   -- Guarded case: both sides are the unfolded mu, use trans_subst_comm.
   have h_proj_mu : projTrans (.mu t body) role = LocalTypeR.mu t (projTrans body role) := by
-    simp [projTrans, Choreography.Projection.Project.trans, hguard]
+    simp [projTrans, Choreography.Projection.Project.trans, hguard, Choreography.Projection.Trans.trans]
   rw [h_proj_mu, LocalTypeR.unfold_mu, ← h_proj_mu]
   exact trans_subst_comm body t (.mu t body) role hclosed
 
@@ -48,7 +48,7 @@ private theorem trans_substitute_unfold_unguarded
         ((projTrans (GlobalType.mu t body) role).unfold) := by
   -- Unguarded case: projection collapses to end, use subst_end_unguarded_eq2_end.
   have h_proj_end : projTrans (.mu t body) role = LocalTypeR.end := by
-    simp [projTrans, Choreography.Projection.Project.trans, hguard]
+    simp [projTrans, Choreography.Projection.Project.trans, hguard, Choreography.Projection.Trans.trans]
   rw [h_proj_end]
   simp [LocalTypeR.unfold]
   have hproj_subst :

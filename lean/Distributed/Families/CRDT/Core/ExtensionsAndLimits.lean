@@ -11,8 +11,7 @@ epoch barriers, bounded approximation) that combine base model classes.
 We need both positive examples (models satisfying extensions) and negative
 examples (counterexamples violating specific conditions) for testing.
 
-Solution Structure. Define `HcrdtExtensions` predicate bundling common
-extension classes. Provide counterexample functions (`sequenceIdIssuerConstant`,
+Solution Structure. Provide counterexample functions (`sequenceIdIssuerConstant`,
 `recycledActorRun`) and structured-state test models for validation.
 -/
 
@@ -24,12 +23,6 @@ namespace CRDT
 universe u v w x y z
 
 /-! ## Extension Predicates -/
-
-def HcrdtExtensions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.sequenceSubclassClass ∧ M.epochBarrierClass ∧
-  M.boundedMetadataApproxClass ∧ M.multiscaleObservablesClass
 
 /-- Sequence-identifier subclass criterion (strict monotonicity of issued ids). -/
 def SequenceIdSubclassCriterion (issueId : Nat → Nat) : Prop :=
@@ -69,39 +62,15 @@ def recycledActorRun : Run Nat :=
 def structuredSingleScaleModel : Model (Nat × Nat) Unit Unit Nat Unit where
   observe := Prod.fst
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := UnitOpContextLayerLaw
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := False
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
+  lattice := prodCRDT natMaxCRDT natMaxCRDT
+  effect := fun _ => (1, 1)
 
 /-- Structured-state model with multi-scale observable projection. -/
 def structuredMultiScaleModel : Model (Nat × Nat) Unit Unit (Nat × Nat) Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := UnitOpContextLayerLaw
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := NatMultiscaleObservableLaw
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
+  lattice := prodCRDT natMaxCRDT natMaxCRDT
+  effect := fun _ => (1, 1)
 
 /-! ## Extension Counterexample Theorems -/
 
@@ -139,13 +108,6 @@ theorem hcrdt_extensions_counterexample_bundle :
     single_scale_observables_not_sufficient, multi_scale_observables_distinguish⟩
 
 /-! ## Limit Predicates and Frontier Witnesses -/
-
-/-- Hypothesis block matching `H_crdt_limits`. -/
-def HcrdtLimits
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.metadataTradeoffFrontierClass ∧ M.gcCausalDominanceClass ∧
-  M.stabilizationLowerBoundClass
 
 /-- Metadata policy used to witness a non-exact SEC frontier point. -/
 def metadataFrontierPolicy : Nat → Nat :=

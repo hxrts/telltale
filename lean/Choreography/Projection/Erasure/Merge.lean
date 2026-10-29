@@ -229,8 +229,9 @@ private lemma lookup_branch_eq_none {lbl : Label} :
               simp [lookupBranchEq, hl, hrest] at h
             exact this.elim
 
+/-! ## Merge Algorithm: Core and Branch Merge -/
+
 mutual
-  /-! ## Merge Algorithm: Core and Branch Merge -/
   -- Core Merge
 
   /-- Merge two local types, returning a common erasure if possible. -/

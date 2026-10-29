@@ -17,7 +17,7 @@ and `lookupType_updateType_ne` for different-endpoint lookup.
 
 set_option autoImplicit false
 
-open Batteries
+open Batteries RBTree
 
 universe u
 

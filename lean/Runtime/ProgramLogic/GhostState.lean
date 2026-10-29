@@ -23,7 +23,7 @@ for session reasoning.
 ## Definitions
 
 - `KnowledgeRA`, `knows`, `FlowPolicy`, `non_leakage`
-- `ProgressRA`, `progress_token_own`, `progress_token_sound`
+- `ProgressRA`, `progress_token_own`, `session_progress_supply`, `progress_token_sound`
 - `GhostSession`, `ghost_session_inv`, `join_sound`, `abort_safe`
 - `ResourceBundle`, `transfer_bundle`, `ResourceTree`
 
@@ -51,9 +51,9 @@ abbrev KnowledgeRA := List (Positive × Unit)
 
 /-- Encode a knowledge fact to Positive for ghost map key. -/
 def encodeKnowledge (k : Knowledge) : Positive :=
-  [Iris.Countable.encode k.endpoint.sid,
-   Iris.Countable.encode k.endpoint.role,
-   Iris.Countable.encode k.payload]
+  Pos.Countable.encode ([Pos.Countable.encode k.endpoint.sid,
+   Pos.Countable.encode k.endpoint.role,
+   Pos.Countable.encode k.payload] : List Pos)
 
 variable [GhostMapSlot Unit]
 
@@ -102,7 +102,7 @@ abbrev ProgressRA := List (Positive × Nat)
 
 /-- Encode (SessionId, Endpoint) to Positive for ghost map key. -/
 def encodeProgressKey (sid : SessionId) (e : Endpoint) : Positive :=
-  [Iris.Countable.encode sid, Iris.Countable.encode e.sid, Iris.Countable.encode e.role]
+  Pos.Countable.encode ([Pos.Countable.encode sid, Pos.Countable.encode e.sid, Pos.Countable.encode e.role] : List Pos)
 
 variable [GhostMapSlot Nat]
 
@@ -110,22 +110,42 @@ def progress_token_own (γ : GhostName) (sid : SessionId) (e : Endpoint) (n : Na
   -- Ownership of n progress tokens for a session endpoint.
   ghost_map_elem γ (encodeProgressKey sid e) n
 
-def session_progress_supply (_γ : GhostName) (_sid : SessionId) : iProp :=
-  -- Abstract session-wide supply of progress tokens.
-  iProp.emp
-def progress_token_sound : Prop :=
-  -- Progress tokens represent positive budget for advancement.
-  ∀ γ sid e n, iProp.entails (progress_token_own γ sid e n)
-    (iProp.pure (n > 0))
+/-- Session-wide progress supply: the authoritative progress-token map for the
+session, together with the invariant that every token it records for an
+endpoint of `sid` carries a strictly positive budget. Token fragments
+(`progress_token_own`) are views into this map. -/
+def session_progress_supply (γ : GhostName) (sid : SessionId) : iProp :=
+  iProp.exist fun (M : GhostMap Nat) =>
+    iProp.sep (ghost_map_auth γ M)
+      (iProp.pure
+        (∀ e n, Iris.Std.get? M (encodeProgressKey sid e) = some n → n > 0))
+
+open Iris.BI in
+/-- Combine an authoritative lookup with a pure side condition stored next to
+the authority. -/
+private theorem sep_pure_lookup {A T : iProp} {φ ψ χ : Prop}
+    (hLook : iprop(A ∗ T) ⊢ iprop(⌜ψ⌝)) (hImp : φ → ψ → χ) :
+    iprop((A ∗ ⌜φ⌝) ∗ T) ⊢ iprop(⌜χ⌝) :=
+  calc iprop((A ∗ ⌜φ⌝) ∗ T) ⊢ iprop((⌜φ⌝ ∗ A) ∗ T) := sep_mono_left sep_comm.1
+    _ ⊢ iprop(⌜φ⌝ ∗ (A ∗ T)) := sep_assoc.1
+    _ ⊢ iprop(⌜φ⌝ ∗ ⌜ψ⌝) := sep_mono_right hLook
+    _ ⊢ iprop(⌜φ ∧ ψ⌝) := pure_sep.1
+    _ ⊢ iprop(⌜χ⌝) := pure_mono (fun h => hImp h.1 h.2)
+
+open Iris.BI in
+/-- Progress-token soundness: a token held against the session supply has a
+strictly positive budget. (A bare token `progress_token_own γ sid e 0` is
+satisfiable, so positivity is only derivable relative to the supply.) -/
+theorem progress_token_sound (γ : GhostName) (sid : SessionId) (e : Endpoint) (n : Nat) :
+    iProp.entails (iProp.sep (session_progress_supply γ sid) (progress_token_own γ sid e n))
+      (iProp.pure (n > 0)) := by
+  refine (sep_exists_right (PROP := iProp)).1.trans (exists_elim fun M => ?_)
+  exact sep_pure_lookup (ghost_map_lookup γ (encodeProgressKey sid e) n M)
+    (fun hPos hLook => hPos e n hLook)
 
 def session_type_mints_tokens : Prop :=
   -- Active sessions support progress: any session/role pair yields a valid endpoint.
   ∀ (sid : SessionId) (r : Role), ∃ (ep : Endpoint), ep.sid = sid ∧ ep.role = r
-
-def progress_aware_starvation_free : Prop :=
-  -- Token ownership implies access to the session supply.
-  ∀ γ sid e n, iProp.entails (progress_token_own γ sid e n)
-    (session_progress_supply γ sid)
 
 /-! ## Finalization tokens -/
 
@@ -145,14 +165,14 @@ structure FinalizationToken where
 /-- Ghost map model for finalization modes in the current abstract RA layer. -/
 abbrev FinalizationRA := List (Positive × FinalizationMode)
 
-instance : Iris.Countable ScopeId where
-  encode s := Iris.Countable.encode s.id
-  decode n := ScopeId.mk <$> Iris.Countable.decode n
-  decode_encode s := by simp [Iris.Countable.decode_encode]
+instance : Pos.Countable ScopeId where
+  encode s := Pos.Countable.encode s.id
+  decode n := ScopeId.mk <$> Pos.Countable.decode n
+  decode_encode s := by simp [Pos.Countable.decode_encode]
 
 /-- Encode ScopeId to Positive. -/
 def encodeScopeId (s : ScopeId) : Positive :=
-  [Iris.Countable.encode s.id]
+  Pos.Countable.encode ([Pos.Countable.encode s.id] : List Pos)
 
 variable [GhostMapSlot FinalizationMode]
 
@@ -188,7 +208,7 @@ abbrev SpeculationRA := GhostMap Nat
 
 /-- Encode `(sid, ghostSid)` for speculation ghost-map keys. -/
 def encodeSpeculationKey (sid ghostSid : SessionId) : Positive :=
-  [Iris.Countable.encode sid, Iris.Countable.encode ghostSid]
+  Pos.Countable.encode ([Pos.Countable.encode sid, Pos.Countable.encode ghostSid] : List Pos)
 
 def speculation_auth (γ : GhostName) (M : SpeculationRA) : iProp :=
   -- Authoritative speculation map.
@@ -217,7 +237,7 @@ def speculation_token_update (γ : GhostName) (M : SpeculationRA)
       (bupd
         (iProp.sep
           (speculation_auth γ
-            (Iris.Std.insert M (encodeSpeculationKey sid ghostSid) (Iris.LeibnizO.mk d')))
+            (Iris.Std.insert M (encodeSpeculationKey sid ghostSid) d'))
           (speculation_token_own γ sid ghostSid d'))) :=
   ghost_map_update γ (encodeSpeculationKey sid ghostSid) d d' M
 
@@ -260,21 +280,44 @@ def speculation_session_inv (γ : GhostName) (sid : SessionId) : iProp :=
     iProp.sep (speculation_auth γ M)
       (iProp.pure
         (∀ ghostSid depth,
-          Iris.Std.get? M (encodeSpeculationKey sid ghostSid) = some (Iris.LeibnizO.mk depth) →
+          Iris.Std.get? M (encodeSpeculationKey sid ghostSid) = some depth →
             depth ≤ ghostSpecBound))
 
 /-! ## Resource bundles -/
 
-/-- Guard-layer ownership predicate (abstract V1 ownership model). -/
-def guard_layer_owns {γ : Type u} [GuardLayer γ] (_layer : γ)
-    (_res : GuardLayer.Resource γ) : iProp :=
-  -- V1 uses an abstract guard resource ownership model.
-  iProp.emp
+/-- Ghost names for the per-session ghost state. Each component lives at its
+own name so that no two authoritative maps of the same value type share a name. -/
+structure SessionGhostNames where
+  session : GhostName -- Endpoint/local-type map (`SessionRA`).
+  progress : GhostName -- Progress-token map.
+  knowledge : GhostName -- Knowledge-fact map.
+  speculation : GhostName -- Speculation-depth map.
+  guard : GhostName -- Guard-resource map, keyed by layer id.
+  effect : GhostName -- Effect-context ghost variable.
 
-/-- Effect-context ownership predicate (abstract V1 ownership model). -/
-def effect_ctx_owns {ε : Type u} [EffectRuntime ε] (_ctx : EffectRuntime.EffectCtx ε) : iProp :=
-  -- V1 treats effect context ownership as abstract.
-  iProp.emp
+/-- Encode a guard layer id as a ghost-map key. -/
+def encodeLayer {γ : Type u} [GuardLayer γ] (layer : γ) : Positive :=
+  Pos.Countable.encode ([Pos.Countable.encode (GuardLayer.layerId layer)] : List Pos)
+
+/-- Guard-layer ownership: exclusive ownership of the ghost-map entry for this
+layer's id, recording the guarded resource `res`. -/
+def guard_layer_owns {γ : Type u} [GuardLayer γ] [GhostMapSlot (GuardLayer.Resource γ)]
+    (γg : GhostName) (layer : γ) (res : GuardLayer.Resource γ) : iProp :=
+  ghost_map_elem γg (encodeLayer layer) res
+
+/-- Effect-context ownership: exclusive ghost-variable ownership of the
+effect context `ctx`. -/
+def effect_ctx_owns {ε : Type u} [EffectRuntime ε] [GhostVarSlot (EffectRuntime.EffectCtx ε)]
+    (γe : GhostName) (ctx : EffectRuntime.EffectCtx ε) : iProp :=
+  ghost_var γe ctx
+
+/-- Two owners of the same effect context name agree on its value. -/
+theorem effect_ctx_owns_agree {ε : Type u} [EffectRuntime ε]
+    [GhostVarSlot (EffectRuntime.EffectCtx ε)] (γe : GhostName)
+    (c₁ c₂ : EffectRuntime.EffectCtx ε) :
+    iProp.entails (iProp.sep (effect_ctx_owns (ε := ε) γe c₁) (effect_ctx_owns (ε := ε) γe c₂))
+      (iProp.pure (c₁ = c₂)) :=
+  ghost_var_agree γe c₁ c₂
 
 structure ResourceBundle (γ ε : Type u) [GuardLayer γ] [EffectRuntime ε] where
   endpoint : Endpoint -- Endpoint being transferred.
@@ -298,7 +341,7 @@ def endpoint_owns_transfer : Prop :=
     iProp.entails
       (iProp.sep (session_auth γ m) (endpoint_owns γ e Lold))
       (bupd
-        (iProp.sep (session_auth γ (Iris.Std.insert m (encodeEndpoint e) (Iris.LeibnizO.mk Lnew)))
+        (iProp.sep (session_auth γ (Iris.Std.insert m (encodeEndpoint e) Lnew))
           (endpoint_owns γ e Lnew)))
 
 theorem endpoint_owns_transfer_holds : endpoint_owns_transfer := by
@@ -308,19 +351,22 @@ theorem endpoint_owns_transfer_holds : endpoint_owns_transfer := by
 
 /-! ## Bundle Ownership -/
 
+/-- Bundle ownership is the separating conjunction of all components, each
+at its own ghost name. -/
 def bundle_owns {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (γn : GhostName) (b : ResourceBundle γ ε) : iProp :=
-  -- Bundle ownership is the separating conjunction of all components.
-  let guardOwns := sepList (b.guardState.map (fun p => guard_layer_owns p.1 p.2))
+    [GhostMapSlot (GuardLayer.Resource γ)] [GhostVarSlot (EffectRuntime.EffectCtx ε)]
+    (γs : SessionGhostNames) (b : ResourceBundle γ ε) : iProp :=
+  let guardOwns := sepList (b.guardState.map (fun p => guard_layer_owns γs.guard p.1 p.2))
   let progressOwns :=
-    sepList (b.progressTokens.map (fun p => progress_token_own γn p.1 p.2.1 p.2.2))
-  let knowledgeOwns := knowledge_set_owns γn b.knowledge
-  iProp.sep (endpoint_owns γn b.endpoint b.localType)
-    (iProp.sep guardOwns (iProp.sep (effect_ctx_owns b.effectSlice)
+    sepList (b.progressTokens.map (fun p => progress_token_own γs.progress p.1 p.2.1 p.2.2))
+  let knowledgeOwns := knowledge_set_owns γs.knowledge b.knowledge
+  iProp.sep (endpoint_owns γs.session b.endpoint b.localType)
+    (iProp.sep guardOwns (iProp.sep (effect_ctx_owns γs.effect b.effectSlice)
       (iProp.sep progressOwns knowledgeOwns)))
 
 def transfer_bundle {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
+    [GhostMapSlot (GuardLayer.Resource γ)] [GhostVarSlot (EffectRuntime.EffectCtx ε)]
+    (γn : SessionGhostNames) (b : ResourceBundle γ ε) : Prop :=
   -- Transfer preserves ownership of the same bundle.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
 
@@ -339,7 +385,8 @@ def bundle_complete {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
   (∀ k ∈ b.knowledge, k.endpoint.sid = b.endpoint.sid)
 
 def transfer_bundle_preserves {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
+    [GhostMapSlot (GuardLayer.Resource γ)] [GhostVarSlot (EffectRuntime.EffectCtx ε)]
+    (γn : SessionGhostNames) (b : ResourceBundle γ ε) : Prop :=
   -- Bundle transfer preserves invariants in the current abstract bundle model.
   transfer_bundle γn b
 
@@ -356,7 +403,8 @@ def transfer_continuation_typed {γ ε : Type u} [GuardLayer γ] [EffectRuntime 
   WellTypedTransfer b ∧ LocalType.targetRole? b.localType ≠ none
 
 def transfer_source_loses {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
-    (γn : GhostName) (b : ResourceBundle γ ε) : Prop :=
+    [GhostMapSlot (GuardLayer.Resource γ)] [GhostVarSlot (EffectRuntime.EffectCtx ε)]
+    (γn : SessionGhostNames) (b : ResourceBundle γ ε) : Prop :=
   -- Source loses ownership and re-establishes bundle ownership at the target lane.
   iProp.entails (bundle_owns γn b) (bundle_owns γn b)
 

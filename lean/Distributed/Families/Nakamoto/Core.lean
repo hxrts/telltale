@@ -1,3 +1,5 @@
+import Distributed.Families.Nakamoto.LongestChain
+
 set_option autoImplicit false
 
 /-! # Distributed.Families.Nakamoto
@@ -112,8 +114,17 @@ structure Assumptions
   qualityWindow : Nat
   minHonestWeight : Nat
   probabilityBudget : ProbabilityBudget M settlementDepth ε
-  commonPrefix :
-    ∀ run, AdmissibleRun run → CommonPrefixAtDepth M run settlementDepth
+  /-- Each admissible run is the public chain of a concrete longest-chain
+  execution (`LongestChain.IsRun`) whose production schedule satisfies the
+  window honest-majority condition at depth `settlementDepth`. This is a
+  refinement link plus a combinatorial schedule condition, not common prefix;
+  common prefix is proved in `LongestChain.common_prefix`. -/
+  realizedByLongestChain :
+    ∀ run, AdmissibleRun run →
+      ∃ (sched : Nat → Bool) (mint : Nat → Block) (lc : Nat → LongestChain.LCState Block),
+        LongestChain.IsRun sched mint lc ∧
+        (∀ T, LongestChain.WindowHonestMajorityUpTo sched settlementDepth T) ∧
+        ∀ t, M.chain (run t) = (lc t).pub
   chainGrowth :
     ∀ run, AdmissibleRun run → ChainGrowth M run growthWindow minGrowth
   chainQuality :
@@ -125,7 +136,7 @@ structure Assumptions
 inductive Assumption where
   | admissibleRuns
   | probabilityBudget
-  | commonPrefix
+  | realizedByLongestChain
   | chainGrowth
   | chainQuality
   | churnWithin
@@ -142,7 +153,7 @@ structure AssumptionResult where
 def coreAssumptions : List Assumption :=
   [ .admissibleRuns
   , .probabilityBudget
-  , .commonPrefix
+  , .realizedByLongestChain
   , .chainGrowth
   , .chainQuality
   , .churnWithin
@@ -150,9 +161,12 @@ def coreAssumptions : List Assumption :=
 
 /-! ## Assumption Validation API -/
 
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
+/-- Constant `true`: this validator performs no runtime check. It only reports
+that the `Assumptions` bundle passed to it carries a proof of each field, which
+the type of the bundle already guarantees. The family model has no concrete
+parameters over which an assumption could be decided. -/
+def proofCarriedNoRuntimeCheck : Bool :=
+  true
 
 
 /-- Validate one assumption against an assumption bundle. -/
@@ -163,32 +177,33 @@ def validateAssumption
   match h with
   | .admissibleRuns =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Admissible runs and security parameters are provided."
       }
   | .probabilityBudget =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "The explicit probability budget boundary is provided."
       }
-  | .commonPrefix =>
+  | .realizedByLongestChain =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Common-prefix semantics are provided for admissible runs."
+      , passed := proofCarriedNoRuntimeCheck
+      , detail := "Runs refine a longest-chain execution with window honest majority \
+          (decide the window condition with `LongestChain.checkWindowHonestMajority`)."
       }
   | .chainGrowth =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Chain-growth semantics are provided for admissible runs."
       }
   | .chainQuality =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Chain-quality semantics are provided for admissible runs."
       }
   | .churnWithin =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Admissible runs satisfy the configured churn budget."
       }
 
@@ -220,6 +235,23 @@ def runAssumptionValidation
 
 /-! ## Derived Guarantees -/
 
+/-- `PrefixOf` agrees with `List.IsPrefix`. -/
+theorem prefixOf_iff {Block : Type v} (xs ys : List Block) : PrefixOf xs ys ↔ xs <+: ys :=
+  ⟨fun ⟨u, h⟩ => ⟨u, h.symm⟩, fun ⟨u, h⟩ => ⟨u, h.symm⟩⟩
+
+/-- Common prefix at the settlement depth, proved from the longest-chain
+refinement and `LongestChain.common_prefix`. -/
+theorem common_prefix_of_assumptions
+    {State : Type u} {Block : Type v} {Party : Type w}
+    {M : Model State Block Party} (a : Assumptions M)
+    (run : Nat → State) (hRun : a.AdmissibleRun run) :
+    CommonPrefixAtDepth M run a.settlementDepth := by
+  intro i j pref hij hPre hLen
+  obtain ⟨sched, mint, lc, hIsRun, hW, hEq⟩ := a.realizedByLongestChain run hRun
+  rw [prefixOf_iff, hEq] at hPre ⊢
+  rw [hEq] at hLen
+  exact LongestChain.common_prefix hIsRun (hW j) hij le_rfl ⟨hPre, hLen⟩
+
 /-- Probabilistic safety follows from the probability boundary and common prefix. -/
 theorem probabilistic_safety_of_assumptions
     {State : Type u} {Block : Type v} {Party : Type w}
@@ -227,7 +259,7 @@ theorem probabilistic_safety_of_assumptions
     (a : Assumptions M) :
     ProbabilisticSafety M a.AdmissibleRun a.ε := by
   intro run hRun
-  exact ⟨a.settlementDepth, a.probabilityBudget, a.commonPrefix run hRun⟩
+  exact ⟨a.settlementDepth, a.probabilityBudget, common_prefix_of_assumptions a run hRun⟩
 
 /-- Settlement-depth finality follows from common-prefix semantics. -/
 theorem settlement_finality_of_assumptions
@@ -236,7 +268,7 @@ theorem settlement_finality_of_assumptions
     (a : Assumptions M) :
     SettlementDepthFinality M a.AdmissibleRun a.settlementDepth := by
   intro run hRun
-  exact a.commonPrefix run hRun
+  exact common_prefix_of_assumptions a run hRun
 
 /-- Liveness-under-churn follows from churn, growth, and quality semantics. -/
 theorem liveness_under_churn_of_assumptions

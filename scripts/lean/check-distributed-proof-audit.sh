@@ -30,6 +30,32 @@ if [[ "${#existing_scopes[@]}" -eq 0 ]]; then
 fi
 
 status=0
+EXCLUDE_GLOBS=()
+
+# Vacuity checks run in multiline mode (`rg -U`), so `\s` spans newlines and a
+# body split across lines (`def P : Prop :=\n  True`) is still caught.
+# `True(?![.\w'])` avoids matching `True.intro` and identifiers like `True'`.
+run_vacuity_checks() {
+  run_check \
+    "no Prop := True placeholder contracts" \
+    '\bProp\s*:=\s*True(?![.\w'"'"'])' "$@"
+
+  run_check \
+    "no direct := True placeholder implementations" \
+    ':=\s*True(?![.\w'"'"'])' "$@"
+
+  run_check \
+    "no := ∀ …, True quantified-True bodies" \
+    ':=\s*(∀|\bforall\b)(?:(?!:=)[^\n]|\n(?!\s*\n)){0,300}?,\s*True(?![.\w'"'"'])' "$@"
+
+  run_check \
+    "no fun _ => True defaults" \
+    '\bfun\b[^=\n]*(=>|↦)\s*True(?![.\w'"'"'])' "$@"
+
+  run_check \
+    "no implication-to-True vacuous guarantees" \
+    '(->|→)\s*True(?![.\w'"'"'])' "$@"
+}
 
 filter_allowlisted() {
   local input="$1"
@@ -48,9 +74,17 @@ filter_allowlisted() {
 run_check() {
   local label="$1"
   local pattern="$2"
+  shift 2
+  local targets=("$@")
   local output
 
-  if output="$(rg --line-number --color never --pcre2 "$pattern" "${existing_scopes[@]}" | sed "s#${ROOT_DIR}/##" || true)" &&
+  if [[ "${#targets[@]}" -eq 0 ]]; then
+    targets=("${existing_scopes[@]}")
+  fi
+
+  if output="$(rg --multiline --line-number --color never --pcre2 \
+        --glob '*.lean' --glob '!.lake/**' ${EXCLUDE_GLOBS[@]+"${EXCLUDE_GLOBS[@]}"} \
+        "$pattern" "${targets[@]}" | sed "s#${ROOT_DIR}/##" || true)" &&
       output="$(filter_allowlisted "$output")" &&
       [[ -n "$output" ]]; then
     echo "FAIL ${label}" >&2
@@ -64,19 +98,9 @@ run_check() {
 
 run_check \
   "no Lean escape hatches in distributed proof scopes" \
-  '^[[:space:]]*(sorry|admit)\b|^[[:space:]]*axiom[[:space:]]+'
+  '^[ \t]*(sorry|admit)\b|^[ \t]*axiom[[:space:]]+'
 
-run_check \
-  "no Prop := True placeholder contracts" \
-  '\bProp[[:space:]]*:=[[:space:]]*True\b'
-
-run_check \
-  "no direct := True placeholder implementations" \
-  ':=[[:space:]]*True\b'
-
-run_check \
-  "no implication-to-True vacuous guarantees" \
-  '(->|→)[[:space:]]*True\b'
+run_vacuity_checks
 
 run_check \
   "no theorem-shaped witness record fields" \

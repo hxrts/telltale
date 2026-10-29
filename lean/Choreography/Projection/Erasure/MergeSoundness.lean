@@ -67,7 +67,7 @@ private theorem merge_branches_send_sound
             simp [hnone] at h
           exact this.elim
 
-  /-! ## mergeBranchesSend: Cons Case -/
+  /- ## mergeBranchesSend: Cons Case -/
 
   | cons head tail ih =>
       obtain ⟨l, vt1, t1⟩ := head
@@ -113,7 +113,7 @@ private theorem merge_branches_send_sound
           have hIn_tail := hsubb1 lbl hIn_rest'
           exact (label_in_tail_of_ne (lbl := lbl) (l := l) (vt := vt1) (t := t1) (rest := tail) hlt).2 hIn_tail
 
-      /-! ## mergeBranchesSend: Cons Branch Erasure Case -/
+      /- ## mergeBranchesSend: Cons Branch Erasure Case -/
 
       -- mergeBranchesSend Cons Branch Erasure Case
 
@@ -241,7 +241,7 @@ private theorem merge_branches_recv_sound
             have htail := hright lbl t2' h1_tail h2'
             simpa [lookupBranch, hlt] using htail
 
-      /-! ## mergeBranchesRecv: Cons Merged-Label Path -/
+      /- ## mergeBranchesRecv: Cons Merged-Label Path -/
 
       · rcases hsome with ⟨t2, t, rest', hlookup, hmerge', hrest, rfl⟩
         have hm_tail : sizeOf tail + sizeOf bs2 < m := by
@@ -287,7 +287,7 @@ private theorem merge_branches_recv_sound
               simpa [lookupBranch, hlt] using hbs
             exact hper lbl t1' t2' t' h1_tail h2' hbs'
 
-        /-! ## mergeBranchesRecv: Cons Merged-Label Remaining Cases -/
+        /- ## mergeBranchesRecv: Cons Merged-Label Remaining Cases -/
 
         · intro lbl t1' h1' h2'
           by_cases hlt : l = lbl
@@ -361,7 +361,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                   simp [merge] at h
                 exact this.elim
 
-      /-! ## merge_sound: Mu Case -/
+      /- ## merge_sound: Mu Case -/
 
       | mu v a' =>
           cases b with
@@ -391,7 +391,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                   simp [merge] at h
                 exact this.elim
 
-      /-! ## merge_sound: Send Case -/
+      /- ## merge_sound: Send Case -/
 
       | send p bs =>
           cases b with
@@ -433,7 +433,7 @@ theorem merge_sound : ∀ a b c, merge a b = some c → Erases a b c := by
                   simp [merge] at h
                 exact this.elim
 
-      /-! ## merge_sound: Recv Case -/
+      /- ## merge_sound: Recv Case -/
 
       | recv p bs =>
           cases b with

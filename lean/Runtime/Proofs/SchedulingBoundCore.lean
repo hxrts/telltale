@@ -387,8 +387,8 @@ theorem kfair_termination_bound
         KFair sys sched' k →
         sys.isTerminal (execute sys c' sched' (k * m)) = true := by
     intro m
-    induction m using Nat.strong_induction_on with
-    | h m ih =>
+    induction m using Nat.strongRecOn with
+    | ind m ih =>
       intro c' sched' hpm hfair'
       cases m with
       | zero =>

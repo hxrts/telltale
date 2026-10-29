@@ -4,10 +4,8 @@ set_option autoImplicit false
 
 Reusable hypothesis bundles for FLP-style lower-bound proofs.
 
-This module intentionally separates:
-- protocol/model assumptions (`Assumptions`), reusable across theorems
-- lower-bound-specific construction premises (`LowerBoundPremises`)
-- a small validation API mirroring the style used in `Distributed.Model.Assumptions`
+This module provides abstract model assumption labels and a small validation
+API. The impossibility theorem is proved in `Distributed.Families.FLP.Theorem`.
 -/
 
 /-
@@ -195,102 +193,14 @@ def TerminatesOnAllFairRuns
     (FairRun : (Nat → State) → Prop) : Prop :=
   ∀ run, FairRun run → M.initial (run 0) → EventuallyDecidesOnRun M run
 
-/-! ## Valency Infrastructure -/
+/-! ## Proved Impossibility
 
-/-- A state is `v`-univalent when every reachable decision is `v`. -/
-def Univalent
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (M : Model State Value Event Party) (s : State) (v : Value) : Prop :=
-  ∀ s' v', M.reachable s s' → M.decide s' = some v' → v' = v
-
-/-- A state is bivalent when two reachable executions can decide different values. -/
-def Bivalent
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (M : Model State Value Event Party) (s : State) : Prop :=
-  ∃ s₀ s₁ v₀ v₁,
-    M.reachable s s₀ ∧
-    M.reachable s s₁ ∧
-    M.decide s₀ = some v₀ ∧
-    M.decide s₁ = some v₁ ∧
-    v₀ ≠ v₁
-
-/-- An event is critical when it moves a bivalent state to a univalent state. -/
-def CriticalEvent
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (M : Model State Value Event Party) (s : State) (e : Event) : Prop :=
-  Bivalent M s ∧ ∃ s' v, M.step s e = some s' ∧ Univalent M s' v
-
-/-- A fair extension relation used to construct nonterminating FLP executions. -/
-def FairScheduleExtension
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (M : Model State Value Event Party)
-    (FairRun : (Nat → State) → Prop)
-    (P : State → Prop) : Prop :=
-  ∀ s, P s → ∃ run, run 0 = s ∧ FairRun run ∧ ∀ n, P (run n)
-
-/-! ## Lower-Bound Premises -/
-
-/-- Additional premises typically discharged by FLP valency lemmas.
-This isolates the two-step FLP proof pattern into reusable inputs. -/
-structure LowerBoundPremises
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (M : Model State Value Event Party) : Type (max u v w x) where
-  Uncommitted : State → Prop
-  FairRun : (Nat → State) → Prop
-  initialUncommitted : ∃ s, M.initial s ∧ Uncommitted s
-  /-- "There exists an infinite fair extension staying uncommitted" premise. -/
-  fairUncommittedExtension : FairScheduleExtension M FairRun Uncommitted
-
-/-- Stronger premises for the full FLP impossibility statement:
-    uncommitted states are precisely non-deciding states for the lower-bound run. -/
-structure ImpossibilityPremises
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (M : Model State Value Event Party)
-    : Type (max u v w x) extends LowerBoundPremises M where
-  uncommittedNotDeciding : ∀ s, Uncommitted s → M.decide s = none
-
-/-! ## Derived FLP Theorems -/
-
-/-- FLP lower-bound shape from reusable assumptions + valency premises.
-This theorem is the reusable endpoint consumed by concrete FLP instantiations. -/
-theorem lower_bound_of_assumptions
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (_a : Assumptions M)
-    (p : LowerBoundPremises M) :
-    ∃ run, p.FairRun run ∧ ∀ n, p.Uncommitted (run n) := by
-  rcases p.initialUncommitted with ⟨s₀, _hInit, hUncommitted⟩
-  rcases p.fairUncommittedExtension s₀ hUncommitted with ⟨run, _h0, hFair, hAll⟩
-  exact ⟨run, hFair, hAll⟩
-
-/-- Construct a fair initial run that never decides, from full FLP premises. -/
-theorem nonterminating_run_of_assumptions
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (_a : Assumptions M)
-    (p : ImpossibilityPremises M) :
-    ∃ run, p.FairRun run ∧ M.initial (run 0) ∧ ∀ n, M.decide (run n) = none := by
-  rcases p.initialUncommitted with ⟨s₀, hInit, hUncommitted⟩
-  rcases p.fairUncommittedExtension s₀ hUncommitted with ⟨run, h0, hFair, hAll⟩
-  refine ⟨run, hFair, ?_, ?_⟩
-  · simpa [h0] using hInit
-  · intro n
-    exact p.uncommittedNotDeciding _ (hAll n)
-
-/-- Full FLP impossibility form: no deterministic async crash-resilient protocol
-    can guarantee decision on all fair runs under the supplied valency premises. -/
-theorem impossibility_of_assumptions
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (a : Assumptions M)
-    (p : ImpossibilityPremises M) :
-    ¬ TerminatesOnAllFairRuns M p.FairRun := by
-  intro hTerm
-  rcases nonterminating_run_of_assumptions a p with ⟨run, hFair, hInit, hNone⟩
-  rcases hTerm run hFair hInit with ⟨n, v, hDec⟩
-  have hNoDec : M.decide (run n) = none := hNone n
-  rw [hNoDec] at hDec
-  cases hDec
+The FLP impossibility itself is proved (not assumed) for the concrete
+asynchronous message-passing model in `Distributed.Families.FLP.Theorem`
+(`Async.flp_impossibility`); the abstract `Model` above only carries the
+assumption-label validation API. The former `LowerBoundPremises` /
+`ImpossibilityPremises` (which assumed the valency argument) were removed.
+-/
 
 end FLP
 end Distributed

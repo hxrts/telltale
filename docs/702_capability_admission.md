@@ -90,7 +90,7 @@ Non-full profiles also require `can_use_mixed_determinism_profiles`.
 
 ## Theorem-Pack Capability Inventory
 
-The theorem-pack inventory publishes machine-readable capability keys.
+The theorem-pack inventory publishes machine-readable capability keys. Keys are strings defined in `lean/Runtime/Proofs/TheoremPack/Inventory.lean`, not Lean theorem names. A key is present when the corresponding profile artifact is attached. For example, `quorum_geometry_safety` is backed by `Distributed.QuorumGeometry.no_conflicting_commits_of_protocol`, `fork_exclusion_of_protocol`, and `safe_finality_of_protocol`.
 
 | Inventory family | Example keys |
 |---|---|

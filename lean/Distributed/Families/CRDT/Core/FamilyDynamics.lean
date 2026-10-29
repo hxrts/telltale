@@ -174,192 +174,52 @@ theorem in_scope_families_adequate_core_representable
   intro A
   exact in_scope_families_adequate A
 
-/-! ## Core Hypothesis Analysis (`H_crdt_core`) -/
+/-! ## Core Hypothesis (`H_crdt_core`) -/
 
-/-- Hypothesis block matching `H_crdt_core`. -/
+/-- `H_crdt_core`: merge is a commutative, associative, idempotent join, and
+updates are inflationary and monotone. Every `Model` satisfies it
+(`hcrdt_core_of_model`), because `Model.lattice` carries the lattice laws. -/
 def HcrdtCore
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (M : Model State Op Context Obs Program) : Prop :=
-  M.semilatticeCoreClass ∧ M.opContextLayerClass
+  (∀ a b, M.lattice.join a b = M.lattice.join b a) ∧
+  (∀ a b c, M.lattice.join (M.lattice.join a b) c = M.lattice.join a (M.lattice.join b c)) ∧
+  (∀ a, M.lattice.join a a = a) ∧
+  (∀ o s, M.lattice.le s (M.apply o s)) ∧
+  (∀ o {s t}, M.lattice.le s t → M.lattice.le (M.apply o s) (M.apply o t))
 
-/-- Semilattice-only foundation predicate in the `H_crdt_core` analysis. -/
-def SemilatticeOnlyFoundation
+/-- Every CRDT model satisfies `H_crdt_core`. -/
+theorem hcrdt_core_of_model
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.semilatticeCoreClass
+    (M : Model State Op Context Obs Program) : HcrdtCore M :=
+  ⟨M.lattice.join_comm, M.lattice.join_assoc, M.lattice.join_idem,
+    M.apply_inflationary, fun o _ _ h => M.apply_monotone o h⟩
 
-/-- Distinct primitive algebra required for op-context CRDT correctness. -/
-def OpContextPrimitiveAlgebra
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.opContextLayerClass
+/-! ## Convergence-Distance Non-Canonicity -/
 
-/-- Adequacy theorem: `H_crdt_core` is exactly semilattice + op-context primitive algebra. -/
-theorem hcrdt_core_iff_semilattice_plus_op_context
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program} :
-    HcrdtCore M ↔
-      (SemilatticeOnlyFoundation M ∧ OpContextPrimitiveAlgebra M) := by
-  rfl
-
-/-! ## Core Analysis Countermodels -/
-
-/-- Concrete model where semilattice and op-context layers are both present. -/
-def semilatticeWithOpContextModel : Model Nat Unit Unit Nat Unit where
-  observe := natUnitModel.observe
-  distance := natUnitModel.distance
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := UnitOpContextLayerLaw
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := NatMultiscaleObservableLaw
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
-
-/-- Concrete model where semilattice core exists but op-context layer is absent. -/
-def semilatticeOnlyNoOpContextModel : Model Nat Unit Unit Nat Unit where
-  observe := natUnitModel.observe
-  distance := natUnitModel.distance
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := False
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := NatMultiscaleObservableLaw
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
-
-/-- Refutation witness: semilattice-only foundations do not imply op-context algebra. -/
-theorem semilattice_only_not_sufficient_for_op_context :
-    SemilatticeOnlyFoundation semilatticeOnlyNoOpContextModel ∧
-      ¬ OpContextPrimitiveAlgebra semilatticeOnlyNoOpContextModel := by
-  simp [SemilatticeOnlyFoundation, OpContextPrimitiveAlgebra, semilatticeOnlyNoOpContextModel]
-
-/-- Universal refutation of deriving op-context from semilattice-only assumptions. -/
-theorem hcrdt_core_refute_semilattice_only_derivation :
-    ¬ (∀ M : Model Nat Unit Unit Nat Unit,
-      SemilatticeOnlyFoundation M → OpContextPrimitiveAlgebra M) := by
-  intro hDerive
-  have hSemi : SemilatticeOnlyFoundation semilatticeOnlyNoOpContextModel := by
-    simp [SemilatticeOnlyFoundation, semilatticeOnlyNoOpContextModel]
-  have hOp : OpContextPrimitiveAlgebra semilatticeOnlyNoOpContextModel :=
-    hDerive semilatticeOnlyNoOpContextModel hSemi
-  simp [OpContextPrimitiveAlgebra, semilatticeOnlyNoOpContextModel] at hOp
-
-/-! ## Core Analysis Reconstruction -/
-
-/-- Distinct op-context primitive algebra is sufficient together with semilattice core. -/
-theorem hcrdt_core_of_semilattice_plus_op_context
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program} :
-    SemilatticeOnlyFoundation M ∧ OpContextPrimitiveAlgebra M → HcrdtCore M := by
-  intro h
-  exact h
-
-/-! ## Foundation Hypothesis Analysis (`H_crdt_foundation`) -/
-
-/-- Hypothesis block matching `H_crdt_foundation`. -/
-def HcrdtFoundation
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.minimalOpStateEquivalenceAssumptions ∧ M.canonicalConvergenceDistanceClass
-
-/-- Minimal assumption block for op/state equivalence analysis. -/
-def MinimalOpStateConditions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.minimalOpStateEquivalenceAssumptions
-
-/-- Canonical convergence-distance assumption. -/
-def CanonicalDConv
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.canonicalConvergenceDistanceClass
-
-/-! ## Foundation Non-Canonicity Countermodels -/
-
-/-- Two concrete models witnessing non-canonicity of convergence distance. -/
+/-- Grow-only max-register model with 0/1 convergence distance. -/
 def foundationModelDistance01 : Model Nat Unit Unit Nat Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := UnitOpContextLayerLaw
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := False
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := NatMultiscaleObservableLaw
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
+  lattice := natMaxCRDT
+  effect := fun _ => 1
 
-/-- Companion model with same observables and a different valid distance. -/
+/-- Companion model with the same lattice/observables and a 0/2 distance. -/
 def foundationModelDistance02 : Model Nat Unit Unit Nat Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 2
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := UnitOpContextLayerLaw
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := False
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := NatMultiscaleObservableLaw
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
+  lattice := natMaxCRDT
+  effect := fun _ => 1
 
-/-! ## Foundation Refutation and Counterexample Theorems -/
-
-/-- Formal non-canonicity witness for `d_conv` under minimal assumptions. -/
+/-- The convergence distance is not determined by lattice, updates, and
+observables: two models agreeing on all of them differ in `distance`. -/
 theorem dconv_noncanonicity_counterexample :
-    MinimalOpStateConditions foundationModelDistance01 ∧
-      MinimalOpStateConditions foundationModelDistance02 ∧
-      (∀ s, foundationModelDistance01.observe s = foundationModelDistance02.observe s) ∧
-      (∃ s₁ s₂, foundationModelDistance01.distance s₁ s₂ ≠ foundationModelDistance02.distance s₁ s₂) := by
-  refine ⟨by simp [MinimalOpStateConditions, foundationModelDistance01], ?_⟩
-  refine ⟨by simp [MinimalOpStateConditions, foundationModelDistance02], ?_⟩
-  refine ⟨by intro s; rfl, ?_⟩
-  refine ⟨0, 1, ?_⟩
-  simp [foundationModelDistance01, foundationModelDistance02]
-
-/-- Refutation: minimal op/state assumptions alone do not force canonical `d_conv`. -/
-theorem hcrdt_foundation_refute_canonical_from_minimal :
-    ¬ (∀ M : Model Nat Unit Unit Nat Unit, MinimalOpStateConditions M → CanonicalDConv M) := by
-  intro hDerive
-  have hMin : MinimalOpStateConditions foundationModelDistance01 := by
-    simp [MinimalOpStateConditions, foundationModelDistance01]
-  have hCanon : CanonicalDConv foundationModelDistance01 :=
-    hDerive foundationModelDistance01 hMin
-  simp [CanonicalDConv, foundationModelDistance01] at hCanon
+    (∀ s, foundationModelDistance01.observe s = foundationModelDistance02.observe s) ∧
+      (∃ s₁ s₂, foundationModelDistance01.distance s₁ s₂ ≠
+        foundationModelDistance02.distance s₁ s₂) :=
+  ⟨fun _ => rfl, 0, 1, by simp [foundationModelDistance01, foundationModelDistance02]⟩
 
 /-! ## Dynamics Hypothesis Analysis (`H_crdt_dynamics`) -/
-
-/-- Hypothesis block matching `H_crdt_dynamics`. -/
-def HcrdtDynamics
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop :=
-  M.mixingTimeControlledClass ∧ M.hotspotSlowModesClass ∧ M.driftDecayClass
 
 /-- Run-level formalization of a mixing-time claim (eventual constancy). -/
 def MixingTimeControlledRun (r : Run Nat) : Prop :=

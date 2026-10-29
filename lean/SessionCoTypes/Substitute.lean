@@ -127,7 +127,7 @@ theorem eq2_substitute (a b : LocalTypeR) (var : String) (repl : LocalTypeR) :
     (∀ t, SubstCommBarendregt.isFreeIn t repl = false) →
     (∀ t body, repl ≠ .mu t body) →
     EQ2 (a.substitute var repl) (b.substitute var repl) :=
-  SessionCoTypes.Bisim.EQ2_substitute_via_Bisim (a := a) (b := b) (var := var) (repl := repl)
+  SessionCoTypes.Bisim.eq2_substitute_via_bisim (a := a) (b := b) (var := var) (repl := repl)
 
 /-! ## Derived Lemmas -/
 
@@ -147,7 +147,7 @@ theorem eq2_substitute_left (a : LocalTypeR) (var : String) (repl : LocalTypeR)
     (hfresh : ∀ t, SubstCommBarendregt.isFreeIn t repl = false)
     (hnomu : ∀ t body, repl ≠ .mu t body) :
     EQ2 (a.substitute var repl) (a.substitute var repl) :=
-  eq2_substitute a a var repl (EQ2_refl a) hbar hbar hfresh hnomu
+  eq2_substitute a a var repl (eq2_refl a) hbar hbar hfresh hnomu
 
 /-! ## Unfold-Substitute Confluence
 
@@ -173,7 +173,7 @@ For these constructors, `unfold` is the identity function:
 - `(t.substitute var repl).unfold = t.substitute var repl`
 - `(t.unfold).substitute var repl = t.substitute var repl`
 
-Both sides are definitionally equal, so `EQ2_refl` suffices.
+Both sides are definitionally equal, so `eq2_refl` suffices.
 
 ## Mu case (mu s body)
 
@@ -219,7 +219,7 @@ applying unfold then substitute. Both produce observationally equivalent
 infinite communication trees.
 
 **Proof sketch:**
-1. Non-mu cases: unfold is identity, trivial by `EQ2_refl`
+1. Non-mu cases: unfold is identity, trivial by `eq2_refl`
 2. Mu case: requires showing confluence of substitution order
 3. Use coinduction on the infinite tree to show semantic equivalence
 
@@ -230,12 +230,12 @@ infinite communication trees.
 theorem unfold_substitute_eq2 (t : LocalTypeR) (var : String) (repl : LocalTypeR)
     (hWFt : LocalTypeR.WellFormed t) (hWFrepl : LocalTypeR.WellFormed repl) :
     EQ2 ((t.substitute var repl).unfold) ((t.unfold).substitute var repl) :=
-  SessionCoTypes.Bisim.unfold_substitute_EQ2_via_Bisim t var repl hWFt hWFrepl
+  SessionCoTypes.Bisim.unfold_substitute_eq2_via_bisim t var repl hWFt hWFrepl
 
 /-- Unfold-substitute confluence for the reflexive case. -/
 theorem unfold_substitute_eq2_refl (t : LocalTypeR) (var : String) (repl : LocalTypeR)
     (_hWFt : LocalTypeR.WellFormed t) (_hWFrepl : LocalTypeR.WellFormed repl) :
     EQ2 ((t.substitute var repl).unfold) ((t.substitute var repl).unfold) :=
-  EQ2_refl _
+  eq2_refl _
 
 end SessionCoTypes.Substitute

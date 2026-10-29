@@ -7,8 +7,7 @@ Reusable hypothesis bundles for CAP-style impossibility proofs.
 This module provides:
 - reusable model assumptions,
 - protocol-level CAP target predicates,
-- impossibility premises,
-- a full impossibility theorem.
+- pointers to the proved impossibility theorem in `CAP.Theorem`.
 -/
 
 /-
@@ -112,70 +111,13 @@ def runAssumptionValidation
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
-/-! ## CAP Guarantee Targets -/
+/-! ## Proved Impossibility
 
-/-- Availability guarantee under partition runs. -/
-def AvailabilityUnderPartition
-    {State : Type u} {Party : Type v}
-    (M : Model State Party)
-    (PartitionRun : (Nat → State) → Prop) : Prop :=
-  ∀ run, PartitionRun run → M.initial (run 0) →
-    ∀ n, M.partitioned (run n) → M.available (run n)
-
-/-- Strong-consistency guarantee under partition runs. -/
-def StrongConsistencyUnderPartition
-    {State : Type u} {Party : Type v}
-    (M : Model State Party)
-    (PartitionRun : (Nat → State) → Prop) : Prop :=
-  ∀ run, PartitionRun run → M.initial (run 0) →
-    ∀ n, M.partitioned (run n) → M.stronglyConsistent (run n)
-
-/-- CAP guarantee target (consistency + availability under partition). -/
-def CAPGuarantee
-    {State : Type u} {Party : Type v}
-    (M : Model State Party)
-    (PartitionRun : (Nat → State) → Prop) : Prop :=
-  AvailabilityUnderPartition M PartitionRun ∧
-  StrongConsistencyUnderPartition M PartitionRun
-
-/-! ## Impossibility Premises and Theorems -/
-
-/-- Premises that capture the core CAP contradiction shape. -/
-structure ImpossibilityPremises
-    {State : Type u} {Party : Type v}
-    (M : Model State Party) : Type (max u v) where
-  PartitionRun : (Nat → State) → Prop
-  partitionExecution :
-    ∃ run n,
-      PartitionRun run ∧
-      M.initial (run 0) ∧
-      (∀ k, M.partitioned (run k)) ∧
-      ¬ M.stronglyConsistent (run n)
-
-/-- Full CAP impossibility theorem in reusable-hypothesis form. -/
-theorem impossibility_of_assumptions
-    {State : Type u} {Party : Type v}
-    {M : Model State Party}
-    (_a : Assumptions M)
-    (p : ImpossibilityPremises M) :
-    ¬ CAPGuarantee M p.PartitionRun := by
-  intro hCAP
-  rcases p.partitionExecution with ⟨run, n, hRun, hInit, hPart, hNotCons⟩
-  have hCons : M.stronglyConsistent (run n) :=
-    hCAP.2 run hRun hInit n (hPart n)
-  exact hNotCons hCons
-
-/-- Corollary form: if availability under partition is given, then strong
-consistency under partition is impossible (under the same premises). -/
-theorem consistency_impossible_with_availability
-    {State : Type u} {Party : Type v}
-    {M : Model State Party}
-    (a : Assumptions M)
-    (p : ImpossibilityPremises M)
-    (_hAvail : AvailabilityUnderPartition M p.PartitionRun) :
-    ¬ StrongConsistencyUnderPartition M p.PartitionRun := by
-  intro hCons
-  exact impossibility_of_assumptions a p ⟨_hAvail, hCons⟩
+The CAP impossibility is proved (not assumed) for a concrete two-node
+asynchronous register model in `Distributed.Families.CAP.Theorem`
+(`Register.cap_impossible`). The former `ImpossibilityPremises`, which
+supplied the inconsistent partitioned run as a hypothesis, was removed.
+-/
 
 end CAP
 end Distributed

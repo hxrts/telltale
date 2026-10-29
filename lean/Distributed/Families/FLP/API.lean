@@ -1,80 +1,53 @@
 import Distributed.Families.FLP.Core
+import Distributed.Families.FLP.Theorem
 
 set_option autoImplicit false
 
 /-! # Distributed.Families.FLP.API
 
-High-level API for automatic FLP lower-bound certification.
+High-level API for the FLP impossibility (Fischer–Lynch–Paterson 1985).
 
-When a protocol instance is built with the reusable FLP hypotheses and the
-standard lower-bound premises, the FLP non-termination witness theorem is
-materialized automatically.
+A protocol bundle supplies a concrete asynchronous protocol
+(`Async.Protocol`) with at least two processes, together with proofs of
+agreement and validity. FLP impossibility (no termination on all admissible
+runs with one crash) and the non-deciding admissible run are then *derived*
+from `Async.flp_impossibility`; nothing about valency is assumed.
 -/
 
 namespace Distributed
 namespace FLP
 
-universe u v w x
-
-/-- A protocol packaged for FLP lower-bound certification.
-
-Users provide model assumptions and valency-style premises; the theorem is
-derived by `lower_bound_of_protocol`. -/
-structure LowerBoundProtocol where
-  State : Type u
-  Value : Type v
-  Event : Type w
-  Party : Type x
-  model : Model State Value Event Party
-  assumptions : Assumptions model
-  premises : LowerBoundPremises model
-
-/-- Stronger protocol package: includes premises sufficient to derive
-the full FLP impossibility (negation of universal fair-run termination). -/
+/-- A consensus protocol packaged for FLP certification. -/
 structure ImpossibilityProtocol where
-  State : Type u
-  Value : Type v
-  Event : Type w
-  Party : Type x
-  model : Model State Value Event Party
-  assumptions : Assumptions model
-  premises : ImpossibilityPremises model
+  Proc : Type
+  Msg : Type
+  St : Type
+  [decProc : DecidableEq Proc]
+  [decMsg : DecidableEq Msg]
+  [finProc : Fintype Proc]
+  [countMsg : Countable Msg]
+  protocol : Async.Protocol Proc Msg St
+  twoProcs : ∃ p q : Proc, p ≠ q
+  agreement : Async.Agreement protocol
+  validity : Async.Validity protocol
 
-/-! ## Certified Bundle Extractors -/
+attribute [instance] ImpossibilityProtocol.decProc ImpossibilityProtocol.decMsg
+  ImpossibilityProtocol.finProc ImpossibilityProtocol.countMsg
 
-/-- Extract the FLP lower-bound theorem from a certified protocol bundle. -/
-theorem lower_bound_of_protocol (P : LowerBoundProtocol) :
-    ∃ run, P.premises.FairRun run ∧ ∀ n, P.premises.Uncommitted (run n) :=
-  lower_bound_of_assumptions P.assumptions P.premises
+/-- The FLP non-termination witness: an admissible run from an initial
+configuration in which no process ever decides. -/
+def NonDecidingRun (P : ImpossibilityProtocol) : Prop :=
+  ∃ r : Async.Run P.protocol, (∃ I, r.cfg 0 = Async.initCfg P.protocol I) ∧
+    r.Admissible ∧ ∀ k v, ¬ Async.Decided P.protocol (r.cfg k) v
 
-/-- Extract the full FLP impossibility theorem from a full protocol bundle. -/
+/-- FLP impossibility for a certified protocol bundle. -/
 theorem impossibility_of_protocol (P : ImpossibilityProtocol) :
-    ¬ TerminatesOnAllFairRuns P.model P.premises.FairRun :=
-  impossibility_of_assumptions P.assumptions P.premises
+    ¬ Async.Termination P.protocol :=
+  Async.flp_impossibility P.agreement P.validity P.twoProcs
 
-/-- Runtime-style certificate object for downstream APIs. -/
-structure LowerBoundCertificate (P : LowerBoundProtocol) where
-  run : Nat → P.State
-  fair : P.premises.FairRun run
-  uncommitted : ∀ n, P.premises.Uncommitted (run n)
-
-/-- Materialize a certificate witness from a certified protocol bundle. -/
-theorem certify (P : LowerBoundProtocol) : Nonempty (LowerBoundCertificate P) := by
-  classical
-  let hLower := lower_bound_of_protocol P
-  refine ⟨⟨Classical.choose hLower, ?_, ?_⟩⟩
-  · exact (Classical.choose_spec hLower).1
-  · exact (Classical.choose_spec hLower).2
-
-/-- FLP core assumptions are always validated for a certified protocol. -/
-theorem core_assumptions_all_passed (P : LowerBoundProtocol) :
-    (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
-
-/-- FLP core assumptions are always validated for a certified full protocol. -/
-theorem core_assumptions_all_passed_impossibility (P : ImpossibilityProtocol) :
-    (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
+/-- FLP lower bound: a certified protocol has an admissible non-deciding run. -/
+theorem lower_bound_of_protocol (P : ImpossibilityProtocol) : NonDecidingRun P :=
+  Async.flp_nondeciding_run P.agreement P.validity P.twoProcs
 
 end FLP
 end Distributed

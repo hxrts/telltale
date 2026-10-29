@@ -396,7 +396,7 @@ theorem buffers_typed_enqueue {G : GEnv} {D : DEnv} {bufs : Buffers}
         have hi' : i < (lookupBuf bufs a).length + 1 := by
           have hi' := hi
           simp [List.length_append] at hi'
-          exact hi'
+          omega
 /- ## Structured Block 6 -/
         exact Nat.le_of_lt_succ hi'
       have hEq : i = (lookupBuf bufs a).length := Nat.le_antisymm hLe' hLe

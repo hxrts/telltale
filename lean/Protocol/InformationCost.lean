@@ -272,11 +272,32 @@ theorem branch_projection_map_is_constant_of_is_blind_comm
   exact branch_projection_map_is_constant_of_comm_blind_for hcomm hns hnr hne
 
 /-! ## Blindness Cost Normalization -/
-/-- Information cost of blind observation is zero by definition. -/
-def blindObservationCost : ℝ := 0
+/-- Observation cost of a projection: mutual information between the branch
+    label and the observer's view under the deterministic projection kernel. -/
+def observationCost {L T : Type} [Fintype L] [Fintype T] [DecidableEq T] [EntropyAPI.Model]
+    (p : ProjectionMap L T) (labelDist : L → ℝ) : ℝ :=
+  mutualInfo (fun lt : L × T => if p.proj lt.1 = lt.2 then labelDist lt.1 else 0)
 
-/-- Blind-observation cost simplifies to zero. -/
-theorem blind_observation_cost_eq_zero : blindObservationCost = 0 := rfl
+/-- Observation cost of a non-participant `role` watching a communication's branch
+    choice through a finite observable `obs` of its projected local type. -/
+def blindObservationCost {T : Type} [Fintype T] [DecidableEq T] [EntropyAPI.Model]
+    (branches : List (Label × GlobalType)) (role : String) (obs : LocalTypeR → T)
+    (labelDist : Fin branches.length → ℝ) : ℝ :=
+  observationCost ⟨fun i => obs ((branchProjectionMap branches role).proj i)⟩ labelDist
+
+/-- A blind communication reveals no information to a non-participant: its
+    observation cost is zero for every label distribution and finite observable. -/
+theorem blind_observation_cost_eq_zero {T : Type} [Fintype T] [DecidableEq T]
+    [EntropyAPI.Laws] {sender receiver role : String} {branches : List (Label × GlobalType)}
+    (hblind : isBlind (GlobalType.comm sender receiver branches) = true)
+    (hns : role ≠ sender) (hnr : role ≠ receiver) (hne : branches ≠ [])
+    (obs : LocalTypeR → T) (labelDist : Fin branches.length → ℝ)
+    (h_nn : ∀ l, 0 ≤ labelDist l) (h_sum : ∑ l, labelDist l = 1) :
+    blindObservationCost branches role obs labelDist = 0 := by
+  -- Blindness makes the projection constant, hence so is any observable of it.
+  obtain ⟨t, ht⟩ := branch_projection_map_is_constant_of_is_blind_comm hblind hns hnr hne
+  exact mutual_info_zero_of_constant_projection _ ⟨obs t, fun i => by simp [ht]⟩
+    labelDist h_nn h_sum
 
 /-- Main bridge theorem from syntactic blindness to invariant local expectation. -/
 theorem is_blind_preserves_local_information
@@ -346,7 +367,7 @@ structure DegenerateMutualInfoBoundaryWitness
 theorem reverse_exactness_fails_of_boundary_witness
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
     (w : DegenerateMutualInfoBoundaryWitness L O) :
-    ¬ (∀ labelDist joint, mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint) := by
+    ¬ (∀ (labelDist : L → ℝ) (joint : L × O → ℝ), mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint) := by
   intro hAll
   exact w.not_erasure_kernel (hAll w.labelDist w.joint w.mi_zero)
 
@@ -369,7 +390,7 @@ structure MutualInfoReverseAssumptionCounterexample
 theorem reverse_exactness_fails_of_assumption_counterexample
     {L O : Type} [Fintype L] [Fintype O] [DecidableEq O] [EntropyAPI.Laws]
     (cex : MutualInfoReverseAssumptionCounterexample L O) :
-    ¬ (∀ labelDist joint, mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint) :=
+    ¬ (∀ (labelDist : L → ℝ) (joint : L × O → ℝ), mutualInfo joint = 0 → EntropyAPI.IsErasureKernel labelDist joint) :=
   reverse_exactness_fails_of_boundary_witness cex.witness
 
 /-- Oracle packaging: each reverse-direction assumption has an explicit witness. -/
@@ -386,7 +407,7 @@ theorem mutual_info_reverse_assumption_sharpness
     ∀ a : MutualInfoReverseAssumption,
       ∃ cex : MutualInfoReverseAssumptionCounterexample L O,
         cex.droppedAssumption = a ∧
-          ¬ (∀ labelDist joint, mutualInfo joint = 0 →
+          ¬ (∀ (labelDist : L → ℝ) (joint : L × O → ℝ), mutualInfo joint = 0 →
               EntropyAPI.IsErasureKernel labelDist joint) := by
   intro a
   rcases hIndep a with ⟨cex, hEq⟩

@@ -56,11 +56,11 @@ def effects_refines_schedStep : Prop :=
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : ProtocolMachineState ι γ π ε ν, schedule_confluence st ∧ cooperative_refines_concurrent st
+    ∀ st : ProtocolMachineState ι γ π ε ν, schedule_deterministic st ∧ cooperative_refines_concurrent st
 
 theorem effects_refines_sched_step_holds : effects_refines_schedStep := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
-    ⟨schedule_confluence_holds st, cooperative_refines_concurrent_holds st⟩
+    ⟨schedule_deterministic_holds st, cooperative_refines_concurrent_holds st⟩
 
 def schedStep_refines_failure : Prop :=
   -- Scheduler liveness bridges to the failure-aware layer: every runnable

@@ -1,10 +1,10 @@
-import Distributed.Families.ByzantineSafety.Core.Base
+import Distributed.Families.ByzantineSafety.Core.Counterexamples
 
 set_option autoImplicit false
 
 /-! # Distributed.Families.ByzantineSafety.Core.Extensions
 
-Counterexample packaging, specialization bridges, validator links, and
+Conflict-witness interfaces, specialization bridges, validator links, and
 admission/diagnostic theorems layered on top of the Byzantine-safety core base.
 -/
 
@@ -22,30 +22,38 @@ namespace ByzantineSafety
 
 universe u v w x
 
-/-! ## Counterexample and Sharpness Shells -/
+/-! ## Conflict-Witness Interfaces
 
-/-- Counterexample shell: dropping quorum-style obligations can admit conflicts. -/
-structure NoQuorumCounterexample
+These structures are interfaces that package a caller-supplied
+`SafetyContradictionWitness`, tagged by the assumption class a client intends
+to blame. They prove nothing about existence. In particular, by
+`safetyAssumptions_exclude_contradiction`, no witness exists for any model
+that also carries a `SafetyAssumptions` record, so a "dropped label" premise
+cannot be combined with a witness non-vacuously. A concrete model admitting a
+witness is `unconstrainedConflictModel` in `Core.Counterexamples`.
+-/
+
+/-- Witness interface tagged "quorum obligations dropped"; packages a supplied witness. -/
+structure NoQuorumConflictWitness
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
   conflict : SafetyContradictionWitness M
 
-/-- Counterexample shell: dropping auth/evidence validity can admit conflicts. -/
-structure InvalidAuthCounterexample
-    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
-    (M : Model State Decision Certificate Obs) where
-  conflict : SafetyContradictionWitness M
-  invalidEvidence : ByzantineEvidence
-  evidenceInvalid : ¬ EvidenceValid invalidEvidence
-
-/-- Counterexample shell: dropping threshold/budget assumptions can admit conflicts. -/
-structure ThresholdBudgetCounterexample
+/-- Witness interface tagged "auth/evidence validity dropped"; packages a supplied
+witness. (`¬ EvidenceValid` is unsatisfiable, see `evidenceValid_always`.) -/
+structure InvalidAuthConflictWitness
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
   conflict : SafetyContradictionWitness M
 
-/-- Counterexample shell: primitive mismatch can admit conflicting finalizations. -/
-structure PrimitiveMismatchCounterexample
+/-- Witness interface tagged "threshold/budget dropped"; packages a supplied witness. -/
+structure ThresholdBudgetConflictWitness
+    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
+    (M : Model State Decision Certificate Obs) where
+  conflict : SafetyContradictionWitness M
+
+/-- Witness interface tagged "primitive mismatch"; packages a supplied witness. -/
+structure PrimitiveMismatchConflictWitness
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
   conflict : SafetyContradictionWitness M
@@ -60,99 +68,39 @@ theorem contradiction_witness_refutes_characterization
   intro hChar
   exact (hChar _ _ _ _ _ w.leftCertified w.rightCertified) w.conflicts
 
-/-! ## Counterexample Constructors by Dropped Assumption Class -/
+/-! ### Interface Refuters
 
-/-- Dropping quorum/intersection obligations admits a packaged contradiction witness. -/
-def noQuorumCounterexample_of_droppedAssumption
+Each refuter only forwards the packaged witness to
+`contradiction_witness_refutes_characterization`.
+-/
+
+/-- A packaged no-quorum witness refutes characterization. -/
+theorem noQuorumConflictWitness_refutes
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (_hDrop : ¬ H.quorumIntersectionWitnessed)
-    (w : SafetyContradictionWitness M) :
-    NoQuorumCounterexample M := by
-  -- The dropped assumption class is tracked by the theorem premise; the witness is canonical.
-  exact { conflict := w }
+    (cex : NoQuorumConflictWitness M) : ¬ CharacterizationCondition M :=
+  contradiction_witness_refutes_characterization cex.conflict
 
-/-- Dropping auth/evidence validity obligations admits a packaged contradiction witness. -/
-def invalidAuthCounterexample_of_droppedAssumption
+/-- A packaged invalid-auth witness refutes characterization. -/
+theorem invalidAuthConflictWitness_refutes
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (_hDrop : ¬ H.evidencePrimitiveConsistent ∨ ¬ H.timingAuthCompatible)
-    (w : SafetyContradictionWitness M)
-    (invalidEvidence : ByzantineEvidence)
-    (hInvalid : ¬ EvidenceValid invalidEvidence) :
-    InvalidAuthCounterexample M := by
-  -- Keep invalid-evidence payload explicit so converse theorems can reuse the same witness.
-  exact
-    { conflict := w
-    , invalidEvidence := invalidEvidence
-    , evidenceInvalid := hInvalid
-    }
+    (cex : InvalidAuthConflictWitness M) : ¬ CharacterizationCondition M :=
+  contradiction_witness_refutes_characterization cex.conflict
 
-/-! ### Threshold and Primitive Constructors -/
-
-/-- Dropping threshold/adversarial-budget obligations admits a contradiction witness. -/
-def thresholdBudgetCounterexample_of_droppedAssumption
+/-- A packaged threshold-budget witness refutes characterization. -/
+theorem thresholdBudgetConflictWitness_refutes
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (_hDrop : ¬ H.adversarialBudgetBounded)
-    (w : SafetyContradictionWitness M) :
-    ThresholdBudgetCounterexample M := by
-  -- The dropped-threshold class is tracked in hypotheses; the witness is reused directly.
-  exact { conflict := w }
+    (cex : ThresholdBudgetConflictWitness M) : ¬ CharacterizationCondition M :=
+  contradiction_witness_refutes_characterization cex.conflict
 
-/-- Dropping primitive-consistency obligations admits a contradiction witness. -/
-def primitiveMismatchCounterexample_of_droppedAssumption
+/-- A packaged primitive-mismatch witness refutes characterization. -/
+theorem primitiveMismatchConflictWitness_refutes
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (_hDrop :
-      ¬ H.conflictExclusionPrimitiveConsistent ∨
-        ¬ H.finalizationWitnessPrimitiveConsistent)
-    (w : SafetyContradictionWitness M) :
-    PrimitiveMismatchCounterexample M := by
-  -- Primitive mismatch is represented at the assumption layer, with witness-level contradiction.
-  exact { conflict := w }
-
-/-! ### Minimality Refuters -/
-
-/-- Minimality form: every no-quorum counterexample refutes characterization. -/
-theorem no_quorum_counterexample_minimal
-    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
-    {M : Model State Decision Certificate Obs}
-    (cex : NoQuorumCounterexample M) :
-    ¬ CharacterizationCondition M := by
-  -- Any packaged contradiction witness immediately refutes characterization.
-  exact contradiction_witness_refutes_characterization cex.conflict
-
-/-- Minimality form: every invalid-auth counterexample refutes characterization. -/
-theorem invalid_auth_counterexample_minimal
-    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
-    {M : Model State Decision Certificate Obs}
-    (cex : InvalidAuthCounterexample M) :
-    ¬ CharacterizationCondition M := by
-  -- The contradiction witness, not the payload shape, is the minimal refuter.
-  exact contradiction_witness_refutes_characterization cex.conflict
-
-/-- Minimality form: every threshold-budget counterexample refutes characterization. -/
-theorem threshold_budget_counterexample_minimal
-    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
-    {M : Model State Decision Certificate Obs}
-    (cex : ThresholdBudgetCounterexample M) :
-    ¬ CharacterizationCondition M := by
-  -- The contradiction witness is sufficient to refute characterization.
-  exact contradiction_witness_refutes_characterization cex.conflict
-
-/-- Minimality form: every primitive-mismatch counterexample refutes characterization. -/
-theorem primitive_mismatch_counterexample_minimal
-    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
-    {M : Model State Decision Certificate Obs}
-    (cex : PrimitiveMismatchCounterexample M) :
-    ¬ CharacterizationCondition M := by
-  -- The contradiction witness is sufficient to refute characterization.
-  exact contradiction_witness_refutes_characterization cex.conflict
+    (cex : PrimitiveMismatchConflictWitness M) : ¬ CharacterizationCondition M :=
+  contradiction_witness_refutes_characterization cex.conflict
 
 /-! ## Weight-Based and Coupled Specializations -/
 
@@ -297,16 +245,16 @@ theorem byzantine_assumptions_for_all_passed_of_additive_checks
 /-- Bundle exposing BFT/Nakamoto/hybrid specialization theorems in one object. -/
 structure FamilySpecializationBundle where
   bftSafety :
-    ∀ (P : Distributed.QuorumGeometry.SafetyProtocol),
+    ∀ (P : Distributed.QuorumGeometry.SafetyProtocol.{u, v, w, x}),
       ByzantineSafety (modelOfQuorumGeometry P.model)
   bftCharacterization :
-    ∀ (P : Distributed.QuorumGeometry.SafetyProtocol),
+    ∀ (P : Distributed.QuorumGeometry.SafetyProtocol.{u, v, w, x}),
       CharacterizationCondition (modelOfQuorumGeometry P.model)
   nakamotoSafety :
-    ∀ (P : Distributed.Nakamoto.SecurityProtocol),
+    ∀ (P : Distributed.Nakamoto.SecurityProtocol.{u, v, w}),
       ByzantineSafety (modelOfNakamoto P.model)
   nakamotoCharacterization :
-    ∀ (P : Distributed.Nakamoto.SecurityProtocol),
+    ∀ (P : Distributed.Nakamoto.SecurityProtocol.{u, v, w}),
       CharacterizationCondition (modelOfNakamoto P.model)
   hybridSafety :
     ∀ {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x},

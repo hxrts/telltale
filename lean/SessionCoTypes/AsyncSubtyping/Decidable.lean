@@ -114,7 +114,7 @@ Uses bounded unfolding to handle mu-bindings. Returns:
 - accept: both end with empty buffer
 - continue succs: successors to explore
 - reject: no valid step (type mismatch or stuck) -/
-def checkAsyncStep (unfoldBound : Nat) (t : AsyncTriple) : StepResult :=
+noncomputable def checkAsyncStep (unfoldBound : Nat) (t : AsyncTriple) : StepResult :=
   let S := unfoldN unfoldBound t.sub
   let T := unfoldN unfoldBound t.sup
   let buf := t.buffer
@@ -226,7 +226,7 @@ inductive ExploreResult where
   deriving Repr, DecidableEq
 
 /-- One step of exploration (simplified: just decrements fuel). -/
-def exploreStep (unfoldBound : Nat) (st : ExploreState) : ExploreState × Option ExploreResult :=
+noncomputable def exploreStep (unfoldBound : Nat) (st : ExploreState) : ExploreState × Option ExploreResult :=
   match st.worklist with
   | [] => (st, some .accepted)
   | (idx, t) :: rest =>
@@ -257,7 +257,7 @@ def exploreStep (unfoldBound : Nat) (st : ExploreState) : ExploreState × Option
 Returns accepted if all reachable triples reach base case.
 Returns rejected if any triple has no valid step.
 Returns outOfFuel if exploration exceeds fuel. -/
-def explore (unfoldBound : Nat) (fuel : Nat) (st : ExploreState) : ExploreResult :=
+noncomputable def explore (unfoldBound : Nat) (fuel : Nat) (st : ExploreState) : ExploreResult :=
   match fuel with
   | 0 => .outOfFuel
   | fuel' + 1 =>
@@ -270,7 +270,7 @@ def explore (unfoldBound : Nat) (fuel : Nat) (st : ExploreState) : ExploreResult
 /-- Check async subtyping with given fuel and unfold bound.
 
 For regular types, sufficient fuel guarantees termination with correct answer. -/
-def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := by
+noncomputable def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := by
   classical
   if h : S ≤ₐ T then
     exact .accepted
@@ -281,7 +281,7 @@ def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := 
     | _ => exact .outOfFuel
 
 /-- Decision function: returns true if subtyping holds (with given bounds). -/
-def isAsyncSubtype (S T : LocalTypeC) (unfoldBound fuel : Nat) : Bool :=
+noncomputable def isAsyncSubtype (S T : LocalTypeC) (unfoldBound fuel : Nat) : Bool :=
   checkAsync S T unfoldBound fuel == .accepted
 
 /-! ## Fuel Bound
@@ -363,7 +363,7 @@ theorem check_async_complete {S T : LocalTypeC}
 Combine soundness and completeness for the decidable instance. -/
 
 /-- Computable decision for async subtyping on regular types. -/
-def decideAsyncSubtype (S T : LocalTypeC)
+noncomputable def decideAsyncSubtype (S T : LocalTypeC)
     (hS : Regular S) (hT : Regular T) : Decidable (S ≤ₐ T) := by
   classical
   let ub := sufficientUnfoldBound S T
@@ -394,7 +394,7 @@ The constructive decision procedure is correct. -/
 
 /-- Main result: async subtyping is decidable for regular types,
     with a constructive decision procedure. -/
-def async_subtype_decidable_constructive
+noncomputable def async_subtype_decidable_constructive
     (S T : LocalTypeC)
     (hS : Regular S) (hT : Regular T) :
     Decidable (S ≤ₐ T) :=

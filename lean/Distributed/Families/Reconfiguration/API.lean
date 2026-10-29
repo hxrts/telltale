@@ -4,41 +4,39 @@ set_option autoImplicit false
 
 /-! # Distributed.Families.Reconfiguration.API
 
-High-level API for automatic reconfiguration certification.
+High-level API for reconfiguration certification over the joint-consensus model.
 -/
 
 namespace Distributed
 namespace Reconfiguration
 
-universe u v w
+universe v w x
 
 /-- Certified protocol package for reconfiguration guarantees. -/
 structure ReconfigurationProtocol where
-  State : Type u
   Decision : Type v
   Certificate : Type w
-  model : Model State Decision Certificate
+  Party : Type x
+  [decEq : DecidableEq Party]
+  model : Model Decision Certificate Party
   assumptions : Assumptions model
 
-/-- Extract no-split-brain theorem from a certified protocol bundle. -/
+attribute [instance] ReconfigurationProtocol.decEq
+
+/-- No split brain for a certified protocol bundle. -/
 theorem no_split_brain_of_protocol (P : ReconfigurationProtocol) :
     NoSplitBrainAcrossReconfiguration P.model :=
   no_split_brain_of_assumptions P.assumptions
 
-/-- Extract safe-handoff theorem from a certified protocol bundle. -/
+/-- Safe handoff for a certified protocol bundle. -/
 theorem safe_handoff_of_protocol (P : ReconfigurationProtocol) :
     SafeHandoff P.model :=
-  safe_handoff_of_assumptions P.assumptions
+  safe_handoff P.model
 
-/-- Extract liveness-preserved theorem from a certified protocol bundle. -/
+/-- Liveness preservation for a certified protocol bundle. -/
 theorem liveness_preserved_of_protocol (P : ReconfigurationProtocol) :
-    LivenessPreserved P.model :=
+    LivenessPreserved P.model P.assumptions.byzantine :=
   liveness_preserved_of_assumptions P.assumptions
-
-/-- Core assumptions are always validated for a certified protocol. -/
-theorem core_assumptions_all_passed (P : ReconfigurationProtocol) :
-    (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
 
 end Reconfiguration
 end Distributed

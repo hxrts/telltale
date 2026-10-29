@@ -28,15 +28,6 @@ section
 
 -- Simulation Properties
 
-/-- Extract the matched label from a `find?` with label predicate. -/
-private theorem find_label_eq {α : Type} {lbl lbl' : Label} {xs : List (Label × α)} {v : α}
-    (h : xs.find? (fun b => b.1 == lbl) = some (lbl', v)) : lbl' = lbl := by
-  have hPred : (lbl' == lbl) := (List.find?_eq_some_iff_append (xs := xs)
-    (p := fun b => b.1 == lbl) (b := (lbl', v))).1 h |>.1
-  have hPred' : (lbl' == lbl) = true := by
-    simpa using hPred
-  exact (beq_iff_eq).1 hPred'
-
 /-- If stepBaseDecide returns some, then StepBase holds. -/
 theorem step_base_decide_sound {C C' : Config} (h : stepBaseDecide C = some C') :
     StepBase C C' := by
@@ -306,7 +297,7 @@ theorem step_decide_sound {C C' : Config} (h : stepDecide C = some C') :
                   have : False := by
                     have hnone : stepDecide C = none := by
                       simp [stepDecide, stepDecideAux, hProc, hPskip, hQskip, hsub', hsubR']
-                      cases hstep.symm.trans hnone
+                    cases hstep.symm.trans hnone
                   exact this.elim
   -- Contextual Soundness: base send case
   | send k x =>
@@ -339,11 +330,15 @@ theorem step_decide_sound {C C' : Config} (h : stepDecide C = some C') :
         simpa [stepDecide, stepDecideAux, hProc] using hstep
       exact Step.base (step_base_decide_sound hBase)
 
-/-- If Step holds for decidable cases, stepDecide returns some (completeness for decidable subset). -/
-theorem step_decide_complete_base {C C' : Config} (_ : StepBase C C')
-    (_ : stepBaseDecide C = some C') :
-    True := by
-  trivial
+/-- Completeness of the base decision procedure: every `StepBase` transition is
+    found by `stepBaseDecide`, which returns exactly that successor. -/
+theorem step_decide_complete_base {C C' : Config} (h : StepBase C C') :
+    stepBaseDecide C = some C' := by
+  cases h with
+  | par_skip_right hProc =>
+      rename_i P _ _
+      cases P <;> simp_all [stepBaseDecide]
+  | _ => simp_all [stepBaseDecide]
 
 -- Example: Running Ping-Pong
 

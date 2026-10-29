@@ -42,7 +42,7 @@ theorem subject_reduction {n : SessionId}
         { proc := .send k x, store := store, bufs := bufs, G := G, D := D, nextSid := n }
       have hStep : StepBase C (sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L) :=
         StepBase.send rfl hk hx hG
-      simpa [C] using (Step.base hStep)
+      simpa [C, sendStep, appendD] using (Step.base hStep)
   -- Subject Reduction Case: Recv
   | recv hk hG hEdge hBuf hv hTrace hGout hDout hSout hStoreOut hBufsOut =>
       rename_i G D Ssh Sown store bufs k x e source T L v vs recvEdge G' D' Sown' store' bufs'
@@ -60,7 +60,7 @@ theorem subject_reduction {n : SessionId}
         { proc := .select k ℓ, store := store, bufs := bufs, G := G, D := D, nextSid := n }
       have hStep : StepBase C (sendStep C e { sid := e.sid, sender := e.role, receiver := target } (.string ℓ) .string L) :=
         StepBase.select rfl hk hG hFind
-      simpa [C] using (Step.base hStep)
+      simpa [C, sendStep, appendD] using (Step.base hStep)
   -- Subject Reduction Case: Branch
   | branch hk hG hEdge hBuf hFindP hFindT hTrace hGout hDout hBufsOut =>
       rename_i G D Ssh Sown store bufs k procs e source bs ℓ P L vs branchEdge G' D' bufs'
@@ -79,7 +79,7 @@ theorem subject_reduction {n : SessionId}
                    D := updateD D { sid := e.sid, sender := source, receiver := e.role } (lookupD D { sid := e.sid, sender := source, receiver := e.role }).tail } :=
 /- ## Structured Block 2 -/
         StepBase.branch rfl hk hG hBuf hFindP hFindT hDeq
-      simpa [C] using (Step.base hStep)
+      simpa [C, sendStep, appendD] using (Step.base hStep)
   -- Subject Reduction Case: Assign
   | assign hv hS hStore =>
       rename_i G D Ssh Sown store bufs x v T S' store'

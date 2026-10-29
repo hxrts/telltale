@@ -543,7 +543,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | File | Lines | Description |
 |------|-------|-------------|
 | Preservation.lean | 1,933 | `preservation_typed`, `progress_*`, `subject_reduction` |
-| Determinism.lean | 359 | `stepBase_det`, `diamond_independent`, `session_isolation` |
+| Determinism.lean | 359 | `step_base_deterministic_strong`, `session_isolation` (no diamond: `StepBase` acts only on the head process) |
 | DeadlockFreedom.lean | 7 | Re-export wrapper for DeadlockFreedomCore and DeadlockFreedomReachability |
 | DeadlockFreedomCore.lean | 291 | `Guarded`, `ReachesComm`, core deadlock freedom definitions |
 | DeadlockFreedomReachability.lean | 380 | `deadlock_free`, `not_stuck`, reachability-based proofs |
@@ -578,7 +578,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
-| CrashTolerance.lean | 225 | `CommGraph`, `CrashTolerant`, `Critical`, crash tolerance predicates |
+| CrashToleranceDrain.lean | 284 | `removeCrashed`, `DeliverStep`, `SessionCanComplete`, `survivors_can_complete`, `drainMeasure` |
+| CrashToleranceCore.lean | 368 | `CommGraph`, `CrashTolerant`, `Critical`, `reachClosure`, `crashTolerantDec` (sound + complete) |
+| CrashTolerance.lean | 377 | site-to-role crash projection, `ProtocolMachineCrashTolerant`, `f_step_preserves_tolerance` |
 | Noninterference.lean | 8 | Re-export wrapper for Noninterference* modules |
 | NoninterferenceCore.lean | 471 | `CEquiv`, `BlindTo`, core noninterference definitions |
 | NoninterferenceExtensions.lean | 178 | `blind_step_preserves_CEquiv` and extended noninterference proofs |
@@ -687,7 +689,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 |------|-------|-------------|
 | Resources/ResourceModel.lean | 179 | Resource model interface and profiles |
 | Resources/SessionRA.lean | 88 | Session resource algebra with auth/frag |
-| Resources/BufferRA.lean | 317 | Message buffer resource algebra with auth/frag |
+| Resources/BufferRA.lean | 435 | Edge-buffer ghost map (`ghost_map` auth/frag); shared ⊂ reliable (FIFO, lossless, duplicate-free) ⊂ unreliable delivery models |
 | Resources/Arena.lean | 1,379 | Memory arena with pointsto, allocation, and ownership tracking |
 | Resources/ProfilesV1.lean | 42 | V1 resource profile definitions |
 
@@ -698,10 +700,10 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | ProgramLogic/LanguageInstance.lean | 93 | Iris `Language`/`EctxLanguage` instances |
 | ProgramLogic/SessionWP.lean | 122 | Session-level WP rules |
 | ProgramLogic/GhostState.lean | 281 | Ghost state management (session maps, buffer maps) |
-| ProgramLogic/CodeLoading.lean | 99 | Code loading and program verification |
+| ProgramLogic/CodeLoading.lean | 153 | Code loading with full-image content ids/signatures (`code_image_id_injective`) and `hotSwap_preserves_coherent` |
 | ProgramLogic/ProofInterfaces.lean | 91 | Proof interface typeclasses |
 | ProgramLogic/WPPair.lean | 131 | WP pairing for send/recv duality |
-| ProgramLogic/WPPipeline.lean | 25 | WP pipeline composition |
+| ProgramLogic/WPPipeline.lean | 89 | Sequential (continuation-style) WP pipeline composition with bind rule `wp_seq_compose` |
 | ProgramLogic/FinalizationWP.lean | 39 | Finalization and cleanup WP rules |
 
 ### Invariants and Transport
@@ -722,8 +724,8 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
 | Proofs/ProtocolMachine/MonitorContracts.lean | 23 | Proof-only monitor contract predicates moved out of `Runtime/ProtocolMachine/Runtime/Monitor.lean` |
 | Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |
-| Proofs/ProtocolMachine/SchedulerContracts.lean | 91 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
-| Proofs/ProtocolMachine/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
+| Proofs/ProtocolMachine/SchedulerContracts.lean | 94 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
+| Proofs/ProtocolMachine/Scheduler.lean | 326 | Scheduler proofs: selection determinism, independent-step confluence (`LocalStepSystem.independent_steps_commute`), single-lane/policy lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean | 116 | Outstanding-effect admissibility, late-result rejection, and observer / `EffectBisim` lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean | 171 | Semantic-handoff theorems and delegation / envelope bridge lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean | 185 | Authoritative-read/publication theorems and observer-projection consequences |
@@ -796,8 +798,9 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
 | Proofs/Progress.lean | 7 | Re-export wrapper for Progress* modules |
 | Proofs/ProgressCore.lean | 395 | `CoherentVMState`, `ProgressVMState`, core progress definitions |
-| Proofs/ProgressTheorems.lean | 233 | `protocol_machine_progress`, instruction enablement theorems |
-| Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API with required progress hypothesis and explicit scheduler/fairness linkage |
+| Proofs/ProgressTheorems.lean | 252 | `protocol_machine_progress` (pending output ⇒ enabled instruction), fair termination from one-step ranking obligations |
+| Proofs/FairTermination.lean | 144 | Generic k-fair termination: `FairRanking` one-step obligations ⇒ `k * measure` completion bound |
+| Proofs/ProgressApi.lean | 181 | Bundle-oriented liveness API with required progress hypothesis and explicit scheduler/fairness linkage |
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
 | Proofs/ReconfigurationObserver.lean | 253 | Canonical proof-facing surface for region layering, linking/delegation harmony, observer equivalence, and replay/cross-target observer alignment |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |

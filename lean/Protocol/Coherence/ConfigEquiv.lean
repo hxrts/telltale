@@ -118,10 +118,8 @@ theorem config_equiv_symm {C₁ C₂ : CoherenceConfig} :
   intro h
   rcases h with ⟨σ, hG, hD⟩
   refine ⟨SessionIso.symm σ, ?_, ?_⟩
-  · simpa [SessionIso.symm, SessionIso.toRenaming] using
-      (config_equiv_symm_g (σ:=σ) (C₁:=C₁) (C₂:=C₂) hG)
-  · simpa [SessionIso.symm, SessionIso.toRenaming] using
-      (config_equiv_symm_d (σ:=σ) (C₁:=C₁) (C₂:=C₂) hD)
+  · exact config_equiv_symm_g (σ:=σ) (C₁:=C₁) (C₂:=C₂) hG
+  · exact config_equiv_symm_d (σ:=σ) (C₁:=C₁) (C₂:=C₂) hD
 
 /-! ## Transitivity Helpers -/
 
@@ -153,7 +151,7 @@ private theorem config_equiv_trans_g
           (SessionIso.toRenaming σ₂) (SessionIso.toRenaming σ₁))) := by
     -- Collapse the two-step map on options.
     simpa [map_rename_local_type_comp] using hComp
-  simpa [rename_endpoint_comp, SessionIso.comp, SessionIso.toRenaming] using hMap
+  exact hMap
 
 /-! ## Transitivity Helper on D Lookups -/
 
@@ -185,7 +183,7 @@ private theorem config_equiv_trans_d
           (SessionIso.toRenaming σ₂) (SessionIso.toRenaming σ₁))) := by
     -- Collapse the two-step map on traces.
     simpa [map_rename_val_type_comp] using hComp
-  simpa [rename_edge_comp, SessionIso.comp, SessionIso.toRenaming] using hMap
+  exact hMap
 
 /-! ## Transitivity and Equivalence Packaging -/
 

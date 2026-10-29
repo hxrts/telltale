@@ -80,11 +80,12 @@ theorem mem_trans_branches_of_mem (branches : List (Label × GlobalType))
   | cons hd tl ih =>
     cases hmem with
     | head =>
-      simp only [transBranches, List.mem_cons]
+      simp only [transBranches, Choreography.Projection.Trans.transBranches, List.mem_cons]
       left
       trivial
     | tail _ htl =>
-      unfold transBranches
+      obtain ⟨l0, g0⟩ := hd
+      simp only [transBranches, Choreography.Projection.Trans.transBranches, List.mem_cons]
       right
       exact ih htl
 

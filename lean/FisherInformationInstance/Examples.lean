@@ -34,7 +34,7 @@ def categorical (k : Nat) [NeZero k] : Family :=
     (fun ω i => if (ω : Nat) = (i : Nat) then 1 else 0)
 
 /-- Categorical model over `k` outcomes. -/
-def categoricalModel (k : Nat) [NeZero k] : Model :=
+noncomputable def categoricalModel (k : Nat) [NeZero k] : Model :=
   RealConcrete.finiteDiscreteModel k (k - 1)
     (fun ω i => if (ω : Nat) = (i : Nat) then 1 else 0)
 
@@ -45,7 +45,7 @@ def binomial (trials : Nat) : Family :=
     (fun ω _ => (ω : Nat))
 
 /-- Binomial model with one natural parameter. -/
-def binomialModel (trials : Nat) : Model :=
+noncomputable def binomialModel (trials : Nat) : Model :=
   letI : NeZero (trials + 1) := ⟨Nat.succ_ne_zero trials⟩
   RealConcrete.finiteDiscreteModel (trials + 1) 1
     (fun ω _ => (ω : Nat))
@@ -56,7 +56,7 @@ def truncatedPoisson (cap : Nat) [NeZero cap] : Family :=
     (fun ω _ => (ω : Nat))
 
 /-- Truncated Poisson-style model. -/
-def truncatedPoissonModel (cap : Nat) [NeZero cap] : Model :=
+noncomputable def truncatedPoissonModel (cap : Nat) [NeZero cap] : Model :=
   RealConcrete.finiteDiscreteModel cap 1
     (fun ω _ => (ω : Nat))
 
@@ -65,7 +65,7 @@ def bayesianClassifier (classes : Nat) [NeZero classes] : Family :=
   categorical classes
 
 /-- Bayesian classifier model, represented by categorical logits. -/
-def bayesianClassifierModel (classes : Nat) [NeZero classes] : Model :=
+noncomputable def bayesianClassifierModel (classes : Nat) [NeZero classes] : Model :=
   categoricalModel classes
 
 /-! ## Example Checks -/
@@ -165,36 +165,36 @@ theorem bayesianClassifier_cramer_rao_check
 /-- Bernoulli empty-region volume check. -/
 theorem bernoulli_volume_empty :
     fisherVolume Fixtures.bernoulliModel (∅ : Set (naturalParameter bernoulli.d)) = 0 := by
-  -- The current API-level volume gives zero to empty regions.
-  rfl
+  -- The empty region has an empty coordinate preimage.
+  exact fisherVolume_zero_of_empty _
 
 /-- Categorical empty-region volume check. -/
 theorem categorical_volume_empty (k : Nat) [NeZero k] :
     fisherVolume (categoricalModel k)
       (∅ : Set (naturalParameter (categorical k).d)) = 0 := by
-  -- The current API-level volume gives zero to empty regions.
-  rfl
+  -- The empty region has an empty coordinate preimage.
+  exact fisherVolume_zero_of_empty _
 
 /-- Binomial empty-region volume check. -/
 theorem binomial_volume_empty (trials : Nat) :
     fisherVolume (binomialModel trials)
       (∅ : Set (naturalParameter (binomial trials).d)) = 0 := by
-  -- The current API-level volume gives zero to empty regions.
-  rfl
+  -- The empty region has an empty coordinate preimage.
+  exact fisherVolume_zero_of_empty _
 
 /-- Truncated Poisson empty-region volume check. -/
 theorem truncatedPoisson_volume_empty (cap : Nat) [NeZero cap] :
     fisherVolume (truncatedPoissonModel cap)
       (∅ : Set (naturalParameter (truncatedPoisson cap).d)) = 0 := by
-  -- The current API-level volume gives zero to empty regions.
-  rfl
+  -- The empty region has an empty coordinate preimage.
+  exact fisherVolume_zero_of_empty _
 
 /-- Bayesian classifier empty-region volume check. -/
 theorem bayesianClassifier_volume_empty (classes : Nat) [NeZero classes] :
     fisherVolume (bayesianClassifierModel classes)
       (∅ : Set (naturalParameter (bayesianClassifier classes).d)) = 0 := by
-  -- The current API-level volume gives zero to empty regions.
-  rfl
+  -- The empty region has an empty coordinate preimage.
+  exact fisherVolume_zero_of_empty _
 
 end Examples
 

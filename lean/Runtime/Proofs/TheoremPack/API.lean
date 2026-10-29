@@ -32,7 +32,7 @@ variable {ν : Type u} [VerificationModel ν]
 /-! ## Construction and Inventory Aliases -/
 
 /-- API alias: build theorem-pack artifacts from a profile space. -/
-abbrev mk
+noncomputable abbrev mk
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State} :
     ProtocolMachineTheoremPack (space := space) :=
@@ -246,7 +246,7 @@ def withSemanticObjectWitnesses
         ProtocolMachineInvariantSpace.withSemanticObjectWitnesses space.toProtocolMachineInvariantSpace w }
 
 /-- Composer API for liveness/distributed/classical/output-condition spaces. -/
-def composeProofSpaces
+noncomputable def composeProofSpaces
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (liveness? : Option (ProtocolMachineLivenessBundle store₀))
@@ -271,7 +271,7 @@ def composeProofSpaces
   | none => s₃
 
 /-- Composer API that additionally attaches semantic-object theorem surfaces. -/
-def composeProofSpacesWithSemanticObjects
+noncomputable def composeProofSpacesWithSemanticObjects
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State)
     (liveness? : Option (ProtocolMachineLivenessBundle store₀))

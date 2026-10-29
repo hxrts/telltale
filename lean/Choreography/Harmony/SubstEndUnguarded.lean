@@ -37,7 +37,8 @@ open SessionCoTypes.SubstCommBarendregt (isFreeIn isFreeInBranches substitute_no
 private theorem size_of_snd_lt_size_of_pair (hd : BranchR) :
     sizeOf hd.2.2 < sizeOf hd := by
   -- sizeOf (a, (b, c)) = 1 + sizeOf a + (1 + sizeOf b + sizeOf c)
-  show sizeOf hd.2.2 < 1 + sizeOf hd.1 + sizeOf hd.2
+  obtain ⟨a, b, c⟩ := hd
+  simp only [Prod.mk.sizeOf_spec]
   omega
 
 /-- sizeOf of element is less than sizeOf of cons list. -/
@@ -99,7 +100,7 @@ theorem is_free_in_subst_other (e : LocalTypeR) (v t : String) (repl : LocalType
           exact is_free_in_subst_other body v t repl hvt hfree
 termination_by sizeOf e
 
-/-! ## Free Variables in Branch Lists -/
+/- ## Free Variables in Branch Lists -/
 
 /-- Free variables in branches preserved through substitution. -/
 

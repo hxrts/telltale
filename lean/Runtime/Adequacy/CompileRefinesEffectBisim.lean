@@ -11,8 +11,10 @@ The Problem. Compile/refinement results are often consumed by extensional
 (observational) corollaries. We want those corollaries to reuse the coinductive
 bridge instead of re-proving observation equality ad hoc.
 
-Solution Structure. Keep `compile_refines` unchanged and add a bridge-style
-corollary parameterized by an effect observer and step relation.
+Solution Structure. A bridge-style corollary parameterized by an effect
+observer and step relation. It does not (and previously only pretended to)
+depend on `compile_refines`: the conclusion follows from bisimulation alone, so
+no compilation hypothesis is taken.
 -/
 
 set_option autoImplicit false
@@ -21,14 +23,11 @@ section
 
 open Runtime.Proofs.EffectBisim
 
-/-- Compile/refinement-adjacent corollary: once a comparison context is
-    established and states are effect-bisimilar, observational equivalence
-    follows directly from the bisimulation bridge. -/
+/-- Observational equivalence of effect-bisimilar states, via the coinductive
+    bridge. Intended for comparing a compiled program's run against its
+    specification once a bisimulation has been established; no compiler
+    refinement premise is needed for this step. -/
 theorem compile_refines_observational_eq_of_effect_bisim
-    {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    (p : Process) (roles : RoleSet) (types : Role → LocalType) (chain : GuardChain γ)
-    (_hCompile : compile_refines (γ:=γ) (ε:=ε) (ν:=ν) p roles types chain)
     {σ : Type} {α : Type}
     (obs : EffectObs σ α) (step : StateRel σ)
     {s t : σ}

@@ -244,6 +244,7 @@ private theorem all_branches_proj_of_comm_nonpart
   have hF := c_project_destruct hproj
   simpa [CProjectF, hns, hnr] using hF
 
+/-! ## Participant Case -/
 /-- Branch coherence from participation structure.
 
 For well-formed communications where role is not a participant, all branch continuations
@@ -253,8 +254,6 @@ project to EQ2-equivalent local types. This is proven using the participation in
 
 This theorem eliminates the trans_branches_coherent assumption by proving coherence from
 first principles, following Coq's proof strategy. -/
-
-/-! ## Participant Case -/
 
 private theorem trans_branches_coherent_eq2_participant
     (sender receiver : String) (branches : List (Label × GlobalType)) (role : String)
@@ -337,23 +336,20 @@ private theorem trans_branches_satisfies_branches_proj_rel
       gbs role (transBranches gbs role) := by
   induction gbs with
   | nil =>
-      simp only [transBranches, BranchesProjRel]
+      simp only [transBranches, Choreography.Projection.Trans.transBranches, BranchesProjRel]
       exact List.Forall₂.nil
   | cons hd tl ih =>
       -- BranchesProjRel (hd :: tl) role (transBranches (hd :: tl) role)
-      unfold transBranches BranchesProjRel
+      obtain ⟨l, g⟩ := hd
+      simp only [transBranches, Choreography.Projection.Trans.transBranches, BranchesProjRel]
       -- Goal: List.Forall₂ (fun gb lb => gb.1 = lb.1 ∧ R gb.2 role lb.2) (hd :: tl) ((hd.1, trans hd.2 role) :: transBranches tl role)
       refine List.Forall₂.cons ?head ?tail
       case head =>
-        -- Show: hd.1 = hd.1 ∧ R hd.2 role (trans hd.2 role)
-        constructor
-        · rfl
-        · constructor
-          · rfl
-          · exact hwf hd (List.Mem.head tl)
+        -- Show: labels match, annotation is none, and R holds for the continuation.
+        exact ⟨rfl, rfl, rfl, hwf (l, g) (List.Mem.head tl)⟩
       case tail =>
         -- Show: BranchesProjRel for tl
-        exact ih (fun gb hmem => hwf gb (List.Mem.tail hd hmem))
+        exact ih (fun gb hmem => hwf gb (List.Mem.tail (l, g) hmem))
 
 /-! ## Branch Witness Extraction -/
 
@@ -370,7 +366,7 @@ private theorem branches_proj_rel_to_c_project
       intro p hp
       cases hp with
       | head =>
-          rcases hpair with ⟨_hlabel, hproj⟩
+          rcases hpair with ⟨_hlabel, _hnone, hproj⟩
           exact ⟨_, hproj⟩
       | tail _ hmem =>
           exact ih _ hmem

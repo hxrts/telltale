@@ -38,7 +38,7 @@ private theorem c_project_trans_rel_comp_recv_extract_base
 
 /-! ## Recv Extraction Left Case -/
 
-/- Helper: left case for CProjectTransRelComp_recv_extract. -/
+/- Helper: left case for c_project_trans_rel_comp_recv_extract. -/
 private theorem c_project_trans_rel_comp_recv_extract_left
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (heq : EQ2 (.recv p1 bs1) b) (hrel : CProjectTransRel b (.recv p2 bs2))
@@ -69,7 +69,7 @@ private theorem c_project_trans_rel_comp_recv_extract_left
 
 /-! ## Recv Extraction Right Case -/
 
-/- Helper: right case for CProjectTransRelComp_recv_extract. -/
+/- Helper: right case for c_project_trans_rel_comp_recv_extract. -/
 private theorem c_project_trans_rel_comp_recv_extract_right
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (hrel : CProjectTransRel (.recv p1 bs1) b) (heq : EQ2 b (.recv p2 bs2))
@@ -107,7 +107,7 @@ private theorem c_project_trans_rel_comp_recv_extract_right
 
 /-! ## Recv Extraction Both Case -/
 
-/- Helper: both case for CProjectTransRelComp_recv_extract. -/
+/- Helper: both case for c_project_trans_rel_comp_recv_extract. -/
 private theorem c_project_trans_rel_comp_recv_extract_both
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b b' : LocalTypeR}
     (heq : EQ2 (.recv p1 bs1) b) (hrel : CProjectTransRel b b') (heq' : EQ2 b' (.recv p2 bs2))
@@ -118,7 +118,7 @@ private theorem c_project_trans_rel_comp_recv_extract_both
   have hcomp :=
     eq2_c_project_trans_rel_eq2_compose (a := .recv p1 bs1) (c := .recv p2 bs2) heq hrel heq'
       hWFa hWFc
-    simpa [EQ2F] using hcomp
+  simpa [EQ2F] using hcomp
 
 /-! ## Recv Extraction Dispatcher -/
 
@@ -131,8 +131,8 @@ private theorem c_project_trans_rel_comp_recv_extract
   rcases h with hbase | hleft | hright | hboth -- Split the composed relation into base/left/right/both cases.
   · exact c_project_trans_rel_comp_recv_extract_base hbase
   · rcases hleft with ⟨b, heq, hrel⟩; exact c_project_trans_rel_comp_recv_extract_left heq hrel hWFa hWFc
-    · rcases hright with ⟨b, hrel, heq⟩; exact c_project_trans_rel_comp_recv_extract_right hrel heq hWFa hWFc
-    · rcases hboth with ⟨b, b', heq, hrel, heq'⟩; exact c_project_trans_rel_comp_recv_extract_both heq hrel heq' hWFa hWFc
+  · rcases hright with ⟨b, hrel, heq⟩; exact c_project_trans_rel_comp_recv_extract_right hrel heq hWFa hWFc
+  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩; exact c_project_trans_rel_comp_recv_extract_both heq hrel heq' hWFa hWFc
 
 /-! ## Mu Intermediate Helpers -/
 
@@ -174,8 +174,8 @@ private theorem eq2_c_project_trans_rel_compose_through_mu_mu_end
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) .end := by
   -- Mu on the left, end on the right: use the EQ2 prefix.
   simp only [EQ2F]
-    left; right; left
-    exact ⟨.mu v body, heq_unfold_left, hrel⟩
+  left; right; left
+  exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu/Var Target -/
 
@@ -186,8 +186,8 @@ private theorem eq2_c_project_trans_rel_compose_through_mu_mu_var
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.var cv) := by
   -- Mu on the left, var on the right: use the EQ2 prefix.
   simp only [EQ2F]
-    left; right; left
-    exact ⟨.mu v body, heq_unfold_left, hrel⟩
+  left; right; left
+  exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu/Send Target -/
 
@@ -199,8 +199,8 @@ private theorem eq2_c_project_trans_rel_compose_through_mu_mu_send
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.send cp cbs) := by
   -- Mu on the left, send on the right: use the EQ2 prefix.
   simp only [EQ2F]
-    left; right; left
-    exact ⟨.mu v body, heq_unfold_left, hrel⟩
+  left; right; left
+  exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu/Recv Target -/
 
@@ -212,8 +212,8 @@ private theorem eq2_c_project_trans_rel_compose_through_mu_mu_recv
     EQ2F (EQ2_closure CProjectTransRelComp) (.mu av abody) (.recv cp cbs) := by
   -- Mu on the left, recv on the right: use the EQ2 prefix.
   simp only [EQ2F]
-    left; right; left
-    exact ⟨.mu v body, heq_unfold_left, hrel⟩
+  left; right; left
+  exact ⟨.mu v body, heq_unfold_left, hrel⟩
 
 /-! ## Through-Mu: Mu Source Dispatcher -/
 

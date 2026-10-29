@@ -21,8 +21,7 @@ def mk
     (protocolSpec : ProtocolSpec)
     (assumptionsPassed :
       (runAssumptionValidation
-        protocolSpec (byzantineSafetyAssumptionsFor protocolSpec)).allPassed = true)
-    (livenessAssumptions? : Option LivenessAssumptions := none) :
+        protocolSpec (byzantineSafetyAssumptionsFor protocolSpec)).allPassed = true) :
     SafetyProtocol where
   State := State
   Decision := Decision
@@ -30,13 +29,12 @@ def mk
   Obs := Obs
   model := model
   safetyAssumptions := safetyAssumptions
-  livenessAssumptions? := livenessAssumptions?
   protocolSpec := protocolSpec
   assumptionsPassed := assumptionsPassed
 
 /--
 Build a Byzantine-safety profile from a quorum-geometry profile. The safety
-artifact is derived from quorum intersection and lock monotonicity; the protocol
+artifact is derived from honest quorum intersection under the `n + f < 2q` fault model; the protocol
 spec gate only records that the declared Byzantine profile is admissible.
 -/
 def ofQuorumGeometry
@@ -44,8 +42,7 @@ def ofQuorumGeometry
     (protocolSpec : ProtocolSpec)
     (assumptionsPassed :
       (runAssumptionValidation
-        protocolSpec (byzantineSafetyAssumptionsFor protocolSpec)).allPassed = true)
-    (livenessAssumptions? : Option LivenessAssumptions := none) :
+        protocolSpec (byzantineSafetyAssumptionsFor protocolSpec)).allPassed = true) :
     SafetyProtocol where
   State := protocol.State
   Decision := protocol.Decision
@@ -53,8 +50,7 @@ def ofQuorumGeometry
   Obs := protocol.State
   model := modelOfQuorumGeometry protocol.model
   safetyAssumptions :=
-    safetyAssumptionsOfQuorumGeometry protocol protocolSpec
-  livenessAssumptions? := livenessAssumptions?
+    safetyAssumptionsOfQuorumGeometry protocol
   protocolSpec := protocolSpec
   assumptionsPassed := assumptionsPassed
 

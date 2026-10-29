@@ -89,10 +89,13 @@ A configuration combines global type and environment. Determinism follows
 from determinism of each component.
 -/
 
-/-- Configuration step is deterministic given the same action.
+/-- Global-only configuration step is deterministic given the same action.
 
-ConfigStep requires uniqueBranchLabels, so we can use global_step_det. -/
-theorem config_step_det {c c₁ c₂ : Configuration} {act : GlobalActionR}
+`ConfigStep` holds the environment fixed by construction (it does not model
+queue updates), so this is determinism of the global-type component plus the
+trivial equality of the frozen environment. `ConfigStep` requires
+uniqueBranchLabels, so we can use global_step_det. -/
+theorem global_config_step_det {c c₁ c₂ : Configuration} {act : GlobalActionR}
     (h₁ : ConfigStep c c₁ act)
     (h₂ : ConfigStep c c₂ act) :
     c₁ = c₂ := by
@@ -148,11 +151,12 @@ predictable execution.
 def UniqueNext (c : Configuration) (act : GlobalActionR) : Prop :=
   ∀ c₁ c₂, ConfigStep c c₁ act → ConfigStep c c₂ act → c₁ = c₂
 
-/-- All enabled actions have unique next states. -/
-theorem all_unique_next (c : Configuration) (act : GlobalActionR) :
+/-- All enabled actions have unique next states under the global-only
+`ConfigStep` (environment held fixed). -/
+theorem global_all_unique_next (c : Configuration) (act : GlobalActionR) :
     UniqueNext c act := by
   intro c₁ c₂ h₁ h₂
-  exact config_step_det h₁ h₂
+  exact global_config_step_det h₁ h₂
 
 /-! ## Confluence (Weaker Property)
 

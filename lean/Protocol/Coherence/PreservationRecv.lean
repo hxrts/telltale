@@ -98,7 +98,7 @@ theorem coherent_recv_preserved
         rw [hTraceVal] at hTrace
         simp only [List.head?] at hTrace
         -- hTrace : none = some T is a contradiction
-        exact Option.noConfusion hTrace
+        first | cases hTrace | simp at hTrace
       | cons t rest =>
         -- t = T from hTrace
         rw [hTraceVal] at hTrace
@@ -141,7 +141,7 @@ theorem coherent_recv_preserved
       | nil =>
         rw [hTraceVal] at hTrace
         simp only [List.head?] at hTrace
-        exact Option.noConfusion hTrace
+        first | cases hTrace | simp at hTrace
       | cons t rest =>
         rw [hTraceVal] at hTrace
         simp only [List.head?, Option.some.injEq] at hTrace

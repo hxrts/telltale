@@ -236,7 +236,7 @@ private theorem free_vars_substitute_subset_strong (n : Nat) :
     ∀ t repl v, v ∈ (body.substitute t repl).freeVars →
     (v ∈ body.freeVars ∧ v ≠ t) ∨ v ∈ repl.freeVars := by
   -- Strong induction on size, splitting by constructor.
-  induction n using Nat.strong_induction_on with
+  induction n using Nat.strongRecOn with
   | _ n ih =>
       intro body hsize t repl v hv
       have ih' : ∀ g' : GlobalType, sizeOf g' < n →

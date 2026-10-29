@@ -392,11 +392,11 @@ theorem c_project_u_gfp : CProjectU = SessionCoTypes.CoinductiveRel.gfp (F := CP
 
 /-- Alias: coinduction via CoinductiveRel for CProject. -/
 theorem c_project_coind' {R : ProjRel} (h : R ≤ CProjectF R) : R ≤ CProject := by
-  simpa [CProject] using (SessionCoTypes.CoinductiveRel.coind (F := CProjectF) h)
+  exact (SessionCoTypes.CoinductiveRel.coind (F := CProjectF) h)
 
 /-- Alias: coinduction via CoinductiveRel for CProjectU. -/
 theorem c_project_u_coind' {R : ProjRel} (h : R ≤ CProjectF_unfold R) : R ≤ CProjectU := by
-  simpa [CProjectU] using (SessionCoTypes.CoinductiveRel.coind (F := CProjectF_unfold) h)
+  exact (SessionCoTypes.CoinductiveRel.coind (F := CProjectF_unfold) h)
 
 /-- Alias: unfold via CoinductiveRel for CProject. -/
 theorem c_project_unfold' : CProject ≤ CProjectF CProject := by

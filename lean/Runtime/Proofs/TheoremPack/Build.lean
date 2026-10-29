@@ -111,8 +111,7 @@ def buildProtocolMachineTheoremPack
     | none => none
     | some p => some
         { protocol := p
-        , proof := Distributed.FLP.lower_bound_of_assumptions
-            p.assumptions p.premises.toLowerBoundPremises
+        , proof := Distributed.FLP.lower_bound_of_protocol p
         }
   let flpImpossibility? :=
     match space.distributed.flp? with
@@ -229,9 +228,10 @@ def buildProtocolMachineTheoremPack
         some
           { protocol := p
           , characterization := Distributed.Coordination.characterization_of_protocol p
-          , coordinationFreeWhenMonotone := Distributed.Coordination.coordination_free_of_monotone p
+          , coordinationFreeWhenMonotone :=
+              Distributed.Coordination.coordination_free_of_monotone p.model
           , coordinationRequiredWhenNonMonotone :=
-              Distributed.Coordination.coordination_required_of_non_monotone p
+              Distributed.Coordination.coordination_required_of_non_monotone p.model
           }
 
   -- Builder: CRDT and Consensus Envelope Families
@@ -243,7 +243,7 @@ def buildProtocolMachineTheoremPack
         some
           { protocol := p
           , exactEnvelope := Distributed.CRDT.exact_envelope_of_protocol p
-          , adequacy := Distributed.CRDT.adequacy_of_protocol p
+          , adequacy := Distributed.CRDT.adequacy_of_refinement_hypothesis_of_protocol p
           , principalCapability := Distributed.CRDT.principal_capability_of_protocol p
           , admissionSoundness := Distributed.CRDT.admission_soundness_of_protocol p
           , admissionCompleteness := Distributed.CRDT.admission_completeness_of_protocol p
@@ -253,10 +253,6 @@ def buildProtocolMachineTheoremPack
           , approximationMonotonicity := Distributed.CRDT.approximation_monotone_of_protocol p
           , exactSECAsLimit := Distributed.CRDT.exact_sec_as_limit_of_protocol p
           , hcrdtCore := Distributed.CRDT.hcrdt_core_of_protocol p
-          , hcrdtFoundation := Distributed.CRDT.hcrdt_foundation_of_protocol p
-          , hcrdtDynamics := Distributed.CRDT.hcrdt_dynamics_of_protocol p
-          , hcrdtExtensions := Distributed.CRDT.hcrdt_extensions_of_protocol p
-          , hcrdtLimits := Distributed.CRDT.hcrdt_limits_of_protocol p
           }
   let crdtMonotonicity? :=
     match space.distributed.crdt? with
@@ -264,8 +260,6 @@ def buildProtocolMachineTheoremPack
     | some p =>
         some
           { protocol := p
-          , semilatticeCore := p.assumptions.semilatticeCoreClass
-          , opContextLayer := p.assumptions.opContextLayerClass
           , mergeInflationary :=
               Distributed.CRDT.merge_inflationary_of_state_based_crdt p.premises.stateSemantics
           , mergeMonotone :=
@@ -320,7 +314,7 @@ def buildProtocolMachineTheoremPack
         some
           { protocol := p
           , exactEnvelope := Distributed.ConsensusEnvelope.exact_envelope_of_protocol p
-          , adequacy := Distributed.ConsensusEnvelope.adequacy_of_protocol p
+          , adequacy := Distributed.ConsensusEnvelope.adequacy_of_refinement_hypothesis p
           , principalCapability := Distributed.ConsensusEnvelope.principal_capability_of_protocol p
           , admissionSoundness := Distributed.ConsensusEnvelope.admission_soundness_of_protocol p
           , admissionCompleteness := Distributed.ConsensusEnvelope.admission_completeness_of_protocol p

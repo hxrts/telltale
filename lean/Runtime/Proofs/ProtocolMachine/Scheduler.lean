@@ -13,8 +13,10 @@ The Problem. The protocol machine scheduler must satisfy confluence (order of re
 doesn't affect reachable states) and cooperative scheduling must refine concurrent
 semantics. These properties underpin deterministic execution guarantees.
 
-Solution Structure. Proves `schedule_confluence_holds` showing the scheduler is
-confluent, and `cooperative_refines_concurrent_holds` showing cooperative mode
+Solution Structure. Proves `schedule_deterministic_holds` (selection is a
+function), `independent_steps_commute` (real confluence: two scheduling choices
+whose footprints are disjoint can be executed in either order with the same
+result, for any step semantics that is local to its footprint), and `cooperative_refines_concurrent_holds` showing cooperative mode
 refines round-robin. Helper lemmas for queue operations (takeOut, bestCandidate)
 support the main proofs.
 -/
@@ -23,14 +25,72 @@ universe u
 
 /-! ## Scheduler Properties -/
 
-theorem schedule_confluence_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- Scheduler selection is deterministic (`schedule` is a function). -/
+theorem schedule_deterministic_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : ProtocolMachineState ι γ π ε ν) : schedule_confluence st :=
+    (st : ProtocolMachineState ι γ π ε ν) : schedule_deterministic st :=
   fun _ _ h1 h2 => by
     have := h1.symm.trans h2
     exact Option.some.inj this
+
+/-! ## Confluence of Independent Steps
+
+A footprint-local step system: each scheduling choice `c` owns a footprint of
+locations, writes only inside it, and computes new values only from values
+inside it. Two choices with disjoint footprints are independent; executing
+them in either order yields the same state (the diamond property). Discharging
+`LocalStepSystem` for the concrete `execInstr` (footprint = the coroutine's
+registers plus the session endpoints/edges it touches) is the remaining
+obligation to instantiate this for the protocol machine. -/
+
+/-- A step system whose steps are local to per-choice footprints. -/
+structure LocalStepSystem (Loc Val Choice : Type) where
+  /-- Locations a choice may read or write. -/
+  footprint : Choice → Loc → Bool
+  /-- New value at a location (only consulted inside the footprint). -/
+  effect : Choice → (Loc → Val) → Loc → Val
+  /-- Effects read only the footprint. -/
+  effect_local : ∀ c s s', (∀ l, footprint c l = true → s l = s' l) →
+    ∀ l, footprint c l = true → effect c s l = effect c s' l
+
+namespace LocalStepSystem
+
+variable {Loc Val Choice : Type} (S : LocalStepSystem Loc Val Choice)
+
+/-- Execute one choice: update its footprint, leave everything else unchanged. -/
+def step (c : Choice) (s : Loc → Val) : Loc → Val :=
+  fun l => if S.footprint c l then S.effect c s l else s l
+
+/-- Two choices are independent when their footprints are disjoint. -/
+def Independent (c₁ c₂ : Choice) : Prop :=
+  ∀ l, ¬ (S.footprint c₁ l = true ∧ S.footprint c₂ l = true)
+
+/-- Helper: stepping an independent choice does not change values in `c`'s footprint
+as seen by `c`'s effect. -/
+theorem effect_after_independent {c c' : Choice} (h : S.Independent c c') (s : Loc → Val)
+    (l : Loc) (hl : S.footprint c l = true) :
+    S.effect c (S.step c' s) l = S.effect c s l := by
+  refine S.effect_local c _ _ (fun l' hl' => ?_) l hl
+  have : S.footprint c' l' = false := by
+    cases h' : S.footprint c' l'
+    · rfl
+    · exact absurd ⟨hl', h'⟩ (h l')
+  simp [step, this]
+
+/-- Diamond: independent steps commute, so both interleavings join. -/
+theorem independent_steps_commute {c₁ c₂ : Choice} (h : S.Independent c₁ c₂)
+    (s : Loc → Val) : S.step c₂ (S.step c₁ s) = S.step c₁ (S.step c₂ s) := by
+  have h' : S.Independent c₂ c₁ := fun l hl => h l ⟨hl.2, hl.1⟩
+  funext l
+  cases h₁ : S.footprint c₁ l <;> cases h₂ : S.footprint c₂ l
+  · simp [step, h₁, h₂]
+  · simp [step, h₁, h₂, S.effect_after_independent h' s l h₂]
+  · simp [step, h₁, h₂, S.effect_after_independent h s l h₁]
+  · exact absurd ⟨h₁, h₂⟩ (h l)
+
+end LocalStepSystem
 
 /-! ## Cooperative Refinement -/
 

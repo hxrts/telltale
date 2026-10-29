@@ -149,7 +149,8 @@ theorem total_type_depth_step_base_le {C C' : Config} (h : StepBase C C') :
       simpa using total_type_depth_select_le (C:=C) (hG:=hG) (hFind:=hFind)
   | branch hProc hK hG hBuf hFindP hFindT hDeq =>
       -- Branch case: reduce to the branch helper lemma.
-      simpa using total_type_depth_branch_le (C:=C) (hG:=hG) (hFind:=hFindT)
+      exact le_trans (le_of_eq (by simp [totalTypeDepth]))
+        (total_type_depth_branch_le (C:=C) (hG:=hG) (hFind:=hFindT))
   | newSession hProc =>
       -- newSession does not change G.
       simp [totalTypeDepth, totalTypeDepthG, newSessionStep]

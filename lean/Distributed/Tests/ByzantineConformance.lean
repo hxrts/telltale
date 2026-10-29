@@ -46,47 +46,43 @@ section CounterexampleRegression
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (hDrop : ¬ H.quorumIntersectionWitnessed)
     (w : SafetyContradictionWitness M) :
-    ¬ CharacterizationCondition M := by
-  let cex := noQuorumCounterexample_of_droppedAssumption H hDrop w
-  exact no_quorum_counterexample_minimal cex
+    ¬ CharacterizationCondition M :=
+  noQuorumConflictWitness_refutes { conflict := w }
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (hDrop : ¬ H.evidencePrimitiveConsistent ∨ ¬ H.timingAuthCompatible)
-    (w : SafetyContradictionWitness M)
-    (bad : ByzantineEvidence)
-    (hBad : ¬ EvidenceValid bad) :
-    ¬ CharacterizationCondition M := by
-  let cex := invalidAuthCounterexample_of_droppedAssumption H hDrop w bad hBad
-  exact invalid_auth_counterexample_minimal cex
+    (w : SafetyContradictionWitness M) :
+    ¬ CharacterizationCondition M :=
+  invalidAuthConflictWitness_refutes { conflict := w }
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (hDrop : ¬ H.adversarialBudgetBounded)
     (w : SafetyContradictionWitness M) :
-    ¬ CharacterizationCondition M := by
-/- ## Structured Block 2 -/
-  let cex := thresholdBudgetCounterexample_of_droppedAssumption H hDrop w
-  exact threshold_budget_counterexample_minimal cex
+    ¬ CharacterizationCondition M :=
+  thresholdBudgetConflictWitness_refutes { conflict := w }
 
 example
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     {M : Model State Decision Certificate Obs}
-    (H : SafetyAssumptions M)
-    (hDrop :
-      ¬ H.conflictExclusionPrimitiveConsistent ∨
-        ¬ H.finalizationWitnessPrimitiveConsistent)
     (w : SafetyContradictionWitness M) :
-    ¬ CharacterizationCondition M := by
-  let cex := primitiveMismatchCounterexample_of_droppedAssumption H hDrop w
-  exact primitive_mismatch_counterexample_minimal cex
+    ¬ CharacterizationCondition M :=
+  primitiveMismatchConflictWitness_refutes { conflict := w }
+
+/- Concrete: an unconstrained model admits a conflict witness. -/
+example :
+    ∃ M : Model Unit Bool Unit Unit,
+      Nonempty (SafetyContradictionWitness M) ∧ ¬ CharacterizationCondition M :=
+  unconstrained_conflict_exists
+
+/- Honest status: safety assumptions exclude every contradiction witness. -/
+example
+    {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
+    {M : Model State Decision Certificate Obs}
+    (H : SafetyAssumptions M) (w : SafetyContradictionWitness M) : False :=
+  safetyAssumptions_exclude_contradiction H w
 
 end CounterexampleRegression
 

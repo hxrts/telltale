@@ -117,9 +117,12 @@ def coreAssumptions : List Assumption :=
 
 /-! ## Assumption Validation API -/
 
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
+/-- Constant `true`: this validator performs no runtime check. It only reports
+that the `Assumptions` bundle passed to it carries a proof of each field, which
+the type of the bundle already guarantees. The family model has no concrete
+parameters over which an assumption could be decided. -/
+def proofCarriedNoRuntimeCheck : Bool :=
+  true
 
 
 /-- Validate one assumption against an assumption bundle. -/
@@ -130,17 +133,17 @@ def validateAssumption
   match h with
   | .reliableBroadcast =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Reliable-broadcast assumption is provided."
       }
   | .agreementPremise =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Agreement premise is provided."
       }
   | .orderingPremise =>
       { assumption := h
-      , passed := proofCarryingValidationPassed
+      , passed := proofCarriedNoRuntimeCheck
       , detail := "Ordering premise is provided."
       }
 

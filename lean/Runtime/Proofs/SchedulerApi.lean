@@ -56,23 +56,15 @@ def schedulerPolicyProfileOf (policy : SchedPolicy) : SchedulerPolicyProfile :=
 
 /-! ### Iris Invariance Interface -/
 
-/-- Iris state-interpretation invariance for scheduler executions from a fixed state. -/
+/-- Iris adequacy for scheduler executions from a fixed state: any pure fact
+established through the protocol-machine WP premise holds after every erased
+multi-step execution starting at `st`. -/
 def SchedulerIrisInvariant [Telltale.TelltaleIris]
     (st : ProtocolMachineState ι γ π ε ν) : Prop :=
-  ∀ (e : Expr) (Φ : SessionVMVal → iProp),
-    iProp.entails iProp.emp
-      (iProp.wand
-        (Iris.state_interp
-          (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) st)
-        (Iris.wp
-          (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) Mask.top e Φ)) →
-    ∀ e' σ',
-      Iris.MultiStep' (Λ:=instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
-        e st e' σ' →
-      iProp.entails iProp.emp
-        (bupd
-          (Iris.state_interp
-            (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) σ'))
+  ∀ (s : Iris.Stuckness) (e : SessionVMExpr ι γ π ε ν)
+    (σ' : ProtocolMachineState ι γ π ε ν) (t' : List (SessionVMExpr ι γ π ε ν)) (φ : Prop),
+    SessionVMWPPremise s e st σ' t' φ →
+    FromMathlib.Relation.ReflTransGen Iris.ProgramLogic.Language.ErasedStep ([e], st) (t', σ') → φ
 
 /-- Proof-carrying scheduler hypothesis bundle for one initial protocol machine state. -/
 structure ProtocolMachineSchedulerBundle (st₀ : ProtocolMachineState ι γ π ε ν) where
@@ -225,11 +217,12 @@ theorem scheduler_policy_pinned_from_bundle {st₀ : ProtocolMachineState ι γ 
     SchedulerPolicyPinned st₀ bundle.policy :=
   bundle.policyPinned
 
-/-- Scheduler confluence theorem instantiated from a scheduler bundle. -/
-theorem scheduler_confluence_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
+/-- Scheduler selection is deterministic (instantiated from a scheduler bundle).
+Genuine confluence of independent steps is `LocalStepSystem.independent_steps_commute`. -/
+theorem scheduler_deterministic_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
-    schedule_confluence st₀ :=
-  schedule_confluence_holds st₀
+    schedule_deterministic st₀ :=
+  schedule_deterministic_holds st₀
 
 /-- Starvation-freedom theorem instantiated from a scheduler bundle. -/
 theorem scheduler_starvation_free_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
@@ -248,8 +241,8 @@ theorem scheduler_iris_invariant_from_bundle [Telltale.TelltaleIris]
     {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
     SchedulerIrisInvariant (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀ := by
-  intro e Φ hWP e' σ' hStep
-  exact state_interp_invariant (e := e) (σ := st₀) (Φ := Φ) hWP e' σ' hStep
+  intro s e σ' t' φ hWP hSteps
+  exact session_vm_wp_invariance s e st₀ σ' t' φ hWP hSteps
 
 end
 

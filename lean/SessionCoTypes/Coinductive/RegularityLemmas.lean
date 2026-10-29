@@ -31,10 +31,11 @@ namespace SessionCoTypes.Coinductive
 lemma child_rel_to_children {t c : LocalTypeC} (h : childRel t c) :
     ∃ i : LocalTypeChild (head t), children t i = c := by
   rcases h with ⟨s, f, i, hdest, hchild⟩
-  have hhead : head t = s := by simp [head, hdest]
-  refine ⟨cast (by simp [hhead]) i, ?_⟩
-  cases hhead; cases hdest
-  simpa [children] using hchild
+  subst hchild
+  have key : ∀ (D : PFunctor.Obj LocalTypeF LocalTypeC) (hD : D = ⟨s, f⟩)
+      (e : LocalTypeChild s = LocalTypeChild D.1), D.2 (cast e i) = f i := by
+    intro D hD e; subst hD; rfl
+  exact ⟨cast (by simp only [head, hdest]; rfl) i, key _ hdest _⟩
 
 /-! ## Decomposing Reachability -/
 
@@ -80,7 +81,7 @@ private theorem mem_child_indices (s : LocalTypeHead) (i : LocalTypeChild s) :
   · cases i
   · cases i
   · cases i
-    simp [childIndices]
+    exact List.mem_singleton.mpr rfl
   · exact List.mem_finRange i
   · exact List.mem_finRange i
 

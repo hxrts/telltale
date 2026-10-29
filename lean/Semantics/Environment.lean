@@ -253,16 +253,17 @@ A trace is fair if:
 This is specified coinductively in practice, but we define the property here.
 -/
 def FairEnv (trace : EnvTrace) : Prop :=
-  -- For now, a simple approximation: delivery count increases unboundedly
-  -- or all queues eventually empty
+  -- Approximation: for every index `i`, some strictly later in-range index `j`
+  -- either has a higher delivery count or no pending timeouts. Both disjuncts
+  -- are bounded by `j > i ∧ j < trace.length`.
   ∀ i, i < trace.length →
     ∃ j, j > i ∧ j < trace.length ∧
-      (match trace.getAt j, trace.getAt i with
+      ((match trace.getAt j, trace.getAt i with
         | some envJ, some envI => envJ.deliveryCount > envI.deliveryCount
         | _, _ => False) ∨
-      (match trace.getAt j with
+       (match trace.getAt j with
         | some env => env.pendingTimeouts.isEmpty
-        | none => False)
+        | none => False))
 
 /-- Action `act` is enabled at position `i` if some environment step with `act`
 can be taken from the environment at `i`. -/

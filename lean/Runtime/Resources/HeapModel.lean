@@ -310,23 +310,112 @@ def heapCommitmentToJson (commitment : HeapCommitment) : Json :=
     , ("nullifier_root_hex", Json.str commitment.nullifierRootHex)
     , ("counter", Json.num commitment.counter) ]
 
-theorem message_payload_encoding_deterministic (payload : MessagePayload) :
-    messagePayloadCanonicalBytes payload = messagePayloadCanonicalBytes payload := rfl
+/-! ## Replay and Ordering Properties -/
 
-theorem resource_encoding_deterministic (resource : Resource) :
-    resourceCanonicalBytes resource = resourceCanonicalBytes resource := by
-  cases resource <;> rfl
+/-- Replay is compositional: replaying a concatenated op log equals replaying
+the suffix from the state reached by the prefix. -/
+theorem applyOps_append (ops₁ ops₂ : List HeapOp) (init : HeapState) :
+    applyOps (ops₁ ++ ops₂) init = applyOps ops₂ (applyOps ops₁ init) := by
+  simp [applyOps, List.foldl_append]
 
-theorem active_ordering_deterministic (state : HeapState) :
-    activeResourceIds state = activeResourceIds state := rfl
+/-- `isNullified` is list membership. -/
+theorem isNullified_iff (rid : ResourceId) (ns : List ResourceId) :
+    isNullified rid ns = true ↔ rid ∈ ns := by
+  unfold isNullified
+  simp only [List.any_eq_true, beq_iff_eq]
+  exact ⟨fun ⟨y, hy, he⟩ => he ▸ hy, fun h => ⟨rid, h, rfl⟩⟩
 
-theorem consumed_ordering_deterministic (state : HeapState) :
-    consumedResourceIds state = consumedResourceIds state := rfl
+/-- Consuming the same resource twice is the same as consuming it once. -/
+theorem consume_idempotent (state : HeapState) (rid : ResourceId) :
+    applyOp (applyOp state (.consume rid)) (.consume rid) = applyOp state (.consume rid) := by
+  by_cases h : isNullified rid state.nullifiers = true
+  · simp [applyOp, h]
+  · have hMem : isNullified rid (state.nullifiers ++ [rid]) = true :=
+      (isNullified_iff _ _).2 (by simp)
+    simp [applyOp, h, hMem]
 
-theorem replay_deterministic (ops : List HeapOp) (init : HeapState := {}) :
-    applyOps ops init = applyOps ops init := rfl
+/-- After `consume rid`, `rid` is in the nullifier set. -/
+theorem mem_nullifiers_consume (state : HeapState) (rid : ResourceId) :
+    rid ∈ (applyOp state (.consume rid)).nullifiers := by
+  by_cases h : isNullified rid state.nullifiers = true
+  · simpa [applyOp, h] using (isNullified_iff _ _).1 h
+  · simp [applyOp, h]
 
-theorem repeated_replay_is_identical (ops : List HeapOp) (init : HeapState := {}) :
-    (applyOps ops init, applyOps ops init) = (applyOps ops init, applyOps ops init) := rfl
+/-- Nullifier membership after a consume: old members plus the consumed id. -/
+theorem mem_nullifiers_consume_iff (state : HeapState) (rid x : ResourceId) :
+    x ∈ (applyOp state (.consume rid)).nullifiers ↔ x ∈ state.nullifiers ∨ x = rid := by
+  by_cases h : isNullified rid state.nullifiers = true
+  · have hr := (isNullified_iff _ _).1 h
+    simp only [applyOp, h, if_true]
+    exact ⟨Or.inl, fun hx => hx.elim id (fun e => e ▸ hr)⟩
+  · simp [applyOp, h]
+
+/-- Consumes commute up to nullifier-set membership (order independence). -/
+theorem consume_comm_mem (state : HeapState) (a b x : ResourceId) :
+    x ∈ (applyOps [.consume a, .consume b] state).nullifiers ↔
+      x ∈ (applyOps [.consume b, .consume a] state).nullifiers := by
+  simp only [applyOps, List.foldl_cons, List.foldl_nil, mem_nullifiers_consume_iff]
+  constructor <;> intro h <;> rcases h with (h | h) | h <;> simp [h]
+
+/-- Consumes never change the entry list or the allocation counter. -/
+theorem consume_preserves_entries (state : HeapState) (rid : ResourceId) :
+    (applyOp state (.consume rid)).entries = state.entries ∧
+      (applyOp state (.consume rid)).counter = state.counter := by
+  by_cases h : isNullified rid state.nullifiers = true <;> simp [applyOp, h]
+
+/-- The active entry set depends only on nullifier membership. -/
+theorem activeEntries_congr (s t : HeapState) (hE : s.entries = t.entries)
+    (hN : ∀ x, x ∈ s.nullifiers ↔ x ∈ t.nullifiers) :
+    activeEntries s = activeEntries t := by
+  unfold activeEntries
+  rw [hE]
+  refine List.filter_congr (fun e _ => ?_)
+  have := hN e.rid
+  rw [Bool.eq_iff_iff]
+  simp only [Bool.not_eq_true', ← Bool.not_eq_true, isNullified_iff, this]
+
+/-- Order independence: two consumes yield the same active entries in either order. -/
+theorem consume_comm_activeEntries (state : HeapState) (a b : ResourceId) :
+    activeEntries (applyOps [.consume a, .consume b] state) =
+      activeEntries (applyOps [.consume b, .consume a] state) := by
+  apply activeEntries_congr
+  · simp only [applyOps, List.foldl_cons, List.foldl_nil, (consume_preserves_entries _ _).1]
+  · exact consume_comm_mem state a b
+
+/-- A consumed resource is no longer active. -/
+theorem consumed_not_active (state : HeapState) (rid : ResourceId) (e : HeapEntry)
+    (he : e ∈ activeEntries (applyOp state (.consume rid))) : e.rid ≠ rid := by
+  intro hEq
+  have hMem := mem_nullifiers_consume state rid
+  simp only [activeEntries, List.mem_filter, Bool.not_eq_true'] at he
+  have := (isNullified_iff _ _).2 (hEq ▸ hMem)
+  simp_all
+
+/-- Each allocation increments the counter by exactly one. -/
+theorem alloc_session_counter (state : HeapState) (role : String) (h : Nat) (d : DigestHex) :
+    (applyOp state (.allocSession role h d)).counter = state.counter + 1 := rfl
+
+/-- Canonical resource bytes begin with a resource-kind tag that separates the
+four resource constructors. -/
+def resourceTag : Resource → Nat
+  | .channel _ => 0x40
+  | .message _ => 0x41
+  | .session _ _ => 0x42
+  | .value _ _ => 0x43
+
+/-- The first seven canonical bytes are the tagged prelude of the resource kind. -/
+theorem resourceCanonicalBytes_prefix (r : Resource) :
+    (resourceCanonicalBytes r).take 7 = canonicalPrelude (resourceTag r) := by
+  cases r <;> simp [resourceCanonicalBytes, resourceTag, canonicalPrelude,
+    heapEncodingMagic, leBytes, List.take_append, List.take_of_length_le]
+
+/-- Resources of different kinds have different canonical encodings. -/
+theorem resourceCanonicalBytes_kind_ne (r₁ r₂ : Resource)
+    (h : resourceTag r₁ ≠ resourceTag r₂) :
+    resourceCanonicalBytes r₁ ≠ resourceCanonicalBytes r₂ := by
+  intro hEq
+  have h₁ := resourceCanonicalBytes_prefix r₁
+  rw [hEq, resourceCanonicalBytes_prefix r₂] at h₁
+  cases r₁ <;> cases r₂ <;> simp_all [resourceTag, canonicalPrelude] <;> decide
 
 end Runtime.Resources.HeapModel

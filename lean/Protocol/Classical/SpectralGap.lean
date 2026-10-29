@@ -58,15 +58,15 @@ theorem wt_config_n_cheeger_inequality (step : FStep)
     (w : ConductanceWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
     (conductance (wtConfigNMarkovChain step) w) ^ 2 / 2 ≤
       spectralGap (wtConfigNMarkovChain step) := by
-  simpa using
-    @cheeger_inequality.{0, 0, 0, 0} WTConfigN inferInstance inferInstance
-      inferInstance (wtConfigNMarkovChain step) hGap w
+  exact
+    @cheeger_inequality.{0, 0, 0, 0} WTConfigN _ _
+      _ (wtConfigNMarkovChain step) hGap w
 
 /-- Strict positivity of protocol spectral gap from `|λ₂| < 1`. -/
 theorem wt_config_n_spectral_gap_pos (step : FStep)
     (h : SpectralGapPos (wtConfigNMarkovChain step)) :
     0 < spectralGap (wtConfigNMarkovChain step) := by
-  simpa using spectral_gap_pos (mc := wtConfigNMarkovChain step) h
+  exact spectral_gap_pos (mc := wtConfigNMarkovChain step) h
 
 /-! ## Stationary and Hitting-Time Corollaries -/
 
@@ -84,18 +84,18 @@ theorem wt_config_n_hitting_time_spectral_bound (step : FStep)
     (hGap : 0 < spectralGap (wtConfigNMarkovChain step))
     (w : HittingTimeWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
     ∀ st, expectedHittingTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
-  simpa using
-    @hitting_time_spectral_bound.{0, 0, 0, 0} WTConfigN inferInstance
-      inferInstance inferInstance (wtConfigNMarkovChain step) hGap w
+  intro st
+  exact @hitting_time_spectral_bound.{0, 0, 0, 0} WTConfigN _
+      _ _ (wtConfigNMarkovChain step) hGap w st
 
 /-- Expected termination-time bound specialized to protocol states. -/
 theorem wt_config_n_expected_termination_bound (step : FStep)
     (hGap : 0 < spectralGap (wtConfigNMarkovChain step))
     (w : TerminationWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
     ∀ st, expectedTerminationTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
-  simpa using
-    @expected_termination_bound.{0, 0, 0, 0} WTConfigN inferInstance
-      inferInstance inferInstance (wtConfigNMarkovChain step) hGap w
+  intro st
+  exact @expected_termination_bound.{0, 0, 0, 0} WTConfigN _
+      _ _ (wtConfigNMarkovChain step) hGap w st
 
 /-! ## Product-Chain Spectral Gap -/
 

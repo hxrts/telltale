@@ -18,11 +18,11 @@ Three input families enter the pack directly from the invariant space. They do n
 | output condition soundness | `outputConditionWitness?` | `withOutputCondition` | `output_condition_soundness` |
 | semantic objects | `semanticObjectWitnesses?` | `withSemanticObjectWitnesses` | `semantic_object_*` |
 
-Termination artifacts use `Adapters.toLivenessBundle?` from `lean/Runtime/Proofs/Adapters/Progress.lean` and the theorem `protocol_machine_termination_from_invariant_space`. Output-condition artifacts lift soundness from `outputConditionWitness?` into `OutputConditionArtifact`. Semantic-object artifacts are built by `SemanticObjectArtifacts.ofWitnessBundle` and cover core invariants, outstanding effects, semantic handoffs, authoritative-read publication, materialization success, progress contracts, effect contracts, replay failure exactness, cross-target progress-dependent work, and transformation-local obligations.
+Termination artifacts use `Adapters.toLivenessBundle?` from `lean/Runtime/Proofs/Adapters/Progress.lean` and the theorem `protocol_machine_termination_from_invariant_space`. The termination bound is derived (`FairTermination.fair_termination`) from one-step ranking obligations in `ProtocolMachineTerminationModel` (measure non-increasing, strict decrease on enabled steps, enabledness stable under unproductive steps, non-complete ⇒ some role enabled); those obligations are not yet discharged for the concrete `execInstr` step. Output-condition artifacts lift soundness from `outputConditionWitness?` into `OutputConditionArtifact`. Semantic-object artifacts are built by `SemanticObjectArtifacts.ofWitnessBundle` and cover core invariants, outstanding effects, semantic handoffs, authoritative-read publication, materialization success, progress contracts, effect contracts, replay failure exactness, cross-target progress-dependent work, and transformation-local obligations.
 
 ## Distributed Families
 
-Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean`. Each family attaches through a `with*` setter on the combined space.
+Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean`. Each family attaches through a `with*` setter on the combined space. Inventory keys are string labels from `lean/Runtime/Proofs/TheoremPack/Inventory.lean`, not Lean theorem names. Each key reports whether the profile artifact is present. The theorems are carried by the family profile. For example, `quorum_geometry_safety` corresponds to `Distributed.QuorumGeometry.no_conflicting_commits_of_protocol`, and `accountable_safety` corresponds to `Distributed.AccountableSafety.accountable_safety_of_protocol`.
 
 | Family | Profile setter | Inventory key |
 |---|---|---|
@@ -53,7 +53,7 @@ Three inventory keys are derived from other profiles and have no distinct setter
 
 ## Classical Families
 
-Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`. Each classical family has a per-family setter on `ProtocolMachineInvariantSpaceWithProfiles`. `withClassicalProfiles` remains available as a batch replacement API when a caller wants to replace the whole `ClassicalProfiles` record.
+Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`. The inventory keys below are string labels, not Lean theorem names. Each classical family has a per-family setter on `ProtocolMachineInvariantSpaceWithProfiles`. `withClassicalProfiles` remains available as a batch replacement API when a caller wants to replace the whole `ClassicalProfiles` record.
 
 | Family | Setter | Wrapper type | Inventory key |
 |---|---|---|---|
@@ -75,7 +75,7 @@ Classical artifacts carry small semantic obligations such as Lyapunov descent, b
 
 `ProtocolMachineExecutionProfile` is the proof-carrying execution context derived from the invariant space. It fixes fairness assumptions, admissibility classes, escalation-window classes, a theorem-pack eligibility list, and a necessity catalog. The builder function is `ProtocolMachineInvariantSpaceWithProfiles.executionProfile`.
 
-Fairness assumptions enumerate `scheduleConfluence`, `starvationFreedom`, and `livenessFairness`. Admissibility classes cover `localEnvelope`, `shardedEnvelope`, and `protocolEnvelopeBridge`. Escalation-window classes cover `progressContractBounded`, `admissionComplexityBounded`, and `protocolBridgeBounded`.
+Fairness assumptions enumerate `scheduleConfluence`, `starvationFreedom`, and `livenessFairness`. The scheduler artifact's `scheduleDeterministic` field records selection determinism; confluence of independent steps is `LocalStepSystem.independent_steps_commute` and is not yet instantiated for `execInstr`. Admissibility classes cover `localEnvelope`, `shardedEnvelope`, and `protocolEnvelopeBridge`. Escalation-window classes cover `progressContractBounded`, `admissionComplexityBounded`, and `protocolBridgeBounded`.
 
 The execution profile also carries a list of `TransportNecessityProfile` values. `executionProfile_necessity_hardened_of_all_proven_necessary` and `executionProfile_necessity_minimal_basis_of_hardened_and_oracles` lift per-profile necessity into catalog-level hardening and minimal-basis closure. Both theorems are stated in `lean/Runtime/Proofs/TheoremPack/Profiles.lean`.
 

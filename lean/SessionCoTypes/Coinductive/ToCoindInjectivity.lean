@@ -10,16 +10,16 @@ set_option linter.dupNamespace false
 
 /-! # toCoind Injectivity
 
-Proof that toCoind embedding is injective for round-trip correctness. -/
+Proof that the toCoind embedding is injective up to payload erasure. -/
 
 /-
-The Problem. The toCoind embedding from inductive to coinductive types should
-be injective: distinct inductive types map to distinct coinductive types.
-This is essential for round-trip correctness.
+The Problem. The toCoind embedding forgets branch payload annotations, so it is
+injective only up to payload erasure. This is essential for round-trip correctness.
 
-Solution Structure. Proves to_coind_injective by case analysis over constructors,
-to_coind_branches_injective for branch list injectivity (mutually recursive),
-and indexing lemmas for toCoindBranches (length, get).
+Solution Structure. Defines `erasePayloads`, proves `toCoind (erasePayloads t) = toCoind t`
+and `toCoind t = toCoind u ↔ erasePayloads t = erasePayloads u` by case analysis over
+constructors (mutually recursive with the branch-list versions), and indexing lemmas
+for toCoindBranches (length, get).
 -/
 
 namespace SessionCoTypes.Coinductive
@@ -27,10 +27,52 @@ namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 
--- toCoind Injectivity
+/-! ## Payload Erasure
+
+`toCoind` forgets the optional payload `ValType` carried by each branch, so it is
+injective only up to payload erasure. -/
 
 mutual
-  theorem to_coind_injective : ∀ {t u : LocalTypeR}, toCoind t = toCoind u → t = u
+  /-- Reset every branch payload annotation to `none`, recursively. -/
+  def erasePayloads : LocalTypeR → LocalTypeR
+    | .end => .end
+    | .var x => .var x
+    | .mu x body => .mu x (erasePayloads body)
+    | .send p bs => .send p (erasePayloadsBranches bs)
+    | .recv p bs => .recv p (erasePayloadsBranches bs)
+
+  /-- Branch-list companion of `erasePayloads`. -/
+  def erasePayloadsBranches : List BranchR → List BranchR
+    | [] => []
+    | (lb, _vt, t) :: rest => (lb, none, erasePayloads t) :: erasePayloadsBranches rest
+end
+
+mutual
+  /-- Erasing payloads does not change the coinductive image. -/
+  theorem to_coind_erase_payloads : ∀ t : LocalTypeR, toCoind (erasePayloads t) = toCoind t
+    | .end => rfl
+    | .var _ => rfl
+    | .mu x body => by
+        simp only [erasePayloads, to_coind_mu, to_coind_erase_payloads body]
+    | .send p bs => by
+        simp only [erasePayloads, to_coind_send, to_coind_branches_erase_payloads bs]
+    | .recv p bs => by
+        simp only [erasePayloads, to_coind_recv, to_coind_branches_erase_payloads bs]
+
+  /-- Branch-list version of `to_coind_erase_payloads`. -/
+  theorem to_coind_branches_erase_payloads :
+      ∀ bs : List BranchR, toCoindBranches (erasePayloadsBranches bs) = toCoindBranches bs
+    | [] => rfl
+    | (lb, _vt, t) :: rest => by
+        simp only [erasePayloadsBranches, toCoindBranches, to_coind_erase_payloads t,
+          to_coind_branches_erase_payloads rest]
+end
+
+-- toCoind Injectivity up to Payload Erasure
+
+mutual
+  theorem to_coind_injective_erase :
+      ∀ {t u : LocalTypeR}, toCoind t = toCoind u → erasePayloads t = erasePayloads u
     | .end, .end, _ => rfl
     | .end, .var _, h => by cases (congrArg head h)
     | .end, .mu _ _, h => by cases (congrArg head h)
@@ -56,10 +98,10 @@ mutual
           exact eq_of_heq hxhy.2
         have hchild : toCoind body = toCoind body' := by
           simpa using congrArg (fun f => f ()) hfun
-        exact congrArg (LocalTypeR.mu x) (to_coind_injective hchild)
+        exact congrArg (LocalTypeR.mu x) (to_coind_injective_erase hchild)
     | .mu _ _, .send _ _, h => by cases (congrArg head h)
     | .mu _ _, .recv _ _, h => by cases (congrArg head h)
-    -- toCoind Injectivity: Send/Recv Constructor Cases
+    -- toCoind Injectivity up to Payload Erasure: Send/Recv Constructor Cases
     | .send _ _, .end, h => by cases (congrArg head h)
     | .send _ _, .var _, h => by cases (congrArg head h)
     | .send _ _, .mu _ _, h => by cases (congrArg head h)
@@ -73,8 +115,8 @@ mutual
         have hbranches : toCoindBranches bs = toCoindBranches cs := by
           have h' := congrArg branchesOf h
           simpa [toCoind, branches_of_mk_send] using h'
-        have hbs : bs = cs := to_coind_branches_injective hbranches
-        subst hbs; rfl
+        have hbs := to_coind_branches_injective_erase hbranches
+        simp only [erasePayloads, hbs]
     | .send _ _, .recv _ _, h => by cases (congrArg head h)
 /- ## Structured Block 2 -/
     | .recv _ _, .end, h => by cases (congrArg head h)
@@ -91,13 +133,14 @@ mutual
         have hbranches : toCoindBranches bs = toCoindBranches cs := by
           have h' := congrArg branchesOf h
           simpa [toCoind, branches_of_mk_recv] using h'
-        have hbs : bs = cs := to_coind_branches_injective hbranches
-        subst hbs; rfl
+        have hbs := to_coind_branches_injective_erase hbranches
+        simp only [erasePayloads, hbs]
 
   -- toCoindBranches Injectivity
 
-  theorem to_coind_branches_injective :
-      ∀ {bs cs : List BranchR}, toCoindBranches bs = toCoindBranches cs → bs = cs
+  theorem to_coind_branches_injective_erase :
+      ∀ {bs cs : List BranchR}, toCoindBranches bs = toCoindBranches cs →
+        erasePayloadsBranches bs = erasePayloadsBranches cs
     | [], [], _ => rfl
     | [], _ :: _, h => by simp [toCoindBranches] at h
     | _ :: _, [], h => by simp [toCoindBranches] at h
@@ -108,12 +151,16 @@ mutual
           simpa [toCoindBranches] using h
         rcases hcons with ⟨hhead, htail⟩
         have hlabel : lb = lc := congrArg Prod.fst hhead
-        have ht : t = u := to_coind_injective (congrArg Prod.snd hhead)
-        have hvt : vt = wt := by simpa [toCoindBranches] using h
-        subst hlabel; subst ht; subst hvt
-        have hrest : bs = cs := to_coind_branches_injective htail
-        subst hrest; rfl
+        have ht := to_coind_injective_erase (congrArg Prod.snd hhead)
+        have hrest := to_coind_branches_injective_erase htail
+        simp only [erasePayloadsBranches, hlabel, ht, hrest]
 end
+
+/-- `toCoind` is injective up to payload erasure. -/
+theorem to_coind_eq_iff_erase_payloads {t u : LocalTypeR} :
+    toCoind t = toCoind u ↔ erasePayloads t = erasePayloads u := by
+  refine ⟨to_coind_injective_erase, fun h => ?_⟩
+  rw [← to_coind_erase_payloads t, ← to_coind_erase_payloads u, h]
 
 -- toCoindBranches Indexing
 
@@ -133,7 +180,11 @@ lemma to_coind_branches_get {bs : List BranchR} (i : Fin bs.length) :
       | zero =>
           cases b with
           | mk label rest => cases rest with | mk vt cont => simp [toCoindBranches, castFin, to_coind_branches_length]
-      | succ i => simpa [castFin, to_coind_branches_length] using ih i
+      | succ i =>
+          have h := ih i
+          simp only [castFin, List.get_eq_getElem, Fin.val_succ] at h ⊢
+          cases b with
+          | mk label rest => cases rest with | mk vt cont => simpa [toCoindBranches] using h
 
 /- ## Structured Block 3 -/
 lemma to_coind_branches_get_snd {bs : List BranchR} (i : Fin bs.length) :

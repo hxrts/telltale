@@ -296,7 +296,7 @@ theorem lookup_buf_update_buf_ne {bufs : Buffers} {e e' : Edge} {buf : Buffer}
         · simp [updateBuf, lookupBuf, List.lookup, h, hy, Option.getD]
         · have hbeq' : (e' == hd.1) = false := beq_eq_false_iff_ne.mpr hy
           simp [updateBuf, lookupBuf, List.lookup, h, hbeq', Option.getD]
-          simpa [lookupBuf] using ih
+          simpa [lookupBuf, Option.getD] using ih
 
 /-! ## Buffer Non-target Edge Corollaries -/
 /-- Enqueue at a different edge doesn't change lookup. -/

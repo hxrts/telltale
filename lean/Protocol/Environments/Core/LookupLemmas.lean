@@ -103,7 +103,7 @@ theorem update_s_env_append_left_of_mem {S₁ S₂ : SEnv} {x : Var} {T : ValTyp
         have hT'' : lookupSEnv tl x = some T' := by
           simp only [lookupSEnv, List.lookup] at hT'
           have hne : (x == hd.1) = false := beq_eq_false_iff_ne.mpr heq
-          simpa [hne] using hT'
+          simpa [lookupSEnv, hne] using hT'
         rw [ih ⟨T', hT''⟩]
 
 /-! ## GEnv Lookup/Update Core Lemmas -/
@@ -167,7 +167,7 @@ theorem lookup_g_mem (env : GEnv) (e : Endpoint) (L : LocalType)
   induction env with
   | nil =>
     simp only [List.lookup] at h
-    exact Option.noConfusion h
+    cases h
   | cons hd tl ih =>
     simp only [List.lookup] at h
     split at h

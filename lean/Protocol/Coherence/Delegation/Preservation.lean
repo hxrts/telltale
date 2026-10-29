@@ -312,6 +312,7 @@ theorem is_redirected_edge_respects_renaming (ρ : SessionRenaming)
   by_cases hSid : e.sid = s
   · -- e.sid = s: both redirects apply
     simp only [hSid, beq_self_eq_true, ↓reduceIte]
+    try rfl
   · -- e.sid ≠ s: neither redirect applies
     have hSidRen : ρ.f e.sid ≠ ρ.f s := fun h => hSid (ρ.inj e.sid s h)
     have hBeq : (e.sid == s) = false := beq_eq_false_iff_ne.mpr hSid

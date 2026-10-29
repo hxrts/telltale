@@ -56,9 +56,6 @@ structure FixedPhaseTerminationPremises
     (trace : SearchMachineTrace) where
   machineTrace : CanonicalMachineTrace goal trace
   reachableNodup : reachable.Nodup
-  finiteBranchingWithinReachable : Prop
-  deterministicSuccessorEnumeration : Prop
-  noInfiniteImprovementChurn : Prop
   invariantHolds : ∀ i, MachineInvariants goal (trace i)
   closedWithinReachable :
     ∀ i ⦃node : Nat⦄, node ∈ (trace i).closedNodes → node ∈ reachable
@@ -365,7 +362,7 @@ theorem canonical_machine_goal_reached_from_ready_witness_path
             exact (by simpa using hLast : head = goalEntry).symm
           subst hGoal
           have hMin : IsMinPriority (trace start).frontier goalEntry := by
-            simpa [frontierTraceOfMachineTrace] using hReady
+            simpa [PathReadyAt, frontierTraceOfMachineTrace] using hReady
           have hBatch : goalEntry ∈ executableServicedEntries (trace start) :=
             min_priority_entry_serviced_next_step hMin
           have hClosed :
@@ -430,9 +427,6 @@ structure ReachabilityCompletenessPremises
     reachableEntryPath.map FrontierEntry.node = reachableNodePath
   reachableReadyPath :
     PathReadyAt (frontierTraceOfMachineTrace trace) start reachableEntryPath
-  finiteReachableUniverse : Prop
-  heuristicAdmissible : Prop
-  heuristicConsistent : Prop
 
 /-- Completeness strengthened to a graph-reachability-driven statement over the
 executable machine trace. -/
@@ -479,9 +473,6 @@ structure RawSuccessorCompletenessPremises
       ∃ entryPath : List FrontierEntry,
         entryPath.map FrontierEntry.node = path ∧
         PathReadyAt (frontierTraceOfMachineTrace trace) start entryPath
-  finiteReachableUniverse : Prop
-  heuristicAdmissible : Prop
-  heuristicConsistent : Prop
 
 /-- Blanket completeness from raw successor semantics: any raw reachable goal
 is eventually reached once reachability is refined into the executable machine's
@@ -647,83 +638,82 @@ theorem canonical_serial_nonmin_entry_eventually_serviced_under_finite_better_en
   exact canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption
     hTrace (finite_better_entry_exhaustion_implies_bounded_strict_preemption hPremises)
 
-/-- Scheduler-facing public fairness premise bundle. This is intentionally
-phrased without bounded-better-arrival or finite-better-universe terminology;
-the scheduler supplies a direct service horizon. -/
+/-- One canonical serial step strictly shrinks the set of strictly better
+competitors of a present entry that is not yet min-priority: the min-key batch
+is strictly better than that entry and is removed, and the canonical step never
+adds entries. -/
+theorem strictlyBetterEntryCount_canonical_step_lt
+    {frontier : List FrontierEntry} {entry : FrontierEntry}
+    (hPresent : entry ∈ frontier) (hNotMin : ¬ IsMinPriority frontier entry) :
+    StrictlyBetterEntryCount (frontierAfterCanonicalStep frontier) entry <
+      StrictlyBetterEntryCount frontier entry := by
+  obtain ⟨other, hOther, hLt⟩ : ∃ other ∈ frontier, other.priority < entry.priority := by
+    by_contra h
+    push Not at h
+    exact hNotMin ⟨hPresent, h⟩
+  obtain ⟨m, hm⟩ := exists_minPriority_of_frontier_ne_nil (List.ne_nil_of_mem hPresent)
+  have hmBatch : m ∈ canonicalBatch frontier := min_priority_entry_serviced_next_step hm
+  have hmBetter : m.priority < entry.priority := lt_of_le_of_lt (hm.2 other hOther) hLt
+  unfold StrictlyBetterEntryCount frontierAfterCanonicalStep
+  rw [List.filter_filter, show (fun a : FrontierEntry =>
+      decide (a.priority < entry.priority) && decide (a ∉ canonicalBatch frontier)) =
+      (fun a => decide (a ∉ canonicalBatch frontier) && decide (a.priority < entry.priority)) from
+      funext fun _ => Bool.and_comm _ _, ← List.filter_filter]
+  exact List.length_filter_lt_length_iff_exists.mpr
+    ⟨m, by simp [hm.1, hmBetter], by simpa using hmBatch⟩
+
+/-- Canonical serial search services every present entry within one more step
+than its current number of strictly better competitors. The bound is derived
+from the scheduler model itself (`CanonicalSerialTrace`), not assumed. -/
+theorem canonical_serial_present_entry_serviced_within_strictly_better_count
+    {trace : FrontierTrace} (hTrace : CanonicalSerialTrace trace) :
+    ∀ (n start : Nat) (entry : FrontierEntry),
+      StrictlyBetterEntryCount (trace start) entry = n →
+      entry ∈ trace start → EventuallyServicedWithin trace start (n + 1) entry := by
+  intro n
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+  intro start entry hCount hPresent
+  by_cases hMin : IsMinPriority (trace start) entry
+  · rcases currently_min_priority_eventually_serviced_within_one_step hTrace hMin with
+      ⟨j, hj, h⟩
+    exact ⟨j, by omega, h⟩
+  have hLt := strictlyBetterEntryCount_canonical_step_lt hPresent hMin
+  rw [← hTrace start] at hLt
+  by_cases hNext : entry ∈ trace (start + 1)
+  · obtain ⟨j, hj, hAbs⟩ := ih _ (hCount ▸ hLt) (start + 1) entry rfl hNext
+    refine ⟨j + 1, by omega, ?_⟩
+    rw [show start + (j + 1) + 1 = start + 1 + j + 1 by omega]
+    exact hAbs
+  · exact ⟨0, by omega, by simpa using hNext⟩
+
+/-- Scheduler-facing public fairness premise bundle: the trace follows the
+canonical serial scheduler and the entry is present at the start. No drain or
+service-horizon assumption is taken; the horizon is computed. -/
 structure SchedulerFairnessPremises
     (trace : FrontierTrace)
     (start : Nat)
-    (entry : FrontierEntry) where
+    (entry : FrontierEntry) : Prop where
   canonicalTrace : CanonicalSerialTrace trace
-  serviceHorizon : Nat
-  presentAcrossHorizon :
-    ∀ j, j ≤ serviceHorizon → entry ∈ trace (start + j)
-  initialSchedulerBound :
-    StrictlyBetterEntryCount (trace start) entry ≤ serviceHorizon
-  schedulerDrainsStrictlyBetterWork :
-    ∀ j, j < serviceHorizon →
-      entry ∈ trace (start + j) →
-      ¬ IsMinPriority (trace (start + j)) entry →
-      StrictlyBetterEntryCount (trace (start + j + 1)) entry <
-        StrictlyBetterEntryCount (trace (start + j)) entry
+  presentAtStart : entry ∈ trace start
 
-/-- The scheduler-facing premise bundle implies bounded strict preemption, but
-the public theorem surface no longer names that older internal lemma family. -/
-theorem scheduler_fairness_implies_internal_bounded_preemption
-    {trace : FrontierTrace}
-    {start : Nat}
-    {entry : FrontierEntry}
-    (hPremises : SchedulerFairnessPremises trace start entry) :
-    BoundedStrictPreemptionPremises trace start hPremises.serviceHorizon entry := by
-  refine
-    { presentAcrossWindow := hPremises.presentAcrossHorizon
-    , initialStrictlyBetterBound := hPremises.initialSchedulerBound
-    , strictlyBetterDecreasesWhileNonMin := hPremises.schedulerDrainsStrictlyBetterWork
-    }
+/-- Derived service horizon: the number of strictly better competitors at the
+start. -/
+def SchedulerFairnessPremises.serviceHorizon
+    {trace : FrontierTrace} {start : Nat} {entry : FrontierEntry}
+    (_ : SchedulerFairnessPremises trace start entry) : Nat :=
+  StrictlyBetterEntryCount (trace start) entry
 
-/-- Under explicit scheduler fairness, a continuously live non-min entry is
-eventually serviced without exposing bounded-better-arrival assumptions in the
-public theorem statement. -/
+/-- Under the canonical serial scheduler, a present non-min entry is serviced
+within its derived service horizon plus one step. -/
 theorem canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness
     {trace : FrontierTrace}
     {start : Nat}
     {entry : FrontierEntry}
     (hPremises : SchedulerFairnessPremises trace start entry) :
-    EventuallyServicedWithin trace start (hPremises.serviceHorizon + 1) entry := by
-  exact canonical_serial_nonmin_entry_eventually_serviced_under_bounded_strict_preemption
-    hPremises.canonicalTrace
-    (scheduler_fairness_implies_internal_bounded_preemption hPremises)
-
-/-- Premise bundle for eventual publication of an optimal goal incumbent. -/
-structure OptimalGoalPublicationPremises
-    (goal : Nat)
-    (trace : SearchMachineTrace)
-    (start bound optimalCost : Nat) where
-  publicationPremises : GoalPublicationPremises goal trace start bound
-  heuristicAdmissible : Prop
-  heuristicConsistent : Prop
-  publishedGoalIncumbentHasOptimalCost :
-    ∀ ⦃i : Nat⦄ ⦃commit : NormalizedCommit⦄,
-      (trace i).incumbent = some commit →
-      commit.node = goal →
-      commit.gScore = optimalCost
-
-/-- Under explicit admissibility and consistency premises, eventual goal
-publication can be strengthened to eventual optimal-goal publication. -/
-theorem eventual_optimal_goal_publication_under_admissible_consistent_heuristic
-    {goal start bound optimalCost : Nat}
-    {trace : SearchMachineTrace}
-    (hPremises : OptimalGoalPublicationPremises goal trace start bound optimalCost) :
-    ∃ j, j < bound ∧
-      ∃ commit,
-        (trace (start + j + 1)).incumbent = some commit ∧
-        commit.node = goal ∧
-        commit.gScore = optimalCost := by
-  rcases goal_reachability_connects_to_incumbent_publication
-      hPremises.publicationPremises with
-    ⟨j, hj, commit, hIncumbent, hGoal⟩
-  refine ⟨j, hj, commit, hIncumbent, hGoal, ?_⟩
-  exact hPremises.publishedGoalIncumbentHasOptimalCost hIncumbent hGoal
+    EventuallyServicedWithin trace start (hPremises.serviceHorizon + 1) entry :=
+  canonical_serial_present_entry_serviced_within_strictly_better_count
+    hPremises.canonicalTrace _ start entry rfl hPremises.presentAtStart
 
 end Search
 end Proofs

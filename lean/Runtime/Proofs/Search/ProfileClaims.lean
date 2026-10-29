@@ -49,21 +49,25 @@ def fairnessClaimClass : SearchExecutionProfile → FairnessClaimClass
   | .batchedParallelExact => .premisedWindowBounded
   | .batchedParallelEnvelopeBounded => .premisedWindowBounded
 
-/-- The reduced threaded exact single-lane step refines canonical serial search
-exactly. This models the real implementation boundary: parallel successor
-generation does not change the frozen legal batch or the normalized committed
-post-state. -/
+/-- The threaded exact single-lane step refines canonical serial search
+exactly: for every lane width and every lane completion order, lane-partitioned
+batch processing followed by the deterministic batch-index merge yields the
+canonical post-step frontier. -/
 theorem threaded_exact_single_lane_step_refines_canonical
-    (frontier : List FrontierEntry) :
-    frontierAfterThreadedExactSingleLaneStep frontier =
+    (frontier : List FrontierEntry) (schedule : LaneSchedule frontier) :
+    frontierAfterThreadedExactSingleLaneStep frontier schedule =
       frontierAfterCanonicalStep frontier :=
-  rfl
+  congrArg StepArtifact.nextFrontier (threaded_step_artifact_eq_canonical frontier schedule)
 
-/-- Canonical serial search has an unconditional exact fairness claim for the
-current legal min-key batch. -/
-theorem canonical_serial_profile_has_exact_one_step_fairness :
-    fairnessClaimClass .canonicalSerial = .exactOneStep :=
-  rfl
+/-- Canonical serial search has an unconditional exact one-step fairness
+theorem for the current legal min-key batch: every frozen frontier satisfies
+`OneStepFair`, i.e. every min-priority entry is gone after one canonical step.
+The public claim tag `fairnessClaimClass .canonicalSerial = .exactOneStep` is
+backed by this statement. -/
+theorem canonical_serial_profile_has_exact_one_step_fairness
+    (frontier : List FrontierEntry) :
+    fairnessClaimClass .canonicalSerial = .exactOneStep ∧ OneStepFair frontier :=
+  ⟨rfl, canonical_serial_batch_is_one_step_fair frontier⟩
 
 /-- Canonical serial search services a goal entry within one step once that
 entry is in the current legal min-key batch. This is the route-discovery-facing
@@ -79,8 +83,9 @@ claim because its reduced one-step semantics refine canonical serial search
 exactly. -/
 theorem threaded_exact_single_lane_has_exact_one_step_fairness
     {frontier : List FrontierEntry} {entry : FrontierEntry}
+    (schedule : LaneSchedule frontier)
     (hMin : IsMinPriority frontier entry) :
-    entry ∉ frontierAfterThreadedExactSingleLaneStep frontier := by
+    entry ∉ frontierAfterThreadedExactSingleLaneStep frontier schedule := by
   rw [threaded_exact_single_lane_step_refines_canonical]
   exact canonical_serial_one_step_fair_for_min_priority_entries hMin
 
@@ -88,18 +93,20 @@ theorem threaded_exact_single_lane_has_exact_one_step_fairness
 suffix bound through exact one-step refinement to canonical serial search. -/
 theorem threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound
     {frontier : List FrontierEntry} {entry : FrontierEntry}
+    (schedule : LaneSchedule frontier)
     (hMin : IsMinPriority frontier entry) :
-    entry ∉ frontierAfterThreadedExactSingleLaneStep frontier := by
+    entry ∉ frontierAfterThreadedExactSingleLaneStep frontier schedule := by
   rw [threaded_exact_single_lane_step_refines_canonical]
   exact canonical_serial_goal_window_service_has_exact_suffix_bound hMin
 
 /-- Threaded exact single-lane search also inherits exact reduced observation
 equivalence to canonical serial search across the claimed search boundary. -/
 theorem threaded_exact_single_lane_has_exact_observation_equivalence
-    (frontier : List FrontierEntry) :
-    observationSliceOfStepArtifact (threadedExactSingleLaneStepArtifact frontier) =
+    (frontier : List FrontierEntry) (schedule : LaneSchedule frontier) :
+    observationSliceOfStepArtifact (threadedExactSingleLaneStepArtifact frontier schedule) =
       observationSliceOfStepArtifact (canonicalStepArtifact frontier) :=
-  threaded_exact_single_lane_commit_trace_refinement_implies_observation_equivalence frontier
+  threaded_exact_single_lane_commit_trace_refinement_implies_observation_equivalence
+    frontier schedule
 
 /-- Batched exact search has no unconditional fairness theorem in this module.
 Its fairness claim is intentionally premise-scoped. -/
@@ -175,7 +182,7 @@ theorem certified_window_trace_is_valid_for_exact_batch_service
       (fun j => certifiedWindowTraceEntryOfCertificate (trace (start + j.1)) (certificates j)) := by
   intro j
   constructor
-  · simpa using hBound j
+  · simpa [certifiedWindowTraceEntryOfCertificate] using hBound j
   · simp [certifiedWindowTraceEntryOfCertificate, hBatchExact j]
 
 /-- Envelope-bounded batched search now carries a theorem-backed certified

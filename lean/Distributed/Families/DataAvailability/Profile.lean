@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 /-! # Distributed.Families.DataAvailability.Profile
 
-Profile constructors for data-availability theorem-pack attachment.
+Profile constructors for DA theorem-pack attachment.
 -/
 
 namespace Distributed
@@ -13,15 +13,11 @@ namespace Profile
 
 universe u v
 
-/-- Build a data-availability profile from shard and reconstruction assumptions. -/
-def mk
-    {State : Type u} {Chunk : Type v}
-    (model : Model State Chunk)
-    (assumptions : Assumptions model)
-    :
-    DAProtocol where
-  State := State
-  Chunk := Chunk
+/-- Build a DA profile from an erasure-coding model and its assumptions. -/
+def mk {F : Type u} [Field F] {Party : Type v} [DecidableEq Party]
+    (model : Model F Party) (assumptions : Assumptions model) : DAProtocol where
+  Field := F
+  Party := Party
   model := model
   assumptions := assumptions
 

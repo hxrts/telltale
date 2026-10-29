@@ -25,7 +25,7 @@ def gfp {R : Type*} [CompleteLattice R] {F : R → R} [CoinductiveRel R F] : R :
 /-- The greatest fixed point is a fixed point: `F gfp = gfp`. -/
 theorem gfp_fixed {R : Type*} [CompleteLattice R] {F : R → R} [CoinductiveRel R F] :
     F (gfp (F := F)) = gfp (F := F) := by
-  simpa [gfp] using (OrderHom.isFixedPt_gfp ⟨F, CoinductiveRel.mono⟩)
+  exact OrderHom.isFixedPt_gfp ⟨F, CoinductiveRel.mono⟩
 
 /-- Simp lemma: the greatest fixed point is a fixed point. -/
 @[simp] theorem gfp_fixed_simp {R : Type*} [CompleteLattice R] {F : R → R} [CoinductiveRel R F] :

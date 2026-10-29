@@ -43,10 +43,12 @@ theorem safe_finality_of_protocol (P : SafetyProtocol) :
   fun hFinalized d' hCommitted =>
     safe_finality_of_assumptions P.assumptions hFinalized d' hCommitted
 
-/-- Core assumptions are always validated for a certified protocol. -/
+/-- The threshold check passes on the parameters of every certified protocol. -/
 theorem core_assumptions_all_passed (P : SafetyProtocol) :
-    (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
+    (runAssumptionValidation P.assumptions.params coreAssumptions).allPassed = true := by
+  have hT := P.assumptions.threshold
+  simp [runAssumptionValidation, allAssumptionsPassed, validateAssumptions,
+    validateAssumption, coreAssumptions, Assumption.Holds, hT]
 
 end QuorumGeometry
 end Distributed

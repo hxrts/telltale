@@ -1,5 +1,7 @@
 
 import Runtime.Proofs.TheoremPack.Build
+import Mathlib.Data.ZMod.Basic
+import Mathlib.Tactic.FinCases
 
 /- ## Structured Block 1 -/
 set_option autoImplicit false
@@ -59,38 +61,52 @@ theorem bft_quorum_spec_assumptions_passed :
 
 /-! ## Concrete Timed Profiles -/
 
-/-- Tiny partial-synchrony model whose timed-run predicates are explicit. -/
+/-- Timing for the partial-synchrony example: 3 parties, views of length 2,
+post-GST delay bound 1, GST at time 4. -/
+def psParams : Distributed.PartialSynchrony.Rounds.Params :=
+  { n := 3, viewLen := 2, delta := 1, gst := 4 }
+
+/-- Example run: party 1 is Byzantine; before GST every delay is 5 (views
+time out), after GST every delay is 1. -/
+def psRun : Distributed.PartialSynchrony.Rounds.RoundRun where
+  honest := fun p => p != 1
+  proposeDelay := fun v => if v * 2 < 4 then 5 else 1
+  voteDelay := fun v => if v * 2 < 4 then 5 else 1
+
+/-- View success is decidable for the example run. -/
+instance : DecidablePred (Distributed.PartialSynchrony.Rounds.ViewDecides psParams psRun) :=
+  fun v => by unfold Distributed.PartialSynchrony.Rounds.ViewDecides; infer_instance
+
+/-- Abstract model over time `t : Nat`: a decision is reported once some view
+of `psRun` has decided by time `t`. -/
 def timedPartialSynchronyModel :
     Distributed.PartialSynchrony.Model Nat Unit Unit Unit where
   initial := fun s => s = 0
-  step := fun s _ => some s
-  decide := fun _ => some ()
-  messageDelayBoundedAfterGST := fun _ gst bound => gst = 0 ∧ bound = 0
-  pacemakerFairAfterGST := fun _ gst => gst = 0
-  leaderCorrectAfterGST := fun _ gst => gst = 0
+  step := fun s _ => some (s + 1)
+  decide := fun t =>
+    if ∃ v, v < t ∧ Distributed.PartialSynchrony.Rounds.ViewDecides psParams psRun v ∧
+        (v + 1) * 2 ≤ t then some () else none
 
-/-- Proof-carrying timed assumptions for the tiny partial-synchrony model. -/
+/-- `psRun` respects the post-GST delay bound. -/
+theorem psRun_admissible : Distributed.PartialSynchrony.Rounds.Admissible psParams psRun := by
+  intro v hv
+  simp only [psParams] at hv
+  simp [psRun, psParams, show ¬ v * 2 < 4 by omega]
+
+/-- Fair runs are the identity clock; they refine `psRun`. -/
 def timedPartialSynchronyAssumptions :
     Distributed.PartialSynchrony.Assumptions timedPartialSynchronyModel where
-  FairRun := fun run => run 0 = 0
-  gst := 0
-  messageDelayBound := 0
-  postGSTBound := 0
-  postGSTMessageDelay := by
-    intro _run _hFair _hInit
-    exact ⟨rfl, rfl⟩
-  fairPacemakerAfterGST := by
-    intro _run _hFair _hInit
-    rfl
-  correctLeaderAfterGST := by
-    intro _run _hFair _hInit
-    rfl
-  postGSTProgress := by
-    intro _run _hFair _hInit
-    exact ⟨0, Nat.le_refl 0, (), rfl⟩
-  boundedWindowProgress := by
-    intro _run _hFair _hInit
-    exact ⟨0, Nat.le_refl 0, (), rfl⟩
+  FairRun := fun run => run = id
+  params := psParams
+  timing := by decide
+  realizedByRounds := by
+    rintro run rfl _
+    refine ⟨psRun, psRun_admissible, ⟨0, by decide, rfl⟩, ?_⟩
+    rintro t ⟨v, hv, hle⟩
+    refine ⟨(), ?_⟩
+    simp only [psParams] at hle
+    simp only [timedPartialSynchronyModel, id]
+    exact ite_eq_left_iff.2 fun h => absurd ⟨v, by omega, hv, hle⟩ h
 
 /-- Concrete partial-synchrony profile used by theorem-pack examples. -/
 def timedPartialSynchronyProfile : Distributed.PartialSynchrony.LivenessProtocol :=
@@ -140,31 +156,74 @@ def timedResponsivenessProfile : Distributed.Responsiveness.ResponsiveProtocol :
 
 /-! ## Concrete Nakamoto Profile -/
 
-/-- Tiny Nakamoto model with explicit chain, probability, churn, and quality semantics. -/
-def tinyNakamotoModel : Distributed.Nakamoto.Model Nat Unit Unit where
+/-- Production schedule: every third round (`t % 3 = 2`) is adversarial. -/
+def nkSched (t : Nat) : Bool := t % 3 != 2
+
+/-- Any three consecutive rounds contain exactly one adversarial round. -/
+theorem nk_adv_three (s n : Nat) :
+    Distributed.Nakamoto.LongestChain.advIn nkSched s (n + 3) =
+      Distributed.Nakamoto.LongestChain.advIn nkSched s n + 1 := by
+  simp only [Distributed.Nakamoto.LongestChain.advIn, nkSched]
+  rw [show s + (n + 1) = s + n + 1 by omega, show s + (n + 2) = s + n + 2 by omega]
+  simp only [bne_iff_ne, ne_eq]
+  split_ifs <;> omega
+
+/-- Adversarial rounds in a window of `n` rounds are at most `⌈n/3⌉`. -/
+theorem nk_adv_le (s n : Nat) :
+    Distributed.Nakamoto.LongestChain.advIn nkSched s n ≤ (n + 2) / 3 := by
+  induction n using Nat.strong_induction_on with
+  | _ n ih =>
+    match n with
+    | 0 => simp [Distributed.Nakamoto.LongestChain.advIn]
+    | 1 => simp only [Distributed.Nakamoto.LongestChain.advIn]; split <;> omega
+    | 2 =>
+      simp only [Distributed.Nakamoto.LongestChain.advIn, nkSched, bne_iff_ne, ne_eq]
+      split_ifs <;> omega
+    | m + 3 => rw [nk_adv_three]; have := ih m (by omega); omega
+
+/-- The schedule has an honest (weak) majority in every window of `≥ 2` rounds. -/
+theorem nk_window (T : Nat) :
+    Distributed.Nakamoto.LongestChain.WindowHonestMajorityUpTo nkSched 2 T := by
+  intro s _ n _ _ hn
+  have h1 := nk_adv_le s n
+  have h2 := Distributed.Nakamoto.LongestChain.honestIn_add_advIn nkSched s n
+  omega
+
+/-- Longest-chain execution of `nkSched` (block `t` is minted as `t`) in which
+the adversary always withholds its private branch. -/
+def nkExec : Nat → Distributed.Nakamoto.LongestChain.LCState Nat
+  | 0 => Distributed.Nakamoto.LongestChain.init
+  | t + 1 => Distributed.Nakamoto.LongestChain.produce nkSched id t (nkExec t)
+
+/-- `nkExec` is a run of the longest-chain protocol. -/
+theorem nkExec_isRun : Distributed.Nakamoto.LongestChain.IsRun nkSched id nkExec :=
+  ⟨rfl, fun _ => Distributed.Nakamoto.LongestChain.AdvAct.wait _⟩
+
+/-- Nakamoto model over time: the observed chain is the public chain of `nkExec`. -/
+def tinyNakamotoModel : Distributed.Nakamoto.Model Nat Nat Unit where
   initial := fun s => s = 0
-  chain := fun _ => [()]
+  chain := fun t => (nkExec t).pub
   honestWeight := fun chain => chain.length
   failureProbabilityAtDepth := fun _ => 0
-  adversarialPowerBounded := (0 : Nat) = 0
+  adversarialPowerBounded :=
+    Distributed.Nakamoto.LongestChain.WindowHonestMajorityUpTo nkSched 2 12
   churnWithin := fun _run churnBudget => 0 ≤ churnBudget
 
-/-- Proof-carrying assumptions for the tiny Nakamoto model. -/
+/-- Assumptions: admissible runs are the identity clock, realised by `nkExec`. -/
 def tinyNakamotoAssumptions :
     Distributed.Nakamoto.Assumptions tinyNakamotoModel where
-  AdmissibleRun := fun _run => (0 : Nat) = 0
+  AdmissibleRun := fun run => run = id
   ε := 0
-  settlementDepth := 0
+  settlementDepth := 2
   churnBudget := 0
   growthWindow := 0
   minGrowth := 0
   qualityWindow := 0
   minHonestWeight := 0
-  probabilityBudget := by
-    exact ⟨rfl, le_rfl⟩
-  commonPrefix := by
-    intro _run _hRun _i _j _pref _hij hPrefix _hDepth
-    exact hPrefix
+  probabilityBudget := ⟨nk_window 12, le_rfl⟩
+  realizedByLongestChain := by
+    rintro run rfl
+    exact ⟨nkSched, id, nkExec, nkExec_isRun, nk_window, fun _ => rfl⟩
   chainGrowth := by
     intro _run _hRun _i
     exact Nat.le_refl _
@@ -181,35 +240,42 @@ def tinyNakamotoProfile : Distributed.Nakamoto.SecurityProtocol :=
 
 /-! ## Concrete DA and Accountable-Safety Profiles -/
 
-/-- Tiny DA model with one shard and a threshold reconstruction predicate. -/
-def tinyDAModel : Distributed.DataAvailability.Model Unit Unit where
-  n := 1
-  k := 1
-  shards := fun _ => [()]
-  validShard := fun _ _ => (0 : Nat) = 0
-  sampled := fun _ _ => (0 : Nat) = 0
-  reconstructs := fun _ chunks => 1 ≤ chunks.length
-  withheld := fun _ _ => (1 : Nat) = 0
+instance : Fact (Nat.Prime 5) := ⟨by norm_num⟩
 
-/-- Proof-carrying assumptions for the tiny DA model. -/
-def tinyDAAssumptions :
+open Polynomial in
+/-- Reed–Solomon DA example over `ZMod 5`: data `X + 1` (degree 1, `k = 2`),
+three shards at points `0, 1, 2`, custodian `i` holds shard `i`; custodian 2
+is Byzantine and returns garbage. Commitments check the true evaluation. -/
+noncomputable def tinyDAModel : Distributed.DataAvailability.Model (ZMod 5) (Fin 3) where
+  n := 3
+  k := 2
+  points := fun i => (i.val : ZMod 5)
+  data := X + C 1
+  custody := id
+  response := fun p => if p = 2 then 0 else (X + C 1 : (ZMod 5)[X]).eval (p.val : ZMod 5)
+  verify := fun i y => y = (X + C 1 : (ZMod 5)[X]).eval (i.val : ZMod 5)
+
+open Polynomial in
+/-- Assumptions for the DA example: honest custodians `{0, 1}`. -/
+noncomputable def tinyDAAssumptions :
     Distributed.DataAvailability.Assumptions tinyDAModel where
-  kOfNWellFormed := ⟨Nat.le_refl 1, Nat.succ_pos 0⟩
-  samplingCoversValidShards := by
-    intro _s _c _hMem _hValid
-    rfl
-  withholdingBound := by
-    intro _s _c _hMem _hValid hWithheld
-    exact Nat.succ_ne_zero 0 hWithheld
-  reconstructionQuorumAvailable := by
-    intro _s
-    exact ⟨[()], Nat.le_refl 1, by intro _c _hMem; exact ⟨List.mem_singleton_self (), rfl, rfl⟩⟩
-  reconstructionSound := by
-    intro _s _chunks hQuorum
-    exact hQuorum.1
+  honest := {0, 1}
+  pointsInjective := by
+    intro i j h
+    fin_cases i <;> fin_cases j <;> first | rfl | (exfalso; revert h; decide)
+  dataDegree := by
+    show (X + C (1 : ZMod 5)).degree < ((2 : Nat) : WithBot Nat)
+    rw [degree_X_add_C]; exact_mod_cast (by norm_num : (1 : Nat) < 2)
+  verifyBinding := fun _ _ h => h
+  verifyComplete := fun _ => rfl
+  honestServes := by
+    intro p hp
+    fin_cases p <;> simp_all [tinyDAModel]
+  custodyDistinct := fun _ _ _ _ h => h
+  honestCustodians := by decide
 
 /-- Concrete DA profile used by theorem-pack examples. -/
-def tinyDAProfile : Distributed.DataAvailability.DAProtocol :=
+noncomputable def tinyDAProfile : Distributed.DataAvailability.DAProtocol :=
   Distributed.DataAvailability.Profile.mk tinyDAModel tinyDAAssumptions
 
 /-- Tiny accountable-safety model where every conflict constructs one fault evidence object. -/

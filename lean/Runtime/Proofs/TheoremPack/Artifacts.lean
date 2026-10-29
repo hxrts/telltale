@@ -164,19 +164,19 @@ def ProofCarryingArtifactMetadata.ofInvariantSpace
 
 structure FLPLowerBoundArtifact where
   protocol : Distributed.FLP.ImpossibilityProtocol
-  proof : ∃ run, protocol.premises.FairRun run ∧ ∀ n, protocol.premises.Uncommitted (run n)
+  proof : Distributed.FLP.NonDecidingRun protocol
 
 /-- Packaged FLP impossibility artifact. -/
 structure FLPImpossibilityArtifact where
   protocol : Distributed.FLP.ImpossibilityProtocol
-  proof : ¬ Distributed.FLP.TerminatesOnAllFairRuns protocol.model protocol.premises.FairRun
+  proof : ¬ Distributed.FLP.Async.Termination protocol.protocol
 
 /-! ## Consensus Impossibility and Quorum -/
 
 /-- Packaged CAP impossibility artifact. -/
 structure CAPImpossibilityArtifact where
   protocol : Distributed.CAP.ImpossibilityProtocol
-  proof : ¬ Distributed.CAP.CAPGuarantee protocol.model protocol.premises.PartitionRun
+  proof : ¬ Distributed.CAP.CAPGuarantee protocol
 
 /-- Packaged quorum-geometry safety artifact. -/
 structure QuorumGeometryArtifact where
@@ -239,7 +239,7 @@ structure ReconfigurationArtifact where
   safeHandoff :
     Distributed.Reconfiguration.SafeHandoff protocol.model
   livenessPreserved :
-    Distributed.Reconfiguration.LivenessPreserved protocol.model
+    Distributed.Reconfiguration.LivenessPreserved protocol.model protocol.assumptions.byzantine
 
 /-! ## Chain and Reconfiguration Safety -/
 
@@ -339,17 +339,11 @@ structure CRDTArtifact where
       protocol.model protocol.premises.approxPolicy
       protocol.premises.referenceRun protocol.premises.deployedRun
   hcrdtCore : Distributed.CRDT.HcrdtCore protocol.model
-  hcrdtFoundation : Distributed.CRDT.HcrdtFoundation protocol.model
-  hcrdtDynamics : Distributed.CRDT.HcrdtDynamics protocol.model
-  hcrdtExtensions : Distributed.CRDT.HcrdtExtensions protocol.model
-  hcrdtLimits : Distributed.CRDT.HcrdtLimits protocol.model
 
 -- Packaged CRDT monotonicity artifact surfaced independently in theorem packs.
 /-- Packaged CRDT monotonicity artifact. -/
 structure CRDTMonotonicityArtifact where
   protocol : Distributed.CRDT.CRDTProtocol
-  semilatticeCore : protocol.model.semilatticeCoreClass
-  opContextLayer : protocol.model.opContextLayerClass
   mergeInflationary :
     Distributed.CRDT.MergeInflationary protocol.premises.stateSemantics
   mergeMonotone :

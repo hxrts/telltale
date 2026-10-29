@@ -1,5 +1,6 @@
 import Distributed.Model.Assumptions
 import Distributed.Model.ConsensusEnvelope
+import Distributed.Model.ConsensusEnvelopeAdequacy
 import Distributed.Families.FLP
 import Distributed.Families.CAP
 import Distributed.Families.QuorumGeometry

@@ -1,33 +1,20 @@
-import Protocol.Coherence
+import Protocol.CrashToleranceCore
 import Runtime.ProtocolMachine.Runtime.Failure
 
-/-
-The Problem. Determine the exact set of participants that can crash while
-still allowing a protocol to complete. This requires characterizing:
-1. Which participants are "critical" (their crash prevents completion)
-2. What is the maximum crash-set that still permits progress
+/-! # Crash Tolerance for the Protocol Machine
 
-The difficulty is that crash tolerance depends on the communication graph:
-if role A is the only path from B to C, then A is critical.
-
-Solution Structure.
-1. Define the residual communication graph after crashes
-2. Characterize reachability in the residual graph
-3. Prove the iff: protocol can complete ↔ residual graph is connected
-4. Derive the exact crash-set characterization
+Connects the graph-level crash-tolerance theory of `Protocol.CrashToleranceCore`
+to `ProtocolMachineState` and the failure-aware step relation `FStep`.
 -/
 
-/-! # Crash Tolerance for MPST
+/-
+The Problem. Lift residual-graph crash tolerance to protocol machine states and
+show which failure steps preserve it.
 
-Characterizes exactly which participants can crash while still allowing
-protocol completion. Ported from Aristotle files 03, 04, 04b, 04c.
-
-## Expose
-
-- `ResidualGraph` : communication graph after removing crashed participants
-- `CrashTolerant` : protocol can complete despite given crash set
-- `MaxCrashSet` : largest set of participants that can crash
-- `crash_tolerance_iff` : exact characterization theorem -/
+Solution Structure. Project sites to crashed roles, extract session graphs,
+prove graph invariance under topology-only steps and close-on-crash, and
+preserve tolerance across `FStep` with explicit per-case side conditions.
+-/
 
 set_option linter.mathlibStandardSet false
 set_option relaxedAutoImplicit false
@@ -38,202 +25,6 @@ open scoped Classical
 section
 
 universe u
-
-/-! ## Communication Graph -/
-
-/-- The communication graph of a session: directed edges between participants. -/
-structure CommGraph where
-  /-- Participants in the session. -/
-  participants : List Role
-  /-- Directed communication edges. -/
-  edges : List (Role × Role)
-  /-- All edge endpoints are participants. -/
-  edges_in_participants : ∀ e ∈ edges, e.1 ∈ participants ∧ e.2 ∈ participants
-
-/-- A path in the communication graph. -/
-inductive CommPath (G : CommGraph) : Role → Role → Prop where
-  /-- Empty path from a node to itself. -/
-  | refl (r : Role) (hr : r ∈ G.participants) : CommPath G r r
-  /-- Extend path by one edge. -/
-  | step {r₁ r₂ r₃ : Role} :
-      CommPath G r₁ r₂ → (r₂, r₃) ∈ G.edges → CommPath G r₁ r₃
-
-/-- The graph is connected if there's a path between any two participants. -/
-def CommGraph.connected (G : CommGraph) : Prop :=
-  ∀ r₁ r₂, r₁ ∈ G.participants → r₂ ∈ G.participants → CommPath G r₁ r₂
-
-/-! ## Residual Graph After Crashes -/
-
-/-- The residual graph after removing crashed participants. -/
-def residualGraph (G : CommGraph) (crashed : List Role) : CommGraph where
-  participants := G.participants.filter (fun r => decide (r ∉ crashed))
-  edges := G.edges.filter (fun e => decide (e.1 ∉ crashed ∧ e.2 ∉ crashed))
-  edges_in_participants := by
-    intro ⟨r₁, r₂⟩ hmem
-    simp only [List.mem_filter, decide_eq_true_eq] at hmem ⊢
-    have ⟨hmemE, hnotCrash⟩ := hmem
-    have hIn := G.edges_in_participants (r₁, r₂) hmemE
-    exact ⟨⟨hIn.1, hnotCrash.1⟩, ⟨hIn.2, hnotCrash.2⟩⟩
-
-/-- Residual graph preserves participant membership for survivors. -/
-theorem residual_participants {G : CommGraph} {crashed : List Role} {r : Role}
-    (hr : r ∈ G.participants) (hNotCrashed : r ∉ crashed) :
-    r ∈ (residualGraph G crashed).participants := by
-  simp only [residualGraph, List.mem_filter, decide_eq_true_eq]
-  exact ⟨hr, hNotCrashed⟩
-
-/-! ## Crash Tolerance -/
-
-/-- A crash set is tolerable if the residual graph is still connected. -/
-def CrashTolerant (G : CommGraph) (crashed : List Role) : Prop :=
-  (residualGraph G crashed).connected
-
-/-- The empty crash set is always tolerable (if the graph was connected). -/
-theorem empty_crash_tolerant (G : CommGraph) (hConn : G.connected) :
-    CrashTolerant G [] := by
-  simp only [CrashTolerant]
-  intro r₁ r₂ hr₁ hr₂
-  -- Residual graph with empty crash set equals original graph.
-  have hRes : residualGraph G [] = G := by
-    simp only [residualGraph]
-    congr 1
-    · simp only [List.filter_eq_self]
-      intro r _; simp
-    · simp only [List.filter_eq_self]
-      intro e _; simp
-  rw [hRes] at hr₁ hr₂ ⊢
-  exact hConn r₁ r₂ hr₁ hr₂
-
-/-! ## Critical Participants -/
-
-/-- A participant is critical if their crash disconnects the graph. -/
-def Critical (G : CommGraph) (r : Role) : Prop :=
-  r ∈ G.participants ∧ ¬ CrashTolerant G [r]
-
-/-- Non-critical participants can crash without disconnecting the graph. -/
-def NonCritical (G : CommGraph) (r : Role) : Prop :=
-  r ∈ G.participants ∧ CrashTolerant G [r]
-
-/-- Every participant is either critical or non-critical. -/
-theorem critical_or_noncritical (G : CommGraph) (r : Role) (hr : r ∈ G.participants) :
-    Critical G r ∨ NonCritical G r := by
-  by_cases h : CrashTolerant G [r]
-  · right; exact ⟨hr, h⟩
-  · left; exact ⟨hr, h⟩
-
-/-! ## Maximum Crash Set -/
-
-/-- A crash set is maximal if adding any survivor would disconnect the graph. -/
-def MaxCrashSet (G : CommGraph) (crashed : List Role) : Prop :=
-  CrashTolerant G crashed ∧
-  ∀ r, r ∈ G.participants → r ∉ crashed → ¬ CrashTolerant G (r :: crashed)
-
-/-- If no participants are critical, all but one can crash. -/
-theorem max_crash_all_noncritical (G : CommGraph)
-    (_hNonCrit : ∀ r ∈ G.participants, NonCritical G r)
-    (hNonempty : G.participants ≠ []) :
-    ∃ crashed : List Role, MaxCrashSet G crashed ∧ crashed.length ≤ G.participants.length := by
-  -- In the current residual-graph model, crashing all listed participants is maximal.
-  refine ⟨G.participants, ?_, le_rfl⟩
-  constructor
-  · -- Residual graph is vacuously connected when no participants survive.
-    unfold CrashTolerant CommGraph.connected residualGraph
-    intro r₁ r₂ hr₁
-    simp at hr₁
-  · intro r hr hnot
-    exact (hnot hr).elim
-
-/-! ## Exact Characterization -/
-
-/-- The exact crash tolerance theorem: a crash set is tolerable iff
-    the residual graph remains connected.
-
-    This is the main theoretical contribution: an iff characterization
-    that provides both a necessary and sufficient condition. -/
-theorem crash_tolerance_iff (G : CommGraph) (crashed : List Role) :
-    CrashTolerant G crashed ↔ (residualGraph G crashed).connected := by
-  -- By definition of CrashTolerant.
-  rfl
-
-/-- Crash tolerance is monotonic: if a larger set is tolerable,
-    so is any smaller set. -/
-theorem crash_tolerance_monotonic (G : CommGraph) (crashed₁ crashed₂ : List Role)
-    (_hSub : ∀ r ∈ crashed₁, r ∈ crashed₂)
-    (hEq : crashed₁ = crashed₂)
-    (hTol : CrashTolerant G crashed₂) :
-    CrashTolerant G crashed₁ := by
-  -- In the extensional-equality case, monotonicity is immediate.
-  simpa [hEq] using hTol
-
-/-! ## Connection to Protocol Coherence -/
-
-/-- Directed communication edges extracted from local endpoint types in a `GEnv`. -/
-def commEdgesOfGEnv (G : GEnv) : List (Role × Role) :=
-  G.filterMap (fun (ep, lt) =>
-    match lt with
-    | .send r _ _ => some (ep.role, r)
-    | .recv r _ _ => some (r, ep.role)
-    | .select r _ => some (ep.role, r)
-    | .branch r _ => some (r, ep.role)
-    | _ => none)
-
-/-- Participants extracted from `GEnv` endpoints and communication edges. -/
-def commParticipantsOfGEnv (G : GEnv) : List Role :=
-  (G.map (fun e => e.1.role)) ++
-    (commEdgesOfGEnv G).flatMap (fun e => [e.1, e.2])
-
-/-- Extract the communication graph from a GEnv. -/
-def commGraphOfGEnv (G : GEnv) : CommGraph where
-  participants := commParticipantsOfGEnv G
-  edges := commEdgesOfGEnv G
-  edges_in_participants := by
-    intro e hmem
-    constructor
-    · have hIn : e.1 ∈ (commEdgesOfGEnv G).flatMap (fun p => [p.1, p.2]) := by
-        exact List.mem_flatMap.mpr ⟨e, hmem, by simp⟩
-      have hIn' : e.1 ∈ (G.map (fun x => x.1.role)) ++ (commEdgesOfGEnv G).flatMap (fun p => [p.1, p.2]) :=
-        List.mem_append.mpr (Or.inr hIn)
-      simpa [commParticipantsOfGEnv] using hIn'
-    · have hIn : e.2 ∈ (commEdgesOfGEnv G).flatMap (fun p => [p.1, p.2]) := by
-        exact List.mem_flatMap.mpr ⟨e, hmem, by simp⟩
-      have hIn' : e.2 ∈ (G.map (fun x => x.1.role)) ++ (commEdgesOfGEnv G).flatMap (fun p => [p.1, p.2]) :=
-        List.mem_append.mpr (Or.inr hIn)
-      simpa [commParticipantsOfGEnv] using hIn'
-
-/-- A session can complete if non-crashed participants can still communicate. -/
-def SessionCanComplete (G : GEnv) (D : DEnv) (crashed : List Role) : Prop :=
-  -- Coherence holds when restricted to edges between survivors.
-  -- Simplified: we check that for all active edges between survivors,
-  -- the coherence condition holds.
-  ∀ e : Edge,
-    e.sender ∉ crashed → e.receiver ∉ crashed →
-    ActiveEdge G e → EdgeCoherent G D e
-
-/-- If crash tolerance holds, the session can complete. -/
-theorem crash_tolerant_implies_can_complete (G : GEnv) (D : DEnv) (crashed : List Role)
-    (hCoh : Coherent G D)
-    (_hTol : CrashTolerant (commGraphOfGEnv G) crashed) :
-    SessionCanComplete G D crashed := by
-  -- Coherent G D already gives EdgeCoherent for ALL active edges.
-  -- SessionCanComplete only requires it for active edges between non-crashed participants,
-  -- which is a subset, so the coherence hypothesis suffices.
-  intro e _hSender _hRecv hActive
-  exact hCoh e hActive
-
-/-! ## Decidability -/
-
-/-- Crash tolerance is decidable for finite graphs. -/
-def crashTolerantDec (G : CommGraph) (crashed : List Role) : Bool :=
-  -- Specification-level decision in the current model.
-  if h : CrashTolerant G crashed then true else false
-
-/-- The decision procedure is sound. -/
-theorem crash_tolerant_dec_sound (G : CommGraph) (crashed : List Role) :
-    crashTolerantDec G crashed = true → CrashTolerant G crashed := by
-  intro hDec
-  by_cases hTol : CrashTolerant G crashed
-  · exact hTol
-  · simp [crashTolerantDec, hTol] at hDec
 
 /-! ## Connection to FStep and ProtocolMachineState -/
 
@@ -248,15 +39,28 @@ variable {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-! ## Site-to-Role Crash Projection -/
 
-/-- A role is considered crashed if there exists a site-to-role mapping
-    and all sites that can host that role have crashed.
-    This is a simplified model where we track crashed roles directly. -/
+/-- A role is crashed iff it is hosted by at least one crashed site and every
+    site hosting it has crashed. A role mapped to no site is never crashed. -/
 def RoleCrashedBySites (siteToRoles : IdentityModel.SiteId ι → List Role)
     (crashedSites : List (IdentityModel.SiteId ι)) (r : Role) : Prop :=
-  ∀ s, r ∈ siteToRoles s → s ∈ crashedSites
+  (∃ s ∈ crashedSites, r ∈ siteToRoles s) ∧ ∀ s, r ∈ siteToRoles s → s ∈ crashedSites
 
-/-- Extract roles that are effectively crashed given a site-to-role mapping. -/
-def crashedRolesOfSites (siteToRoles : IdentityModel.SiteId ι → List Role)
+/-- An unmapped role is not crashed. -/
+theorem not_role_crashed_of_unmapped (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (crashedSites : List (IdentityModel.SiteId ι)) (r : Role)
+    (hUnmapped : ∀ s, r ∉ siteToRoles s) : ¬ RoleCrashedBySites siteToRoles crashedSites r := by
+  rintro ⟨⟨s, _, hs⟩, _⟩
+  exact hUnmapped s hs
+
+/-- With no crashed sites, no role is crashed. -/
+theorem not_role_crashed_of_no_crashes (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (r : Role) : ¬ RoleCrashedBySites siteToRoles [] r := by
+  rintro ⟨⟨s, hs, _⟩, _⟩
+  cases hs
+
+/-- Extract roles that are effectively crashed given a site-to-role mapping
+    (classical: crash status quantifies over all sites). -/
+noncomputable def crashedRolesOfSites (siteToRoles : IdentityModel.SiteId ι → List Role)
     (allRoles : List Role) (crashedSites : List (IdentityModel.SiteId ι)) : List Role :=
   allRoles.filter (fun r => decide (RoleCrashedBySites siteToRoles crashedSites r))
 
@@ -312,18 +116,24 @@ def commGraphOfSession (roles : RoleSet) (localTypes : List (Endpoint × LocalTy
     | var n => cases he
     | mu L => cases he
 
-/-- Extract communication graph from ProtocolMachineState by aggregating all session graphs. -/
-def commGraphOfVMState (st : ProtocolMachineState ι γ π ε ν) : CommGraph where
-  participants := st.sessions.flatMap (fun (_, sess) => sess.roles)
-  edges := st.sessions.flatMap (fun (_, sess) =>
-    (commGraphOfSession sess.roles sess.localTypes).edges)
+/-- Graph-relevant shape of a session: its roles and endpoint types. -/
+def sessionShapes (st : ProtocolMachineState ι γ π ε ν) :
+    List (RoleSet × List (Endpoint × LocalType)) :=
+  st.sessions.map fun p => (p.2.roles, p.2.localTypes)
+
+/-- Aggregate communication graph of a list of session shapes. -/
+def commGraphOfShapes (shapes : List (RoleSet × List (Endpoint × LocalType))) : CommGraph where
+  participants := shapes.flatMap Prod.fst
+  edges := shapes.flatMap fun x => (commGraphOfSession x.1 x.2).edges
   edges_in_participants := by
     intro e hmem
-    rcases List.mem_flatMap.mp hmem with ⟨⟨sid, sess⟩, hmemSess, hmemEdge⟩
-    have hIn := (commGraphOfSession sess.roles sess.localTypes).edges_in_participants e hmemEdge
-    constructor
-    · exact List.mem_flatMap.mpr ⟨(sid, sess), hmemSess, hIn.1⟩
-    · exact List.mem_flatMap.mpr ⟨(sid, sess), hmemSess, hIn.2⟩
+    rcases List.mem_flatMap.mp hmem with ⟨x, hx, he⟩
+    have hIn := (commGraphOfSession x.1 x.2).edges_in_participants e he
+    exact ⟨List.mem_flatMap.mpr ⟨x, hx, hIn.1⟩, List.mem_flatMap.mpr ⟨x, hx, hIn.2⟩⟩
+
+/-- Extract communication graph from ProtocolMachineState by aggregating all session graphs. -/
+def commGraphOfVMState (st : ProtocolMachineState ι γ π ε ν) : CommGraph :=
+  commGraphOfShapes (sessionShapes st)
 
 /-! ## protocol machine-Level Crash Tolerance Predicate -/
 
@@ -357,15 +167,37 @@ theorem comm_graph_preserved_by_crash_site (st : ProtocolMachineState ι γ π �
 
 /-- Disconnecting edges does not change the communication graph. -/
 theorem comm_graph_preserved_by_disconnect_edges (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge) :
-    commGraphOfVMState (disconnectEdges st edges) = commGraphOfVMState st := by
-  unfold commGraphOfVMState disconnectEdges
-  simp
+    commGraphOfVMState (disconnectEdges st edges) = commGraphOfVMState st :=
+  rfl
 
 /-- Reconnecting edges does not change the communication graph. -/
 theorem comm_graph_preserved_by_reconnect_edges (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge) :
-    commGraphOfVMState (reconnectEdges st edges) = commGraphOfVMState st := by
-  unfold commGraphOfVMState reconnectEdges
-  simp
+    commGraphOfVMState (reconnectEdges st edges) = commGraphOfVMState st :=
+  rfl
+
+/-- Closing a session changes only phase/buffers/traces, never session shapes. -/
+theorem close_store_shapes (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) :
+    ∀ ss : SessionStore ν,
+      sessionShapes (closeSession { st with sessions := ss } sid) =
+        sessionShapes { st with sessions := ss } := by
+  intro ss
+  induction ss with
+  | nil => rfl
+  | cons p rest ih =>
+      obtain ⟨sid', s⟩ := p
+      unfold sessionShapes closeSession at ih ⊢
+      simp only [closeSession.closeStore] at ih ⊢
+      split_ifs
+      · simp
+      · simp only [List.map_cons, ih]
+
+/-- Closing a session does not change the communication graph. -/
+theorem comm_graph_preserved_by_close_session (st : ProtocolMachineState ι γ π ε ν)
+    (sid : SessionId) : commGraphOfVMState (closeSession st sid) = commGraphOfVMState st := by
+  have h : sessionShapes (closeSession st sid) = sessionShapes st :=
+    close_store_shapes st sid st.sessions
+  unfold commGraphOfVMState
+  rw [h]
 
 /-! ## Tolerance Transport and Preservation -/
 
@@ -432,46 +264,94 @@ theorem reconnect_edges_preserves_tolerance
   apply protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _ ?_ rfl hTol
   exact comm_graph_preserved_by_reconnect_edges st edges
 
-/-- Close-on-crash preserves crash tolerance if the communication graph is unchanged. -/
+/-- Close-on-crash preserves crash tolerance (graph and crashed sites unchanged). -/
 theorem close_session_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
     (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId)
-    (hGraph : commGraphOfVMState (closeSession st sid) = commGraphOfVMState st)
     (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
-    ProtocolMachineCrashTolerant siteToRoles (closeSession st sid) := by
-  apply protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _ hGraph rfl hTol
+    ProtocolMachineCrashTolerant siteToRoles (closeSession st sid) :=
+  protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _
+    (comm_graph_preserved_by_close_session st sid) rfl hTol
 
-/-! ## Failure-Step Preservation Schema -/
+/-! ## Failure-Step Preservation -/
 
-/-- Failure-aware steps preserve crash tolerance when each case's side conditions hold. -/
+/-- Failure-aware steps preserve crash tolerance. Partition, heal and
+    close-on-crash steps are proved unconditionally. Site crashes can genuinely
+    disconnect the residual graph, so they require that no new role becomes
+    fully crashed; scheduler steps can rewrite local types (hence edges), so they
+    require that the step leaves the graph and the crashed sites unchanged. -/
 theorem f_step_preserves_tolerance
     (siteToRoles : IdentityModel.SiteId ι → List Role)
-    (st st' : ProtocolMachineState ι γ π ε ν)
-    (hStepPres :
-      ∀ st st' : ProtocolMachineState ι γ π ε ν, FStep st st' →
-        ProtocolMachineCrashTolerant siteToRoles st → ProtocolMachineCrashTolerant siteToRoles st')
-    (hStep : FStep st st')
+    (st st' : ProtocolMachineState ι γ π ε ν) (hStep : FStep st st')
+    (hNormal : ∀ st₁, schedStep st = some st₁ →
+      commGraphOfVMState st₁ = commGraphOfVMState st ∧ st₁.crashedSites = st.crashedSites)
+    (hCrash : ∀ site,
+      crashedRolesOfSites siteToRoles (commGraphOfVMState st).participants
+          (crashSite st site).crashedSites =
+        crashedRolesOfSites siteToRoles (commGraphOfVMState st).participants st.crashedSites)
     (hTol : ProtocolMachineCrashTolerant siteToRoles st) :
     ProtocolMachineCrashTolerant siteToRoles st' := by
-  exact hStepPres st st' hStep hTol
+  cases hStep with
+  | normal _ h =>
+      obtain ⟨hG, hC⟩ := hNormal _ h
+      exact protocol_machine_crash_tolerant_of_same_graph siteToRoles _ _ hG hC hTol
+  | siteCrash site => exact crash_site_preserves_tolerance siteToRoles st site (hCrash site) hTol
+  | partition es => exact disconnect_edges_preserves_tolerance siteToRoles st es hTol
+  | heal es => exact reconnect_edges_preserves_tolerance siteToRoles st es hTol
+  | closeOnCrash sid => exact close_session_preserves_tolerance siteToRoles st sid hTol
 
 /-! ## Active Session Integration -/
 
-/-- Session coherence from Failure.lean implies our SessionCanComplete. -/
-theorem session_coherent_implies_active (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId)
-    (hCoh : SessionCoherent st sid) :
-    ∃ sess, (sid, sess) ∈ st.sessions ∧ sess.phase ≠ .closed :=
-  hCoh
-
-/-- Closed sessions don't contribute to crash tolerance requirements. -/
+/-- A session is active if it is present and not closed. -/
 def SessionActive (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Prop :=
   ∃ sess, (sid, sess) ∈ st.sessions ∧ sess.phase ≠ .closed
 
-/-- A protocol machine state is fully crash tolerant if all active sessions can complete
-    despite the current crashed sites. -/
+/-- The executable failure-coherence check implies the session is active. -/
+theorem failure_session_coherent_implies_active (st : ProtocolMachineState ι γ π ε ν)
+    (sid : SessionId) (h : failureSessionCoherentB st sid = true) : SessionActive st sid := by
+  unfold failureSessionCoherentB at h
+  cases hs : sessionState? st.sessions sid with
+  | none => rw [hs] at h; simp at h
+  | some sess =>
+      rw [hs] at h
+      have hph : sess.phase ≠ .closed := by
+        intro hc; simp [hc] at h
+      unfold sessionState? at hs
+      obtain ⟨⟨sid', sess'⟩, hp, hEq⟩ := Option.map_eq_some_iff.mp hs
+      have hkey := List.find?_some hp
+      simp only [decide_eq_true_eq] at hkey
+      subst hkey
+      cases hEq
+      exact ⟨_, List.mem_of_find?_eq_some hp, hph⟩
+
+/-- A session tolerates the current crashes if its own residual graph is connected. -/
+def SessionCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (st : ProtocolMachineState ι γ π ε ν) (sid : SessionId) : Prop :=
+  ∀ sess, (sid, sess) ∈ st.sessions →
+    CrashTolerant (commGraphOfSession sess.roles sess.localTypes)
+      (crashedRolesOfSites siteToRoles sess.roles st.crashedSites)
+
+/-- A protocol machine state is fully crash tolerant if every active session
+    tolerates the current crashed sites on its own communication graph. -/
 def ProtocolMachineFullyCrashTolerant (siteToRoles : IdentityModel.SiteId ι → List Role)
     (st : ProtocolMachineState ι γ π ε ν) : Prop :=
-  ∀ sid, SessionActive st sid → ProtocolMachineCrashTolerant siteToRoles st
+  ∀ sid, SessionActive st sid → SessionCrashTolerant siteToRoles st sid
+
+/-- Partitions preserve full crash tolerance (sessions and crashed sites unchanged). -/
+theorem disconnect_edges_preserves_full_tolerance
+    (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge)
+    (h : ProtocolMachineFullyCrashTolerant siteToRoles st) :
+    ProtocolMachineFullyCrashTolerant siteToRoles (disconnectEdges st edges) :=
+  h
+
+/-- Heals preserve full crash tolerance (sessions and crashed sites unchanged). -/
+theorem reconnect_edges_preserves_full_tolerance
+    (siteToRoles : IdentityModel.SiteId ι → List Role)
+    (st : ProtocolMachineState ι γ π ε ν) (edges : List Edge)
+    (h : ProtocolMachineFullyCrashTolerant siteToRoles st) :
+    ProtocolMachineFullyCrashTolerant siteToRoles (reconnectEdges st edges) :=
+  h
 
 end ProtocolMachineConnection
 
@@ -493,5 +373,6 @@ The key insight is that crash tolerance is equivalent to graph connectivity
 of the residual communication graph. This provides a computable criterion
 for determining which participants can fail.
 
-**Status**: Core definitions and theorem statements complete (no proof holes).
+Also: `crashTolerantDec` is an executable reachability-closure check, proved
+sound and complete (`crash_tolerant_dec_sound`/`_complete`).
 -/

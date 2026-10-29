@@ -130,14 +130,14 @@ def firstClassCapabilityLeanModuleBoundary : List String :=
 
 theorem protocolCriticalCapabilityBoundary_nonempty :
     protocolCriticalCapabilityBoundary ≠ [] := by
-  native_decide
+  decide
 
 theorem capabilityBoundary_covers_all_classes :
     (∃ entry ∈ protocolCriticalCapabilityBoundary, entry.capabilityClass = .admission) ∧
     (∃ entry ∈ protocolCriticalCapabilityBoundary, entry.capabilityClass = .ownership) ∧
     (∃ entry ∈ protocolCriticalCapabilityBoundary, entry.capabilityClass = .evidence) ∧
     (∃ entry ∈ protocolCriticalCapabilityBoundary, entry.capabilityClass = .transition) := by
-  native_decide
+  decide
 
 end Proofs
 end Runtime

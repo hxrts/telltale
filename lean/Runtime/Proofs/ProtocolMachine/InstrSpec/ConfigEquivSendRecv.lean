@@ -170,11 +170,13 @@ theorem send_spec_respects_config_equiv
       -- Rewrite goal with he, then use the update equations
       rw [he]
       simp only [renameEdge]
-      rw [hD₁', hD₂', lookup_d_update_eq, lookup_d_update_eq]
+      rw [hD₁', hD₂']
+      erw [lookup_d_update_eq, lookup_d_update_eq]
       -- Now show: (trace ++ [T]).map rename = (trace.map rename) ++ [rename T]
       simp only [List.map_append, List.map_cons, List.map_nil]
       -- Apply hTrace to match the trace lookups
-      rw [hTrace]
+      erw [hTrace]
+      rfl
     · -- Case: e' ≠ sendEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ sendEdge := by
         intro heq
@@ -317,7 +319,8 @@ theorem recv_spec_respects_config_equiv
       -- Rewrite goal
       rw [he]
       simp only [renameEdge]
-      rw [hD₁', hD₂', lookup_d_update_eq, lookup_d_update_eq]
+      rw [hD₁', hD₂']
+      erw [lookup_d_update_eq, lookup_d_update_eq]
       -- rest₁ and rest₂ are the tails after consuming T
       -- From hBuf₁: lookupD D₁ recvEdge = T :: rest₁
       -- From hTrace: lookupD D₂ (rename recvEdge) = (lookupD D₁ recvEdge).map rename
@@ -325,9 +328,10 @@ theorem recv_spec_respects_config_equiv
       -- From hBuf₂: lookupD D₂ (rename recvEdge) = renameT :: rest₂
       -- So rest₂ = rest₁.map rename
       rw [hBuf₁, List.map_cons] at hTrace
-      rw [hBuf₂] at hTrace
+      erw [hBuf₂] at hTrace
       simp only [List.cons.injEq] at hTrace
       rw [hTrace.2]
+      rfl
     · -- Case: e' ≠ recvEdge (frame)
       have hne₂ : renameEdge ρ e' ≠ renameEdge ρ recvEdge := by
         intro heq; exact he (rename_edge_inj ρ e' recvEdge heq)

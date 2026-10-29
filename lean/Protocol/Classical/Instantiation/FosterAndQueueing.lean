@@ -21,7 +21,8 @@ coherence and progress measures to the abstract transport API.
 Solution Structure. We define:
 1. `WTConfigNState`: coherence-projected state space (erasure-level image)
 2. `protocolV`: progress measure from type depth + buffer length + send potential
-3. `FosterLivenessAssumptions`: side conditions for Foster transport
+3. `FosterLivenessAssumptions`: drift conditions for Foster transport
+   (discharged concretely in `FosterDrain`)
 4. Concrete theorem instantiations for each classical family
 -/
 
@@ -56,12 +57,14 @@ structure ProtocolFosterSideConditions where
   harmony : Prop
   finiteState : Prop
 
-/-- 3.9.1 assumptions tying coherence and progress measure behavior to `FStep`. -/
+/-- 3.9.1 drift assumptions for a step on bundled well-typed states.
+
+Coherence preservation is not an assumption: `FStep` maps coherent states to
+coherent states by its type. A concrete, fully proved instance (Lyapunov
+function = in-flight load, step = one delivery) is `drain_foster_assumptions`
+in `Protocol.Classical.Instantiation.FosterDrain`. -/
 structure FosterLivenessAssumptions (step : FStep) (μ : ProgressMeasureComponents) : Prop where
-  /-- Coherence is preserved by one protocol step. -/
-  coherence_preservation :
-    ∀ st, Coherent (step st).1.G (step st).1.D
-  /-- Nonincrease from coherence preservation. -/
+  /-- The potential never increases along a step. -/
   nonincrease_of_coherence :
     ∀ st, protocolV μ (step st) ≤ protocolV μ st
   /-- Strict descent on positive potential (progress on non-terminal coherent states). -/
@@ -232,8 +235,7 @@ def mkProtocolLDPInputFromModel (m : ProtocolLDPModel) : LDPInput :=
 theorem protocol_ldp_tightening (m : ProtocolLDPModel) :
     ∀ n,
       m.p (n + 1) ≤ Classical.LargeDeviationPrinciple.exponentialEnvelope m.C m.ρ n := by
-  simpa [mkProtocolLDPInputFromModel, protocolLDPWitness] using
-    transport_ldp (input := mkProtocolLDPInputFromModel m)
+  exact transport_ldp (input := mkProtocolLDPInputFromModel m)
 
 /-- Diffusion-scale parameter extracted from arrival/service rates. -/
 def diffusionSigmaFromRates (arrivalRate serviceRate : Real) : Real :=
@@ -263,7 +265,7 @@ theorem main_text_ldp_sla_tail
     (w : Classical.LargeDeviationPrinciple.LDPWitness p) :
     ∀ n,
       p (n + 1) ≤ Classical.LargeDeviationPrinciple.exponentialEnvelope w.C w.ρ n := by
-  simpa [mkProtocolLDPInput] using transport_ldp (input := mkProtocolLDPInput p w)
+  exact transport_ldp (input := mkProtocolLDPInput p w)
 
 end ProtocolClassical
 

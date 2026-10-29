@@ -65,7 +65,7 @@ lemma preserved_sub_middle_par_skip_left
       simpa [splitMid] using splitMid.hS
     simpa [hS1MidNil] using hSownSplit
   cases hP_pre
-  simp at hS1MidNil
+  try simp at hS1MidNil
   -- `par_skip_left`: Reframe Surviving Branch
   have hQ0 :
       HasTypeProcPreOut Ssh Sown splitMid.G2 Q
@@ -148,7 +148,7 @@ lemma preserved_sub_middle_par_skip_right
       simpa [splitMid] using splitMid.hS
     simpa [hS2MidNil] using hSownSplit
   cases hQ_pre
-  simp at hS2MidNil
+  try simp at hS2MidNil
   -- `par_skip_right`: Reframe Surviving Branch
   have hP0 :
       HasTypeProcPreOut Ssh Sown splitMid.G1 P

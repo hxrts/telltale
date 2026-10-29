@@ -82,15 +82,16 @@ theorem full_commit_epoch_reconfiguration_with_policy_preserves_invariants
       · intro entry hEntry
         simp [fullCommitEpochReconfigurationWithPolicy] at hEntry
         rcases hEntry with ⟨orig, hOrig, rfl⟩
-        simpa [fullFrontierEntryFor] using hInv.openClosedDisjoint hOrig
+        simpa [fullFrontierEntryFor, fullCommitEpochReconfigurationWithPolicy] using
+          hInv.openClosedDisjoint hOrig
       · simpa [FullInconsSubsetClosed, fullCommitEpochReconfigurationWithPolicy] using
           hInv.inconsSubsetClosed
       · simpa [FullParentScoreCoherent, fullCommitEpochReconfigurationWithPolicy] using
           hInv.parentScoreCoherent
       · simp [FullPublicationTraceGoalCoherent, fullCommitEpochReconfigurationWithPolicy]
       · simp [FullIncumbentCoherent, fullCommitEpochReconfigurationWithPolicy]
-      · simpa [FullOpenNodesNodup, fullCommitEpochReconfigurationWithPolicy] using
-          hInv.openNodesNodup
+      · simpa [FullOpenNodesNodup, fullCommitEpochReconfigurationWithPolicy,
+          fullFrontierEntryFor, Function.comp_def] using hInv.openNodesNodup
       · simpa [FullClosedNodesNodup, fullCommitEpochReconfigurationWithPolicy] using
           hInv.closedNodesNodup
       · simpa [FullInconsNodesNodup, fullCommitEpochReconfigurationWithPolicy] using

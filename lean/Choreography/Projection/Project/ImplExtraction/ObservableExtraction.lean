@@ -108,8 +108,8 @@ theorem branches_rel_trans_chain_no_wf {R : Rel}
               constructor
               · exact branches_rel_trans_chain_head_no_wf hextend h1 h2
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
-                · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
-                    (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+              · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
+                  (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
 
 /-! ## Branch-Chain Reverse Composition Helpers -/
 
@@ -135,12 +135,12 @@ theorem branches_rel_trans_chain_rev_no_wf {R : Rel}
               constructor
               · exact branches_rel_trans_chain_rev_head_no_wf hextend h1 h2
                   (hwf_bs lb_bs (by simp)) (hwf_cs lb_cs (by simp)) (hwf_ds lb_ds (by simp))
-                · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
-                    (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
+              · exact ih hcd_tail (wf_tail_of_cons hwf_bs)
+                  (wf_tail_of_cons hwf_cs) (wf_tail_of_cons hwf_ds)
 
 /-! ## Var Extraction Left/Right/Base/Both Cases -/
 
-/- Helper: left composition case for CProjectTransRelComp_var_extract. -/
+/- Helper: left composition case for c_project_trans_rel_comp_var_extract. -/
 private theorem c_project_trans_rel_comp_var_extract_left
     {v1 v2 : String} {b : LocalTypeR}
     (heq : EQ2 (.var v1) b) (hrel : CProjectTransRel b (.var v2)) : v1 = v2 := by
@@ -159,7 +159,7 @@ private theorem c_project_trans_rel_comp_var_extract_left
         with ⟨body', hEq⟩
       cases hEq
 
-/- Helper: right composition case for CProjectTransRelComp_var_extract. -/
+/- Helper: right composition case for c_project_trans_rel_comp_var_extract. -/
 private theorem c_project_trans_rel_comp_var_extract_right
     {v1 v2 : String} {b : LocalTypeR}
     (hrel : CProjectTransRel (.var v1) b) (heq : EQ2 b (.var v2)) : v1 = v2 := by
@@ -168,7 +168,7 @@ private theorem c_project_trans_rel_comp_var_extract_right
   subst hb
   simpa [EQ2F] using (EQ2.destruct heq)
 
-/- Helper: base case for CProjectTransRelComp_var_extract. -/
+/- Helper: base case for c_project_trans_rel_comp_var_extract. -/
 private theorem c_project_trans_rel_comp_var_extract_base
     {v1 v2 : String} (hbase : CProjectTransRel (.var v1) (.var v2)) : v1 = v2 := by
     -- Direct CProjectTransRel on vars enforces equality.
@@ -179,7 +179,7 @@ private theorem c_project_trans_rel_comp_var_extract_base
 
 /-! ## Var Extraction Final Theorem -/
 
-/- Helper: both composition case for CProjectTransRelComp_var_extract. -/
+/- Helper: both composition case for c_project_trans_rel_comp_var_extract. -/
 private theorem c_project_trans_rel_comp_var_extract_both
     {v1 v2 : String} {b b' : LocalTypeR}
     (heq : EQ2 (.var v1) b) (hrel : CProjectTransRel b b') (heq' : EQ2 b' (.var v2))
@@ -200,8 +200,8 @@ theorem c_project_trans_rel_comp_var_extract
     exact c_project_trans_rel_comp_var_extract_left heq hrel
   · rcases hright with ⟨b, hrel, heq⟩
     exact c_project_trans_rel_comp_var_extract_right hrel heq
-    · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
-      exact c_project_trans_rel_comp_var_extract_both heq hrel heq' hWFa hWFc
+  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
+    exact c_project_trans_rel_comp_var_extract_both heq hrel heq' hWFa hWFc
 
 /-! ## Send Branch Well-Formedness -/
 
@@ -215,7 +215,7 @@ private theorem send_branches_wf (p : String) (bs : List BranchR)
 
 /-! ## Send Extraction Base/Left/Right/Both Cases -/
 
-/- Helper: base case for CProjectTransRelComp_send_extract. -/
+/- Helper: base case for c_project_trans_rel_comp_send_extract. -/
 private theorem c_project_trans_rel_comp_send_extract_base
     {p1 p2 : String} {bs1 bs2 : List BranchR}
     (hbase : CProjectTransRel (.send p1 bs1) (.send p2 bs2)) :
@@ -224,7 +224,7 @@ private theorem c_project_trans_rel_comp_send_extract_base
   have hbase_f := c_project_trans_rel_postfix (.send p1 bs1) (.send p2 bs2) hbase
   simpa [EQ2F] using hbase_f
 
-/- Helper: left case for CProjectTransRelComp_send_extract. -/
+/- Helper: left case for c_project_trans_rel_comp_send_extract. -/
 private theorem c_project_trans_rel_comp_send_extract_left
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (heq : EQ2 (.send p1 bs1) b) (hrel : CProjectTransRel b (.send p2 bs2))
@@ -255,7 +255,7 @@ private theorem c_project_trans_rel_comp_send_extract_left
 
 /-! ## Send Extraction Right Case -/
 
-/- Helper: right case for CProjectTransRelComp_send_extract. -/
+/- Helper: right case for c_project_trans_rel_comp_send_extract. -/
 private theorem c_project_trans_rel_comp_send_extract_right
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b : LocalTypeR}
     (hrel : CProjectTransRel (.send p1 bs1) b) (heq : EQ2 b (.send p2 bs2))
@@ -291,7 +291,7 @@ private theorem c_project_trans_rel_comp_send_extract_right
 
 /-! ## Send Extraction Both Case -/
 
-/- Helper: both case for CProjectTransRelComp_send_extract. -/
+/- Helper: both case for c_project_trans_rel_comp_send_extract. -/
 private theorem c_project_trans_rel_comp_send_extract_both
     {p1 p2 : String} {bs1 bs2 : List BranchR} {b b' : LocalTypeR}
     (heq : EQ2 (.send p1 bs1) b) (hrel : CProjectTransRel b b') (heq' : EQ2 b' (.send p2 bs2))
@@ -318,8 +318,8 @@ theorem c_project_trans_rel_comp_send_extract
     exact c_project_trans_rel_comp_send_extract_left heq hrel hWFa hWFc
   · rcases hright with ⟨b, hrel, heq⟩
     exact c_project_trans_rel_comp_send_extract_right hrel heq hWFa hWFc
-    · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
-      exact c_project_trans_rel_comp_send_extract_both heq hrel heq' hWFa hWFc
+  · rcases hboth with ⟨b, b', heq, hrel, heq'⟩
+    exact c_project_trans_rel_comp_send_extract_both heq hrel heq' hWFa hWFc
 
 /-! ## Recv Branch Well-Formedness -/
 
@@ -331,5 +331,5 @@ theorem recv_branches_wf (p : String) (bs : List BranchR)
   -- Extract per-branch well-formedness from recv well-formedness.
   exact LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := bs) hWF
 
-/- Helper: base case for CProjectTransRelComp_recv_extract. -/
+/- Helper: base case for c_project_trans_rel_comp_recv_extract. -/
 end Choreography.Projection.Project

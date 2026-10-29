@@ -8,7 +8,7 @@ Ghost map for session endpoints.
 
 ## Definitions
 
-- `SessionMap := GhostMap LocalType` (iris-lean's finite map with Positive keys)
+- `SessionMap := GhostMap LocalType` (upstream `ExtTreeMap` keyed by `Pos`)
 - `session_auth γ m` — authoritative session map
 - `endpoint_frag γ e L` — per-endpoint fragment
 - `frag_included`, `session_advance`, `endpoint_transfer`
@@ -25,16 +25,17 @@ open Iris.Std
 
 /-! ## Endpoint Encoding -/
 
-/-- Encode an Endpoint to Positive for use as ghost map key.
-    Uses Iris's Countable encoding for Nat (SessionId) and String (Role). -/
+/-- Encode an Endpoint to a positive ghost-map key: encode the session id and
+    role separately, then encode the two-element list of positives. -/
 def encodeEndpoint (e : Endpoint) : Positive :=
-  [Iris.Countable.encode e.sid, Iris.Countable.encode e.role]
+  Pos.Countable.encode ([Pos.Countable.encode e.sid, Pos.Countable.encode e.role] : List Pos)
 
-/-- Decode is left inverse of encode. -/
+/-- Endpoint encoding is injective. -/
 theorem encode_endpoint_inj : Function.Injective encodeEndpoint := by
   intro ⟨sid1, role1⟩ ⟨sid2, role2⟩ h
-  simp only [encodeEndpoint, List.cons.injEq, and_true] at h
-  simp only [Iris.Countable.encode_inj h.1, Iris.Countable.encode_inj h.2]
+  have h' := Pos.encode_inj h
+  simp only [List.cons.injEq, and_true] at h'
+  simp only [Pos.encode_inj h'.1, Pos.encode_inj h'.2]
 
 /-! ## Session Map Type -/
 
@@ -48,9 +49,7 @@ namespace GMap
 
 /-- Lookup an endpoint's local type from a session ghost map. -/
 def lookup (m : SessionMap) (e : Endpoint) : Option LocalType :=
-  match Iris.Std.get? m (encodeEndpoint e) with
-  | some (Iris.LeibnizO.mk L) => some L
-  | none => none
+  Iris.Std.get? m (encodeEndpoint e)
 
 end GMap
 
@@ -69,7 +68,7 @@ def endpoint_frag (γ : GhostName) (e : Endpoint) (L : LocalType) : iProp :=
 /-- Lookup: auth + fragment implies the endpoint maps to the local type. -/
 def frag_included (γ : GhostName) (m : SessionMap) (e : Endpoint) (L : LocalType) :
     iProp.entails (iProp.sep (session_auth γ m) (endpoint_frag γ e L))
-      (iProp.pure (get? m (encodeEndpoint e) = some (Iris.LeibnizO.mk L))) :=
+      (iProp.pure (get? m (encodeEndpoint e) = some L)) :=
   ghost_map_lookup γ (encodeEndpoint e) L m
 
 /-- Update: advance an endpoint's local type. -/
@@ -77,7 +76,7 @@ def session_advance (γ : GhostName) (m : SessionMap)
     (e : Endpoint) (L L' : LocalType) :
     iProp.entails (iProp.sep (session_auth γ m) (endpoint_frag γ e L))
       (bupd (iProp.sep
-        (session_auth γ (insert m (encodeEndpoint e) (Iris.LeibnizO.mk L')))
+        (session_auth γ (insert m (encodeEndpoint e) L'))
         (endpoint_frag γ e L'))) :=
   ghost_map_update γ (encodeEndpoint e) L L' m
 
@@ -90,12 +89,8 @@ def delegation_ghost_map_update (γ : GhostName) (m : SessionMap)
     iProp.entails
       (iProp.sep (session_auth γ m) (endpoint_frag γ receiverEp Lold))
       (bupd (iProp.sep
-        (session_auth γ (insert m (encodeEndpoint receiverEp) (Iris.LeibnizO.mk Lnew)))
+        (session_auth γ (insert m (encodeEndpoint receiverEp) Lnew))
         (endpoint_frag γ receiverEp Lnew))) :=
   session_advance γ m receiverEp Lold Lnew
-
-/-- Endpoint fragments are transferable (trivially). -/
-def endpoint_transfer (γ : GhostName) (e : Endpoint) (L : LocalType) : Prop :=
-  iProp.entails (endpoint_frag γ e L) (endpoint_frag γ e L)
 
 end

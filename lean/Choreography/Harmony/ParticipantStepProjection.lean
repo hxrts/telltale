@@ -40,10 +40,10 @@ private def action_pred (g : GlobalType) (act : GlobalActionR) : Prop :=
       GlobalActionR.sender act = sender ∧ GlobalActionR.receiver act = receiver
   | _ => False
 
-private theorem mem_trans_branches_of_mem (branches : List (Label × GlobalType))
+theorem mem_trans_branches_of_mem (branches : List (Label × GlobalType))
     (label : Label) (cont : GlobalType) (role : String)
     (hmem : (label, cont) ∈ branches) :
-    (label, projTrans cont role) ∈ projTransBranches branches role := by
+    (label, none, projTrans cont role) ∈ projTransBranches branches role := by
   induction branches with
   | nil => cases hmem
   | cons hd tl ih =>
@@ -51,10 +51,10 @@ private theorem mem_trans_branches_of_mem (branches : List (Label × GlobalType)
       | mk label_hd cont_hd =>
         cases hmem with
         | head =>
-            simp [projTransBranches, Choreography.Projection.Project.transBranches]
+            simp [projTransBranches, Choreography.Projection.Project.transBranches, Choreography.Projection.Trans.transBranches]
         | tail _ htl =>
             have ih' := ih htl
-            simp [projTransBranches, Choreography.Projection.Project.transBranches, List.mem_cons, ih']
+            simp [projTransBranches, Choreography.Projection.Project.transBranches, Choreography.Projection.Trans.transBranches, List.mem_cons, ih']
 
 /-! ## Sender Head Case -/
 
@@ -65,12 +65,12 @@ private theorem proj_trans_sender_step_comm_head
     ∃ bs cont,
       projTrans (GlobalType.comm sender receiver branches) sender =
         LocalTypeR.send receiver bs ∧
-      (label, cont) ∈ bs ∧
+      (label, none, cont) ∈ bs ∧
       EQ2 (projTrans g' sender) cont := by
   -- Head comm: sender projects to a send with matching branch.
   refine ⟨projTransBranches branches sender, projTrans g' sender, ?_, ?_, ?_⟩
   · simpa [projTrans] using (trans_comm_sender sender receiver sender branches rfl)
-  · have hmem' : (label, projTrans g' sender) ∈ projTransBranches branches sender :=
+  · have hmem' : (label, none, projTrans g' sender) ∈ projTransBranches branches sender :=
       mem_trans_branches_of_mem branches label g' sender hmem
     simpa using hmem'
   · simp [projTrans, eq2_refl]
@@ -83,7 +83,7 @@ theorem proj_trans_sender_step (g g' : GlobalType) (act : GlobalActionR)
     ∃ bs cont,
       projTrans g (GlobalActionR.sender act) =
         .send (GlobalActionR.receiver act) bs ∧
-      (GlobalActionR.label act, cont) ∈ bs ∧
+      (GlobalActionR.label act, none, cont) ∈ bs ∧
       EQ2 (projTrans g' (GlobalActionR.sender act)) cont := by
   cases hstep with
   | comm_head sender receiver branches label =>
@@ -112,7 +112,7 @@ private theorem proj_trans_receiver_step_comm_head
     ∃ bs cont,
       projTrans (GlobalType.comm sender receiver branches) receiver =
         LocalTypeR.recv sender bs ∧
-      (label, cont) ∈ bs ∧
+      (label, none, cont) ∈ bs ∧
       EQ2 (projTrans g' receiver) cont := by
   -- Head comm: receiver projects to a recv with matching branch.
   have hne : receiver ≠ sender := by
@@ -121,7 +121,7 @@ private theorem proj_trans_receiver_step_comm_head
     intro hEq; exact hno.1 hEq.symm
   refine ⟨projTransBranches branches receiver, projTrans g' receiver, ?_, ?_, ?_⟩
   · simpa [projTrans] using (trans_comm_receiver sender receiver receiver branches rfl hne)
-  · have hmem' : (label, projTrans g' receiver) ∈ projTransBranches branches receiver :=
+  · have hmem' : (label, none, projTrans g' receiver) ∈ projTransBranches branches receiver :=
       mem_trans_branches_of_mem branches label g' receiver hmem
     simpa using hmem'
   · simp [projTrans, eq2_refl]
@@ -135,7 +135,7 @@ theorem proj_trans_receiver_step (g g' : GlobalType) (act : GlobalActionR)
     ∃ bs cont,
       projTrans g (GlobalActionR.receiver act) =
         .recv (GlobalActionR.sender act) bs ∧
-      (GlobalActionR.label act, cont) ∈ bs ∧
+      (GlobalActionR.label act, none, cont) ∈ bs ∧
       EQ2 (projTrans g' (GlobalActionR.receiver act)) cont := by
   cases hstep with
   | comm_head sender receiver branches label =>
@@ -211,9 +211,8 @@ theorem proj_trans_other_step_comm_head
           exact proj_trans_other_step_comm_head_nonempty sender receiver fl fc rest
             label cont role hmem hclosed hwf hns hnr hproj
 
-/-- Helper: comm_async case when role is the sender. -/
-
 /-! ## Non-Participant Async: Sender/Receiver Cases -/
+/-- Helper: comm_async case when role is the sender. -/
 
 private theorem proj_trans_other_step_comm_async_sender
     (sender receiver : String) (branches branches' : List (Label × GlobalType)) (role : String)
@@ -252,9 +251,8 @@ private theorem proj_trans_other_step_comm_async_receiver
   rw [hrecv', hrecv]
   exact EQ2.construct ⟨rfl, hbranch_rel⟩
 
-/-- Helper: comm_async case for non-participants (role ≠ sender/receiver). -/
-
 /-! ## Non-Participant Async: Other Roles -/
+/-- Helper: comm_async case for non-participants (role ≠ sender/receiver). -/
 
 private theorem proj_trans_other_step_comm_async_other_cons
     (sender receiver : String) (label label' : Label) (cont cont' : GlobalType)
@@ -269,9 +267,9 @@ private theorem proj_trans_other_step_comm_async_other_cons
   simp [projTrans, trans_comm_other, hrs, hrr]
   have hbranch_rel' :
       BranchesRel EQ2
-        ((label', projTrans cont' role) :: projTransBranches rest' role)
-        ((label, projTrans cont role) :: projTransBranches rest role) := by
-    simpa [projTransBranches, Choreography.Projection.Project.transBranches] using hbranch_rel
+        ((label', none, projTrans cont' role) :: projTransBranches rest' role)
+        ((label, none, projTrans cont role) :: projTransBranches rest role) := by
+    simpa [projTransBranches, Choreography.Projection.Project.transBranches, Choreography.Projection.Trans.transBranches] using hbranch_rel
   cases hbranch_rel' with
   | cons hpair _ => exact hpair.2
 

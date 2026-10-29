@@ -315,11 +315,13 @@ theorem lookup_d_rename_pr (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
   cases h : D.list.lookup e with
   | none =>
       simp [h] at hFold
-      simpa [hLookup, h] using hFold
+      simp only [hLookup, h]
+      exact hFold
   | some ts =>
       simp [h] at hFold
 /- ## Structured Block 6 -/
-      simpa [hLookup, h] using hFold
+      simp only [hLookup, h]
+      exact hFold
 
 /-- The coherence invariant is preserved under protocol renaming.
     This is the main conservation theorem. -/

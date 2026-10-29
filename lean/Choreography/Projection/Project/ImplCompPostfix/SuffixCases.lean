@@ -90,7 +90,9 @@ private theorem c_project_trans_rel_comp_postfix_suffix_mu_nonmu
         (v := v) (v' := v') (body_lt := body_lt) (body_t := body_t)
         hrel_ab heq_bc hWFa hWFc
     | _ =>
-        simpa [EQ2F] using (Or.inl hcomp_left)
+        first
+          | (simp only [EQ2F]; exact Or.inl hcomp_left)
+          | simpa [EQ2F] using (Or.inl hcomp_left)
 
 -- Suffix Non-Mu/Mu Case
 
@@ -117,7 +119,9 @@ private theorem c_project_trans_rel_comp_postfix_suffix_nonmu_mu
         (v := v) (v' := v') (body_lt := body_lt) (body_t := body_t)
         hrel_ab heq_bc hWFa hWFc
     | _ =>
-        simpa [EQ2F] using (Or.inl hcomp_right)
+        first
+          | (simp only [EQ2F]; exact Or.inl hcomp_right)
+          | simpa [EQ2F] using (Or.inl hcomp_right)
 
 -- Suffix Var/Var Case
 
@@ -374,8 +378,8 @@ theorem c_project_trans_rel_comp_postfix :
     exact c_project_trans_rel_comp_postfix_prefix heq_ab hrel_bb' hWFa hWFc
   · -- 2-hop suffix: ∃ b, CProjectTransRel lt b ∧ EQ2 b t
     exact c_project_trans_rel_comp_postfix_suffix hrel_ab heq_bc hWFa hWFc
-    · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
-      exact c_project_trans_rel_comp_postfix_chain heq_ab hrel_bb' heq_b'c hWFa hWFc
+  · -- 3-hop: ∃ b b', EQ2 lt b ∧ CProjectTransRel b b' ∧ EQ2 b' t
+    exact c_project_trans_rel_comp_postfix_chain heq_ab hrel_bb' heq_b'c hWFa hWFc
 
 -- Main EQ2 Theorem
 
@@ -385,9 +389,13 @@ Proven by coinduction using CProjectTransRelCompWF as witness relation.
 Uses eq2_coind_upto which handles the EQ2 closure automatically.
 
 Requires `allCommsNonEmpty` assumption (matching Coq's `size_pred`) to handle
-non-participant cases which recurse through branches. -/
+non-participant cases which recurse through branches.
+
+Delegation is excluded (`g.delegateFree`): the send/recv agreement lemmas used in the
+witness relation go through `transBranches`, which cannot express delegation annotations. -/
 theorem c_project_implies_eq2_trans_thm (g : GlobalType) (role : String) (lt : LocalTypeR)
-    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) := by
+    (h : CProject g role lt) (hwf : g.wellFormed = true) (hdf : g.delegateFree = true) :
+    EQ2 lt (trans g role) := by
   -- Apply coinduction up-to with witness relation CProjectTransRelCompWF
   -- eq2_coind_upto says: if ∀ a b, R a b → EQ2F (EQ2_closure R) a b, then R ⊆ EQ2
   -- EQ2_closure R = fun a b => R a b ∨ EQ2 a b, which matches c_project_trans_rel_comp_postfix
@@ -397,7 +405,7 @@ theorem c_project_implies_eq2_trans_thm (g : GlobalType) (role : String) (lt : L
     exact c_project_trans_rel_comp_postfix lt' t' hrel
   · -- Seed relation: CProjectTransRelCompWF holds by the base CProjectTransRel case.
 /- ## Structured Block 7 -/
-    have hrel : CProjectTransRel lt (trans g role) := ⟨g, role, h, rfl, hwf⟩
+    have hrel : CProjectTransRel lt (trans g role) := ⟨g, role, h, rfl, hwf, hdf⟩
     exact c_project_trans_rel_comp_wf_of_c_project_trans_rel hrel
 
 

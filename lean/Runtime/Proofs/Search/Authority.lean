@@ -32,10 +32,10 @@ def AuthorityIndependent
 downstream authority policy derives regions. -/
 theorem threaded_exact_single_lane_refinement_is_authority_policy_neutral
     (policy : SearchAuthorityPolicy)
-    (frontier : List FrontierEntry) :
-    frontierAfterThreadedExactSingleLaneStep frontier =
-      frontierAfterCanonicalStep frontier := by
-  simpa using threaded_exact_single_lane_step_refines_canonical frontier
+    (frontier : List FrontierEntry) (schedule : LaneSchedule frontier) :
+    frontierAfterThreadedExactSingleLaneStep frontier schedule =
+      frontierAfterCanonicalStep frontier :=
+  threaded_exact_single_lane_step_refines_canonical frontier schedule
 
 /-- Canonical serial one-step fairness is likewise authority-policy neutral at
 the reduced proof boundary. -/

@@ -31,10 +31,14 @@ structure ClassicalTransportWitness (State : Type v) where
   harmony : Prop
   finiteState : Prop
 
-/-- Output-condition witness expected by theorem-pack adapters. -/
+/-- Output-condition witness expected by theorem-pack adapters.
+
+`accepted` has no default: callers must supply the semantic acceptance
+predicate that `verify` is claimed to be sound for, so `sound` is never
+vacuous by construction. -/
 structure OutputConditionWitness where
   verify : OutputConditionClaim → Bool
-  accepted : OutputConditionClaim → Prop := fun _ => True
+  accepted : OutputConditionClaim → Prop
   sound : ∀ claim, verify claim = true → accepted claim
 
 /-- Attachment surface for core semantic-object invariants. -/

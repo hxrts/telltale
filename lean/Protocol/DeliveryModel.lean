@@ -155,11 +155,11 @@ theorem fifo : DeliveryModelLaws DeliveryModel.fifo := by
   · intro from_ L
     rfl
   · intro from_ L ts T L' h
-    simpa using (consume_append (from_:=from_) (Lr:=L) (ts:=ts) (T:=T) (L':=L') h)
+    simpa using (_root_.consume_append (from_:=from_) (Lr:=L) (ts:=ts) (T:=T) (L':=L') h)
   · intro from_ L T ts
-    simpa using (consume_cons (from_:=from_) (Lr:=L) (T:=T) (ts:=ts))
+    exact _root_.consume_cons (from_:=from_) (Lr:=L) (T:=T) (ts:=ts)
   · intro ρ from_ L ts
-    simpa using (consume_rename (ρ:=ρ) (from_:=from_) (L:=L) (ts:=ts))
+    simpa using (_root_.consume_rename (ρ:=ρ) (from_:=from_) (L:=L) (ts:=ts))
 
 end DeliveryModelLaws
 
@@ -176,18 +176,18 @@ theorem fifo : DeliveryModelLawsStrong DeliveryModel.fifo := by
       consume_single_branch_string := ?_
       consume_branch_nonempty_false := ?_ }
   · intro from_ L ts L' hNotRecv hNotBranch h
-    exact consume_non_recv_empty (from_:=from_) (L:=L) (ts:=ts) (L':=L') hNotRecv hNotBranch h
+    exact _root_.consume_non_recv_empty (from_:=from_) (L:=L) (ts:=ts) (L':=L') hNotRecv hNotBranch h
   · intro from_ r T L ts L' hNe h
-    exact consume_other_empty (from_:=from_) (r:=r) (T:=T) (L:=L) (ts:=ts) (L':=L') hNe h
+    exact _root_.consume_other_empty (from_:=from_) (r:=r) (T:=T) (L:=L) (ts:=ts) (L':=L') hNe h
   · intro from_ T L
     -- Consume from_ (.recv from_ T L) [T] = Consume from_ L [] = some L
-    simpa using (consume_recv_cons (from_:=from_) (T:=T) (L:=L) (ts:=[]))
+    exact (_root_.consume_recv_cons (from_:=from_) (T:=T) (L:=L) (ts:=[])).trans rfl
   · intro from_ T T' L L' h
-    exact consume_single_recv_match (from_:=from_) (T:=T) (T':=T') (L:=L) (L':=L') h
+    exact _root_.consume_single_recv_match (from_:=from_) (T:=T) (T':=T') (L:=L) (L':=L') h
   · intro from_ bs T L' h
-    exact consume_single_branch_string (from_:=from_) (bs:=bs) (T:=T) (L':=L') h
+    exact _root_.consume_single_branch_string (from_:=from_) (bs:=bs) (T:=T) (L':=L') h
   · intro from_ r bs t ts L' h
-    exact consume_branch_nonempty_false (from_:=from_) (r:=r) (bs:=bs) (t:=t) (ts:=ts) (L':=L') h
+    exact _root_.consume_branch_nonempty_false (from_:=from_) (r:=r) (bs:=bs) (t:=t) (ts:=ts) (L':=L') h
 
 end DeliveryModelLawsStrong
 

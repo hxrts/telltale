@@ -1,15 +1,29 @@
+import Mathlib.Data.Finset.Basic
+
 set_option autoImplicit false
 
 /-! # Distributed.Families.Coordination
 
-Reusable CALM-style coordination characterization:
-- coordination-free safety when monotonicity holds,
-- explicit coordination requirement otherwise.
+CALM-style coordination characterization for a concrete query model:
+- a query maps a finite set of delivered input facts to a set of output facts,
+- a coordination-free replica answers on whatever prefix of a delivery order
+  it has received so far,
+- it is safe iff no answer emitted on a prefix is retracted once the rest of
+  the input arrives.
+
+We prove: coordination-free answering is safe iff the query is monotone, and a
+non-monotone query has a delivery order on which a coordination-free answer
+is retracted (so the replica must coordinate to learn the input is complete).
+
+Scope: this is the order-theoretic core of CALM. It does not model
+transducer networks or prove the distributed-computability direction.
 -/
 
 /-
-The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
-Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+The Problem. Earlier versions carried both halves of the characterization as
+premises plus an excluded-middle "assumption".
+Solution Structure. Define safety over delivery orders, then prove both
+directions from the definition of monotonicity; no assumptions remain.
 -/
 
 /-! ## Core Development -/
@@ -19,130 +33,87 @@ namespace Coordination
 
 universe u v
 
-/-- Minimal model interface for coordination-characterization reasoning. -/
-structure Model (State : Type u) (Update : Type v) where
-  apply : State → Update → State
-  le : State → State → Prop
-  inputLe : Update → Update → Prop
+/-- A query over finite sets of delivered input facts. -/
+structure Model (Input : Type u) (Output : Type v) where
+  query : Finset Input → Set Output
 
-/-- Program monotonicity over growing inputs and ordered outputs. -/
-def MonotoneUpdates
-    {State : Type u} {Update : Type v}
-    (M : Model State Update) : Prop :=
-  ∀ s u₁ u₂, M.inputLe u₁ u₂ → M.le (M.apply s u₁) (M.apply s u₂)
+variable {Input : Type u} {Output : Type v} [DecidableEq Input]
 
-/-- Coordination-free safety predicate. -/
-def CoordinationFreeSafety
-    {State : Type u} {Update : Type v}
-    (M : Model State Update) : Prop :=
-  ∀ s u, M.le s (M.apply s u)
+/-- Facts delivered by a list of messages. -/
+def delivered (xs : List Input) : Finset Input := xs.toFinset
 
-/-- Coordination-required predicate. -/
-def CoordinationRequired
-    {State : Type u} {Update : Type v}
-    (M : Model State Update) : Prop :=
-  ∃ s u₁ u₂,
-    M.inputLe u₁ u₂ ∧ ¬ M.le (M.apply s u₁) (M.apply s u₂)
+/-- Monotone query: more input never removes output facts. -/
+def MonotoneUpdates (M : Model Input Output) : Prop :=
+  ∀ I J : Finset Input, I ⊆ J → M.query I ⊆ M.query J
+
+/-- Coordination-free safety: answering on any delivered prefix never emits a
+fact that the answer on the full delivery retracts. -/
+def CoordinationFreeSafety (M : Model Input Output) : Prop :=
+  ∀ pre rest : List Input, M.query (delivered pre) ⊆ M.query (delivered (pre ++ rest))
+
+/-- Coordination required: some delivery prefix yields an output fact that the
+full delivery retracts. -/
+def CoordinationRequired (M : Model Input Output) : Prop :=
+  ∃ (pre rest : List Input) (o : Output),
+    o ∈ M.query (delivered pre) ∧ o ∉ M.query (delivered (pre ++ rest))
 
 /-- Combined coordination characterization. -/
-def CoordinationCharacterization
-    {State : Type u} {Update : Type v}
-    (M : Model State Update) : Prop :=
+def CoordinationCharacterization (M : Model Input Output) : Prop :=
   (MonotoneUpdates M → CoordinationFreeSafety M) ∧
   (¬ MonotoneUpdates M → CoordinationRequired M)
 
-/-! ## Assumption Atoms and Contracts -/
+/-! ## Proofs -/
 
-/-- Reusable core coordination assumption bundle. -/
-structure Assumptions
-    {State : Type u} {Update : Type v}
-    (M : Model State Update) : Prop where
-  monotonicityClassDeclared : MonotoneUpdates M ∨ ¬ MonotoneUpdates M
+/-- A prefix delivers a subset of the full delivery. -/
+theorem delivered_prefix_subset (pre rest : List Input) :
+    delivered pre ⊆ delivered (pre ++ rest) := by
+  intro x hx
+  simp only [delivered, List.mem_toFinset, List.mem_append] at hx ⊢
+  exact Or.inl hx
 
-/-- Built-in assumption labels for summary/validation APIs. -/
-inductive Assumption where
-  | monotonicityClassDeclared
-  deriving Repr, DecidableEq, Inhabited
+/-- Every pair `I ⊆ J` is realised by a delivery prefix and its extension. -/
+theorem delivered_realises {I J : Finset Input} (h : I ⊆ J) :
+    delivered I.toList = I ∧ delivered (I.toList ++ (J \ I).toList) = J := by
+  refine ⟨by simp [delivered], ?_⟩
+  ext x
+  simp only [delivered, List.mem_toFinset, List.mem_append, Finset.mem_toList,
+    Finset.mem_sdiff]
+  constructor
+  · rintro (hx | ⟨hx, _⟩)
+    exacts [h hx, hx]
+  · intro hx; by_cases hI : x ∈ I
+    exacts [Or.inl hI, Or.inr ⟨hx, hI⟩]
 
-/-- Validation result for one assumption atom. -/
-structure AssumptionResult where
-  assumption : Assumption
-  passed : Bool
-  detail : String
-  deriving Repr, DecidableEq, Inhabited
+/-- Monotone queries are safe without coordination. -/
+theorem coordination_free_of_monotone (M : Model Input Output)
+    (h : MonotoneUpdates M) : CoordinationFreeSafety M :=
+  fun pre rest => h _ _ (delivered_prefix_subset pre rest)
 
-/-- Core reusable coordination assumption set. -/
-def coreAssumptions : List Assumption :=
-  [ .monotonicityClassDeclared ]
+/-- Coordination-free safety forces monotonicity (converse of CALM). -/
+theorem monotone_of_coordination_free (M : Model Input Output)
+    (h : CoordinationFreeSafety M) : MonotoneUpdates M := by
+  intro I J hIJ
+  obtain ⟨h1, h2⟩ := delivered_realises hIJ
+  have := h I.toList (J \ I).toList
+  rwa [h1, h2] at this
 
-/-! ## Assumption Validation API -/
+/-- Monotonicity characterises coordination-free safety. -/
+theorem monotone_iff_coordination_free (M : Model Input Output) :
+    MonotoneUpdates M ↔ CoordinationFreeSafety M :=
+  ⟨coordination_free_of_monotone M, monotone_of_coordination_free M⟩
 
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
+/-- Non-monotone queries require coordination. -/
+theorem coordination_required_of_non_monotone (M : Model Input Output)
+    (h : ¬ MonotoneUpdates M) : CoordinationRequired M := by
+  have hNot : ¬ CoordinationFreeSafety M := fun hc => h (monotone_of_coordination_free M hc)
+  simp only [CoordinationFreeSafety, Set.subset_def, not_forall] at hNot
+  obtain ⟨pre, rest, o, ho, hno⟩ := hNot
+  exact ⟨pre, rest, o, ho, hno⟩
 
-
-/-- Validate one assumption against an assumption bundle. -/
-def validateAssumption
-    {State : Type u} {Update : Type v}
-    {M : Model State Update}
-    (_a : Assumptions M) (h : Assumption) : AssumptionResult :=
-  match h with
-  | .monotonicityClassDeclared =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Monotonicity-class declaration is provided."
-      }
-
-/-- Validate a list of assumptions. -/
-def validateAssumptions
-    {State : Type u} {Update : Type v}
-    {M : Model State Update}
-    (a : Assumptions M) (hs : List Assumption) : List AssumptionResult :=
-  hs.map (validateAssumption a)
-
-/-- True iff every validation atom passed. -/
-def allAssumptionsPassed (rs : List AssumptionResult) : Bool :=
-  rs.all (fun r => r.passed)
-
-/-- Summary of assumption validation. -/
-structure AssumptionSummary where
-  results : List AssumptionResult
-  allPassed : Bool
-  deriving Repr, DecidableEq, Inhabited
-
-/-- Summary API for assumption validation. -/
-def runAssumptionValidation
-    {State : Type u} {Update : Type v}
-    {M : Model State Update}
-    (a : Assumptions M) (hs : List Assumption) :
-    AssumptionSummary :=
-  let rs := validateAssumptions a hs
-  { results := rs, allPassed := allAssumptionsPassed rs }
-
-/-! ## Theorem Premises and Main Result -/
-
-/-- Additional premises used to derive coordination theorem forms. -/
-structure Premises
-    {State : Type u} {Update : Type v}
-    (M : Model State Update) : Type (max u v) where
-  coordinationFreeWhenMonotone :
-    MonotoneUpdates M → CoordinationFreeSafety M
-  coordinationRequiredWhenNonMonotone :
-    ¬ MonotoneUpdates M → CoordinationRequired M
-
-/-- Coordination characterization from supplied assumptions and premises. -/
-theorem coordination_characterization_of_assumptions
-    {State : Type u} {Update : Type v}
-    {M : Model State Update}
-    (_a : Assumptions M)
-    (p : Premises M) :
-    CoordinationCharacterization M := by
-  refine ⟨?_, ?_⟩
-  · intro hMono
-    exact p.coordinationFreeWhenMonotone hMono
-  · intro hNonMono
-    exact p.coordinationRequiredWhenNonMonotone hNonMono
+/-- The coordination characterization, proved for every query model. -/
+theorem coordination_characterization (M : Model Input Output) :
+    CoordinationCharacterization M :=
+  ⟨coordination_free_of_monotone M, coordination_required_of_non_monotone M⟩
 
 end Coordination
 end Distributed

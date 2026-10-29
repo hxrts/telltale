@@ -20,7 +20,7 @@ namespace SessionCoTypes.Coinductive
 /-- Canonical finite-reachability checker for regular coinductive types.
 
 The unfolding bound is chosen from the maximum unfolding depths of both sides. -/
-def regularTypeEqCheck
+noncomputable def regularTypeEqCheck
     (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Bool :=
   let bound := max (maxUnfoldDepth a) (maxUnfoldDepth b)
   bisim a b ha hb bound
@@ -36,7 +36,7 @@ theorem regular_type_eq_check_sound
 /-- Total decision wrapper for regular type equivalence.
 
 Fast path uses `regularTypeEqCheck`; fallback is a complete logical decision. -/
-def regularTypeEqDecide
+noncomputable def regularTypeEqDecide
     (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) : Bool :=
   if hcheck : regularTypeEqCheck a b ha hb = true then
     true
@@ -53,7 +53,7 @@ theorem regular_type_eq_decide_spec
   · simp [hcheck]
 
 /-- Regular coinductive type equivalence is decidable. -/
-def regular_type_equivalence_decidable
+noncomputable def regular_type_equivalence_decidable
     (a b : LocalTypeC) (ha : Regular a) (hb : Regular b) :
     Decidable (EQ2C a b) := by
   exact

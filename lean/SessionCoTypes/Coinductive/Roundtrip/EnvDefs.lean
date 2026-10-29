@@ -21,7 +21,7 @@ needed for round-trip correctness. `toInductiveBody` handles the body conversion
 namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
-local instance : DecidableEq LocalTypeC := by
+noncomputable local instance : DecidableEq LocalTypeC := by
   classical
   infer_instance
 /-! ## Environment Naming and Containment
@@ -30,13 +30,13 @@ Core definitions for assigning names to coinductive nodes and building environme
 -/
 
 /-- Name assigned to a coinductive node in a finite system. -/
-def nameOf (c : LocalTypeC) (all : Finset LocalTypeC) : String :=
+noncomputable def nameOf (c : LocalTypeC) (all : Finset LocalTypeC) : String :=
   match head c with
   | .mu x => x
   | _     => nameFor c all
 
 /-- Environment generated from a finite system of nodes. -/
-def envOf (all : Finset LocalTypeC) (_visited : Finset LocalTypeC) : EnvPair :=
+noncomputable def envOf (all : Finset LocalTypeC) (_visited : Finset LocalTypeC) : EnvPair :=
   (fun x => { c | c ∈ all ∧ nameOf c all = x }, fun x => { mkVar x })
 
 /-! ## envOf containment helpers -/
@@ -88,33 +88,33 @@ lemma name_of_ne_var_of_head_var {all : Finset LocalTypeC} {b : LocalTypeC} {x :
 /-! ## toCoind Branch and Head Helpers -/
 
 lemma branches_of_to_coind_send_of_fn {p : String} {n : Nat}
-    (f : Fin n → (Label × LocalTypeR)) :
+    (f : Fin n → BranchR) :
     branchesOf (toCoind (.send p (List.ofFn f))) =
-      List.ofFn (fun i => ((f i).1, toCoind (f i).2)) := by
+      List.ofFn (fun i => ((f i).1, toCoind (f i).2.2)) := by
   simp [branches_of_mk_send, to_coind_branches_of_fn]
 
 lemma branches_of_to_coind_recv_of_fn {p : String} {n : Nat}
-    (f : Fin n → (Label × LocalTypeR)) :
+    (f : Fin n → BranchR) :
     branchesOf (toCoind (.recv p (List.ofFn f))) =
-      List.ofFn (fun i => ((f i).1, toCoind (f i).2)) := by
+      List.ofFn (fun i => ((f i).1, toCoind (f i).2.2)) := by
   simp [branches_of_mk_recv, to_coind_branches_of_fn]
 
 lemma head_to_coind_send_of_fn {p : String} {n : Nat}
-    (f : Fin n → (Label × LocalTypeR)) :
+    (f : Fin n → BranchR) :
     head (toCoind (.send p (List.ofFn f))) =
       .send p (List.ofFn fun i => (f i).1) := by
   have hcomp :
-      (Prod.fst ∘ fun i => ((f i).1, toCoind (f i).2)) = fun i => (f i).1 := by
+      (Prod.fst ∘ fun i => ((f i).1, toCoind (f i).2.2)) = fun i => (f i).1 := by
     funext i
     rfl
   simp [head_mk_send, to_coind_branches_of_fn, List.map_ofFn, hcomp]
 
 lemma head_to_coind_recv_of_fn {p : String} {n : Nat}
-    (f : Fin n → (Label × LocalTypeR)) :
+    (f : Fin n → BranchR) :
     head (toCoind (.recv p (List.ofFn f))) =
       .recv p (List.ofFn fun i => (f i).1) := by
   have hcomp :
-      (Prod.fst ∘ fun i => ((f i).1, toCoind (f i).2)) = fun i => (f i).1 := by
+      (Prod.fst ∘ fun i => ((f i).1, toCoind (f i).2.2)) = fun i => (f i).1 := by
     funext i
     rfl
   simp [head_mk_recv, to_coind_branches_of_fn, List.map_ofFn, hcomp]
@@ -123,14 +123,14 @@ lemma head_to_coind_recv_of_fn {p : String} {n : Nat}
 
 lemma env_of_var_r (all visited : Finset LocalTypeC) : EnvVarR (envOf all visited) := by
   intro x c hmem
-  simpa [envOf] using hmem
+  simpa [envOf, envR, envL] using hmem
 
 lemma env_of_resolves_l_of_backedge {all visited : Finset LocalTypeC}
     (hback : ∀ c ∈ all, EQ2C (mkVar (nameOf c all)) c) :
     EnvResolvesL (envOf all visited) := by
   intro x c hmem
   have hmem' : c ∈ all ∧ nameOf c all = x := by
-    simpa [envOf] using hmem
+    simpa [envOf, envR, envL] using hmem
   rcases hmem' with ⟨hmem_all, hname⟩
   have h := hback c hmem_all
   simpa [hname] using h
@@ -144,7 +144,7 @@ lemma env_of_resolves_of_backedge {all visited : Finset LocalTypeC}
 /-! ## toInductive body helper -/
 
 /-- Canonical unfold body for toInductiveAux. -/
-def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
+noncomputable def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
     (current : LocalTypeC)
     (h_closed : IsClosedSet all)
     (h_visited : visited ⊆ all) (h_current : current ∈ all) : LocalTypeR :=
@@ -159,22 +159,22 @@ def toInductiveBody (root : LocalTypeC) (all visited : Finset LocalTypeC)
       toInductiveAux root all visited' child h_closed
         (subset_insert_of_mem h_current h_visited) hchild_mem
   | ⟨.send p labels, k⟩ =>
-      let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+      let f : Fin labels.length → BranchR := fun i =>
         let child := k i
         have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
         have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
         let body := toInductiveAux root all visited' child h_closed
           (subset_insert_of_mem h_current h_visited) hchild_mem
-        (labels[i], body)
+        (labels[i], none, body)
       LocalTypeR.send p (List.ofFn f)
   | ⟨.recv p labels, k⟩ =>
-      let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+      let f : Fin labels.length → BranchR := fun i =>
         let child := k i
         have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
         have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
         let body := toInductiveAux root all visited' child h_closed
           (subset_insert_of_mem h_current h_visited) hchild_mem
-        (labels[i], body)
+        (labels[i], none, body)
       LocalTypeR.recv p (List.ofFn f)
 
 /-! ## toInductiveBody Expansion Lemma -/
@@ -194,22 +194,22 @@ lemma to_inductive_body_eq_match (root : LocalTypeC) (all visited : Finset Local
           toInductiveAux root all (Insert.insert current visited) child h_closed
             (subset_insert_of_mem h_current h_visited) hchild_mem
       | ⟨.send p labels, k⟩ =>
-          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+          let f : Fin labels.length → BranchR := fun i =>
             let child := k i
             have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
             have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
             let body := toInductiveAux root all (Insert.insert current visited) child h_closed
               (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels[i], body)
+            (labels[i], none, body)
           LocalTypeR.send p (List.ofFn f)
       | ⟨.recv p labels, k⟩ =>
-          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+          let f : Fin labels.length → BranchR := fun i =>
             let child := k i
             have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
             have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
             let body := toInductiveAux root all (Insert.insert current visited) child h_closed
               (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels[i], body)
+            (labels[i], none, body)
           LocalTypeR.recv p (List.ofFn f)) := by
   rfl
 

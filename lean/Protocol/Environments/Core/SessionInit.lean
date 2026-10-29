@@ -17,7 +17,7 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
-open Batteries
+open Batteries RBTree
 
 section
 
@@ -156,7 +156,7 @@ theorem d_env_union_find?_left {D1 D2 : DEnv} {e : Edge} {ts : Trace}
               simpa [hinsert] using hacc
             simpa [List.foldl_cons, f, hfind] using
               ih (acc := acc.insert p.1 p.2) hacc'
-  simpa [f] using hfold (ps := D2.map.toList) (acc := D1.map) h0
+  exact hfold (ps := D2.map.toList) (acc := D1.map) h0
 
 /-! ## DEnvUnion Lookup when Key is Absent from Left -/
 /-- DEnvUnion find? when key not in left. -/
@@ -250,7 +250,8 @@ theorem d_env_union_find?_right {D1 D2 : DEnv} {e : Edge}
           | some _ => acc
           | none => acc.insert k v) (∅ : RBMap Edge Trace compare) D2.map).find? e =
         D2.find? e := by
-      simpa [DEnvUnion, d_env_find?_of_map] using hEmptyUnion
+      simp only [DEnvUnion, d_env_find?_of_map] at hEmptyUnion
+      exact hEmptyUnion
     simpa [RBMap.foldl_eq_foldl_toList] using hEmptyUnion'
   exact hEqFold.trans hEmptyFold
 
@@ -294,7 +295,8 @@ theorem update_d_d_env_union_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
           ((D1 ++ D2).map.insert e ts).find? e' = (D1 ++ D2).map.find? e' := by
         simpa using
           (RBMap.find?_insert_of_ne (t := (D1 ++ D2).map) (k := e) (v := ts) (k' := e') hne')
-      simpa [updateD, d_env_find?_of_map] using hfind
+      simp only [updateD, d_env_find?_of_map]
+      first | exact hfind | simpa [DEnv.find?] using hfind
     cases hfind : D1.find? e' with
     | some ts' =>
         -- key in left; both unions agree on left value
@@ -318,7 +320,8 @@ theorem update_d_d_env_union_right {D1 D2 : DEnv} {e : Edge} {ts : List ValType}
               (D2.map.insert e ts).find? e' = D2.map.find? e' := by
             simpa using
               (RBMap.find?_insert_of_ne (t := D2.map) (k := e) (v := ts) (k' := e') hne')
-          simpa [updateD, d_env_find?_of_map] using hfind
+          simp only [updateD, d_env_find?_of_map]
+          first | exact hfind | simpa [DEnv.find?] using hfind
         simp [hLeft, hLeftUnion, hRightUnion, hUpd]
 
 /-! ## DEnvUnion Associativity -/
@@ -403,7 +406,7 @@ theorem init_buffers_not_mem_of_lookup_none (sid : SessionId) (roles : RoleSet) 
   -- Any edge in allEdges would be found with an empty buffer.
   intro hMem
   have hSome := init_buffers_lookup_mem sid roles e hMem
-  exact Option.noConfusion (hSome.symm.trans h)
+  cases (hSome.symm.trans h)
 
 /-! ## initBuffers Lookup None for Non-members -/
 /-- initBuffers returns none for edges not in allEdges. -/

@@ -67,7 +67,9 @@ def toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
   | .mu x body => by
       apply regular_of_children
       intro i; cases i
-      simpa [toCoind] using toCoind_regular body
+      have hb := toCoind_regular body
+      simp only [toCoind, children, mkMu, PFunctor.M.dest_mk]
+      exact hb
   | .send p bs => by
       have hreg := toCoindBranches_regular_aux bs (fun cont hsz => by
         have hsz' : sizeOf cont < sizeOf (LocalTypeR.send p bs) := by
@@ -75,7 +77,8 @@ def toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
         exact toCoind_regular cont)
       apply regular_of_children
       intro i
-      simpa using hreg (castFin (by simp) i)
+      have hi := hreg (castFin (by simp) i)
+      exact hi
   | .recv p bs => by
       have hreg := toCoindBranches_regular_aux bs (fun cont hsz => by
         have hsz' : sizeOf cont < sizeOf (LocalTypeR.recv p bs) := by
@@ -83,7 +86,8 @@ def toCoind_regular : ∀ t : LocalTypeR, Regular (toCoind t)
         exact toCoind_regular cont)
       apply regular_of_children
       intro i
-      simpa using hreg (castFin (by simp) i)
+      have hi := hreg (castFin (by simp) i)
+      exact hi
 termination_by t => sizeOf t
 
 end SessionCoTypes.Coinductive

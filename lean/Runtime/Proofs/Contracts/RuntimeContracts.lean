@@ -266,10 +266,10 @@ def determinismProfileSupported
     (artifacts : ProtocolMachineDeterminismArtifacts)
     (profile : ProtocolMachineDeterminismProfile) : Bool :=
   match profile with
-  | .full => artifacts.full
-  | .moduloEffectTrace => artifacts.moduloEffectTrace
-  | .moduloCommutativity => artifacts.moduloCommutativity
-  | .replay => artifacts.replay
+  | .full => artifacts.full.isSome
+  | .moduloEffectTrace => artifacts.moduloEffectTrace.isSome
+  | .moduloCommutativity => artifacts.moduloCommutativity.isSome
+  | .replay => artifacts.replay.isSome
 
 /-- Runtime profile selection gate for
 `full`, `moduloEffectTrace`, `moduloCommutativity`, and `replay`. -/
@@ -297,7 +297,7 @@ def SchedulerProfileContract.ofBundle {st₀ : ProtocolMachineState ι γ π ε 
   }
 
 /-- Build a theorem-pack capability contract from a proof space. -/
-def TheoremPackCapabilityContract.ofProofSpace
+noncomputable def TheoremPackCapabilityContract.ofProofSpace
     {store₀ : SessionStore ν} {State : Type v}
     (space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State) :
     TheoremPackCapabilityContract space :=

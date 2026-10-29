@@ -26,6 +26,62 @@ open SessionCoTypes.EQ2Paco
 open Paco
 open SessionTypes.Participation
 
+/-! ## Delegate-Free and Payload Helpers -/
+
+private theorem hdf_br {g : GlobalType} {s r : String} {gbs : List (Label × GlobalType)}
+    (hg : GlobalType.fullUnfoldIter g = .comm s r gbs)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true) :
+    ∀ gb ∈ gbs, gb.2.delegateFree = true := by
+  intro gb hgb
+  rw [hg] at hdfg
+  exact delegate_free_of_mem (by simpa using hdfg) hgb
+
+private theorem pay_nonpart {g : GlobalType} {role : String} {cand : LocalTypeR} {s r : String}
+    {gbs : List (Label × GlobalType)}
+    (hg : GlobalType.fullUnfoldIter g = .comm s r gbs) (hrs : role ≠ s) (hrr : role ≠ r)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
+    PayloadFree cand.fullUnfold ∨ AllBranchesProj CProjectU gbs role cand.fullUnfold := by
+  rcases hpayc with h | h
+  · exact Or.inl (payload_free_full_unfold _ h)
+  · rcases c_project_u_destruct h with ⟨_, _, hcore⟩
+    rw [hg] at hcore
+    simp only [CProjectF_unfold_core, hrs, hrr, if_false] at hcore
+    rcases hcore with ⟨_, hend⟩ | ⟨_, hall⟩
+    · left
+      rw [hend]
+      simp [PayloadFree]
+    · exact Or.inr hall
+
+private theorem pay_send {g : GlobalType} {role : String} {cand : LocalTypeR} {s r p : String}
+    {gbs : List (Label × GlobalType)} {cs : List BranchR}
+    (hg : GlobalType.fullUnfoldIter g = .comm s r gbs) (hfull : cand.fullUnfold = .send p cs)
+    (hrs : role = s) (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
+    BranchesPayloadFree cs ∨ BranchesProjRel CProjectU gbs s cs := by
+  rcases hpayc with h | h
+  · have h' := payload_free_full_unfold _ h
+    rw [hfull] at h'
+    exact Or.inl h'
+  · rcases c_project_u_destruct h with ⟨_, _, hcore⟩
+    rw [hg, hfull] at hcore
+    subst hrs
+    simp [CProjectF_unfold_core] at hcore
+    exact Or.inr hcore.2
+
+private theorem pay_recv {g : GlobalType} {role : String} {cand : LocalTypeR} {s r p : String}
+    {gbs : List (Label × GlobalType)} {cs : List BranchR}
+    (hg : GlobalType.fullUnfoldIter g = .comm s r gbs) (hfull : cand.fullUnfold = .recv p cs)
+    (hrr : role = r) (hne : r ≠ s) (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
+    BranchesPayloadFree cs ∨ BranchesProjRel CProjectU gbs r cs := by
+  rcases hpayc with h | h
+  · have h' := payload_free_full_unfold _ h
+    rw [hfull] at h'
+    exact Or.inl h'
+  · rcases c_project_u_destruct h with ⟨_, _, hcore⟩
+    rw [hg, hfull] at hcore
+    subst hrr
+    simp [CProjectF_unfold_core, hne] at hcore
+    exact Or.inr hcore.2
+
 /-! ## Mu Postfix Case -/
 
 private theorem c_project_ueq2_rel_postfix_mu_case
@@ -35,7 +91,9 @@ private theorem c_project_ueq2_rel_postfix_mu_case
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
-    (hWFproj : ∀ g role cand, CProjectU g role cand → LocalTypeR.WellFormed cand) :
+    (hWFproj : ∀ g role cand, CProjectU g role cand → LocalTypeR.WellFormed cand)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- Mu: only end case survives after fullUnfold, others contradict hcore.
   have hmu0 : e0.fullUnfold.muHeight = 0 :=
@@ -45,7 +103,7 @@ private theorem c_project_ueq2_rel_postfix_mu_case
       have : False := by simpa [LocalTypeR.muHeight, he0] using hmu0
       exact this.elim
   | «end» =>
-      exact c_project_ueq2_rel_postfix_mu_end_case (g := g) (role := role) (cand := cand)
+      exact c_project_ueq2_rel_postfix_mu_end_case (hdfg := hdfg) (g := g) (role := role) (cand := cand)
         (e0 := e0) (t := t) (body := body) hg hcore heq_full heq hWF_full hWF hWFcand hWFproj he0
   | var _ =>
       have : False := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
@@ -70,7 +128,9 @@ private theorem c_project_ueq2_rel_postfix_comm_end_case
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/end: nonparticipant end or impossible participant branches.
   have hcore' := by simpa [CProjectF_unfold_core, CProjectF, hg, he0] using hcore
@@ -91,7 +151,7 @@ private theorem c_project_ueq2_rel_postfix_comm_end_case
             simpa [hrs, hrr, he0] using hcore''
           exact Or.inr (by
               simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using
-                (c_project_ueq2_rel_comm_nonpart heq_full_cand_full hWF_full hWFcand_full hcore_nonpart))
+                (c_project_ueq2_rel_comm_nonpart (hdf := hdf_br hg hdfg) (hpay := pay_nonpart hg hrs hrr hpayc) heq_full_cand_full hWF_full hWFcand_full hcore_nonpart))
 
 /-! ### Comm Var Case -/
 
@@ -102,7 +162,9 @@ private theorem c_project_ueq2_rel_postfix_comm_var_case
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/var: only nonparticipant branch is possible.
   by_cases hrs : role = sender
@@ -118,10 +180,10 @@ private theorem c_project_ueq2_rel_postfix_comm_var_case
           (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧
             AllBranchesProj CProjectU gbs role e0.fullUnfold := by
         simpa [he0] using hcore_nonpart
-      have hnonpart' := c_project_ueq2_rel_comm_nonpart
+      have hnonpart' := c_project_ueq2_rel_comm_nonpart (hdf := hdf_br hg hdfg) (hpay := pay_nonpart hg hrs hrr hpayc)
         heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-        exact Or.inr (by
-          simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+      exact Or.inr (by
+        simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
 /-! ### Comm Mu Case -/
 
@@ -133,7 +195,9 @@ private theorem c_project_ueq2_rel_postfix_comm_mu_case
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/mu: only nonparticipant branch is possible.
   by_cases hrs : role = sender
@@ -145,7 +209,7 @@ private theorem c_project_ueq2_rel_postfix_comm_mu_case
           (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧
             AllBranchesProj CProjectU gbs role e0.fullUnfold := by
         simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hcore
-      have hnonpart' := c_project_ueq2_rel_comm_nonpart
+      have hnonpart' := c_project_ueq2_rel_comm_nonpart (hdf := hdf_br hg hdfg) (hpay := pay_nonpart hg hrs hrr hpayc)
         heq_full_cand_full hWF_full hWFcand_full hcore_nonpart
       exact Or.inr (by
         simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
@@ -164,7 +228,9 @@ private theorem c_project_ueq2_rel_postfix_comm_send_sender
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
-    (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold) :
+    (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/send sender: lift branches through EQ2 and rebuild the send witness.
   have hfpair : p = receiver ∧ BranchesProjRel CProjectU gbs sender bs := by
@@ -179,9 +245,10 @@ private theorem c_project_ueq2_rel_postfix_comm_send_sender
     LocalTypeR.WellFormed.branches_of_send (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs sender cs :=
     branches_proj_rel_lift_eq2_u hbranches hrel_br hWF_branches hWF_branches_cand
-    exact Or.inr (by
-      simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrs] using
-        ⟨(by simpa using hpartner), hbranches'⟩)
+      (hdf_br hg hdfg) (pay_send hg hfull hrs hpayc)
+  exact Or.inr (by
+    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrs] using
+      ⟨(by simpa using hpartner), hbranches'⟩)
 
 /-! ### Comm Send Nonparticipant Case -/
 
@@ -194,7 +261,9 @@ private theorem c_project_ueq2_rel_postfix_comm_send_nonpart
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/send nonparticipant: lift AllBranchesProj to cand.fullUnfold.
   have hcore_nonpart :
@@ -205,10 +274,10 @@ private theorem c_project_ueq2_rel_postfix_comm_send_nonpart
       (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧
         AllBranchesProj CProjectU gbs role e0.fullUnfold := by
     simpa [he0] using hcore_nonpart
-  have hnonpart' := c_project_ueq2_rel_comm_nonpart
+  have hnonpart' := c_project_ueq2_rel_comm_nonpart (hdf := hdf_br hg hdfg) (hpay := pay_nonpart hg hrs hrr hpayc)
     heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-    exact Or.inr (by
-      simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+  exact Or.inr (by
+    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
 /-! ### Comm Send Dispatcher -/
 
@@ -222,17 +291,19 @@ private theorem c_project_ueq2_rel_postfix_comm_send_case
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/send: split into sender/receiver/nonparticipant cases.
   by_cases hrs : role = sender
-  · exact c_project_ueq2_rel_postfix_comm_send_sender (g := g) (role := role) (cand := cand) (e0 := e0)
+  · exact c_project_ueq2_rel_postfix_comm_send_sender (hdfg := hdfg) (hpayc := hpayc) (g := g) (role := role) (cand := cand) (e0 := e0)
       (sender := sender) (receiver := receiver) (p := p) (gbs := gbs) (bs := bs)
       hg he0 hrs hcore heq_full heq hWF_full hWF hWFcand hWFcand_full
   · by_cases hrr : role = receiver
     · have hne : receiver ≠ sender := by intro h; exact hrs (hrr.trans h)
       exact False.elim (by simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrr, hne] using hcore)
-    · exact c_project_ueq2_rel_postfix_comm_send_nonpart (g := g) (role := role) (cand := cand) (e0 := e0)
+    · exact c_project_ueq2_rel_postfix_comm_send_nonpart (hdfg := hdfg) (hpayc := hpayc) (g := g) (role := role) (cand := cand) (e0 := e0)
         (sender := sender) (receiver := receiver) (p := p) (gbs := gbs) (bs := bs)
         hg he0 hrs hrr hcore hWF_full hWFcand_full heq_full_cand_full
 
@@ -250,7 +321,9 @@ private theorem c_project_ueq2_rel_postfix_comm_recv_receiver
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
-    (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold) :
+    (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/recv receiver: lift branches through EQ2 and rebuild the recv witness.
   have hfpair : p = sender ∧ BranchesProjRel CProjectU gbs receiver bs := by
@@ -265,9 +338,10 @@ private theorem c_project_ueq2_rel_postfix_comm_recv_receiver
     LocalTypeR.WellFormed.branches_of_recv (p := p) (bs := cs) (by simpa [hfull] using hWFcand_full)
   have hbranches' : BranchesProjRel CProjectUEQ2Rel gbs receiver cs :=
     branches_proj_rel_lift_eq2_u hbranches hrel_br hWF_branches hWF_branches_cand
-    exact Or.inr (by
-      simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrr, hne] using
-        ⟨(by simpa using hpartner), hbranches'⟩)
+      (hdf_br hg hdfg) (pay_recv hg hfull hrr hne hpayc)
+  exact Or.inr (by
+    simpa [CProjectF_unfold_core, CProjectF, hg, hfull, hrr, hne] using
+      ⟨(by simpa using hpartner), hbranches'⟩)
 
 /-! ### Comm Recv Nonparticipant Case -/
 
@@ -280,7 +354,9 @@ private theorem c_project_ueq2_rel_postfix_comm_recv_nonpart
     (hcore : CProjectF_unfold_core CProjectU (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold e0))
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/recv nonparticipant: lift AllBranchesProj to cand.fullUnfold.
   have hcore_nonpart :
@@ -291,10 +367,10 @@ private theorem c_project_ueq2_rel_postfix_comm_recv_nonpart
       (∀ pair, pair ∈ gbs → part_of_all2 role pair.2) ∧
         AllBranchesProj CProjectU gbs role e0.fullUnfold := by
     simpa [he0] using hcore_nonpart
-  have hnonpart' := c_project_ueq2_rel_comm_nonpart
+  have hnonpart' := c_project_ueq2_rel_comm_nonpart (hdf := hdf_br hg hdfg) (hpay := pay_nonpart hg hrs hrr hpayc)
     heq_full_cand_full hWF_full hWFcand_full hcore_nonpart'
-    exact Or.inr (by
-      simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
+  exact Or.inr (by
+    simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs, hrr] using hnonpart')
 
 /-! ### Comm Recv Dispatcher -/
 
@@ -308,17 +384,19 @@ private theorem c_project_ueq2_rel_postfix_comm_recv_case
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
     (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
-    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold) :
+    (heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   -- comm/recv: split into receiver/ nonparticipant cases.
   by_cases hrs : role = sender
   · exact False.elim (by simpa [CProjectF_unfold_core, CProjectF, hg, he0, hrs] using hcore)
   · by_cases hrr : role = receiver
     · have hne : receiver ≠ sender := by intro h; exact hrs (hrr.trans h)
-      exact c_project_ueq2_rel_postfix_comm_recv_receiver (g := g) (role := role) (cand := cand) (e0 := e0)
+      exact c_project_ueq2_rel_postfix_comm_recv_receiver (hdfg := hdfg) (hpayc := hpayc) (g := g) (role := role) (cand := cand) (e0 := e0)
         (sender := sender) (receiver := receiver) (p := p) (gbs := gbs) (bs := bs)
         hg he0 hrr hne hcore heq_full heq hWF_full hWF hWFcand hWFcand_full
-    · exact c_project_ueq2_rel_postfix_comm_recv_nonpart (g := g) (role := role) (cand := cand) (e0 := e0)
+    · exact c_project_ueq2_rel_postfix_comm_recv_nonpart (hdfg := hdfg) (hpayc := hpayc) (g := g) (role := role) (cand := cand) (e0 := e0)
         (sender := sender) (receiver := receiver) (p := p) (gbs := gbs) (bs := bs)
         hg he0 hrs hrr hcore hWF_full hWFcand_full heq_full_cand_full
 
@@ -331,25 +409,27 @@ private theorem c_project_ueq2_rel_postfix_comm_case
     (heq_full : EQ2 e0 e0.fullUnfold) (heq : EQ2 e0 cand)
     (hWF_full : LocalTypeR.WellFormed e0.fullUnfold)
     (hWF : LocalTypeR.WellFormed e0) (hWFcand : LocalTypeR.WellFormed cand)
-    (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold) :
+    (hWFcand_full : LocalTypeR.WellFormed cand.fullUnfold)
+    (hdfg : (GlobalType.fullUnfoldIter g).delegateFree = true)
+    (hpayc : PayloadFree cand ∨ CProjectU g role cand) :
     CProjectF_unfold_core CProjectUEQ2Rel (GlobalType.fullUnfoldIter g) role (LocalTypeR.fullUnfold cand) := by
   have heq_full_cand_full : EQ2 e0.fullUnfold cand.fullUnfold := -- relate fullUnfolds before splitting
     eq2_full_unfold_to_full_unfold heq_full heq hWF_full hWF hWFcand hWFcand_full
   cases he0 : LocalTypeR.fullUnfold e0 with
   | «end» =>
-      exact c_project_ueq2_rel_postfix_comm_end_case
+      exact c_project_ueq2_rel_postfix_comm_end_case (hdfg := hdfg) (hpayc := hpayc)
         hg he0 hcore heq_full heq hWF_full hWF hWFcand hWFcand_full heq_full_cand_full
   | var v =>
-      exact c_project_ueq2_rel_postfix_comm_var_case
+      exact c_project_ueq2_rel_postfix_comm_var_case (hdfg := hdfg) (hpayc := hpayc)
         hg he0 hcore hWF_full hWFcand_full heq_full_cand_full
   | mu t body0 =>
-      exact c_project_ueq2_rel_postfix_comm_mu_case
+      exact c_project_ueq2_rel_postfix_comm_mu_case (hdfg := hdfg) (hpayc := hpayc)
         hg he0 hcore hWF_full hWFcand_full heq_full_cand_full
   | send p bs =>
-      exact c_project_ueq2_rel_postfix_comm_send_case
+      exact c_project_ueq2_rel_postfix_comm_send_case (hdfg := hdfg) (hpayc := hpayc)
         hg he0 hcore heq_full heq hWF_full hWF hWFcand hWFcand_full heq_full_cand_full
   | recv p bs =>
-      exact c_project_ueq2_rel_postfix_comm_recv_case
+      exact c_project_ueq2_rel_postfix_comm_recv_case (hdfg := hdfg) (hpayc := hpayc)
         hg he0 hcore heq_full heq hWF_full hWF hWFcand hWFcand_full heq_full_cand_full
 
 /-! ## Postfix Closure -/
@@ -360,7 +440,8 @@ private theorem c_project_ueq2_rel_postfix
     (hWFproj : ∀ g role cand, CProjectU g role cand → LocalTypeR.WellFormed cand) :
     ∀ g role cand, CProjectUEQ2Rel g role cand →
       CProjectF_unfold CProjectUEQ2Rel g role cand := by
-  intro g role cand hrel; rcases hrel with ⟨e0, hproj, heq, hWF, hWFcand⟩
+  intro g role cand hrel; rcases hrel with ⟨e0, hproj, heq, hWF, hWFcand, hdf, hpayc⟩
+  have hdfg := delegate_free_full_unfold_iter g hdf
   rcases (c_project_u_destruct hproj) with ⟨hwf_g, hWF0, hcore⟩; dsimp [CProjectF_unfold] at hcore ⊢
   refine ⟨hwf_g, hWFcand, ?_⟩
   have heq_full : EQ2 e0 e0.fullUnfold := by simpa [LocalTypeR.fullUnfold] using
@@ -378,26 +459,34 @@ private theorem c_project_ueq2_rel_postfix
           hg hcore heq_full heq hWF_full hWF hWFcand)
   | mu t body =>
       simpa [hg] using
-        (c_project_ueq2_rel_postfix_mu_case (g := g) (role := role) (cand := cand) (e0 := e0) (t := t) (body := body)
+        (c_project_ueq2_rel_postfix_mu_case (hdfg := hdfg) (hpayc := hpayc) (g := g) (role := role) (cand := cand) (e0 := e0) (t := t) (body := body)
           hg hcore heq_full heq hWF_full hWF hWFcand hWFproj)
   | comm sender receiver gbs =>
       simpa [hg] using
-        (c_project_ueq2_rel_postfix_comm_case (g := g) (role := role) (cand := cand) (e0 := e0)
+        (c_project_ueq2_rel_postfix_comm_case (hdfg := hdfg) (hpayc := hpayc) (g := g) (role := role) (cand := cand) (e0 := e0)
           (sender := sender) (receiver := receiver) (gbs := gbs)
           hg hcore heq_full heq hWF_full hWF hWFcand hWFcand_full)
+  | delegate _ _ _ _ _ =>
+      rw [hg] at hdfg
+      simp at hdfg
 
 /-! ## Final EQ2 Stability Theorem -/
 
-/-- CProjectU is stable under EQ2-equivalent candidates (with well-formedness). -/
+/-- CProjectU is stable under EQ2-equivalent candidates (with well-formedness).
+
+    Delegation is excluded (`g.delegateFree`) and the new candidate must be `PayloadFree`:
+    `BranchesProjRel` requires `none` annotations while EQ2 ignores them. The delegation
+    EQ2-transfer case is not yet covered. -/
 theorem c_project_u_eq2 (g : GlobalType) (role : String) (e0 e1 : LocalTypeR)
     (hproj : CProjectU g role e0) (heq : EQ2 e0 e1)
     (hWF : LocalTypeR.WellFormed e0) (hWF' : LocalTypeR.WellFormed e1)
-    (hWFproj : ∀ g role cand, CProjectU g role cand → LocalTypeR.WellFormed cand) :
+    (hWFproj : ∀ g role cand, CProjectU g role cand → LocalTypeR.WellFormed cand)
+    (hdf : g.delegateFree = true) (hpf : PayloadFree e1) :
     CProjectU g role e1 := by
   apply c_project_u_coind
   · intro g' role' cand hrel
     exact c_project_ueq2_rel_postfix hWFproj g' role' cand hrel
-  · exact ⟨e0, hproj, heq, hWF, hWF'⟩
+  · exact ⟨e0, hproj, heq, hWF, hWF', hdf, Or.inl hpf⟩
 
 
 end Choreography.Projection.Project

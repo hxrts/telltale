@@ -171,7 +171,7 @@ theorem all_edges_sid (sid : SessionId) (rs : RoleSet) :
   split at hite
   · simp only [Option.some.injEq] at hite
     rw [← hite]
-  · exact Option.noConfusion hite
+  · cases hite
 
 /-- Edges in allEdges have senders in the role set. -/
 theorem all_edges_sender_mem (sid : SessionId) (rs : RoleSet) :

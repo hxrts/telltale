@@ -135,7 +135,9 @@ lemma is_guarded_from_db_fresh (t : LocalTypeDB) (ctx : NameContext)
     | zero => rfl
     | succ j =>
         have hj' : NameContext.get? ctx j = some fresh := by
-          simpa only [NameOnlyContext.get?_cons_succ] using hj
+          have hj2 : NameOnlyContext.get? (NameOnlyContext.cons fresh ctx) (j + 1) = some fresh := hj
+          rw [NameOnlyContext.get?_cons_succ] at hj2
+          exact hj2
         have hmem : fresh ∈ ctx := get?_mem hj'
         exact (hfreshAll ctx hmem).elim
   have hclosed' : t.isClosedAt ctx'.length = true := by

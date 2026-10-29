@@ -279,6 +279,20 @@ private theorem c_project_not_muve_of_part_of2_aux : (g : GlobalType) → (role 
         intro pair hmem hproj' hpart' hne'
         exact c_project_not_muve_of_part_of2_aux pair.2 role lt hproj' hpart' hne'
       exact c_project_not_muve_of_part_of2_aux_comm_cons sender receiver first rest role lt hproj hpart hne ih
+  | .delegate p q sid r cont, role, lt, hproj, hpart, hne => by
+      have hF := c_project_destruct hproj
+      have hne' : cont.allCommsNonEmpty = true := by
+        simpa [GlobalType.allCommsNonEmpty] using hne
+      cases lt <;> first | (simp [isMuve]; done) | skip
+      all_goals
+        have hnp : role ≠ p := by
+          intro h; subst h; simp [CProjectF] at hF
+        have hnq : role ≠ q := by
+          intro h; subst h; simp [CProjectF, hnp] at hF
+        simp only [CProjectF, hnp, hnq, if_false] at hF
+        rcases part_of2_delegate_inv hpart with hd | hc
+        · simp [is_participant, hnp, hnq] at hd
+        · exact c_project_not_muve_of_part_of2_aux cont role _ hF hc hne'
 termination_by g _ _ _ _ _ => sizeOf g
 decreasing_by
   all_goals
@@ -480,6 +494,24 @@ private theorem c_project_part_of2_implies_part_of_all2_aux : (g : GlobalType) �
         hproj hpart hne hnsc
         (fun pair hmem hproj' hpart' hne' hnsc' =>
           c_project_part_of2_implies_part_of_all2_aux pair.2 role lt hproj' hpart' hne' hnsc')
+  | .delegate p q sid r cont, role, lt, hproj, hpart, hne, hnsc => by
+      cases hip : is_participant role p q
+      · have hnp : role ≠ p := by intro h; simp [is_participant, h] at hip
+        have hnq : role ≠ q := by intro h; simp [is_participant, h] at hip
+        have hF := c_project_destruct hproj
+        simp only [CProjectF, hnp, hnq, if_false] at hF
+        have hc : part_of2 role cont := by
+          rcases part_of2_delegate_inv hpart with hd | hc
+          · rw [hip] at hd; cases hd
+          · exact hc
+        have hne' : cont.allCommsNonEmpty = true := by
+          simpa [GlobalType.allCommsNonEmpty] using hne
+        have hnsc' : cont.noSelfComm = true := by
+          simp only [GlobalType.noSelfComm, Bool.and_eq_true] at hnsc
+          exact hnsc.2
+        exact part_of_all2.intro _ (part_of_allF.delegate_cont p q sid r cont
+          (c_project_part_of2_implies_part_of_all2_aux cont role lt hF hc hne' hnsc'))
+      · exact part_of_all2.intro _ (part_of_allF.delegate_direct p q sid r cont hip)
 termination_by g _ _ _ _ _ _ => sizeOf g
 decreasing_by
   all_goals

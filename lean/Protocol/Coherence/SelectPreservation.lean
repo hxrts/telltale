@@ -114,7 +114,7 @@ theorem coherent_select_preserved
       | cons t ts =>
         rw [hTrace] at hL'
         simp only [Consume, consumeOne] at hL'
-        exact Option.noConfusion hL'
+        first | cases hL' | simp at hL'
     -- Select Preservation: Updated Edge with Distinct Target
     · -- Normal case: target ≠ selector
       have hTargetNeq : selectorEp ≠ { sid := selectorEp.sid, role := targetRole } := by
@@ -261,7 +261,7 @@ theorem coherent_branch_preserved
       | nil =>
         rw [hTraceVal] at hTrace
         simp only [List.head?] at hTrace
-        exact Option.noConfusion hTrace
+        first | cases hTrace | simp at hTrace
       | cons t rest =>
         rw [hTraceVal] at hTrace
         simp only [List.head?, Option.some.injEq] at hTrace
@@ -294,7 +294,7 @@ theorem coherent_branch_preserved
       | nil =>
         rw [hTraceVal] at hTrace
         simp only [List.head?] at hTrace
-        exact Option.noConfusion hTrace
+        first | cases hTrace | simp at hTrace
       | cons t rest =>
         rw [hTraceVal] at hTrace
         simp only [List.head?, Option.some.injEq] at hTrace

@@ -185,13 +185,14 @@ theorem is_guarded_to_db_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (
               db'.isGuarded (i + (cons y pref).length + 1) = true := by
             have hbody' : body.toDB? ((cons y pref) ++ fromList (x :: toList ctx)) = some db' := by
               simp only [from_list_cons_to_list]
-              simpa using hbody_db
+              exact hbody_db
             exact hbody (pref := cons y pref) (ctx := ctx) (i := i) (db := db') hidx hbody'
           have hguard'' : db'.isGuarded (i + pref.length + 1 + 1) = true := by
             have : i + (cons y pref).length + 1 = i + pref.length + 1 + 1 := by
 /- ## Structured Block 4 -/
               simp [Nat.add_left_comm, Nat.add_comm, cons_length]
-            simpa [this] using hguard'
+            rw [this] at hguard'
+            exact hguard'
           simpa [LocalTypeDB.isGuarded, Nat.add_left_comm, Nat.add_comm] using hguard''
 
     -- Shadowed Prefix Guardedness: Variable Case

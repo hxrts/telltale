@@ -128,11 +128,13 @@ def mkRecv (p : String) (bs : List (Label × LocalTypeC)) : LocalTypeC :=
     (i : Fin (bs.map Prod.fst).length) :
     children (mkSend p bs) i = (bs.get (castFin (by simp) i)).2 := by
   simp [children, mkSend]
+  rfl
 
 @[simp] lemma children_mk_recv (p : String) (bs : List (Label × LocalTypeC))
     (i : Fin (bs.map Prod.fst).length) :
     children (mkRecv p bs) i = (bs.get (castFin (by simp) i)).2 := by
   simp [children, mkRecv]
+  rfl
 
 /-! ## Injectivity and Distinctness -/
 

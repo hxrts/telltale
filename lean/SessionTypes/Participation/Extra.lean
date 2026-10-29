@@ -289,7 +289,7 @@ theorem part_of2_unfold_iter (role : String) (g : GlobalType) :
   induction n generalizing g with
   | zero =>
       intro h
-      simpa using h
+      exact h
   | succ n ih =>
       intro h
       have h' : part_of2 role (GlobalType.unfold (Nat.rec g (fun _ acc => GlobalType.unfold acc) n)) := by

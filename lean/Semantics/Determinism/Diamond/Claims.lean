@@ -14,6 +14,8 @@ proved theorems in `Core`.
 -/
 
 namespace Semantics.Determinism
+open SessionTypes.GlobalType
+open Semantics.Environment
 
 /-! ## Claims Bundle -/
 
@@ -27,8 +29,8 @@ structure Claims where
   /-- Environment step determinism. -/
   env_step_det : ∀ {env env₁ env₂ : EnvConfig} {act : EnvAction},
       EnvConfigStep env act env₁ → EnvConfigStep env act env₂ → env₁ = env₂
-  /-- Configuration step determinism. -/
-  config_step_det : ∀ {c c₁ c₂ : Configuration} {act : GlobalActionR},
+  /-- Global-only configuration step determinism (environment held fixed). -/
+  global_config_step_det : ∀ {c c₁ c₂ : Configuration} {act : GlobalActionR},
       ConfigStep c c₁ act → ConfigStep c c₂ act → c₁ = c₂
   /-- Diamond property for independent actions. -/
   diamond_independent : ∀ {c c₁ c₂ : Configuration} {act₁ act₂ : GlobalActionR},
@@ -41,7 +43,7 @@ def claims : Claims where
   -- Package determinism theorems.
   global_step_det := global_step_det
   env_step_det := env_step_det
-  config_step_det := config_step_det
+  global_config_step_det := global_config_step_det
   diamond_independent := diamond_independent
 
 end Semantics.Determinism

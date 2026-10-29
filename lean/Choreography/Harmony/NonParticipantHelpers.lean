@@ -87,7 +87,7 @@ theorem proj_trans_other_step_branches_nil (act : GlobalActionR) (role : String)
     (_hns : role ≠ act.sender) (_hnr : role ≠ act.receiver) :
     BranchesRel EQ2 (projTransBranches [] role) (projTransBranches [] role) := by
   -- Empty branch lists are trivially related.
-  simp [projTransBranches, Choreography.Projection.Project.transBranches, BranchesRel]
+  simp [projTransBranches, Choreography.Projection.Project.transBranches, BranchesRel, Choreography.Projection.Trans.transBranches]
 
 private abbrev StepIH (g g' : GlobalType) (act : GlobalActionR) : Prop :=
   -- Branch-step head hypothesis type.
@@ -118,7 +118,7 @@ theorem proj_trans_other_step_branches_cons
     BranchesRel EQ2 (projTransBranches ((label, g') :: rest') role)
       (projTransBranches ((label, g) :: rest) role) := by
   -- Build the cons proof from the head IH and tail IH.
-  simp [projTransBranches, Choreography.Projection.Project.transBranches, BranchesRel]
+  simp [projTransBranches, Choreography.Projection.Project.transBranches, BranchesRel, Choreography.Projection.Trans.transBranches]
   constructor
   · exact ih_step (hclosed (label, g) List.mem_cons_self)
       (hwf (label, g) List.mem_cons_self)

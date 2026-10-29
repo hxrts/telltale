@@ -34,14 +34,16 @@ private theorem c_project_trans_rel_postfix_comm_send_sender
     (hrs : role = sender)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
-    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Sender case: lift BranchesProjRel to BranchesRel and wrap into the closure.
   simp [CProjectF, hrs] at hf
   obtain ⟨hpartner, hbranches⟩ := hf
-  have hwf_branches : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true := by
+  have hwf_branches : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true ∧ gb.2.delegateFree = true := by
     intro gb hmem
-    exact GlobalType.well_formed_comm_branches sender receiver gbs hwf gb hmem
+    exact ⟨GlobalType.well_formed_comm_branches sender receiver gbs hwf gb hmem,
+      delegate_free_of_mem (by simpa using hdf) hmem⟩
   subst htrans
   rw [hrs, trans_comm_sender sender receiver sender gbs rfl, hpartner]
   exact ⟨rfl, branches_rel_mono (fun _ _ hr => Or.inl (Or.inl hr))
@@ -52,11 +54,12 @@ private theorem c_project_trans_rel_postfix_comm_send_nonpart
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
-    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Non-participant send: use the extracted comm witness from c_project_send_implies_trans_send.
   have hexists := c_project_send_implies_trans_send
-    (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf
+    (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf hdf
   obtain ⟨gbs', htrans_send, hbranches', hwf_gbs'⟩ := hexists
   subst htrans
   rw [htrans_send]
@@ -71,14 +74,16 @@ private theorem c_project_trans_rel_postfix_comm_recv_receiver
     (hrr : role = receiver) (hne : receiver ≠ sender)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
-    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
   -- Receiver case: lift BranchesProjRel to BranchesRel and wrap into the closure.
   simp [CProjectF, hrr, hne] at hf
   obtain ⟨hpartner, hbranches⟩ := hf
-  have hwf_branches : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true := by
+  have hwf_branches : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true ∧ gb.2.delegateFree = true := by
     intro gb hmem
-    exact GlobalType.well_formed_comm_branches sender receiver gbs hwf gb hmem
+    exact ⟨GlobalType.well_formed_comm_branches sender receiver gbs hwf gb hmem,
+      delegate_free_of_mem (by simpa using hdf) hmem⟩
   subst htrans
   rw [hrr, trans_comm_receiver sender receiver receiver gbs rfl hne, hpartner]
   exact ⟨rfl, branches_rel_mono (fun _ _ hr => Or.inl (Or.inl hr))
@@ -89,11 +94,12 @@ private theorem c_project_trans_rel_postfix_comm_recv_nonpart
     {gbs : List (Label × GlobalType)} {lbs : List BranchR} {t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
-    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
   -- Non-participant recv: use the extracted comm witness from c_project_recv_implies_trans_recv.
   have hexists := c_project_recv_implies_trans_recv
-    (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf
+    (GlobalType.comm sender receiver gbs) role partner lbs hproj hwf hdf
   obtain ⟨gbs', htrans_recv, hbranches', hwf_gbs'⟩ := hexists
   subst htrans
   rw [htrans_recv]
@@ -108,17 +114,18 @@ private theorem c_project_trans_rel_postfix_comm_send
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.send partner lbs)) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.send partner lbs) t := by
   -- Split on the role to select sender/non-participant cases.
   by_cases hrs : role = sender
-  · exact c_project_trans_rel_postfix_comm_send_sender (t := t) hrs hf htrans hwf
+  · exact c_project_trans_rel_postfix_comm_send_sender (t := t) hrs hf htrans hwf hdf
   · by_cases hrr : role = receiver
     ·
       have hne' : receiver ≠ sender := fun heq => hrs (hrr ▸ heq)
       have : False := by simpa [CProjectF, hrr, hne'] using hf
       exact this.elim
-    · exact c_project_trans_rel_postfix_comm_send_nonpart (t := t) hproj htrans hwf
+    · exact c_project_trans_rel_postfix_comm_send_nonpart (t := t) hproj htrans hwf hdf
 
 private theorem c_project_trans_rel_postfix_comm_recv
     {sender receiver role partner : String}
@@ -126,6 +133,7 @@ private theorem c_project_trans_rel_postfix_comm_recv
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.recv partner lbs)) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.recv partner lbs) t := by
   -- Split on the role to select receiver/non-participant cases.
@@ -135,8 +143,8 @@ private theorem c_project_trans_rel_postfix_comm_recv
     exact this.elim
   · by_cases hrr : role = receiver
     · have hne' : receiver ≠ sender := fun heq => hrs (hrr ▸ heq)
-      exact c_project_trans_rel_postfix_comm_recv_receiver (t := t) hrr hne' hf htrans hwf
-    · exact c_project_trans_rel_postfix_comm_recv_nonpart (t := t) hproj htrans hwf
+      exact c_project_trans_rel_postfix_comm_recv_receiver (t := t) hrr hne' hf htrans hwf hdf
+    · exact c_project_trans_rel_postfix_comm_recv_nonpart (t := t) hproj htrans hwf hdf
 
 /-! ## Comm Constructor Cases -/
 
@@ -172,7 +180,8 @@ private theorem c_project_trans_rel_postfix_comm_mu
     (hproj : CProject (GlobalType.comm sender receiver gbs) role (LocalTypeR.mu ltvar lbody))
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
-    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu ltvar lbody) t := by
   -- Non-participant mu: extract body and apply the mu closure helper.
   have hexists := c_project_mu_implies_trans_mu
@@ -187,12 +196,12 @@ private theorem c_project_trans_rel_postfix_comm_mu
         trans (GlobalType.comm sender receiver gbs) role =
           LocalTypeR.mu ltvar (trans gbody role) := by
       simpa using htrans_mu
-    exact ⟨GlobalType.comm sender receiver gbs, role, hproj, htrans_mu'.symm, hwf⟩
+    exact ⟨GlobalType.comm sender receiver gbs, role, hproj, htrans_mu'.symm, hwf, hdf⟩
   simpa [htrans_mu] using c_project_trans_rel_postfix_mu_closure hmu_rel
 
 /-! ## Global Constructor Case Helpers -/
 
-/-- Helper: g = .end cases for CProjectTransRel_postfix. -/
+/-- Helper: g = .end cases for c_project_trans_rel_postfix. -/
 private theorem c_project_trans_rel_postfix_end_cases
     {role : String} {lt t : LocalTypeR}
     (hf : CProjectF CProject GlobalType.end role lt)
@@ -209,7 +218,7 @@ private theorem c_project_trans_rel_postfix_end_cases
 
 /-! ## Constructor Case Helpers: var/mu/comm -/
 
-/-- Helper: g = .var cases for CProjectTransRel_postfix. -/
+/-- Helper: g = .var cases for c_project_trans_rel_postfix. -/
 private theorem c_project_trans_rel_postfix_var_cases
     {vt : String} {role : String} {lt t : LocalTypeR}
     (hf : CProjectF CProject (GlobalType.var vt) role lt)
@@ -224,12 +233,13 @@ private theorem c_project_trans_rel_postfix_var_cases
       have : False := by simpa [CProjectF] using hf
       exact this.elim
 
-/-- Helper: g = .mu cases for CProjectTransRel_postfix. -/
+/-- Helper: g = .mu cases for c_project_trans_rel_postfix. -/
 private theorem c_project_trans_rel_postfix_mu_cases
     {muvar : String} {gbody : GlobalType} {role : String} {lt t : LocalTypeR}
     (hproj : CProject (GlobalType.mu muvar gbody) role lt)
     (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hwf : (GlobalType.mu muvar gbody).wellFormed = true)
+    (hdf : (GlobalType.mu muvar gbody).delegateFree = true)
     (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true)
     (hf : CProjectF CProject (GlobalType.mu muvar gbody) role lt) :
     EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
@@ -239,19 +249,20 @@ private theorem c_project_trans_rel_postfix_mu_cases
       exact c_project_trans_rel_postfix_mu_end (_hproj := hproj) (htrans := htrans) (hne := hne) hf
   | mu ltvar lbody =>
       exact c_project_trans_rel_postfix_mu_mu (hproj := hproj) (htrans := htrans) (hwf := hwf)
-        (hne := hne) hf
+        (hne := hne) hf hdf
   | var _ | send _ _ | recv _ _ =>
       -- These constructors contradict CProjectF for .mu.
       have : False := by simpa [CProjectF] using hf
       exact this.elim
 
-/-- Helper: g = .comm cases for CProjectTransRel_postfix. -/
+/-- Helper: g = .comm cases for c_project_trans_rel_postfix. -/
 private theorem c_project_trans_rel_postfix_comm_cases
     {sender receiver role : String} {gbs : List (Label × GlobalType)} {lt t : LocalTypeR}
     (hproj : CProject (GlobalType.comm sender receiver gbs) role lt)
     (htrans : t = trans (GlobalType.comm sender receiver gbs) role)
     (hne : (GlobalType.comm sender receiver gbs).allCommsNonEmpty = true)
     (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true)
     (hf : CProjectF CProject (GlobalType.comm sender receiver gbs) role lt) :
     EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
   -- Dispatch by candidate constructor.
@@ -259,11 +270,11 @@ private theorem c_project_trans_rel_postfix_comm_cases
   | «end» =>
       exact c_project_trans_rel_postfix_comm_end (t := t) hproj hne htrans
   | send partner lbs =>
-      exact c_project_trans_rel_postfix_comm_send (t := t) hproj htrans hwf hf
+      exact c_project_trans_rel_postfix_comm_send (t := t) hproj htrans hwf hdf hf
   | recv partner lbs =>
-      exact c_project_trans_rel_postfix_comm_recv (t := t) hproj htrans hwf hf
+      exact c_project_trans_rel_postfix_comm_recv (t := t) hproj htrans hwf hdf hf
   | mu ltvar lbody =>
-      exact c_project_trans_rel_postfix_comm_mu (t := t) hproj htrans hne hwf
+      exact c_project_trans_rel_postfix_comm_mu (t := t) hproj htrans hne hwf hdf
   | var v =>
       exact c_project_trans_rel_postfix_comm_var (t := t) hproj hne htrans
 
@@ -272,7 +283,7 @@ private theorem c_project_trans_rel_postfix_comm_cases
 /-- Postfix property for CProjectTransRel with EQ2_closure of the composite relation. -/
 theorem c_project_trans_rel_postfix :
     ∀ lt t, CProjectTransRel lt t → EQ2F (EQ2_closure CProjectTransRelComp) lt t := by
-  intro lt t ⟨g, role, hproj, htrans, hwf⟩
+  intro lt t ⟨g, role, hproj, htrans, hwf, hdf⟩
   -- Proof strategy: reduce to CProjectF cases and dispatch by global constructor.
   have hne : g.allCommsNonEmpty = true := by
     have hwf' := hwf
@@ -286,10 +297,12 @@ theorem c_project_trans_rel_postfix :
       exact c_project_trans_rel_postfix_var_cases (lt := lt) (vt := vt) hf htrans
   | mu muvar gbody =>
       exact c_project_trans_rel_postfix_mu_cases (lt := lt) (muvar := muvar) (gbody := gbody)
-        hproj htrans hwf hne hf
+        hproj htrans hwf hdf hne hf
   | comm sender receiver gbs =>
       exact c_project_trans_rel_postfix_comm_cases (lt := lt) (sender := sender) (receiver := receiver)
-        (gbs := gbs) hproj htrans hne hwf hf
+        (gbs := gbs) hproj htrans hne hwf hdf hf
+  | delegate _ _ _ _ _ =>
+      simp at hdf
 
 /-! ## Composition Extensions -/
 

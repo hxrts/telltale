@@ -97,7 +97,7 @@ theorem certified_envelope_window_trace_is_valid
       (fun j => certifiedEnvelopeWindowTraceEntryOfCertificate (trace (start + j.1)) (certificates j)) := by
   intro j
   constructor
-  · simpa using hBound j
+  · simpa [certifiedEnvelopeWindowTraceEntryOfCertificate] using hBound j
   · simp [certifiedEnvelopeWindowTraceEntryOfCertificate, hBatchExact j]
 
 end Search

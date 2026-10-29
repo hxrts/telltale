@@ -76,12 +76,12 @@ private theorem dest_dual_c_recv (p : String) (labels : List SessionTypes.Global
 private theorem dest_dual_c_twice_end (f : LocalTypeF.B .end → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.end, f⟩))) = ⟨.end, PEmpty.elim⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.end, f⟩))]
-  rw [dest_dual_c_end, dest_dual_c_end]
+  rw [dest_dual_c_end]; exact dest_dual_c_end ..
 
 private theorem dest_dual_c_twice_var (x : String) (f : LocalTypeF.B (.var x) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.var x, f⟩))) = ⟨.var x, PEmpty.elim⟩ := by
   conv_lhs => arg 1; arg 1; rw [← PFunctor.M.mk_dest (dualC (PFunctor.M.mk ⟨.var x, f⟩))]
-  rw [dest_dual_c_var, dest_dual_c_var]
+  rw [dest_dual_c_var]; exact dest_dual_c_var ..
 
 private theorem dest_dual_c_twice_mu (x : String) (f : LocalTypeF.B (.mu x) → LocalTypeC) :
     PFunctor.M.dest (dualC (dualC (PFunctor.M.mk ⟨.mu x, f⟩))) =

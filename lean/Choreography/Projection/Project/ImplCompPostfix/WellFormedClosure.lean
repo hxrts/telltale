@@ -125,7 +125,7 @@ private theorem eq2_f_lift_comp_wf_mu_right
 
 /-! ## EQ2F Mu/Mu Lifting -/
 
-/- Helper: mu-mu case for EQ2F_lift_compWF. -/
+/- Helper: mu-mu case for eq2_f_lift_comp_wf. -/
 private theorem eq2_f_lift_comp_wf_mu_mu
     {v v' : String} {body_lt body_t : LocalTypeR}
     (h : EQ2F (EQ2_closure CProjectTransRelComp) (.mu v body_lt) (.mu v' body_t))
@@ -296,7 +296,9 @@ theorem c_project_trans_rel_comp_postfix_prefix_mu_nonmu
         (v := v) (v' := v') (body_lt := body_lt) (body_t := body_t)
         heq_ab hrel_bb' hWFa hWFc
   | _ =>
-      simpa [EQ2F] using (Or.inl hcomp_left)
+      first
+        | (simp only [EQ2F]; exact Or.inl hcomp_left)
+        | simpa [EQ2F] using (Or.inl hcomp_left)
 
 /-! ## Prefix Non-Mu/Mu Case with WF Closure -/
 
@@ -323,7 +325,9 @@ theorem c_project_trans_rel_comp_postfix_prefix_nonmu_mu
         (v := v) (v' := v') (body_lt := body_lt) (body_t := body_t)
         heq_ab hrel_bb' hWFa hWFc
   | _ =>
-      simpa [EQ2F] using (Or.inl hcomp_right)
+      first
+        | (simp only [EQ2F]; exact Or.inl hcomp_right)
+        | simpa [EQ2F] using (Or.inl hcomp_right)
 
 /-! ## Prefix Var/Var Case with WF Closure -/
 

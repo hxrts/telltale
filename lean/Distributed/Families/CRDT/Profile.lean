@@ -13,11 +13,10 @@ namespace Profile
 
 universe u v w x y z
 
-/-- Build a CRDT theorem-family profile from semantic assumptions and premises. -/
+/-- Build a CRDT theorem-family profile from a model and premises. -/
 def mk
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     (model : Model State Op Context Obs Program)
-    (assumptions : Assumptions model)
     (premises : Premises model) :
     CRDTProtocol where
   State := State
@@ -26,7 +25,6 @@ def mk
   Obs := Obs
   Program := Program
   model := model
-  assumptions := assumptions
   premises := premises
 
 /-- Build a CRDT erasure profile from erasure premises. -/

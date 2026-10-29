@@ -42,26 +42,47 @@ structure ProtocolMachineDeterminismHypotheses
   replayDeterminism : Prop
   replayDeterminismProof : replayDeterminism
 
-/-- Artifact inventory derived from determinism hypotheses. -/
+/-- A determinism statement packaged with its proof. Artifacts carry this
+evidence instead of an erased `Bool`, so a consumer can always recover the
+proposition that was established. -/
+structure DeterminismEvidence where
+  statement : Prop
+  proof : statement
+
+/-- Artifact inventory derived from determinism hypotheses. Each profile is
+`some evidence` only when a proof of that profile's statement was supplied. -/
 structure ProtocolMachineDeterminismArtifacts where
-  full : Bool
-  moduloEffectTrace : Bool
-  moduloCommutativity : Bool
-  replay : Bool
+  full : Option DeterminismEvidence
+  moduloEffectTrace : Option DeterminismEvidence
+  moduloCommutativity : Option DeterminismEvidence
+  replay : Option DeterminismEvidence
 
 /-! ## Artifact Construction -/
 
-private def witnessToBool {P : Prop} (_h : P) : Bool := true
-
-/-- Build determinism artifacts from a hypothesis bundle. -/
+/-- Build determinism artifacts from a hypothesis bundle, keeping each
+statement together with its proof. -/
 def buildProtocolMachineDeterminismArtifacts {st₀ : ProtocolMachineState ι γ π ε ν}
     (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
     ProtocolMachineDeterminismArtifacts :=
-  { full := witnessToBool h.fullDeterminismProof
-  , moduloEffectTrace := witnessToBool h.moduloEffectTraceProof
-  , moduloCommutativity := witnessToBool h.moduloCommutativityProof
-  , replay := witnessToBool h.replayDeterminismProof
+  { full := some ⟨h.fullDeterminism, h.fullDeterminismProof⟩
+  , moduloEffectTrace := some ⟨h.moduloEffectTrace, h.moduloEffectTraceProof⟩
+  , moduloCommutativity := some ⟨h.moduloCommutativity, h.moduloCommutativityProof⟩
+  , replay := some ⟨h.replayDeterminism, h.replayDeterminismProof⟩
   }
+
+/-- The `full` artifact built from hypotheses carries exactly the bundle's
+full-determinism statement. -/
+theorem buildProtocolMachineDeterminismArtifacts_full {st₀ : ProtocolMachineState ι γ π ε ν}
+    (h : ProtocolMachineDeterminismHypotheses (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀) :
+    ((buildProtocolMachineDeterminismArtifacts h).full.map (·.statement)) =
+      some h.fullDeterminism :=
+  rfl
+
+/-- Any evidence present in an artifact proves its recorded statement. -/
+theorem DeterminismEvidence.sound {e? : Option DeterminismEvidence}
+    {e : DeterminismEvidence} (hSome : e? = some e) : e.statement := by
+  subst hSome
+  exact e.proof
 
 /-! ## Theorem Projections -/
 
@@ -91,12 +112,13 @@ theorem replay_determinism_from_hypotheses {st₀ : ProtocolMachineState ι γ �
 
 /-! ## Runtime Inventory View -/
 
-/-- Inventory projection for runtime capability gates. -/
+/-- Inventory projection for runtime capability gates: a flag is `true` iff
+proof evidence for that profile is present. -/
 def determinismInventory (artifacts : ProtocolMachineDeterminismArtifacts) : List (String × Bool) :=
-  [ ("determinism_full", artifacts.full)
-  , ("determinism_modulo_effect_trace", artifacts.moduloEffectTrace)
-  , ("determinism_modulo_commutativity", artifacts.moduloCommutativity)
-  , ("determinism_replay", artifacts.replay)
+  [ ("determinism_full", artifacts.full.isSome)
+  , ("determinism_modulo_effect_trace", artifacts.moduloEffectTrace.isSome)
+  , ("determinism_modulo_commutativity", artifacts.moduloCommutativity.isSome)
+  , ("determinism_replay", artifacts.replay.isSome)
   ]
 
 end

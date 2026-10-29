@@ -245,6 +245,15 @@ private theorem part_of_all2_implies_part_of2_aux (role : String) (g : GlobalTyp
           all_comms_non_empty_of_mem hmem hne_branches
         exact part_of_all2_implies_part_of2_aux role pair.2 hpoa hne_pair
       exact part_of_all2_implies_part_of2_aux_comm role sender receiver branches h hne ih
+  | .delegate p q sid r cont =>
+      have hne_cont : cont.allCommsNonEmpty = true := by
+        simpa [GlobalType.allCommsNonEmpty] using hne
+      match h with
+      | .intro _ (.delegate_direct _ _ _ _ _ hd) =>
+          exact part_of2.intro _ (part_ofF.delegate_direct p q sid r cont hd)
+      | .intro _ (.delegate_cont _ _ _ _ _ hc) =>
+          exact part_of2.intro _ (part_ofF.delegate_cont p q sid r cont
+            (part_of_all2_implies_part_of2_aux role cont hc hne_cont))
 termination_by sizeOf g
 decreasing_by
   all_goals simp_wf
@@ -252,6 +261,7 @@ decreasing_by
     simp only [sizeOf, GlobalType._sizeOf_1] at *; omega
   · simpa using (size_of_elem_snd_lt_comm (sender := sender) (receiver := receiver)
       (branches := branches) (gb := pair) hmem)
+  · simp only [sizeOf, GlobalType._sizeOf_1] at *; omega
 
 /-! ## part_of_all2 -> part_of2: Public Bridge -/
 
@@ -263,6 +273,7 @@ theorem part_of_all2_implies_part_of2 (role : String) (g : GlobalType)
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
   exact part_of_all2_implies_part_of2_aux role g h hwf.1.1.2
 
+/-! ## Nonparticipant Bridge: Left Contradiction -/
 /-- Helper: if CProject gives lt and role doesn't participate, then lt is EQ2 to trans.
 
 This uses the muve/closed infrastructure from EQ_end and part_of2_or_end.
@@ -272,8 +283,6 @@ This uses the muve/closed infrastructure from EQ_end and part_of2_or_end.
 1. By `part_of2_or_end`, we get `part_of_all2 role g ∨ EQ2 lt .end`
 2. The Left case contradicts `hnotpart` via `part_of_all2_implies_part_of2`
 3. The Right case: chain `EQ2 lt .end` with `EQ2 .end (trans g role)` from `eq_end` -/
-
-/-! ## Nonparticipant Bridge: Left Contradiction -/
 
 private theorem c_project_implies_eq2_trans_nonpart_left (g : GlobalType) (role : String)
     (hnotpart : ¬part_of2 role g) (hwf : g.wellFormed = true)
@@ -324,22 +333,22 @@ private theorem c_project_end_inv (role : String) (cand : LocalTypeR)
   cases cand with
   | «end» => rfl
   | var _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
   | send _ _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
   | recv _ _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
   | mu _ _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
@@ -350,27 +359,27 @@ private theorem c_project_var_inv (t role : String) (cand : LocalTypeR)
     (hproj : CProject (.var t) role cand) : cand = .var t := by
   cases cand with
   | var t' =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       simp [CProjectF] at hf
       subst hf
       rfl
   | «end» =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
   | send _ _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
   | recv _ _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
   | mu _ _ =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by
         simp [CProjectF] at hf
       exact this.elim
@@ -382,7 +391,7 @@ private theorem c_project_mu_inv (t : String) (gbody : GlobalType) (role : Strin
     ∃ candBody, CProject gbody role candBody ∧
       ((candBody.isGuarded t = true ∧ cand = .mu t candBody) ∨
        (candBody.isGuarded t = false ∧ cand = .end)) := by
-  simpa [CProjectF] using (CProject_destruct hproj)
+  simpa [CProjectF] using (c_project_destruct hproj)
 
 /-! ## Candidate Inversion: Comm Sender -/
 
@@ -393,14 +402,14 @@ private theorem c_project_comm_sender_inv (sender receiver : String)
     ∃ lbs, cand = .send receiver lbs ∧ BranchesProjRel CProject gbs sender lbs := by
   cases cand with
   | send partner lbs =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       simp [CProjectF, hrole] at hf
       rcases hf with ⟨hpartner, hbranches⟩
       subst hpartner
       exact ⟨lbs, rfl, hbranches⟩
   | _ =>
       -- Non-send candidates contradict the comm sender clause.
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by simpa [CProjectF, hrole] using hf
       exact this.elim
 
@@ -419,14 +428,14 @@ private theorem c_project_comm_receiver_inv (sender receiver : String)
     exact hns h.symm
   cases cand with
   | recv partner lbs =>
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       simp [CProjectF, hrole, hne] at hf
       rcases hf with ⟨hpartner, hbranches⟩
       subst hpartner
       exact ⟨lbs, rfl, hbranches⟩
   | _ =>
       -- Non-recv candidates contradict the comm receiver clause.
-      have hf := CProject_destruct hproj
+      have hf := c_project_destruct hproj
       have : False := by simpa [CProjectF, hrole, hne] using hf
       exact this.elim
 
@@ -437,7 +446,7 @@ private theorem c_project_comm_other_inv (sender receiver : String)
     (hs : role ≠ sender) (hr : role ≠ receiver)
     (hproj : CProject (.comm sender receiver gbs) role cand) :
     AllBranchesProj CProject gbs role cand := by
-  have hf := CProject_destruct hproj
+  have hf := c_project_destruct hproj
   simp [CProjectF, hs, hr] at hf
   exact hf
 
@@ -447,7 +456,7 @@ private theorem c_project_full_unfold_right_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProject g role cand) (hmu : cand.muHeight = 0) :
     CProject g role cand.fullUnfold := by
-  simpa [LocalTypeR.fullUnfold_muHeight_zero hmu] using hproj
+  simpa [LocalTypeR.full_unfold_mu_height_zero hmu] using hproj
 
 /-! ## FullUnfold Transfer: CProject Left -/
 
@@ -455,7 +464,7 @@ private theorem c_project_full_unfold_left_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProject g role cand.fullUnfold) (hmu : cand.muHeight = 0) :
     CProject g role cand := by
-  simpa [LocalTypeR.fullUnfold_muHeight_zero hmu] using hproj
+  simpa [LocalTypeR.full_unfold_mu_height_zero hmu] using hproj
 
 /-! ## FullUnfold Transfer: CProjectU Right -/
 
@@ -463,7 +472,7 @@ private theorem c_project_u_full_unfold_right_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProjectU g role cand) (hmu : cand.muHeight = 0) :
     CProjectU g role cand.fullUnfold := by
-  simpa [LocalTypeR.fullUnfold_muHeight_zero hmu] using hproj
+  simpa [LocalTypeR.full_unfold_mu_height_zero hmu] using hproj
 
 /-! ## FullUnfold Transfer: CProjectU Left -/
 
@@ -471,7 +480,7 @@ private theorem c_project_u_full_unfold_left_of_mu_height_zero
     {g : GlobalType} {role : String} {cand : LocalTypeR}
     (hproj : CProjectU g role cand.fullUnfold) (hmu : cand.muHeight = 0) :
     CProjectU g role cand := by
-  simpa [LocalTypeR.fullUnfold_muHeight_zero hmu] using hproj
+  simpa [LocalTypeR.full_unfold_mu_height_zero hmu] using hproj
 
 
 end Choreography.Projection.Project
