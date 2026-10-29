@@ -26,6 +26,16 @@ package_config_path() {
   local package_name="$1"
   local package_dir=".lake/packages/${package_name}"
   local config_path
+  local sub_dir
+
+  # Packages such as upstream iris-lean keep their Lake config in a manifest
+  # `subDir` rather than at the checkout root.
+  sub_dir="$(jq -r --arg n "${package_name}" \
+    '.packages[]? | select(.name == $n) | .subDir // empty' \
+    lake-manifest.json 2>/dev/null || true)"
+  if [[ -n "${sub_dir}" ]]; then
+    package_dir="${package_dir}/${sub_dir}"
+  fi
 
   for config_path in \
     "${package_dir}/lakefile.toml" \

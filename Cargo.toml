@@ -183,6 +183,11 @@ name = "bounded_recursion"
 path = "examples/theory/bounded_recursion.rs"
 required-features = ["theory-bounded"]
 
+[profile.dev]
+# Keep ordinary edit builds eligible for sccache. Opt in to the separate
+# incremental iteration lane explicitly with CARGO_INCREMENTAL=1.
+incremental = false
+
 [profile.release]
 debug = true
 

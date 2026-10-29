@@ -72,3 +72,20 @@ Canonical Rust development and CI select exact Rust 1.99.1 in Nix,
 Cargo-home plugins from changing that selection. The older manifest MSRV is
 a separate compatibility claim; current-toolchain validation does not prove
 it. Lean retains its independent `lean-toolchain` pin.
+
+### Shared local Rust compiler cache
+
+The Nix shell exposes sccache with Aura's existing local store
+(`~/.cache/aura-sccache`) and one shared 10G budget. Explicit `SCCACHE_DIR` and
+`SCCACHE_CACHE_SIZE` settings are preserved. Each checkout retains its own Cargo
+target. Shell entry performs no compilation or cache-server startup.
+`TELLTALE_NO_SCCACHE=1` opts out at shell entry or per Cargo invocation.
+
+Ordinary builds and canonical acceptance are nonincremental. The dev profile
+sets `incremental = false`, and the Nix shell defaults `CARGO_INCREMENTAL=0` for
+excluded tooling manifests. Acceptance runs set `CARGO_INCREMENTAL=0`
+explicitly. `CARGO_INCREMENTAL=1` is the edit/test opt-in. It bypasses the
+selected sccache wrapper for that invocation and preserves unrelated caller
+wrappers. Incremental and linker-invoking Rust units are not cache hits.
+Matching compiler versions or directories alone do not prove cross-repository
+reuse. Measure actual matching-unit hits separately.

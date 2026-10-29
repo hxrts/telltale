@@ -160,14 +160,14 @@ check-doc-fast-fail:
 
 # Canonical PR-critical verification lane used by fast CI and local dry runs.
 check-pr-critical:
-    just check-doc-fast-fail
-    just check-pr-critical-core
+    CARGO_INCREMENTAL=0 just check-doc-fast-fail
+    CARGO_INCREMENTAL=0 just check-pr-critical-core
 
 # Canonical PR-critical verification lane minus the cheap doc/metadata fast-fail
 # checks, so local wrappers can run those first without duplication.
 check-pr-critical-core:
-    just check-pr-critical-early-lean
-    just check-pr-critical-remaining
+    CARGO_INCREMENTAL=0 just check-pr-critical-early-lean
+    CARGO_INCREMENTAL=0 just check-pr-critical-remaining
 
 # Native CI exposes this original prefix as one positive Lean checkpoint.
 check-pr-critical-early-lean:
@@ -207,6 +207,8 @@ check-pr-critical-remaining:
 check-deep-assurance:
     #!/usr/bin/env bash
     set -euo pipefail
+    # Canonical acceptance is nonincremental regardless of the caller's shell.
+    export CARGO_INCREMENTAL=0
     tmp_root="${TMPDIR:-/tmp}"
     if [[ ! -d "$tmp_root" ]]; then
       export TMPDIR="/tmp"
@@ -234,6 +236,7 @@ check-fast-structure:
     fi
     bash scripts/ops/test-doc-fast-fail-contract.sh
     bash scripts/ops/test-verify-pipeline-contract.sh
+    bash scripts/dev/test-cargo-in-nix.sh
     just check-ci-assurance-lanes
     just check-formal-claim-scope
     just check-workflow-actions

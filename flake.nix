@@ -51,17 +51,22 @@
           targets = [ "wasm32-unknown-unknown" ];
         };
 
-        # Cargo searches Cargo-home plugins before PATH. Keep Clippy on the
+        # Match Aura's cache executable as well as its compiler input.
+        sharedSccache = compilerPkgs.sccache;
+
+        # Cargo searches Cargo-home plugins before PATH. Keep Clippy and fmt on the
         # same exact stable compiler as ordinary builds.
         telltaleCargo = pkgs.writeShellScriptBin "cargo" ''
           set -euo pipefail
           export RUSTC="${rustToolchain}/bin/rustc"
           export RUSTDOC="${rustToolchain}/bin/rustdoc"
           export CARGO="${rustToolchain}/bin/cargo"
-          if [ "''${1:-}" = clippy ]; then
-            exec ${rustToolchain}/bin/cargo-clippy "$@"
-          fi
-          exec ${rustToolchain}/bin/cargo "$@"
+          export TELLTALE_NIX_CARGO_BIN="${rustToolchain}/bin/cargo"
+          export TELLTALE_NIX_CLIPPY_BIN="${rustToolchain}/bin/cargo-clippy"
+          export TELLTALE_NIX_FMT_BIN="${rustToolchain}/bin/cargo-fmt"
+          export TELLTALE_NIX_SCCACHE_BIN="${sharedSccache}/bin/sccache"
+          export RUSTFMT="${rustToolchain}/bin/rustfmt"
+          exec ${pkgs.bash}/bin/bash ${./scripts/dev/cargo-in-nix.sh} "$@"
         '';
 
         wasmPack = pkgs.rustPlatform.buildRustPackage rec {
@@ -147,6 +152,16 @@
 
           shellHook = ''
             ${toolkitSupport.shellHook}
+            # Match Aura's one local 10G store; targets remain checkout-local.
+            # Shell entry exposes tooling but never starts a cache server/build.
+            # Nonincremental by default; CARGO_INCREMENTAL=1 is the explicit
+            # edit/test opt-in and bypasses sccache per invocation.
+            export CARGO_INCREMENTAL="''${CARGO_INCREMENTAL:-0}"
+            if [ "''${TELLTALE_NO_SCCACHE:-0}" != 1 ]; then
+              export RUSTC_WRAPPER="''${RUSTC_WRAPPER-${sharedSccache}/bin/sccache}"
+              export SCCACHE_DIR="''${SCCACHE_DIR:-$HOME/.cache/aura-sccache}"
+              export SCCACHE_CACHE_SIZE="''${SCCACHE_CACHE_SIZE:-10G}"
+            fi
             export ELAN_TOOLCHAIN="${leanToolchain}"
 
             # Default Lake's artifact cache on and keep cached artifacts

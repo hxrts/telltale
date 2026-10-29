@@ -25,6 +25,14 @@
 ^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*accountableSafety[[:space:]]*:
 ^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*byzantineSafety[[:space:]]*:
 ^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*recoveryActionSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Envelope\.lean:.*byzantineSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Envelope\.lean:.*recoveryActionSafety[[:space:]]*:
+
+# Deliberately trivial Unit evidence instance for `theorem_evidence_export`.
+# Its `True` relations define the one-point model on which every envelope
+# premise is proved; the exported flags are documented as certifying only this
+# instance, not any real protocol.
+^lean/Runtime/Proofs/Examples/EnvelopeEvidence\.lean:
 
 # Induction motives: auxiliary motives for mutual/nested recursors over branch
 # lists. `True` is the correct motive for components the theorem says nothing
