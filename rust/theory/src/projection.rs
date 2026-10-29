@@ -24,6 +24,7 @@
 //!
 //! ```
 //! use telltale_theory::projection::MemoizedProjector;
+//! use telltale_types::content_id::DefaultContentHasher;
 //! use telltale_types::{GlobalType, Label};
 //!
 //! let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
@@ -237,6 +238,7 @@ pub fn project_all(global: &GlobalType) -> Result<Vec<(String, LocalTypeR)>, Pro
 ///
 /// ```
 /// use telltale_theory::projection::MemoizedProjector;
+/// use telltale_types::content_id::DefaultContentHasher;
 /// use telltale_types::{GlobalType, Label};
 ///
 /// let mut projector = MemoizedProjector::<DefaultContentHasher>::new();
