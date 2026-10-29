@@ -177,11 +177,11 @@ impl ProtocolAnnotation {
 
     fn format_duration_value(duration: Duration) -> String {
         let millis = duration.as_millis();
-        if millis % 3_600_000 == 0 {
+        if millis.is_multiple_of(3_600_000) {
             format!("{}h", millis / 3_600_000)
-        } else if millis % 60_000 == 0 {
+        } else if millis.is_multiple_of(60_000) {
             format!("{}m", millis / 60_000)
-        } else if millis % 1000 == 0 {
+        } else if millis.is_multiple_of(1000) {
             format!("{}s", millis / 1000)
         } else {
             format!("{millis}ms")

@@ -301,7 +301,7 @@
 
     impl EffectHandler for IdentityFlappingHandler {
         fn handler_identity(&self) -> String {
-            if self.calls.fetch_add(1, Ordering::Relaxed) % 2 == 0 {
+            if self.calls.fetch_add(1, Ordering::Relaxed).is_multiple_of(2) {
                 "handler_a".to_string()
             } else {
                 "handler_b".to_string()

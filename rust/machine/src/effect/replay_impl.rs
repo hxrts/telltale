@@ -299,7 +299,7 @@ mod tests {
         #[allow(clippy::as_conversions, clippy::cast_possible_wrap)]
         fn send_decision(&self, input: SendDecisionInput<'_>) -> EffectResult<SendDecision> {
             let idx = self.counter.fetch_add(1, Ordering::Relaxed);
-            if idx % 2 == 0 {
+            if idx.is_multiple_of(2) {
                 EffectResult::success(SendDecision::Deliver(
                     input.payload.unwrap_or(Value::Nat(idx as u64)),
                 ))

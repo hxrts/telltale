@@ -41,7 +41,7 @@ impl CheckpointStore {
     /// Record a checkpoint artifact if `tick` hits the interval.
     pub fn maybe_checkpoint(&mut self, checkpoint: CheckpointArtifact) {
         let tick = checkpoint.tick;
-        if self.interval == 0 || tick % self.interval != 0 {
+        if self.interval == 0 || !tick.is_multiple_of(self.interval) {
             return;
         }
         self.last_persist_error = None;

@@ -2630,7 +2630,11 @@ where
             machine.state_mut().trace_state.productive_steps += 1;
         }
         if progress_logging_enabled
-            && machine.state().trace_state.total_scheduler_steps % 50_000 == 0
+            && machine
+                .state()
+                .trace_state
+                .total_scheduler_steps
+                .is_multiple_of(50_000)
         {
             eprintln!(
                 "[telltale-progress] steps={} productive={} batches={} open={} closed={} accepted_nodes={}",

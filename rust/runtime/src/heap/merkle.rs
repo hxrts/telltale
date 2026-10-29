@@ -180,7 +180,7 @@ impl<H: Hasher> MerkleTree<H> {
         let mut current_index = index;
 
         for level in &self.levels[..self.levels.len().saturating_sub(1)] {
-            let sibling_index = if current_index % 2 == 0 {
+            let sibling_index = if current_index.is_multiple_of(2) {
                 current_index + 1
             } else {
                 current_index - 1
@@ -192,7 +192,7 @@ impl<H: Hasher> MerkleTree<H> {
                 level[current_index].clone()
             };
 
-            let direction = if current_index % 2 == 0 {
+            let direction = if current_index.is_multiple_of(2) {
                 Direction::Right
             } else {
                 Direction::Left

@@ -481,7 +481,7 @@ impl InMemoryViewerService {
             .trace
             .records
             .iter()
-            .filter(|record| step_limit.map_or(true, |limit| record.step <= limit))
+            .filter(|record| step_limit.is_none_or(|limit| record.step <= limit))
             .collect::<Vec<_>>();
         let nodes = records
             .iter()
@@ -517,7 +517,7 @@ impl InMemoryViewerService {
             .trace
             .records
             .iter()
-            .filter(|record| step_limit.map_or(true, |limit| record.step <= limit))
+            .filter(|record| step_limit.is_none_or(|limit| record.step <= limit))
             .collect::<Vec<_>>();
         let nodes = records
             .iter()

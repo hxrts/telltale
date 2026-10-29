@@ -120,7 +120,7 @@ impl ThreadedProtocolMachine {
             && coroutine
                 .operation_continuation
                 .as_ref()
-                .map_or(true, |original| original.resolved || original.invalidated)
+                .is_none_or(|original| original.resolved || original.invalidated)
         {
             return Err(fail(EffectFailure::contract_violation(
                 "source child has no actual original enclosing continuation",
@@ -295,7 +295,7 @@ impl ThreadedProtocolMachine {
             && coroutine
                 .operation_continuation
                 .as_ref()
-                .map_or(true, |original| original.resolved || original.invalidated)
+                .is_none_or(|original| original.resolved || original.invalidated)
         {
             return Err(EffectFailure::contract_violation(
                 "source commit has no actual original enclosing continuation",

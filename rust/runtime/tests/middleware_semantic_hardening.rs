@@ -374,7 +374,7 @@ async fn extension_dispatch_replays_deterministically_across_identical_runs() {
 async fn seeded_fault_injection_replays_the_same_failure_schedule() {
     async fn schedule(seed: u64) -> Vec<bool> {
         let mut handler = FaultInjection::with_seed(
-            ScriptedSendHandler::new(std::iter::repeat(Ok(())).take(8)),
+            ScriptedSendHandler::new(std::iter::repeat_n(Ok(()), 8)),
             0.5,
             seed,
         );

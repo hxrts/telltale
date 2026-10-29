@@ -1279,9 +1279,7 @@ fn require_source_operation_records(
             || progress
                 .last_progress_tick
                 .zip(endpoint)
-                .map_or(true, |(tick, end)| {
-                    tick > end || Some(tick) < source["issued_at"].as_u64()
-                })
+                .is_none_or(|(tick, end)| tick > end || Some(tick) < source["issued_at"].as_u64())
         {
             return Err(invalid_output(
                 "source resolution bypassed original lifecycle/window",

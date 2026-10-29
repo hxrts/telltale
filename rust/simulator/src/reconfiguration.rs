@@ -457,13 +457,13 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
             if kind != "sent" {
                 return false;
             }
-            role.map_or(true, |expected| expected == from || expected == to)
+            role.is_none_or(|expected| expected == from || expected == to)
         }
         ObsEvent::Received { from, to, .. } => {
             if kind != "received" {
                 return false;
             }
-            role.map_or(true, |expected| expected == from || expected == to)
+            role.is_none_or(|expected| expected == from || expected == to)
         }
         ObsEvent::Opened { .. } => kind == "opened" && role.is_none(),
         ObsEvent::Closed { .. } => kind == "closed" && role.is_none(),
@@ -471,7 +471,7 @@ fn event_matches(event: &ObsEvent, kind: &str, role: Option<&str>) -> bool {
             if kind != "invoked" {
                 return false;
             }
-            role.map_or(true, |expected| expected == observed)
+            role.is_none_or(|expected| expected == observed)
         }
         ObsEvent::Halted { .. } => kind == "halted" && role.is_none(),
         ObsEvent::Faulted { .. } => kind == "faulted" && role.is_none(),

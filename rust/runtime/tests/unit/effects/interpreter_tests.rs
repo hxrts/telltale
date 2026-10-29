@@ -53,6 +53,7 @@ async fn interpret_reference(
     program: Program<TestRole, TestMessage>,
 ) -> ChoreoResult<InterpretResult<TestMessage>> {
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::double_must_use)]
     #[async_recursion]
     async fn run_program(
         handler: &mut testing::MockHandler<TestRole>,

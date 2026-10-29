@@ -74,6 +74,9 @@ pub trait SimulatedTransport: Send {
 /// Asynchronous simulated transport trait.
 ///
 /// This trait is used for async protocol execution with simulated transport.
+// `async_trait` expands to `#[must_use]` on pinned boxed futures, which newer
+// clippy flags as `double_must_use`.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait AsyncSimulatedTransport: Send + Sync {
     /// Send a message to a destination.

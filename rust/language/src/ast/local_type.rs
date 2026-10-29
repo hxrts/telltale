@@ -116,7 +116,7 @@ impl LocalType {
                     && on_timeout.check_well_formed(rec_vars)
                     && on_cancel
                         .as_deref()
-                        .map_or(true, |branch| branch.check_well_formed(rec_vars))
+                        .is_none_or(|branch| branch.check_well_formed(rec_vars))
             }
             LocalType::End => true,
         }

@@ -225,7 +225,7 @@ impl<T> RetainedLog<T> {
     }
 
     fn drain(&mut self) -> Vec<T> {
-        self.0.drain(..).collect()
+        std::mem::take(&mut self.0)
     }
 
     fn trim_to_capacity(&mut self, capacity: usize) {

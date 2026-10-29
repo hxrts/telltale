@@ -289,7 +289,7 @@ impl TopologyHandler {
     pub async fn close(&self) -> TransportResult<()> {
         let mut transports = write_lock!(self.transports);
 
-        for (_, transport) in transports.iter() {
+        for transport in transports.values() {
             transport.close().await?;
         }
 

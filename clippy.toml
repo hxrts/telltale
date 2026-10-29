@@ -40,7 +40,7 @@ too-many-lines-threshold = 100
 too-many-arguments-threshold = 10
 
 # MSRV for compatibility
-msrv = "1.75.0"
+msrv = "1.95.0"
 
 # Disallow certain types in public APIs
 # The default lane keeps noisy style rules out. Run the style audit recipe for

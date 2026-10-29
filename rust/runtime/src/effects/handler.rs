@@ -322,6 +322,9 @@ pub type ChoreoResult<T> = std::result::Result<T, ChoreographyError>;
 /// objects. The macro also enforces `Send` on all returned futures, so the bounds on
 /// methods like [`with_timeout`](ChoreoHandler::with_timeout) apply equally to native
 /// multithreaded runtimes and single-threaded WASM builds.
+// `async_trait` expands to `#[must_use]` on pinned boxed futures, which newer
+// clippy flags as `double_must_use`.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait ChoreoHandler: Send {
     /// The role type for this choreography
@@ -449,6 +452,9 @@ pub trait ChoreoHandler: Send {
 /// Extension trait for handler lifecycle management
 ///
 /// Provides setup and teardown methods for managing handler state and connections.
+// `async_trait` expands to `#[must_use]` on pinned boxed futures, which newer
+// clippy flags as `double_must_use`.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait ChoreoHandlerExt: ChoreoHandler {
     /// Setup phase - establish connections, initialize state

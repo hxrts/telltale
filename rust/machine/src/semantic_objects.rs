@@ -1044,7 +1044,7 @@ impl<'a> ProtocolMachineFinalization<'a> {
 
         operation_id
             .and_then(|operation_id| self.path_for_operation_id(operation_id))
-            .map_or(true, |path| !path.is_canonical())
+            .is_none_or(|path| !path.is_canonical())
     }
 
     /// Derive the explicit finalization path for one operation id.

@@ -119,6 +119,9 @@ impl TransportMessage for ByteMessage {
 }
 
 /// Transport trait for sending and receiving messages between roles.
+// `async_trait` expands to `#[must_use]` on pinned boxed futures, which newer
+// clippy flags as `double_must_use`.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait Transport: Send + Sync + 'static {
     /// Send a message to a specific role.

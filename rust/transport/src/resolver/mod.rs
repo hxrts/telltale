@@ -44,6 +44,9 @@ pub enum ResolverError {
 }
 
 /// Resolves role names to network endpoints.
+// `async_trait` expands to `#[must_use]` on pinned boxed futures, which newer
+// clippy flags as `double_must_use`.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait EndpointResolver: Send + Sync {
     /// Resolve a role to an endpoint.

@@ -280,7 +280,7 @@ impl OriginalOperationContinuation {
             || self
                 .issued_at
                 .checked_add(self.declaration.budget_ticks.get())
-                .map_or(true, |end| tick > end)
+                .is_none_or(|end| tick > end)
         {
             return Err(OperationTransitionError::Contract(
                 "original operation window expired or validation was refused",
@@ -755,7 +755,7 @@ pub(crate) fn await_should_wake(
         || original
             .issued_at
             .checked_add(original.declaration.budget_ticks.get())
-            .map_or(true, |end| tick > end)
+            .is_none_or(|end| tick > end)
     {
         return true;
     }

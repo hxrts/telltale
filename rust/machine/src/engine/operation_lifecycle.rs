@@ -65,7 +65,7 @@ impl ProtocolMachine {
                 .coroutines
                 .iter()
                 .find(|coroutine| coroutine.id == id)
-                .map_or(true, |coroutine| {
+                .is_none_or(|coroutine| {
                     crate::operation_lifecycle::await_should_wake(
                         coroutine.operation_continuation.as_ref(),
                         &operation_id,
@@ -93,7 +93,7 @@ impl ProtocolMachine {
             && coroutine
                 .operation_continuation
                 .as_ref()
-                .map_or(true, |original| original.resolved || original.invalidated)
+                .is_none_or(|original| original.resolved || original.invalidated)
         {
             return Err(Fault::Invoke {
                 failure: EffectFailure::contract_violation(

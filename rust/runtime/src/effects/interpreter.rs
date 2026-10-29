@@ -76,6 +76,7 @@ impl<M, R: RoleId> Interpreter<M, R> {
         }
     }
 
+    #[allow(clippy::double_must_use)]
     #[async_recursion]
     async fn run<H>(
         &mut self,
@@ -356,6 +357,7 @@ impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
         }
     }
 
+    #[allow(clippy::double_must_use)]
     #[async_recursion]
     async fn run<H>(
         &mut self,
@@ -461,6 +463,9 @@ impl<M, R: RoleId> ExtensibleInterpreter<M, R> {
 }
 
 /// Extension trait to add program interpretation to handlers
+// `async_trait` expands to `#[must_use]` on pinned boxed futures, which newer
+// clippy flags as `double_must_use`.
+#[allow(clippy::double_must_use)]
 #[async_trait]
 pub trait ChoreoHandlerExt: ChoreoHandler + Sized {
     /// Run a choreographic program using this handler

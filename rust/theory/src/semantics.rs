@@ -273,12 +273,9 @@ fn step_fuel(g: &GlobalType, act: &GlobalAction, fuel: usize) -> Option<GlobalTy
                     // Step all branches
                     let mut new_branches = Vec::with_capacity(branches.len());
                     for (l, cont) in branches {
-                        if let Some(stepped) = step_fuel(cont, act, fuel - 1) {
-                            new_branches.push((l.clone(), stepped));
-                        } else {
-                            // If any branch can't step, the whole step fails
-                            return None;
-                        }
+                        // If any branch can't step, the whole step fails
+                        let stepped = step_fuel(cont, act, fuel - 1)?;
+                        new_branches.push((l.clone(), stepped));
                     }
                     return Some(GlobalType::Comm {
                         sender: sender.clone(),
@@ -426,11 +423,8 @@ fn local_step_fuel(lt: &LocalTypeR, act: &LocalAction, fuel: usize) -> Option<Lo
                     if enabled {
                         let mut new_branches = Vec::with_capacity(branches.len());
                         for (l, vt, cont) in branches {
-                            if let Some(stepped) = local_step_fuel(cont, act, fuel - 1) {
-                                new_branches.push((l.clone(), vt.clone(), stepped));
-                            } else {
-                                return None;
-                            }
+                            let stepped = local_step_fuel(cont, act, fuel - 1)?;
+                            new_branches.push((l.clone(), vt.clone(), stepped));
                         }
                         return Some(LocalTypeR::Send {
                             partner: partner.clone(),

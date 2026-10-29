@@ -351,7 +351,7 @@ impl ProtocolMachine {
         if self
             .sessions
             .default_handler_for_session(sid)
-            .map_or(true, String::is_empty)
+            .is_none_or(String::is_empty)
         {
             return Err(Fault::Invoke {
                 failure: EffectFailure::contract_violation("no handler bound"),
