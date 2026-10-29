@@ -46,7 +46,10 @@ impl ThreadedProtocolMachine {
         outcome: &EffectOutcome,
         handler_identity: &str,
         effect_id: u64,
-    ) {
+    ) -> Result<(), EffectFailure> {
+        let successor = effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let mut request = request.clone();
         request.effect_id = Some(effect_id);
         let exchange = EffectExchangeRecord {
@@ -56,9 +59,23 @@ impl ThreadedProtocolMachine {
             request,
             outcome: outcome.clone(),
         };
+        if let crate::effect::EffectRequestBody::NominalCommand { request } = &exchange.request.body
+        {
+            if let Some(coroutine) = self.coroutine_by_id(request.coroutine) {
+                let mut original = coroutine
+                    .lock()
+                    .expect("threaded ProtocolMachine lock poisoned");
+                crate::operation_lifecycle::retain_source_child_outcome(
+                    &mut original,
+                    effect_id,
+                    outcome,
+                );
+            }
+        }
         self.sync_runtime_effect_from_exchange(&exchange);
         self.effect_exchanges.push(exchange);
-        self.next_effect_id = self.next_effect_id.max(effect_id.saturating_add(1));
+        self.next_effect_id = self.next_effect_id.max(successor);
+        Ok(())
     }
 
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<String> {
@@ -148,6 +165,29 @@ impl ThreadedProtocolMachine {
         }
     }
 
+    fn prune_terminal_effect_records(&mut self) {
+        // A busy/poisoned original registry cannot prove a record disposable.
+        let Ok(registry) = self.sessions.sessions.try_read() else {
+            return;
+        };
+        let resident = |sid| registry.contains_key(&sid);
+        crate::engine::prune_terminal_effect_history(
+            &mut self.outstanding_effects,
+            &self.config.observability_retention,
+            resident,
+        );
+        crate::engine::prune_terminal_effect_history(
+            &mut self.operation_instances,
+            &self.config.observability_retention,
+            resident,
+        );
+        crate::engine::prune_terminal_effect_history(
+            &mut self.progress_contracts,
+            &self.config.observability_retention,
+            resident,
+        );
+    }
+
     fn set_progress_contract_state(
         &mut self,
         operation_id: &str,
@@ -194,6 +234,7 @@ impl ThreadedProtocolMachine {
                     reason,
                 });
             }
+            self.prune_terminal_effect_records();
             return;
         }
 
@@ -215,6 +256,7 @@ impl ThreadedProtocolMachine {
             .then_some(self.clock.tick),
             reason,
         });
+        self.prune_terminal_effect_records();
     }
 
     #[allow(clippy::too_many_lines)]
@@ -312,7 +354,6 @@ impl ThreadedProtocolMachine {
                         "status": "blocked",
                         "reason": reason.clone().unwrap_or_default(),
                     });
-                    effect_mut.ordering_key = self.clock.tick;
                 }
                 if let Some(operation) = self
                     .operation_instances
@@ -354,7 +395,6 @@ impl ThreadedProtocolMachine {
                         "reason": reason.clone().unwrap_or_default(),
                     });
                     effect_mut.completed_at_tick = Some(self.clock.tick);
-                    effect_mut.ordering_key = self.clock.tick;
                 }
                 if let Some(operation) = self
                     .operation_instances
@@ -386,14 +426,33 @@ impl ThreadedProtocolMachine {
         session: Option<SessionId>,
         handler_identity: &str,
         inputs: serde_json::Value,
-    ) -> u64 {
+    ) -> Result<u64, EffectFailure> {
+        self.issue_runtime_effect_with_budget(
+            effect_kind,
+            session,
+            handler_identity,
+            inputs,
+            Some(1),
+        )
+    }
+
+    fn issue_runtime_effect_with_budget(
+        &mut self,
+        effect_kind: &str,
+        session: Option<SessionId>,
+        handler_identity: &str,
+        inputs: serde_json::Value,
+        budget_ticks: Option<u64>,
+    ) -> Result<u64, EffectFailure> {
         let effect_id = self.next_effect_id;
-        self.next_effect_id = self.next_effect_id.saturating_add(1);
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)?;
+        self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let operation_id = Self::effect_operation_id(effect_id);
         let (effect_interface, effect_operation) =
             infer_effect_interface_and_operation(effect_kind);
         let owner_id = self.current_operation_owner(session);
-        let budget_ticks = Some(1);
 
         self.outstanding_effects.push(OutstandingEffect {
             effect_id,
@@ -414,6 +473,7 @@ impl ThreadedProtocolMachine {
             outputs: json!({ "status": "pending" }),
         });
         self.operation_instances.push(OperationInstance {
+            agreement_profile: None,
             operation_id: operation_id.clone(),
             session,
             owner_id,
@@ -434,7 +494,7 @@ impl ThreadedProtocolMachine {
             None,
             true,
         );
-        effect_id
+        Ok(effect_id)
     }
 
     fn sync_runtime_effect_from_trace_entry(&mut self, entry: &EffectTraceEntry) {
@@ -492,6 +552,7 @@ impl ThreadedProtocolMachine {
             outputs: entry.outputs.clone(),
         });
         self.operation_instances.push(OperationInstance {
+            agreement_profile: None,
             operation_id: operation_id.clone(),
             session,
             owner_id,
@@ -530,7 +591,7 @@ impl ThreadedProtocolMachine {
             return;
         }
 
-        let status = match &exchange.outcome.status {
+        let status = match exchange.outcome.accepted_status(&exchange.request.body) {
             crate::effect::EffectOutcomeStatus::Success => OutstandingEffectStatus::Succeeded,
             crate::effect::EffectOutcomeStatus::Blocked => OutstandingEffectStatus::Blocked,
             crate::effect::EffectOutcomeStatus::Failure { .. } => OutstandingEffectStatus::Failed,
@@ -539,6 +600,7 @@ impl ThreadedProtocolMachine {
             crate::effect::EffectRequestBody::SendDecision { .. } => "send_decision",
             crate::effect::EffectRequestBody::Receive { .. } => "handle_recv",
             crate::effect::EffectRequestBody::Choose { .. } => "handle_choose",
+            crate::effect::EffectRequestBody::NominalCommand { .. } => "nominal_command",
             crate::effect::EffectRequestBody::InvokeStep { .. } => "invoke_step",
             crate::effect::EffectRequestBody::Acquire { .. } => "handle_acquire",
             crate::effect::EffectRequestBody::Release { .. } => "handle_release",
@@ -578,6 +640,7 @@ impl ThreadedProtocolMachine {
             outputs,
         });
         self.operation_instances.push(OperationInstance {
+            agreement_profile: None,
             operation_id: operation_id.clone(),
             session,
             owner_id,
@@ -643,8 +706,14 @@ impl ThreadedProtocolMachine {
             let effect = &mut self.outstanding_effects[effect_index];
             effect.status = status;
             effect.outputs = outputs;
-            effect.completed_at_tick = Some(self.clock.tick);
-            effect.ordering_key = self.clock.tick;
+            // Completion never refreshes the original admitted ordering key.
+            // Blocked is live, not an acknowledgement of terminal completion.
+            if !matches!(
+                status,
+                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+            ) {
+                effect.completed_at_tick = Some(self.clock.tick);
+            }
             operation_id = effect.operation_id.clone();
             session = effect.session;
             budget_ticks = effect.budget_ticks;
@@ -692,7 +761,6 @@ impl ThreadedProtocolMachine {
                 "reason": reason,
             });
             effect.completed_at_tick = Some(self.clock.tick);
-            effect.ordering_key = self.clock.tick;
             invalidated.push(effect.operation_id.clone());
         }
 
@@ -712,6 +780,7 @@ impl ThreadedProtocolMachine {
                 true,
             );
         }
+        self.prune_terminal_effect_records();
     }
 
     fn apply_semantic_handoff_obligations(&mut self, receipt: &DelegationReceipt) {
@@ -739,7 +808,6 @@ impl ThreadedProtocolMachine {
                         "handoff_id": receipt.receipt_id,
                     });
                     effect.completed_at_tick = Some(self.clock.tick);
-                    effect.ordering_key = self.clock.tick;
                     invalidated_operations.push(effect.operation_id.clone());
                 }
                 OutstandingEffectStatus::Succeeded

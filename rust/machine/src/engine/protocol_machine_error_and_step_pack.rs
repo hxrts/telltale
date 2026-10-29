@@ -1,6 +1,13 @@
 /// Errors from ProtocolMachine operations.
 #[derive(Debug, thiserror::Error)]
 pub enum ProtocolMachineError {
+    /// Another round cannot fit in the original simulated clock.
+    #[error("simulation round admission failed: {0}")]
+    ClockExhausted(
+        #[from]
+        #[source]
+        crate::clock::ClockExhaustion,
+    ),
     /// A coroutine faulted.
     #[error("coroutine {coro_id} faulted: {fault}")]
     Fault {
@@ -9,6 +16,13 @@ pub enum ProtocolMachineError {
         /// The fault.
         fault: Fault,
     },
+    /// Fresh session allocation was refused before insertion.
+    #[error("session allocation failed: {0}")]
+    SessionAllocation(
+        #[from]
+        #[source]
+        crate::session::SessionAllocationError,
+    ),
     /// Session limit exceeded.
     #[error("max sessions ({max}) exceeded")]
     TooManySessions {
@@ -47,6 +61,9 @@ pub enum ProtocolMachineError {
     ThreadPoolBuild {
         /// Build error details.
         message: String,
+        /// Original native pool-construction failure, including its I/O source.
+        #[source]
+        source: Box<dyn std::error::Error + Send + Sync>,
     },
     /// Code image failed runtime validation checks.
     #[error("invalid code image: {reason}")]
@@ -63,6 +80,10 @@ pub enum ProtocolMachineError {
 
 /// How to update the coroutine after an instruction.
 pub(crate) enum CoroUpdate {
+    /// Consume the original returned nominal result only after commit gates.
+    CompleteNominal,
+    /// Apply explicit source lifecycle against actual main-owner canonical records.
+    OperationLifecycle(crate::operation_lifecycle::OperationAction),
     /// Advance PC by 1, status = Ready.
     AdvancePc,
     /// Set PC to target (for Jmp), status = Ready.
@@ -212,6 +233,83 @@ impl<T> RetainedLog<T> {
             let overflow = self.0.len() - capacity;
             self.0.drain(0..overflow);
         }
+    }
+}
+
+// These are the existing canonical owners, not optional trace retention.
+pub(crate) trait LiveEffectRecord {
+    fn is_live(&self) -> bool;
+    fn retained_session(&self) -> Option<SessionId>;
+}
+impl LiveEffectRecord for OutstandingEffect {
+    fn is_live(&self) -> bool {
+        matches!(
+            self.status,
+            OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+        )
+    }
+    fn retained_session(&self) -> Option<SessionId> {
+        self.session
+    }
+}
+impl LiveEffectRecord for OperationInstance {
+    fn is_live(&self) -> bool {
+        matches!(
+            self.phase,
+            OperationPhase::Pending | OperationPhase::Blocked
+        )
+    }
+    fn retained_session(&self) -> Option<SessionId> {
+        self.session
+    }
+}
+impl LiveEffectRecord for ProgressContract {
+    fn is_live(&self) -> bool {
+        !self.is_terminal()
+    }
+    fn retained_session(&self) -> Option<SessionId> {
+        self.session
+    }
+}
+
+pub(crate) fn prune_terminal_effect_history<T: LiveEffectRecord>(
+    records: &mut Vec<T>,
+    retention: &ObservabilityRetentionConfig,
+    resident: impl Fn(SessionId) -> bool,
+) {
+    let capacity = match retention.mode {
+        ObservabilityRetentionMode::Full => return,
+        ObservabilityRetentionMode::Disabled => 0,
+        ObservabilityRetentionMode::Capped => retention.capacity,
+    };
+    let protected =
+        |record: &T| record.is_live() || record.retained_session().is_some_and(&resident);
+    let mut discard = records
+        .iter()
+        .filter(|record| !protected(record))
+        .count()
+        .saturating_sub(capacity);
+    records.retain(|record| {
+        if protected(record) || discard == 0 {
+            true
+        } else {
+            discard -= 1;
+            false
+        }
+    });
+}
+impl<T: LiveEffectRecord> RetainedLog<T> {
+    fn push_canonical(&mut self, item: T, _retention: &ObservabilityRetentionConfig) {
+        // Only the actual machine owner can prove session nonresidency.
+        // Defer pruning to its coherent progress/settlement boundary.
+        self.0.push(item);
+    }
+    fn prune_terminal(
+        &mut self,
+        retention: &ObservabilityRetentionConfig,
+        resident: impl Fn(SessionId) -> bool,
+    ) {
+        prune_terminal_effect_history(&mut self.0, retention, resident);
     }
 }
 

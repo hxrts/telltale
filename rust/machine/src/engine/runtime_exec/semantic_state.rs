@@ -46,7 +46,10 @@ impl ProtocolMachine {
         outcome: &EffectOutcome,
         handler_identity: &str,
         effect_id: u64,
-    ) {
+    ) -> Result<(), EffectFailure> {
+        let successor = effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let mut request = request.clone();
         request.effect_id = Some(effect_id);
         let exchange = EffectExchangeRecord {
@@ -56,10 +59,23 @@ impl ProtocolMachine {
             request,
             outcome: outcome.clone(),
         };
+        if let crate::effect::EffectRequestBody::NominalCommand { request } = &exchange.request.body
+        {
+            if let Some(coroutine) = self
+                .coroutines
+                .iter_mut()
+                .find(|coroutine| coroutine.id == request.coroutine)
+            {
+                crate::operation_lifecycle::retain_source_child_outcome(
+                    coroutine, effect_id, outcome,
+                );
+            }
+        }
         self.sync_runtime_effect_from_exchange(&exchange);
         self.effect_exchanges
             .push(exchange, &self.config.observability_retention);
-        self.next_effect_id = self.next_effect_id.max(effect_id.saturating_add(1));
+        self.next_effect_id = self.next_effect_id.max(successor);
+        Ok(())
     }
 
     fn current_operation_owner(&self, session: Option<SessionId>) -> Option<FragmentOwnerId> {
@@ -144,6 +160,17 @@ impl ProtocolMachine {
         }
     }
 
+    fn prune_terminal_effect_records(&mut self) {
+        let registry = &self.sessions;
+        let resident = |sid| registry.get(sid).is_some();
+        self.outstanding_effects
+            .prune_terminal(&self.config.observability_retention, resident);
+        self.operation_instances
+            .prune_terminal(&self.config.observability_retention, resident);
+        self.progress_contracts
+            .prune_terminal(&self.config.observability_retention, resident);
+    }
+
     fn set_progress_contract_state(
         &mut self,
         operation_id: &str,
@@ -195,10 +222,11 @@ impl ProtocolMachine {
                     retention,
                 );
             }
+            self.prune_terminal_effect_records();
             return;
         }
 
-        self.progress_contracts.push(
+        self.progress_contracts.push_canonical(
             ProgressContract {
                 operation_id: operation_id.to_string(),
                 session,
@@ -219,6 +247,7 @@ impl ProtocolMachine {
             },
             retention,
         );
+        self.prune_terminal_effect_records();
     }
 
     #[allow(clippy::too_many_lines)]
@@ -320,7 +349,6 @@ impl ProtocolMachine {
                         "status": "blocked",
                         "reason": reason.clone().unwrap_or_default(),
                     });
-                    effect_mut.ordering_key = self.clock.tick;
                 }
                 if let Some(operation) = self
                     .operation_instances
@@ -365,7 +393,6 @@ impl ProtocolMachine {
                         "reason": reason.clone().unwrap_or_default(),
                     });
                     effect_mut.completed_at_tick = Some(self.clock.tick);
-                    effect_mut.ordering_key = self.clock.tick;
                 }
                 if let Some(operation) = self
                     .operation_instances
@@ -397,16 +424,35 @@ impl ProtocolMachine {
         session: Option<SessionId>,
         handler_identity: &str,
         inputs: serde_json::Value,
-    ) -> u64 {
+    ) -> Result<u64, EffectFailure> {
+        self.issue_runtime_effect_with_budget(
+            effect_kind,
+            session,
+            handler_identity,
+            inputs,
+            Some(1),
+        )
+    }
+
+    fn issue_runtime_effect_with_budget(
+        &mut self,
+        effect_kind: &str,
+        session: Option<SessionId>,
+        handler_identity: &str,
+        inputs: serde_json::Value,
+        budget_ticks: Option<u64>,
+    ) -> Result<u64, EffectFailure> {
         let effect_id = self.next_effect_id;
-        self.next_effect_id = self.next_effect_id.saturating_add(1);
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)?;
+        self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+            EffectFailure::contract_violation("canonical effect occurrence identifiers exhausted")
+        })?;
         let operation_id = Self::effect_operation_id(effect_id);
         let (effect_interface, effect_operation) =
             infer_effect_interface_and_operation(effect_kind);
         let owner_id = self.current_operation_owner(session);
-        let budget_ticks = Some(1);
 
-        self.outstanding_effects.push(
+        self.outstanding_effects.push_canonical(
             OutstandingEffect {
                 effect_id,
                 operation_id: operation_id.clone(),
@@ -427,8 +473,9 @@ impl ProtocolMachine {
             },
             &self.config.observability_retention,
         );
-        self.operation_instances.push(
+        self.operation_instances.push_canonical(
             OperationInstance {
+                agreement_profile: None,
                 operation_id: operation_id.clone(),
                 session,
                 owner_id,
@@ -451,7 +498,7 @@ impl ProtocolMachine {
             None,
             true,
         );
-        effect_id
+        Ok(effect_id)
     }
 
     fn sync_runtime_effect_from_trace_entry(&mut self, entry: &EffectTraceEntry) {
@@ -491,7 +538,7 @@ impl ProtocolMachine {
         };
         let budget_ticks = Some(1);
 
-        self.outstanding_effects.push(
+        self.outstanding_effects.push_canonical(
             OutstandingEffect {
                 effect_id: entry.effect_id,
                 operation_id: operation_id.clone(),
@@ -512,8 +559,9 @@ impl ProtocolMachine {
             },
             &self.config.observability_retention,
         );
-        self.operation_instances.push(
+        self.operation_instances.push_canonical(
             OperationInstance {
+                agreement_profile: None,
                 operation_id: operation_id.clone(),
                 session,
                 owner_id,
@@ -555,7 +603,7 @@ impl ProtocolMachine {
             return;
         }
 
-        let status = match &exchange.outcome.status {
+        let status = match exchange.outcome.accepted_status(&exchange.request.body) {
             crate::effect::EffectOutcomeStatus::Success => OutstandingEffectStatus::Succeeded,
             crate::effect::EffectOutcomeStatus::Blocked => OutstandingEffectStatus::Blocked,
             crate::effect::EffectOutcomeStatus::Failure { .. } => OutstandingEffectStatus::Failed,
@@ -564,6 +612,7 @@ impl ProtocolMachine {
             crate::effect::EffectRequestBody::SendDecision { .. } => "send_decision",
             crate::effect::EffectRequestBody::Receive { .. } => "handle_recv",
             crate::effect::EffectRequestBody::Choose { .. } => "handle_choose",
+            crate::effect::EffectRequestBody::NominalCommand { .. } => "nominal_command",
             crate::effect::EffectRequestBody::InvokeStep { .. } => "invoke_step",
             crate::effect::EffectRequestBody::Acquire { .. } => "handle_acquire",
             crate::effect::EffectRequestBody::Release { .. } => "handle_release",
@@ -584,7 +633,7 @@ impl ProtocolMachine {
         let outputs =
             serde_json::to_value(&exchange.outcome).expect("typed effect outcome should serialize");
 
-        self.outstanding_effects.push(
+        self.outstanding_effects.push_canonical(
             OutstandingEffect {
                 effect_id: exchange.effect_id,
                 operation_id: operation_id.clone(),
@@ -605,8 +654,9 @@ impl ProtocolMachine {
             },
             &self.config.observability_retention,
         );
-        self.operation_instances.push(
+        self.operation_instances.push_canonical(
             OperationInstance {
+                agreement_profile: None,
                 operation_id: operation_id.clone(),
                 session,
                 owner_id,
@@ -675,8 +725,14 @@ impl ProtocolMachine {
             let effect = &mut self.outstanding_effects.as_mut_slice()[effect_index];
             effect.status = status;
             effect.outputs = outputs;
-            effect.completed_at_tick = Some(self.clock.tick);
-            effect.ordering_key = self.clock.tick;
+            // Completion never refreshes the original admitted ordering key.
+            // Blocked is live, not an acknowledgement of terminal completion.
+            if !matches!(
+                status,
+                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+            ) {
+                effect.completed_at_tick = Some(self.clock.tick);
+            }
             operation_id = effect.operation_id.clone();
             session = effect.session;
             budget_ticks = effect.budget_ticks;
@@ -736,8 +792,12 @@ impl ProtocolMachine {
             let effect = &mut self.outstanding_effects.as_mut_slice()[effect_index];
             effect.status = status;
             effect.outputs = outputs;
-            effect.completed_at_tick = Some(self.clock.tick);
-            effect.ordering_key = self.clock.tick;
+            if !matches!(
+                status,
+                OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+            ) {
+                effect.completed_at_tick = Some(self.clock.tick);
+            }
             operation_id = effect.operation_id.clone();
             session = effect.session;
             budget_ticks = effect.budget_ticks;
@@ -788,7 +848,6 @@ impl ProtocolMachine {
                 "reason": reason,
             });
             effect.completed_at_tick = Some(self.clock.tick);
-            effect.ordering_key = self.clock.tick;
             invalidated.push(effect.operation_id.clone());
         }
 
@@ -808,6 +867,7 @@ impl ProtocolMachine {
                 true,
             );
         }
+        self.prune_terminal_effect_records();
     }
 
     fn apply_semantic_handoff_obligations(&mut self, receipt: &DelegationReceipt) {
@@ -835,7 +895,6 @@ impl ProtocolMachine {
                         "handoff_id": receipt.receipt_id,
                     });
                     effect.completed_at_tick = Some(self.clock.tick);
-                    effect.ordering_key = self.clock.tick;
                     invalidated_operations.push(effect.operation_id.clone());
                 }
                 OutstandingEffectStatus::Succeeded
@@ -1066,8 +1125,11 @@ mod runtime_effect_state_tests {
         }
 
         fn execute(&mut self, action: LifecycleAction) {
-            self.action_log
-                .push(format!("tick={} {}", self.machine.clock.tick, action.name()));
+            self.action_log.push(format!(
+                "tick={} {}",
+                self.machine.clock.tick,
+                action.name()
+            ));
             *self.action_counts.entry(action.name()).or_insert(0) += 1;
             match action {
                 LifecycleAction::OpenOwnedSession => self.open_owned_session(),
@@ -1105,16 +1167,19 @@ mod runtime_effect_state_tests {
         fn issue_effect(&mut self) {
             let sid = self.session_id.expect("session must be opened");
             self.machine.clock.tick = self.machine.clock.tick.saturating_add(1);
-            let effect_id = self.machine.issue_runtime_effect(
-                "invoke_step",
-                Some(sid),
-                "host/runtime",
-                serde_json::json!({
-                    "session": sid,
-                    "seed": self.seed,
-                    "ordering_key": self.machine.clock.tick,
-                }),
-            );
+            let effect_id = self
+                .machine
+                .issue_runtime_effect(
+                    "invoke_step",
+                    Some(sid),
+                    "host/runtime",
+                    serde_json::json!({
+                        "session": sid,
+                        "seed": self.seed,
+                        "ordering_key": self.machine.clock.tick,
+                    }),
+                )
+                .expect("unit fixture has fresh occurrence capacity");
             let effect = self
                 .machine
                 .outstanding_effects
@@ -1327,6 +1392,7 @@ mod runtime_effect_state_tests {
         fn push_proof_gap_operation(&mut self, operation_id: &str, sid: SessionId) {
             self.machine.operation_instances.push(
                 OperationInstance {
+                    agreement_profile: None,
                     operation_id: operation_id.to_string(),
                     session: Some(sid),
                     owner_id: self.active_owner.clone(),
@@ -1369,10 +1435,9 @@ mod runtime_effect_state_tests {
                 },
                 passed: true,
             };
-            self.machine.output_condition_checks.push(
-                check.clone(),
-                &self.machine.config.observability_retention,
-            );
+            self.machine
+                .output_condition_checks
+                .push(check.clone(), &self.machine.config.observability_retention);
             self.last_bound_handle = Some(format!("materialization:{}", check.meta.output_digest));
         }
 
@@ -1495,7 +1560,9 @@ mod runtime_effect_state_tests {
                 declared.insert(match event {
                     ScheduledEffectEvent::IssueEffect => LifecycleAction::IssueEffect,
                     ScheduledEffectEvent::CompleteEffect => LifecycleAction::CompleteEffect,
-                    ScheduledEffectEvent::DuplicateCompletion => LifecycleAction::DuplicateCompletion,
+                    ScheduledEffectEvent::DuplicateCompletion => {
+                        LifecycleAction::DuplicateCompletion
+                    }
                     ScheduledEffectEvent::LateCancel => LifecycleAction::LateCancel,
                     ScheduledEffectEvent::TimeoutEffect => LifecycleAction::TimeoutEffect,
                     ScheduledEffectEvent::CancelEffect => LifecycleAction::CancelEffect,
@@ -1617,12 +1684,18 @@ mod runtime_effect_state_tests {
             }
 
             if let Some(active_owner) = self.active_owner.as_deref() {
-                for effect in self.machine.outstanding_effects.as_slice().iter().filter(|effect| {
-                    matches!(
-                        effect.status,
-                        OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
-                    )
-                }) {
+                for effect in self
+                    .machine
+                    .outstanding_effects
+                    .as_slice()
+                    .iter()
+                    .filter(|effect| {
+                        matches!(
+                            effect.status,
+                            OutstandingEffectStatus::Pending | OutstandingEffectStatus::Blocked
+                        )
+                    })
+                {
                     assert_eq!(
                         effect.owner_id.as_deref(),
                         Some(active_owner),
@@ -1630,14 +1703,17 @@ mod runtime_effect_state_tests {
                         self.context("active effects must have one semantic owner"),
                     );
                 }
-                for operation in self
-                    .machine
-                    .operation_instances
-                    .as_slice()
-                    .iter()
-                    .filter(|operation| {
-                        matches!(operation.phase, OperationPhase::Pending | OperationPhase::Blocked)
-                    })
+                for operation in
+                    self.machine
+                        .operation_instances
+                        .as_slice()
+                        .iter()
+                        .filter(|operation| {
+                            matches!(
+                                operation.phase,
+                                OperationPhase::Pending | OperationPhase::Blocked
+                            )
+                        })
                 {
                     assert_eq!(
                         operation.owner_id.as_deref(),
@@ -2157,6 +2233,7 @@ mod runtime_effect_state_tests {
         );
         machine.operation_instances.push(
             OperationInstance {
+                agreement_profile: None,
                 operation_id: "effect:11".to_string(),
                 session: Some(5),
                 owner_id: Some("coro:0".to_string()),
@@ -2173,6 +2250,7 @@ mod runtime_effect_state_tests {
         );
         machine.operation_instances.push(
             OperationInstance {
+                agreement_profile: None,
                 operation_id: "effect:12".to_string(),
                 session: Some(5),
                 owner_id: Some("coro:0".to_string()),
@@ -2227,10 +2305,7 @@ mod runtime_effect_state_tests {
         assert!(err.to_string().contains("late result"));
     }
 
-    #[test]
-    fn runtime_regions_preserve_locality_across_handoff_structure() {
-        let mut machine = test_vm();
-        machine.clock.tick = 7;
+    fn seed_blocked_locality_handoff(machine: &mut ProtocolMachine) {
         machine.outstanding_effects.push(
             OutstandingEffect {
                 effect_id: 21,
@@ -2254,6 +2329,7 @@ mod runtime_effect_state_tests {
         );
         machine.operation_instances.push(
             OperationInstance {
+                agreement_profile: None,
                 operation_id: "effect:21".to_string(),
                 session: Some(8),
                 owner_id: Some("coro:0".to_string()),
@@ -2268,6 +2344,13 @@ mod runtime_effect_state_tests {
             },
             &machine.config.observability_retention,
         );
+    }
+
+    #[test]
+    fn runtime_regions_preserve_locality_across_handoff_structure() {
+        let mut machine = test_vm();
+        machine.clock.tick = 7;
+        seed_blocked_locality_handoff(&mut machine);
 
         let receipt = delegation_receipt(
             8,
@@ -2296,7 +2379,10 @@ mod runtime_effect_state_tests {
             .find(|region| region.session == Some(8))
             .expect("handoff should retain one region view");
         assert_eq!(region.region_id, "session:8");
-        assert_eq!(region.scope, crate::semantic_objects::OwnershipScope::Session);
+        assert_eq!(
+            region.scope,
+            crate::semantic_objects::OwnershipScope::Session
+        );
         assert_eq!(
             region.owner_id.as_deref(),
             Some("coro:1"),
@@ -2334,18 +2420,22 @@ mod runtime_effect_state_tests {
     fn runtime_progress_contract_escalates_and_invalidates_late_results() {
         let mut machine = test_vm();
         machine.clock.tick = 1;
-        let effect_id = machine.issue_runtime_effect(
-            "invoke_step",
-            Some(7),
-            "host/runtime",
-            serde_json::json!({ "session": 7 }),
-        );
+        let effect_id = machine
+            .issue_runtime_effect(
+                "invoke_step",
+                Some(7),
+                "host/runtime",
+                serde_json::json!({ "session": 7 }),
+            )
+            .expect("unit fixture has fresh occurrence capacity");
 
         machine.clock.tick = 2;
-        machine.evaluate_progress_contracts()
+        machine
+            .evaluate_progress_contracts()
             .expect("blocked escalation should succeed");
         assert!(matches!(
-            machine.progress_contracts
+            machine
+                .progress_contracts
                 .as_slice()
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
@@ -2355,10 +2445,12 @@ mod runtime_effect_state_tests {
         ));
 
         machine.clock.tick = 3;
-        machine.evaluate_progress_contracts()
+        machine
+            .evaluate_progress_contracts()
             .expect("no-progress escalation should succeed");
         assert!(matches!(
-            machine.progress_contracts
+            machine
+                .progress_contracts
                 .as_slice()
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
@@ -2368,10 +2460,12 @@ mod runtime_effect_state_tests {
         ));
 
         machine.clock.tick = 4;
-        machine.evaluate_progress_contracts()
+        machine
+            .evaluate_progress_contracts()
             .expect("degraded escalation should succeed");
         assert!(matches!(
-            machine.progress_contracts
+            machine
+                .progress_contracts
                 .as_slice()
                 .iter()
                 .find(|contract| contract.operation_id == format!("effect:{effect_id}"))
@@ -2381,7 +2475,8 @@ mod runtime_effect_state_tests {
         ));
 
         machine.clock.tick = 5;
-        machine.evaluate_progress_contracts()
+        machine
+            .evaluate_progress_contracts()
             .expect("timeout escalation should succeed");
         let contract = machine
             .progress_contracts
@@ -2416,14 +2511,17 @@ mod runtime_effect_state_tests {
     fn runtime_progress_contract_requires_bounded_waits() {
         let mut machine = test_vm();
         machine.clock.tick = 1;
-        let effect_id = machine.issue_runtime_effect(
-            "invoke_step",
-            Some(9),
-            "host/runtime",
-            serde_json::json!({ "session": 9 }),
-        );
+        let effect_id = machine
+            .issue_runtime_effect(
+                "invoke_step",
+                Some(9),
+                "host/runtime",
+                serde_json::json!({ "session": 9 }),
+            )
+            .expect("unit fixture has fresh occurrence capacity");
         let operation_id = format!("effect:{effect_id}");
-        machine.outstanding_effects
+        machine
+            .outstanding_effects
             .as_mut_slice()
             .iter_mut()
             .find(|effect| effect.effect_id == effect_id)
@@ -2461,7 +2559,8 @@ mod runtime_effect_state_tests {
                         .iter()
                         .all(|action| !matches!(action, LifecycleAction::DuplicateCompletion)),
                 "{}",
-                harness.context("duplicate-completion scenarios must record a late-result rejection"),
+                harness
+                    .context("duplicate-completion scenarios must record a late-result rejection"),
             );
         }
 

@@ -3,8 +3,8 @@
 //! Emits layout-sensitive syntax for the choreography language.
 
 use crate::ast::{
-    Annotations, AuthorityExpr, Branch, CaseBranch, ChoiceGuard, Choreography, Condition,
-    MessageType, Protocol, Role, RoleParam,
+    Annotations, AuthorityBindingMode, AuthorityExpr, Branch, CaseBranch, ChoiceGuard,
+    Choreography, Condition, MessageType, Protocol, Role, RoleParam,
 };
 use crate::compiler::parser::parse_choreography_str;
 
@@ -140,7 +140,9 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             format_choice_protocol(role, branches, indent, config, out)
         }
         Protocol::Let {
+            execution_role,
             name,
+            mode,
             expr,
             continuation,
             ..
@@ -148,7 +150,20 @@ fn format_protocol(protocol: &Protocol, indent: usize, config: &PrettyConfig, ou
             write_line(
                 out,
                 indent,
-                &format!("let {} = {}", name, format_authority_expr(expr)),
+                &format!(
+                    "{}let {}{} = {}",
+                    match mode {
+                        AuthorityBindingMode::Plain => "",
+                        AuthorityBindingMode::Authoritative => "authoritative ",
+                        AuthorityBindingMode::Observe => "observe ",
+                    },
+                    name,
+                    execution_role
+                        .as_ref()
+                        .map(|role| format!(" at {}", format_role_ref(role)))
+                        .unwrap_or_default(),
+                    format_authority_expr(expr)
+                ),
             );
             format_protocol(continuation, indent, config, out);
         }
@@ -665,5 +680,28 @@ protocol Stable =
         let first = format_choreography_str(input).expect("first format should succeed");
         let second = format_choreography_str(&first).expect("second format should succeed");
         assert_eq!(first, second);
+    }
+}
+
+#[cfg(test)]
+mod explicit_placement_tests {
+    use super::*;
+    #[test]
+    fn explicit_role_roundtrips_without_selecting_an_ambient_role() {
+        let original = parse_choreography_str(
+            "protocol Placed =\n  roles A, B\n  let value at B = Nothing\n  A -> B : Commit\n",
+        )
+        .unwrap();
+        let rendered = format_choreography(&original);
+        assert!(rendered.contains("let value at B = Nothing"));
+        let reparsed = parse_choreography_str(&rendered).unwrap();
+        let Protocol::Let {
+            execution_role: Some(role),
+            ..
+        } = reparsed.protocol
+        else {
+            panic!("placement erased");
+        };
+        assert_eq!(role.name().to_string(), "B");
     }
 }

@@ -26,6 +26,39 @@ pub(crate) fn inline_calls(
                         })?;
                 result.extend(inline_calls(called, protocol_defs, input)?);
             }
+            Statement::Let {
+                execution_role,
+                name,
+                mode,
+                expr,
+                body,
+            } => {
+                result.push(Statement::Let {
+                    execution_role: execution_role.clone(),
+                    name: name.clone(),
+                    mode: *mode,
+                    expr: expr.clone(),
+                    body: body
+                        .as_ref()
+                        .map(|body| inline_calls(body, protocol_defs, input))
+                        .transpose()?,
+                });
+            }
+            Statement::Case { expr, branches } => {
+                let branches = branches
+                    .iter()
+                    .map(|branch| {
+                        Ok(super::super::types::CaseBranchSpec {
+                            pattern: branch.pattern.clone(),
+                            statements: inline_calls(&branch.statements, protocol_defs, input)?,
+                        })
+                    })
+                    .collect::<Result<Vec<_>, ParseError>>()?;
+                result.push(Statement::Case {
+                    expr: expr.clone(),
+                    branches,
+                });
+            }
             Statement::Choice { role, branches, .. } => {
                 let mut new_branches = Vec::new();
                 for b in branches {

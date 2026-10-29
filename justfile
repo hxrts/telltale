@@ -166,6 +166,11 @@ check-pr-critical:
 # Canonical PR-critical verification lane minus the cheap doc/metadata fast-fail
 # checks, so local wrappers can run those first without duplication.
 check-pr-critical-core:
+    just check-pr-critical-early-lean
+    just check-pr-critical-remaining
+
+# Native CI exposes this original prefix as one positive Lean checkpoint.
+check-pr-critical-early-lean:
     #!/usr/bin/env bash
     set -euo pipefail
     tmp_root="${TMPDIR:-/tmp}"
@@ -174,6 +179,17 @@ check-pr-critical-core:
     fi
     just check-fast-structure
     bash scripts/ops/test-perf-baseline-contract.sh
+    just reclaim-build-space-if-needed 10000
+    just verify-lean-protocol-machine-targets
+
+# Continue the original assurance inventory after the early Lean checkpoint.
+check-pr-critical-remaining:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    tmp_root="${TMPDIR:-/tmp}"
+    if [[ ! -d "$tmp_root" ]]; then
+      export TMPDIR="/tmp"
+    fi
     just check-focused-assurance
     just check-package-artifacts
     just check-arch-lean
@@ -184,7 +200,6 @@ check-pr-critical-core:
     just check-capability-gates
     just reclaim-build-space-if-needed 10000
     just check-release-conformance
-    just verify-lean-protocol-machine-targets
     just verify-protocols
     just verify-track-a
 
@@ -218,6 +233,7 @@ check-fast-structure:
       export TMPDIR="/tmp"
     fi
     bash scripts/ops/test-doc-fast-fail-contract.sh
+    bash scripts/ops/test-verify-pipeline-contract.sh
     just check-ci-assurance-lanes
     just check-formal-claim-scope
     just check-workflow-actions
@@ -428,6 +444,9 @@ check-workspace-tests-split:
       telltale-web
       telltale-lints
     )
+    # The selected root DSL fixtures also require the default feature configuration.
+    # Keep this separate from the all-features run below; the configurations differ.
+    TMPDIR="$tmpdir" cargo test -p telltale --test dsl_runtime_semantics_tests -- --nocapture
     for pkg in "${packages[@]}"; do
       echo "==> cargo test -p ${pkg} --all-targets --all-features"
       if [[ "$pkg" == "telltale-bridge" ]]; then
@@ -1085,7 +1104,7 @@ verify-lean-full: lean-init
 
 # Targeted Lean protocol machine architecture modules for fast CI checks.
 verify-lean-protocol-machine-targets: lean-init
-    {{lean_build}} --label "telltale build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime" -- lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime
+    {{lean_build}} --label "telltale build protocol machine targets" -- lake --dir lean build Runtime.ProtocolMachine.API Runtime.ProtocolMachine.Runtime Runtime.Tests.NominalImageRunner Runtime.Tests.NominalCommandExecution Runtime.Tests.OperationLifecycleExecution Runtime.Tests.OperationReadinessExecution Runtime.Tests.OperationFailureExecution Runtime.Tests.InvokeOutcomeAcceptance
 
 # Cross-target runtime comparison lane.
 verify-cross-target-matrix:

@@ -4,7 +4,7 @@ impl ProtocolMachine {
     ///
     /// # Errors
     ///
-    /// Returns a `ProtocolMachineError` if a coroutine faults.
+    /// Returns a `ProtocolMachineError` before round mutation if the original simulated clock is exhausted, or if a coroutine faults.
     #[allow(clippy::too_many_lines)]
     pub(crate) fn kernel_step_round(
         &mut self,
@@ -16,9 +16,9 @@ impl ProtocolMachine {
         if n == 0 {
             return Err(ProtocolMachineError::InvalidConcurrency { n });
         }
+        self.clock.advance()?;
         self.last_sched_step = None;
         self.last_pre_dispatch_state = None;
-        self.clock.advance();
         if self.all_done() {
             self.last_pre_dispatch_state = self.refinement_slice().ok();
             return Ok(StepResult::AllDone);
@@ -30,6 +30,7 @@ impl ProtocolMachine {
         self.prune_expired_timeouts();
         self.try_unblock_senders();
         self.try_unblock_receivers();
+        self.try_unblock_operations();
         self.evaluate_progress_contracts()?;
         self.ensure_ready_eligibility();
         self.last_pre_dispatch_state = self.refinement_slice().ok();
@@ -125,6 +126,14 @@ impl ProtocolMachine {
                     },
                     &self.config.observability_retention,
                 );
+                crate::operation_lifecycle::fail_active_operation(
+                    &mut self.coroutines[idx],
+                    self.operation_instances.as_mut_slice(),
+                    self.progress_contracts.as_mut_slice(),
+                    self.outstanding_effects.as_mut_slice(),
+                    &fault,
+                    self.clock.tick,
+                );
                 self.coroutines[idx].status = CoroStatus::Faulted(fault.clone());
                 self.sched.mark_done(coro_id);
                 #[cfg(debug_assertions)]
@@ -155,7 +164,10 @@ impl ProtocolMachine {
     /// # Errors
     ///
     /// Returns a `ProtocolMachineError` if a coroutine faults.
-    pub fn step(&mut self, handler: &dyn EffectHandler) -> Result<StepResult, ProtocolMachineError> {
+    pub fn step(
+        &mut self,
+        handler: &dyn EffectHandler,
+    ) -> Result<StepResult, ProtocolMachineError> {
         self.step_round(handler, 1)
     }
 
@@ -178,7 +190,7 @@ impl ProtocolMachine {
     ///
     /// # Errors
     ///
-    /// Returns a `ProtocolMachineError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` before round mutation if the original simulated clock is exhausted, or if any coroutine faults.
     pub fn run_concurrent(
         &mut self,
         handler: &dyn EffectHandler,
@@ -299,15 +311,21 @@ impl ProtocolMachine {
     ) -> Result<ClosedSessionSummary, crate::session::SessionDisposalError> {
         for (index, coroutine) in self.coroutines.iter().enumerate() {
             if self.coro_index(coroutine.id) != Some(index) {
-                return Err(crate::session::SessionDisposalError::InvalidCoroutineIndex {
-                    coroutine: coroutine.id,
-                });
+                return Err(
+                    crate::session::SessionDisposalError::InvalidCoroutineIndex {
+                        coroutine: coroutine.id,
+                    },
+                );
             }
         }
         // Every fallible residency/epoch check completes before removing the
         // actual target or changing scheduling ownership.
         let summary = self.sessions.close_and_reap_required(sid)?;
-        for coroutine in self.coroutines.iter_mut().filter(|coro| coro.session_id == sid) {
+        for coroutine in self
+            .coroutines
+            .iter_mut()
+            .filter(|coro| coro.session_id == sid)
+        {
             coroutine.status = CoroStatus::Done;
             self.sched.unregister(coroutine.id);
             self.eligible_ready.remove(&coroutine.id);
@@ -316,7 +334,8 @@ impl ProtocolMachine {
         self.resource_states.remove(&sid);
         self.communication_consumption.prune_session(sid);
         self.invalidate_outstanding_effects_for_session(sid, "required session disposal");
-        self.coroutines.retain(|coroutine| coroutine.session_id != sid);
+        self.coroutines
+            .retain(|coroutine| coroutine.session_id != sid);
         self.rebuild_coroutine_indexes();
         self.eligibility_dirty = true;
         self.obs_trace.push(
@@ -351,11 +370,12 @@ impl ProtocolMachine {
             self.resource_states.remove(sid);
             self.communication_consumption.prune_session(*sid);
         }
-        self.coroutines.retain(|coro| {
-            !(eligible.contains(&coro.session_id) && coro.is_terminal())
-        });
+        self.coroutines
+            .retain(|coro| !(eligible.contains(&coro.session_id) && coro.is_terminal()));
         self.rebuild_coroutine_indexes();
-        self.sessions.reap_sessions(&eligible)
+        let summaries = self.sessions.reap_sessions(&eligible);
+        self.prune_terminal_effect_records();
+        summaries
     }
 
     /// Lean-aligned observable trace accessor.
@@ -429,5 +449,4 @@ impl ProtocolMachine {
     pub fn live_session_count(&self) -> usize {
         self.sessions.live_count()
     }
-
 }

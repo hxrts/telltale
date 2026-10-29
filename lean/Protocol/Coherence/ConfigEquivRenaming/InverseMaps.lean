@@ -49,6 +49,7 @@ theorem rename_val_type_left_inv (σ : SessionIso) :
   | bool => rfl
   | nat => rfl
   | string => rfl
+  | readiness => rfl
   | prod T1 T2 ih1 ih2 =>
       simp [renameValType, ih1, ih2]
   | chan sid role =>

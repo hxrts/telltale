@@ -31,6 +31,9 @@ inductive HasTypeVal (G : GEnv) : Value → ValType → Prop where
   | bool (b : Bool) : HasTypeVal G (.bool b) .bool
   | nat (n : Nat) : HasTypeVal G (.nat n) .nat
   | string (s : String) : HasTypeVal G (.string s) .string
+  /-- Payload typing alone does not authorize consuming this evidence. -/
+  | readiness (witness : SessionTypes.ReadinessWitness) :
+      HasTypeVal G (.readiness witness) .readiness
   | prod {v₁ v₂ T₁ T₂} :
       HasTypeVal G v₁ T₁ →
       HasTypeVal G v₂ T₂ →
@@ -96,6 +99,7 @@ theorem has_type_val_unique {G : GEnv} {v : Value} {T₁ T₂ : ValType}
   | bool => cases h₂; rfl
   | nat => cases h₂; rfl
   | string => cases h₂; rfl
+  | readiness => cases h₂; rfl
   | prod _ _ ih₁ ih₂ =>
     cases h₂ with
     | prod h₂a h₂b => congr 1 <;> [exact ih₁ h₂a; exact ih₂ h₂b]
@@ -111,6 +115,7 @@ theorem has_type_val_mono (G G' : GEnv) (v : Value) (T : ValType)
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod h1 h2 ih1 ih2 => exact HasTypeVal.prod (ih1 G' hMono) (ih2 G' hMono)
   | chan hLookup => exact HasTypeVal.chan (hMono _ _ hLookup)
 

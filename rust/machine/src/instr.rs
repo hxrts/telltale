@@ -19,6 +19,12 @@ pub type PC = usize;
 pub enum InvokeAction {
     /// Named action descriptor (Lean-aligned shape).
     Named(String),
+    /// Static command declaration; loader validation does not grant live authority.
+    DeclareCommand(crate::nominal_command::NominalCommandDeclaration),
+    /// Typed command; never dispatches through generic step.
+    NominalCommand(Box<crate::nominal_command::NominalCommandCall>),
+    /// Explicit source operation lifecycle, never dispatched through generic step.
+    OperationLifecycle(Box<crate::operation_lifecycle::OperationAction>),
     /// Register-carried action descriptor.
     Reg(Reg),
 }

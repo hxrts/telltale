@@ -198,6 +198,32 @@ instance instEffectRuntimeSum (ε₁ ε₂ : Type u) [EffectRuntime ε₁] [Effe
     match a, ctx with
     | Sum.inl a1, (c1, c2) => (EffectRuntime.exec a1 c1, c2)
     | Sum.inr a2, (c1, c2) => (c1, EffectRuntime.exec a2 c2)
+  commandDeclaration := fun action => match action with
+    | .inl action => EffectRuntime.commandDeclaration action
+    | .inr action => EffectRuntime.commandDeclaration action
+  commandCall := fun action => match action with
+    | .inl action => EffectRuntime.commandCall action
+    | .inr action => EffectRuntime.commandCall action
+  relocateCommand := fun action call => match action with
+    | .inl action => (EffectRuntime.relocateCommand action call).map Sum.inl
+    | .inr action => (EffectRuntime.relocateCommand action call).map Sum.inr
+  operationAction := fun action => match action with
+    | .inl action => EffectRuntime.operationAction action
+    | .inr action => EffectRuntime.operationAction action
+  relocateOperation := fun action operation => match action with
+    | .inl action => (EffectRuntime.relocateOperation action operation).map Sum.inl
+    | .inr action => (EffectRuntime.relocateOperation action operation).map Sum.inr
+  -- Both contexts contribute to the stable semantic contract. This is not a
+  -- physical-provider identity or an independently issued authority witness.
+  commandHandlerIdentity := fun ctx =>
+    reprStr (EffectRuntime.commandHandlerIdentity ctx.1, EffectRuntime.commandHandlerIdentity ctx.2)
+  invokeCommand := fun action request ctx => match action with
+    | .inl action =>
+        let (outcome, next) := EffectRuntime.invokeCommand action request ctx.1
+        (outcome, (next, ctx.2))
+    | .inr action =>
+        let (outcome, next) := EffectRuntime.invokeCommand action request ctx.2
+        (outcome, (ctx.1, next))
 
 instance instEffectSpecSum (ε₁ ε₂ : Type u)
     [EffectRuntime ε₁] [EffectRuntime ε₂] [EffectSpec ε₁] [EffectSpec ε₂] :
@@ -216,6 +242,20 @@ instance instEffectRuntimeProd (ε₁ ε₂ : Type u) [EffectRuntime ε₁] [Eff
   exec := fun a ctx =>
     match a, ctx with
     | (a1, a2), (c1, c2) => (EffectRuntime.exec a1 c1, EffectRuntime.exec a2 c2)
+  -- A product has no declared nominal ordering/result-combination contract.
+  -- Preserve classification so it cannot silently fall through to generic exec;
+  -- the unavailable default callback and relocation refuse nominal execution.
+  commandDeclaration := fun action =>
+    (EffectRuntime.commandDeclaration action.1).orElse fun _ =>
+      EffectRuntime.commandDeclaration action.2
+  commandCall := fun action =>
+    (EffectRuntime.commandCall action.1).orElse fun _ =>
+      EffectRuntime.commandCall action.2
+
+  operationAction := fun action =>
+    if (EffectRuntime.operationAction action.1).isSome || (EffectRuntime.operationAction action.2).isSome then
+      some .unsupportedComposition
+    else none
 
 instance instEffectSpecProd (ε₁ ε₂ : Type u)
     [EffectRuntime ε₁] [EffectRuntime ε₂] [EffectSpec ε₁] [EffectSpec ε₂] :

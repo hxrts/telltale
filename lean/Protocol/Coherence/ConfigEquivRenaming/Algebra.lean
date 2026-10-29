@@ -231,6 +231,7 @@ theorem rename_val_type_comp (ρ₂ ρ₁ : SessionRenaming) :
   | bool => rfl
   | nat => rfl
   | string => rfl
+  | readiness => rfl
   | prod T1 T2 ih1 ih2 =>
       simp [renameValType, ih1, ih2]
   | chan sid role =>
@@ -255,6 +256,7 @@ theorem rename_val_type_id : ∀ T, renameValType SessionRenaming.id T = T := by
   | bool => rfl
   | nat => rfl
   | string => rfl
+  | readiness => rfl
   | prod T1 T2 ih1 ih2 =>
       simp [renameValType, ih1, ih2]
   | chan sid role =>
@@ -412,6 +414,7 @@ theorem rename_value_comp (ρ₂ ρ₁ : SessionRenaming) :
   | bool b => rfl
   | nat n => rfl
   | string s => rfl
+  | readiness witness => rfl
   | prod v1 v2 ih1 ih2 =>
       simp [renameValue, ih1, ih2]
   | chan e =>
@@ -426,6 +429,7 @@ theorem rename_value_id : ∀ v, renameValue SessionRenaming.id v = v := by
   | bool b => rfl
   | nat n => rfl
   | string s => rfl
+  | readiness witness => rfl
   | prod v1 v2 ih1 ih2 =>
       simp [renameValue, ih1, ih2]
   | chan e =>

@@ -49,6 +49,8 @@ structure StepPack (ι γ π ε ν : Type u)
   coro : CoroutineState γ ε
   st : ProtocolMachineState ι γ π ε ν
   res : ExecResult γ ε
+  /-- Consume the original retained nominal result only after the output gate. -/
+  nominalCommit : Bool := false
 
 /-! ## Buffer helpers -/
 
@@ -326,6 +328,7 @@ def valTypeOf (v : Value) : ValType :=
   | .bool _ => .bool
   | .nat _ => .nat
   | .string _ => .string
+  | .readiness _ => .readiness
   | .prod v1 v2 => .prod (valTypeOf v1) (valTypeOf v2)
   | .chan ep => .chan ep.sid ep.role
 
@@ -401,8 +404,21 @@ def haltPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
         match coro.ownedEndpoints with
         | ep :: _ => { st with sessions := SessionStore.removeType st.sessions ep }
         | [] => st
-  let coro' := advancePc { coro with status := .done }
+  let coro' := { coro with status := .done }
   pack coro' st' (mkRes .halted none)
+
+/-- Halt marks the original coroutine done at its actual halt instruction,
+matching both Rust committers rather than advancing past the terminal opcode. -/
+theorem haltPack_preserves_pc {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) :
+    (haltPack st coro).coro.pc = coro.pc := by
+  rfl
+
+/-- Terminal status does not require a new instruction or continuation. -/
+theorem haltPack_marks_done {ι γ π ε ν : Type u} [ProtocolMachineDomain ι γ π ε ν]
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε) :
+    (haltPack st coro).coro.status = .done := by
+  rfl
 
 /-! ## Result helpers: cost accounting -/
 

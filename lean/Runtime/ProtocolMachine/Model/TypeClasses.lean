@@ -1,4 +1,6 @@
 import Std
+import Runtime.ProtocolMachine.Model.Effects
+import Runtime.ProtocolMachine.Model.OperationLifecycle
 import Protocol.Basic
 import Protocol.LocalType
 import Protocol.Values
@@ -172,6 +174,29 @@ class EffectRuntime (ε : Type u) where
   EffectCtx : Type
   /-- Execute an action in the effect context. -/
   exec : EffectAction → EffectCtx → EffectCtx
+  /-- Typed action classification, not a textual operation-name dispatch. Existing
+  models leave these None and retain exactly the original generic exec path. -/
+  commandDeclaration : EffectAction → Option Runtime.ProtocolMachine.Model.NominalCommandDeclaration := fun _ => none
+  commandCall : EffectAction → Option Runtime.ProtocolMachine.Model.NominalCommandCall := fun _ => none
+  /-- Preserve the concrete typed action while rebasing its command descriptor.
+  The image owner checks both classifiers against the requested descriptor;
+  unsupported action models refuse relocation rather than regenerate bytecode. -/
+  relocateCommand : EffectAction → Runtime.ProtocolMachine.Model.NominalCommandCall →
+      Option EffectAction := fun _ _ => none
+  /-- Executable source operation classification. Descriptor presence never
+  reconstructs the canonical coroutine's original admitted continuation. -/
+  operationAction : EffectAction → Option Runtime.ProtocolMachine.Model.OperationAction := fun _ => none
+  /-- Preserve exact installed child-PC/call applicability through role relocation. -/
+  relocateOperation : EffectAction → Runtime.ProtocolMachine.Model.OperationAction →
+      Option EffectAction := fun _ _ => none
+  /-- Semantic handler identity, never a physical provider/resource witness. -/
+  commandHandlerIdentity : EffectCtx → String := fun _ => "model.nominal"
+  /-- A classified nominal command cannot fall through to generic exec. The
+  default refuses, so adding a descriptor alone does not implement a command. -/
+  invokeCommand : EffectAction → Runtime.ProtocolMachine.Model.NominalCommandRequest → EffectCtx →
+      Runtime.ProtocolMachine.Model.EffectOutcome × EffectCtx := fun _ _ ctx =>
+    (⟨.failure "unavailable" "nominal command is not implemented", none⟩, ctx)
+
 
 -- Spec-only view of effects (typing obligations).
 class EffectSpec (ε : Type u) [EffectRuntime ε] where

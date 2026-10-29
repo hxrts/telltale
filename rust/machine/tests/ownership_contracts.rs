@@ -540,6 +540,7 @@ fn ownership_finalization_path_marks_observed_only_results_noncanonical() {
         &[],
         &[],
         &[OperationInstance {
+            agreement_profile: None,
             operation_id: "effect:1".to_string(),
             session: Some(1),
             owner_id: Some("runtime/owner".to_string()),
@@ -603,6 +604,7 @@ fn ownership_finalization_path_marks_authoritative_reads_explicitly() {
         }],
         &[],
         &[OperationInstance {
+            agreement_profile: None,
             operation_id: "gate:1".to_string(),
             session: Some(1),
             owner_id: Some("runtime/owner".to_string()),
@@ -629,7 +631,7 @@ fn ownership_finalization_path_marks_authoritative_reads_explicitly() {
     assert_eq!(path.stage, FinalizationStage::Authoritative);
     assert_eq!(
         path.authoritative_read_ids,
-        vec!["readiness:7:Issued".to_string()]
+        vec!["authority_read:content:1:S1:1S13:runtime/ownerS9:readinessS6:issuedS13:session.readyS1:7S1:0N".to_string()]
     );
 }
 
@@ -639,6 +641,7 @@ fn ownership_proof_bearing_success_is_enforced_for_publication() {
         &[],
         &[],
         &[OperationInstance {
+            agreement_profile: None,
             operation_id: "accept:1".to_string(),
             session: Some(1),
             owner_id: Some("runtime/owner".to_string()),
@@ -736,6 +739,7 @@ fn ownership_handoff_invalidates_finalization_path_for_affected_operations() {
             reason: None,
         }],
         &[OperationInstance {
+            agreement_profile: None,
             operation_id: "effect:1".to_string(),
             session: Some(1),
             owner_id: Some("runtime/owner".to_string()),
@@ -786,6 +790,7 @@ fn ownership_publication_path_is_canonical_and_unique() {
         &[],
         &[
             OperationInstance {
+                agreement_profile: None,
                 operation_id: "effect:1".to_string(),
                 session: Some(1),
                 owner_id: Some("runtime/owner".to_string()),
@@ -799,6 +804,7 @@ fn ownership_publication_path_is_canonical_and_unique() {
                 requires_proof: false,
             },
             OperationInstance {
+                agreement_profile: None,
                 operation_id: "effect:1".to_string(),
                 session: Some(1),
                 owner_id: Some("runtime/owner".to_string()),
@@ -905,4 +911,230 @@ cfg_if! {
             assert_eq!(coop_audit.receipt.to_coro, threaded_audit.receipt.to_coro);
         }
     }
+}
+
+#[test]
+fn ownership_semantic_read_identity_is_scoped_to_actual_sessions() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let first = machine
+        .load_choreography_owned(&image, "owner/first")
+        .unwrap();
+    let second = machine
+        .load_choreography_owned(&image, "owner/second")
+        .unwrap();
+    let a = first
+        .issue_readiness_witness(&mut machine, "predicate/first")
+        .unwrap();
+    let b = second
+        .issue_readiness_witness(&mut machine, "predicate/second")
+        .unwrap();
+    assert_eq!(a.witness_id, b.witness_id);
+    assert_ne!(a.session_id, b.session_id);
+    let ca = first.mark_owner_died(&mut machine).unwrap();
+    let cb = second.mark_owner_died(&mut machine).unwrap();
+    assert_eq!(ca.witness_id, cb.witness_id);
+    let mut objects = machine.semantic_objects();
+    for (session, owner) in [
+        (a.session_id, "owner/first"),
+        (b.session_id, "owner/second"),
+    ] {
+        add_semantic_read_binding_operation(&mut objects, session, owner);
+    }
+    for reversed in [false, true] {
+        if reversed {
+            objects.authoritative_reads.reverse();
+        }
+        for (session, owner, predicate) in [
+            (a.session_id, "owner/first", "predicate/first"),
+            (b.session_id, "owner/second", "predicate/second"),
+        ] {
+            let readiness_id = objects
+                .authoritative_reads
+                .iter()
+                .find(|read| {
+                    read.session == Some(session)
+                        && read.kind == AuthoritativeReadKind::Readiness
+                        && read.lifecycle == telltale_machine::AuthoritativeReadLifecycle::Issued
+                })
+                .unwrap()
+                .read_id
+                .clone();
+            let read = objects.require_authoritative_read(&readiness_id).unwrap();
+            assert_eq!(read.session, Some(session));
+            assert_eq!(read.owner_id.as_deref(), Some(owner));
+            assert_eq!(read.predicate_ref.as_deref(), Some(predicate));
+            let cancellation_id = objects
+                .authoritative_reads
+                .iter()
+                .find(|read| {
+                    read.session == Some(session)
+                        && read.kind == AuthoritativeReadKind::Cancellation
+                })
+                .unwrap()
+                .read_id
+                .clone();
+            assert_eq!(
+                objects
+                    .require_authoritative_read(&cancellation_id)
+                    .unwrap()
+                    .session,
+                Some(session)
+            );
+            let region = objects
+                .regions
+                .iter()
+                .find(|region| region.session == Some(session))
+                .unwrap();
+            assert!(region.authoritative_read_ids.contains(&readiness_id));
+            assert!(region.authoritative_read_ids.contains(&cancellation_id));
+            let path = objects
+                .finalization()
+                .path_for_operation_id(&format!("test:session:{session}"))
+                .unwrap();
+            assert!(path.authoritative_read_ids.contains(&readiness_id));
+            for id in path.authoritative_read_ids {
+                assert_eq!(
+                    objects.require_authoritative_read(&id).unwrap().session,
+                    Some(session)
+                );
+            }
+        }
+    }
+    assert_legacy_semantic_read_identity(&mut objects);
+}
+
+fn assert_legacy_semantic_read_identity(
+    objects: &mut telltale_machine::ProtocolMachineSemanticObjects,
+) {
+    let mut old = objects.authoritative_reads[0].clone();
+    old.read_id = "readiness:1:Issued".into();
+    objects.authoritative_reads = vec![old.clone(), old.clone()];
+    assert_eq!(
+        objects.require_authoritative_read(&old.read_id).unwrap(),
+        &old
+    );
+    let mut foreign = old.clone();
+    foreign.session = Some(usize::MAX);
+    objects.authoritative_reads.push(foreign);
+    assert!(objects
+        .require_authoritative_read(&old.read_id)
+        .unwrap_err()
+        .contains("ambiguous"));
+}
+
+#[test]
+fn ownership_semantic_read_reobservations_preserve_content_addressed_checks() {
+    use telltale_machine::output_condition::{OutputConditionCheck, OutputConditionMeta};
+    let check = OutputConditionCheck {
+        meta: OutputConditionMeta {
+            predicate_ref: "same/predicate".into(),
+            witness_ref: None,
+            output_digest: "same/digest".into(),
+        },
+        passed: true,
+    };
+    let objects = protocol_machine_semantic_objects(
+        &[],
+        &[],
+        &[],
+        &[],
+        &[check.clone(), check.clone()],
+        &[],
+        &[],
+    );
+    let id = &objects.authoritative_reads[0].read_id;
+    assert!(objects.require_authoritative_read(id).is_ok());
+    let mut rejected = check.clone();
+    rejected.passed = false;
+    let conflicting =
+        protocol_machine_semantic_objects(&[], &[], &[], &[], &[check, rejected], &[], &[]);
+    assert!(conflicting
+        .require_authoritative_read(id)
+        .unwrap_err()
+        .contains("ambiguous"));
+}
+
+#[test]
+fn ownership_semantic_read_distinct_rejections_retain_exact_content_identity() {
+    let image = simple_send_recv_image("A", "B", "m");
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let owner = machine
+        .load_choreography_owned(&image, "owner/original")
+        .unwrap();
+    let original = owner
+        .issue_readiness_witness(&mut machine, "predicate/original")
+        .unwrap();
+    let mut altered_predicate = original.clone();
+    altered_predicate.predicate_ref = "predicate/foreign".into();
+    let mut altered_generation = original.clone();
+    altered_generation.generation += 1;
+    assert!(owner
+        .consume_readiness_witness(&mut machine, &altered_predicate)
+        .is_err());
+    assert!(owner
+        .consume_readiness_witness(&mut machine, &altered_generation)
+        .is_err());
+    let mut objects = machine.semantic_objects();
+    let rejected: Vec<_> = objects
+        .authoritative_reads
+        .iter()
+        .filter(|read| {
+            read.kind == AuthoritativeReadKind::Readiness
+                && read.lifecycle == telltale_machine::AuthoritativeReadLifecycle::Rejected
+        })
+        .collect();
+    assert_eq!(rejected.len(), 2);
+    assert_ne!(rejected[0].read_id, rejected[1].read_id);
+    assert_ne!(rejected[0], rejected[1]);
+    for read in &objects.authoritative_reads {
+        assert_eq!(
+            objects.require_authoritative_read(&read.read_id).unwrap(),
+            read
+        );
+    }
+    objects.authoritative_reads.reverse();
+    for read in &objects.authoritative_reads {
+        assert_eq!(
+            objects.require_authoritative_read(&read.read_id).unwrap(),
+            read
+        );
+    }
+    // Rejected attempts do not consume or confer the actual original authority.
+    owner
+        .consume_readiness_witness(&mut machine, &original)
+        .unwrap();
+    let mut settled = machine.semantic_objects();
+    for reversed in [false, true] {
+        if reversed {
+            settled.authoritative_reads.reverse();
+        }
+        for read in &settled.authoritative_reads {
+            assert_eq!(
+                settled.require_authoritative_read(&read.read_id).unwrap(),
+                read
+            );
+        }
+    }
+}
+
+fn add_semantic_read_binding_operation(
+    objects: &mut telltale_machine::ProtocolMachineSemanticObjects,
+    session: usize,
+    owner: &str,
+) {
+    objects.operation_instances.push(OperationInstance {
+        agreement_profile: None,
+        operation_id: format!("test:session:{session}"),
+        session: Some(session),
+        owner_id: Some(owner.into()),
+        kind: "read_binding_component".into(),
+        phase: OperationPhase::Pending,
+        handler_identity: None,
+        effect_ids: Vec::new(),
+        dependent_operation_ids: Vec::new(),
+        terminal_publication: None,
+        budget_ticks: None,
+        requires_proof: false,
+    });
 }

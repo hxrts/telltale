@@ -334,11 +334,13 @@ fn test_lean_conservation_inv_preserved() {
 #[test]
 fn test_lean_close_empty() {
     let mut store = SessionStore::new();
-    let sid = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &BTreeMap::new(),
-    );
+    let sid = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &BTreeMap::new(),
+        )
+        .expect("fresh fixture session allocation");
 
     store.close(sid).unwrap();
     let session = store.get(sid).unwrap();
@@ -580,11 +582,13 @@ fn test_lean_open_close_session_state_transitions() {
         },
     );
     let mut store = SessionStore::new();
-    let sid = store.open(
-        vec!["A".to_string(), "B".to_string()],
-        &BufferConfig::default(),
-        &local_types,
-    );
+    let sid = store
+        .open(
+            vec!["A".to_string(), "B".to_string()],
+            &BufferConfig::default(),
+            &local_types,
+        )
+        .expect("fresh fixture session allocation");
 
     let opened = store.get(sid).expect("session exists after open");
     assert_eq!(opened.status, SessionStatus::Active);
@@ -927,11 +931,13 @@ fn test_lean_authority_evidence_rejection_behavior() {
     let mut local_types = BTreeMap::new();
     local_types.insert("A".to_string(), LocalTypeR::End);
     local_types.insert("B".to_string(), LocalTypeR::End);
-    let sid = store.open(
-        vec!["A".into(), "B".into()],
-        &BufferConfig::default(),
-        &local_types,
-    );
+    let sid = store
+        .open(
+            vec!["A".into(), "B".into()],
+            &BufferConfig::default(),
+            &local_types,
+        )
+        .expect("fresh fixture session allocation");
     let owner = store
         .claim_ownership(sid, "owner/a", OwnershipScope::Session)
         .expect("claim ownership");

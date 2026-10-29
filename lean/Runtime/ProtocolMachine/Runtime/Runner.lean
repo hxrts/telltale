@@ -1,5 +1,6 @@
 import Runtime.ProtocolMachine.Runtime.Scheduler
 import Runtime.ProtocolMachine.Semantics.ExecHelpers
+import Runtime.ProtocolMachine.Semantics.ExecOperationLifecycle
 
 
 /-! # Scheduled Runner
@@ -37,6 +38,13 @@ def tryUnblockReceivers {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer
           let sched' := unblockCoroutine stAcc.sched cid
           let st' := { stAcc with sched := sched' }
           wakeCoroutine st' cid
+    | .operationAwait operationId =>
+        match stAcc.coroutines[cid]? with
+        | none => stAcc
+        | some original =>
+            if sourceOperationAwaitShouldWake stAcc original operationId then
+              wakeCoroutine { stAcc with sched := unblockCoroutine stAcc.sched cid } cid
+            else stAcc
     | _ => stAcc
   let st' := st.sched.blockedSet.toList.foldl step { st with sched := syncLaneViews st.sched }
   st'

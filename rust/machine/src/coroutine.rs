@@ -64,6 +64,8 @@ pub enum Value {
     Prod(Box<Value>, Box<Value>),
     /// Endpoint reference for ownership and guard operations.
     Endpoint(Endpoint),
+    /// Exact typed witness data; the original issuer registry must authorize use.
+    Readiness(crate::session::ReadinessWitness),
 }
 
 /// Coroutine execution status.
@@ -113,6 +115,11 @@ pub enum BlockReason {
     },
     /// Waiting for spawn scheduling/activation.
     Spawn,
+    /// Waiting for the actual admitted children of one original source operation.
+    OperationAwait {
+        /// Exact original operation occurrence, never merely its source name.
+        operation_id: String,
+    },
     /// Waiting for a session close to complete.
     Close {
         /// The session being closed.
@@ -158,6 +165,11 @@ pub enum Fault {
     Invoke {
         /// Typed failure from the handler boundary.
         failure: crate::effect::EffectFailure,
+    },
+    /// Original typed ownership refusal at an executable operation boundary.
+    OperationOwnership {
+        /// The canonical transition's original refusal, not a formatted substitute.
+        error: crate::session::OwnershipError,
     },
     /// Guard layer failure.
     Acquire {
@@ -207,6 +219,11 @@ pub enum Fault {
     },
     /// Coroutine exhausted its deterministic execution budget.
     OutOfCredits,
+    /// Finite Rust session admission failed; the actual typed cause is retained.
+    SessionAllocation {
+        /// Original exhausted or non-fresh allocation refusal.
+        error: crate::session::SessionAllocationError,
+    },
 }
 
 impl std::fmt::Display for Fault {
@@ -235,11 +252,13 @@ impl std::fmt::Display for Fault {
                 edge.sid, edge.sender, edge.receiver
             ),
             Self::Invoke { failure } => write!(f, "invoke fault: {failure}"),
+            Self::OperationOwnership { error } => write!(f, "operation ownership fault: {error}"),
             Self::Acquire { layer, failure } => {
                 write!(f, "acquire fault ({layer}): {failure}")
             }
             Self::Transfer { message } => write!(f, "transfer fault: {message}"),
             Self::Speculation { message } => write!(f, "speculation fault: {message}"),
+            Self::SessionAllocation { error } => write!(f, "session allocation fault: {error}"),
             Self::Close { message } => write!(f, "close fault: {message}"),
             Self::FlowViolation { message } => write!(f, "flow violation: {message}"),
             Self::NoProgressToken { edge } => write!(
@@ -291,6 +310,16 @@ pub struct Coroutine<E = ()> {
     /// Remaining instruction budget for deterministic cost accounting.
     #[serde(default = "default_cost_budget")]
     pub cost_budget: usize,
+    /// Original opaque owner, issued only by the owned loader, never from serde.
+    #[serde(skip)]
+    pub(crate) nominal_owner: Option<crate::owned::OwnedSession>,
+    /// Original source operation across child effects; restored metadata cannot issue it.
+    #[serde(skip)]
+    pub(crate) operation_continuation:
+        Option<crate::operation_lifecycle::OriginalOperationContinuation>,
+    /// One original nominal continuation; checkpoints cannot reconstruct it.
+    #[serde(skip)]
+    pub(crate) nominal_continuation: Option<crate::nominal_command::PendingNominalContinuation>,
 }
 
 /// Lean-aligned coroutine state alias.
@@ -342,6 +371,9 @@ impl Coroutine {
             session_id,
             role,
             cost_budget,
+            nominal_owner: None,
+            operation_continuation: None,
+            nominal_continuation: None,
         }
     }
 

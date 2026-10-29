@@ -873,7 +873,9 @@ fn corrupt_value(val: Value) -> Value {
             Value::Str(format!("corrupt:{s}"))
         }
         Value::Prod(a, b) => Value::Prod(Box::new(corrupt_value(*a)), b),
-        Value::Endpoint(_) => val,
+        // Typed authority-bearing observations are not fabricated by a scalar
+        // corruption rule; actual witness admission still checks the registry.
+        Value::Endpoint(_) | Value::Readiness(_) => val,
     }
 }
 

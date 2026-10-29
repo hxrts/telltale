@@ -41,6 +41,7 @@ def valTypeRToValType : SessionTypes.ValType → ValType
   | .bool => .bool
   | .nat => .nat
   | .string => .string
+  | .readiness => .readiness
   | .prod a b => .prod (valTypeRToValType a) (valTypeRToValType b)
   | .chan sid role => .chan sid role
 

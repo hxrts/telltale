@@ -176,3 +176,21 @@ host-lifecycle scope.
 - [Authority Language Surface](703_authority_language_surface.md)
 - [Protocol Machine Architecture](401_protocol_machine_architecture.md)
 - [Verification Inventory](902_verification_inventory.md)
+
+## Typed Invocation Acceptance
+
+A host response is an observation until the machine accepts it against the
+original request. Register state may change only for a successful outcome with
+the exact response family required by that request. Failure and blocked outcomes
+cannot authorize a state update by attaching a success-shaped payload. A
+malformed successful outcome is a failed contract, not a successful publication
+or a successful child in effect composition. The raw exchange remains available
+as an observation.
+
+Nominal authority invocation additionally requires a declared operation,
+role-scoped execution under its actual session owner and generation, typed
+arguments and outcome, and one live continuation. Unknown declarations, stale
+owners, duplicate completion and invalidated continuations must fail before
+publication or continuation advancement. The generic runtime.step boundary does
+not yet implement this nominal contract. Naming an action is not dispatch or
+proof that the contract was checked.

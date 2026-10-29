@@ -1,3 +1,5 @@
+import Runtime.ProtocolMachine.Semantics.ExecNominalCommand
+import Runtime.ProtocolMachine.Semantics.ExecOperationLifecycle
 import Runtime.ProtocolMachine.Semantics.ExecHelpers
 
 
@@ -92,7 +94,7 @@ def stepRelease {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
 
 /-! ## Invoke -/
 
-def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def stepInvokeLegacy {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -112,3 +114,25 @@ def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
         | some ep => StepEvent.obs (.invoked ep action)
         | none => StepEvent.internal
       continuePack st' { coro with effectCtx := ctx' } (some ev)
+
+/-! Typed nominal actions cannot silently fall through to generic exec. -/
+def stepInvoke {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
+    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
+    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
+    (st : ProtocolMachineState ι γ π ε ν) (coro : CoroutineState γ ε)
+    (action : EffectRuntime.EffectAction ε) : StepPack ι γ π ε ν :=
+  match EffectRuntime.operationAction action with
+  | some operation =>
+      if (EffectRuntime.commandDeclaration action).isSome || (EffectRuntime.commandCall action).isSome then
+        faultPack st coro (.invokeFault "ambiguous source operation action") "ambiguous source operation action"
+      else stepOperationLifecycle st coro operation
+  | none =>
+    match EffectRuntime.commandDeclaration action, EffectRuntime.commandCall action with
+    | some _, some _ => faultPack st coro (.invokeFault "ambiguous nominal action") "ambiguous nominal action"
+    | some declaration, none =>
+        if declaration.interfaceName.isEmpty || declaration.operationName.isEmpty then
+          faultPack st coro (.invokeFault "invalid nominal declaration") "invalid nominal declaration"
+        else continuePack st coro none
+    | none, some call => stepNominalCommand st coro action call
+    | none, none => stepInvokeLegacy st coro action

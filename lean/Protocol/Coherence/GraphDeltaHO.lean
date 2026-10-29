@@ -69,7 +69,7 @@ lemma consume_one_ho_realizable (from_ receiver : Role) (T : ValType) (L : Local
           · exact ⟨hReceiver, hRole⟩
         · intro e he
           simp at he
-      | unit | bool | nat | string | prod _ _ =>
+      | unit | bool | nat | string | readiness | prod _ _ =>
         simp [consumeOneHO, hEq] at h
         cases h
         simp [GraphDelta.realizable, GraphDelta.empty]

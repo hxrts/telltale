@@ -1,5 +1,40 @@
 // Thread-pool construction and scheduling for threaded mode.
+#[cfg(all(test, not(target_arch = "wasm32")))]
+fn thread_pool_build_error(source: rayon::ThreadPoolBuildError) -> ProtocolMachineError {
+    ProtocolMachineError::ThreadPoolBuild {
+        message: source.to_string(),
+        source: Box::new(source),
+    }
+}
+
 impl ThreadedProtocolMachine {
+    /// Consume this machine and join every original private native worker.
+    ///
+    /// Returns the untouched original machine when called from its own native
+    /// worker. Retry from an external owning context; no teardown was requested.
+    /// This is a blocking host operation, not a cancellation-safe async wait. It acknowledges worker termination
+    /// only; callers must settle signed/session obligations before consuming it.
+    ///
+    /// # Errors
+    ///
+    /// Returns the original machine if this caller is one of its native workers.
+    ///
+    /// Native join unwind returns its original payload and untouched worker
+    /// custody as Unproven. The consumed handle receives no settlement ACK.
+    #[must_use = "retain the original machine on refusal and inspect actual disposal"]
+    pub fn shutdown_worker_pool(
+        self,
+    ) -> Result<NativeWorkerPoolDisposal, NativeWorkerPoolShutdownFailure> {
+        if self.pool.is_original_worker() {
+            return Err(NativeWorkerPoolShutdownFailure::OriginalWorker(Box::new(
+                self,
+            )));
+        }
+        self.pool
+            .shutdown()
+            .map_err(NativeWorkerPoolShutdownFailure::Unproven)
+    }
+
     /// Create with thread pool sized to available OS parallelism.
     #[must_use]
     pub fn auto(config: ProtocolMachineConfig) -> Self {
@@ -22,12 +57,12 @@ impl ThreadedProtocolMachine {
             .validate_invariants()
             .map_err(|reason| ProtocolMachineError::InvalidConfig { reason })?;
         let worker_count = workers.max(1);
-        let pool = ThreadPoolBuilder::new()
-            .num_threads(worker_count)
-            .build()
-            .map_err(|e| ProtocolMachineError::ThreadPoolBuild {
-                message: e.to_string(),
-            })?;
+        let pool = build_owned_native_pool(worker_count).map_err(|source| {
+            ProtocolMachineError::ThreadPoolBuild {
+                message: source.to_string(),
+                source: Box::new(source),
+            }
+        })?;
         let tick_duration = config.tick_duration;
         let communication_replay_mode = config.communication_replay_mode;
         let communication_nullifier_identity = config.communication_nullifier_identity;
@@ -198,7 +233,7 @@ impl ThreadedProtocolMachine {
             roles.clone(),
             &self.config.buffer_config,
             &image.local_types,
-        );
+        )?;
         self.bind_default_handlers_for_session(sid);
         self.intern_session_runtime_symbols(sid);
         self.resource_states
@@ -225,6 +260,10 @@ impl ThreadedProtocolMachine {
     /// # Errors
     ///
     /// Returns a `ProtocolMachineError` if the choreography cannot be loaded or claimed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if a loaded coroutine mutex is poisoned while attaching the issued owner.
     pub fn load_choreography_owned(
         &mut self,
         image: &CodeImage,
@@ -235,14 +274,23 @@ impl ThreadedProtocolMachine {
             .sessions
             .claim_ownership(sid, owner_id, OwnershipScope::Session, self.clock.tick)
             .map_err(ProtocolMachineError::OwnershipContract)?;
-        Ok(OwnedSession::new(sid, capability))
+        let owner = OwnedSession::new(sid, capability);
+        for coroutine in &self.coroutines {
+            let mut coroutine = coroutine
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            if coroutine.session_id == sid {
+                coroutine.nominal_owner = Some(owner.clone());
+            }
+        }
+        Ok(owner)
     }
 
     /// Execute one scheduler round: advance up to `n` ready coroutines.
     ///
     /// # Errors
     ///
-    /// Returns a `ProtocolMachineError` if any coroutine faults.
+    /// Returns a `ProtocolMachineError` before round mutation if the original simulated clock is exhausted, or if any coroutine faults.
     pub(crate) fn kernel_step_round(
         &mut self,
         handler: &dyn EffectHandler,
@@ -251,7 +299,7 @@ impl ThreadedProtocolMachine {
         if n == 0 {
             return Err(ProtocolMachineError::InvalidConcurrency { n });
         }
-        self.clock.advance();
+        self.clock.advance()?;
         let tick = self.clock.tick;
         if self.all_done() {
             return Ok(StepResult::AllDone);
@@ -263,6 +311,7 @@ impl ThreadedProtocolMachine {
         self.prune_expired_timeouts();
         self.try_unblock_senders();
         self.try_unblock_receivers();
+        self.try_unblock_operations();
         self.evaluate_progress_contracts()?;
 
         let mut progressed = false;
@@ -341,15 +390,84 @@ impl ThreadedProtocolMachine {
         }))
     }
 
+    fn admit_selected_effect_capacity(
+        &mut self,
+        picks: &mut Vec<Picked>,
+    ) -> Result<(), ProtocolMachineError> {
+        // Hold the complete selected wave before the first issuance or worker.
+        // This does not consume IDs or make a second speculative scheduler pick.
+        let mut capacity = 0u64;
+        let mut first_nominal = None;
+        let mut capacity_overflow = false;
+        for (index, pick) in picks.iter().enumerate() {
+            let coro = pick
+                .coro
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
+            if let Some(instr) = self
+                .programs
+                .get(coro.program_id)
+                .and_then(|p| p.get(coro.pc))
+            {
+                let issued = coro.nominal_continuation.is_some();
+                if index == 0
+                    && matches!(
+                        instr,
+                        Instr::Invoke {
+                            action: InvokeAction::NominalCommand(_),
+                        }
+                    )
+                {
+                    first_nominal = Some(issued);
+                }
+                let additional = if coro.cost_budget < self.config.instruction_cost {
+                    0
+                } else {
+                    crate::commit_common::instruction_effect_capacity(instr, issued)
+                };
+                match capacity.checked_add(additional) {
+                    Some(total) => capacity = total,
+                    None => capacity_overflow = true,
+                }
+            }
+        }
+        if capacity_overflow
+            || crate::commit_common::require_effect_capacity(self.next_effect_id, capacity).is_err()
+        {
+            // Only the actual first nominal occurrence may perform a zero-fresh
+            // callback/settlement fallback. All other original picks are restored.
+            if first_nominal != Some(true) {
+                self.restore_picks_to_ready(picks);
+                return Err(ProtocolMachineError::HandlerError(
+                    EffectFailure::contract_violation(
+                        "canonical effect occurrence identifiers exhausted",
+                    ),
+                ));
+            }
+            let remaining = picks.split_off(1);
+            self.restore_picks_to_ready(&remaining);
+        }
+        Ok(())
+    }
+
     fn execute_picks(
         &mut self,
-        picks: Vec<Picked>,
+        mut picks: Vec<Picked>,
         handler: &dyn EffectHandler,
         tick: u64,
     ) -> Result<bool, ProtocolMachineError> {
         let handler_identity = handler.handler_identity();
         self.enforce_handler_identity_contract(&handler_identity)?;
         self.contention_metrics.observe_wave_width(picks.len());
+        self.admit_selected_effect_capacity(&mut picks)?;
+        // Pre-dispatch issuance is ordered by the actual selected wave. No worker
+        // may invent an occurrence after a callback has already executed.
+        let admissions: Vec<_> = picks
+            .iter()
+            .map(|pick| self.prepare_nominal_pick(pick, &handler_identity, tick))
+            .collect();
+        let nominal_publication_admitted =
+            crate::commit_common::require_effect_capacity(self.next_effect_id, 3).is_ok();
         let step_ctx = ThreadedStepCtx {
             config: &self.config,
             guard_resources: &self.guard_resources,
@@ -362,6 +480,7 @@ impl ThreadedProtocolMachine {
             timed_out_sites: &self.timed_out_sites,
             handler,
             tick,
+            nominal_publication_admitted,
         };
         let exec_ctx = ThreadedExecCtx {
             store: &self.sessions,
@@ -372,7 +491,14 @@ impl ThreadedProtocolMachine {
             let Some(pick) = picks.into_iter().next() else {
                 return Ok(false);
             };
-            let result = exec_instr(&pick.coro, &pick.session, &exec_ctx);
+            let result = match admissions
+                .into_iter()
+                .next()
+                .expect("one selected admission")
+            {
+                Ok(()) => exec_instr(&pick.coro, &pick.session, &exec_ctx),
+                Err(fault) => Err(ThreadedExecFault::new(fault)),
+            };
             return self.commit_pick_result(&pick, result, tick, handler, &handler_identity);
         }
 
@@ -380,16 +506,32 @@ impl ThreadedProtocolMachine {
             self.pool.install(|| {
                 picks
                     .par_iter()
-                    .map(|pick| exec_instr(&pick.coro, &pick.session, &exec_ctx))
+                    .zip(admissions.par_iter())
+                    .map(|(pick, admission)| match admission {
+                        Ok(()) => exec_instr(&pick.coro, &pick.session, &exec_ctx),
+                        Err(fault) => Err(ThreadedExecFault::new(fault.clone())),
+                    })
                     .collect()
             });
 
         let mut progressed = false;
+        let mut first_error = None;
         for (pick, result) in picks.into_iter().zip(results) {
-            progressed |=
-                self.commit_pick_result(&pick, result, tick, handler, &handler_identity)?;
+            match self.commit_pick_result(&pick, result, tick, handler, &handler_identity) {
+                Ok(did_progress) => progressed |= did_progress,
+                Err(error) => {
+                    // Every selected worker already returned. Consume its result
+                    // through the original gates while retaining the first fault.
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+            }
         }
-        Ok(progressed)
+        match first_error {
+            Some(error) => Err(error),
+            None => Ok(progressed),
+        }
     }
 
     fn commit_pick_result(
@@ -431,23 +573,7 @@ impl ThreadedProtocolMachine {
                         }
                     },
                     Err(fault) => {
-                        self.trace.push(ObsEvent::Faulted {
-                            tick,
-                            coro_id: pick.coro_id,
-                            fault: fault.clone(),
-                        });
-                        let mut coro = pick
-                            .coro
-                            .lock()
-                            .expect("threaded ProtocolMachine lock poisoned");
-                        let was_terminal = coro.is_terminal();
-                        coro.status = CoroStatus::Faulted(fault.clone());
-                        self.note_status_transition(was_terminal, coro.is_terminal());
-                        self.scheduler.mark_done(pick.coro_id);
-                        return Err(ProtocolMachineError::Fault {
-                            coro_id: pick.coro_id,
-                            fault,
-                        });
+                        return Err(self.commit_pick_fault(pick, fault, tick));
                     }
                 }
                 Ok(true)
@@ -456,25 +582,52 @@ impl ThreadedProtocolMachine {
                 fault,
                 effect_observations,
             }) => {
-                self.record_effect_observations(effect_observations, handler_identity);
-                self.trace.push(ObsEvent::Faulted {
-                    tick,
-                    coro_id: pick.coro_id,
-                    fault: fault.clone(),
-                });
-                let mut coro = pick
-                    .coro
-                    .lock()
-                    .expect("threaded ProtocolMachine lock poisoned");
-                let was_terminal = coro.is_terminal();
-                coro.status = CoroStatus::Faulted(fault.clone());
-                self.note_status_transition(was_terminal, coro.is_terminal());
-                self.scheduler.mark_done(pick.coro_id);
-                Err(ProtocolMachineError::Fault {
-                    coro_id: pick.coro_id,
-                    fault,
-                })
+                self.record_effect_observations(effect_observations, handler_identity)
+                    .map_err(ProtocolMachineError::HandlerError)?;
+                if let Fault::Invoke { failure } = &fault {
+                    if failure
+                        == &EffectFailure::contract_violation(
+                            "canonical effect occurrence identifiers exhausted",
+                        )
+                    {
+                        self.settle_nominal_publication_failure(&pick.coro, failure)?;
+                    }
+                }
+                Err(self.commit_pick_fault(pick, fault, tick))
             }
+        }
+    }
+
+    fn commit_pick_fault(
+        &mut self,
+        pick: &Picked,
+        fault: Fault,
+        tick: u64,
+    ) -> ProtocolMachineError {
+        self.trace.push(ObsEvent::Faulted {
+            tick,
+            coro_id: pick.coro_id,
+            fault: fault.clone(),
+        });
+        let mut coro = pick
+            .coro
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
+        let was_terminal = coro.is_terminal();
+        crate::operation_lifecycle::fail_active_operation(
+            &mut coro,
+            &mut self.operation_instances,
+            &mut self.progress_contracts,
+            &mut self.outstanding_effects,
+            &fault,
+            tick,
+        );
+        coro.status = CoroStatus::Faulted(fault.clone());
+        self.note_status_transition(was_terminal, coro.is_terminal());
+        self.scheduler.mark_done(pick.coro_id);
+        ProtocolMachineError::Fault {
+            coro_id: pick.coro_id,
+            fault,
         }
     }
 

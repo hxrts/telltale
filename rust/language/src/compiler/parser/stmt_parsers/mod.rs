@@ -4,7 +4,7 @@
 
 use crate::ast::{DslAnnotationEntry, Role};
 use proc_macro2::TokenStream;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use super::error::{ErrorSpan, ParseError};
 use super::role::parse_role_ref;
@@ -178,6 +178,35 @@ fn parse_loop_predicate(
         span: ErrorSpan::from_pest_span(span, input),
     })?;
     Ok(predicate.to_token_stream())
+}
+
+// `statement` is silent in the grammar. Compact branches therefore contain
+// their concrete statement rule, not a Rule::statement wrapper. Route those
+// through the SAME checked dispatcher used for ordinary block statements.
+fn parse_branch_body(
+    pair: pest::iterators::Pair<Rule>,
+    declared_roles: &HashSet<String>,
+    input: &str,
+    protocol_defs: &HashMap<String, Vec<super::types::Statement>>,
+) -> Result<Vec<super::types::Statement>, ParseError> {
+    let pair = if pair.as_rule() == Rule::branch_body {
+        let span = pair.as_span();
+        pair.into_inner()
+            .next()
+            .ok_or_else(|| syntax_error(span, input, "branch body is empty"))?
+    } else {
+        pair
+    };
+    if pair.as_rule() == Rule::block {
+        super::statement::parse_block(pair, declared_roles, input, protocol_defs)
+    } else {
+        Ok(vec![super::statement::parse_statement(
+            pair,
+            declared_roles,
+            input,
+            protocol_defs,
+        )?])
+    }
 }
 
 #[cfg(test)]

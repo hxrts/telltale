@@ -34,6 +34,10 @@
 
 /// Channel abstractions for asynchronous communication.
 pub mod channel;
+mod nominal_command;
+mod operation_lifecycle;
+pub use nominal_command::{compile_command_operation, CommandCompileError};
+pub use operation_lifecycle::{compile_operation_image, compile_operation_lifecycle};
 
 // Re-export core types (always available)
 pub use futures;
@@ -88,6 +92,7 @@ pub mod dsl {
             OwnershipScope, PrestateBinding, ProgressContract, ProgressState, PublicationEvent,
             PublicationObserverClass, PublicationStatus, SemanticHandoff,
         };
+        pub use telltale_machine::runtime::loader::CodeImage;
         pub use telltale_machine::{
             ProtocolCriticalCapabilityClass, ProtocolCriticalCapabilityLifecycleState,
         };

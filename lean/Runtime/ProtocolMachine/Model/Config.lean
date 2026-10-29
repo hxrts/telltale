@@ -73,6 +73,8 @@ structure ProtocolMachineRuntimeConfig (ι γ π ε ν : Type u) [ProtocolMachin
   spatialOk : RoleSet → Bool
   transportOk : HandlerId → SignedBuffers ν → Bool
   complianceProof : Resource ν → ComplianceProof ν
+  /-- Actual register width selected for newly loaded coroutines. Legacy model default remains eight. -/
+  numRegisters : Nat := 8
   maxCoroutines : Nat := 1024
   maxSessions : Nat := 256
   monitorMode : MonitorMode := .sessionTypePrecheck

@@ -1,14 +1,30 @@
 // Topology event ingress, timeout management, and dispatch.
 impl ProtocolMachine {
-    fn next_timeout_witness(&mut self, site: &str, until_tick: u64) -> TimeoutWitness {
+    fn require_timeout_witness_capacity(&self, count: u64) -> Result<(), ProtocolMachineError> {
+        self.next_authority_witness_id
+            .checked_add(count)
+            .ok_or_else(|| {
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                    "timeout witness counter exhausted",
+                ))
+            })?;
+        Ok(())
+    }
+
+    fn next_timeout_witness(
+        &mut self,
+        site: &str,
+        until_tick: u64,
+    ) -> Result<TimeoutWitness, ProtocolMachineError> {
+        self.require_timeout_witness_capacity(1)?;
         let witness = TimeoutWitness {
             witness_id: self.next_authority_witness_id,
             site: site.to_string(),
             issued_at_tick: self.clock.tick,
             until_tick,
         };
-        self.next_authority_witness_id = self.next_authority_witness_id.saturating_add(1);
-        witness
+        self.next_authority_witness_id += 1;
+        Ok(witness)
     }
 
     fn audit_issued_timeout_witness(&mut self, witness: &TimeoutWitness) {
@@ -143,6 +159,14 @@ impl ProtocolMachine {
                 let fault = Fault::Invoke {
                     failure: EffectFailure::topology_disruption(reason.clone()),
                 };
+                crate::operation_lifecycle::fail_active_operation(
+                    coro,
+                    self.operation_instances.as_mut_slice(),
+                    self.progress_contracts.as_mut_slice(),
+                    self.outstanding_effects.as_mut_slice(),
+                    &fault,
+                    self.clock.tick,
+                );
                 coro.status = CoroStatus::Faulted(fault.clone());
                 faulted.push((coro.id, fault));
             }
@@ -261,7 +285,10 @@ impl ProtocolMachine {
         Ok(())
     }
 
-    fn apply_topology_event(&mut self, event: &TopologyPerturbation) {
+    fn apply_topology_event(
+        &mut self,
+        event: &TopologyPerturbation,
+    ) -> Result<(), ProtocolMachineError> {
         match event {
             TopologyPerturbation::Crash { site } => {
                 self.crashed_sites.insert(site.clone());
@@ -291,7 +318,7 @@ impl ProtocolMachine {
                     .clock
                     .tick
                     .saturating_add(self.duration_to_ticks(*duration));
-                let witness = self.next_timeout_witness(site, until_tick);
+                let witness = self.next_timeout_witness(site, until_tick)?;
                 if let Some(previous) = self.timed_out_sites.remove(site) {
                     self.authority_audit_log.push(
                         AuthorityAuditRecord {
@@ -322,6 +349,7 @@ impl ProtocolMachine {
             }
         }
         self.normalize_topology_state();
+        Ok(())
     }
 
     fn ingest_topology_events(
@@ -334,6 +362,8 @@ impl ProtocolMachine {
         let request = EffectRequest::topology_events(tick);
         self.ensure_effect_request_allowed(&request)
             .map_err(ProtocolMachineError::HandlerError)?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, 1)
+            .map_err(ProtocolMachineError::HandlerError)?;
         let predicted_effect_id = self.next_effect_id;
         let topology_outcome = handler.handle_effect(request.clone());
         self.record_effect_exchange(
@@ -341,7 +371,8 @@ impl ProtocolMachine {
             &topology_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(ProtocolMachineError::HandlerError)?;
         let mut events = topology_outcome
             .into_topology()
             .unwrap_or_else(EffectResult::failure)
@@ -351,8 +382,29 @@ impl ProtocolMachine {
             .map_err(ProtocolMachineError::HandlerError)?;
         self.assert_topology_events_sorted(tick, &events)?;
         events.sort_by_key(TopologyPerturbation::ordering_key);
+        let event_count = u64::try_from(events.len()).map_err(|_| {
+            ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                "topology effect batch count exceeds u64",
+            ))
+        })?;
+        crate::commit_common::require_effect_capacity(self.next_effect_id, event_count)
+            .map_err(ProtocolMachineError::HandlerError)?;
+        // Refuse the whole admitted event batch before applying even a
+        // preceding non-timeout mutation when its witness IDs cannot fit.
+        let timeout_count = u64::try_from(
+            events
+                .iter()
+                .filter(|event| matches!(event, TopologyPerturbation::Timeout { .. }))
+                .count(),
+        )
+        .map_err(|_| {
+            ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                "timeout witness batch count exceeds u64",
+            ))
+        })?;
+        self.require_timeout_witness_capacity(timeout_count)?;
         for event in events {
-            self.apply_topology_event(&event);
+            self.apply_topology_event(&event)?;
             let effect_kind = "topology_event".to_string();
             let (effect_interface, effect_operation) =
                 infer_effect_interface_and_operation(&effect_kind);
@@ -378,7 +430,11 @@ impl ProtocolMachine {
                 self.effect_trace
                     .push(entry, &self.config.observability_retention);
             }
-            self.next_effect_id = self.next_effect_id.saturating_add(1);
+            self.next_effect_id = self.next_effect_id.checked_add(1).ok_or_else(|| {
+                ProtocolMachineError::HandlerError(EffectFailure::contract_violation(
+                    "canonical effect occurrence identifiers exhausted",
+                ))
+            })?;
         }
         Ok(())
     }
@@ -626,6 +682,11 @@ impl ProtocolMachine {
 
         // 1.5 Monitor precheck and deterministic cost charge.
         self.monitor_precheck(&monitor_ep, &role, &instr)?;
+        if self.coroutines[idx].cost_budget < self.config.instruction_cost {
+            return Err(Fault::OutOfCredits);
+        }
+        self.require_instruction_effect_capacity(idx, &instr)?;
+
         self.charge_instruction_cost(idx)?;
 
         // 2. Dispatch to per-instruction step function.
@@ -650,7 +711,8 @@ impl ProtocolMachine {
                         &outcome,
                         &handler_identity,
                         predicted_effect_id,
-                    );
+                    )
+                    .map_err(|failure| Fault::Invoke { failure })?;
                     outcome.into_output_condition_hint().ok().flatten()
                 }
                 Err(_) => None,
@@ -659,6 +721,24 @@ impl ProtocolMachine {
 
         // 3. Commit atomically.
         self.commit_pack(idx, pack, output_hint, handler, &handler_identity)
+    }
+
+    fn require_instruction_effect_capacity(&self, idx: usize, instr: &Instr) -> Result<(), Fault> {
+        // A retained nominal callback can settle Failure/Blocked without a fresh
+        // occurrence. Its publication hold is checked after retaining that result.
+        let existing_nominal = matches!(
+            instr,
+            Instr::Invoke {
+                action: InvokeAction::NominalCommand(_)
+            }
+        ) && self.coroutines[idx].nominal_continuation.is_some();
+        let capacity = if existing_nominal {
+            0
+        } else {
+            crate::commit_common::instruction_effect_capacity(instr, false)
+        };
+        crate::commit_common::require_effect_capacity(self.next_effect_id, capacity)
+            .map_err(|failure| Fault::Invoke { failure })
     }
 
     // ---- Per-instruction step functions (each owns its type logic) ----
@@ -743,53 +823,19 @@ impl ProtocolMachine {
             &send_outcome,
             &handler_identity,
             predicted_effect_id,
-        );
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         let decision = match send_outcome
             .into_send_decision()
             .unwrap_or_else(EffectResult::failure)
         {
             EffectResult::Success(decision) => decision,
             EffectResult::Blocked => {
-                let effect_id = self.issue_runtime_effect(
-                    "send_decision",
-                    Some(sid),
-                    &handler_identity,
-                    effect_inputs.clone(),
-                );
-                let failure = EffectFailure::contract_violation("send_decision returned blocked");
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
+                return Err(Fault::Invoke {
+                    failure: EffectFailure::contract_violation("send_decision returned blocked"),
+                })
             }
-            EffectResult::Failure(failure) => {
-                let effect_id = self.issue_runtime_effect(
-                    "send_decision",
-                    Some(sid),
-                    &handler_identity,
-                    effect_inputs.clone(),
-                );
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
-            }
+            EffectResult::Failure(failure) => return Err(Fault::Invoke { failure }),
         };
 
         let edge = Edge::new(sid, role.to_string(), partner.clone());
@@ -856,12 +902,14 @@ impl ProtocolMachine {
         match enqueue {
             EnqueueResult::Ok => {}
             EnqueueResult::WouldBlock => {
-                let effect_id = self.issue_runtime_effect(
-                    "send_decision",
-                    Some(sid),
-                    &handler_identity,
-                    effect_inputs,
-                );
+                let effect_id = self
+                    .issue_runtime_effect(
+                        "send_decision",
+                        Some(sid),
+                        &handler_identity,
+                        effect_inputs,
+                    )
+                    .map_err(|failure| Fault::Invoke { failure })?;
                 self.complete_runtime_effect(
                     effect_id,
                     OutstandingEffectStatus::Blocked,

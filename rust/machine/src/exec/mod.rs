@@ -78,6 +78,6 @@ pub(crate) fn step_instr(
         Instr::Jump { target } => Ok(control::step_jump(target)),
         Instr::Spawn { target, args } => control::step_spawn(machine, coro_idx, target, &args),
         Instr::Yield => Ok(control::step_yield()),
-        Instr::Halt => control::step_halt(machine, ep),
+        Instr::Halt => control::step_halt(machine, coro_idx, ep),
     }
 }

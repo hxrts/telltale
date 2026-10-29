@@ -208,12 +208,12 @@ impl ProtocolMachine {
     fn open_choreography_session(
         &mut self,
         plan: &crate::session::SessionOpenPlan,
-    ) -> (SessionId, Vec<String>) {
+    ) -> Result<(SessionId, Vec<String>), ProtocolMachineError> {
         let sid = self.sessions.next_session_id();
         let roles = plan.roles().to_vec();
         self.sessions
-            .open_with_sid_from_plan(sid, plan, &self.config.buffer_config);
-        (sid, roles)
+            .open_with_sid_from_plan(sid, plan, &self.config.buffer_config)?;
+        Ok((sid, roles))
     }
 
     fn finalize_open_choreography_session(
@@ -322,13 +322,16 @@ impl ProtocolMachine {
     ///
     /// Returns an error if session or coroutine limits are exceeded.
     #[doc(hidden)]
-    pub fn load_choreography(&mut self, image: &CodeImage) -> Result<SessionId, ProtocolMachineError> {
+    pub fn load_choreography(
+        &mut self,
+        image: &CodeImage,
+    ) -> Result<SessionId, ProtocolMachineError> {
         self.ensure_session_capacity()?;
         image
             .validate_runtime_shape()
             .map_err(|reason| ProtocolMachineError::InvalidCodeImage { reason })?;
         let plan = self.session_open_plan(image).clone();
-        let (sid, roles) = self.open_choreography_session(&plan);
+        let (sid, roles) = self.open_choreography_session(&plan)?;
         self.finalize_open_choreography_session(sid, &roles, &plan)?;
         self.programs.reserve(image.programs.len());
         self.coroutines.reserve(roles.len());

@@ -131,15 +131,13 @@ impl ProtocolExtension for TimeoutProtocol {
     }
 
     fn mentions_role(&self, role: &Role) -> bool {
-        self.role_names
-            .iter()
-            .any(|name| name == &role.name().to_string())
+        self.role_names.iter().any(|name| role.name() == name)
     }
 
     fn validate(&self, all_roles: &[Role]) -> Result<(), ExtensionValidationError> {
         // Validate that all mentioned roles are declared
         for role_name in &self.role_names {
-            if !all_roles.iter().any(|r| &r.name().to_string() == role_name) {
+            if !all_roles.iter().any(|r| r.name() == role_name) {
                 return Err(ExtensionValidationError::UndeclaredRole {
                     role: role_name.clone(),
                 });
@@ -167,11 +165,7 @@ impl ProtocolExtension for TimeoutProtocol {
         role: &Role,
         _context: &ProjectionContext,
     ) -> Result<LocalType, ProjectionError> {
-        if self
-            .role_names
-            .iter()
-            .any(|name| name == &role.name().to_string())
-        {
+        if self.role_names.iter().any(|name| role.name() == name) {
             // This role participates in the timeout; body defaults to End
             // (full implementation would project the protocol body recursively)
             Ok(LocalType::Timeout {

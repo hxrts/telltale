@@ -36,7 +36,7 @@ use crate::determinism::{DeterminismMode, EffectDeterminismTier};
 use crate::effect::SendDecisionInput;
 use crate::effect::{
     infer_effect_interface_and_operation, CorruptionType, EffectExchangeRecord, EffectFailure,
-    EffectHandler, EffectOutcome, EffectRequest, EffectResponse, EffectResult, EffectTraceEntry,
+    EffectHandler, EffectOutcome, EffectRequest, EffectResult, EffectTraceEntry,
     ReplayEffectHandler, SendDecision, TopologyPerturbation,
 };
 use crate::exec;
@@ -90,6 +90,8 @@ include!("engine/runtime_exec/mod.rs");
 include!("engine/validation.rs");
 include!("engine/topology_and_dispatch.rs");
 include!("engine/instruction_effects.rs");
+include!("engine/nominal_command.rs");
+include!("engine/operation_lifecycle.rs");
 include!("engine/instruction_tag.rs");
 include!("engine/instruction_choice.rs");
 include!("engine/open_commit.rs");
@@ -102,6 +104,146 @@ mod tests {
     include!("../tests/unit/protocol_machine/tests_runtime_progress.rs");
     include!("../tests/unit/protocol_machine/tests_monitor_persist.rs");
     include!("../tests/unit/protocol_machine/tests_compiler_topology.rs");
+    include!("../tests/unit/protocol_machine/tests_timeout_witness_exhaustion.rs");
     include!("../tests/unit/protocol_machine/tests_flow_policy_faults.rs");
     include!("../tests/unit/protocol_machine/tests_semantic_state.rs");
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod invoke_outcome_tests {
+    use super::*;
+    type FixtureMachine = ProtocolMachine;
+    fn make_machine() -> ProtocolMachine {
+        make_machine_with_config(ProtocolMachineConfig::default())
+    }
+    fn make_machine_with_config(config: ProtocolMachineConfig) -> ProtocolMachine {
+        ProtocolMachine::new(config)
+    }
+    fn blocked_acquire_is_fault() -> bool {
+        false
+    }
+    fn snapshot(
+        machine: &ProtocolMachine,
+        sid: usize,
+    ) -> (*const Value, Vec<Value>, usize, CoroStatus) {
+        snapshot_role(machine, sid, "A")
+    }
+    fn snapshot_role(
+        machine: &ProtocolMachine,
+        sid: usize,
+        role: &str,
+    ) -> (*const Value, Vec<Value>, usize, CoroStatus) {
+        let coro = machine
+            .coroutines
+            .iter()
+            .find(|c| c.session_id == sid && c.role == role)
+            .unwrap();
+        (
+            coro.regs.as_ptr(),
+            coro.regs.clone(),
+            coro.pc,
+            coro.status.clone(),
+        )
+    }
+    include!("../tests/unit/invoke_outcome_atomicity.rs");
+    include!("../tests/unit/send_capacity_fixture.rs");
+    fn send_counter_dispatch_allocations() -> u64 {
+        2
+    }
+    fn send_counter_queue_state(machine: &FixtureMachine, sid: usize) -> serde_json::Value {
+        let session = machine.sessions.get(sid).unwrap();
+        let edge = Edge::new(sid, "A", "B");
+        let endpoint = Endpoint {
+            sid,
+            role: "A".into(),
+        };
+        let queue = &session.buffers[&edge];
+        serde_json::to_value((
+            queue.len(),
+            queue.capacity(),
+            queue,
+            &session.local_types[&endpoint].current,
+        ))
+        .unwrap()
+    }
+    fn settle_send_counter_machine(machine: FixtureMachine) {
+        drop(machine);
+    }
+    include!("../tests/unit/send_capacity_counter.rs");
+
+    include!("../tests/unit/send_capacity_retention.rs");
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod live_effect_retention_tests {
+    use super::*;
+    fn make_machine(retention: ObservabilityRetentionConfig) -> ProtocolMachine {
+        ProtocolMachine::new(ProtocolMachineConfig {
+            observability_retention: retention,
+            ..ProtocolMachineConfig::default()
+        })
+    }
+    include!("../tests/unit/live_effect_retention.rs");
+}
+
+#[cfg(test)]
+mod clock_admission_tests {
+    use super::*;
+    fn make_clock_machine() -> ProtocolMachine {
+        ProtocolMachine::new(ProtocolMachineConfig::default())
+    }
+    fn settle_clock_machine(machine: ProtocolMachine) {
+        drop(machine);
+    }
+    fn original_round_observations(machine: &ProtocolMachine) -> String {
+        format!(
+            "{:?}|{:?}",
+            machine.last_sched_step, machine.last_pre_dispatch_state
+        )
+    }
+    fn runtime_clock_snapshot(machine: &ProtocolMachine) -> serde_json::Value {
+        serde_json::to_value((
+            &machine.coroutines,
+            &machine.sched,
+            machine.semantic_objects(),
+            machine.refinement_slice().unwrap(),
+            &machine.obs_trace,
+            &machine.effect_trace,
+            &machine.effect_exchanges,
+            machine.next_effect_id,
+        ))
+        .unwrap()
+    }
+    include!("../tests/unit/clock_admission.rs");
+    include!("../tests/unit/effect_capacity.rs");
+    type NominalCapacityMachine = ProtocolMachine;
+    fn make_nominal_capacity_machine(
+        retention: ObservabilityRetentionConfig,
+    ) -> NominalCapacityMachine {
+        let config = ProtocolMachineConfig {
+            observability_retention: retention,
+            output_condition_policy: crate::output_condition::OutputConditionPolicy::AllowAll,
+            ..ProtocolMachineConfig::default()
+        };
+        ProtocolMachine::new(config)
+    }
+    fn nominal_capacity_expected_original_exchanges(
+        retention: ObservabilityRetentionConfig,
+    ) -> usize {
+        match retention.mode {
+            ObservabilityRetentionMode::Full => 2,
+            ObservabilityRetentionMode::Disabled => 0,
+            ObservabilityRetentionMode::Capped => 2.min(retention.capacity),
+        }
+    }
+    fn nominal_capacity_host_failure_outputs(failure: &EffectFailure) -> serde_json::Value {
+        serde_json::json!({"status":"failure", "failure":failure})
+    }
+    include!("../tests/unit/nominal_effect_capacity.rs");
+}
+
+#[cfg(test)]
+mod session_allocation_tests {
+    use super::*;
+    include!("../tests/unit/session_allocation.rs");
 }

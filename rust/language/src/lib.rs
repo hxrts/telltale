@@ -36,8 +36,8 @@ pub use compiler::codegen::{
 pub use compiler::parser::{
     choreography_macro, collect_dsl_lints, explain_lowering, parse_choreography,
     parse_choreography_file, parse_choreography_str, parse_choreography_str_with_extensions,
-    parse_dsl, render_lsp_lint_diagnostics, ErrorSpan, LintDiagnostic, LintLevel, ParseError,
-    DEFAULT_SOURCE_EXTENSION,
+    parse_declared_operation, parse_dsl, render_lsp_lint_diagnostics, ErrorSpan, LintDiagnostic,
+    LintLevel, ParseError, DEFAULT_SOURCE_EXTENSION,
 };
 pub use compiler::projection::{project, ProjectionError};
 pub use effect_spec::{

@@ -168,6 +168,8 @@ def failureClassOfLeanFault {γ : Type u} : _root_.Fault γ → FailureClass
   | .invalidSignature _ => .signatureInvalid
   | .acquireFault _ _ => .guardFault
   | .invokeFault _ => .invokeFault
+  | .effectFault _ _ => .invokeFault
+  | .outputCondition _ => .outputConditionFault
   | .transferFault _ => .transferFault
   | .closeFault _ => .closeFault
   | .specFault _ => .specFault

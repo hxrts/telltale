@@ -51,10 +51,11 @@ pub fn classify_fault(fault: &Fault) -> FaultClass {
             FaultClass::Verification
         }
         Fault::Invoke { .. } => FaultClass::Invoke,
+        Fault::OperationOwnership { .. } => FaultClass::Transfer,
         Fault::Acquire { .. } => FaultClass::Acquire,
         Fault::Transfer { .. } => FaultClass::Transfer,
         Fault::Speculation { .. } => FaultClass::Speculation,
-        Fault::Close { .. } => FaultClass::Close,
+        Fault::Close { .. } | Fault::SessionAllocation { .. } => FaultClass::Close,
         Fault::FlowViolation { .. } => FaultClass::Flow,
         Fault::NoProgressToken { .. } => FaultClass::Progress,
         Fault::OutputCondition { .. } => FaultClass::OutputCondition,

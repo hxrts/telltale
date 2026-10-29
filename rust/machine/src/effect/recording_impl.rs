@@ -6,8 +6,18 @@ impl EffectHandler for RecordingEffectHandler<'_> {
 
     fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
         let outcome = self.inner.handle_effect(request.clone());
-        self.tape
-            .record_exchange(request, outcome.clone(), &self.inner.handler_identity(), None);
+        #[cfg(test)]
+        let recorded = request.clone();
+        self.tape.record_exchange(
+            request,
+            outcome.clone(),
+            &self.inner.handler_identity(),
+            None,
+        );
+        #[cfg(test)]
+        if let Some(observe) = self.after_record {
+            observe(&recorded);
+        }
         outcome
     }
 
@@ -44,30 +54,21 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         state: &mut Vec<Value>,
         payload: &Value,
     ) -> EffectResult<()> {
-        let outcome = self
-            .handle_effect(EffectRequest::receive(
-                0,
-                None,
-                None,
-                role,
-                partner,
-                label,
-                state,
-                payload.clone(),
-            ))
-            .into_unit("handle_recv")
-            .unwrap_or_else(EffectResult::failure);
-        if let EffectResult::Success(()) = &outcome {
-            if let Some(EffectResponse::Receive { state: new_state }) = self
-                .tape
-                .exchanges()
-                .last()
-                .and_then(|exchange| exchange.outcome.response.clone())
-            {
-                *state = new_state;
-            }
-        }
-        outcome
+        self.handle_effect(EffectRequest::receive(
+            0,
+            None,
+            None,
+            role,
+            partner,
+            label,
+            state,
+            payload.clone(),
+        ))
+        .into_receive_state()
+        .unwrap_or_else(EffectResult::failure)
+        .map_success(|new_state| {
+            *state = new_state;
+        })
     }
 
     fn handle_choose(
@@ -78,34 +79,19 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         state: &[Value],
     ) -> EffectResult<String> {
         self.handle_effect(EffectRequest::choose(
-            0,
-            None,
-            None,
-            role,
-            partner,
-            labels,
-            state,
+            0, None, None, role, partner, labels, state,
         ))
         .into_label()
         .unwrap_or_else(EffectResult::failure)
     }
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
-        let outcome = self
-            .handle_effect(EffectRequest::invoke_step(0, None, None, role, state))
-            .into_unit("invoke_step")
-            .unwrap_or_else(EffectResult::failure);
-        if let EffectResult::Success(()) = &outcome {
-            if let Some(EffectResponse::InvokeStep { state: new_state }) = self
-                .tape
-                .exchanges()
-                .last()
-                .and_then(|exchange| exchange.outcome.response.clone())
-            {
+        self.handle_effect(EffectRequest::invoke_step(0, None, None, role, state))
+            .into_invoke_state()
+            .unwrap_or_else(EffectResult::failure)
+            .map_success(|new_state| {
                 *state = new_state;
-            }
-        }
-        outcome
+            })
     }
 
     fn handle_acquire(
@@ -128,9 +114,11 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         evidence: &Value,
         state: &[Value],
     ) -> EffectResult<()> {
-        self.handle_effect(EffectRequest::release(0, sid, None, role, layer, evidence, state))
-            .into_unit("handle_release")
-            .unwrap_or_else(EffectResult::failure)
+        self.handle_effect(EffectRequest::release(
+            0, sid, None, role, layer, evidence, state,
+        ))
+        .into_unit("handle_release")
+        .unwrap_or_else(EffectResult::failure)
     }
 
     fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
@@ -145,10 +133,12 @@ impl EffectHandler for RecordingEffectHandler<'_> {
         role: &str,
         state: &[Value],
     ) -> Option<OutputConditionHint> {
-        self.handle_effect(EffectRequest::output_condition_hint(0, sid, None, role, state))
-            .into_output_condition_hint()
-            .ok()
-            .flatten()
+        self.handle_effect(EffectRequest::output_condition_hint(
+            0, sid, None, role, state,
+        ))
+        .into_output_condition_hint()
+        .ok()
+        .flatten()
     }
 
     fn supports_wal_sync(&self) -> bool {

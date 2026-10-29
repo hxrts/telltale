@@ -12,6 +12,7 @@ fn val_type_of(value: &Value) -> telltale_types::ValType {
         Value::Nat(_) => ValType::Nat,
         Value::Bool(_) => ValType::Bool,
         Value::Str(_) => ValType::String,
+        Value::Readiness(_) => ValType::Readiness,
         Value::Prod(left, right) => {
             ValType::Prod(Box::new(val_type_of(left)), Box::new(val_type_of(right)))
         }

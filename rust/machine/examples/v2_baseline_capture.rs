@@ -47,6 +47,8 @@ cfg_if! {
     impl EffectHandler for PassthroughHandler {
         fn handle_effect(&self, request: EffectRequest) -> EffectOutcome {
             match request.body {
+            EffectRequestBody::NominalCommand { .. } => EffectOutcome::failure(
+                EffectFailure::unavailable("this generic handler does not implement nominal commands")),
                 EffectRequestBody::SendDecision { payload, .. } => {
                     let decision = SendDecision::Deliver(payload.unwrap_or(Value::Nat(1)));
                     EffectOutcome::success(EffectResponse::SendDecision { decision })

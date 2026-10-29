@@ -32,6 +32,7 @@ def renameValType (ρ : SessionRenaming) : ValType → ValType
   | .bool => .bool
   | .nat => .nat
   | .string => .string
+  | .readiness => .readiness
   | .prod T₁ T₂ => .prod (renameValType ρ T₁) (renameValType ρ T₂)
   | .chan sid role => .chan (ρ.f sid) role
 
@@ -84,6 +85,7 @@ def renameValue (ρ : SessionRenaming) : Value → Value
   | .bool b => .bool b
   | .nat n => .nat n
   | .string s => .string s
+  | .readiness witness => .readiness witness
   | .prod v₁ v₂ => .prod (renameValue ρ v₁) (renameValue ρ v₂)
   | .chan e => .chan (renameEndpoint ρ e)
 /-- Rename all endpoints in GEnv. -/
@@ -196,6 +198,7 @@ theorem rename_val_type_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
       | bool => cases h
       | nat => cases h
       | string => cases h
+      | readiness => cases h
       | prod _ _ => cases h
       | chan _ _ => cases h
   | bool =>
@@ -206,6 +209,7 @@ theorem rename_val_type_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
           rfl
       | nat => cases h
       | string => cases h
+      | readiness => cases h
       | prod _ _ => cases h
       | chan _ _ => cases h
   | nat =>
@@ -216,6 +220,7 @@ theorem rename_val_type_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
           cases h
           rfl
       | string => cases h
+      | readiness => cases h
       | prod _ _ => cases h
       | chan _ _ => cases h
   | string =>
@@ -226,9 +231,12 @@ theorem rename_val_type_inj (ρ : SessionRenaming) {T1 T2 : ValType} :
       | string =>
           cases h
           rfl
+      | readiness => cases h
       | prod _ _ => cases h
       | chan _ _ => cases h
   -- ValType Injectivity: Product and Channel Cases
+  | readiness =>
+      cases T2 <;> simp_all [renameValType]
   | prod T1a T1b ih1 ih2 =>
       cases T2 <;> simp [renameValType] at h
       case prod T2a T2b =>

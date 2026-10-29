@@ -107,6 +107,8 @@ structure SessionState (ν : Type u) [VerificationModel ν] where
   handlers : List (Edge × HandlerId) -- Handler bindings per edge.
   epoch : Nat -- Epoch tag for rotation.
   phase : SessionPhase -- Lifecycle status.
+  /-- Same session owner, independent of diagnostic or serialized witness observations. -/
+  ownership : SessionTypes.ModelOwnershipState := {}
 
 abbrev SessionStore (ν : Type u) [VerificationModel ν] :=
   List (SessionId × SessionState ν)

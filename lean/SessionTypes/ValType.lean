@@ -25,6 +25,8 @@ inductive ValType where
   | string : ValType
   | prod : ValType → ValType → ValType
   | chan : Nat → String → ValType  -- (session id, role)
+  /-- Evidence data, not an endpoint or a live issuer-registry capability. -/
+  | readiness : ValType
   deriving Repr, DecidableEq, BEq, Inhabited
 
 namespace ValType
