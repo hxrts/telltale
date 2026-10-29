@@ -54,6 +54,8 @@ node_modules/
 
 # Simulator artifacts
 artifacts
+# Lean module directories named Artifacts (case-insensitive filesystems)
+!lean/**/Artifacts/
 
 # Paper build artifacts
 /papers/build/
