@@ -1967,6 +1967,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -3461,6 +3464,7 @@ dependencies = [
  "futures",
  "getrandom 0.2.17",
  "hex",
+ "instant",
  "num-complex",
  "proc-macro2",
  "proptest",
@@ -3588,6 +3592,7 @@ dependencies = [
  "futures",
  "getrandom 0.2.17",
  "hex",
+ "instant",
  "parking_lot 0.12.5",
  "pest",
  "pest_derive",

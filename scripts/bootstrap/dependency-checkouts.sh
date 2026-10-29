@@ -60,7 +60,11 @@ ensure_mathlib_cache() {
 # ── iris-lean Build Artifacts ─────────────────────────────────────────
 
 ensure_iris_build() {
+  # Upstream iris-lean keeps its Lake package in the `Iris/` subdirectory.
   local checkout="$1"
+  if [[ -f "${checkout}/Iris/lakefile.toml" || -f "${checkout}/Iris/lakefile.lean" ]]; then
+    checkout="${checkout}/Iris"
+  fi
   local -a lake_args=(
     "--log-level=error"
     "-KmoreLeanArgs=#[\"-Dlinter.unusedSectionVars=false\",\"-Dlinter.unusedVariables=false\"]"

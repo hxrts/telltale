@@ -367,7 +367,7 @@ commits independently, lanes may complete in any order (a `LaneSchedule`
 carries an arbitrary permutation of the lanes), and results are merged
 deterministically by batch index. `threadedMergedResults_eq_canonical` proves
 the merged result equals the canonical indexed batch for every width and
-completion order; `threaded_step_artifact_eq_canonical` lifts this to the step
+completion order. `threaded_step_artifact_eq_canonical` lifts this to the step
 artifact. The model does not cover successor proposals or authority conflicts,
 which the reduced artifact does not carry.
 
@@ -512,8 +512,8 @@ Non-min fairness:
   numeric preemption bound.
 - `canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness` -
   public scheduler-facing non-min fairness theorem. Its only premises are that
-  the trace follows the canonical serial scheduler and the entry is present;
-  the service horizon (number of strictly better competitors at the start) is
+  the trace follows the canonical serial scheduler and the entry is present.
+  The service horizon (number of strictly better competitors at the start) is
   computed, and the strict drain of better work is proved
   (`strictlyBetterEntryCount_canonical_step_lt`), not assumed. The reduced
   frontier model has no new arrivals, so preemption is automatically bounded.
@@ -538,7 +538,7 @@ Completeness:
 - `eventual_optimal_goal_publication_under_admissible_consistent_heuristic`
   (`AStarOptimality`) - A*-style optimality. `HeuristicConsistent`
   (`h n ≤ c(n,n') + h n'`) and `HeuristicAdmissible` (`h n ≤` cost of any path
-  to the goal) are concrete; admissibility is proved from consistency and
+  to the goal) are concrete. Admissibility is proved from consistency and
   `h goal = 0`. Optimal cost of the published incumbent is proved from the
   machine's min-priority expansion order, g-score soundness of goal entries,
   and `optimalCost` being a lower bound on source-to-goal path costs. The
