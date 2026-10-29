@@ -10,7 +10,7 @@ evidence inventory consumed by Rust admission.
 Envelope profiles attached here are built from genuine proofs for the
 degenerate instance in which every state, observation, placement, protocol,
 and deployment is `Unit`. On `Unit`, all erased runs coincide, so every
-envelope equivalence holds by `funext`; no `sorry` or axiom is used. This is
+envelope equivalence holds by `funext`; no proof holes or axioms are used. This is
 evidence for the trivial instance only, not for any non-trivial protocol.
 
 The envelope-admission profile is *not* attached: its premise bundle is
