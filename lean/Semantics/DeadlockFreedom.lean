@@ -51,6 +51,9 @@ namespace Semantics.DeadlockFreedom
 open SessionTypes.GlobalType
 open Choreography.Projection.Project
 open Semantics.SubjectReduction
+open SessionTypes.LocalTypeR
+open SessionCoTypes.EQ2
+open SessionCoTypes.EQ2.HeadInversion
 
 /-! ## Progress Predicate: ReachesComm
 
@@ -255,43 +258,102 @@ theorem deadlock_free_trichotomy (c : Configuration) (hwf : c.globalType.wellFor
 
 /-! ## Configuration Progress (Head Communications) -/
 
-/-- Advance one process for the head step taking continuation `g'`. -/
-def advanceProcess (g' : GlobalType) (act : GlobalActionR) (p : Process) : Process :=
-  if Participant act p.role then { p with localType := trans g' p.role }
+/-- The continuation of the first branch labelled `label`, if any. -/
+def branchCont (label : Label) (bs : List BranchR) : Option LocalTypeR :=
+  (bs.find? (fun b => decide (b.1 = label))).map (·.2.2)
+
+/-- The continuation of a local type's own head-normal form (`fullUnfold`) for
+`label`; the type itself is returned if no such branch exists. -/
+def ownCont (label : Label) (lt : LocalTypeR) : LocalTypeR :=
+  match lt.fullUnfold with
+  | .send _ bs => (branchCont label bs).getD lt
+  | .recv _ bs => (branchCont label bs).getD lt
+  | _ => lt
+
+/-- Advance one process by `act`: participants step their own local type. -/
+def advanceProcess (act : GlobalActionR) (p : Process) : Process :=
+  if Participant act p.role then { p with localType := ownCont act.label p.localType }
   else p
 
-/-- `advanceProcess` realizes `ProcessAdvance` for a head communication step. -/
+/-- If some branch of `as` carries `label`, `branchCont` returns the
+continuation of a member branch carrying that label. -/
+theorem branchCont_some {as : List BranchR} {label : Label} {x : BranchR}
+    (hx : x ∈ as) (hl : x.1 = label) :
+    ∃ vt cont, branchCont label as = some cont ∧ (label, vt, cont) ∈ as := by
+  cases h : as.find? (fun b => decide (b.1 = label)) with
+  | none =>
+      have := List.find?_eq_none.mp h x hx
+      simp [hl] at this
+  | some y =>
+      have hy := List.mem_of_find?_eq_some h
+      have hyl : y.1 = label := by simpa using List.find?_some h
+      refine ⟨y.2.1, y.2.2, by simp [branchCont, h], ?_⟩
+      rw [← hyl]; exact hy
+
+/-- The own-type branch list of a typed participant contains the stepped label. -/
+theorem own_label_mem {as : List BranchR} {bs : List (Label × GlobalType)} {role : String}
+    {label : Label} {g' : GlobalType} (hrel : BranchesRel EQ2 as (transBranches bs role))
+    (hmem : (label, g') ∈ bs) :
+    ∃ vt cont, branchCont label as = some cont ∧ (label, vt, cont) ∈ as := by
+  obtain ⟨x, hx, hl, -⟩ := branches_rel_mem_right hrel
+    (Choreography.Harmony.mem_trans_branches_of_mem bs label g' role hmem)
+  exact branchCont_some hx hl
+
+/-- `advanceProcess` realizes `ProcessAdvance` for a typed participant of a head
+communication: the chosen continuation comes from the process's own type. -/
+theorem advance_participant {bs : List (Label × GlobalType)} {g' : GlobalType}
+    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs) {p : Process}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed)
+    (hp : Participant act p.role) :
+    LocalAdvance act p.role p.localType (ownCont act.label p.localType) := by
+  by_cases hs : p.role = act.sender
+  · obtain ⟨as, has, hrel⟩ := own_head_send ht hwf hs
+    obtain ⟨vt, cont, hc, hm⟩ := own_label_mem hrel hmem
+    have he : ownCont act.label p.localType = cont := by simp [ownCont, has, hc]
+    exact he ▸ .send hs has ⟨vt, hm⟩
+  · have hr := hp.resolve_left hs
+    obtain ⟨as, has, hrel⟩ := own_head_recv ht hwf hr hs
+    obtain ⟨vt, cont, hc, hm⟩ := own_label_mem hrel hmem
+    have he : ownCont act.label p.localType = cont := by simp [ownCont, has, hc]
+    exact he ▸ .recv hr hs has ⟨vt, hm⟩
+
+/-- `advanceProcess` realizes `ProcessAdvance` for a typed process of a head
+communication step. -/
 theorem advanceProcess_spec {bs : List (Label × GlobalType)} {g' : GlobalType}
-    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs) (p : Process) :
-    ProcessAdvance (.comm act.sender act.receiver bs) act p (advanceProcess g' act p) where
+    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs) {p : Process}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed) :
+    ProcessAdvance act p (advanceProcess act p) where
   role_eq := by unfold advanceProcess; split <;> rfl
-  advance := by
-    intro hp
-    refine ⟨trans g' p.role, ?_, by simp [advanceProcess, hp]⟩
-    have hb : ∃ vt, (act.label, vt, trans g' p.role) ∈ transBranches bs p.role :=
-      ⟨none, Choreography.Harmony.mem_trans_branches_of_mem bs act.label g' p.role hmem⟩
-    by_cases hs : p.role = act.sender
-    · rw [trans_comm_sender _ _ _ bs hs]; exact .send hs hb
-    · have hr := hp.resolve_left hs
-      rw [trans_comm_receiver _ _ _ bs hr hs]; exact .recv hr hs hb
+  advance := fun hp =>
+    ⟨_, advance_participant hmem ht hwf hp, by simp [advanceProcess, hp]⟩
   frame := by intro hp; simp [advanceProcess, hp]
 
-/-- Pointwise advancement along a mapped list. -/
+/-- Pointwise advancement along a mapped list of typed processes. -/
 theorem forall2_map_advance {bs : List (Label × GlobalType)} {g' : GlobalType}
-    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs) :
-    ∀ ps : List Process, List.Forall₂ (ProcessAdvance (.comm act.sender act.receiver bs) act)
-      ps (ps.map (advanceProcess g' act))
-  | [] => .nil
-  | p :: ps => .cons (advanceProcess_spec hmem p) (forall2_map_advance hmem ps)
+    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs)
+    (hwf : (GlobalType.comm act.sender act.receiver bs).wellFormed = true) :
+    ∀ ps : List Process, (∀ p ∈ ps, p.wellTyped (.comm act.sender act.receiver bs)) →
+      List.Forall₂ (ProcessAdvance act) ps (ps.map (advanceProcess act))
+  | [], _ => .nil
+  | p :: ps, ht =>
+      .cons (advanceProcess_spec hmem (ht p List.mem_cons_self)
+          (trans_well_formed_of_well_formed _ _ hwf))
+        (forall2_map_advance hmem hwf ps (fun q hq => ht q (List.mem_cons_of_mem _ hq)))
 
-/-- A configuration headed by a communication steps along any of its branches. -/
+/-- A well-typed configuration headed by a communication steps along any of its
+branches, each participant advancing its own local type. -/
 theorem head_config_step (c : Configuration) {s r : String} {bs : List (Label × GlobalType)}
-    {label : Label} {cont : GlobalType} (hg : c.globalType = .comm s r bs)
+    {label : Label} {cont : GlobalType} (htyped : WellTypedConfig c)
+    (hwf : c.globalType.wellFormed = true) (hg : c.globalType = .comm s r bs)
     (hmem : (label, cont) ∈ bs) :
-    ConfigStep c ⟨cont, c.processes.map (advanceProcess cont ⟨s, r, label⟩)⟩ ⟨s, r, label⟩ where
+    ConfigStep c ⟨cont, c.processes.map (advanceProcess ⟨s, r, label⟩)⟩ ⟨s, r, label⟩ where
   global_step := by rw [hg]; exact step.comm_head s r bs label cont hmem
   processes_advance := by
-    rw [hg]; exact forall2_map_advance (act := ⟨s, r, label⟩) hmem c.processes
+    have ht := htyped.processes_typed
+    rw [hg] at ht hwf
+    exact forall2_map_advance (act := ⟨s, r, label⟩) hmem hwf c.processes ht
 
 /-! ## Deadlock Freedom Theorem -/
 
@@ -317,7 +379,7 @@ theorem deadlock_free (c : Configuration) {s r : String} {bs : List (Label × Gl
   cases hcomm with
   | comm _ _ _ hne =>
     obtain ⟨label, cont, hmem⟩ := first_branch_mem hne
-    have hstep := head_config_step c hg hmem
+    have hstep := head_config_step c htyped hwf hg hmem
     exact ⟨_, _, hstep, step_preserves_typing htyped ⟨⟨bs, hg⟩, huniq, hclosed, hwf, hblind⟩ hstep⟩
 
 /-- Corollary: such configurations are not stuck. -/

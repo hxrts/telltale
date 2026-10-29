@@ -214,6 +214,7 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 | Observable.lean | 394 | Membership predicates for observable behavior |
 | Dual.lean | 266 | Duality lemmas |
 | FullUnfold.lean | 265 | Full unfolding with termination argument |
+| EQ2/HeadInversion.lean | 120 | EQ2 head inversion through `fullUnfold` (send/recv), BranchesRel membership transfer |
 | Quotient.lean | 132 | Quotient by EQ2 (warning: subsingleton via `eq2_mu_var_self`; not used semantically) |
 | DBBridge.lean | 50 | Bridge lemmas for de Bruijn |
 | Coinductive/Bisim.lean | 84 | Coinductive bisimulation definition |
@@ -341,8 +342,8 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Typing.lean | 23 | Typing judgment interface |
 | Determinism/Core.lean | 600 | Determinism proof part 1 |
 | Determinism/Diamond.lean | 516 | Determinism proof part 2 |
-| DeadlockFreedom.lean | 353 | Deadlock freedom for comm-headed configs (representative local types) |
-| SubjectReduction.lean | 363 | Head-step subject reduction; typing = WF ∧ EQ2 to projection |
+| DeadlockFreedom.lean | 415 | Deadlock freedom for comm-headed configs; `advanceProcess` steps each participant's own type (`ownCont`) |
+| SubjectReduction.lean | 403 | Head-step subject reduction; typing = WF ∧ EQ2 to projection; `LocalAdvance` steps the process's own `fullUnfold` |
 
 ---
 
