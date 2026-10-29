@@ -61,39 +61,42 @@ theorem bft_quorum_spec_assumptions_passed :
 
 /-! ## Concrete Timed Profiles -/
 
-/-- Timing for the partial-synchrony example: 3 parties, views of length 2,
-post-GST delay bound 1, GST at time 4. -/
+/-- Parameters for the partial-synchrony example: 4 parties (`f = 1`), views
+of length 2, post-GST delay bound 1, GST at time 4. -/
 def psParams : Distributed.PartialSynchrony.Rounds.Params :=
-  { n := 3, viewLen := 2, delta := 1, gst := 4 }
+  { n := 4, f := 1, viewLen := 2, delta := 1, gst := 4 }
 
-/-- Example run: party 1 is Byzantine; before GST every delay is 5 (views
-time out), after GST every delay is 1. -/
+/-- Example run: party 1 is Byzantine and never votes; every leader proposes 7;
+before GST every delay is 5 (views time out), after GST every delay is 1. -/
 def psRun : Distributed.PartialSynchrony.Rounds.RoundRun where
   honest := fun p => p != 1
-  proposeDelay := fun v => if v * 2 < 4 then 5 else 1
-  voteDelay := fun v => if v * 2 < 4 then 5 else 1
+  proposalTo := fun _ _ => 7
+  proposeDelay := fun v _ => if v * 2 < 4 then 5 else 1
+  voteDelay := fun v _ => if v * 2 < 4 then 5 else 1
+  byzVote := fun _ _ => none
 
-/-- View success is decidable for the example run. -/
-instance : DecidablePred (Distributed.PartialSynchrony.Rounds.ViewDecides psParams psRun) :=
-  fun v => by unfold Distributed.PartialSynchrony.Rounds.ViewDecides; infer_instance
-
-/-- Abstract model over time `t : Nat`: a decision is reported once some view
-of `psRun` has decided by time `t`. -/
+/-- Abstract model over time `t : Nat`: value 7 is reported once some view of
+`psRun` ending by time `t` has a vote quorum for 7. -/
 def timedPartialSynchronyModel :
     Distributed.PartialSynchrony.Model Nat Unit Unit Unit where
   initial := fun s => s = 0
   step := fun s _ => some (s + 1)
   decide := fun t =>
-    if ∃ v, v < t ∧ Distributed.PartialSynchrony.Rounds.ViewDecides psParams psRun v ∧
+    if ∃ v, v < t ∧ Distributed.PartialSynchrony.Rounds.ViewDecides psParams psRun v 7 ∧
         (v + 1) * 2 ≤ t then some () else none
 
 /-- `psRun` respects the post-GST delay bound. -/
 theorem psRun_admissible : Distributed.PartialSynchrony.Rounds.Admissible psParams psRun := by
-  intro v hv
+  intro v _ hv
   simp only [psParams] at hv
   simp [psRun, psParams, show ¬ v * 2 < 4 by omega]
 
-/-- Fair runs are the identity clock; they refine `psRun`. -/
+/-- `psRun` has one Byzantine party and constant (hence consistent) proposals. -/
+theorem psRun_wellFormed : Distributed.PartialSynchrony.Rounds.WellFormed psParams psRun :=
+  ⟨by unfold Distributed.PartialSynchrony.Rounds.FaultBound; decide, fun _ _ _ => rfl⟩
+
+/-- Fair runs are the identity clock; they refine `psRun`. Any decided value is
+an honest party's received proposal, hence 7. -/
 def timedPartialSynchronyAssumptions :
     Distributed.PartialSynchrony.Assumptions timedPartialSynchronyModel where
   FairRun := fun run => run = id
@@ -101,8 +104,10 @@ def timedPartialSynchronyAssumptions :
   timing := by decide
   realizedByRounds := by
     rintro run rfl _
-    refine ⟨psRun, psRun_admissible, ⟨0, by decide, rfl⟩, ?_⟩
-    rintro t ⟨v, hv, hle⟩
+    refine ⟨psRun, psRun_admissible, psRun_wellFormed, ?_⟩
+    rintro t ⟨v, x, hv, hle⟩
+    obtain ⟨p, _, rfl⟩ := Distributed.PartialSynchrony.Rounds.decided_value_proposed
+      psParams psRun (by decide) psRun_wellFormed.1 hv
     refine ⟨(), ?_⟩
     simp only [psParams] at hle
     simp only [timedPartialSynchronyModel, id]
@@ -203,11 +208,9 @@ theorem nkExec_isRun : Distributed.Nakamoto.LongestChain.IsRun nkSched id nkExec
 def tinyNakamotoModel : Distributed.Nakamoto.Model Nat Nat Unit where
   initial := fun s => s = 0
   chain := fun t => (nkExec t).pub
-  honestWeight := fun chain => chain.length
   failureProbabilityAtDepth := fun _ => 0
   adversarialPowerBounded :=
     Distributed.Nakamoto.LongestChain.WindowHonestMajorityUpTo nkSched 2 12
-  churnWithin := fun _run churnBudget => 0 ≤ churnBudget
 
 /-- Assumptions: admissible runs are the identity clock, realised by `nkExec`. -/
 def tinyNakamotoAssumptions :
@@ -215,24 +218,10 @@ def tinyNakamotoAssumptions :
   AdmissibleRun := fun run => run = id
   ε := 0
   settlementDepth := 2
-  churnBudget := 0
-  growthWindow := 0
-  minGrowth := 0
-  qualityWindow := 0
-  minHonestWeight := 0
   probabilityBudget := ⟨nk_window 12, le_rfl⟩
   realizedByLongestChain := by
     rintro run rfl
     exact ⟨nkSched, id, nkExec, nkExec_isRun, nk_window, fun _ => rfl⟩
-  chainGrowth := by
-    intro _run _hRun _i
-    exact Nat.le_refl _
-  chainQuality := by
-    intro _run _hRun _i
-    exact Nat.zero_le _
-  churnWithin := by
-    intro _run _hRun
-    exact Nat.zero_le _
 
 /-- Concrete Nakamoto profile used by theorem-pack examples. -/
 def tinyNakamotoProfile : Distributed.Nakamoto.SecurityProtocol :=
@@ -245,14 +234,16 @@ instance : Fact (Nat.Prime 5) := ⟨by norm_num⟩
 open Polynomial in
 /-- Reed–Solomon DA example over `ZMod 5`: data `X + 1` (degree 1, `k = 2`),
 three shards at points `0, 1, 2`, custodian `i` holds shard `i`; custodian 2
-is Byzantine and returns garbage. Commitments check the true evaluation. -/
+is Byzantine and withholds its shard. The commitment is an ideal one whose
+check is the true evaluation, so `CommitmentBinding` holds by construction. -/
 noncomputable def tinyDAModel : Distributed.DataAvailability.Model (ZMod 5) (Fin 3) where
   n := 3
   k := 2
   points := fun i => (i.val : ZMod 5)
   data := X + C 1
   custody := id
-  response := fun p => if p = 2 then 0 else (X + C 1 : (ZMod 5)[X]).eval (p.val : ZMod 5)
+  response := fun p =>
+    if p = 2 then none else some ((X + C 1 : (ZMod 5)[X]).eval (p.val : ZMod 5))
   verify := fun i y => y = (X + C 1 : (ZMod 5)[X]).eval (i.val : ZMod 5)
 
 open Polynomial in
@@ -266,7 +257,7 @@ noncomputable def tinyDAAssumptions :
   dataDegree := by
     show (X + C (1 : ZMod 5)).degree < ((2 : Nat) : WithBot Nat)
     rw [degree_X_add_C]; exact_mod_cast (by norm_num : (1 : Nat) < 2)
-  verifyBinding := fun _ _ h => h
+  binding := fun _ _ h => h
   verifyComplete := fun _ => rfl
   honestServes := by
     intro p hp

@@ -11,7 +11,7 @@ Packaged scheduler artifacts and policy-specific theorem bundles. -/
 
 /-
 The Problem. Scheduler correctness proofs involve multiple properties (confluence,
-starvation freedom, refinement) that depend on the specific scheduling policy.
+one-step non-blocking scheduling, refinement) that depend on the specific scheduling policy.
 Users need packaged artifacts that bundle these properties for each policy type.
 
 Solution Structure. Defines policy-specific artifact structures (RoundRobinPolicyArtifact,
@@ -61,7 +61,7 @@ structure ProtocolMachineSchedulerArtifact (st₀ : ProtocolMachineState ι γ �
   profile : SchedulerPolicyProfile
   policyPinned : SchedulerPolicyPinned st₀ policy
   scheduleDeterministic : schedule_deterministic st₀
-  starvationFree : starvation_free st₀
+  scheduleNonblocking : schedule_nonblocking st₀
   cooperativeRefinement : cooperative_refines_concurrent st₀
   roundRobin? : Option (RoundRobinPolicyArtifact (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀)
   cooperative? : Option (CooperativePolicyArtifact (ι := ι) (γ := γ) (π := π) (ε := ε) (ν := ν) st₀)
@@ -125,7 +125,7 @@ def buildProtocolMachineSchedulerArtifact {st₀ : ProtocolMachineState ι γ π
   , profile := bundle.profile
   , policyPinned := scheduler_policy_pinned_from_bundle bundle
   , scheduleDeterministic := scheduler_deterministic_from_bundle bundle
-  , starvationFree := scheduler_starvation_free_from_bundle bundle
+  , scheduleNonblocking := scheduler_nonblocking_from_bundle bundle
   , cooperativeRefinement := scheduler_cooperative_refinement_from_bundle bundle
   , roundRobin? := roundRobin?
   , cooperative? := cooperative?
@@ -175,7 +175,7 @@ noncomputable def protocolProofInventory
   , ("scheduler_profile_priority", pack.scheduler.priority?.isSome)
   , ("scheduler_profile_progress_aware", pack.scheduler.progressAware?.isSome)
   , ("scheduler_confluence", true)
-  , ("scheduler_starvation_free", true)
+  , ("scheduler_schedule_nonblocking", true)
   , ("scheduler_cooperative_refinement", true)
   , ("scheduler_cooperative_normalization", pack.scheduler.cooperative?.isSome)
   ] ++ Runtime.Proofs.TheoremPackAPI.capabilities (space := proofSpace.profiles) pack.theorems

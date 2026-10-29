@@ -4,6 +4,7 @@ import Semantics.Typing
 import Semantics.EnvStep
 import Choreography.Harmony
 import SessionCoTypes.EQ2
+import SessionCoTypes.EQ2Props
 
 
 /-
@@ -43,18 +44,17 @@ open SessionTypes.LocalTypeR
 open Choreography.Projection.Project
 open Choreography.Projection.Project
 open SessionCoTypes.EQ2
-open SessionCoTypes.Quotient
 open Semantics.EnvStep
 open Semantics.Typing
 open Choreography.Harmony
 
 /-! ## Configuration -/
 
-/-- A process is abstracted as having a local type. -/
+/-- A process is abstracted as having a (representative) local type. -/
 structure Process where
   -- Each process is identified by a role and its local type.
   role : String
-  localType : QLocalTypeR
+  localType : LocalTypeR
   deriving Inhabited
 
 /-- A configuration consists of a global type and a list of processes. -/
@@ -70,10 +70,11 @@ Following the ECOOP 2025 Coq mechanization, we use a fixed role set S that conta
 all roles of the global type. This handles the case where roles can shrink during
 stepping (Remark 10 in the paper). -/
 
-/-- A process is well-typed if its local type matches the projection of the global type. -/
+/-- A process is well-typed if its local type is well-formed and `EQ2`-equivalent
+to the projection of the global type. Comparison is on representatives, restricted
+to well-formed types where `EQ2` is an equivalence. -/
 def Process.wellTyped (p : Process) (g : GlobalType) : Prop :=
-  -- Typing means the local type matches the projection of the global type.
-  p.localType = QLocalTypeR.ofLocal (trans g p.role)
+  p.localType.WellFormed ∧ EQ2 p.localType (trans g p.role)
 
 /-- A configuration is well-typed relative to a fixed role set S if:
     1. All processes are well-typed under the global type
@@ -122,7 +123,7 @@ structure ProcessAdvance (g : GlobalType) (act : GlobalActionR) (p p' : Process)
   role_eq : p'.role = p.role
   /-- Participants advance their old local type by the action. -/
   advance : Participant act p.role →
-    ∃ lt, LocalAdvance act p.role (trans g p.role) lt ∧ p'.localType = QLocalTypeR.ofLocal lt
+    ∃ lt, LocalAdvance act p.role (trans g p.role) lt ∧ p'.localType = lt
   /-- Non-participants are unchanged. -/
   frame : ¬ Participant act p.role → p'.localType = p.localType
 
@@ -270,11 +271,19 @@ theorem receiver_type_after_step {bs : List (Label × GlobalType)} {g' : GlobalT
 
 /-! ## Subject Reduction -/
 
-/-- A participant's advanced type is the projection of the stepped global type. -/
-theorem participant_typed {c c' : Configuration} {act : GlobalActionR}
+/-- The stepped global type of a configuration step is well-formed. -/
+theorem stepped_trans_wf {c c' : Configuration} {act : GlobalActionR}
+    (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act) (role : String) :
+    (trans c'.globalType role).WellFormed :=
+  trans_well_formed_of_well_formed _ role
+    (step_preserves_well_formed _ _ act hstep.global_step hh.wf)
+
+/-- A participant's advanced type is (as a representative) exactly the projection
+of the stepped global type. -/
+theorem participant_advance_eq {c c' : Configuration} {act : GlobalActionR}
     (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act) {p p' : Process}
     (hadv : ProcessAdvance c.globalType act p p') (hp : Participant act p.role) :
-    p'.wellTyped c'.globalType := by
+    p'.localType = trans c'.globalType p'.role := by
   obtain ⟨bs, hg⟩ := hh.head
   obtain ⟨lt, hlt, hpl⟩ := hadv.advance hp
   rw [hg] at hlt
@@ -287,10 +296,19 @@ theorem participant_typed {c c' : Configuration} {act : GlobalActionR}
     simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true, decide_eq_true_eq] at hu
     exact hu.1
   have heq := mem_branch_unique_label huniq hm (head_step_mem hstep' rfl rfl)
-  simp [Process.wellTyped, hpl, hadv.role_eq, heq]
+  rw [hpl, hadv.role_eq, heq]
 
-/-- A non-participant's unchanged type is still the projection of the stepped
-global type (via `other_type_preserved`). -/
+/-- A participant's advanced type is well-typed under the stepped global type. -/
+theorem participant_typed {c c' : Configuration} {act : GlobalActionR}
+    (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act) {p p' : Process}
+    (hadv : ProcessAdvance c.globalType act p p') (hp : Participant act p.role) :
+    p'.wellTyped c'.globalType := by
+  have he := participant_advance_eq hh hstep hadv hp
+  refine ⟨he ▸ stepped_trans_wf hh hstep _, ?_⟩
+  rw [he]; exact eq2_refl _
+
+/-- A non-participant's unchanged type is still `EQ2` to the projection of the
+stepped global type (via `other_type_preserved` and `eq2_trans_wf`). -/
 theorem nonparticipant_typed {c c' : Configuration} {act : GlobalActionR}
     (htyped : WellTypedConfig c) (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act)
     {p p' : Process} (hpm : p ∈ c.processes)
@@ -300,10 +318,10 @@ theorem nonparticipant_typed {c c' : Configuration} {act : GlobalActionR}
   have hnr : p.role ≠ act.receiver := fun h => hp (Or.inr h)
   have hE := other_type_preserved _ _ act p.role hstep.global_step hh.closed hh.wf hns hnr
     hh.blind
-  have hq : QLocalTypeR.ofLocal (trans c.globalType p.role) =
-      QLocalTypeR.ofLocal (trans c'.globalType p.role) := Quot.sound (eq2_symm hE)
-  simp only [Process.wellTyped, hadv.frame hp, hadv.role_eq]
-  exact (htyped.processes_typed p hpm).trans hq
+  obtain ⟨hwfp, hEp⟩ := htyped.processes_typed p hpm
+  rw [Process.wellTyped, hadv.frame hp, hadv.role_eq]
+  exact ⟨hwfp, SessionCoTypes.EQ2Props.eq2_trans_wf hEp (eq2_symm hE) hwfp
+    (trans_well_formed_of_well_formed _ _ hh.wf) (stepped_trans_wf hh hstep _)⟩
 
 /-- Subject reduction for head communication steps: a well-typed configuration
 whose global type is a communication headed by `act` steps (with each process

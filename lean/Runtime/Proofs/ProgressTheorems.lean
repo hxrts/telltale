@@ -90,7 +90,13 @@ theorem frontier_of_pending_output {store : SessionStore ν}
 /-- Progress: a well-formed state with a pending output has an enabled instruction.
 
     Input-only states (every live endpoint waits on recv/branch) need global
-    deadlock freedom to rule out cyclic waiting; that fact is not derived here. -/
+    deadlock freedom to rule out cyclic waiting; that fact is not derived here.
+    Exact remaining hypothesis: for a coherent store whose sessions are
+    projections of well-formed, delegate-free global types, `¬ AllSessionsComplete
+    store → FrontierEnabled store` (a non-terminated global type has a projected
+    sender, or a receiver whose buffer head is pending). Deriving it needs a
+    store-to-global-type correspondence invariant maintained by `execInstr`,
+    which the Runtime layer does not yet carry. -/
 theorem protocol_machine_progress {store : SessionStore ν}
     (hWF : WellFormedVMState store) (hOut : HasPendingOutput store) :
     EnabledInstruction store :=
@@ -123,7 +129,17 @@ abbrev FairScheduler (numRoles k : Nat) (sched : Nat → Nat) : Prop :=
 
 /-- One-step ranking obligations for a protocol-machine step function, with the
 Lyapunov measure `protocolMachineMeasure`. Every field is a single-step fact;
-the termination bound is derived, not assumed. -/
+the termination bound is derived, not assumed.
+
+Remaining obligation (not yet discharged): no instance is constructed for the
+concrete machine. Instantiating it requires (a) a `step` function factoring
+`execInstr`/`schedStep` through the session store, (b) `nonincreasing` and
+`enabled_decreases` for each instruction (a `send`/`receive` commit replaces
+`L` by its continuation, so the type measure drops, but `send` grows the trace
+measure by one; the measure must weight types above traces, cf.
+`Runtime/Proofs/WeightedMeasure`), (c) `enabled_stable`, which fails for
+blocked receives unless enabledness is defined relative to buffer contents, and
+(d) `progress`, which is global deadlock freedom (see `HasPendingOutput`). -/
 structure ProtocolMachineTerminationModel where
   /-- Finite role universe used by the scheduler. -/
   numRoles : Nat

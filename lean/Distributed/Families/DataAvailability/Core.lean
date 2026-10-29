@@ -4,25 +4,36 @@ set_option autoImplicit false
 
 /-! # Distributed.Families.DataAvailability
 
-Data availability derived from a concrete erasure-coding and custody model:
+Data availability derived from a concrete erasure-coding, custody, and
+withholding-adversary model:
 - the data is a polynomial of degree `< k` over a field `F` (Reed–Solomon),
 - shard `i : Fin n` is its evaluation at the distinct point `points i`,
-- each custodian holds one shard index and returns a response,
-- responses are checked against a binding commitment (`verify`),
-- honest custodians return their shard faithfully.
+- each custodian holds one shard index and answers a query with
+  `response p : Option F`; `none` is withholding. Byzantine custodians are
+  unconstrained (withhold, or serve arbitrary values); honest custodians serve
+  their correct shard,
+- a retriever queries every custodian and keeps, per shard, a response that
+  passes the commitment check `verify` (`collect`); a shard sample succeeds
+  iff `collect` yields a value (`SampleSucceeds`),
+- the commitment's binding property is a separately named cryptographic
+  assumption (`CommitmentBinding`): verified openings are correct. It says
+  nothing about whether anything is served.
 
-From at least `k` honest custodians holding distinct shards we prove (via
-Lagrange interpolation, not by assumption) that `k` verified shards are
-available and that interpolating any `≥ k` verified shards recovers the data.
+Theorems: with `≥ k` honest custodians on distinct shards, `≥ k` shards are
+retrievable despite withholding (`availability_of_assumptions`), and decoding
+the retrieved shards yields the data (`retrievability_of_assumptions`, via
+Lagrange interpolation in `decode_correct`). Sampling: if availability fails,
+every sample set of size `≥ k` contains a failing sample
+(`sampling_detects_unavailability`). Probabilistic sampling amplification is
+not modelled.
 -/
 
 /-
-The Problem. Earlier versions assumed sampling coverage and a withholding
-bound whose conjunction was the availability conclusion, and assumed
-reconstruction soundness of an abstract code.
-Solution Structure. Fix Reed–Solomon coding, prove k-of-n reconstruction
-with `Lagrange.eq_interpolate_of_eval_eq`, and derive availability from the
-honest-custodian count.
+The Problem. An earlier version made `verify` definitionally correctness and
+stated availability as the honest-serving count itself.
+Solution Structure. Model withholding responses and a concrete collection
+procedure; state binding as a named cryptographic assumption; prove that the
+procedure retrieves `≥ k` shards and decodes the data.
 -/
 
 /-! ## Core Development -/
@@ -34,15 +45,15 @@ open Polynomial
 
 universe u v
 
-/-- Erasure-coded data with custody. `verify i y` is the commitment check that
-`y` is the correct value of shard `i`. -/
+/-- Erasure-coded data with custody and possibly withheld responses.
+`verify i y` is the commitment check for an opening of shard `i` to `y`. -/
 structure Model (F : Type u) [Field F] (Party : Type v) where
   n : Nat
   k : Nat
   points : Fin n → F
   data : F[X]
   custody : Party → Fin n
-  response : Party → F
+  response : Party → Option F
   verify : Fin n → F → Prop
 
 variable {F : Type u} [Field F] {Party : Type v}
@@ -52,34 +63,54 @@ noncomputable def decode (M : Model F Party) (I : Finset (Fin M.n)) (val : Fin M
     F[X] :=
   Lagrange.interpolate I M.points val
 
+/-- Some custodian of shard `i` served `y`, and `y` passes the commitment check. -/
+def Served (M : Model F Party) (i : Fin M.n) (y : F) : Prop :=
+  ∃ p, M.custody p = i ∧ M.response p = some y ∧ M.verify i y
+
+open Classical in
+/-- Retrieval: for each shard, a verified served value, if any. -/
+noncomputable def collect (M : Model F Party) (i : Fin M.n) : Option F :=
+  if h : ∃ y, Served M i y then some (Classical.choose h) else none
+
+/-- A sample of shard `i` succeeds iff retrieval yields a verified value. -/
+def SampleSucceeds (M : Model F Party) (i : Fin M.n) : Prop := (collect M i).isSome
+
+open Classical in
+/-- Shards the retriever obtains. -/
+noncomputable def retrievable (M : Model F Party) : Finset (Fin M.n) :=
+  Finset.univ.filter (SampleSucceeds M)
+
+/-- The retriever's output: decode the retrieved shards. -/
+noncomputable def retrieved (M : Model F Party) : F[X] :=
+  decode M (retrievable M) (fun i => (collect M i).getD 0)
+
 /-! ## Properties -/
 
-/-- Availability: some set of custodians serves `≥ k` distinct shards whose
-responses pass the commitment check. -/
-def DataAvailability (M : Model F Party) : Prop :=
-  ∃ S : Finset Party, M.k ≤ (S.image M.custody).card ∧
-    ∀ p ∈ S, M.verify (M.custody p) (M.response p)
+/-- Availability: the retriever obtains at least `k` distinct verified shards. -/
+def DataAvailability (M : Model F Party) : Prop := M.k ≤ (retrievable M).card
 
-/-- Retrievability: every `≥ k` set of verified shard values decodes to the data,
-and such a set exists. -/
-def DataRetrievability (M : Model F Party) : Prop :=
-  (∀ (I : Finset (Fin M.n)) (val : Fin M.n → F),
-    M.k ≤ I.card → (∀ i ∈ I, M.verify i (val i)) → decode M I val = M.data) ∧
-  ∃ (I : Finset (Fin M.n)) (val : Fin M.n → F),
-    M.k ≤ I.card ∧ ∀ i ∈ I, M.verify i (val i)
+/-- Retrievability: the retriever's decoded output is the data. -/
+def DataRetrievability (M : Model F Party) : Prop := retrieved M = M.data
+
+/-- Commitment binding (cryptographic assumption, e.g. KZG binding under its
+hardness assumption): any opening that verifies is the true evaluation. It
+constrains only what verifies, not what is served. -/
+def CommitmentBinding (M : Model F Party) : Prop :=
+  ∀ i y, M.verify i y → y = M.data.eval (M.points i)
 
 /-! ## Assumptions -/
 
-/-- Coding, commitment, and custody assumptions. None mentions availability or
-decoding: the commitment fields are standard binding/completeness of the
-commitment scheme; the rest are concrete, decidable custody facts. -/
+/-- Coding, commitment, and custody assumptions. Non-honest custodians'
+responses are unconstrained (the withholding adversary). -/
 structure Assumptions [DecidableEq Party] (M : Model F Party) where
   honest : Finset Party
   pointsInjective : Function.Injective M.points
   dataDegree : M.data.degree < M.k
-  verifyBinding : ∀ i y, M.verify i y → y = M.data.eval (M.points i)
+  /-- Cryptographic binding of the commitment. -/
+  binding : CommitmentBinding M
+  /-- Completeness of the commitment: correct openings verify. -/
   verifyComplete : ∀ i, M.verify i (M.data.eval (M.points i))
-  honestServes : ∀ p ∈ honest, M.response p = M.data.eval (M.points (M.custody p))
+  honestServes : ∀ p ∈ honest, M.response p = some (M.data.eval (M.points (M.custody p)))
   custodyDistinct : Set.InjOn M.custody honest
   honestCustodians : M.k ≤ honest.card
 
@@ -95,45 +126,70 @@ theorem decode_correct (M : Model F Party) (hInj : Function.Injective M.points)
     lt_of_lt_of_le hDeg (by exact_mod_cast hI)
   exact (Lagrange.eq_interpolate_of_eval_eq val (hInj.injOn) hd hval).symm
 
-/-- Verified shards decode to the data (binding commitments). -/
+/-- Verified shards decode to the data (under commitment binding). -/
 theorem decode_verified [DecidableEq Party] {M : Model F Party} (a : Assumptions M)
     (I : Finset (Fin M.n)) (val : Fin M.n → F) (hI : M.k ≤ I.card)
     (hv : ∀ i ∈ I, M.verify i (val i)) : decode M I val = M.data :=
   decode_correct M a.pointsInjective a.dataDegree I val hI
-    (fun i hi => (a.verifyBinding i (val i) (hv i hi)).symm)
+    (fun i hi => (a.binding i (val i) (hv i hi)).symm)
 
-/-! ## Availability from Honest Custodians -/
+/-! ## Retrieval -/
 
-/-- Honest custodians cover `≥ k` distinct shard indices. -/
-theorem honest_shards_card [DecidableEq Party] {M : Model F Party} (a : Assumptions M) :
-    M.k ≤ (a.honest.image M.custody).card := by
-  rw [Finset.card_image_of_injOn a.custodyDistinct]
-  exact a.honestCustodians
+/-- A collected value was served and verifies. -/
+theorem collect_verified {M : Model F Party} {i : Fin M.n} {y : F}
+    (h : collect M i = some y) : M.verify i y := by
+  unfold collect at h
+  split at h
+  · next hs =>
+    cases h
+    obtain ⟨_, _, _, hv⟩ := Classical.choose_spec hs
+    exact hv
+  · cases h
 
-/-- Honest responses pass the commitment check. -/
-theorem honest_verified [DecidableEq Party] {M : Model F Party} (a : Assumptions M)
-    {p : Party} (hp : p ∈ a.honest) : M.verify (M.custody p) (M.response p) := by
-  rw [a.honestServes p hp]; exact a.verifyComplete _
+/-- Retrieved shards carry verified values. -/
+theorem retrievable_verified {M : Model F Party} {i : Fin M.n} (hi : i ∈ retrievable M) :
+    M.verify i ((collect M i).getD 0) := by
+  classical
+  simp only [retrievable, Finset.mem_filter, SampleSucceeds] at hi
+  obtain ⟨y, hy⟩ := Option.isSome_iff_exists.1 hi.2
+  rw [hy]; exact collect_verified hy
 
-/-- Data availability, proved from `≥ k` honest custodians. -/
+/-- Shards of honest custodians are retrievable, whatever others withhold. -/
+theorem honest_shard_retrievable [DecidableEq Party] {M : Model F Party} (a : Assumptions M)
+    {p : Party} (hp : p ∈ a.honest) : M.custody p ∈ retrievable M := by
+  classical
+  have hs : ∃ y, Served M (M.custody p) y :=
+    ⟨_, p, rfl, a.honestServes p hp, a.verifyComplete _⟩
+  simp [retrievable, SampleSucceeds, collect, hs]
+
+/-! ## Availability and Retrievability -/
+
+/-- Data availability, proved from `≥ k` honest custodians on distinct shards. -/
 theorem availability_of_assumptions [DecidableEq Party] {M : Model F Party}
-    (a : Assumptions M) : DataAvailability M :=
-  ⟨a.honest, honest_shards_card a, fun _ hp => honest_verified a hp⟩
+    (a : Assumptions M) : DataAvailability M := by
+  have h : a.honest.image M.custody ⊆ retrievable M := by
+    intro i hi
+    obtain ⟨p, hp, rfl⟩ := Finset.mem_image.1 hi
+    exact honest_shard_retrievable a hp
+  have := Finset.card_le_card h
+  rw [Finset.card_image_of_injOn a.custodyDistinct] at this
+  exact le_trans a.honestCustodians this
 
-/-- Data retrievability, proved from interpolation and honest custody. -/
+/-- Data retrievability: decoding the retrieved shards yields the data. -/
 theorem retrievability_of_assumptions [DecidableEq Party] {M : Model F Party}
-    (a : Assumptions M) : DataRetrievability M := by
-  refine ⟨fun I val hI hv => decode_verified a I val hI hv, ?_⟩
-  refine ⟨a.honest.image M.custody, fun i => M.data.eval (M.points i),
-    honest_shards_card a, fun i _ => a.verifyComplete i⟩
+    (a : Assumptions M) : DataRetrievability M :=
+  decode_verified a _ _ (availability_of_assumptions a) fun _ hi => retrievable_verified hi
 
-/-- Sampling: a sample of any shard held by an honest custodian succeeds with a
-correct value. -/
-theorem sample_honest_shard [DecidableEq Party] {M : Model F Party} (a : Assumptions M)
-    {p : Party} (hp : p ∈ a.honest) :
-    M.verify (M.custody p) (M.response p) ∧
-      M.response p = M.data.eval (M.points (M.custody p)) :=
-  ⟨honest_verified a hp, a.honestServes p hp⟩
+/-- Sampling: if fewer than `k` shards are retrievable, every sample set of size
+`≥ k` contains a failing sample. -/
+theorem sampling_detects_unavailability {M : Model F Party} (hU : ¬ DataAvailability M)
+    (T : Finset (Fin M.n)) (hT : M.k ≤ T.card) : ∃ i ∈ T, ¬ SampleSucceeds M i := by
+  classical
+  by_contra h
+  have hsub : T ⊆ retrievable M := fun i hi => by
+    simp only [retrievable, Finset.mem_filter, Finset.mem_univ, true_and]
+    exact Classical.byContradiction fun hn => h ⟨i, hi, hn⟩
+  exact hU (le_trans hT (Finset.card_le_card hsub))
 
 /-! ## Assumption Validation API -/
 

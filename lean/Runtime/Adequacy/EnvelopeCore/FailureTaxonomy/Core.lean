@@ -489,7 +489,9 @@ structure FailureEnvelopePremises (State : Type u) (Obs : Type v) where
   crossTargetConformanceWitness :
     CrossTargetFailureConformance
       failureVisible singleThreadRun multiThreadRun shardedRun
-  recoveryActionSafetyWitness :
+  /-- Assumed input: `Safe` and `recoveryStep` are arbitrary, so recovery-action
+  safety is not derivable here and must be discharged by the instantiation. -/
+  assumedRecoveryActionSafety :
     RecoveryActionSafety Safe recoveryStep
   noUnsafeReplayWitness :
     NoUnsafeReplay Safe replayPre replay

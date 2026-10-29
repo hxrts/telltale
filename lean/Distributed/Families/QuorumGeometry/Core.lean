@@ -238,5 +238,36 @@ theorem safe_finality_of_assumptions
     ∀ d', Committed M s d' → ¬ M.conflicts d d' :=
   fun _ hCommitted => no_conflicting_commits_of_assumptions a hFinalized hCommitted
 
+/-! ## Safety Across a Run -/
+
+/-- A run is a sequence of states whose signature sets only grow: once validator
+`p` has signed `d`, that signature is still recorded at every later state. -/
+structure Run
+    {State : Type u} {Decision : Type v} {Certificate : Type w} {Party : Type x}
+    (M : Model State Decision Certificate Party) where
+  state : Nat → State
+  signedMono : ∀ {i j p d}, i ≤ j → M.signed (state i) p d → M.signed (state j) p d
+
+/-- No conflicting commits across a run: certificates formed at different steps
+`i`, `j` of a monotone run never certify conflicting decisions. Proof: both
+signer sets are quorums, so they share an honest validator; by monotonicity its
+two signatures coexist at step `max i j`, contradicting honest no-equivocation. -/
+theorem no_conflicting_commits_across_run
+    {State : Type u} {Decision : Type v} {Certificate : Type w} {Party : Type x}
+    {M : Model State Decision Certificate Party}
+    (a : Assumptions M) (r : Run M) {i j : Nat} {d₁ d₂ : Decision}
+    (h₁ : Committed M (r.state i) d₁) (h₂ : Committed M (r.state j) d₂) :
+    ¬ M.conflicts d₁ d₂ := by
+  classical
+  rcases h₁ with ⟨c₁, hc₁⟩
+  rcases h₂ with ⟨c₂, hc₂⟩
+  obtain ⟨p, hp₁, hp₂, hH⟩ := honest_in_inter _ _ a.validators a.byzantine
+    a.params.n a.params.f a.params.q (a.certSignersValidators hc₁)
+    (a.certSignersValidators hc₂) a.validatorCount a.byzantineBound
+    (a.certQuorumSize hc₁) (a.certQuorumSize hc₂) a.threshold
+  exact a.honestNoEquivocation hH
+    (r.signedMono (le_max_left i j) (a.certSignaturesGenuine hc₁ hp₁))
+    (r.signedMono (le_max_right i j) (a.certSignaturesGenuine hc₂ hp₂))
+
 end QuorumGeometry
 end Distributed

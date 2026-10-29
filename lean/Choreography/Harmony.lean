@@ -3,6 +3,7 @@ import Choreography.Harmony.Substitution
 import Choreography.Harmony.ParticipantSteps
 import Choreography.Harmony.NonParticipantHelpers
 import Choreography.Harmony.NonParticipantSteps
+import Choreography.Harmony.EnvStepHarmony
 
 /- 
 The Problem. The harmony development is split across multiple focused files,
@@ -111,8 +112,9 @@ Harmony between global steps and environment steps.
 
 The following definitions form the semantic interface for proofs:
 
-- `Claims`: bundle of harmony properties
-- `step_harmony`: global step induces matching env step
+- `Claims`: bundle of harmony properties (EnvStepHarmony.lean)
+- `step_harmony`: head-communication global step induces an independent `EnvStep`
+- `envstep_realizable`: converse for projected head communications
 - `proj_trans_other_step`: non-participant projection unchanged after step
 
 ## Technical Debt Summary (legacy gaps removed; assumption-free in this file)

@@ -85,6 +85,7 @@ lean_lib Entropy where
 lean_lib FisherInformation where
   globs := #[
     `FisherInformationAPI,
+    `FisherInformationAPI.*,
     `FisherInformationInstance,
     `FisherInformationInstance.*
   ]

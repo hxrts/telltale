@@ -82,7 +82,10 @@ def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] 
     pickRunnableInQueue .roundRobin st' st'.sched.readyQueue =
       pickRunnableInQueue st'.sched.policy st' st'.sched.readyQueue
 
-def starvation_free {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- One-step non-blocking scheduling: if some ready coroutine is queued, `schedule`
+returns a step. This is NOT fairness or starvation freedom; it says nothing
+about which coroutine runs or whether a given one eventually runs. -/
+def schedule_nonblocking {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]

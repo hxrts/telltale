@@ -260,80 +260,69 @@ def mkProtocolMeanFieldProfile
     MeanFieldProfile :=
   mkMeanFieldProfile (ProtocolClassical.mkProtocolMeanFieldInput m)
 
-/-- Lift protocol spectral-gap termination witnesses into a runtime spectral-gap profile. -/
-def mkProtocolSpectralGapProfile
-    [DecidableEq ProtocolClassical.WTConfigN] [Fintype ProtocolClassical.WTConfigN]
-    (step : ProtocolClassical.FStep)
-    (gap_pos :
-      Classical.SpectralGapTermination.SpectralGapPos
-        (ProtocolClassical.wtConfigNMarkovChain step))
-    (termination :
-      Classical.SpectralGapTermination.TerminationWitness
-        (ProtocolClassical.wtConfigNMarkovChain step)) :
-    SpectralGapProfile ProtocolClassical.WTConfigN :=
-  mkSpectralGapProfile
-    (Classical.Transport.mkSpectralGapInput
-      (ProtocolClassical.wtConfigNMarkovChain step) gap_pos termination)
+/- `mkProtocolSpectralGapProfile` was removed: it instantiated the spectral
+interface on the deterministic 0/1 protocol kernel, whose spectral gap is
+degenerate (see `Protocol.Classical.SpectralGap`). -/
 
 /-! ## Packaged Classical Artifacts -/
 
-/-- Packaged Foster transport artifact. -/
+/-- Foster artifact; deterministic potential bound derived from the drift input. -/
 structure FosterArtifact (State : Type v) where
   profile : FosterProfile State
   proof : Classical.Transport.FosterConclusion profile.input
 
-/-- Packaged MaxWeight transport artifact. -/
+/-- MaxWeight artifact; `proof` is the assumed classical input `choice.optimal`. -/
 structure MaxWeightArtifact where
   profile : MaxWeightProfile
   proof : @Classical.Transport.MaxWeightConclusion
     profile.ι profile.instFintype profile.input
 
-/-- Packaged LDP transport artifact. -/
+/-- LDP artifact; derived from an assumed `LDPWitness`. -/
 structure LDPArtifact where
   profile : LDPProfile
   proof : Classical.Transport.LDPConclusion profile.input
 
-/-- Packaged mean-field transport artifact. -/
+/-- Mean-field artifact; elementary reindexing identity only. -/
 structure MeanFieldArtifact where
   profile : MeanFieldProfile
   proof : Classical.Transport.MeanFieldConclusion profile.input
 
-/-- Packaged heavy-traffic transport artifact. -/
+/-- Heavy-traffic artifact; elementary `(σ√n)² = σ²n` identity only. -/
 structure HeavyTrafficArtifact where
   profile : HeavyTrafficProfile
   proof : Classical.Transport.HeavyTrafficConclusion profile.input
   diffusionScaleLaw : Classical.Transport.HeavyTrafficDiffusionScaleLaw profile.input
 
-/-- Packaged mixing-time transport artifact. -/
+/-- Mixing artifact; derived from an assumed `MixingWitness`. -/
 structure MixingArtifact where
   profile : MixingProfile
   proof : Classical.Transport.MixingConclusion profile.input
 
-/-- Packaged fluid-limit transport artifact. -/
+/-- Fluid artifact; derived from an assumed `FluidDescentWitness`. -/
 structure FluidArtifact where
   profile : FluidProfile
   proof : Classical.Transport.FluidConclusion profile.input
 
-/-- Packaged concentration transport artifact. -/
+/-- Concentration artifact; `tailBound` is the assumed classical input. -/
 structure ConcentrationArtifact where
   profile : ConcentrationProfile
   proof : Classical.Transport.ConcentrationConclusion profile.input
   tailBound : Classical.Transport.ConcentrationTailConclusion profile.input
 
-/-- Packaged Little's-law transport artifact. -/
+/-- Little's-law artifact; `proof` is the assumed classical input `law`. -/
 structure LittlesLawArtifact where
   profile : LittlesLawProfile
   proof : Classical.Transport.LittlesLawConclusion profile.input
   waitTime : Classical.Transport.LittlesLawWaitTimeConclusion profile.input
   throughput : Classical.Transport.LittlesLawThroughputConclusion profile.input
 
-/-- Packaged functional-CLT transport artifact. -/
+/-- Functional-CLT artifact; degenerate constant-path identity, not a CLT. -/
 structure FunctionalCLTArtifact where
   profile : FunctionalCLTProfile
   proof : Classical.Transport.FunctionalCLTConclusion profile.input
   scaledProcessLaw : Classical.Transport.FunctionalCLTScaledProcessLaw profile.input
 
-/-- Packaged spectral-gap termination transport artifact. -/
+/-- Spectral-gap artifact; `proof` is the assumed `termination.bounded_by_gap`. -/
 structure SpectralGapArtifact (State : Type v) where
   profile : SpectralGapProfile State
   proof :
@@ -346,22 +335,20 @@ def fosterArtifactOfProfile
     {State : Type v}
     (p : FosterProfile State) : FosterArtifact State :=
   { profile := p
-  , proof := Classical.Transport.transported_foster_lyapunov (input := p.input)
+  , proof := Classical.Transport.foster_conclusion_of_input (input := p.input)
   }
 
 def maxWeightArtifactOfProfile
     (p : MaxWeightProfile) : MaxWeightArtifact :=
   letI : Fintype p.ι := p.instFintype
   { profile := p
-  , proof := by
-      simpa using
-        (Classical.Transport.transported_max_weight (ι := p.ι) (input := p.input))
+  , proof := p.input.choice.optimal
   }
 
 def ldpArtifactOfProfile
     (p : LDPProfile) : LDPArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_ldp p.input
+  , proof := Classical.Transport.ldp_conclusion_of_input p.input
   }
 
 /-! ## Artifact Constructors: Extended Profiles -/
@@ -369,50 +356,48 @@ def ldpArtifactOfProfile
 def meanFieldArtifactOfProfile
     (p : MeanFieldProfile) : MeanFieldArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_mean_field p.input
+  , proof := Classical.Transport.mean_field_permutation_invariant p.input
   }
 
 def heavyTrafficArtifactOfProfile
     (p : HeavyTrafficProfile) : HeavyTrafficArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_heavy_traffic p.input
-  , diffusionScaleLaw :=
-      Classical.Transport.transported_heavy_traffic_diffusion_scale_law p.input
+  , proof := Classical.Transport.heavy_traffic_scaled_variance_identity p.input
+  , diffusionScaleLaw := Classical.Transport.heavy_traffic_scaled_variance_identity p.input
   }
 
 def mixingArtifactOfProfile
     (p : MixingProfile) : MixingArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_mixing p.input
+  , proof := Classical.Transport.mixing_conclusion_of_input p.input
   }
 
 def fluidArtifactOfProfile
     (p : FluidProfile) : FluidArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_fluid_limit p.input
+  , proof := Classical.Transport.fluid_conclusion_of_input p.input
   }
 
 def concentrationArtifactOfProfile
     (p : ConcentrationProfile) : ConcentrationArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_concentration p.input
-  , tailBound := Classical.Transport.transported_concentration_tail p.input
+  , proof := Classical.Transport.concentration_conclusion_of_input p.input
+  , tailBound := p.input.witness.tail_upper
   }
 
 def littlesLawArtifactOfProfile
     (p : LittlesLawProfile) : LittlesLawArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_littles_law p.input
-  , waitTime := Classical.Transport.transported_littles_law_wait_time p.input
-  , throughput := Classical.Transport.transported_littles_law_throughput p.input
+  , proof := p.input.law
+  , waitTime := Classical.Transport.littles_law_wait_time_of_input p.input
+  , throughput := Classical.Transport.littles_law_throughput_of_input p.input
   }
 
 def functionalCLTArtifactOfProfile
     (p : FunctionalCLTProfile) : FunctionalCLTArtifact :=
   { profile := p
-  , proof := Classical.Transport.transported_functional_clt p.input
-  , scaledProcessLaw :=
-      Classical.Transport.transported_functional_clt_scaled_process_law p.input
+  , proof := Classical.Transport.constant_path_scaled_process_zero p.input
+  , scaledProcessLaw := Classical.Transport.constant_path_scaled_process_zero p.input
   }
 
 def spectralGapArtifactOfProfile
@@ -421,7 +406,7 @@ def spectralGapArtifactOfProfile
   letI : Fintype State := p.instFintype
   letI : DecidableEq State := p.instDecidableEq
   { profile := p
-  , proof := Classical.Transport.transported_spectral_gap_termination p.input
+  , proof := p.input.termination.bounded_by_gap
   }
 
 /-! ## Artifact Extraction Theorems -/

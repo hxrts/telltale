@@ -49,7 +49,6 @@ The following definitions form the semantic interface for proofs:
 namespace Semantics.DeadlockFreedom
 
 open SessionTypes.GlobalType
-open SessionCoTypes.Quotient
 open Choreography.Projection.Project
 open Semantics.SubjectReduction
 
@@ -258,7 +257,7 @@ theorem deadlock_free_trichotomy (c : Configuration) (hwf : c.globalType.wellFor
 
 /-- Advance one process for the head step taking continuation `g'`. -/
 def advanceProcess (g' : GlobalType) (act : GlobalActionR) (p : Process) : Process :=
-  if Participant act p.role then { p with localType := QLocalTypeR.ofLocal (trans g' p.role) }
+  if Participant act p.role then { p with localType := trans g' p.role }
   else p
 
 /-- `advanceProcess` realizes `ProcessAdvance` for a head communication step. -/

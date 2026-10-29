@@ -7,8 +7,9 @@ set_option autoImplicit false
 Semantic constructors for transported classical theorem inputs.
 
 These helpers build transport inputs from family-level assumptions and witnesses.
-They do not store final theorem conclusions; downstream theorem packs still derive
-conclusions through `Classical.Transport.Theorems`.
+They do not store final theorem conclusions; downstream theorem packs obtain
+conclusions through `Classical.Transport.Theorems` or, for families whose
+conclusion is itself an assumed input, directly from the witness field.
 -/
 
 namespace Classical
@@ -28,7 +29,7 @@ def mkFosterInput
   , step_agrees := step_agrees
   }
 
-/-- Build a MaxWeight input from an optimal protocol schedule. -/
+/-- Build a MaxWeight input; `optimal` is an assumed classical input. -/
 def mkMaxWeightInput
     {ι : Type} [Fintype ι]
     (q : ι → Real)
@@ -95,7 +96,7 @@ def mkConcentrationInput
   , witness := witness
   }
 
-/-- Build a Little's-law input from steady-state queueing quantities. -/
+/-- Build a Little's-law input; `law` is an assumed classical input. -/
 def mkLittlesLawInput
     (lam W L : Real)
     (law : L = lam * W) :
@@ -106,7 +107,7 @@ def mkLittlesLawInput
   , law := law
   }
 
-/-- Build a functional-CLT input for the constant centering instance. -/
+/-- Build the degenerate constant-path functional-CLT input (not a CLT instance). -/
 def mkFunctionalCLTInput
     (c : Real)
     (N t : Nat)
@@ -120,7 +121,7 @@ def mkFunctionalCLTInput
   , mean_eq_const := rfl
   }
 
-/-- Build a spectral-gap termination input from chain, gap, and termination witnesses. -/
+/-- Build a spectral-gap input; `termination` carries the assumed `τ ≤ 1/γ` bound. -/
 def mkSpectralGapInput
     {State : Type u} [Fintype State] [DecidableEq State]
     (chain : SpectralGapTermination.MarkovChain State)

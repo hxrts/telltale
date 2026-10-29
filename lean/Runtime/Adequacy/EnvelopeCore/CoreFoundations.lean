@@ -180,9 +180,31 @@ theorem local_exact_iff_sharded_exact_of_collapse
   · intro hShard
     exact local_exact_of_sharded_exact_and_collapse hShard hCollapse
 
-/-! ## Phase E1 Premises and Projections -/
+/-! ## Maximality Is Definitional -/
 
-/-- Premises bundle for Phase E1 local/sharded exact-characterization extraction. -/
+/-- Local maximality holds for every envelope: as stated, the schema is
+`P → P` for the relation `R`, so it carries no information beyond its
+hypothesis. Kept as a theorem so it is never supplied as a premise. -/
+theorem local_envelope_maximality
+    {State : Type u} {Obs : Type v}
+    (E : LocalEnvelope State Obs) (RefRun ImplRun : Run State → Prop) :
+    LocalEnvelopeMaximality E RefRun ImplRun :=
+  fun _ hR => hR
+
+/-- Sharded maximality holds for every envelope (see `local_envelope_maximality`). -/
+theorem sharded_envelope_maximality
+    {State : Type u} {Obs : Type v}
+    (E : ShardedEnvelope State Obs) (RefRun ImplRun : Run State → Prop) :
+    ShardedEnvelopeMaximality E RefRun ImplRun :=
+  fun _ hR => hR
+
+/-! ## Phase E1 Premises -/
+
+/-- Premises bundle for Phase E1 local/sharded exact characterization.
+
+Soundness and realizability are assumed inputs (they constrain arbitrary
+run predicates and cannot be derived). Maximality is not a premise: it is
+proved by `local_envelope_maximality` / `sharded_envelope_maximality`. -/
 structure EnvelopePhaseE1Premises (State : Type u) (Obs : Type v) where
   localEnvelope : LocalEnvelope State Obs
   shardedEnvelope : ShardedEnvelope State Obs
@@ -190,78 +212,40 @@ structure EnvelopePhaseE1Premises (State : Type u) (Obs : Type v) where
   localImplRun : Run State → Prop
   shardedRefRun : Run State → Prop
   shardedImplRun : Run State → Prop
-  localSoundnessWitness :
+  /-- Assumed input. -/
+  assumedLocalSoundness :
     LocalEnvelopeSoundness localEnvelope localRefRun localImplRun
-  shardedSoundnessWitness :
+  /-- Assumed input. -/
+  assumedShardedSoundness :
     ShardedEnvelopeSoundness shardedEnvelope shardedRefRun shardedImplRun
-  localRealizabilityWitness :
+  /-- Assumed input. -/
+  assumedLocalRealizability :
     LocalEnvelopeRealizability localEnvelope localRefRun localImplRun
-  shardedRealizabilityWitness :
+  /-- Assumed input. -/
+  assumedShardedRealizability :
     ShardedEnvelopeRealizability shardedEnvelope shardedRefRun shardedImplRun
-  localMaximalityWitness :
-    LocalEnvelopeMaximality localEnvelope localRefRun localImplRun
-  shardedMaximalityWitness :
-    ShardedEnvelopeMaximality shardedEnvelope shardedRefRun shardedImplRun
-
-/-- Extract local envelope soundness from E1 premises. -/
-theorem local_envelope_soundness_of_e1_premises
-    {State : Type u} {Obs : Type v}
-    (p : EnvelopePhaseE1Premises State Obs) :
-    LocalEnvelopeSoundness p.localEnvelope p.localRefRun p.localImplRun :=
-  p.localSoundnessWitness
-
-/-- Extract sharded envelope soundness from E1 premises. -/
-theorem sharded_envelope_soundness_of_e1_premises
-    {State : Type u} {Obs : Type v}
-    (p : EnvelopePhaseE1Premises State Obs) :
-    ShardedEnvelopeSoundness p.shardedEnvelope p.shardedRefRun p.shardedImplRun :=
-  p.shardedSoundnessWitness
-
-/-- Extract local envelope realizability/completeness from E1 premises. -/
-theorem local_envelope_realizability_of_e1_premises
-    {State : Type u} {Obs : Type v}
-    (p : EnvelopePhaseE1Premises State Obs) :
-    LocalEnvelopeRealizability p.localEnvelope p.localRefRun p.localImplRun :=
-  p.localRealizabilityWitness
-
-/-- Extract sharded envelope realizability/completeness from E1 premises. -/
-theorem sharded_envelope_realizability_of_e1_premises
-    {State : Type u} {Obs : Type v}
-    (p : EnvelopePhaseE1Premises State Obs) :
-    ShardedEnvelopeRealizability p.shardedEnvelope p.shardedRefRun p.shardedImplRun :=
-  p.shardedRealizabilityWitness
-
-/-- Extract local envelope maximality from E1 premises. -/
-theorem local_envelope_maximality_of_e1_premises
-    {State : Type u} {Obs : Type v}
-    (p : EnvelopePhaseE1Premises State Obs) :
-    LocalEnvelopeMaximality p.localEnvelope p.localRefRun p.localImplRun :=
-  p.localMaximalityWitness
-
-/-- Extract sharded envelope maximality from E1 premises. -/
-theorem sharded_envelope_maximality_of_e1_premises
-    {State : Type u} {Obs : Type v}
-    (p : EnvelopePhaseE1Premises State Obs) :
-    ShardedEnvelopeMaximality p.shardedEnvelope p.shardedRefRun p.shardedImplRun :=
-  p.shardedMaximalityWitness
 
 /-! ## E1 Exactness Packaging -/
 
-/-- Package local exact characterization from E1 premises. -/
+/-- Local exact characterization from the assumed soundness/realizability
+premises plus proved maximality. -/
 theorem local_exact_envelope_characterization_of_e1_premises
     {State : Type u} {Obs : Type v}
     (p : EnvelopePhaseE1Premises State Obs) :
     LocalExactEnvelopeCharacterization
-      p.localEnvelope p.localRefRun p.localImplRun := by
-  exact ⟨p.localSoundnessWitness, p.localRealizabilityWitness, p.localMaximalityWitness⟩
+      p.localEnvelope p.localRefRun p.localImplRun :=
+  ⟨p.assumedLocalSoundness, p.assumedLocalRealizability,
+    local_envelope_maximality _ _ _⟩
 
-/-- Package sharded exact characterization from E1 premises. -/
+/-- Sharded exact characterization from the assumed soundness/realizability
+premises plus proved maximality. -/
 theorem sharded_exact_envelope_characterization_of_e1_premises
     {State : Type u} {Obs : Type v}
     (p : EnvelopePhaseE1Premises State Obs) :
     ShardedExactEnvelopeCharacterization
-      p.shardedEnvelope p.shardedRefRun p.shardedImplRun := by
-  exact ⟨p.shardedSoundnessWitness, p.shardedRealizabilityWitness, p.shardedMaximalityWitness⟩
+      p.shardedEnvelope p.shardedRefRun p.shardedImplRun :=
+  ⟨p.assumedShardedSoundness, p.assumedShardedRealizability,
+    sharded_envelope_maximality _ _ _⟩
 
 end Adequacy
 end Runtime

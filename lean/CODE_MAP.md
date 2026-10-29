@@ -39,7 +39,7 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | SessionCoTypes |    78 |  16,302 | Coinductive EQ2, bisimulation, duality, async subtyping    |
 | Choreography   |    89 |  19,361 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
-| Classical      |    17 |   2,439 | Transported theorems (queueing, large deviations, mixing)  |
+| Classical      |    17 |   2,439 | Conditional interfaces over assumed classical inputs       |
 | ClassicalAnalysis |     3 |   1,508 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   170 |  40,152 | Async buffered MPST, coherence, preservation, monitoring   |
@@ -100,11 +100,12 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 
 | File | Lines | Description |
 |------|-------|-------------|
-| LocalTypeConv.lean | 187 | Named ↔ de Bruijn conversions |
+| LocalTypeConv.lean | 234 | Named ↔ de Bruijn conversions; roundtrip/contractiveness over `GeneratedContext` |
 | LocalTypeConvDefs.lean | 210 | Conversion definition predicates |
 | LocalTypeConvProofs/Helpers.lean | 433 | Soundness of named → de Bruijn |
 | LocalTypeConvProofs/ClosedRoundtrip.lean | 404 | Completeness of named → de Bruijn |
-| LocalTypeConvProofs/Roundtrip.lean | 575 | Substitution equivalence under conversion |
+| LocalTypeConvProofs/Roundtrip/General.lean | 380 | Guardedness/contractiveness preservation (named → DB) |
+| LocalTypeConvProofs/Roundtrip/Contractive.lean | 225 | Guardedness/contractiveness preservation (DB → named, generated contexts) |
 | LocalTypeRDBBridge.lean | 47 | Bridge between LocalTypeR and LocalTypeDB |
 
 ### Supporting Modules
@@ -213,7 +214,7 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 | Observable.lean | 394 | Membership predicates for observable behavior |
 | Dual.lean | 266 | Duality lemmas |
 | FullUnfold.lean | 265 | Full unfolding with termination argument |
-| Quotient.lean | 111 | Quotient by EQ2 equivalence |
+| Quotient.lean | 132 | Quotient by EQ2 (warning: subsingleton via `eq2_mu_var_self`; not used semantically) |
 | DBBridge.lean | 50 | Bridge lemmas for de Bruijn |
 | Coinductive/Bisim.lean | 84 | Coinductive bisimulation definition |
 | Coinductive/BisimHelpers.lean | 322 | Bisimulation helpers |
@@ -228,8 +229,8 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 | File | Lines | Description |
 |------|-------|-------------|
 | AsyncSubtyping.lean | 39 | Re-export wrapper for async subtyping module |
-| AsyncSubtyping/Core.lean | 382 | AsyncTriple, MsgBuffer, 7 async step rules, AsyncSubtypeRel coinductive relation |
-| AsyncSubtyping/Decidable.lean | 381 | checkAsync worklist algorithm, isAsyncSubtype decision function, soundness/completeness |
+| AsyncSubtyping/Core.lean | 344 | AsyncTriple, MsgBuffer, 7 async step rules, AsyncSubtypeRel coinductive relation |
+| AsyncSubtyping/Decidable.lean | 395 | Sound bounded checker: checkAsync worklist exploration (accepted/stuck/outOfFuel), check_async_sound; async subtyping is undecidable, no completeness claimed |
 
 Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.lean, Coinductive/BisimDecidable.lean, Coinductive/Roundtrip.lean.
 
@@ -294,15 +295,16 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Harmony.lean | 150 | Main harmony structure |
+| Harmony.lean | 161 | Main harmony structure |
 | Harmony/MuUnfoldLemmas.lean | 257 | Mu-unfolding auxiliary lemmas |
 | Harmony/StepProjection.lean | 255 | Projection preserves stepping semantics |
 | Harmony/SubstEndUnguarded.lean | 239 | Substitution with guardedness constraints |
-| Harmony/StepHarmony.lean | 423 | Main structure |
+| Harmony/StepHarmony.lean | 409 | Projection coherence and trans/CProject bridge |
 | Harmony/Substitution.lean | 519 | Communication handling |
 | Harmony/ParticipantSteps.lean | 533 | Branching |
 | Harmony/NonParticipantHelpers.lean | 126 | Recursion |
-| Harmony/NonParticipantSteps.lean | 147 | Final properties |
+| Harmony/NonParticipantSteps.lean | 138 | Non-participant projection stability |
+| Harmony/EnvStepHarmony.lean | 172 | step_harmony (head steps ⇒ EnvStep), envstep_realizable (converse), Claims |
 
 ### Supporting Modules
 
@@ -335,35 +337,35 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | File | Lines | Description |
 |------|-------|-------------|
 | Environment.lean | 299 | Environment configuration (message queues, timeouts, actions) |
-| EnvStep.lean | 191 | Environment-step relation |
+| EnvStep.lean | 203 | projEnv / EnvStep on representative (`LocalTypeR`) envs |
 | Typing.lean | 23 | Typing judgment interface |
 | Determinism/Core.lean | 600 | Determinism proof part 1 |
 | Determinism/Diamond.lean | 516 | Determinism proof part 2 |
-| DeadlockFreedom.lean | 293 | Deadlock freedom with fairness |
-| SubjectReduction.lean | 201 | Subject reduction for well-typed processes |
+| DeadlockFreedom.lean | 353 | Deadlock freedom for comm-headed configs (representative local types) |
+| SubjectReduction.lean | 363 | Head-step subject reduction; typing = WF ∧ EQ2 to projection |
 
 ---
 
 ## Classical
 
 **Root Module:** `Classical.lean`
-**Description:** Transported theorems from queueing theory, probability, and stochastic processes, organized into family kernels and a layered transport API.
+**Description:** Honest conditional interfaces (Option B) for classical results from queueing theory, probability, and stochastic processes. Named classical theorems are assumed inputs carried by `*Witness`/`*Input` fields; Lean proves only consequences derived from them or elementary identities. Organized into family kernels and a layered transport API.
 
 ### Families
 
 | File | Description |
 |------|-------------|
-| Families/FosterLyapunovHarris.lean | Foster-Lyapunov-Harris theorem for stability/recurrence |
-| Families/MaxWeightBackpressure.lean | MaxWeight scheduling optimality and backpressure |
-| Families/LargeDeviationPrinciple.lean | Large deviation bounds for rare events |
-| Families/HeavyTrafficDiffusion.lean | Heavy traffic diffusion limits |
-| Families/MixingTimeBounds.lean | Mixing-time bounds for Markov chains |
-| Families/FluidLimitStability.lean | Fluid-limit stability analysis |
-| Families/ConcentrationInequalities.lean | Concentration inequalities |
-| Families/LittlesLaw.lean | Little's law identities |
-| Families/FunctionalCLT.lean | Functional central limit theorem |
-| Families/PropagationOfChaos.lean | Mean-field limits and propagation of chaos |
-| Families/SpectralGapTermination.lean | Spectral-gap / Cheeger / hitting-time interfaces |
+| Families/FosterLyapunovHarris.lean | Deterministic drift systems; potential reaches zero within `V s` steps (no stochastic Harris recurrence) |
+| Families/MaxWeightBackpressure.lean | MaxWeight weight function; optimality is an assumed input |
+| Families/LargeDeviationPrinciple.lean | Exponential envelopes; tail bound is an assumed input |
+| Families/HeavyTrafficDiffusion.lean | √n-scaling identities (`scaled_variance_identity`); no diffusion limit |
+| Families/MixingTimeBounds.lean | Geometric envelopes; distance bound is an assumed input |
+| Families/FluidLimitStability.lean | Energy monotonicity from an assumed descent inequality |
+| Families/ConcentrationInequalities.lean | Sub-Gaussian tail form; tail bound is an assumed input |
+| Families/LittlesLaw.lean | Rearrangements of L = λW; the law itself is an assumed input |
+| Families/FunctionalCLT.lean | Centering/partial-sum identities; no functional CLT |
+| Families/PropagationOfChaos.lean | Finite-average identities (`mean_permutation_invariant`); no mean-field limit |
+| Families/SpectralGapTermination.lean | Spectral-gap vocabulary; Cheeger/hitting-time/stationarity are assumed witnesses |
 
 ### Transport Layers
 
@@ -596,8 +598,8 @@ Protocol-specific instantiation of the classical transport framework.
 |------|-------|-------------|
 | Classical/Regime.lean | 74 | Classical regime definition, totality, determinism, exchangeability |
 | Classical/Framework.lean | 126 | TransportFramework, step induction, classical regime instantiation |
-| Classical/TransportLedger.lean | 88 | Ledger bookkeeping for transported theorem discharge planning |
-| Classical/SpectralGap.lean | 97 | Spectral gap bounds, mixing time analysis, Cheeger inequality interface |
+| Classical/TransportLedger.lean | 88 | Ledger bookkeeping; entries marked conditional-on-assumed-input or elementary |
+| Classical/SpectralGap.lean | 97 | Deterministic 0/1 protocol chain (degenerate spectrum; no spectral claims) |
 | Classical/Instantiation.lean | 474 | Protocol-facing instantiation (Foster-Lyapunov, MaxWeight, Mean-field) |
 
 ---
@@ -776,16 +778,16 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Adequacy/Adequacy.lean | 297 | Adequacy theorem connecting WP to execution |
 | Adequacy/CompileRefinesEffectBisim.lean | 39 | Compilation refinement via effect bisimulation |
 | Adequacy/EnvelopeCore.lean | 54 | V2: Envelope core re-exports |
-| Adequacy/EnvelopeCore/CoreFoundations.lean | 267 | V2: Core envelope definitions and axioms |
+| Adequacy/EnvelopeCore/CoreFoundations.lean | 267 | V2: Core envelope definitions; E1 soundness/realizability are assumed premises, maximality is proved (definitional) |
 | Adequacy/EnvelopeCore/AdmissionLogic.lean | 379 | V2: Runtime admission checks and capability gates |
-| Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence proofs for determinism envelope |
-| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration with coherence |
+| Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence; adequacy/full abstraction derived, spatial and capability monotonicity assumed |
+| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration; E2 protocol bridge properties are assumed premises (`assumed*`) |
 | Adequacy/EnvelopeCore/FailureTaxonomy.lean | 7 | V2: Failure taxonomy re-exports |
 | Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification plus explicit progress-failure taxonomy mapping |
 | Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | 112 | V2: Protocol-specific failure handling |
 
 ### Proofs
-| Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade unifying proof exports |
+| Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade: scheduler step facts (not refinements), handler-spec premise projections (`*_of_handler_spec`) |
 | Proofs/Contracts/DeterminismApi.lean | 105 | Determinism profile artifacts and hypothesis bundles for runtime gating |
 | Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided protocol machine policy |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
@@ -1007,7 +1009,7 @@ Four executables defined in lakefile.lean:
 
 | Library | Sorry Count | Status |
 |---------|------------:|--------|
-| SessionCoTypes | 0 | AsyncSubtyping/Core.lean, Decidable.lean — complete |
+| SessionCoTypes | 0 | AsyncSubtyping/Core.lean, Decidable.lean — sound bounded checker (async subtyping undecidable) |
 | Protocol | 0 | Coherence, CrashTolerance, Noninterference — complete |
 | Runtime | 0 | Progress, SchedulingBound, WeightedMeasure, Diamond — complete |
 | **Total** | **0** | **Fully proved** |
@@ -1084,7 +1086,7 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **protocol machine failure proofs/predicates?** → Runtime/Proofs/ProtocolMachine/Failure.lean, Runtime/Proofs/ProtocolMachine/FailurePredicates.lean
 - **Buffer boundedness?** → Protocol/BufferBoundedness.lean
 - **Protocol symmetry?** → Protocol/Symmetry.lean
-- **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean
+- **Spectral gap interface (assumed witnesses)?** → Classical/Families/SpectralGapTermination.lean
 - **protocol machine JSON runner?** → Runtime/Tests/ProtocolMachineRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)
 

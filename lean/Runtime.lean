@@ -15,6 +15,8 @@ import Runtime.ProgramLogic.GhostState
 import Runtime.ProgramLogic.CodeLoading
 import Runtime.Adequacy.Adequacy
 import Runtime.Adequacy.CommTraceAdequacy
+import Runtime.Adequacy.CommTraceMachine
+import Runtime.Proofs.ProtocolMachine.BufferConfluence
 import Runtime.Adequacy.CompileRefines
 import Runtime.Proofs.Concurrency
 import Runtime.Proofs.ConcurrencyThreaded

@@ -9,14 +9,12 @@ of a receiver by buffering messages. We need to define when S <: T (S is a
 subtype of T) in the presence of asynchronous communication.
 
 The difficulty is that async subtyping is coinductive (potentially infinite
-derivations for recursive types), but we want a decidable algorithm for
-regular types.
+derivations for recursive types) and undecidable even for regular types.
 
 Solution Structure.
 1. Define AsyncTriple (S, T, buffer) as the state of a subtyping check
 2. Define the async subtyping rules as a coinductive relation
-3. Prove that for regular types, the reachable triples are finite
-4. Build a decision procedure based on worklist exploration
+3. Build a sound bounded checker based on worklist exploration
 -/
 
 /-! # Async Subtyping for Session Types
@@ -33,8 +31,8 @@ asynchronously by buffering messages.
 
 ## Main Results
 
-- `reachable_triples_finite` : For regular types, reachable set is finite
-- `async_subtype_decidable` : Existence of decision procedure -/
+- `reachable_sub_in_reachable` / `reachable_sup_in_reachable` : reachable
+  triples only contain reachable subtypes and supertypes -/
 
 set_option linter.dupNamespace false
 
@@ -210,7 +208,7 @@ notation:50 S " ≤ₐ " T => AsyncSubtypeRel ⟨S, T, []⟩
 
 /-! ## Reachable Triples
 
-For decidability, we need to show the set of reachable triples is finite. -/
+Triples reachable from an initial configuration via `AsyncStep`. -/
 
 /-- One-step reachability between triples. -/
 def tripleStep (t₁ t₂ : AsyncTriple) : Prop :=
@@ -222,14 +220,12 @@ def tripleReachable (t₁ t₂ : AsyncTriple) : Prop :=
 
 /-- Set of all triples reachable from a given triple. -/
 def reachableTriples (t : AsyncTriple) : Set AsyncTriple :=
-  -- Specification-level reachable set used by the current decidability layer.
-  { t' | t' = t }
+  { t' | tripleReachable t t' }
 
 /-! ## Reachable Types
 
 Key observation: reachable triples only contain types reachable from the
-original types. Since reachable types of regular types are finite,
-and buffer lengths are bounded by a function of depth, the triple set is finite. -/
+original types. (Buffers, however, may grow without bound.) -/
 
 /-- Types appearing in reachable triples come from reachable types. -/
 theorem reachable_sub_in_reachable {t₀ t : AsyncTriple}
@@ -337,68 +333,12 @@ theorem reachable_sup_in_reachable {t₀ t : AsyncTriple}
         | inr heq =>
             left; rw [← heq]; exact Relation.ReflTransGen.single hBody
 
-/-! ## Buffer Bound
+/-! ## Undecidability Note
 
-In the current specification-level model, `reachableTriples` is the singleton
-set containing only the initial triple. Therefore the only reachable buffer is
-the initial buffer, and its length is an exact global bound. -/
-
-/-- Maximum buffer length in any reachable triple is bounded. -/
-def maxBufferBound (S T : LocalTypeC) : Nat :=
-  (AsyncTriple.initial S T).buffer.length
-
-/-- The initial async-subtyping buffer is empty. -/
-@[simp] theorem initial_buffer_empty (S T : LocalTypeC) :
-    (AsyncTriple.initial S T).buffer = [] := rfl
-
-/-- In this model, `maxBufferBound` is exactly zero. -/
-@[simp] theorem max_buffer_bound_eq_zero (S T : LocalTypeC) :
-    maxBufferBound S T = 0 := by
-  simp [maxBufferBound, AsyncTriple.initial]
-
-/-- Any reachable triple respects `maxBufferBound` on buffer length. -/
-theorem reachable_buffer_le_max_buffer_bound (S T : LocalTypeC)
-    {t : AsyncTriple}
-    (ht : t ∈ reachableTriples (AsyncTriple.initial S T)) :
-    t.buffer.length ≤ maxBufferBound S T := by
-  have hEq : t = AsyncTriple.initial S T := by
-    simpa [reachableTriples] using ht
-  subst hEq
-  simp [maxBufferBound]
-
-/-! ## Finiteness Theorem (Statement)
-
-For regular types, the set of reachable triples is finite. -/
-
-/-- For regular types S and T, the reachable triples form a finite set.
-
-**Proof idea:**
-- Reachable sub-types form a finite set (by regularity of S)
-- Reachable sup-types form a finite set (by regularity of T)
-- Buffer contents are labels from reachable types (finite)
-- Buffer length is bounded (by depth analysis)
-- Therefore: triple set ⊆ (finite types) × (finite types) × (finite buffers) -/
-  theorem reachable_triples_finite
-    (S T : LocalTypeC)
-    (_hS : Regular S)
-    (_hT : Regular T) :
-    Set.Finite (reachableTriples (AsyncTriple.initial S T)) := by
-  -- By definition, reachableTriples is a singleton set.
-  simp [reachableTriples]
-
-/-! ## Decidability (Existence)
-
-Given finiteness, decidability follows from standard arguments. -/
-
-/-- Async subtyping is decidable for regular types.
-
-This is an existence statement. The constructive algorithm is in Decidable.lean. -/
-theorem async_subtype_decidable
-    (S T : LocalTypeC)
-    (_hS : Regular S)
-    (_hT : Regular T) :
-    Nonempty (Decidable (S ≤ₐ T)) := by
-  classical
-  exact ⟨inferInstance⟩
+Reachable triples need not be finite even for regular types: for
+`S = μX. !q{a}.X` and any `T`, rule `sub_send_async` reaches buffers
+`[a]`, `[a, a]`, ... of unbounded length. Asynchronous subtyping is in fact
+undecidable for regular session types, so this development provides only a
+sound, bounded checker (`Decidable.lean`), not a decision procedure. -/
 
 end SessionCoTypes.AsyncSubtyping

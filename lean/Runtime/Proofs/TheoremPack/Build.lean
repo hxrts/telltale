@@ -63,6 +63,11 @@ structure ProtocolMachineTheoremPack
   protocolMachineEnvelopeAdmission? : Option ProtocolMachineEnvelopeAdmissionArtifact
   protocolEnvelopeBridge? : Option ProtocolEnvelopeBridgeArtifact
   proofCarryingMetadata : ProofCarryingArtifactMetadata
+  /- Classical artifacts (Option B). These are conditional on assumed classical
+  inputs or are elementary identities; none is a proof of the named classical
+  theorem. Evidence classes: `classicalEvidenceInventory` in
+  `Runtime.Proofs.TheoremPack.Inventory`. Assumed inputs: `maxWeight?`,
+  `concentration?` (tail), `littlesLaw?`, `spectralGapTermination?`. -/
   foster? : Option (Adapters.FosterArtifact State)
   maxWeight? : Option Adapters.MaxWeightArtifact
   ldp? : Option Adapters.LDPArtifact
@@ -161,7 +166,7 @@ def buildProtocolMachineTheoremPack
           { protocol := p
           , probabilisticSafety := Distributed.Nakamoto.probabilistic_safety_of_protocol p
           , settlementFinality := Distributed.Nakamoto.settlement_finality_of_protocol p
-          , livenessUnderChurn := Distributed.Nakamoto.liveness_under_churn_of_protocol p
+          , chainGrowth := Distributed.Nakamoto.chain_growth_of_protocol p
           }
   let reconfiguration? :=
     match space.distributed.reconfiguration? with

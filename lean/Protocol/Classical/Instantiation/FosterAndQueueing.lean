@@ -116,13 +116,15 @@ def protocolFosterInput
   { system := ProtocolDriftSystem step μ h
     step_agrees := rfl }
 
-/-- 3.9.1: call transported Foster-Lyapunov theorem on protocol instantiation. -/
-theorem protocol_transported_foster_lyapunov
+/-- 3.9.1: conditional on `FosterLivenessAssumptions`, the potential is
+non-increasing along iterates (deterministic drift; see `FosterDrain` for a
+fully proved instance of the assumptions). -/
+theorem protocol_foster_conclusion_of_assumptions
     (step : FStep) (μ : ProgressMeasureComponents)
     (h : FosterLivenessAssumptions step μ)
     (hSide : ProtocolFosterSideConditions) :
     Classical.Transport.FosterConclusion (protocolFosterInput step μ h hSide) := by
-  exact Classical.Transport.transported_foster_lyapunov
+  exact Classical.Transport.foster_conclusion_of_input
     (input := protocolFosterInput step μ h hSide)
 
 /-! ## Foster Iterate Bound (R.7) -/
@@ -134,7 +136,7 @@ theorem r7_lyapunov_potential_integration
     (hSide : ProtocolFosterSideConditions) :
     ∀ st n, protocolV μ ((step^[n]) st) ≤ protocolV μ st := by
   intro st n
-  exact protocol_transported_foster_lyapunov step μ h hSide st n
+  exact protocol_foster_conclusion_of_assumptions step μ h hSide st n
 
 /-! ## MaxWeight Instantiation -/
 
@@ -170,33 +172,11 @@ def mkProtocolMaxWeightInput {ι : Type} [Fintype ι]
   { q := queueWeightsFromBuffers bufferOccupancy
     choice := protocolMaxWeightChoice (queueWeightsFromBuffers bufferOccupancy) sched hOptimal }
 
-/-- MaxWeight scheduling optimality for protocol queue weights. -/
-theorem protocol_max_weight_optimality
-    {ι : Type} [Fintype ι]
-    (bufferOccupancy : ι → Nat)
-    (sched : ProtocolSchedule ι)
-    (hOptimal :
-      ∀ ν : ι → Real,
-        Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) ν ≤
-          Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) sched) :
-    ∀ ν : ι → Real,
-      Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) ν ≤
-        Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) sched := by
-  intro ν
-  exact hOptimal ν
-
-/-- 3.9.2: instantiate `MaxWeightInput` and call transported theorem. -/
-theorem protocol_transported_max_weight
-    {ι : Type} [Fintype ι]
-    (bufferOccupancy : ι → Nat)
-    (sched : ProtocolSchedule ι)
-    (hOptimal :
-      ∀ ν : ι → Real,
-        Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) ν ≤
-          Classical.MaxWeightBackpressure.weight (queueWeightsFromBuffers bufferOccupancy) sched) :
-    Classical.Transport.MaxWeightConclusion
-      (mkProtocolMaxWeightInput bufferOccupancy sched hOptimal) := by
-  exact transport_max_weight (mkProtocolMaxWeightInput bufferOccupancy sched hOptimal)
+/-
+MaxWeight optimality is an assumed classical input (`hOptimal`); the former
+`protocol_max_weight_optimality` / `protocol_transported_max_weight` theorems
+only returned that hypothesis and were removed. Use `hOptimal` directly.
+-/
 
 /-! ## Large-Deviation and Heavy-Traffic Instantiation -/
 
@@ -231,11 +211,11 @@ def mkProtocolLDPInputFromModel (m : ProtocolLDPModel) : LDPInput :=
   { p := m.p
     witness := protocolLDPWitness m }
 
-/-- Exponential tightening bound for protocol rare-event probabilities. -/
+/-- Conditional on the model's assumed exponential tail, one-step tightening. -/
 theorem protocol_ldp_tightening (m : ProtocolLDPModel) :
     ∀ n,
       m.p (n + 1) ≤ Classical.LargeDeviationPrinciple.exponentialEnvelope m.C m.ρ n := by
-  exact transport_ldp (input := mkProtocolLDPInputFromModel m)
+  exact Classical.Transport.ldp_conclusion_of_input (input := mkProtocolLDPInputFromModel m)
 
 /-- Diffusion-scale parameter extracted from arrival/service rates. -/
 def diffusionSigmaFromRates (arrivalRate serviceRate : Real) : Real :=
@@ -247,25 +227,27 @@ def mkProtocolHeavyTrafficInput
   { σ := diffusionSigmaFromRates arrivalRate serviceRate
     n := n }
 
-/-- 3.9.4: variance scaling law in near-capacity operation. -/
-theorem protocol_heavy_traffic_variance_scaling
+/-- 3.9.4: elementary identity `(σ√n)² = σ²n` at the protocol rates (not a
+heavy-traffic diffusion limit). -/
+theorem protocol_heavy_traffic_scaled_variance_identity
     (arrivalRate serviceRate : Real) (n : Nat) :
     Classical.Transport.HeavyTrafficConclusion
       (mkProtocolHeavyTrafficInput arrivalRate serviceRate n) := by
-  exact transport_heavy_traffic (mkProtocolHeavyTrafficInput arrivalRate serviceRate n)
+  exact Classical.Transport.heavy_traffic_scaled_variance_identity (mkProtocolHeavyTrafficInput arrivalRate serviceRate n)
 
 /-- Protocol-side constructor for the main-text LDP exemplar input. -/
 def mkProtocolLDPInput (p : Nat → Real)
     (w : Classical.LargeDeviationPrinciple.LDPWitness p) : LDPInput :=
   { p := p, witness := w }
 
-/-- Main-text discharged exemplar (SLA tails) via transported LDP theorem. -/
-theorem main_text_ldp_sla_tail
+/-- Main-text exemplar (SLA tails): conditional on an assumed `LDPWitness`,
+one-step envelope tightening. -/
+theorem main_text_ldp_sla_tail_of_witness
     (p : Nat → Real)
     (w : Classical.LargeDeviationPrinciple.LDPWitness p) :
     ∀ n,
       p (n + 1) ≤ Classical.LargeDeviationPrinciple.exponentialEnvelope w.C w.ρ n := by
-  exact transport_ldp (input := mkProtocolLDPInput p w)
+  exact Classical.Transport.ldp_conclusion_of_input (input := mkProtocolLDPInput p w)
 
 end ProtocolClassical
 

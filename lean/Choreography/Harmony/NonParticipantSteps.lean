@@ -2,7 +2,7 @@ import Choreography.Harmony.NonParticipantHelpers
 
 /-! # Choreography.Harmony.NonParticipantSteps
 
-Non-participant step preservation proof and Claims bundle.
+Non-participant step preservation proof.
 -/
 
 /-
@@ -134,33 +134,5 @@ theorem branches_step_preserves_trans (branches branches' : List (Label × Globa
       exact branches_step_preserves_trans_cons label g g' rest rest' act role hstep_g
         ih
         hclosed hwf hblind hns hnr
-
-/-! ## Claims Bundle -/
-
-/-- Domain containment for EnvStep: post-step domain is subset of pre-step domain.
-
-Note: EnvStep does NOT preserve domain equality because global steps can shrink
-the role set (step_roles_subset). Instead, we have containment.
-
-For domain equality, use EnvStepOnto which projects onto a fixed role set. -/
-
-
-theorem envstep_dom_subset {env env' : ProjectedEnv} {act : GlobalActionR}
-    (h : EnvStep env act env') :
-    ∀ p, p ∈ env'.map Prod.fst → p ∈ env.map Prod.fst := by
-  -- Reduce to the global step case and apply step_roles_subset.
-  cases h with
-  | of_global g g' _ hstep =>
-      intro p hp
-      simp only [proj_env_dom] at hp ⊢
-      exact step_roles_subset g g' _ hstep p hp
-
-/-- Build the claims bundle from proven theorems. -/
-
-
-def claims : Claims where
-  -- Package the main harmony theorems.
-  harmony := step_harmony
-  dom_subset := fun _ _ _ h => envstep_dom_subset h
 
 end Choreography.Harmony

@@ -458,7 +458,7 @@ def protocol_machine_deadlock_free_via_progress : Prop :=
 /-- protocol machine deadlock freedom holds: follows from scheduler liveness. -/
 theorem protocol_machine_deadlock_free_via_progress_holds : protocol_machine_deadlock_free_via_progress := by
   intro ι γ π ε ν _ _ _ _ _ _ _ _ _ _ _ _ st _hwf ⟨cid, hmem, hstatus⟩
-  have hsf := starvation_free_holds st
+  have hsf := schedule_nonblocking_holds st
   have hcid := hsf cid hmem
   match hcoro : st.coroutines[cid]? with
   | none =>

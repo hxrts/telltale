@@ -113,23 +113,20 @@ These properties hold when the context is "adequate" for the term being converte
 For closed terms, empty context is adequate. For open terms, the context must contain
 all free variables. -/
 
-/-- General round-trip requires adequate context.
-
-**Warning**: This assumes `ctx.Nodup` and a global freshness predicate
-(`∀ c, freshName c ∉ c`), plus `isClosedAt` for the current depth. Without these
-guarantees, this property may not hold. -/
+/-- General round-trip for contexts built by repeated fresh-name generation
+(the contexts `fromDB` itself produces under binders). -/
 theorem to_db_from_db_roundtrip (t : LocalTypeDB) (ctx : NameContext)
-    (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
+    (hgen : LocalTypeConvProofs.GeneratedContext ctx)
     (hclosed : t.isClosedAt ctx.length = true) :
   (t.fromDB ctx hclosed).toDB? ctx = some t :=
-  LocalTypeConvProofs.to_db_from_db_roundtrip t ctx h_nodup h_fresh hclosed
+  LocalTypeConvProofs.to_db_from_db_roundtrip_generated t ctx hgen hclosed
 
-/-- Branch version of round-trip. -/
+/-- Branch version of round-trip for generated contexts. -/
 theorem branches_to_db_from_db_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
-    (h_nodup : ctx.Nodup) (h_fresh : ∀ c, NameContext.freshName c ∉ c)
+    (hgen : LocalTypeConvProofs.GeneratedContext ctx)
     (hclosed : isClosedAtBranches ctx.length bs = true) :
   LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs :=
-  LocalTypeConvProofs.branches_to_db_from_db_roundtrip bs ctx h_nodup h_fresh hclosed
+  LocalTypeConvProofs.branches_to_db_from_db_roundtrip_generated bs ctx hgen hclosed
 
 /-! ## Guardedness and Contractiveness Preservation
 
@@ -143,11 +140,15 @@ theorem is_guarded_to_db (t : LocalTypeR) (ctx : Context) (x : String) (i : Nat)
   db.isGuarded i = true :=
   LocalTypeConvProofs.is_guarded_to_db t ctx x i db
 
-theorem is_guarded_from_db (t : LocalTypeDB) (ctx : NameContext) (i : Nat) :
-  t.isClosedAt (ctx.length) = true →
-  t.isGuarded i = true →
-  True := by
-  intro _ _; exact True.intro
+/-- Guardedness transfers from DB to named form: if index `i` is guarded in `t`
+and `i` names `v` uniquely in `ctx`, then `v` is guarded in `t.fromDB ctx`. -/
+theorem is_guarded_from_db (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v : String)
+    (hget : NameContext.get? ctx i = some v)
+    (huniq : ∀ j, NameContext.get? ctx j = some v → j = i)
+    (hclosed : t.isClosedAt ctx.length = true)
+    (hguard : t.isGuarded i = true) :
+  (t.fromDB ctx hclosed).isGuarded v = true :=
+  LocalTypeConvProofs.is_guarded_from_db_at t ctx i v hget huniq hclosed hguard
 
 theorem is_contractive_to_db (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB) :
   t.isContractive = true →
@@ -155,13 +156,14 @@ theorem is_contractive_to_db (t : LocalTypeR) (ctx : Context) (db : LocalTypeDB)
   db.isContractive = true :=
   LocalTypeConvProofs.is_contractive_to_db t ctx db
 
+/-- Contractiveness transfers from DB to named form over a generated context. -/
 theorem is_contractive_from_db (t : LocalTypeDB) (ctx : NameContext)
-    (h_fresh : ∀ c, NameContext.freshName c ∉ c) :
+    (hgen : LocalTypeConvProofs.GeneratedContext ctx) :
   t.isContractive = true →
   (hclosed : t.isClosedAt (ctx.length) = true) →
   (t.fromDB ctx hclosed).isContractive = true := by
   intro hcontr hclosed
-  exact LocalTypeConvProofs.is_contractive_from_db t ctx h_fresh hcontr hclosed
+  exact LocalTypeConvProofs.is_contractive_from_db t ctx hgen hcontr hclosed
 
 /-! ## Substitution Bridge (Named → DB) -/
 

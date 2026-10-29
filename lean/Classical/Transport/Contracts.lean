@@ -16,7 +16,13 @@ set_option autoImplicit false
 
 /-! # Classical.Transport.Contracts
 
-Input and conclusion contracts for transported theorem families.
+Input and conclusion contracts for the classical theorem families, as honest
+conditional interfaces (Option B). Inputs carry the *assumed* classical result
+as a witness field; conclusions are either consequences derived from it, the
+assumed field itself (MaxWeight, Little's law, concentration tail, spectral
+termination), or elementary identities needing no assumption (heavy traffic,
+mean field, the degenerate constant-path functional CLT).
+See `Classical.Transport.Theorems` for the classification.
 -/
 
 /-
@@ -43,13 +49,14 @@ structure FosterInput (State : Type u) (ctx : TransportCtx State) where
 /-- Naming-normalized alias: assumptions required for the Foster transport family. -/
 abbrev FosterAssumptions (State : Type u) (ctx : TransportCtx State) := FosterInput State ctx
 
+/-- Potential bound along iterates (derived from the drift input). -/
 def FosterConclusion {State : Type u} {ctx : TransportCtx State}
     (input : FosterInput State ctx) : Prop :=
   ∀ s n, input.system.V (input.system.step^[n] s) ≤ input.system.V s
 
 /-! ## MaxWeight Contracts -/
 
-/-- MaxWeight transport contract. -/
+/-- MaxWeight contract; `choice.optimal` is an assumed classical input. -/
 structure MaxWeightInput (ι : Type) [Fintype ι] where
   q : ι → Real
   choice : MaxWeightBackpressure.MaxWeightChoice q
@@ -57,6 +64,7 @@ structure MaxWeightInput (ι : Type) [Fintype ι] where
 /-- Naming-normalized alias: assumptions required for MaxWeight transport. -/
 abbrev MaxWeightAssumptions (ι : Type) [Fintype ι] := MaxWeightInput ι
 
+/-- MaxWeight optimality: identical to the assumed `choice.optimal` field. -/
 def MaxWeightConclusion {ι : Type} [Fintype ι]
     (input : MaxWeightInput ι) : Prop :=
   ∀ ν : ι → Real,
@@ -73,6 +81,7 @@ structure LDPInput where
 /-- Naming-normalized alias: assumptions required for LDP transport. -/
 abbrev LDPAssumptions := LDPInput
 
+/-- One-step tightening (derived from the assumed `LDPWitness`). -/
 def LDPConclusion (input : LDPInput) : Prop :=
   ∀ n, input.p (n + 1) ≤
     LargeDeviationPrinciple.exponentialEnvelope input.witness.C input.witness.ρ n
@@ -86,6 +95,7 @@ structure MeanFieldInput (n : Nat) where
 /-- Naming-normalized alias: assumptions required for mean-field transport. -/
 abbrev MeanFieldAssumptions (n : Nat) := MeanFieldInput n
 
+/-- Reindexing invariance of a finite average (elementary identity). -/
 def MeanFieldConclusion {n : Nat} (input : MeanFieldInput n) : Prop :=
   ∀ σ : Equiv.Perm (Fin n),
     PropagationOfChaos.empiricalMean (fun i => input.x (σ i)) =
@@ -101,10 +111,11 @@ structure HeavyTrafficInput where
 /-- Naming-normalized alias: assumptions required for heavy-traffic transport. -/
 abbrev HeavyTrafficAssumptions := HeavyTrafficInput
 
+/-- Elementary identity `(σ√n)² = σ²n`; not a diffusion limit. -/
 def HeavyTrafficConclusion (input : HeavyTrafficInput) : Prop :=
   (input.σ * HeavyTrafficDiffusion.diffusionScale input.n) ^ 2 = input.σ ^ 2 * input.n
 
-/-- Named heavy-traffic diffusion-scale law exposed to runtime theorem packs. -/
+/-- Alias of `HeavyTrafficConclusion` exposed to theorem packs (elementary identity). -/
 def HeavyTrafficDiffusionScaleLaw (input : HeavyTrafficInput) : Prop :=
   HeavyTrafficConclusion input
 
@@ -118,6 +129,7 @@ structure MixingInput where
 /-- Naming-normalized alias: assumptions required for mixing-time transport. -/
 abbrev MixingAssumptions := MixingInput
 
+/-- One-step envelope bound (derived from the assumed `MixingWitness`). -/
 def MixingConclusion (input : MixingInput) : Prop :=
   ∀ n, input.d (n + 1) ≤ MixingTimeBounds.geometricEnvelope input.witness.C input.witness.ρ n
 
@@ -131,6 +143,7 @@ structure FluidInput where
 /-- Naming-normalized alias: assumptions required for fluid-limit transport. -/
 abbrev FluidAssumptions := FluidInput
 
+/-- Energy monotonicity (derived from the assumed `FluidDescentWitness`). -/
 def FluidConclusion (input : FluidInput) : Prop :=
   ∀ n, FluidLimitStability.energy input.x (n + 1) ≤ FluidLimitStability.energy input.x n
 
@@ -144,10 +157,11 @@ structure ConcentrationInput where
 /-- Naming-normalized alias: assumptions required for concentration transport. -/
 abbrev ConcentrationAssumptions := ConcentrationInput
 
+/-- `p 0 ≤ 2` (derived from the assumed `ConcentrationWitness`). -/
 def ConcentrationConclusion (input : ConcentrationInput) : Prop :=
   input.p 0 ≤ 2
 
-/-- Full sub-Gaussian concentration tail bound. -/
+/-- Sub-Gaussian tail bound: identical to the assumed `witness.tail_upper`. -/
 def ConcentrationTailConclusion (input : ConcentrationInput) : Prop :=
   ∀ t, 0 ≤ t →
     input.p t ≤
@@ -161,6 +175,7 @@ abbrev LittlesLawInput := LittlesLaw.LittleInput
 /-- Naming-normalized alias: assumptions required for Little's-law transport. -/
 abbrev LittlesLawAssumptions := LittlesLawInput
 
+/-- `L = λW`: identical to the assumed `law` field. -/
 def LittlesLawConclusion (input : LittlesLawInput) : Prop :=
   input.L = input.lam * input.W
 
@@ -174,7 +189,9 @@ def LittlesLawThroughputConclusion (input : LittlesLawInput) : Prop :=
 
 /-! ## Functional CLT Contracts -/
 
-/-- Functional CLT transport contract. -/
+/-- Degenerate functional-CLT contract: `path_eq_const` and `mean_eq_const`
+force a constant path centred at its own value. No stochastic path or
+convergence is modelled; this is not a Donsker/functional CLT input. -/
 structure FunctionalCLTInput where
   c : Real
   N : Nat
@@ -188,16 +205,17 @@ structure FunctionalCLTInput where
 /-- Naming-normalized alias: assumptions required for functional-CLT transport. -/
 abbrev FunctionalCLTAssumptions := FunctionalCLTInput
 
+/-- Scaled process of the constant path is zero (elementary, degenerate). -/
 def FunctionalCLTConclusion (input : FunctionalCLTInput) : Prop :=
   FunctionalCLT.scaledProcess input.x input.μ input.N input.t = 0
 
-/-- Named path-level scaled-process centering law exposed to runtime theorem packs. -/
+/-- Alias of `FunctionalCLTConclusion` exposed to theorem packs (degenerate identity). -/
 def FunctionalCLTScaledProcessLaw (input : FunctionalCLTInput) : Prop :=
   FunctionalCLTConclusion input
 
 /-! ## Spectral-Gap Termination Contracts -/
 
-/-- Spectral-gap termination transport contract over a finite-state Markov chain. -/
+/-- Spectral-gap contract; `termination.bounded_by_gap` is an assumed classical input. -/
 structure SpectralGapInput (State : Type u) [Fintype State] [DecidableEq State] where
   chain : SpectralGapTermination.MarkovChain State
   gap_pos : SpectralGapTermination.SpectralGapPos chain
@@ -208,7 +226,7 @@ abbrev SpectralGapAssumptions
     (State : Type u) [Fintype State] [DecidableEq State] :=
   SpectralGapInput State
 
-/-- Expected termination is bounded by inverse spectral gap. -/
+/-- `τ ≤ 1 / γ`: identical to the assumed `termination.bounded_by_gap` field. -/
 def SpectralGapConclusion
     {State : Type u} [Fintype State] [DecidableEq State]
     (input : SpectralGapInput State) : Prop :=

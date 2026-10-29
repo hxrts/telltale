@@ -193,7 +193,7 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
   -- Extended Laws: Spectral Gap Identity
 
   spectral_gap_eq := by
-    -- The gap field is defined as `1 - secondSpectrumValue`.
+    -- Definitional: the gap field is defined as `1 - secondSpectrumValue`.
     intro State _ _ kernel
     simp [realAnalysisModel]
 

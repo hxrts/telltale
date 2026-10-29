@@ -3,6 +3,10 @@ import ClassicalAnalysisAPI
 
 /-! # Propagation of Chaos and Mean-Field Limits
 
+**Scope (Option B, honest conditional interface).** Only elementary identities about finite averages are proved (reindexing
+invariance, constant averages). No mean-field limit or asymptotic
+independence statement appears in this module.
+
 This module provides the mathematical foundation for analyzing large-scale
 session-typed systems where many participants interact. The "propagation of
 chaos" phenomenon describes how, in systems with many interacting components,
@@ -134,21 +138,18 @@ def empiricalMean [EntropyAPI.AnalysisModel] (x : Fin n → Real) : Real :=
 
     Relabeling sessions does not change the aggregate. This is the
     foundation of exchangeability: sessions are statistically equivalent. -/
-theorem empirical_total_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
+theorem total_permutation_invariant (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
     empiricalTotal (fun i => x (σ i)) = empiricalTotal x := by
   simpa [empiricalTotal] using
     (Fintype.sum_equiv σ (fun i => x (σ i)) x (by intro i; rfl))
 
 /-- The empirical mean is invariant under permutation of indices.
 
-    Relabeling sessions does not change the average. This permutation
-    invariance is the mathematical signature of propagation of chaos:
-    any subset of k sessions is statistically equivalent to any other
-    subset of k sessions.
-
-    For Coherence: this justifies analyzing "typical" session behavior
-    without tracking which specific sessions we are examining. -/
-theorem empirical_mean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
+    Elementary identity: a finite average is invariant under reindexing.
+    This is *not* propagation of chaos, which would require an interacting
+    n-particle system, a mean-field limit (McKean-Vlasov), and asymptotic
+    independence of k-marginals as n → ∞. -/
+theorem mean_permutation_invariant (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
     [EntropyAPI.AnalysisLaws] →
     empiricalMean (fun i => x (σ i)) = empiricalMean x := by
   intro _
@@ -162,7 +163,7 @@ theorem empirical_mean_perm (σ : Equiv.Perm (Fin n)) (x : Fin n → Real) :
 
     For protocols: if all sessions are in identical states, the
     aggregate behavior equals the individual behavior. -/
-theorem empirical_mean_const (c : Real) :
+theorem mean_const (c : Real) :
     [EntropyAPI.AnalysisLaws] →
     ∀ hn : n ≠ 0, empiricalMean (fun _ : Fin n => c) = c := by
   intro _ hn

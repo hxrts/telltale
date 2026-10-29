@@ -23,8 +23,14 @@ Theorem `common_prefix`: under that condition every reorganisation removes
 fewer than `k` blocks, so any prefix that is `k` blocks deep in the public
 chain at round `i` stays a prefix at every later round `j ≤ T`.
 
+Theorem `chain_growth`: under the same condition, every window of `n ≥ k`
+rounds adds at least `⌈n/2⌉` blocks to the public chain.
+
 Limitations, stated precisely: this is the deterministic core of the
-Bitcoin-backbone common-prefix argument. It does not model network delay,
+Bitcoin-backbone common-prefix argument. There is no network delay: honest
+parties see every honest block and every release in the round it happens.
+It does not model chain quality (the fraction of honest blocks in the
+adopted chain), participant churn,
 multiple simultaneous adversarial branches, or the probabilistic analysis
 showing that random mining satisfies the window condition with high
 probability.
@@ -209,6 +215,49 @@ theorem common_prefix {sched : Nat → Bool} {mint : Nat → Block}
     intro hjT
     exact deep_act (inv_produce (inv_run hR j)) hjT hW (hR.2 j)
       (deep_produce (ih (by omega)))
+
+/-! ## Chain Growth -/
+
+/-- Adversary actions never shorten the public chain: a release only adopts a
+strictly longer chain. -/
+theorem act_pub_le {t : Nat} {s s' : LCState Block} (hA : AdvAct t s s') :
+    s.pub.length ≤ s'.pub.length := by
+  cases hA with
+  | wait => exact le_rfl
+  | restart _ _ => exact le_rfl
+  | release hRel =>
+    simp only [List.length_append, List.length_take] at hRel ⊢
+    omega
+
+/-- One round grows the public chain by at least one block if the round is honest. -/
+theorem pub_step {sched : Nat → Bool} {mint : Nat → Block} {run : Nat → LCState Block}
+    (hR : IsRun sched mint run) (t : Nat) :
+    (run t).pub.length + (if sched t then 1 else 0) ≤ (run (t + 1)).pub.length := by
+  refine le_trans ?_ (act_pub_le (hR.2 t))
+  unfold produce; split <;> simp_all
+
+/-- Over `n` rounds from `t`, the public chain grows by at least the number of
+honest rounds. -/
+theorem pub_growth {sched : Nat → Bool} {mint : Nat → Block} {run : Nat → LCState Block}
+    (hR : IsRun sched mint run) (t : Nat) :
+    ∀ n, (run t).pub.length + honestIn sched t n ≤ (run (t + n)).pub.length
+  | 0 => by simp [honestIn]
+  | n + 1 => by
+    have := pub_growth hR t n
+    have := pub_step hR (t + n)
+    simp only [honestIn, ← Nat.add_assoc] at this ⊢
+    omega
+
+/-- Chain growth: under the window condition, every window of `n ≥ k` rounds
+ending by `T` adds at least `⌈n/2⌉` public blocks. -/
+theorem chain_growth {sched : Nat → Bool} {mint : Nat → Block} {run : Nat → LCState Block}
+    {k T : Nat} (hR : IsRun sched mint run) (hW : WindowHonestMajorityUpTo sched k T)
+    {t n : Nat} (hk : k ≤ n) (hT : t + n ≤ T) :
+    (run t).pub.length + (n + 1) / 2 ≤ (run (t + n)).pub.length := by
+  have h1 := pub_growth hR t n
+  have h2 := hW t (by omega) n (by omega) hT hk
+  have h3 := honestIn_add_advIn sched t n
+  omega
 
 end LongestChain
 end Nakamoto

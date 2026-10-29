@@ -2,6 +2,9 @@ import Mathlib
 
 /-! # Fluid Limit Stability
 
+**Scope (Option B, honest conditional interface).** The per-step energy descent is an assumed input (`FluidDescentWitness.descent`);
+only monotonicity consequences are proved. No fluid limit is constructed.
+
 This module provides the mathematical foundation for stability analysis of
 large-scale session-typed systems via fluid approximations. Fluid limits
 replace discrete stochastic systems with continuous deterministic flows,
@@ -102,7 +105,9 @@ namespace FluidLimitStability
 def energy (x : Nat → Real) (n : Nat) : Real :=
   (x n) ^ 2
 
-/-- A `FluidDescentWitness` certifies that energy dissipates.
+/-- Assumed input (Option B): a per-step energy-descent inequality for `x`.
+    `descent` is supplied by the caller; no fluid-limit theorem (convergence of
+    scaled stochastic processes to an ODE, Dai's stability criterion) is proved.
 
     The witness provides:
     - κ: the dissipation rate (must be ≥ 0)
@@ -115,20 +120,20 @@ structure FluidDescentWitness (x : Nat → Real) where
   kappa_nonneg : 0 ≤ κ
   descent : ∀ n, energy x (n + 1) ≤ energy x n - κ * |x n|
 
-/-- Energy is non-increasing when dissipation holds.
+/-- Conditional on an assumed `FluidDescentWitness`: energy is non-increasing.
 
     For protocols: if the descent condition holds, energy can only decrease.
     Combined with non-negativity of energy, this gives eventual convergence. -/
-theorem nonincreasing_energy {x : Nat → Real} (h : FluidDescentWitness x) :
+theorem energy_nonincreasing_of_descent_witness {x : Nat → Real} (h : FluidDescentWitness x) :
     ∀ n, energy x (n + 1) ≤ energy x n := by
   intro n
   exact le_trans (h.descent n) (sub_le_self _ (mul_nonneg h.kappa_nonneg (abs_nonneg _)))
 
-/-- Each step dissipates at least κ|x(n)| of energy.
+/-- Conditional on an assumed `FluidDescentWitness`: each step dissipates at least κ|x(n)| of energy.
 
     For protocols: the "slack" in each step is at least κ times the current
     backlog. This means large backlogs drain faster, preventing runaway growth. -/
-theorem one_step_dissipation {x : Nat → Real} (h : FluidDescentWitness x) (n : Nat) :
+theorem one_step_dissipation_of_descent_witness {x : Nat → Real} (h : FluidDescentWitness x) (n : Nat) :
     energy x n - energy x (n + 1) ≥ h.κ * |x n| := by
   have hstep := h.descent n
   linarith

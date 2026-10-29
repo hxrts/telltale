@@ -8,14 +8,21 @@ Reconfiguration safety derived from a concrete joint-consensus model:
 - each epoch `e` has a validator set `config e` and a quorum size `quorum e`,
 - a commit step appends an entry certified by a quorum of the current epoch,
 - a reconfiguration step advances the epoch and keeps the committed log,
+- signatures are epoch-indexed: `signed e p d` means `p` signed `d` in epoch `e`,
 - at most `f` validators are Byzantine; honest validators never sign two
-  conflicting decisions,
+  conflicting decisions within one epoch (`honestNoEquivocation`) and carry
+  their vote lock across a handoff, i.e. never sign in an adjacent epoch a
+  decision conflicting with one they signed before (`honestHandoffLock`),
 - same-epoch threshold `|config e| + f < 2 * quorum e` and joint-consensus
-  overlap `|config e ∪ config (e+1)| + f < quorum e + quorum (e+1)`.
+  overlap `|config e ∪ config (e+1)| + f < quorum e + quorum (e+1)`,
+- capacity `quorum e + f ≤ |config e|` on the configuration sequence.
 
 From these we prove (not assume) that commits certified in the same or
 adjacent epochs never conflict, that a step preserves the committed prefix,
-and that liveness (an honest quorum in the current epoch) is preserved.
+and that every state is live (the honest members of its epoch form a quorum).
+Both honesty rules are per-validator behaviour; neither mentions certificates.
+Liveness is a counting consequence of capacity: a property of the
+configuration sequence, so it holds for every state, reachable or not.
 -/
 
 /-
@@ -45,12 +52,12 @@ structure RState (Decision : Type v) (Certificate : Type w) where
   log : List (Entry Decision Certificate)
 
 /-- Reconfiguration model: per-epoch configurations and signature semantics.
-`signed p d` means validator `p` signed decision `d` at some point. -/
+`signed e p d` means validator `p` signed decision `d` in epoch `e`. -/
 structure Model (Decision : Type v) (Certificate : Type w) (Party : Type x) where
   config : Nat → Finset Party
   quorum : Nat → Nat
   signers : Certificate → Finset Party
-  signed : Party → Decision → Prop
+  signed : Nat → Party → Decision → Prop
   conflicts : Decision → Decision → Prop
 
 variable {Decision : Type v} {Certificate : Type w} {Party : Type x}
@@ -59,7 +66,7 @@ variable {Decision : Type v} {Certificate : Type w} {Party : Type x}
 def Model.ValidCert (M : Model Decision Certificate Party)
     (e : Nat) (d : Decision) (c : Certificate) : Prop :=
   M.signers c ⊆ M.config e ∧ M.quorum e ≤ (M.signers c).card ∧
-    ∀ p ∈ M.signers c, M.signed p d
+    ∀ p ∈ M.signers c, M.signed e p d
 
 /-- Protocol steps: certified commit in the current epoch, or reconfiguration. -/
 inductive Step (M : Model Decision Certificate Party) :
@@ -92,7 +99,7 @@ def Adjacent (e e' : Nat) : Prop := e ≤ e' + 1 ∧ e' ≤ e + 1
 /-! ## Assumptions -/
 
 /-- Fault model. No field mentions commits or steps: all are numeric
-per-epoch thresholds or the per-validator honesty rule. -/
+per-epoch thresholds on the configuration sequence or per-validator rules. -/
 structure Assumptions [DecidableEq Party] (M : Model Decision Certificate Party) where
   byzantine : Finset Party
   f : Nat
@@ -100,9 +107,15 @@ structure Assumptions [DecidableEq Party] (M : Model Decision Certificate Party)
   sameEpochThreshold : ∀ e, (M.config e).card + f < 2 * M.quorum e
   jointOverlap : ∀ e,
     (M.config e ∪ M.config (e + 1)).card + f < M.quorum e + M.quorum (e + 1)
-  honestNoEquivocation :
-    ∀ {p d₁ d₂}, p ∉ byzantine → M.signed p d₁ → M.signed p d₂ → ¬ M.conflicts d₁ d₂
-  honestQuorumAvailable : ∀ e, M.quorum e ≤ (M.config e \ byzantine).card
+  /-- Per-epoch honesty: no two conflicting signatures within one epoch. -/
+  honestNoEquivocation : ∀ {e p d₁ d₂}, p ∉ byzantine →
+    M.signed e p d₁ → M.signed e p d₂ → ¬ M.conflicts d₁ d₂
+  /-- Handoff lock: an honest validator's vote in one epoch binds it in the
+  adjacent one (either order, since `conflicts` need not be symmetric). -/
+  honestHandoffLock : ∀ {e e' p d₁ d₂}, (e' = e + 1 ∨ e = e' + 1) → p ∉ byzantine →
+    M.signed e p d₁ → M.signed e' p d₂ → ¬ M.conflicts d₁ d₂
+  /-- Capacity of the configuration sequence: room for a quorum beside `f` faults. -/
+  quorumCapacity : ∀ e, M.quorum e + f ≤ (M.config e).card
 
 /-- Liveness of a state: honest members of the current epoch form a quorum. -/
 def Live [DecidableEq Party] (M : Model Decision Certificate Party)
@@ -158,26 +171,30 @@ theorem honest_signer_same [DecidableEq Party] {M : Model Decision Certificate P
   have := a.sameEpochThreshold e; have := a.byzantineBound; have := h.2.1; have := h'.2.1
   exact honest_common _ _ _ _ h.1 h'.1 (by omega)
 
-/-- A shared honest signer excludes a conflict (honesty rule). -/
+/-- A shared honest signer of certificates in epochs `e`, `e'` excludes a conflict:
+same epoch by `honestNoEquivocation`, adjacent epochs by `honestHandoffLock`. -/
 theorem no_conflict_of_honest [DecidableEq Party] {M : Model Decision Certificate Party}
     (a : Assumptions M) {e e' d d' c c'}
     (h : M.ValidCert e d c) (h' : M.ValidCert e' d' c')
+    (hE : e = e' ∨ e' = e + 1 ∨ e = e' + 1)
     (hp : ∃ p, p ∈ M.signers c ∧ p ∈ M.signers c' ∧ p ∉ a.byzantine) :
     ¬ M.conflicts d d' := by
   obtain ⟨p, hp, hp', hH⟩ := hp
-  exact a.honestNoEquivocation hH (h.2.2 p hp) (h'.2.2 p hp')
+  rcases hE with rfl | hE
+  · exact a.honestNoEquivocation hH (h.2.2 p hp) (h'.2.2 p hp')
+  · exact a.honestHandoffLock hE hH (h.2.2 p hp) (h'.2.2 p hp')
 
 /-- Valid certificates in adjacent epochs never certify conflicting decisions. -/
 theorem valid_certs_no_conflict [DecidableEq Party] {M : Model Decision Certificate Party}
     (a : Assumptions M) {e e' d d' c c'}
     (h : M.ValidCert e d c) (h' : M.ValidCert e' d' c') (hAdj : Adjacent e e') :
     ¬ M.conflicts d d' := by
-  apply no_conflict_of_honest a h h'
   rcases Nat.lt_trichotomy e e' with hlt | rfl | hgt
   · obtain rfl : e' = e + 1 := by unfold Adjacent at hAdj; omega
-    exact honest_signer_joint a h h'
-  · exact honest_signer_same a h h'
+    exact no_conflict_of_honest a h h' (by omega) (honest_signer_joint a h h')
+  · exact no_conflict_of_honest a h h' (Or.inl rfl) (honest_signer_same a h h')
   · obtain rfl : e = e' + 1 := by unfold Adjacent at hAdj; omega
+    refine no_conflict_of_honest a h h' (by omega) ?_
     obtain ⟨p, h1, h2, h3⟩ := honest_signer_joint a h' h
     exact ⟨p, h2, h1, h3⟩
 
@@ -236,12 +253,21 @@ theorem committed_preserved {M : Model Decision Certificate Party} {s s' d}
   obtain ⟨en, hen, hd⟩ := hc
   exact ⟨en, (step_log_prefix h).subset hen, hd⟩
 
-/-- Liveness preservation, proved from per-epoch honest-quorum availability. -/
+/-- Every state is live: by `quorumCapacity` and `|byzantine| ≤ f`, removing the
+Byzantine parties from `config e` leaves at least `quorum e` honest members. -/
+theorem live_of_assumptions [DecidableEq Party]
+    {M : Model Decision Certificate Party} (a : Assumptions M)
+    (s : RState Decision Certificate) : Live M a.byzantine s := by
+  have hSd := Finset.le_card_sdiff a.byzantine (M.config s.epoch)
+  have := a.quorumCapacity s.epoch; have := a.byzantineBound
+  unfold Live; omega
+
+/-- Liveness preservation across steps, a corollary of `live_of_assumptions`
+(liveness is a property of the configuration sequence, not of the step). -/
 theorem liveness_preserved_of_assumptions [DecidableEq Party]
     {M : Model Decision Certificate Party} (a : Assumptions M) :
-    LivenessPreserved M a.byzantine := by
-  intro sOld sNew _ _
-  exact a.honestQuorumAvailable sNew.epoch
+    LivenessPreserved M a.byzantine :=
+  fun {_ sNew} _ _ => live_of_assumptions a sNew
 
 /-! ## Assumption Validation API -/
 
@@ -249,16 +275,16 @@ theorem liveness_preserved_of_assumptions [DecidableEq Party]
 inductive Assumption where
   | sameEpochThreshold
   | jointOverlap
-  | honestQuorumAvailable
+  | quorumCapacity
   deriving Repr, DecidableEq, Inhabited
 
 /-- Proposition named by each label for epochs `< horizon`. -/
 def Assumption.Holds [DecidableEq Party] (M : Model Decision Certificate Party)
-    (byz : Finset Party) (f horizon : Nat) : Assumption → Prop
+    (_byz : Finset Party) (f horizon : Nat) : Assumption → Prop
   | .sameEpochThreshold => ∀ e < horizon, (M.config e).card + f < 2 * M.quorum e
   | .jointOverlap => ∀ e < horizon,
       (M.config e ∪ M.config (e + 1)).card + f < M.quorum e + M.quorum (e + 1)
-  | .honestQuorumAvailable => ∀ e < horizon, M.quorum e ≤ (M.config e \ byz).card
+  | .quorumCapacity => ∀ e < horizon, M.quorum e + f ≤ (M.config e).card
 
 instance [DecidableEq Party] (M : Model Decision Certificate Party) (byz : Finset Party)
     (f horizon : Nat) (h : Assumption) : Decidable (h.Holds M byz f horizon) := by
@@ -266,7 +292,7 @@ instance [DecidableEq Party] (M : Model Decision Certificate Party) (byz : Finse
 
 /-- Core assumption labels. -/
 def coreAssumptions : List Assumption :=
-  [.sameEpochThreshold, .jointOverlap, .honestQuorumAvailable]
+  [.sameEpochThreshold, .jointOverlap, .quorumCapacity]
 
 /-- Decide one label over the concrete configuration schedule. -/
 def validateAssumption [DecidableEq Party] (M : Model Decision Certificate Party)

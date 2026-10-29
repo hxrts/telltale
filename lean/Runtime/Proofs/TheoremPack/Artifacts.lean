@@ -109,13 +109,17 @@ structure ProfileArtifactMetadata where
   executionProfile : ProtocolMachineExecutionProfile
   theoremPackEligibility : List (String × Bool)
 
-/-- Progress metadata carried alongside theorem-pack artifacts. -/
+/-- Progress metadata carried alongside theorem-pack artifacts.
+
+Each flag records that a premise bundle was supplied, not that anything was
+proved from it. -/
 structure ProgressArtifactMetadata where
-  requiresExplicitProgressContracts : Bool
+  /-- Semantic-object witnesses (with their mandatory progress contracts) supplied. -/
   parityCriticalOperationsProtected : Bool
+  /-- Replay/failure-exactness witness supplied (links the failure taxonomy). -/
   failureTaxonomyLinked : Bool
 
-/-- Envelope/adherence metadata carried alongside theorem-pack artifacts. -/
+/-- Envelope/adherence metadata: presence flags for supplied premise bundles. -/
 structure EnvelopeArtifactMetadata where
   protocolMachineEnvelopeAdherence : Bool
   protocolMachineEnvelopeAdmission : Bool
@@ -145,9 +149,9 @@ def ProofCarryingArtifactMetadata.ofInvariantSpace
       , theoremPackEligibility := executionProfile.theoremPackEligibility
       }
   , progress :=
-      { requiresExplicitProgressContracts := true
-      , parityCriticalOperationsProtected := semanticObjects?.isSome
-      , failureTaxonomyLinked := semanticObjects?.isSome
+      { parityCriticalOperationsProtected := semanticObjects?.isSome
+      , failureTaxonomyLinked :=
+          semanticObjects?.any (·.replayFailureExactness?.isSome)
       }
   , envelope :=
       { protocolMachineEnvelopeAdherence := hasProtocolMachineEnvelopeAdherence
@@ -227,9 +231,9 @@ structure NakamotoArtifact where
   settlementFinality :
     Distributed.Nakamoto.SettlementDepthFinality
       protocol.model protocol.assumptions.AdmissibleRun protocol.assumptions.settlementDepth
-  livenessUnderChurn :
-    Distributed.Nakamoto.LivenessUnderChurn
-      protocol.model protocol.assumptions.AdmissibleRun protocol.assumptions.churnBudget
+  chainGrowth :
+    Distributed.Nakamoto.ChainGrowthLiveness
+      protocol.model protocol.assumptions.AdmissibleRun protocol.assumptions.settlementDepth
 
 /-- Packaged reconfiguration artifact. -/
 structure ReconfigurationArtifact where
@@ -421,6 +425,7 @@ structure ConsensusEnvelopeArtifact where
 /-- Packaged failure-envelope theorem-family artifact. -/
 structure FailureEnvelopeArtifact where
   protocol : Runtime.Adequacy.FailureEnvelopeProtocol
+  /-- Assumed premise (`assumedRecoveryActionSafety`), not proved. -/
   recoveryActionSafety :
     Runtime.Adequacy.RecoveryActionSafety
       protocol.premises.Safe protocol.premises.recoveryStep
@@ -478,27 +483,33 @@ structure ProtocolMachineEnvelopeAdherenceArtifact where
     Runtime.Adequacy.ShardedExchangeNormalization
       protocol.premises.shardedHypotheses.shardedEnvelope
       protocol.premises.shardedHypotheses.certifiedExchange
+  /-- Assumed premise (`assumedSpatialMonotonicity`), not proved. -/
   monotonicity :
     Runtime.Adequacy.SpatialSubtypingMonotonicity
       protocol.premises.subtype protocol.premises.obligation
+  /-- Derived from `localAdherence` (`protocol_machine_local_adequacy_of_adherence`). -/
   localAdequacy :
     Runtime.Adequacy.ProtocolMachineObservationalAdequacyModuloEnvelope
       (Runtime.Adequacy.EqEnvLocal protocol.premises.localHypotheses.localEnvelope)
       protocol.premises.localHypotheses.refRun
       protocol.premises.localHypotheses.vmRun
+  /-- Derived from `shardedAdherence`. -/
   shardedAdequacy :
     Runtime.Adequacy.ProtocolMachineObservationalAdequacyModuloEnvelope
       (Runtime.Adequacy.EqEnvShard protocol.premises.shardedHypotheses.shardedEnvelope)
       protocol.premises.shardedHypotheses.refRun
       protocol.premises.shardedHypotheses.vmRun
+  /-- Proved for every envelope (`local_envelope_full_abstraction`). -/
   localFullAbstraction :
     Runtime.Adequacy.EnvelopeFullAbstraction
       protocol.premises.localHypotheses.localEnvelope.toEnvelope.observe
       (Runtime.Adequacy.EqEnvLocal protocol.premises.localHypotheses.localEnvelope)
+  /-- Proved for every envelope (`sharded_envelope_full_abstraction`). -/
   shardedFullAbstraction :
     Runtime.Adequacy.EnvelopeFullAbstraction
       protocol.premises.shardedHypotheses.shardedEnvelope.toEnvelope.observe
       (Runtime.Adequacy.EqEnvShard protocol.premises.shardedHypotheses.shardedEnvelope)
+  /-- Instance of the assumed `assumedCapabilityMonotonicity` premise. -/
   capabilityMonotonicity :
     protocol.premises.guarantee protocol.premises.weakCapability →
     protocol.premises.guarantee protocol.premises.strongCapability
@@ -558,7 +569,10 @@ structure ProtocolMachineEnvelopeAdmissionArtifact where
 
 /-! ## Bridge and Runtime Artifacts -/
 
-/-- Packaged protocol-envelope-bridge theorem-family artifact. -/
+/-- Packaged protocol-envelope-bridge artifact.
+
+Every proposition field re-exposes an assumed `assumed*` premise of
+`ProtocolEnvelopeBridgePremises`; none is proved from protocol semantics. -/
 structure ProtocolEnvelopeBridgeArtifact where
   profile : Adapters.ProtocolEnvelopeBridgeProfile
   roleRenamingInvariant :

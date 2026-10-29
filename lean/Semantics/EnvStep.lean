@@ -1,4 +1,4 @@
-import SessionCoTypes.Quotient
+import SessionCoTypes.EQ2
 import SessionTypes.GlobalType
 import SessionTypes.LocalTypeR
 import Choreography.Projection.Project
@@ -19,7 +19,8 @@ We must connect global steps to local environment updates in a way that:
 Solution Structure. We define:
 1. ProjectedEnv: maps roles to their local types (via trans projection)
 2. projEnv/projEnvOnto: construct environments from global types
-3. EnvStep/EnvStepOnto: lift global steps to environment transitions
+3. EnvStep: an independent environment-level communication step on
+   representative environments (related to global steps in Choreography.Harmony)
 4. Preservation theorems showing domain consistency
 -/
 
@@ -35,9 +36,8 @@ The following definitions form the semantic interface for proofs:
 - `ProjectedEnv.lookup`
 - `ProjectedEnv.set`
 - `projEnv`
+- `LocalEnv`, `projLocalEnvOnto`
 - `EnvStep`
-- `step_to_envstep`
-- `envstep_preserves_dom`
 -/
 
 namespace Semantics.EnvStep
@@ -45,21 +45,21 @@ namespace Semantics.EnvStep
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open Choreography.Projection.Project
-open SessionCoTypes.Quotient
+open SessionCoTypes.EQ2
 
 /-! ## Basic Definitions -/
 
-/-- Projected environment mapping roles to local types (quotiented). -/
-abbrev ProjectedEnv := List (String × QLocalTypeR)
+/-- Projected environment mapping roles to representative local types. -/
+abbrev ProjectedEnv := List (String × LocalTypeR)
 
 namespace ProjectedEnv
 
 /-- Lookup a role in a projected environment. -/
-def lookup (env : ProjectedEnv) (role : String) : Option QLocalTypeR :=
+def lookup (env : ProjectedEnv) (role : String) : Option LocalTypeR :=
   (env.find? (fun pair => pair.1 == role)).map Prod.snd
 
 /-- Set a role in a projected environment (insert if missing). -/
-def set (env : ProjectedEnv) (role : String) (lt : QLocalTypeR) : ProjectedEnv :=
+def set (env : ProjectedEnv) (role : String) (lt : LocalTypeR) : ProjectedEnv :=
   match env with
   | [] => [(role, lt)]
   | (r, t) :: rest =>
@@ -74,24 +74,9 @@ end ProjectedEnv
 
 /-- Project a global type into a role-indexed environment. -/
 def projEnv (g : GlobalType) : ProjectedEnv :=
-  g.roles.map fun role => (role, QLocalTypeR.ofLocal (trans g role))
-
-/-- Environment step induced by a global step through projection.
-
-This lifts global type transitions to environment-level transitions by
-projecting both the source and target global types. -/
-inductive EnvStep : ProjectedEnv → GlobalActionR → ProjectedEnv → Prop where
-  | of_global (g g' : GlobalType) (act : GlobalActionR) :
-      step g act g' →
-      EnvStep (projEnv g) act (projEnv g')
+  g.roles.map fun role => (role, trans g role)
 
 /-! ## Derived Theorems -/
-
-/-- Global step implies environment step (via projection). -/
-theorem step_to_envstep (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
-    EnvStep (projEnv g) act (projEnv g') :=
-  EnvStep.of_global g g' act hstep
 
 /-- projEnv produces an environment with the same domain as g.roles. -/
 theorem proj_env_dom (g : GlobalType) :
@@ -155,43 +140,64 @@ rather than g.roles. This handles the case where roles shrink during stepping. -
 
 /-- Project a global type onto a fixed role set. -/
 def projEnvOnto (g : GlobalType) (S : List String) : ProjectedEnv :=
-  S.map fun role => (role, QLocalTypeR.ofLocal (trans g role))
+  S.map fun role => (role, trans g role)
 
 /-- projEnvOnto produces an environment with domain S. -/
 theorem proj_env_onto_dom (g : GlobalType) (S : List String) :
     (projEnvOnto g S).map Prod.fst = S := by
   simp only [projEnvOnto, List.map_map, Function.comp_def, List.map_id']
 
-/-- Environment step onto a fixed role set.
+/-! ## Representative-Level Environments and Environment Steps
 
-This variant requires that the initial global type's roles are contained in S,
-ensuring that projection is well-defined even as roles shrink during execution. -/
-inductive EnvStepOnto (S : List String) :
-    ProjectedEnv → GlobalActionR → ProjectedEnv → Prop where
-  | of_global (g g' : GlobalType) (act : GlobalActionR) :
-      step g act g' →
-      (∀ p, p ∈ g.roles → p ∈ S) →
-      EnvStepOnto S (projEnvOnto g S) act (projEnvOnto g' S)
+`EnvStep` is stated over environments of *representative* local types
+(`LocalTypeR`), not over `QLocalTypeR`, which is a subsingleton
+(`SessionCoTypes.Quotient.QLocalTypeR.of_local_eq`). -/
 
-/-- Environment step onto fixed role set preserves domain.
+/-- Environment mapping roles to representative local types. -/
+abbrev LocalEnv := List (String × LocalTypeR)
 
-The domain remains S throughout execution, even as the active roles
-in the global type may shrink. -/
-theorem envstep_onto_preserves_dom {S : List String} {env env' : ProjectedEnv}
-    {act : GlobalActionR} (hstep : EnvStepOnto S env act env') :
-    env.map Prod.fst = env'.map Prod.fst := by
-  cases hstep with
-  | of_global g g' _ _ _ =>
-      simp only [proj_env_onto_dom]
+/-- Lookup a role in a representative-level environment. -/
+def LocalEnv.lookup (env : LocalEnv) (role : String) : Option LocalTypeR :=
+  (env.find? (fun pair => pair.1 == role)).map Prod.snd
 
-/-! ## Legacy API (deprecated)
+/-- Project a global type onto a fixed role set, keeping representatives. -/
+def projLocalEnvOnto (g : GlobalType) (S : List String) : LocalEnv :=
+  S.map fun role => (role, trans g role)
 
-These definitions are kept for backward compatibility but should be migrated
-to use the fixed role set approach.
+/-- Lookup in a projected environment: the projection if the role is in `S`. -/
+theorem lookup_proj_local_env_onto (g : GlobalType) (S : List String) (p : String) :
+    (projLocalEnvOnto g S).lookup p = if p ∈ S then some (trans g p) else none := by
+  induction S with
+  | nil => simp [projLocalEnvOnto, LocalEnv.lookup]
+  | cons r rest ih =>
+      by_cases h : r = p
+      · subst h; simp [projLocalEnvOnto, LocalEnv.lookup]
+      · have hb : ((r, trans g r).1 == p) = false := by simpa using h
+        simp only [projLocalEnvOnto, LocalEnv.lookup, List.map_cons, List.find?_cons, hb] at ih ⊢
+        rw [ih]; simp [Ne.symm h]
 
-Migration timeline:
-- 2026-03-15: no new uses of legacy `EnvStep` in Lean modules.
-- 2026-04-15: bridge/runtime callers switch to `EnvStepOnto`.
-- 2026-05-31: remove legacy aliases after downstream parity checks pass. -/
+/-- `projLocalEnvOnto` has domain `S`. -/
+theorem proj_local_env_onto_dom (g : GlobalType) (S : List String) :
+    (projLocalEnvOnto g S).map Prod.fst = S := by
+  simp only [projLocalEnvOnto, List.map_map, Function.comp_def, List.map_id']
+
+/-- Environment-level communication step, defined independently of global steps.
+
+For `act = p → q : ℓ`: the domain is unchanged; `p`'s type is a send to `q`
+offering `ℓ` and becomes (up to `EQ2`) the `ℓ` continuation; `q`'s type is a
+receive from `p` offering `ℓ` and becomes (up to `EQ2`) its `ℓ` continuation;
+every other role keeps its type up to `EQ2`. -/
+structure EnvStep (env : LocalEnv) (act : GlobalActionR) (env' : LocalEnv) : Prop where
+  /-- The role domain is preserved. -/
+  dom : env'.map Prod.fst = env.map Prod.fst
+  /-- The sender performs the send of `act.label`. -/
+  sender : ∃ bs cont, env.lookup act.sender = some (.send act.receiver bs) ∧
+    (act.label, none, cont) ∈ bs ∧ ∃ t', env'.lookup act.sender = some t' ∧ EQ2 t' cont
+  /-- The receiver performs the matching receive. -/
+  receiver : ∃ bs cont, env.lookup act.receiver = some (.recv act.sender bs) ∧
+    (act.label, none, cont) ∈ bs ∧ ∃ t', env'.lookup act.receiver = some t' ∧ EQ2 t' cont
+  /-- All other roles are unchanged up to `EQ2`. -/
+  frame : ∀ p, p ≠ act.sender → p ≠ act.receiver → ∀ t, env.lookup p = some t →
+    ∃ t', env'.lookup p = some t' ∧ EQ2 t' t
 
 end Semantics.EnvStep

@@ -42,7 +42,7 @@ set_option autoImplicit false
 universe u
 private def payloadByteEstimate (v : Value) : Nat :=
   (reprStr v).length
-private def payloadSizeViolation? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def payloadSizeViolation? {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -89,14 +89,14 @@ private def strictSchemaMissingAnnotationRecv?
   else
     none
 /-! ## Send semantics -/
-private def sendUpdateSessions {ν : Type u} [VerificationModel ν]
+def sendUpdateSessions {ν : Type u} [VerificationModel ν]
     (sessions : SessionStore ν) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (T : ValType) (L' : LocalType) : SessionStore ν :=
   let sessions1 := updateSessBuffers sessions ep.sid bufs'
   let trace := SessionStore.lookupTrace sessions1 edge
   let sessions2 := SessionStore.updateTrace sessions1 edge (trace ++ [T])
   SessionStore.updateType sessions2 ep L'
-private def sendCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def sendCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -106,7 +106,7 @@ private def sendCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
   let sessions' := sendUpdateSessions st.sessions ep edge bufs' T L'
   let st' := { st with buffers := bufs', sessions := sessions' }
   continuePack st' coro (some (.obs (.sent edge v seqNo)))
-private def sendAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def sendAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -125,7 +125,7 @@ private def sendAfterEnqueue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
       faultPack st coro (.flowViolation "buffer drop") "buffer drop"
   | .error =>
       faultPack st coro (.flowViolation "buffer overflow") "buffer overflow"
-private def sendOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def sendOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -137,7 +137,7 @@ private def sendOnHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLay
   let (res, bufs') := bufEnqueue cfg st'.buffers edge signed
   sendAfterEnqueue st' coro ep edge T L' v h seqNo res bufs'
 /-! ## Send semantics: edge and endpoint dispatch -/
-private def sendOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def sendOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -151,7 +151,7 @@ private def sendOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     match SessionStore.lookupHandler st.sessions edge with
     | none => faultPack st coro (.specFault "no handler bound") "no handler bound"
     | some h => sendOnHandler st coro ep edge T L' v h
-private def sendWithType {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def sendWithType {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -165,7 +165,7 @@ private def sendWithType {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLaye
         sendOnEdge st coro ep edge T L' v
   else
     faultPack st coro (.typeViolation T (valTypeOf v)) "bad send payload"
-private def sendWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def sendWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -194,7 +194,7 @@ def stepSend {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | some v, _ => faultPack st coro (.typeViolation (.chan 0 "") (valTypeOf v)) "bad send channel"
   | none, _ => faultPack st coro .outOfRegisters "missing send channel"
 /-! ## Receive semantics -/
-private def recvUpdateSessions {ν : Type u} [VerificationModel ν]
+def recvUpdateSessions {ν : Type u} [VerificationModel ν]
     (sessions : SessionStore ν) (ep : Endpoint) (edge : Edge)
     (bufs' : SignedBuffers ν) (L' : LocalType) : SessionStore ν :=
   let sessions1 := updateSessBuffers sessions ep.sid bufs'
@@ -202,7 +202,7 @@ private def recvUpdateSessions {ν : Type u} [VerificationModel ν]
   let trace' := match trace with | [] => [] | _ :: ts => ts
   let sessions2 := SessionStore.updateTrace sessions1 edge trace'
   SessionStore.updateType sessions2 ep L'
-private def recvCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def recvCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -219,7 +219,7 @@ private def recvCommit {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
 
 /-! ## Receive semantics: validation and replay-consumption -/
 
-private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -254,7 +254,7 @@ private def recvAfterDequeue {ι γ π ε ν : Type u} [IdentityModel ι] [Guard
         else
           faultPack st coro (.invalidSignature edge) "invalid signature"
 /-! ## Receive semantics: dequeue and edge checks -/
-private def recvWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def recvWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -267,7 +267,7 @@ private def recvWithHandler {ι γ π ε ν : Type u} [IdentityModel ι] [GuardL
       blockPack st coro' (.recvWait edge { sid := edge.sid, endpoint := { sid := edge.sid, role := edge.receiver } })
   | some (sv, bufs') =>
       recvAfterDequeue st coro ep edge T L' dst h tokens' sv bufs'
-private def recvOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def recvOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -282,7 +282,7 @@ private def recvOnEdge {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer 
     match SessionStore.lookupHandler st.sessions edge with
     | none => faultPack st coro (.specFault "no handler bound") "no handler bound"
     | some h => recvWithHandler st coro ep edge T L' dst h coro.progressTokens
-private def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+def recvWithEndpoint {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]

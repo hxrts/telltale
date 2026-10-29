@@ -19,7 +19,8 @@ and a concise Appendix D discharge surface.
 
 Solution Structure.
 1. Instantiate mixing, fluid, concentration, Little's law, CLT, and mean-field layers.
-2. Provide Appendix D wrappers that call transported theorems directly.
+2. Provide Appendix D wrappers over the conditional lemmas (assumed classical
+   inputs are used directly, not restated).
 -/
 
 /-! ## Core Development -/
@@ -59,11 +60,11 @@ def mkProtocolMixingInputFromModel (m : ProtocolMixingModel) : MixingInput :=
   { d := m.d
     witness := protocolMixingWitness m }
 
-/-- Geometric convergence to steady state. -/
-theorem protocol_mixing_geometric_convergence (m : ProtocolMixingModel) :
+/-- Conditional on the model's assumed geometric envelope, one-step bound. -/
+theorem protocol_mixing_one_step_of_model (m : ProtocolMixingModel) :
     ∀ n, m.d (n + 1) ≤ Classical.MixingTimeBounds.geometricEnvelope m.C m.ρ n := by
   exact
-    transport_mixing (input := mkProtocolMixingInputFromModel m)
+    Classical.Transport.mixing_conclusion_of_input (input := mkProtocolMixingInputFromModel m)
 
 /-! ## Fluid-Limit Instantiation -/
 
@@ -92,13 +93,13 @@ def mkProtocolFluidInputFromModel (m : ProtocolFluidModel) : FluidInput :=
   { x := m.x
     witness := protocolFluidWitness m }
 
-/-- Energy monotonically decreases for protocol fluid trajectories. -/
-theorem protocol_fluid_energy_nonincreasing (m : ProtocolFluidModel) :
+/-- Conditional on the model's assumed descent inequality, energy is non-increasing. -/
+theorem protocol_fluid_energy_nonincreasing_of_model (m : ProtocolFluidModel) :
     ∀ n,
       Classical.FluidLimitStability.energy m.x (n + 1) ≤
         Classical.FluidLimitStability.energy m.x n := by
   exact
-    transport_fluid_limit (input := mkProtocolFluidInputFromModel m)
+    Classical.Transport.fluid_conclusion_of_input (input := mkProtocolFluidInputFromModel m)
 
 /-! ## Concentration Instantiation -/
 
@@ -128,17 +129,14 @@ def mkProtocolConcentrationInputFromModel
   { p := m.p
     witness := protocolConcentrationWitness m }
 
-/-- Tail bounds for buffer/latency observable deviations. -/
-theorem protocol_concentration_tail_bounds (m : ProtocolConcentrationModel) :
-    ∀ t, 0 ≤ t →
-      m.p t ≤ Classical.ConcentrationInequalities.subGaussianTail m.σ t :=
-  m.tail_upper
+/- The sub-Gaussian tail is the assumed `m.tail_upper`; no restating theorem. -/
 
-/-- Instantiate concentration input and call transported concentration theorem. -/
-theorem protocol_transported_concentration (m : ProtocolConcentrationModel) :
+/-- Conditional on the model's assumed sub-Gaussian tail, `p 0 ≤ 2`. -/
+theorem protocol_concentration_at_zero_of_model (m : ProtocolConcentrationModel) :
     m.p 0 ≤ 2 := by
   exact
-    transport_concentration (input := mkProtocolConcentrationInputFromModel m)
+    Classical.Transport.concentration_conclusion_of_input
+      (input := mkProtocolConcentrationInputFromModel m)
 
 /-! ## Little's Law Instantiation -/
 
@@ -156,30 +154,22 @@ def mkProtocolLittleInput (m : ProtocolLittleModel) : LittlesLawInput :=
     L := m.L
     law := m.law }
 
-/-- Prove `L = λW` for coherent steady-state protocol configurations. -/
-theorem protocol_littles_law (m : ProtocolLittleModel) :
-    m.L = m.lam * m.W := by
-  exact
-    transport_littles_law (input := mkProtocolLittleInput m)
-
-/-- Capacity-planning and monitoring readiness derived from Little's law. -/
-def CapacityPlanningMonitoringReady (m : ProtocolLittleModel) : Prop :=
-  m.L = m.lam * m.W
-
-theorem protocol_capacity_planning_monitoring (m : ProtocolLittleModel) :
-    CapacityPlanningMonitoringReady m := by
-  simpa [CapacityPlanningMonitoringReady] using protocol_littles_law m
+/-
+`L = λW` is the assumed `m.law` (Little's law is not proved). The former
+`protocol_littles_law`, `CapacityPlanningMonitoringReady` and
+`protocol_capacity_planning_monitoring` only restated it and were removed.
+-/
 
 /-! ## Functional CLT Instantiation -/
 
-/-- Protocol-level model for Functional CLT centering instance. -/
+/-- Degenerate constant-path model (no stochastic path; not a functional CLT). -/
 structure ProtocolFunctionalCLTModel where
   c : Real
   N : Nat
   t : Nat
   N_ne_zero : N ≠ 0
 
-/-- Scaled process for protocol trajectories. -/
+/-- Scaled process of the constant path `fun _ => m.c` centred at `m.c`. -/
 def protocolScaledProcess (m : ProtocolFunctionalCLTModel) : Real :=
   @Classical.FunctionalCLT.scaledProcess.{0, 0, 0, 0} inferInstance
     (fun _ : Nat => m.c) m.c m.N m.t
@@ -194,11 +184,12 @@ def mkProtocolFunctionalCLTInput
     path_eq_const := rfl
     mean_eq_const := rfl }
 
-/-- Centering-at-mean for the protocol scaled process. -/
-theorem protocol_functional_clt_centering (m : ProtocolFunctionalCLTModel) :
+/-- The constant path centred at its own value has zero scaled process. -/
+theorem protocol_constant_path_scaled_process_zero (m : ProtocolFunctionalCLTModel) :
     protocolScaledProcess m = 0 := by
   exact
-    transport_functional_clt (input := mkProtocolFunctionalCLTInput m)
+    Classical.Transport.constant_path_scaled_process_zero
+      (input := mkProtocolFunctionalCLTInput m)
 
 /-! ## Mean-Field Instantiation -/
 
@@ -211,8 +202,8 @@ structure ProtocolMeanFieldModel where
 def protocolEmpiricalMean (m : ProtocolMeanFieldModel) : Real :=
   @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0} m.n inferInstance m.x
 
-/-- Sessions are exchangeable (permutation invariance of empirical mean). -/
-theorem protocol_mean_field_permutation_invariance
+/-- Reindexing invariance of the empirical mean (elementary; not a mean-field limit). -/
+theorem protocol_mean_permutation_invariant
     (m : ProtocolMeanFieldModel) :
     ∀ σ : Equiv.Perm (Fin m.n),
       @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
@@ -220,62 +211,45 @@ theorem protocol_mean_field_permutation_invariance
         @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
           m.n inferInstance m.x := by
   intro σ
-  exact Classical.PropagationOfChaos.empirical_mean_perm (σ := σ) (x := m.x)
+  exact Classical.PropagationOfChaos.mean_permutation_invariant (σ := σ) (x := m.x)
 
 /-- Instantiate `MeanFieldInput` from protocol model quantities. -/
 def mkProtocolMeanFieldInput (m : ProtocolMeanFieldModel) : MeanFieldInput m.n :=
   { x := m.x }
 
-/-- Instantiate mean-field transport theorem for protocol scaling analysis. -/
-theorem protocol_transported_mean_field (m : ProtocolMeanFieldModel) :
-    Classical.Transport.MeanFieldConclusion (mkProtocolMeanFieldInput m) := by
-  exact transport_mean_field (input := mkProtocolMeanFieldInput m)
-
-/-- Multi-session scalability analysis contract. -/
-def MultiSessionScalabilityLaw (m : ProtocolMeanFieldModel) : Prop :=
-  ∀ σ : Equiv.Perm (Fin m.n),
-    @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
-        m.n inferInstance (fun i => m.x (σ i)) =
-      @Classical.PropagationOfChaos.empiricalMean.{0, 0, 0, 0}
-        m.n inferInstance m.x
-
-theorem protocol_multi_session_scalability (m : ProtocolMeanFieldModel) :
-    MultiSessionScalabilityLaw m := by
-  intro σ
-  exact protocol_mean_field_permutation_invariance m σ
+/-
+The former `protocol_transported_mean_field`, `MultiSessionScalabilityLaw` and
+`protocol_multi_session_scalability` restated `protocol_mean_permutation_invariant`
+under scalability names and were removed.
+-/
 
 /-! ## Appendix D Discharge Theorems -/
 
-/-- Appendix D discharge: transported Foster-Lyapunov-Harris result. -/
+/-- Appendix D: deterministic Foster potential bound, conditional on the drift input. -/
 theorem appendix_d_foster_discharge
     (fw : TransportFramework)
     (system : Classical.FosterLyapunovHarris.DriftSystem CoherenceState)
     (hStep : system.step = fw.step) :
     Classical.Transport.FosterConclusion (mkFosterInput fw system hStep) := by
-  exact transport_foster_lyapunov fw system hStep
+  exact foster_conclusion_of_framework fw system hStep
 
-/-- Appendix D discharge: transported MaxWeight result. -/
-theorem appendix_d_max_weight_discharge
-    {ι : Type} [Fintype ι]
-    (input : MaxWeightInput ι) :
-    Classical.Transport.MaxWeightConclusion input := by
-  exact transport_max_weight input
-
-/-- Appendix D discharge: transported Mixing-Time result. -/
+/-- Appendix D: mixing one-step bound, conditional on the assumed `MixingWitness`. -/
 theorem appendix_d_mixing_discharge
     (input : MixingInput) :
     Classical.Transport.MixingConclusion input := by
-  exact transport_mixing input
+  exact Classical.Transport.mixing_conclusion_of_input input
 
-/-- Appendix D discharge: transported Mean-Field result. -/
+/-- Appendix D: mean-field reindexing invariance (elementary identity). -/
 theorem appendix_d_mean_field_discharge
     {n : Nat}
     (input : MeanFieldInput n) :
     Classical.Transport.MeanFieldConclusion input := by
-  exact transport_mean_field input
+  exact Classical.Transport.mean_field_permutation_invariant input
 
-/-- Conjunction of the four Appendix D discharge obligations: transported
-    Foster-Lyapunov-Harris, MaxWeight, mixing-time, and mean-field conclusions. -/
+/-- Conjunction of the four Appendix D obligations. Honest status (Option B):
+    Foster and mixing are derived from assumed inputs; the MaxWeight conjunct
+    holds only because its conclusion *is* the assumed `choice.optimal` field;
+    the mean-field conjunct is an elementary identity. -/
 def AppendixDDischargeSetReady : Prop :=
   (∀ (fw : TransportFramework)
       (system : Classical.FosterLyapunovHarris.DriftSystem CoherenceState)
@@ -286,9 +260,10 @@ def AppendixDDischargeSetReady : Prop :=
   (∀ (input : MixingInput), Classical.Transport.MixingConclusion input) ∧
   (∀ {n : Nat} (input : MeanFieldInput n), Classical.Transport.MeanFieldConclusion input)
 
-/-- All Appendix D discharge obligations hold. -/
+/-- All Appendix D obligations hold, in the conditional sense documented on
+    `AppendixDDischargeSetReady`. -/
 theorem appendix_d_discharge_set_ready : AppendixDDischargeSetReady :=
-  ⟨appendix_d_foster_discharge, fun input => appendix_d_max_weight_discharge input,
+  ⟨appendix_d_foster_discharge, fun input => input.choice.optimal,
     appendix_d_mixing_discharge, fun input => appendix_d_mean_field_discharge input⟩
 
 end ProtocolClassical

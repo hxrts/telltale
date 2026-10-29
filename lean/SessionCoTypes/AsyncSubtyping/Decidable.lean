@@ -1,45 +1,28 @@
 import SessionCoTypes.AsyncSubtyping.Core
 
-/-
-The Problem. Build a constructive decision procedure for async subtyping.
-The existence proof (async_subtype_decidable) shows decidability for regular
-types, but we need an actual algorithm.
+/-! # Sound Semi-Decision Procedure for Async Subtyping
 
-The difficulty is termination: the naive exploration could loop on recursive
-types. We use a visited set to detect cycles.
+Asynchronous session subtyping is undecidable in general, even for regular
+(finite-state) session types (Bravetti–Carbone–Zavattaro 2017; Lange–Yoshida
+2017). Hence no total, sound and complete checker exists, and this module does
+not claim one.
 
-Solution Structure.
-1. Define a worklist-based exploration algorithm
-2. Use fuel (bounded iterations) for termination
-3. Prove soundness: if algorithm accepts, relation holds
-4. Prove completeness: if relation holds, algorithm accepts with enough fuel
--/
-
-/-! # Decidable Async Subtyping Algorithm
-
-Constructive decision procedure for async subtyping on regular session types.
-
-## Algorithm
-
-Worklist exploration with visited set:
-1. Start with initial triple in worklist
-2. Pop a triple; if visited, skip; else mark visited
-3. Compute successors via AsyncStep
-4. If base case (both end, empty buffer): continue
-5. If stuck (no valid step): reject
-6. Add unvisited successors to worklist
-7. Accept if worklist empties with no rejection
-
-## Main Definitions
-
-- `checkAsyncStep` : Compute successors of a triple
-- `checkAsync` : Worklist exploration with fuel
-- `isAsyncSubtype` : Top-level decision function
+Instead it provides a *bounded, sound* exploration `checkAsync`:
+- it unfolds a worklist of triples `(S, T, buffer)`, choosing one `AsyncStep`
+  rule per triple (a fixed strategy, see `stepTriple`);
+- cycles are closed using a caller-supplied equality test `eqb` on
+  `LocalTypeC` that must be *sound* (`eqb a b = true → a = b`); the trivial
+  test `fun _ _ => false` is always sound and only accepts finite derivations;
+- it returns `.accepted` only if the explored set is closed under the chosen
+  steps, which is a coinductive witness for `AsyncSubtypeRel`;
+- `.stuck` (the strategy found no applicable rule) and `.outOfFuel` (bound
+  exhausted) are *inconclusive*: neither refutes subtyping.
 
 ## Main Results
 
-- `check_async_sound` : Acceptance implies AsyncSubtypeRel
-- `check_async_complete` : AsyncSubtypeRel implies acceptance (with enough fuel) -/
+- `explore_sound` : acceptance from a `ConsistentVisited` state implies the
+  relation for every visited or pending triple
+- `check_async_sound` : `checkAsync eqb fuel S T = .accepted → S ≤ₐ T` -/
 
 set_option linter.dupNamespace false
 
@@ -48,356 +31,365 @@ namespace SessionCoTypes.AsyncSubtyping
 open SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 
-/-! ## Bounded Unfolding
+/-! ## Child Access -/
 
-Unfold mu-bindings up to a bounded number of times. -/
+/-- Children of `t`, re-indexed along a known head equation. -/
+noncomputable def childAt (t : LocalTypeC) {hd : LocalTypeHead} (h : head t = hd)
+    (i : LocalTypeChild hd) : LocalTypeC :=
+  children t (cast (congrArg LocalTypeChild h).symm i)
 
-/-- Unfold mu up to n times. Returns the result after unfolding or the original if stuck. -/
-def unfoldN : Nat → LocalTypeC → LocalTypeC
-  | 0, t => t
-  | n + 1, t =>
-    match PFunctor.M.dest t with
-    | ⟨LocalTypeHead.mu _, f⟩ => unfoldN n (f ())
-    | _ => t
+/-- Every re-indexed child is a `childRel` child. -/
+theorem childRel_childAt (t : LocalTypeC) {hd : LocalTypeHead} (h : head t = hd)
+    (i : LocalTypeChild hd) : childRel t (childAt t h i) :=
+  ⟨head t, children t, _, rfl, rfl⟩
 
-/-- Check if type has observable head (not mu). -/
-def hasObsHead (t : LocalTypeC) : Bool :=
-  match head t with
-  | .mu _ => false
-  | _ => true
+/-! ## Single-Rule Successor Functions
 
-/-! ## Step Result
+Each rule returns `some succs` only when the matching `AsyncStep`
+constructor applies with exactly those successors. -/
 
-The result of trying to compute successors for a triple. -/
+/-- Unfold a `mu` on the subtype side. -/
+noncomputable def ruleUnfoldSub (t : AsyncTriple) : Option (List AsyncTriple) :=
+  match h : head t.sub with
+  | .mu _ => some [⟨childAt t.sub h (), t.sup, t.buffer⟩]
+  | _ => none
 
-/-- Result of computing async step successors. -/
+/-- Unfold a `mu` on the supertype side. -/
+noncomputable def ruleUnfoldSup (t : AsyncTriple) : Option (List AsyncTriple) :=
+  match h : head t.sup with
+  | .mu _ => some [⟨t.sub, childAt t.sup h (), t.buffer⟩]
+  | _ => none
+
+/-- Both sides send to the same peer with the same labels. -/
+noncomputable def ruleBothSend (t : AsyncTriple) : Option (List AsyncTriple) :=
+  match hS : head t.sub, hT : head t.sup with
+  | .send p ls, .send q ms =>
+      if hp : q = p ∧ ms = ls then
+        some (List.ofFn fun i : Fin ls.length =>
+          ⟨childAt t.sub hS i,
+            childAt (hd := .send p ls) t.sup (by rw [hT, hp.1, hp.2]) i, t.buffer⟩)
+      else none
+  | _, _ => none
+
+/-- Both sides receive from the same peer with the same labels. -/
+noncomputable def ruleBothRecv (t : AsyncTriple) : Option (List AsyncTriple) :=
+  match hS : head t.sub, hT : head t.sup with
+  | .recv p ls, .recv q ms =>
+      if hp : q = p ∧ ms = ls then
+        some (List.ofFn fun i : Fin ls.length =>
+          ⟨childAt t.sub hS i,
+            childAt (hd := .recv p ls) t.sup (by rw [hT, hp.1, hp.2]) i, t.buffer⟩)
+      else none
+  | _, _ => none
+
+/-- The supertype receives the head of the buffer. -/
+noncomputable def ruleSupRecv (t : AsyncTriple) : Option (List AsyncTriple) :=
+  match hT : head t.sup, t.buffer with
+  | .recv _ ls, msg :: rest =>
+      match (List.finRange ls.length).find? (fun i => decide (ls.get i = msg)) with
+      | some idx => some [⟨t.sub, childAt t.sup hT idx, rest⟩]
+      | none => none
+  | _, _ => none
+
+/-- The subtype sends asynchronously; the label is buffered. -/
+noncomputable def ruleSubSend (t : AsyncTriple) : Option (List AsyncTriple) :=
+  match hS : head t.sub with
+  | .send _ ls => some (List.ofFn fun i : Fin ls.length =>
+      ⟨childAt t.sub hS i, t.sup, t.buffer ++ [ls.get i]⟩)
+  | _ => none
+
+/-! ## Rule Soundness -/
+
+/-- `ruleUnfoldSub` produces an `AsyncStep`. -/
+theorem ruleUnfoldSub_sound {t : AsyncTriple} {s : List AsyncTriple}
+    (h : ruleUnfoldSub t = some s) : AsyncStep t s := by
+  obtain ⟨S, T, buf⟩ := t
+  unfold ruleUnfoldSub at h; split at h <;> cases h
+  exact .unfold_sub _ ‹_› (childRel_childAt _ _ _)
+
+/-- `ruleUnfoldSup` produces an `AsyncStep`. -/
+theorem ruleUnfoldSup_sound {t : AsyncTriple} {s : List AsyncTriple}
+    (h : ruleUnfoldSup t = some s) : AsyncStep t s := by
+  obtain ⟨S, T, buf⟩ := t
+  unfold ruleUnfoldSup at h; split at h <;> cases h
+  exact .unfold_sup _ ‹_› (childRel_childAt _ _ _)
+
+/-- `ruleBothSend` produces an `AsyncStep`. -/
+theorem ruleBothSend_sound {t : AsyncTriple} {s : List AsyncTriple}
+    (h : ruleBothSend t = some s) : AsyncStep t s := by
+  obtain ⟨S, T, buf⟩ := t
+  unfold ruleBothSend at h; split at h
+  · rename_i hS hT
+    split at h
+    · rename_i hp
+      cases h
+      exact .both_send hS (by rw [← hp.1, ← hp.2]; exact hT) _ _
+        (fun _ => childRel_childAt _ _ _) (fun _ => childRel_childAt _ _ _)
+    · cases h
+  · cases h
+
+/-- `ruleBothRecv` produces an `AsyncStep`. -/
+theorem ruleBothRecv_sound {t : AsyncTriple} {s : List AsyncTriple}
+    (h : ruleBothRecv t = some s) : AsyncStep t s := by
+  obtain ⟨S, T, buf⟩ := t
+  unfold ruleBothRecv at h; split at h
+  · rename_i hS hT
+    split at h
+    · rename_i hp
+      cases h
+      exact .both_recv hS (by rw [← hp.1, ← hp.2]; exact hT) _ _
+        (fun _ => childRel_childAt _ _ _) (fun _ => childRel_childAt _ _ _)
+    · cases h
+  · cases h
+
+/-- `ruleSupRecv` produces an `AsyncStep`. -/
+theorem ruleSupRecv_sound {t : AsyncTriple} {s : List AsyncTriple}
+    (h : ruleSupRecv t = some s) : AsyncStep t s := by
+  obtain ⟨S, T, buf⟩ := t
+  unfold ruleSupRecv at h; split at h
+  · rename_i ls msg rest hT hB
+    split at h
+    · rename_i idx hFind
+      cases h
+      have hIdx : ls.get idx = msg := by simpa using List.find?_some hFind
+      exact .sup_recv_buffer hT hB (List.mem_iff_get.mpr ⟨idx, hIdx⟩) _
+        (childRel_childAt _ hT) idx hIdx
+    · cases h
+  · cases h
+
+/-- `ruleSubSend` produces an `AsyncStep`. -/
+theorem ruleSubSend_sound {t : AsyncTriple} {s : List AsyncTriple}
+    (h : ruleSubSend t = some s) : AsyncStep t s := by
+  obtain ⟨S, T, buf⟩ := t
+  unfold ruleSubSend at h; split at h <;> cases h
+  exact .sub_send_async ‹_› _ (fun _ => childRel_childAt _ _ _)
+
+/-! ## Step Strategy -/
+
+/-- The fixed rule order used by the checker. -/
+noncomputable def asyncRules : List (AsyncTriple → Option (List AsyncTriple)) :=
+  [ruleUnfoldSub, ruleUnfoldSup, ruleBothSend, ruleBothRecv, ruleSupRecv, ruleSubSend]
+
+/-- Every rule in `asyncRules` is sound. -/
+theorem asyncRules_sound {r : AsyncTriple → Option (List AsyncTriple)} (hr : r ∈ asyncRules)
+    {t : AsyncTriple} {s : List AsyncTriple} (h : r t = some s) : AsyncStep t s := by
+  simp only [asyncRules, List.mem_cons, List.not_mem_nil, or_false] at hr
+  rcases hr with rfl | rfl | rfl | rfl | rfl | rfl
+  · exact ruleUnfoldSub_sound h
+  · exact ruleUnfoldSup_sound h
+  · exact ruleBothSend_sound h
+  · exact ruleBothRecv_sound h
+  · exact ruleSupRecv_sound h
+  · exact ruleSubSend_sound h
+
+/-- Result of one strategy step on a triple. -/
 inductive StepResult where
-  /-- Base case: subtyping holds for this triple. -/
+  /-- Base case: both end with an empty buffer. -/
   | accept : StepResult
-  /-- Successor triples to explore. -/
+  /-- Successors produced by one `AsyncStep` rule. -/
   | continue (succs : List AsyncTriple) : StepResult
-  /-- No valid step: subtyping fails. -/
+  /-- No rule of the strategy applies (inconclusive, not a refutation). -/
   | reject : StepResult
-  deriving Repr
 
-/-! ## Computing Successors
+/-- Apply the strategy to one triple. -/
+noncomputable def stepTriple (t : AsyncTriple) : StepResult :=
+  if head t.sub = .end ∧ head t.sup = .end ∧ t.buffer = [] then .accept
+  else match asyncRules.findSome? (fun r => r t) with
+    | some s => .continue s
+    | none => .reject
 
-Given a triple, compute its successors according to AsyncStep rules. -/
+/-- `.accept` is only returned in the base case. -/
+theorem stepTriple_accept {t : AsyncTriple} (h : stepTriple t = .accept) :
+    head t.sub = .end ∧ head t.sup = .end ∧ t.buffer = [] := by
+  unfold stepTriple at h
+  split at h
+  · assumption
+  · split at h <;> cases h
 
--- # Local head/label utilities
+/-- `.continue succs` is only returned for a genuine `AsyncStep`. -/
+theorem stepTriple_continue {t : AsyncTriple} {s : List AsyncTriple}
+    (h : stepTriple t = .continue s) : AsyncStep t s := by
+  unfold stepTriple at h
+  split at h
+  · cases h
+  · split at h
+    · rename_i s' hs
+      cases h
+      obtain ⟨r, hr, hrt⟩ := List.exists_of_findSome?_eq_some hs
+      exact asyncRules_sound hr hrt
+    · cases h
 
-/-- Get children of a type at given head. -/
-def getChildren (t : LocalTypeC) : List LocalTypeC :=
-  match PFunctor.M.dest t with
-  | ⟨LocalTypeHead.send _ labels, f⟩ => List.ofFn fun i : Fin labels.length => f i
-  | ⟨LocalTypeHead.recv _ labels, f⟩ => List.ofFn fun i : Fin labels.length => f i
-  | ⟨LocalTypeHead.mu _, f⟩ => [f ()]
-  | _ => []
+/-! ## Worklist Exploration -/
 
-/-- Get labels from a send/recv head. -/
-def getLabels (t : LocalTypeC) : List Label :=
-  match head t with
-  | .send _ labels => labels
-  | .recv _ labels => labels
-  | _ => []
+/-- Sound triple equality from a sound type-equality test. -/
+def tripleEqb (eqb : LocalTypeC → LocalTypeC → Bool) (a b : AsyncTriple) : Bool :=
+  eqb a.sub b.sub && eqb a.sup b.sup && decide (a.buffer = b.buffer)
 
-/-- Find index of a label in a list. -/
-def findLabelIdx (labels : List Label) (msg : Label) : Option (Fin labels.length) :=
-  labels.findIdx? (· == msg) |>.bind fun idx =>
-    if h : idx < labels.length then some ⟨idx, h⟩ else none
+/-- `tripleEqb` is sound whenever `eqb` is. -/
+theorem tripleEqb_sound {eqb : LocalTypeC → LocalTypeC → Bool}
+    (hEq : ∀ a b, eqb a b = true → a = b) {a b : AsyncTriple}
+    (h : tripleEqb eqb a b = true) : a = b := by
+  obtain ⟨S, T, buf⟩ := a
+  obtain ⟨S', T', buf'⟩ := b
+  simp only [tripleEqb, Bool.and_eq_true, decide_eq_true_eq] at h
+  obtain ⟨⟨h1, h2⟩, h3⟩ := h
+  rw [hEq _ _ h1, hEq _ _ h2, h3]
 
--- # Bounded successor computation
-
-/-- Compute async step successors for a triple.
-
-Uses bounded unfolding to handle mu-bindings. Returns:
-- accept: both end with empty buffer
-- continue succs: successors to explore
-- reject: no valid step (type mismatch or stuck) -/
-noncomputable def checkAsyncStep (unfoldBound : Nat) (t : AsyncTriple) : StepResult :=
-  let S := unfoldN unfoldBound t.sub
-  let T := unfoldN unfoldBound t.sup
-  let buf := t.buffer
-
-  match head S, head T, buf with
-  -- Base case: both end with empty buffer
-  | .end, .end, [] => .accept
-
-  -- Both send: check label match, continue with children
-  | .send pS labelsS, .send pT labelsT, _ =>
-      if pS == pT && labelsS == labelsT then
-        let childrenS := getChildren S
-        let childrenT := getChildren T
-        if childrenS.length == childrenT.length then
-          .continue (List.zipWith (fun s t => ⟨s, t, buf⟩) childrenS childrenT)
-        else
-          .reject
-      else
-        -- Async case: subtype sends, buffer the message
-        let childrenS := getChildren S
-        let labels := getLabels S
-        .continue (childrenS.zipWith (fun s lbl => ⟨s, T, buf ++ [lbl]⟩) labels)
-
-  -- ## Receive/terminal mismatch handling
-
-  -- Both recv: check label match, continue with children
-  | .recv pS labelsS, .recv pT labelsT, _ =>
-      if pS == pT && labelsS == labelsT then
-        let childrenS := getChildren S
-        let childrenT := getChildren T
-        if childrenS.length == childrenT.length then
-          .continue (List.zipWith (fun s t => ⟨s, t, buf⟩) childrenS childrenT)
-        else
-          .reject
-      else
-        .reject
-
-  -- Subtype sends (async): buffer message
-  | .send _ _, _, _ =>
-      let childrenS := getChildren S
-      let labels := getLabels S
-      .continue (childrenS.zipWith (fun s lbl => ⟨s, T, buf ++ [lbl]⟩) labels)
-
-  -- Supertype receives: try to dequeue from buffer
-  | _, .recv _ labelsT, msg :: rest =>
-      match findLabelIdx labelsT msg with
-      | some idx =>
-          let childrenT := getChildren T
-/- ## Structured Block 1 -/
-          if h : idx.val < childrenT.length then
-            .continue [⟨S, childrenT.get ⟨idx.val, h⟩, rest⟩]
-          else
-            .reject
-      | none => .reject
-
-  -- End with non-empty buffer: reject
-  | .end, _, _ :: _ => .reject
-
-  -- Type mismatch: reject
-  | _, _, _ => .reject
-
-/-! ## Triple Identification
-
-Since LocalTypeC doesn't have decidable equality, we use a structural
-representation for the visited set. For regular types, we can identify
-triples by their position in the exploration tree. -/
-
-/-- Index-based triple representation for visited set tracking.
-    For regular types, we can assign indices to reachable types. -/
-structure TripleIdx where
-  subIdx : Nat
-  supIdx : Nat
-  buffer : MsgBuffer
-  deriving DecidableEq, Repr
-
-/-! ## Worklist Exploration
-
-The main algorithm: explore triples with a visited set.
-Since we can't directly compare LocalTypeC for equality, we use
-a fuel-based exploration that terminates by counting steps. -/
-
-/-- State for worklist exploration. -/
+/-- Exploration state: pending and already-processed triples. -/
 structure ExploreState where
-  /-- Triples yet to explore (with indices). -/
-  worklist : List (TripleIdx × AsyncTriple)
-  /-- Already-visited triple indices. -/
-  visited : List TripleIdx
-  /-- Counter for assigning indices to new types. -/
-  nextIdx : Nat
-  deriving Repr
+  /-- Triples yet to explore. -/
+  worklist : List AsyncTriple
+  /-- Triples already processed (each closed under its chosen step). -/
+  visited : List AsyncTriple
 
-/-- Initial exploration state. -/
-def ExploreState.initial (t : AsyncTriple) : ExploreState :=
-  ⟨[(⟨0, 0, t.buffer⟩, t)], [], 1⟩
-
-/-- Check if a triple index has been visited. -/
-def ExploreState.isVisited (st : ExploreState) (idx : TripleIdx) : Bool :=
-  st.visited.contains idx
-
-/-- Add a triple index to visited set. -/
-def ExploreState.markVisited (st : ExploreState) (idx : TripleIdx) : ExploreState :=
-  { st with visited := idx :: st.visited }
-
-/-- Exploration result. -/
+/-- Exploration outcome. Only `.accepted` carries a guarantee. -/
 inductive ExploreResult where
+  /-- A closed witness set was found: subtyping holds. -/
   | accepted : ExploreResult
-  | rejected : ExploreResult
+  /-- The strategy got stuck; inconclusive. -/
+  | stuck : ExploreResult
+  /-- The fuel bound was exhausted; inconclusive. -/
   | outOfFuel : ExploreResult
   deriving Repr, DecidableEq
 
-/-- One step of exploration (simplified: just decrements fuel). -/
-noncomputable def exploreStep (unfoldBound : Nat) (st : ExploreState) : ExploreState × Option ExploreResult :=
-  match st.worklist with
-  | [] => (st, some .accepted)
-  | (idx, t) :: rest =>
-      let st' := { st with worklist := rest }
-      if st'.isVisited idx then
-        -- Already visited: skip
-        (st', none)
-      else
-        let st'' := st'.markVisited idx
-        match checkAsyncStep unfoldBound t with
-        | .accept =>
-            -- Base case: continue with rest
-            (st'', none)
-        | .continue succs =>
-            -- Add successors with fresh indices
-            let newWorklist := succs.mapIdx fun i succ =>
-              let succIdx : TripleIdx := ⟨st''.nextIdx + i, st''.nextIdx + i, succ.buffer⟩
-              (succIdx, succ)
-            ({ st'' with
-               worklist := newWorklist ++ st''.worklist,
-               nextIdx := st''.nextIdx + succs.length }, none)
-        | .reject =>
-            -- Failed
-            (st'', some .rejected)
+/-- Bounded worklist exploration; `fuel` bounds the number of popped triples. -/
+noncomputable def explore (eqb : LocalTypeC → LocalTypeC → Bool) :
+    Nat → ExploreState → ExploreResult
+  | 0, _ => .outOfFuel
+  | _ + 1, ⟨[], _⟩ => .accepted
+  | n + 1, ⟨t :: rest, vs⟩ =>
+      if vs.any (tripleEqb eqb · t) then explore eqb n ⟨rest, vs⟩
+      else match stepTriple t with
+        | .accept => explore eqb n ⟨rest, t :: vs⟩
+        | .continue succs => explore eqb n ⟨succs ++ rest, t :: vs⟩
+        | .reject => .stuck
 
-/-- Worklist exploration with fuel.
+/-- Bounded sound check of `S ≤ₐ T`. See the module doc for the meaning of results. -/
+noncomputable def checkAsync (eqb : LocalTypeC → LocalTypeC → Bool) (fuel : Nat)
+    (S T : LocalTypeC) : ExploreResult :=
+  explore eqb fuel ⟨[AsyncTriple.initial S T], []⟩
 
-Returns accepted if all reachable triples reach base case.
-Returns rejected if any triple has no valid step.
-Returns outOfFuel if exploration exceeds fuel. -/
-noncomputable def explore (unfoldBound : Nat) (fuel : Nat) (st : ExploreState) : ExploreResult :=
-  match fuel with
-  | 0 => .outOfFuel
-  | fuel' + 1 =>
-      match exploreStep unfoldBound st with
-      | (_, some result) => result
-      | (st', none) => explore unfoldBound fuel' st'
+/-- Boolean form: `true` only when `checkAsync` accepted. -/
+noncomputable def isAsyncSubtypeBounded (eqb : LocalTypeC → LocalTypeC → Bool) (fuel : Nat)
+    (S T : LocalTypeC) : Bool :=
+  checkAsync eqb fuel S T == .accepted
 
--- Top-Level Decision Function
+/-! ## Exploration Invariant -/
 
-/-- Check async subtyping with given fuel and unfold bound.
+/-- `v` is a base case, or has an `AsyncStep` whose successors all lie in `cover`. -/
+def ClosedIn (cover : List AsyncTriple) (v : AsyncTriple) : Prop :=
+  (head v.sub = .end ∧ head v.sup = .end ∧ v.buffer = []) ∨
+    ∃ succs, AsyncStep v succs ∧ ∀ s ∈ succs, s ∈ cover
 
-For regular types, sufficient fuel guarantees termination with correct answer. -/
-noncomputable def checkAsync (S T : LocalTypeC) (_unfoldBound _fuel : Nat) : ExploreResult := by
-  classical
-  if h : S ≤ₐ T then
-    exact .accepted
-  else
-    match explore _unfoldBound _fuel (ExploreState.initial (AsyncTriple.initial S T)) with
-/- ## Structured Block 2 -/
-    | .rejected => exact .rejected
-    | _ => exact .outOfFuel
+/-- `ClosedIn` is monotone in the cover. -/
+theorem ClosedIn.mono {c c' : List AsyncTriple} (hc : c ⊆ c') {v : AsyncTriple}
+    (h : ClosedIn c v) : ClosedIn c' v := by
+  rcases h with h | ⟨s, hs, hm⟩
+  · exact .inl h
+  · exact .inr ⟨s, hs, fun x hx => hc (hm x hx)⟩
 
-/-- Decision function: returns true if subtyping holds (with given bounds). -/
-noncomputable def isAsyncSubtype (S T : LocalTypeC) (unfoldBound fuel : Nat) : Bool :=
-  checkAsync S T unfoldBound fuel == .accepted
+/-- Every visited triple is closed w.r.t. visited ∪ worklist. -/
+def ConsistentVisited (st : ExploreState) : Prop :=
+  ∀ v ∈ st.visited, ClosedIn (st.visited ++ st.worklist) v
 
-/-! ## Fuel Bound
+/-- A consistent state with empty worklist is a coinductive witness. -/
+theorem consistent_closed_sound {vs : List AsyncTriple}
+    (h : ConsistentVisited ⟨[], vs⟩) : ∀ t ∈ vs, AsyncSubtypeRel t := by
+  intro t ht
+  refine AsyncSubtypeRel.coinduct (· ∈ vs) (fun a ha => ?_) t ht
+  rcases h a ha with hd | ⟨s, hs, hm⟩
+  · exact .inl hd
+  · exact .inr ⟨s, hs, fun x hx => by simpa using hm x hx⟩
 
-For regular types, we can compute a sufficient fuel bound. -/
+/-! ## Invariant Preservation -/
 
-/-- Sufficient fuel for regular types.
+/-- Skipping an already-visited triple preserves consistency. -/
+theorem consistent_skip {t : AsyncTriple} {rest vs : List AsyncTriple} (ht : t ∈ vs)
+    (h : ConsistentVisited ⟨t :: rest, vs⟩) : ConsistentVisited ⟨rest, vs⟩ := by
+  intro v hv
+  refine (h v hv).mono ?_
+  intro x hx
+  simp only [List.mem_append, List.mem_cons] at hx ⊢
+  rcases hx with hx | rfl | hx
+  · exact .inl hx
+  · exact .inl ht
+  · exact .inr hx
 
-In the current specification-level model, one productive exploration round is
-enough after the initial state is processed. We keep one extra step for
-termination bookkeeping. -/
-def sufficientFuel (S T : LocalTypeC) : Nat :=
-  maxBufferBound S T + 1
+/-- Processing `t` with a closing step preserves consistency. -/
+theorem consistent_push {t : AsyncTriple} {rest vs succs : List AsyncTriple}
+    (hc : ClosedIn (t :: vs ++ (succs ++ rest)) t)
+    (h : ConsistentVisited ⟨t :: rest, vs⟩) :
+    ConsistentVisited ⟨succs ++ rest, t :: vs⟩ := by
+  intro v hv
+  simp only [List.mem_cons] at hv
+  rcases hv with rfl | hv
+  · exact hc
+  · refine (h v hv).mono ?_
+    intro x hx
+    simp only [List.mem_append, List.mem_cons] at hx ⊢
+    tauto
 
-/-- Sufficient unfold bound for observable types.
+/-- Coverage grows when a triple is moved to `visited`. -/
+theorem cover_push {t x : AsyncTriple} {rest vs succs : List AsyncTriple}
+    (hx : x ∈ vs ++ t :: rest) : x ∈ t :: vs ++ (succs ++ rest) := by
+  simp only [List.mem_append, List.mem_cons] at hx ⊢
+  tauto
 
-In the current specification-level model, bounded unfolding is not needed by
-the correctness proof of `checkAsync` (which is relation-driven). -/
-def sufficientUnfoldBound (_S _T : LocalTypeC) : Nat :=
-  0
+/-! ## Soundness -/
 
-/-! ## Soundness
+/-- One step of the soundness induction for a fresh (unvisited) triple. -/
+theorem explore_sound_fresh {eqb : LocalTypeC → LocalTypeC → Bool} {n : Nat}
+    {t : AsyncTriple} {rest vs : List AsyncTriple}
+    (ih : ∀ st, explore eqb n st = .accepted → ConsistentVisited st →
+      ∀ x ∈ st.visited ++ st.worklist, AsyncSubtypeRel x)
+    (hacc : (match stepTriple t with
+        | .accept => explore eqb n ⟨rest, t :: vs⟩
+        | .continue succs => explore eqb n ⟨succs ++ rest, t :: vs⟩
+        | .reject => .stuck) = ExploreResult.accepted)
+    (hc : ConsistentVisited ⟨t :: rest, vs⟩) :
+    ∀ x ∈ vs ++ t :: rest, AsyncSubtypeRel x := by
+  intro x hx
+  split at hacc
+  · rename_i hs
+    have hc' := consistent_push (succs := []) (.inl (stepTriple_accept hs)) hc
+    exact ih _ hacc hc' x (cover_push (succs := []) hx)
+  · rename_i succs hs
+    have hcl : ClosedIn (t :: vs ++ (succs ++ rest)) t :=
+      .inr ⟨succs, stepTriple_continue hs, fun s hs' => by simp [hs']⟩
+    exact ih _ hacc (consistent_push hcl hc) x (cover_push hx)
+  · cases hacc
 
-If the algorithm accepts, the async subtyping relation holds. -/
+/-- Acceptance from a consistent state proves the relation for every covered triple. -/
+theorem explore_sound {eqb : LocalTypeC → LocalTypeC → Bool}
+    (hEq : ∀ a b, eqb a b = true → a = b) :
+    ∀ (n : Nat) (st : ExploreState), explore eqb n st = .accepted →
+      ConsistentVisited st → ∀ x ∈ st.visited ++ st.worklist, AsyncSubtypeRel x := by
+  intro n
+  induction n with
+  | zero => intro st h; simp [explore] at h
+  | succ n ih =>
+    rintro ⟨_ | ⟨t, rest⟩, vs⟩ hacc hc x hx
+    · exact consistent_closed_sound hc x (by simpa using hx)
+    · simp only [explore] at hacc
+      split at hacc
+      · rename_i hseen
+        obtain ⟨v, hv, hvt⟩ := List.any_eq_true.mp hseen
+        have ht : t ∈ vs := tripleEqb_sound hEq hvt ▸ hv
+        refine ih _ hacc (consistent_skip ht hc) x ?_
+        simp only [List.mem_append, List.mem_cons] at hx ⊢
+        rcases hx with hx | rfl | hx <;> simp_all
+      · exact explore_sound_fresh ih hacc hc x hx
 
-/-- Visited set forms a consistent set: every visited triple either:
-    1. Is a base case (both end, empty buffer), or
-    2. Has all successors in the visited set. -/
-def ConsistentVisited (_unfoldBound : Nat) (_visited : List TripleIdx) : Prop :=
-  True -- Simplified; full definition requires tracking triples
+/-- Soundness: if `checkAsync` accepts (with a sound equality test), `S ≤ₐ T`. -/
+theorem check_async_sound {eqb : LocalTypeC → LocalTypeC → Bool}
+    (hEq : ∀ a b, eqb a b = true → a = b) {fuel : Nat} {S T : LocalTypeC}
+    (h : checkAsync eqb fuel S T = .accepted) : S ≤ₐ T :=
+  explore_sound hEq fuel _ h (fun _ hv => by simp at hv) _ (by simp [AsyncTriple.initial])
 
-/-- If exploration accepts, the visited set is consistent. -/
-theorem explore_accepted_consistent {unfoldBound fuel : Nat} {st : ExploreState}
-    (_h : explore unfoldBound fuel st = .accepted) :
-    ConsistentVisited unfoldBound st.visited := by
-  -- The exploration only accepts when worklist is empty and no rejection occurred.
-  trivial
-
-/-- Soundness: if checkAsync accepts, AsyncSubtypeRel holds.
-
-**Proof idea:**
-By coinduction. The visited set forms a consistent set.
-Every triple in a consistent set satisfies AsyncSubtypeRel:
-- Base cases satisfy by .done
-- Non-base cases satisfy by .step with successors in the set -/
-theorem check_async_sound {S T : LocalTypeC} {unfoldBound fuel : Nat}
-    (h : checkAsync S T unfoldBound fuel = .accepted) :
-    S ≤ₐ T := by
-  classical
-  by_cases hRel : S ≤ₐ T
-  · exact hRel
-  · have hne : ¬(checkAsync S T unfoldBound fuel = .accepted) := by
-      simp [checkAsync, hRel]
-      cases explore unfoldBound fuel (ExploreState.initial (AsyncTriple.initial S T)) <;> simp
-    exact False.elim (hne h)
-
-/-! ## Completeness
-
-If the async subtyping relation holds, the algorithm accepts with enough fuel. -/
-
-/-- Completeness: if AsyncSubtypeRel holds, checkAsync accepts with enough fuel.
-
-**Proof idea:**
-Every triple in the AsyncSubtypeRel derivation is reachable.
-For regular types, reachable triples are finite.
-With fuel ≥ |reachable triples|, the algorithm visits all of them.
-Since the relation holds, no triple causes rejection. -/
-theorem check_async_complete {S T : LocalTypeC}
-    (_hS : Regular S) (_hT : Regular T)
-    (hRel : S ≤ₐ T) :
-    ∃ unfoldBound fuel,
-      checkAsync S T unfoldBound fuel = .accepted := by
-  classical
-  refine ⟨sufficientUnfoldBound S T, sufficientFuel S T, ?_⟩
-  simp [checkAsync, hRel]
-
-/-! ## Decidable Instance
-
-Combine soundness and completeness for the decidable instance. -/
-
-/-- Computable decision for async subtyping on regular types. -/
-noncomputable def decideAsyncSubtype (S T : LocalTypeC)
-    (hS : Regular S) (hT : Regular T) : Decidable (S ≤ₐ T) := by
-  classical
-  let ub := sufficientUnfoldBound S T
-  let fuel := sufficientFuel S T
-  match hResult : checkAsync S T ub fuel with
-  | .accepted =>
-      exact isTrue (check_async_sound hResult)
-  | .rejected =>
-      exact isFalse (by
-        intro hRel
-        have ⟨ub', fuel', hacc⟩ := check_async_complete hS hT hRel
-        -- Any bounds accept when the relation holds (due checkAsync first branch).
-        have hacc' : checkAsync S T ub fuel = .accepted := by
-          simp [checkAsync, hRel]
-        rw [hacc'] at hResult
-        cases hResult)
-  | .outOfFuel =>
-      exact isFalse (by
-        intro hRel
-        have hacc' : checkAsync S T ub fuel = .accepted := by
-          simp [checkAsync, hRel]
-        rw [hacc'] at hResult
-        cases hResult)
-
-/-! ## Main Theorem
-
-The constructive decision procedure is correct. -/
-
-/-- Main result: async subtyping is decidable for regular types,
-    with a constructive decision procedure. -/
-noncomputable def async_subtype_decidable_constructive
-    (S T : LocalTypeC)
-    (hS : Regular S) (hT : Regular T) :
-    Decidable (S ≤ₐ T) :=
-  decideAsyncSubtype S T hS hT
+/-- Boolean soundness for `isAsyncSubtypeBounded`. -/
+theorem is_async_subtype_bounded_sound {eqb : LocalTypeC → LocalTypeC → Bool}
+    (hEq : ∀ a b, eqb a b = true → a = b) {fuel : Nat} {S T : LocalTypeC}
+    (h : isAsyncSubtypeBounded eqb fuel S T = true) : S ≤ₐ T :=
+  check_async_sound hEq (by simpa [isAsyncSubtypeBounded] using h)
 
 end SessionCoTypes.AsyncSubtyping

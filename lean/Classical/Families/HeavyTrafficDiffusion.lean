@@ -3,6 +3,10 @@ import ClassicalAnalysisAPI
 
 /-! # Heavy Traffic Diffusion Limits
 
+**Scope (Option B, honest conditional interface).** Only elementary identities about `√n` scaling are proved (e.g.
+`scaled_variance_identity`). No diffusion limit, random variable or
+weak-convergence statement appears in this module.
+
 This module provides the mathematical foundation for analyzing session-typed
 systems under high load. Heavy traffic theory studies systems operating near
 their capacity limits, where fluctuations become important and can be
@@ -130,15 +134,14 @@ theorem centered_div_scale [EntropyAPI.AnalysisLaws] {n : Nat} (hn : 0 < n) (x �
     exact ne_of_gt (diffusion_scale_pos hn)
   field_simp [hscale]
 
-/-- Variance under diffusion scaling.
+/-- Elementary identity `(σ · √n)² = σ² · n`.
 
-    If a random variable has standard deviation σ, then after multiplying by
-    √n, its variance becomes σ² · n. This is the fundamental variance growth
-    law for random walks: variance accumulates linearly in time.
-
-    For protocols: if per-step buffer fluctuation has variance σ², then after
-    n steps the total buffer deviation has variance σ² · n. -/
-theorem variance_scaling [EntropyAPI.AnalysisLaws] (σ : Real) (n : Nat) :
+    This is real-number algebra using `(√n)² = n`; it involves no random
+    variable, variance, or limit. It is *not* a heavy-traffic diffusion limit
+    (Kingman/Iglehart-Whitt), which would require a sequence of queueing
+    systems with load → 1 and weak convergence of scaled queue lengths to
+    reflected Brownian motion. -/
+theorem scaled_variance_identity [EntropyAPI.AnalysisLaws] (σ : Real) (n : Nat) :
     (σ * diffusionScale n) ^ 2 = σ ^ 2 * n := by
   have hsq : (diffusionScale n) ^ 2 = n := by
     simpa [diffusionScale] using EntropyAPI.fluctuation_scale_sq n

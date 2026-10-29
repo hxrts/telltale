@@ -13,9 +13,11 @@ Reusable partial-synchrony assumptions and liveness theorems:
 The Problem. Earlier versions assumed post-GST progress and bounded-window
 progress directly; those fields were the liveness conclusions.
 Solution Structure. Each fair run refines a concrete view-based execution
-(`Rounds`) with GST, post-GST delay bound `Δ`, and rotating leaders; progress
-is proved there (`Rounds.decided_after_gst`) and transported along the
-refinement.
+(`Rounds`): rotating leaders propose, parties vote, a `2f+1` vote quorum
+within a view decides, and messages after GST arrive within `Δ`. Progress is
+proved there from the vote rule (`Rounds.decided_after_gst`) and transported
+along the refinement; agreement is `Rounds.view_agreement` /
+`Rounds.first_decision_unique`.
 -/
 
 /-! ## Core Development -/
@@ -85,7 +87,7 @@ structure Assumptions
   timing : params.TimingOK
   realizedByRounds :
     ∀ run, FairRun run → M.initial (run 0) →
-      ∃ R : Rounds.RoundRun, Rounds.Admissible params R ∧ Rounds.HasHonest params R ∧
+      ∃ R : Rounds.RoundRun, Rounds.Admissible params R ∧ Rounds.WellFormed params R ∧
         ∀ t, Rounds.DecidedBy params R t → ∃ v, M.decide (run t) = some v
 
 variable {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
@@ -129,10 +131,10 @@ def validateAssumption (a : Assumptions M) (h : Assumption) : AssumptionResult :
   match h with
   | .timing =>
       { assumption := h, passed := decide a.params.TimingOK
-      , detail := "0 < n, 0 < L and 2Δ ≤ L." }
+      , detail := "n = 3f+1, 0 < L and 2Δ ≤ L." }
   | .realizedByRounds =>
       { assumption := h, passed := proofCarriedNoRuntimeCheck
-      , detail := "Fair runs refine an admissible view-based execution with an honest party." }
+      , detail := "Fair runs refine an admissible, well-formed vote-quorum execution (≤ f faults)." }
 
 /-- Soundness of the decided label. -/
 theorem validateAssumption_timing_sound (P : Rounds.Params)

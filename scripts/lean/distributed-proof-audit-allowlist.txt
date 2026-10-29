@@ -11,6 +11,10 @@
 #   corresponding API/Instance trust boundary in the Lean file header.
 
 # Existing explicit trust boundaries documented in lean/CODE_MAP.md.
+# Category: assumed input (Option B). The ClassicalAnalysisAPI/Instance laws are
+# assumed real-analysis inputs (or definitional identities such as
+# `spectral_gap_eq`); classical theorem families consume them as honest
+# conditional interfaces and do not claim to prove the named classical results.
 ^lean/ClassicalAnalysisAPI\.lean:
 ^lean/ClassicalAnalysisInstance\.lean:
 ^lean/ClassicalAnalysisInstance/

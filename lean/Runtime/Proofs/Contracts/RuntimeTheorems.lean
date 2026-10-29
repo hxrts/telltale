@@ -15,10 +15,10 @@ import ClassicalAnalysisAPI
 Core theorem statements and proofs for the protocol machine runtime layer. This module collects
 proven theorems across several categories:
 
-- **Refinement stack**: Layered refinement from effects through scheduling to failure handling
+- **Scheduler step properties**: determinism, cooperative/round-robin agreement, one-step non-blocking
 - **Core protocol machine**: Deadlock freedom, transfer preservation, progress measures
 - **Multi-session**: Cross-session diamond property (disjoint sessions commute)
-- **Handlers**: Transport spec satisfaction, effect polymorphism
+- **Handlers**: projections of the handler transport-spec premise
 - **Cost metering**: Credit soundness, budget bounds, information-theoretic costs
 
 Theorems in this module are stated and proved in executable form. -/
@@ -30,26 +30,26 @@ need a single entry point to access proven guarantees without navigating the pro
 structure.
 
 Solution Structure. Collects theorem statements into categories, providing types
-and instantiation functions for each. Refinement stack theorems establish behavioral
-equivalences between abstraction layers. Core protocol machine theorems cover deadlock freedom
+and instantiation functions for each. Scheduler step theorems are per-state facts, not inter-layer
+refinements. Core protocol machine theorems cover deadlock freedom
 and progress. Multi-session theorems prove the diamond property for disjoint sessions.
 -/
 
 set_option autoImplicit false
 section
 
-/-! ## Refinement Stack
+/-! ## Scheduler Step Properties
 
-The refinement stack establishes behavioral equivalences between abstraction layers:
-- Effects layer refines scheduler step (confluence + cooperative refinement)
-- Scheduler step refines failure-aware layer (starvation freedom)
-- Failure layer refines speculative execution (combined properties)
+Per-state scheduler facts. These are not refinement theorems between layers:
+- `schedule_deterministic`: `schedule` is a function of the state.
+- `cooperative_refines_concurrent`: under the cooperative policy, selection
+  coincides with round-robin selection on the same queue.
+- `schedule_nonblocking`: one-step non-blocking (not fairness).
 -/
 
-def effects_refines_schedStep : Prop :=
-  -- Effect-level operations refine scheduler steps: schedule confluence holds
-  -- (order of ready coroutines doesn't affect reachable states) and cooperative
-  -- scheduling refines concurrent semantics.
+/-- Scheduler determinism plus cooperative/round-robin selection agreement.
+No inter-layer refinement is claimed. -/
+def schedule_deterministic_and_cooperative_agrees : Prop :=
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -58,28 +58,14 @@ def effects_refines_schedStep : Prop :=
     [IdentityVerificationBridge ι ν],
     ∀ st : ProtocolMachineState ι γ π ε ν, schedule_deterministic st ∧ cooperative_refines_concurrent st
 
-theorem effects_refines_sched_step_holds : effects_refines_schedStep := by
+theorem schedule_deterministic_and_cooperative_agrees_holds :
+    schedule_deterministic_and_cooperative_agrees := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
     ⟨schedule_deterministic_holds st, cooperative_refines_concurrent_holds st⟩
 
-def schedStep_refines_failure : Prop :=
-  -- Scheduler liveness bridges to the failure-aware layer: every runnable
-  -- coroutine eventually gets scheduled (no starvation).
-  ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
-    [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
-    [IdentityVerificationBridge ι ν],
-    ∀ st : ProtocolMachineState ι γ π ε ν, starvation_free st
-
-theorem sched_step_refines_failure_holds : schedStep_refines_failure := by
-  exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
-    starvation_free_holds st
-
-def failure_refines_speculative : Prop :=
-  -- Combined refinement property: cooperative refinement and starvation freedom
-  -- jointly characterize the executable behavior envelope for speculative execution.
+/-- Cooperative/round-robin selection agreement plus one-step non-blocking
+scheduling. No refinement or fairness is claimed. -/
+def cooperative_agrees_and_schedule_nonblocking : Prop :=
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -87,11 +73,12 @@ def failure_refines_speculative : Prop :=
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
     ∀ st : ProtocolMachineState ι γ π ε ν,
-      cooperative_refines_concurrent st ∧ starvation_free st
+      cooperative_refines_concurrent st ∧ schedule_nonblocking st
 
-theorem failure_refines_speculative_holds : failure_refines_speculative := by
+theorem cooperative_agrees_and_schedule_nonblocking_holds :
+    cooperative_agrees_and_schedule_nonblocking := by
   exact fun {ι} {γ} {π} {ε} {ν} _ _ _ _ _ _ _ _ _ _ _ _ st =>
-    ⟨cooperative_refines_concurrent_holds st, starvation_free_holds st⟩
+    ⟨cooperative_refines_concurrent_holds st, schedule_nonblocking_holds st⟩
 
 /-! ## Core protocol machine Theorems
 
@@ -178,43 +165,38 @@ by
 
 /-! ## Handler and Effect Polymorphism
 
-Theorems about handler traces satisfying transport specifications,
-enabling polymorphic effect handling.
+Projections of the `HandlerSatisfiesTransportSpec` premise: each statement
+takes the handler's spec proof as a hypothesis and applies it. Nothing here
+proves that a concrete handler satisfies a spec.
 -/
 
-def handler_is_session : Prop :=
-  -- Every handler ID corresponds to a handler session kind.
-  ∀ (γ : Type) (hsid : HandlerId), ∃ sk : SessionKind γ, sk = SessionKind.handler hsid
-
-theorem handler_is_session_holds : handler_is_session :=
-  fun _ hsid => ⟨SessionKind.handler hsid, rfl⟩
-
-def handler_progress : Prop :=
-  -- Handler traces satisfy their declared transport specs.
+/-- Given a handler spec premise, its traces satisfy the declared spec. -/
+def handler_progress_of_handler_spec : Prop :=
   ∀ (ν : Type) [VerificationModel ν] handler (handlers : List (Edge × HandlerId))
     (trace : TransportTrace ν)
     (hSpec : HandlerSatisfiesTransportSpec ν handler),
     IsHandlerTrace (ν:=ν) handler handlers trace →
     SpecSatisfied hSpec.spec trace
 
-theorem handler_progress_holds : handler_progress :=
+theorem handler_progress_of_handler_spec_holds : handler_progress_of_handler_spec :=
   fun _ν _ _handler handlers trace hSpec hTrace =>
     hSpec.proof handlers trace hTrace
 
-def handler_transport_refines : Prop :=
-  -- Handler-backed traces refine some transport spec (existential witness).
+/-- Given a handler spec premise, its traces satisfy some spec. -/
+def handler_transport_refines_of_handler_spec : Prop :=
   ∀ (ν : Type) [VerificationModel ν] handler (handlers : List (Edge × HandlerId))
     (trace : TransportTrace ν)
     (_hSpec : HandlerSatisfiesTransportSpec ν handler),
     IsHandlerTrace (ν:=ν) handler handlers trace →
     ∃ spec, SpecSatisfied spec trace
 
-theorem handler_transport_refines_holds : handler_transport_refines :=
+theorem handler_transport_refines_of_handler_spec_holds :
+    handler_transport_refines_of_handler_spec :=
   fun _ν _ _handler handlers trace hSpec hTrace =>
     ⟨hSpec.spec, hSpec.proof handlers trace hTrace⟩
 
-def effect_polymorphic_safety : Prop :=
-  -- Two spec-satisfying handlers both respect their own specs on shared traces.
+/-- Given two handler spec premises, a shared trace satisfies both specs. -/
+def effect_polymorphic_safety_of_handler_spec : Prop :=
   ∀ (ν : Type) [VerificationModel ν] h1 h2 (handlers : List (Edge × HandlerId))
     (trace : TransportTrace ν)
     (hSpec1 : HandlerSatisfiesTransportSpec ν h1)
@@ -223,7 +205,8 @@ def effect_polymorphic_safety : Prop :=
     IsHandlerTrace (ν:=ν) h2 handlers trace →
     SpecSatisfied hSpec1.spec trace ∧ SpecSatisfied hSpec2.spec trace
 
-theorem effect_polymorphic_safety_holds : effect_polymorphic_safety :=
+theorem effect_polymorphic_safety_of_handler_spec_holds :
+    effect_polymorphic_safety_of_handler_spec :=
   fun _ν _ _h1 _h2 handlers trace hSpec1 hSpec2 hTrace1 hTrace2 =>
     ⟨hSpec1.proof handlers trace hTrace1, hSpec2.proof handlers trace hTrace2⟩
 
@@ -231,13 +214,6 @@ theorem effect_polymorphic_safety_holds : effect_polymorphic_safety :=
 
 Token-based progress tracking for receive operations.
 -/
-
-def session_type_mints_tokens_lifted : Prop :=
-  -- Session progress supply yields minted tokens for each (session, role) pair.
-  ∀ (sid : SessionId) (r : Role), ∃ (ep : Endpoint), ep.sid = sid ∧ ep.role = r
-
-theorem session_type_mints_tokens_holds : session_type_mints_tokens_lifted :=
-  fun sid r => ⟨{ sid := sid, role := r }, rfl, rfl⟩
 
 def recv_consumes_token : Prop :=
   -- Consuming a progress token requires the token to be present and removes it.
@@ -252,18 +228,19 @@ theorem recv_consumes_token_holds : recv_consumes_token := by
   next hc => exact ⟨hc, by simpa [eq_comm] using h⟩
   next _ => simp at h
 
-def starvation_free_lifted : Prop :=
-  -- Scheduling liveness: every runnable coroutine eventually gets scheduled.
+def schedule_nonblocking_lifted : Prop :=
+  -- One-step non-blocking: a queued ready coroutine means `schedule` steps.
+  -- This is not fairness: no coroutine is guaranteed to eventually run.
   ∀ {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν],
-    ∀ st : ProtocolMachineState ι γ π ε ν, starvation_free st
+    ∀ st : ProtocolMachineState ι γ π ε ν, schedule_nonblocking st
 
-theorem starvation_free_lifted_holds : starvation_free_lifted :=
-  fun st => starvation_free_holds st
+theorem schedule_nonblocking_lifted_holds : schedule_nonblocking_lifted :=
+  fun st => schedule_nonblocking_holds st
 
 /-! ## Cost Metering
 

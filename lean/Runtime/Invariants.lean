@@ -150,8 +150,13 @@ A conserved quantity `proj : Endpoint → M` summed over a duplicate-free cover 
 the session's endpoints. The lemmas below prove the two algebraic shapes every
 session operation must take to preserve it: joining/leaving with a zero
 contribution, and a transfer between two endpoints that keeps their combined
-contribution. They do not yet connect to the machine's `open`/`send`/`recv`/
-`close` step functions; that connection is the remaining obligation. -/
+contribution. The machine-level message-conservation law (per edge: sent = received ++
+in-flight) is proved preserved by the real `stepSend` (FIFO buffer mode) and
+`stepReceive` in `Runtime/Adequacy/CommTraceMachine.lean`
+(`stepSend_conservation`, `stepReceive_conservation`). Remaining obligation:
+the generic `coverSum` conservation over endpoints is not yet instantiated for
+the machine's session `open`/`close` operations (`ExecSession.lean`), whose
+effect on the conserved quantity is only shaped by the lemmas below. -/
 
 /-- Sum of the conserved quantity over an endpoint cover. -/
 def coverSum {M : Type} [AddCommMonoid M] (proj : Endpoint → M) (eps : List Endpoint) : M :=

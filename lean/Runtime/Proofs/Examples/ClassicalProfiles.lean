@@ -401,23 +401,6 @@ example (m : ProtocolClassical.ProtocolMeanFieldModel) :
     ).meanField?.isSome = true := by
   rfl
 
-example
-    [DecidableEq ProtocolClassical.WTConfigN] [Fintype ProtocolClassical.WTConfigN]
-    (step : ProtocolClassical.FStep)
-    (gap_pos :
-      Classical.SpectralGapTermination.SpectralGapPos
-        (ProtocolClassical.wtConfigNMarkovChain step))
-    (termination :
-      Classical.SpectralGapTermination.TerminationWitness
-        (ProtocolClassical.wtConfigNMarkovChain step)) :
-    (buildProtocolMachineTheoremPack
-      (space :=
-        (classicalBaseSpaceFor (ν := ν) (store₀ := store₀)
-          ProtocolClassical.WTConfigN).withSpectralGap
-          (Adapters.mkProtocolSpectralGapProfile step gap_pos termination))
-    ).spectralGapTermination?.isSome = true := by
-  rfl
-
 end
 
 end Examples

@@ -8,11 +8,24 @@ set_option linter.unnecessarySimpa false
 
 open scoped BigOperators
 
+/-! # Protocol.Classical.SpectralGap
+
+Deterministic-chain encoding of a protocol step `FStep` as a 0/1 stochastic
+kernel on `WTConfigN`.
+
+**Honest scope (Option B).** A deterministic kernel is a functional-graph
+matrix: its eigenvalues are `0` and roots of unity, so every nontrivial
+eigenvalue has modulus `0` or `1` and the spectral gap is degenerate (`0` or
+`1`). Spectral-gap, Cheeger, hitting-time and product-chain statements over
+this kernel were therefore vacuous restatements of assumed witnesses and have
+been removed. Only the deterministic-chain facts (nonnegativity and
+stochasticity of the kernel) are proved here. A meaningful spectral result
+would need a genuinely stochastic (e.g. scheduler-randomised) protocol kernel.
+-/
+
 section
 
 namespace ProtocolClassical
-
-open Classical.SpectralGapTermination
 
 /-- Alias used in 2.7: well-typed coherent protocol states. -/
 abbrev WTConfigN := WTConfigNState
@@ -25,6 +38,7 @@ variable [DecidableEq WTConfigN]
 def wtConfigNDetTransition (step : FStep) (s s' : WTConfigN) : ℝ :=
   if s' = step s then 1 else 0
 
+/-- The deterministic 0/1 kernel is nonnegative. -/
 theorem wt_config_n_det_transition_nonneg (step : FStep) :
     ∀ s s', 0 ≤ wtConfigNDetTransition step s s' := by
   intro s s'
@@ -34,8 +48,9 @@ theorem wt_config_n_det_transition_nonneg (step : FStep) :
 
 variable [Fintype WTConfigN]
 
-/-! ## Markov-Chain Instance -/
+/-! ## Deterministic Chain -/
 
+/-- Each row of the deterministic kernel sums to one (single `1` at `step s`). -/
 theorem wt_config_n_det_transition_stochastic (step : FStep) :
     ∀ s, (∑ s', wtConfigNDetTransition step s s') = 1 := by
   intro s
@@ -43,71 +58,11 @@ theorem wt_config_n_det_transition_stochastic (step : FStep) :
   simpa [wtConfigNDetTransition] using
     (Finset.sum_ite_eq (s := (Finset.univ : Finset WTConfigN)) (a := step s) (b := (1 : ℝ)))
 
-/-- 2.7 task: instantiate `MarkovChain` against `WTConfigN`. -/
-def wtConfigNMarkovChain (step : FStep) :
+/-- The deterministic chain induced by `step` (degenerate spectrum; see module doc). -/
+def wtConfigNDeterministicChain (step : FStep) :
     Classical.SpectralGapTermination.MarkovChain WTConfigN where
   transition := wtConfigNDetTransition step
   nonneg := wt_config_n_det_transition_nonneg step
   stochastic := wt_config_n_det_transition_stochastic step
-
-/-! ## Spectral and Conductance Bounds -/
-
-/-- 2.7 task: protocol-level Cheeger inequality over the `WTConfigN` chain. -/
-theorem wt_config_n_cheeger_inequality (step : FStep)
-    (hGap : 0 ≤ spectralGap (wtConfigNMarkovChain step))
-    (w : ConductanceWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
-    (conductance (wtConfigNMarkovChain step) w) ^ 2 / 2 ≤
-      spectralGap (wtConfigNMarkovChain step) := by
-  exact
-    @cheeger_inequality.{0, 0, 0, 0} WTConfigN _ _
-      _ (wtConfigNMarkovChain step) hGap w
-
-/-- Strict positivity of protocol spectral gap from `|λ₂| < 1`. -/
-theorem wt_config_n_spectral_gap_pos (step : FStep)
-    (h : SpectralGapPos (wtConfigNMarkovChain step)) :
-    0 < spectralGap (wtConfigNMarkovChain step) := by
-  exact spectral_gap_pos (mc := wtConfigNMarkovChain step) h
-
-/-! ## Stationary and Hitting-Time Corollaries -/
-
-/-- Existence of a stationary distribution from an explicit protocol witness. -/
-theorem wt_config_n_exists_stationary_dist (step : FStep)
-    (w : StationaryWitness.{0} (wtConfigNMarkovChain step)) :
-    ∃ π : WTConfigN → ℝ,
-      IsProbabilityDist π ∧ IsStationary (wtConfigNMarkovChain step) π := by
-  simpa using
-    @exists_stationary_dist.{0, 0, 0, 0} WTConfigN inferInstance inferInstance
-      (wtConfigNMarkovChain step) w
-
-/-- Hitting-time spectral upper bound specialized to protocol states. -/
-theorem wt_config_n_hitting_time_spectral_bound (step : FStep)
-    (hGap : 0 < spectralGap (wtConfigNMarkovChain step))
-    (w : HittingTimeWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
-    ∀ st, expectedHittingTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
-  intro st
-  exact @hitting_time_spectral_bound.{0, 0, 0, 0} WTConfigN _
-      _ _ (wtConfigNMarkovChain step) hGap w st
-
-/-- Expected termination-time bound specialized to protocol states. -/
-theorem wt_config_n_expected_termination_bound (step : FStep)
-    (hGap : 0 < spectralGap (wtConfigNMarkovChain step))
-    (w : TerminationWitness.{0, 0, 0, 0} (wtConfigNMarkovChain step)) :
-    ∀ st, expectedTerminationTime w st ≤ 1 / spectralGap (wtConfigNMarkovChain step) := by
-  intro st
-  exact @expected_termination_bound.{0, 0, 0, 0} WTConfigN _
-      _ _ (wtConfigNMarkovChain step) hGap w st
-
-/-! ## Product-Chain Spectral Gap -/
-
-/-- Independent-session spectral-gap lower bound for two protocol kernels. -/
-theorem wt_config_n_independent_sessions_spectral_gap
-    (step₁ step₂ : FStep)
-    (w : IndependentSessionsWitness.{0, 0, 0, 0}
-      (wtConfigNMarkovChain step₁)
-      (wtConfigNMarkovChain step₂)) :
-    min (spectralGap (wtConfigNMarkovChain step₁))
-        (spectralGap (wtConfigNMarkovChain step₂)) ≤
-      spectralGap w.productChain := by
-  exact w.gap_lower_bound
 
 end ProtocolClassical

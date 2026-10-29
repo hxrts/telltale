@@ -3,6 +3,11 @@ import ClassicalAnalysisAPI
 
 /-! # Functional Central Limit Theorem
 
+**Scope (Option B, honest conditional interface).** Only elementary identities are proved: additivity of centering and the
+fact that a *constant* sequence centred at its own value has zero scaled
+partial sums. No Donsker/functional CLT (weak convergence in Skorokhod
+space) is proved or assumed here.
+
 This module provides the mathematical foundation for path-level convergence
 in session-typed distributed systems. The functional CLT (also known as
 Donsker's theorem) extends the classical central limit theorem from

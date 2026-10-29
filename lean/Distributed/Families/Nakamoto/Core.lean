@@ -5,14 +5,22 @@ set_option autoImplicit false
 /-! # Distributed.Families.Nakamoto
 
 Reusable Nakamoto-style assumptions and theorem forms:
-- probabilistic safety,
-- settlement-depth finality,
-- liveness under admissible churn.
+- probabilistic safety (common prefix plus an explicit probability boundary),
+- settlement-depth finality (common prefix),
+- chain growth (liveness).
+
+Common prefix and chain growth are proved for the deterministic longest-chain
+model of `LongestChain` under its combinatorial window condition, and
+transported along a refinement. That model has no network delay. Chain
+quality and churn are not modelled; their former premises restated the
+conclusions and were removed.
 -/
 
 /-
-The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
-Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+The Problem. Earlier versions carried `chainGrowth`, `chainQuality`, and
+`churnWithin` premises equal to the liveness conclusions.
+Solution Structure. Prove chain growth in `LongestChain.chain_growth`, transport
+it along `realizedByLongestChain`, and drop the unprovable quality/churn forms.
 -/
 
 /-! ## Core Development -/
@@ -26,10 +34,8 @@ universe u v w
 structure Model (State : Type u) (Block : Type v) (Party : Type w) where
   initial : State → Prop
   chain : State → List Block
-  honestWeight : List Block → Nat
   failureProbabilityAtDepth : Nat → Rat
   adversarialPowerBounded : Prop
-  churnWithin : (Nat → State) → Nat → Prop
 
 /-! ## Chain Trace Semantics -/
 
@@ -54,13 +60,6 @@ def ChainGrowth
     (window minGrowth : Nat) : Prop :=
   ∀ i, (M.chain (run i)).length + minGrowth ≤
     (M.chain (run (i + window))).length
-
-/-- Chain quality: enough honest weight is present in each sampled growth window. -/
-def ChainQuality
-    {State : Type u} {Block : Type v} {Party : Type w}
-    (M : Model State Block Party) (run : Nat → State)
-    (window minHonestWeight : Nat) : Prop :=
-  ∀ i, minHonestWeight ≤ M.honestWeight (M.chain (run (i + window)))
 
 /-! ## Probability Boundary -/
 
@@ -87,17 +86,14 @@ def SettlementDepthFinality
     (k : Nat) : Prop :=
   ∀ run, AdmissibleRun run → CommonPrefixAtDepth M run k
 
-/-- Liveness predicate under churn budget `χ`. -/
-def LivenessUnderChurn
+/-- Chain-growth liveness: every admissible run grows by at least `⌈k/2⌉`
+blocks in every window of `k` rounds. -/
+def ChainGrowthLiveness
     {State : Type u} {Block : Type v} {Party : Type w}
     (M : Model State Block Party)
     (AdmissibleRun : (Nat → State) → Prop)
-    (χ : Nat) : Prop :=
-  ∀ run, AdmissibleRun run →
-    M.churnWithin run χ ∧
-      ∃ growthWindow minGrowth qualityWindow minHonestWeight,
-        ChainGrowth M run growthWindow minGrowth ∧
-        ChainQuality M run qualityWindow minHonestWeight
+    (k : Nat) : Prop :=
+  ∀ run, AdmissibleRun run → ChainGrowth M run k ((k + 1) / 2)
 
 /-! ## Assumption Atoms and Contracts -/
 
@@ -108,11 +104,6 @@ structure Assumptions
   AdmissibleRun : (Nat → State) → Prop
   ε : Rat
   settlementDepth : Nat
-  churnBudget : Nat
-  growthWindow : Nat
-  minGrowth : Nat
-  qualityWindow : Nat
-  minHonestWeight : Nat
   probabilityBudget : ProbabilityBudget M settlementDepth ε
   /-- Each admissible run is the public chain of a concrete longest-chain
   execution (`LongestChain.IsRun`) whose production schedule satisfies the
@@ -125,21 +116,12 @@ structure Assumptions
         LongestChain.IsRun sched mint lc ∧
         (∀ T, LongestChain.WindowHonestMajorityUpTo sched settlementDepth T) ∧
         ∀ t, M.chain (run t) = (lc t).pub
-  chainGrowth :
-    ∀ run, AdmissibleRun run → ChainGrowth M run growthWindow minGrowth
-  chainQuality :
-    ∀ run, AdmissibleRun run → ChainQuality M run qualityWindow minHonestWeight
-  churnWithin :
-    ∀ run, AdmissibleRun run → M.churnWithin run churnBudget
 
 /-- Built-in assumption labels for summary/validation APIs. -/
 inductive Assumption where
   | admissibleRuns
   | probabilityBudget
   | realizedByLongestChain
-  | chainGrowth
-  | chainQuality
-  | churnWithin
   deriving Repr, DecidableEq, Inhabited
 
 /-- Validation result for one assumption atom. -/
@@ -154,9 +136,6 @@ def coreAssumptions : List Assumption :=
   [ .admissibleRuns
   , .probabilityBudget
   , .realizedByLongestChain
-  , .chainGrowth
-  , .chainQuality
-  , .churnWithin
   ]
 
 /-! ## Assumption Validation API -/
@@ -190,21 +169,6 @@ def validateAssumption
       , passed := proofCarriedNoRuntimeCheck
       , detail := "Runs refine a longest-chain execution with window honest majority \
           (decide the window condition with `LongestChain.checkWindowHonestMajority`)."
-      }
-  | .chainGrowth =>
-      { assumption := h
-      , passed := proofCarriedNoRuntimeCheck
-      , detail := "Chain-growth semantics are provided for admissible runs."
-      }
-  | .chainQuality =>
-      { assumption := h
-      , passed := proofCarriedNoRuntimeCheck
-      , detail := "Chain-quality semantics are provided for admissible runs."
-      }
-  | .churnWithin =>
-      { assumption := h
-      , passed := proofCarriedNoRuntimeCheck
-      , detail := "Admissible runs satisfy the configured churn budget."
       }
 
 /-- Validate a list of assumptions. -/
@@ -270,22 +234,17 @@ theorem settlement_finality_of_assumptions
   intro run hRun
   exact common_prefix_of_assumptions a run hRun
 
-/-- Liveness-under-churn follows from churn, growth, and quality semantics. -/
-theorem liveness_under_churn_of_assumptions
+/-- Chain growth, proved from the longest-chain refinement and
+`LongestChain.chain_growth`. -/
+theorem chain_growth_of_assumptions
     {State : Type u} {Block : Type v} {Party : Type w}
     {M : Model State Block Party}
     (a : Assumptions M) :
-    LivenessUnderChurn M a.AdmissibleRun a.churnBudget := by
-  intro run hRun
-  exact
-    ⟨ a.churnWithin run hRun
-    , a.growthWindow
-    , a.minGrowth
-    , a.qualityWindow
-    , a.minHonestWeight
-    , a.chainGrowth run hRun
-    , a.chainQuality run hRun
-    ⟩
+    ChainGrowthLiveness M a.AdmissibleRun a.settlementDepth := by
+  intro run hRun i
+  obtain ⟨sched, mint, lc, hIsRun, hW, hEq⟩ := a.realizedByLongestChain run hRun
+  rw [hEq, hEq]
+  exact LongestChain.chain_growth hIsRun (hW (i + a.settlementDepth)) le_rfl le_rfl
 
 end Nakamoto
 end Distributed

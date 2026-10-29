@@ -1,4 +1,4 @@
-import FisherInformationInstance.BernoulliCalculus
+import FisherInformationInstance.BernoulliDuality
 
 /-! # Bernoulli Fisher Laws Instance
 
@@ -6,14 +6,12 @@ A nondegenerate (`d = 1`) checked `Laws` instance for the Bernoulli family
 `Fixtures.bernoulliModel`, whose Fisher matrix is the real Fisher information
 `σ(θ)(1 - σ(θ)) > 0`.
 
-## Honest Scope
+## Scope
 
-The KL, Fisher-metric, Taylor, Cramer-Rao, and reachability-volume laws are
-proved with full content. `LegendreDuality`, `DualPotentialEqLegendre`,
-`KLZeroIffEqualParameters`, and `NaturalGradientExists` are guarded by the API's
-`isMinimal` predicate, which demands that the identity map invert the gradient
-map; the Bernoulli family is not minimal in that sense
-(`bernoulli_not_minimal`), so those four fields hold vacuously here.
+Every law is proved with full content. Minimality (affine independence of the
+statistic `0, 1`), Legendre duality, dual potential = negative entropy, the KL
+Bregman closed form, KL-zero-iff-equal, natural-gradient existence, and the
+Fisher/Hessian identity are proved in `BernoulliDuality`.
 -/
 
 /-
@@ -39,17 +37,6 @@ noncomputable section
 
 /-! ## Model-Level Reductions -/
 
-/-- Bernoulli closed-form KL is the softplus Bregman gap. -/
-theorem klClosedForm_eq (θ₁ θ₂ : naturalParameter bernoulliFamily.d) :
-    klClosedForm bernoulliModel θ₁ θ₂ =
-      softplus (θ₂ bernoulliIndex) - softplus (θ₁ bernoulliIndex) -
-        (θ₂ bernoulliIndex - θ₁ bernoulliIndex) * logistic (θ₁ bernoulliIndex) := by
-  -- Expand the log-partitions and the one-coordinate dot product.
-  show logPartition bernoulliFamily θ₂ - logPartition bernoulliFamily θ₁ -
-    dot (naturalParameterSub θ₂ θ₁) (bernoulliExpectationParam θ₁).coord = _
-  rw [logPartition_eq, logPartition_eq, dot_eq]
-  rfl
-
 /-- The Bernoulli Fisher metric is `v · σ(1-σ) · w`. -/
 theorem fisherMetric_eq (θ : naturalParameter bernoulliFamily.d)
     (v w : Fin bernoulliFamily.d → ℝ) :
@@ -67,30 +54,6 @@ theorem fisherAt_det (θ : naturalParameter bernoulliFamily.d) :
   -- `1 × 1` determinants are the single entry.
   have h : ∀ A : Matrix (Fin 1) (Fin 1) ℝ, A.det = A 0 0 := fun A => Matrix.det_fin_one A
   exact (h (bernoulliModel.fisherAt θ)).trans (fisherInformation_eq θ _ _)
-
-/-- Entry of a `1 × 1` real matrix inverse. -/
-theorem fin_one_inv_apply (A : Matrix (Fin 1) (Fin 1) ℝ) : A⁻¹ 0 0 = (A 0 0)⁻¹ := by
-  -- `A⁻¹ = det⁻¹ • adj` and `adj = 1` in dimension one.
-  rw [Matrix.inv_def, Matrix.adjugate_fin_one, Matrix.det_fin_one, Ring.inverse_eq_inv']
-  simp
-
-/-- The inverse Bernoulli Fisher matrix is the reciprocal variance. -/
-theorem fisherAt_inv_apply (θ : naturalParameter bernoulliFamily.d) :
-    (bernoulliModel.fisherAt θ)⁻¹ bernoulliIndex bernoulliIndex =
-      (logisticVar (θ bernoulliIndex))⁻¹ := by
-  -- Specialize the `1 × 1` inverse formula.
-  exact (fin_one_inv_apply (bernoulliModel.fisherAt θ)).trans
-    (congrArg Inv.inv (fisherInformation_eq θ _ _))
-
-/-- The Bernoulli family is not minimal in the API's identity-inverse sense. -/
-theorem bernoulli_not_minimal : ¬ isMinimal bernoulliFamily := by
-  -- At `θ = 0` the gradient map returns `σ(0) > 0 ≠ 0`.
-  intro h
-  have h0 := congrArg (fun θ : naturalParameter bernoulliFamily.d => θ bernoulliIndex)
-    (h.1 ⟨fun _ => 0⟩)
-  change gradientLogPartition bernoulliFamily ⟨fun _ => 0⟩ bernoulliIndex = 0 at h0
-  rw [gradient_eq] at h0
-  exact (logistic_pos _).ne' h0
 
 /-! ## Law Proofs -/
 
@@ -154,7 +117,7 @@ theorem bernoulli_reachabilityVolumeBound : ReachabilityVolumeBound bernoulliMod
 (the Bernoulli family attains the Cramer-Rao bound). -/
 theorem bernoulli_cr_gap_zero (θ : naturalParameter bernoulliFamily.d)
     (g : bernoulliFamily.Ω → Fin bernoulliFamily.d → ℝ)
-    (hunb : unbiasedEstimator bernoulliModel θ g) :
+    (hunb : locallyUnbiasedEstimator bernoulliModel θ g) :
     estimatorCovariance bernoulliModel θ g bernoulliIndex bernoulliIndex -
       (bernoulliModel.fisherAt θ)⁻¹ bernoulliIndex bernoulliIndex = 0 := by
   -- With `q = σ(1-σ)` and `D = g₁ - g₀`: `qD = 1` and variance `qD² = D = q⁻¹`.
@@ -209,17 +172,18 @@ open Fixtures
 noncomputable instance bernoulliLaws : Laws where
   toModel := bernoulliModel
   fisher_psd := bernoulli_fisherPSD
-  fisher_eq_hessian := fun _ => rfl
-  legendre_duality := fun h => absurd h bernoulli_not_minimal
-  dual_potential_eq_legendre := fun h => absurd h bernoulli_not_minimal
+  fisher_eq_hessian := bernoulli_fisherEqHessian
+  legendre_duality := bernoulli_legendreDuality
+  dual_potential_eq_legendre := bernoulli_dualPotentialEqLegendre
+  kl_closed_form := bernoulli_klClosedForm
   kl_nonneg := bernoulli_klNonneg
-  kl_zero_iff_equal_parameters := fun h => absurd h bernoulli_not_minimal
+  kl_zero_iff_equal_parameters := bernoulli_klZeroIffEqualParameters
   kl_second_order_taylor := bernoulli_klSecondOrderTaylor
   fisher_metric_symmetric := bernoulli_fisherMetricSymmetric
   fisher_metric_psd := bernoulli_fisherMetricPSD
   cramer_rao_bound := bernoulli_cramerRaoBound
   reachability_volume_bound := bernoulli_reachabilityVolumeBound
-  natural_gradient_exists := fun h => absurd h bernoulli_not_minimal
+  natural_gradient_exists := bernoulli_naturalGradientExists
 
 end RealConcrete
 

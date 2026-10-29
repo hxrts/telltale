@@ -3,8 +3,23 @@ import ClassicalAnalysisAPI
 
 /-! # Classical.Families.SpectralGapTermination
 
-Spectral-gap assumptions and reusable termination-rate lemmas for finite-state
-Markov chains.
+Spectral-gap vocabulary for finite-state Markov chains, packaged as an honest
+conditional interface (Option B).
+
+**What is proved here.** Only elementary algebra: nonnegativity/positivity of
+`spectralGap` from the stated side conditions, and the squaring step that turns
+an assumed bound `Φ ≤ √(2γ)` into `Φ² / 2 ≤ γ`.
+
+**What is assumed, not proved.** Every classical spectral result (Cheeger's
+inequality, existence of a stationary distribution, hitting/termination times
+bounded by `1 / γ`, product-chain gap bounds) enters only as a field of a
+`*Witness` structure supplied by the caller. Nothing in this module relates the
+witness quantities to the transition kernel; in particular `ConductanceWitness.Φ`
+is *not* defined as the conductance (bottleneck ratio) of the chain. A genuine
+proof would need: the variational (Dirichlet-form) characterisation of the gap
+of a reversible chain, the definition of conductance as a minimum over cuts,
+and the Cheeger/Jerrum-Sinclair argument; Perron-Frobenius for stationarity;
+and a spectral-decomposition bound on expected hitting times.
 -/
 
 set_option linter.mathlibStandardSet false
@@ -60,6 +75,7 @@ def spectralGap (mc : MarkovChain State) : ℝ :=
 def SpectralGapNonneg (mc : MarkovChain State) : Prop :=
   secondLargestEigenvalue mc ≤ 1
 
+/-- `γ ≥ 0` from the side condition `|λ₂| ≤ 1` (definitional unfolding). -/
 theorem spectral_gap_nonneg (mc : MarkovChain State) (h : SpectralGapNonneg mc) :
     0 ≤ spectralGap mc := by
   unfold spectralGap SpectralGapNonneg at *
@@ -67,18 +83,23 @@ theorem spectral_gap_nonneg (mc : MarkovChain State) (h : SpectralGapNonneg mc) 
 
 /-! ## Conductance and Cheeger Bound -/
 
-/-- Conductance witness used by the Cheeger inequality interface. -/
+/-- Assumed Cheeger-type input. `Φ` is an arbitrary real number; the field
+`upper : Φ ≤ √(2γ)` *is* the (assumed) Cheeger upper bound. `Φ` is never tied
+to the cut-based conductance of `mc`; a real Cheeger inequality would define
+`Φ` from the kernel and prove `upper`. -/
 structure ConductanceWitness (mc : MarkovChain State) where
   Φ : ℝ
   nonneg : 0 ≤ Φ
   upper : Φ ≤ Real.sqrt (2 * spectralGap mc)
 
-/-- Conductance constant extracted from the witness. -/
+/-- The `Φ` value carried by an assumed `ConductanceWitness` (not computed from `mc`). -/
 def conductance (mc : MarkovChain State) (w : ConductanceWitness mc) : ℝ :=
   w.Φ
 
-/-- Cheeger-style lower bound `γ ≥ Φ² / 2` from the witness inequality. -/
-theorem cheeger_inequality (mc : MarkovChain State)
+/-- Conditional Cheeger-style lower bound: *assuming* `0 ≤ Φ ≤ √(2γ)` (the
+witness fields), squaring yields `Φ² / 2 ≤ γ`. This is only the algebraic
+squaring step; the analytic content of Cheeger's inequality is the assumption. -/
+theorem cheeger_bound_of_conductance_witness (mc : MarkovChain State)
     (hGap : 0 ≤ spectralGap mc)
     (w : ConductanceWitness mc) :
     (conductance mc w) ^ 2 / 2 ≤ spectralGap mc := by
@@ -110,6 +131,7 @@ theorem cheeger_inequality (mc : MarkovChain State)
 def SpectralGapPos (mc : MarkovChain State) : Prop :=
   secondLargestEigenvalue mc < 1
 
+/-- `γ > 0` from the side condition `|λ₂| < 1` (definitional unfolding). -/
 theorem spectral_gap_pos (mc : MarkovChain State) (h : SpectralGapPos mc) :
     0 < spectralGap mc := by
   unfold spectralGap SpectralGapPos at *
@@ -125,54 +147,40 @@ def IsProbabilityDist (π : State → ℝ) : Prop :=
 def IsStationary (mc : MarkovChain State) (π : State → ℝ) : Prop :=
   ∀ s', (∑ s, π s * mc.transition s s') = π s'
 
-/-- Witness packaging an explicit stationary distribution. -/
+/-- Assumed input: an explicit stationary distribution supplied by the caller.
+Use the fields directly; existence is not derived from the kernel here (that
+would require Perron-Frobenius / a compactness argument). -/
 structure StationaryWitness (mc : MarkovChain State) where
   π : State → ℝ
   prob : IsProbabilityDist π
   stationary : IsStationary mc π
 
-omit [DecidableEq State] in
-theorem exists_stationary_dist (mc : MarkovChain State)
-    (w : StationaryWitness mc) :
-    ∃ π : State → ℝ, IsProbabilityDist π ∧ IsStationary mc π := by
-  exact ⟨w.π, w.prob, w.stationary⟩
-
 /-! ## Hitting and Termination Bounds -/
 
-/-- Witness for expected hitting-time bounds from spectral data. -/
+/-- Assumed input: a nonnegative function `τ` with `τ s ≤ 1 / γ`. The bound
+`bounded_by_gap` is the assumed classical result; `τ` is not defined as an
+expected hitting time of `mc`. A real proof would define `τ` as the expectation
+of the hitting time and bound it through the spectral decomposition of `P`. -/
 structure HittingTimeWitness (mc : MarkovChain State) where
   τ : State → ℝ
   nonneg : ∀ s, 0 ≤ τ s
   bounded_by_gap : ∀ s, τ s ≤ 1 / spectralGap mc
 
-/-- Expected hitting-time function extracted from the witness. -/
+/-- The `τ` function carried by an assumed `HittingTimeWitness`. -/
 def expectedHittingTime {mc : MarkovChain State} (w : HittingTimeWitness mc) : State → ℝ :=
   w.τ
 
-theorem hitting_time_spectral_bound (mc : MarkovChain State)
-    (_hGap : 0 < spectralGap mc)
-    (w : HittingTimeWitness mc) :
-    ∀ s, expectedHittingTime w s ≤ 1 / spectralGap mc := by
-  intro s
-  exact w.bounded_by_gap s
-
-/-- Witness for expected termination-time bounds. -/
+/-- Assumed input: a `HittingTimeWitness` (so `τ ≤ 1 / γ` is assumed) that
+also vanishes on a caller-chosen terminal predicate. -/
 structure TerminationWitness (mc : MarkovChain State)
     extends HittingTimeWitness mc where
   terminal : State → Prop
   zero_on_terminal : ∀ s, terminal s → τ s = 0
 
-/-- Expected termination-time function extracted from the witness. -/
+/-- The `τ` function carried by an assumed `TerminationWitness`. -/
 def expectedTerminationTime {mc : MarkovChain State}
     (w : TerminationWitness mc) : State → ℝ :=
   w.τ
-
-theorem expected_termination_bound (mc : MarkovChain State)
-    (_hGap : 0 < spectralGap mc)
-    (w : TerminationWitness mc) :
-    ∀ s, expectedTerminationTime w s ≤ 1 / spectralGap mc := by
-  intro s
-  exact w.toHittingTimeWitness.bounded_by_gap s
 
 /-! ## Independent Session Composition -/
 
@@ -182,7 +190,10 @@ variable {State₁ : Type*}
 variable [Fintype State₁] [DecidableEq State₁]
 variable [EntropyAPI.AnalysisModel]
 
-/-- Witness for spectral-gap behavior under independent session composition. -/
+/-- Assumed input: some chain on the product space whose gap is at least the
+minimum of the two factor gaps. `productChain` is not required to be the
+tensor product of `mc₁` and `mc₂`; a real result would construct the product
+kernel and compute its spectrum. -/
 structure IndependentSessionsWitness
     [EntropyAPI.AnalysisModel]
     (mc₁ : MarkovChain State₁) (mc₂ : MarkovChain State₁) where
@@ -190,14 +201,6 @@ structure IndependentSessionsWitness
   gap_lower_bound :
     min (spectralGap (State := State₁) mc₁) (spectralGap (State := State₁) mc₂) ≤
       spectralGap (State := State₁ × State₁) productChain
-
-theorem independent_sessions_spectral_gap
-    [EntropyAPI.AnalysisModel]
-    (mc₁ : MarkovChain State₁) (mc₂ : MarkovChain State₁)
-    (w : IndependentSessionsWitness mc₁ mc₂) :
-    min (spectralGap (State := State₁) mc₁) (spectralGap (State := State₁) mc₂) ≤
-      spectralGap (State := State₁ × State₁) w.productChain := by
-  exact w.gap_lower_bound
 
 end IndependentSessions
 

@@ -2,6 +2,9 @@ import Mathlib
 
 /-! # Mixing Time Bounds
 
+**Scope (Option B, honest conditional interface).** The geometric distance bound is an assumed input (`MixingWitness.dist_upper`);
+only envelope monotonicity and its consequence are proved. No mixing bound is proved.
+
 This module provides the mathematical foundation for convergence rate analysis
 in session-typed distributed systems. Mixing time theory characterizes how
 quickly a stochastic system approaches its equilibrium distribution.
@@ -113,7 +116,9 @@ theorem envelope_step (C ρ : Real) (n : Nat)
     simpa [pow_succ] using mul_le_of_le_one_right (pow_nonneg hρ0 n) hρ1
   exact mul_le_mul_of_nonneg_left hpow hC
 
-/-- A `MixingWitness` certifies that a distance sequence has geometric decay.
+/-- Assumed classical input (Option B): a geometric envelope for `d`.
+    `dist_upper` is supplied by the caller; no mixing-time bound for any Markov
+    chain (coupling/spectral argument on total-variation distance) is proved.
 
     The witness provides:
     - C: the initial distance bound
@@ -130,11 +135,11 @@ structure MixingWitness (d : Nat → Real) where
   rho_le_one : ρ ≤ 1
   dist_upper : ∀ n, d n ≤ geometricEnvelope C ρ n
 
-/-- One-step bound: distance at step n+1 is bounded by the envelope at step n.
+/-- Conditional on an assumed `MixingWitness`: distance at step n+1 is bounded by the envelope at step n.
 
     For protocols: knowing d(n+1) ≤ C · ρⁿ⁺¹ and using monotonicity, we get
     d(n+1) ≤ C · ρⁿ. This allows deriving simpler bounds at the cost of tightness. -/
-theorem one_step_bound {d : Nat → Real} (h : MixingWitness d) (n : Nat) :
+theorem one_step_bound_of_mixing_witness {d : Nat → Real} (h : MixingWitness d) (n : Nat) :
     d (n + 1) ≤ geometricEnvelope h.C h.ρ n := by
   exact le_trans (h.dist_upper (n + 1))
     (envelope_step h.C h.ρ n h.C_nonneg h.rho_nonneg h.rho_le_one)

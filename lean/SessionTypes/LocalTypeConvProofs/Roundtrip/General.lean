@@ -16,15 +16,15 @@ requires showing that guardedness and contractiveness are preserved across conve
 This is essential for verifying that well-formed named types convert to well-formed de Bruijn
 types and vice versa.
 
-Solution Structure. Proves `to_db_from_db_roundtrip` for arbitrary nodup contexts with fresh
-name generation. `is_guarded_to_db` shows that guardedness in named representation implies
+Solution Structure. The genuine roundtrip for generated contexts lives in
+`ClosedRoundtrip.lean` (`to_db_from_db_roundtrip_generated`). `is_guarded_to_db` shows that guardedness in named representation implies
 guardedness in de Bruijn. `is_contractive_to_db` and `is_contractive_from_db` prove that
 contractiveness is preserved in both directions, enabling well-formedness preservation.
 -/
 
 /-! # SessionTypes.LocalTypeConvProofs.Roundtrip
 
-General roundtrip with adequate context, and guardedness/contractiveness preservation across conversions.
+Guardedness/contractiveness preservation across conversions.
 -/
 
 namespace SessionTypes.LocalTypeConvProofs
@@ -33,98 +33,6 @@ open SessionTypes.LocalTypeR
 open SessionTypes.LocalTypeDB
 open SessionTypes.LocalTypeConv
 open SessionTypes.NameOnlyContext
--- General roundtrip with adequate context
-
-theorem to_db_from_db_roundtrip (t : LocalTypeDB) (ctx : NameContext)
-    (hnodup : ctx.Nodup)
-    (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
-    (hclosed : t.isClosedAt ctx.length = true) :
-    (t.fromDB ctx hclosed).toDB? ctx = some t := by
-  let P1 : LocalTypeDB → Prop :=
-    fun t =>
-      ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
-        (hclosed : t.isClosedAt ctx.length = true) →
-          (t.fromDB ctx hclosed).toDB? ctx = some t
-  let P2 : List (Label × LocalTypeDB) → Prop :=
-    fun bs =>
-      ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
-        (hclosed : isClosedAtBranches ctx.length bs = true) →
-          LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs
-  let P3 : Label × LocalTypeDB → Prop :=
-    fun b =>
-      ∀ ctx, ctx.Nodup → (∀ c, NameContext.freshName c ∉ c) →
-        (hclosed : b.2.isClosedAt ctx.length = true) →
-          (b.2.fromDB ctx hclosed).toDB? ctx = some b.2
-
-  -- General Roundtrip: Structural Recursion Setup
-
-  have hrec : P1 t := by
-    refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
-      ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
-    · intro ctx hnodup hfreshAll hclosed
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?]
-    · intro n ctx hnodup hfreshAll hclosed
-      have hlt : n < ctx.length := by
-        simpa [LocalTypeDB.isClosedAt] using hclosed
-      obtain ⟨v, hget⟩ := get?_some_of_lt (ctx := ctx) (i := n) hlt
-      have hidx : Context.indexOf ctx v = some n := get_index_of_roundtrip ctx n v hnodup hget
-      have hfrom : LocalTypeDB.fromDB ctx (.var n) hclosed = LocalTypeR.var v :=
-        from_db_var_of_get ctx n hclosed v hget
-      simp [hfrom, LocalTypeR.toDB?]
-      rw [Context.index_of_eq] at hidx
-      simp [hidx]
-
-    -- General Roundtrip: send/recv/μ and branch Cases
-
-    · intro p bs hbs ctx hnodup hfreshAll hclosed
-      have hclosed' : isClosedAtBranches ctx.length bs = true := by
-/- ## Structured Block 2 -/
-        simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hbs' := hbs ctx hnodup hfreshAll hclosed'
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs']
-    · intro p bs hbs ctx hnodup hfreshAll hclosed
-      have hclosed' : isClosedAtBranches ctx.length bs = true := by
-        simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hbs' := hbs ctx hnodup hfreshAll hclosed'
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbs']
-    · intro body hbody ctx hnodup hfreshAll hclosed
-      have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
-        simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hnodup' : (NameOnlyContext.cons (NameContext.freshName ctx) ctx).Nodup := by
-        apply List.nodup_cons.mpr
-        exact ⟨hfreshAll ctx, hnodup⟩
-      have hbody' := hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) hnodup' hfreshAll hclosed'
-      simp [LocalTypeDB.fromDB, LocalTypeR.toDB?, hbody']
-    · intro ctx hnodup hfreshAll hclosed
-      simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?]
-    · intro head tail hhead htail ctx hnodup hfreshAll hclosed
-      obtain ⟨l, t⟩ := head
-      have hclosed' : t.isClosedAt ctx.length = true ∧ isClosedAtBranches ctx.length tail = true := by
-        simpa [isClosedAtBranches] using hclosed
-      have ht := hhead ctx hnodup hfreshAll hclosed'.1
-      have htl := htail ctx hnodup hfreshAll hclosed'.2
-      simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
-    · intro fst snd hsnd ctx hnodup hfreshAll hclosed
-      exact hsnd ctx hnodup hfreshAll hclosed
-  exact hrec ctx hnodup hfreshAll hclosed
-
--- General Roundtrip: Branch Lists
-
-theorem branches_to_db_from_db_roundtrip (bs : List (Label × LocalTypeDB)) (ctx : NameContext)
-    (hnodup : ctx.Nodup)
-    (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
-    (hclosed : isClosedAtBranches ctx.length bs = true) :
-    LocalTypeR.branchesToDB? ctx (LocalTypeDB.branchesFromDB ctx bs hclosed) = some bs := by
-  induction bs with
-  | nil => simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?]
-  | cons hd tl ih =>
-      obtain ⟨l, t⟩ := hd
-      have hclosed' : t.isClosedAt ctx.length = true ∧ isClosedAtBranches ctx.length tl = true := by
-        simpa [isClosedAtBranches] using hclosed
-      have ht := to_db_from_db_roundtrip t ctx hnodup hfreshAll hclosed'.1
-      have htl := ih hclosed'.2
-      simp [LocalTypeDB.branchesFromDB, LocalTypeR.branchesToDB?, ht, htl]
-
 -- Guardedness / contractiveness preservation
 
 theorem is_guarded_to_db_shadowed_prefix (t : LocalTypeR) (pref ctx : Context) (x : String) (i : Nat)

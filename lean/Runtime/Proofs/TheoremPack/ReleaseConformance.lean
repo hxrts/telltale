@@ -184,45 +184,72 @@ def replayConformsToClasses {ε : Type u} [EffectRuntime ε]
 
 /-! ## Release Witness Gates and Report -/
 
-/-- Failure-envelope cross-target witness gate. -/
+/-- Executed-run conformance evidence supplied by the release harness.
+
+These bits record runtime runs that the theorem pack cannot witness by
+itself. `ReleaseRunEvidence.none` (all `false`) is the honest default: with
+it, no release gate passes. -/
+structure ReleaseRunEvidence where
+  /-- Single-thread, multi-thread, and sharded runs agreed on failure-visible output. -/
+  crossTargetRunsAgree : Bool
+  /-- Checkpoint/restart replay produced the expected structured errors. -/
+  restartReplayPassed : Bool
+  /-- Single-thread conformance run passed. -/
+  singleThreadRunPassed : Bool
+  /-- Multi-thread conformance run passed. -/
+  multiThreadRunPassed : Bool
+  /-- Sharded conformance run passed. -/
+  shardedRunPassed : Bool
+  deriving Repr, DecidableEq
+
+/-- No executed-run evidence; every gate fails. -/
+def ReleaseRunEvidence.none : ReleaseRunEvidence :=
+  ⟨false, false, false, false, false⟩
+
+/-- Cross-target gate: the failure-envelope premises (incl. cross-target
+conformance) are supplied and the cross-target runs agreed. -/
 def hasFailureEnvelopeCrossTargetWitness
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.failureEnvelope?.isSome
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence) : Bool :=
+  pack.failureEnvelope?.isSome && ev.crossTargetRunsAgree
 
-/-- Restart/structured-error adequacy witness gate. -/
+/-- Restart gate: the failure-envelope premises (incl. restart/structured-error
+adequacy) are supplied and the restart replay passed. -/
 def hasRestartStructuredErrorAdequacyWitness
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.failureEnvelope?.isSome
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence) : Bool :=
+  pack.failureEnvelope?.isSome && ev.restartReplayPassed
 
-/-- Release gate: single-thread evidence is present. -/
+/-- Single-thread gate: local envelope-adherence premises are supplied and the
+single-thread run passed. -/
 def hasSingleThreadEvidence
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.failureEnvelope?.isSome
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence) : Bool :=
+  pack.protocolMachineEnvelopeAdherence?.isSome && ev.singleThreadRunPassed
 
-/-- Release gate: multi-thread evidence is present. -/
-def hasMultiThreadEvidence
-    {ν : Type u} [VerificationModel ν]
-    {store₀ : SessionStore ν} {State : Type v}
-    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.failureEnvelope?.isSome
+/-- Multi-thread gate: the multi-thread run passed (premise-free; the pack has
+no multi-thread-specific artifact). -/
+def hasMultiThreadEvidence (ev : ReleaseRunEvidence) : Bool :=
+  ev.multiThreadRunPassed
 
-/-- Release gate: sharded evidence is present. -/
+/-- Sharded gate: protocol-bridge premises (incl. shard-cut preservation) are
+supplied and the sharded run passed. -/
 def hasShardedEvidence
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
-    (pack : ProtocolMachineTheoremPack (space := space)) : Bool :=
-  pack.failureEnvelope?.isSome
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence) : Bool :=
+  pack.protocolEnvelopeBridge?.isSome && ev.shardedRunPassed
 
 /-! ### Release Conformance Report -/
 
@@ -241,64 +268,80 @@ structure ReleaseConformanceReport where
   singleThreadEvidence : Bool
   multiThreadEvidence : Bool
   shardedEvidence : Bool
+  /-- Conjunction of replay conformance and all five gates; never defaulted. -/
   releaseReady : Bool
   deriving Repr, DecidableEq
 
-/-- Build a release conformance report from theorem-pack inventory and replay evidence. -/
+/-- Build a release conformance report. `releaseReady` always requires every
+gate; there is no untagged bypass. -/
 def buildReleaseConformanceReport {ε : Type w} [EffectRuntime ε]
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence)
     (baseline replay : List (TickedObsEvent ε))
-    (classes : List CertifiedReplayEquivalenceClass := defaultCertifiedReplayClasses)
-    (releaseTagged : Bool := false) :
+    (classes : List CertifiedReplayEquivalenceClass := defaultCertifiedReplayClasses) :
     ReleaseConformanceReport :=
   let inventory := theoremInventory (space := space) pack
-  let transform := transformationEligibilitySnapshot inventory
   let replayOk := replayConformsToClasses inventory classes baseline replay
-  let crossTarget := hasFailureEnvelopeCrossTargetWitness pack
-  let restartAdequacy := hasRestartStructuredErrorAdequacyWitness pack
-  let singleEvidence := hasSingleThreadEvidence pack
-  let multiEvidence := hasMultiThreadEvidence pack
-  let shardedEvidence := hasShardedEvidence pack
-  let required :=
-    replayOk &&
-      crossTarget &&
-      restartAdequacy &&
-      singleEvidence &&
-      multiEvidence &&
-      shardedEvidence
-  let releaseReady := if releaseTagged then required else true
+  let crossTarget := hasFailureEnvelopeCrossTargetWitness pack ev
+  let restartAdequacy := hasRestartStructuredErrorAdequacyWitness pack ev
+  let singleEvidence := hasSingleThreadEvidence pack ev
+  let multiEvidence := hasMultiThreadEvidence ev
+  let shardedEvidence := hasShardedEvidence pack ev
   { version := releaseConformanceReportVersion
   , theoremInventory := inventory
-  , transformationEligibility := transform
+  , transformationEligibility := transformationEligibilitySnapshot inventory
   , replayConformance := replayOk
   , failureEnvelopeCrossTargetWitness := crossTarget
   , restartStructuredErrorAdequacyWitness := restartAdequacy
   , singleThreadEvidence := singleEvidence
   , multiThreadEvidence := multiEvidence
   , shardedEvidence := shardedEvidence
-  , releaseReady := releaseReady
+  , releaseReady := replayOk && crossTarget && restartAdequacy &&
+      singleEvidence && multiEvidence && shardedEvidence
   }
 
 /-! ### Build Gate -/
 
-/-- Release-tagged build gate derived from the report. -/
+/-- Release build gate derived from the report (requires every gate). -/
 def releaseBuildGate {ε : Type w} [EffectRuntime ε]
     {ν : Type u} [VerificationModel ν]
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
     (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence)
     (baseline replay : List (TickedObsEvent ε))
-    (classes : List CertifiedReplayEquivalenceClass := defaultCertifiedReplayClasses)
-    (releaseTagged : Bool := false) : Bool :=
-  (buildReleaseConformanceReport
-    (pack := pack)
-    (baseline := baseline)
-    (replay := replay)
-    (classes := classes)
-    (releaseTagged := releaseTagged)).releaseReady
+    (classes : List CertifiedReplayEquivalenceClass := defaultCertifiedReplayClasses) :
+    Bool :=
+  (buildReleaseConformanceReport pack ev baseline replay classes).releaseReady
+
+/-- Soundness of the release gate: a passing gate implies replay conformance,
+every pack premise the gates inspect, and every executed-run evidence bit. -/
+theorem releaseBuildGate_sound {ε : Type w} [EffectRuntime ε]
+    {ν : Type u} [VerificationModel ν]
+    {store₀ : SessionStore ν} {State : Type v}
+    {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
+    (pack : ProtocolMachineTheoremPack (space := space))
+    (ev : ReleaseRunEvidence)
+    (baseline replay : List (TickedObsEvent ε))
+    (classes : List CertifiedReplayEquivalenceClass)
+    (h : releaseBuildGate pack ev baseline replay classes = true) :
+    replayConformsToClasses (theoremInventory (space := space) pack)
+        classes baseline replay = true ∧
+      pack.failureEnvelope?.isSome = true ∧
+      pack.protocolMachineEnvelopeAdherence?.isSome = true ∧
+      pack.protocolEnvelopeBridge?.isSome = true ∧
+      ev.crossTargetRunsAgree = true ∧ ev.restartReplayPassed = true ∧
+      ev.singleThreadRunPassed = true ∧ ev.multiThreadRunPassed = true ∧
+      ev.shardedRunPassed = true := by
+  simp only [releaseBuildGate, buildReleaseConformanceReport,
+    hasFailureEnvelopeCrossTargetWitness, hasRestartStructuredErrorAdequacyWitness,
+    hasSingleThreadEvidence, hasMultiThreadEvidence, hasShardedEvidence,
+    Bool.and_eq_true] at h
+  obtain ⟨⟨⟨⟨⟨hR, hF, hC⟩, -, hRe⟩, hA, hS⟩, hM⟩, hB, hSh⟩ := h
+  exact ⟨hR, hF, hA, hB, hC, hRe, hS, hM, hSh⟩
 
 end Proofs
 end Runtime

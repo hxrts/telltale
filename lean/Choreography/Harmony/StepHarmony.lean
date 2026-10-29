@@ -18,7 +18,7 @@ for participants.
 
 Solution Structure. Prove step harmony for direct communication steps, then show
 non-participant projections are stable across unrelated steps. Combine these into
-a Claims bundle that exposes the main harmony properties for downstream safety
+the harmony theorems (see EnvStepHarmony.lean) that expose the main properties for downstream safety
 proofs.
 -/
 
@@ -30,8 +30,6 @@ Harmony between global steps and environment steps.
 
 The following definitions form the semantic interface for proofs:
 
-- `Claims`: bundle of harmony properties
-- `step_harmony`: global step induces matching env step
 - `proj_trans_other_step`: non-participant projection unchanged after step
 
 ## Technical Debt Summary (legacy gaps removed; assumption-free in this file)
@@ -183,33 +181,6 @@ open Semantics.EnvStep
 abbrev projTrans := Choreography.Projection.Project.trans
 open Choreography.Projection.Project (trans_comm_sender trans_comm_receiver trans_comm_other
   transBranches lcontractive trans_well_formed_of_well_formed)
-
-/-! ## Claims Bundle -/
-
-/-- Claims bundle for harmony lemmas. -/
-
-
-structure Claims where
-  /-- Global step induces environment step. -/
-  harmony : ∀ g g' act, step g act g' → EnvStep (projEnv g) act (projEnv g')
-  /-- Domain containment through steps (post ⊆ pre). -/
-  dom_subset : ∀ env env' act, EnvStep env act env' →
-    ∀ p, p ∈ env'.map Prod.fst → p ∈ env.map Prod.fst
-
-/-! ## Step Harmony
-
-The harmony property states that global steps are faithfully reflected in
-the projected environment. This is the key lemma connecting global semantics
-to local session type semantics. -/
-
-/-- Global step induces environment step through projection. -/
-
-
-theorem step_harmony (g g' : GlobalType) (act : GlobalActionR)
-    (hstep : step g act g') :
-    EnvStep (projEnv g) act (projEnv g') :=
-  -- Directly lift the global step to an environment step.
-  step_to_envstep g g' act hstep
 
 /-! ## Projection Coherence -/
 

@@ -31,10 +31,10 @@ theorem settlement_finality_of_protocol (P : SecurityProtocol) :
       P.model P.assumptions.AdmissibleRun P.assumptions.settlementDepth :=
   settlement_finality_of_assumptions P.assumptions
 
-/-- Extract churn-liveness theorem from a certified protocol bundle. -/
-theorem liveness_under_churn_of_protocol (P : SecurityProtocol) :
-    LivenessUnderChurn P.model P.assumptions.AdmissibleRun P.assumptions.churnBudget :=
-  liveness_under_churn_of_assumptions P.assumptions
+/-- Extract chain-growth liveness from a certified protocol bundle. -/
+theorem chain_growth_of_protocol (P : SecurityProtocol) :
+    ChainGrowthLiveness P.model P.assumptions.AdmissibleRun P.assumptions.settlementDepth :=
+  chain_growth_of_assumptions P.assumptions
 
 /-- Core assumptions are always validated for a certified protocol. -/
 theorem core_assumptions_all_passed (P : SecurityProtocol) :

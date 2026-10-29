@@ -91,7 +91,7 @@ inductive ProtocolMachineSchedulerHypothesis where
   | policyPinned
   | policyProfileClass
   | scheduleConfluence
-  | starvationFree
+  | scheduleNonblocking
   | cooperativeRefinement
   | irisStateInvariant
   deriving Repr, DecidableEq, Inhabited
@@ -116,7 +116,7 @@ def protocolMachineSchedulerCoreHypotheses : List ProtocolMachineSchedulerHypoth
   [ .policyPinned
   , .policyProfileClass
   , .scheduleConfluence
-  , .starvationFree
+  , .scheduleNonblocking
   , .cooperativeRefinement
   ]
 
@@ -146,10 +146,10 @@ def validateProtocolMachineSchedulerHypothesis {st₀ : ProtocolMachineState ι 
       , passed := true
       , detail := "Scheduler confluence theorem is available from Runtime.Proofs.ProtocolMachine.Scheduler."
       }
-  | .starvationFree =>
+  | .scheduleNonblocking =>
       { hypothesis := h
       , passed := true
-      , detail := "Starvation-freedom theorem is available from Runtime.Proofs.ProtocolMachine.Scheduler."
+      , detail := "One-step non-blocking scheduling theorem is available from Runtime.Proofs.ProtocolMachine.Scheduler."
       }
   | .cooperativeRefinement =>
       { hypothesis := h
@@ -224,11 +224,11 @@ theorem scheduler_deterministic_from_bundle {st₀ : ProtocolMachineState ι γ 
     schedule_deterministic st₀ :=
   schedule_deterministic_holds st₀
 
-/-- Starvation-freedom theorem instantiated from a scheduler bundle. -/
-theorem scheduler_starvation_free_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
+/-- One-step non-blocking scheduling (not fairness) instantiated from a scheduler bundle. -/
+theorem scheduler_nonblocking_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}
     (_bundle : ProtocolMachineSchedulerBundle st₀) :
-    starvation_free st₀ :=
-  starvation_free_holds st₀
+    schedule_nonblocking st₀ :=
+  schedule_nonblocking_holds st₀
 
 /-- Cooperative refinement theorem instantiated from a scheduler bundle. -/
 theorem scheduler_cooperative_refinement_from_bundle {st₀ : ProtocolMachineState ι γ π ε ν}

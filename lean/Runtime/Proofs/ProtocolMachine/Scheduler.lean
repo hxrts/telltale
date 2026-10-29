@@ -43,7 +43,10 @@ inside it. Two choices with disjoint footprints are independent; executing
 them in either order yields the same state (the diamond property). Discharging
 `LocalStepSystem` for the concrete `execInstr` (footprint = the coroutine's
 registers plus the session endpoints/edges it touches) is the remaining
-obligation to instantiate this for the protocol machine. -/
+obligation to instantiate this for the protocol machine. The buffer component
+is instantiated in `BufferConfluence.lean` (real FIFO enqueues/dequeues on
+distinct edges commute); whole-state commutation fails because `obsTrace`,
+the clock and replay bookkeeping record step order. -/
 
 /-- A step system whose steps are local to per-choice footprints. -/
 structure LocalStepSystem (Loc Val Choice : Type) where
@@ -296,13 +299,13 @@ private theorem pick_runnable_some_of_mem_runnable
   unfold pickRunnable
   simpa [sched, st'] using hFromSched
 
-/-! ## Starvation Freedom -/
+/-! ## One-Step Non-Blocking Scheduling -/
 
-theorem starvation_free_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+theorem schedule_nonblocking_holds {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (st : ProtocolMachineState ι γ π ε ν) : starvation_free st := by
+    (st : ProtocolMachineState ι γ π ε ν) : schedule_nonblocking st := by
   intro cid hmem
   match hcoro : st.coroutines[cid]? with
   | none => exact trivial
