@@ -1,4 +1,5 @@
 import FisherInformationInstance.RealConcrete
+import FisherInformationInstance.BernoulliLaws
 
 /-! # Fisher Information Models
 
@@ -20,12 +21,12 @@ namespace FisherInformationAPI
 
 /-! ## Exported Concrete Models -/
 
-/-- Canonical checked finite-discrete model currently exposed by the instance layer. -/
-def finiteDiscreteModel : Model :=
-  RealConcrete.unitModel
+/-- Canonical checked finite-discrete model: the Bernoulli family (`d = 1`). -/
+noncomputable def finiteDiscreteModel : Model :=
+  Fixtures.bernoulliModel
 
-/-- Canonical checked finite-discrete laws witness currently exposed by the instance layer. -/
-def finiteDiscreteLaws : Laws :=
-  RealConcrete.unitLaws
+/-- Canonical checked finite-discrete laws witness: the Bernoulli laws instance. -/
+noncomputable def finiteDiscreteLaws : Laws :=
+  RealConcrete.bernoulliLaws
 
 end FisherInformationAPI

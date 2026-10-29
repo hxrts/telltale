@@ -24,8 +24,7 @@ def VerifiedCodeImage.fromSemanticLowering {γ ε : Type u} [GuardLayer γ] [Eff
     (γ := γ) (ε := ε) lowering
   { artifacts := artifacts
   , executableSurface := by
-      simpa [Runtime.Proofs.Lowering.GeneratedArtifactSurface.supportsExecution,
-        Runtime.Proofs.Lowering.lowerSemanticToProtocolMachine] using hExec
+      exact hExec
   , artifactRefinement := by
       exact Runtime.Proofs.Lowering.lowerProtocolMachineToArtifacts_refines
         (γ := γ) (ε := ε) lowering }

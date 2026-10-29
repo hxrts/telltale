@@ -16,10 +16,10 @@ use crate::loader::CodeImage;
 use crate::output_condition::OutputConditionPolicy;
 use crate::runtime_contracts::{
     enforce_protocol_machine_runtime_gates, execution_profile_supported,
-    validate_transport_contracts_for_execution_profile, ProtocolMachineAdmissibilityClass,
-    ProtocolMachineEscalationWindowClass, ProtocolMachineExecutionProfile,
-    ProtocolMachineFairnessAssumption, RuntimeContracts, RuntimeGateResult,
-    TransportContractGateError,
+    validate_transport_contracts_for_execution_profile, LeanEvidenceInventory,
+    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
+    ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeContracts,
+    RuntimeGateResult, TransportContractGateError,
 };
 use crate::scheduler::SchedPolicy;
 use telltale_types::{
@@ -70,6 +70,10 @@ pub struct TheoremPackCapabilities {
     pub schedulers: Vec<SchedulerCapability>,
     /// Whether output-condition commit-gating is certified.
     pub output_condition_gating: bool,
+    /// Lean-produced theorem inventory backing envelope admission keys.
+    ///
+    /// Empty by default: envelope keys are not admitted without Lean evidence.
+    pub lean_evidence: LeanEvidenceInventory,
 }
 
 impl TheoremPackCapabilities {
@@ -90,7 +94,24 @@ impl TheoremPackCapabilities {
                 SchedulerCapability::ProgressAware,
             ],
             output_condition_gating: true,
+            lean_evidence: LeanEvidenceInventory::empty(),
         }
+    }
+
+    /// Attach Lean-produced theorem inventory evidence.
+    #[must_use]
+    pub fn with_lean_evidence(mut self, evidence: LeanEvidenceInventory) -> Self {
+        self.lean_evidence = evidence;
+        self
+    }
+
+    /// Test/dev-only full capability set assuming envelope evidence without Lean.
+    ///
+    /// Never the default; production callers must supply Lean evidence.
+    #[must_use]
+    pub fn assume_envelope_evidence_for_testing() -> Self {
+        Self::full()
+            .with_lean_evidence(LeanEvidenceInventory::assume_envelope_evidence_for_testing())
     }
 
     /// Proof-carrying execution profile derived from theorem-pack capabilities.
@@ -141,29 +162,35 @@ impl TheoremPackCapabilities {
                 .insert(ProtocolMachineEscalationWindowClass::AdmissionComplexity);
         }
 
+        let ev = |key: &str| self.lean_evidence.admits(key);
         ProtocolMachineExecutionProfile {
             fairness_assumptions,
             admissibility_classes,
             escalation_window_classes,
             theorem_pack_eligibility: vec![
-                ("protocol_machine_envelope_adherence".to_string(), true),
+                (
+                    "protocol_machine_envelope_adherence".to_string(),
+                    ev("protocol_machine_envelope_adherence"),
+                ),
                 (
                     "protocol_machine_envelope_admission".to_string(),
-                    self.determinism.iter().any(|capability| {
-                        matches!(
-                            capability,
-                            DeterminismCapability::Full
-                                | DeterminismCapability::Replay
-                                | DeterminismCapability::ModuloEffects
-                                | DeterminismCapability::ModuloCommutativity
-                        )
-                    }),
+                    ev("protocol_machine_envelope_admission")
+                        && self.determinism.iter().any(|capability| {
+                            matches!(
+                                capability,
+                                DeterminismCapability::Full
+                                    | DeterminismCapability::Replay
+                                    | DeterminismCapability::ModuloEffects
+                                    | DeterminismCapability::ModuloCommutativity
+                            )
+                        }),
                 ),
                 (
                     "protocol_envelope_bridge".to_string(),
-                    self.output_condition_gating,
+                    ev("protocol_envelope_bridge") && self.output_condition_gating,
                 ),
             ],
+            lean_evidence: self.lean_evidence.clone(),
         }
     }
 
@@ -1737,7 +1764,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/bad".to_string(),
                 link_ok_full: false,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
@@ -1757,7 +1784,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/1".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
@@ -1766,7 +1793,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/2".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
@@ -1787,7 +1814,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/ok".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
@@ -1823,6 +1850,7 @@ mod tests {
                     ],
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
+                    lean_evidence: LeanEvidenceInventory::assume_envelope_evidence_for_testing(),
                 },
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
@@ -1857,6 +1885,7 @@ mod tests {
                     ],
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: true,
+                    lean_evidence: LeanEvidenceInventory::assume_envelope_evidence_for_testing(),
                 },
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
@@ -1888,6 +1917,7 @@ mod tests {
                     determinism: vec![DeterminismCapability::Full],
                     schedulers: vec![SchedulerCapability::Cooperative],
                     output_condition_gating: false,
+                    lean_evidence: LeanEvidenceInventory::assume_envelope_evidence_for_testing(),
                 },
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
@@ -1919,7 +1949,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/full".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
@@ -1947,6 +1977,7 @@ mod tests {
                         SchedulerCapability::ProgressAware,
                     ],
                     output_condition_gating: true,
+                    lean_evidence: LeanEvidenceInventory::assume_envelope_evidence_for_testing(),
                 },
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
@@ -1968,7 +1999,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/no-runtime-contracts".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: None,
             },
         );
@@ -1995,7 +2026,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/no-mixed-profile-gate".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(contracts),
             },
         );
@@ -2018,7 +2049,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/no-transport-contracts".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: None,
             },
         );
@@ -2050,7 +2081,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/unauthenticated-transport".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(contracts),
             },
         );
@@ -2079,7 +2110,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/replay-ok".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         );
@@ -2101,7 +2132,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/reconfig-missing-cap".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(contracts),
             },
         )
@@ -2128,7 +2159,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/reconfig-ok".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2175,7 +2206,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/reconfig-overlap".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2206,7 +2237,7 @@ mod tests {
                 CompositionCertificate {
                     artifact_id: "cert/reconfig-history".to_string(),
                     link_ok_full: true,
-                    theorem_pack: TheoremPackCapabilities::full(),
+                    theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                     runtime_contracts: Some(RuntimeContracts::full()),
                 },
             )
@@ -2242,7 +2273,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/reconfig-plan".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2339,7 +2370,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/reconfig-plan-invalid".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2411,7 +2442,7 @@ mod tests {
                 CompositionCertificate {
                     artifact_id: artifact_id.to_string(),
                     link_ok_full: true,
-                    theorem_pack: TheoremPackCapabilities::full(),
+                    theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                     runtime_contracts: Some(RuntimeContracts::full()),
                 },
             )
@@ -2508,7 +2539,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/runtime-upgrade".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2587,7 +2618,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/runtime-upgrade-reject".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2653,7 +2684,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/runtime-upgrade-rollback".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2723,7 +2754,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/runtime-upgrade-snapshot".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )
@@ -2781,7 +2812,7 @@ mod tests {
             CompositionCertificate {
                 artifact_id: "cert/runtime-upgrade-snapshot".to_string(),
                 link_ok_full: true,
-                theorem_pack: TheoremPackCapabilities::full(),
+                theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
                 runtime_contracts: Some(RuntimeContracts::full()),
             },
         )

@@ -117,7 +117,7 @@ lemma is_guarded_from_db_at (t : LocalTypeDB) (ctx : NameContext) (i : Nat) (v :
 -- isGuarded Preservation at Fresh Binder
 
 lemma is_guarded_from_db_fresh (t : LocalTypeDB) (ctx : NameContext)
-    (hfreshAll : ∀ c, NameContext.freshName c ∉ c)
+    (hgen : GeneratedContext ctx)
     (hclosed : t.isClosedAt (ctx.length + 1) = true)
     (hguard : t.isGuarded 0 = true) :
     (t.fromDB (NameOnlyContext.cons (NameContext.freshName ctx) ctx) (by
@@ -135,9 +135,11 @@ lemma is_guarded_from_db_fresh (t : LocalTypeDB) (ctx : NameContext)
     | zero => rfl
     | succ j =>
         have hj' : NameContext.get? ctx j = some fresh := by
-          simpa only [NameOnlyContext.get?_cons_succ] using hj
+          have hj2 : NameOnlyContext.get? (NameOnlyContext.cons fresh ctx) (j + 1) = some fresh := hj
+          rw [NameOnlyContext.get?_cons_succ] at hj2
+          exact hj2
         have hmem : fresh ∈ ctx := get?_mem hj'
-        exact (hfreshAll ctx hmem).elim
+        exact (fresh_not_in_generated ctx hgen hmem).elim
   have hclosed' : t.isClosedAt ctx'.length = true := by
     show t.isClosedAt (NameOnlyContext.cons fresh ctx).length = true
     simp only [NameOnlyContext.cons_length]
@@ -147,26 +149,26 @@ lemma is_guarded_from_db_fresh (t : LocalTypeDB) (ctx : NameContext)
 -- isContractive Preservation from DB
 
 theorem is_contractive_from_db (t : LocalTypeDB) (ctx : NameContext)
-    (hfreshAll : ∀ c, NameContext.freshName c ∉ c) :
+    (hgen : GeneratedContext ctx) :
     t.isContractive = true →
     (hclosed : t.isClosedAt (ctx.length) = true) →
     (t.fromDB ctx hclosed).isContractive = true := by
   intro hcontr hclosed
   let P1 : LocalTypeDB → Prop :=
     fun t =>
-      ∀ ctx, (∀ c, NameContext.freshName c ∉ c) →
+      ∀ ctx, GeneratedContext ctx →
         t.isContractive = true →
         (hclosed : t.isClosedAt ctx.length = true) →
           (t.fromDB ctx hclosed).isContractive = true
   let P2 : List (Label × LocalTypeDB) → Prop :=
     fun bs =>
-      ∀ ctx, (∀ c, NameContext.freshName c ∉ c) →
+      ∀ ctx, GeneratedContext ctx →
         isContractiveBranches bs = true →
         (hclosed : isClosedAtBranches ctx.length bs = true) →
           LocalTypeR.isContractiveBranches (LocalTypeDB.branchesFromDB ctx bs hclosed) = true
   let P3 : Label × LocalTypeDB → Prop :=
     fun b =>
-      ∀ ctx, (∀ c, NameContext.freshName c ∉ c) →
+      ∀ ctx, GeneratedContext ctx →
         b.2.isContractive = true →
         (hclosed : b.2.isClosedAt ctx.length = true) →
           (b.2.fromDB ctx hclosed).isContractive = true
@@ -176,48 +178,48 @@ theorem is_contractive_from_db (t : LocalTypeDB) (ctx : NameContext)
   have hrec : P1 t := by
     refine (LocalTypeDB.rec (motive_1 := P1) (motive_2 := P2) (motive_3 := P3)
       ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ t)
-    · intro ctx hfreshAll hcontr hclosed
+    · intro ctx hgen hcontr hclosed
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
-    · intro n ctx hfreshAll hcontr hclosed
+    · intro n ctx hgen hcontr hclosed
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive]
-    · intro p bs hbs ctx hfreshAll hcontr hclosed
+    · intro p bs hbs ctx hgen hcontr hclosed
       have hbs_contr : isContractiveBranches bs = true := by
         simpa [LocalTypeDB.isContractive] using hcontr
       have hbs_closed : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hbs' := hbs ctx hfreshAll hbs_contr hbs_closed
+      have hbs' := hbs ctx hgen hbs_contr hbs_closed
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hbs']
-    · intro p bs hbs ctx hfreshAll hcontr hclosed
+    · intro p bs hbs ctx hgen hcontr hclosed
 /- ## Structured Block 4 -/
       have hbs_contr : isContractiveBranches bs = true := by
         simpa [LocalTypeDB.isContractive] using hcontr
       have hbs_closed : isClosedAtBranches ctx.length bs = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hbs' := hbs ctx hfreshAll hbs_contr hbs_closed
+      have hbs' := hbs ctx hgen hbs_contr hbs_closed
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hbs']
-    · intro body hbody ctx hfreshAll hcontr hclosed
+    · intro body hbody ctx hgen hcontr hclosed
       simp [LocalTypeDB.isContractive] at hcontr
       rcases hcontr with ⟨hguard, hbody_contr⟩
       have hclosed' : body.isClosedAt (ctx.length + 1) = true := by
         simpa [LocalTypeDB.isClosedAt] using hclosed
-      have hguard' := is_guarded_from_db_fresh body ctx hfreshAll hclosed' hguard
+      have hguard' := is_guarded_from_db_fresh body ctx hgen hclosed' hguard
       have hbody' :=
-        hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) hfreshAll hbody_contr hclosed'
+        hbody (ctx := NameOnlyContext.cons (NameContext.freshName ctx) ctx) (GeneratedContext.cons hgen) hbody_contr hclosed'
       simp [LocalTypeDB.fromDB, LocalTypeR.isContractive, hguard', hbody']
-    · intro ctx hfreshAll hcontr hclosed
+    · intro ctx hgen hcontr hclosed
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.isContractiveBranches, isClosedAtBranches] at hcontr hclosed ⊢
-    · intro head tail hhead htail ctx hfreshAll hcontr hclosed
+    · intro head tail hhead htail ctx hgen hcontr hclosed
       obtain ⟨l, t⟩ := head
       have hpair_contr : t.isContractive = true ∧ isContractiveBranches tail = true := by
         simpa [isContractiveBranches, Bool.and_eq_true] using hcontr
       have hpair_closed : t.isClosedAt ctx.length = true ∧ isClosedAtBranches ctx.length tail = true := by
         simpa [isClosedAtBranches] using hclosed
-      have ht := hhead ctx hfreshAll hpair_contr.1 hpair_closed.1
-      have htl := htail ctx hfreshAll hpair_contr.2 hpair_closed.2
+      have ht := hhead ctx hgen hpair_contr.1 hpair_closed.1
+      have htl := htail ctx hgen hpair_contr.2 hpair_closed.2
       simp [LocalTypeDB.branchesFromDB, LocalTypeR.isContractiveBranches, ht, htl]
     · intro fst snd hsnd
       exact hsnd
-  exact hrec ctx hfreshAll hcontr hclosed
+  exact hrec ctx hgen hcontr hclosed
 
 
 end SessionTypes.LocalTypeConvProofs

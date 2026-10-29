@@ -27,7 +27,7 @@ namespace SessionCoTypes.Coinductive
 lemma head_of_dest {t : LocalTypeC} {h : LocalTypeHead}
     {f : LocalTypeChild h → LocalTypeC}
     (hdest : PFunctor.M.dest t = ⟨h, f⟩) : head t = h := by
-  simpa [head] using congrArg Sigma.fst hdest
+  exact congrArg Sigma.fst hdest
 
 lemma mk_of_dest {t : LocalTypeC} {h : LocalTypeHead}
     {f : LocalTypeChild h → LocalTypeC}

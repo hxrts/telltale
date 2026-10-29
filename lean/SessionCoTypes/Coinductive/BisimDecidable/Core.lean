@@ -175,7 +175,7 @@ lemma full_unfold_n_of_has_non_mu_head {t : LocalTypeC} (h : hasNonMuHead t = tr
   | succ n ih =>
       cases hdest : PFunctor.M.dest t with
       | mk hhead f =>
-          have hhead' : head t = hhead := by simp [head, hdest]
+          have hhead' : head t = hhead := by simp only [head, hdest]; rfl
           cases hhead with
           | mu x =>
               simp [hasNonMuHead, hhead'] at h
@@ -200,16 +200,20 @@ lemma full_unfold_n_add (n m : Nat) (t : LocalTypeC) :
           | mu x =>
               simp [ih]
           | «end» =>
-              have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
+              have hnonmu : hasNonMuHead t = true := by
+                simp only [hasNonMuHead, head, hdest]; rfl
               simp [full_unfold_n_of_has_non_mu_head hnonmu]
           | var v =>
-              have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
+              have hnonmu : hasNonMuHead t = true := by
+                simp only [hasNonMuHead, head, hdest]; rfl
               simp [full_unfold_n_of_has_non_mu_head hnonmu]
           | send p labels =>
-              have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
+              have hnonmu : hasNonMuHead t = true := by
+                simp only [hasNonMuHead, head, hdest]; rfl
               simp [full_unfold_n_of_has_non_mu_head hnonmu]
           | recv p labels =>
-              have hnonmu : hasNonMuHead t = true := by simp [hasNonMuHead, head, hdest]
+              have hnonmu : hasNonMuHead t = true := by
+                simp only [hasNonMuHead, head, hdest]; rfl
               simp [full_unfold_n_of_has_non_mu_head hnonmu]
 
 /-! ## Stabilization Beyond a Non-mu Cutoff -/
@@ -295,16 +299,14 @@ lemma child_rel_of_mem_children_of {t c : LocalTypeC} (h : c ∈ childrenOf t) :
           subst h
           exact ⟨LocalTypeHead.mu x, f, (), hdest, rfl⟩
       | send p labels =>
-          have h' : c ∈ List.ofFn f := by
-            simpa [childrenOf, hdest] using h
-          have hmem : ∃ i : Fin labels.length, f i = c := List.mem_ofFn.mp h'
+          have hmem : ∃ i : Fin labels.length, f i = c := by
+            simpa [childrenOf, hdest, List.mem_ofFn] using h
           rcases hmem with ⟨i, hi⟩
           subst hi
           exact ⟨LocalTypeHead.send p labels, f, i, hdest, rfl⟩
       | recv p labels =>
-          have h' : c ∈ List.ofFn f := by
-            simpa [childrenOf, hdest] using h
-          have hmem : ∃ i : Fin labels.length, f i = c := List.mem_ofFn.mp h'
+          have hmem : ∃ i : Fin labels.length, f i = c := by
+            simpa [childrenOf, hdest, List.mem_ofFn] using h
           rcases hmem with ⟨i, hi⟩
           subst hi
           exact ⟨LocalTypeHead.recv p labels, f, i, hdest, rfl⟩

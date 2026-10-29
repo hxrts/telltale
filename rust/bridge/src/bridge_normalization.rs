@@ -81,6 +81,16 @@ pub fn bridge_normalization_ledger() -> Vec<BridgeNormalizationEntry> {
             "rust/bridge/tests/protocol_machine_correspondence_tests.rs",
             "rust/bridge/tests/protocol_machine_differential_steps.rs",
         ],
+    }, BridgeNormalizationEntry {
+        surface: "single nominal occurrence comparison",
+        rule: "Relate only the validated original nominal occurrence ID and preserve exact original-or-plus-one reply relation/refusal; never normalize ticks, typed application results, lifecycle or continuation",
+        classification: BridgeNormalizationClassification::IrreducibleTrustedComparisonLogic,
+        rationale: "Rust also issues non-nominal observational effects, so its absolute counter namespace differs from the selected executable model. Each side must retain exactly one actual nominal occurrence with consistent operation/request references before the comparison relates that ID. Raw outputs are unchanged.",
+        artifacts: &[
+            "rust/bridge/src/nominal_image.rs",
+            "rust/bridge/tests/support/nominal_image_correspondence.rs",
+            "lean/Runtime/Tests/NominalImageRunner.lean",
+        ],
     }]
 }
 
@@ -91,8 +101,10 @@ mod tests {
     #[test]
     fn bridge_normalization_contract_ledger_is_minimal_and_explicit() {
         let ledger = bridge_normalization_ledger();
-        assert_eq!(ledger.len(), 1);
+        assert_eq!(ledger.len(), 2);
 
+        assert_eq!(ledger[1].surface, "single nominal occurrence comparison");
+        assert!(ledger[1].rule.contains("never normalize ticks"));
         let tick = &ledger[0];
         assert_eq!(tick.surface, "semantic-audit tick normalization");
         assert_eq!(

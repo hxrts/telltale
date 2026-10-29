@@ -252,7 +252,7 @@ private theorem branches_proj_rel_typed_to_erase
                             have hvt' : PayloadSort.toValType? sort = some (.chan sid r) := by
                               simpa using hvt.symm
                             exact (False.elim (PayloadSort.to_val_type?_ne_chan sort sid r hvt'))
-                    | unit | bool | nat | string | prod _ _ => rfl
+                    | unit | bool | nat | string | readiness | prod _ _ => rfl
               refine List.Forall₂.cons ?_ ih
               exact ⟨hlab, hnone, ⟨cont, hproj, rfl⟩⟩
 

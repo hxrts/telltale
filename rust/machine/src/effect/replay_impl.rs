@@ -4,8 +4,10 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         self.peek_handler_identity()
             .or_else(|| self.recorded_handler_identity())
             .unwrap_or_else(|| {
-                self.fallback
-                    .map_or_else(|| "replay_handler".to_string(), EffectHandler::handler_identity)
+                self.fallback.map_or_else(
+                    || "replay_handler".to_string(),
+                    EffectHandler::handler_identity,
+                )
             })
     }
 
@@ -15,6 +17,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
             EffectRequestBody::SendDecision { .. } => "send_decision",
             EffectRequestBody::Receive { .. } => "handle_recv",
             EffectRequestBody::Choose { .. } => "handle_choose",
+            EffectRequestBody::NominalCommand { .. } => "nominal_command",
             EffectRequestBody::InvokeStep { .. } => "invoke_step",
             EffectRequestBody::Acquire { .. } => "handle_acquire",
             EffectRequestBody::Release { .. } => "handle_release",
@@ -89,7 +92,9 @@ impl EffectHandler for ReplayEffectHandler<'_> {
                 }
             }
             "topology_events" => {
-                if let Some(outcome) = decode_effect_result::<Vec<TopologyPerturbation>>(&entry.outputs) {
+                if let Some(outcome) =
+                    decode_effect_result::<Vec<TopologyPerturbation>>(&entry.outputs)
+                {
                     return match outcome {
                         EffectResult::Success(events) => {
                             EffectOutcome::success(EffectResponse::TopologyEvents { events })
@@ -158,7 +163,7 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         state: &mut Vec<Value>,
         payload: &Value,
     ) -> EffectResult<()> {
-        let outcome = self.handle_effect(EffectRequest::receive(
+        self.handle_effect(EffectRequest::receive(
             0,
             None,
             None,
@@ -167,13 +172,12 @@ impl EffectHandler for ReplayEffectHandler<'_> {
             label,
             state,
             payload.clone(),
-        ));
-        if let Some(EffectResponse::Receive { state: new_state }) = outcome.response.clone() {
+        ))
+        .into_receive_state()
+        .unwrap_or_else(EffectResult::failure)
+        .map_success(|new_state| {
             *state = new_state;
-        }
-        outcome
-            .into_unit("handle_recv")
-            .unwrap_or_else(EffectResult::failure)
+        })
     }
 
     fn handle_choose(
@@ -184,26 +188,19 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         state: &[Value],
     ) -> EffectResult<String> {
         self.handle_effect(EffectRequest::choose(
-            0,
-            None,
-            None,
-            role,
-            partner,
-            labels,
-            state,
+            0, None, None, role, partner, labels, state,
         ))
         .into_label()
         .unwrap_or_else(EffectResult::failure)
     }
 
     fn step(&self, role: &str, state: &mut Vec<Value>) -> EffectResult<()> {
-        let outcome = self.handle_effect(EffectRequest::invoke_step(0, None, None, role, state));
-        if let Some(EffectResponse::InvokeStep { state: new_state }) = outcome.response.clone() {
-            *state = new_state;
-        }
-        outcome
-            .into_unit("invoke_step")
+        self.handle_effect(EffectRequest::invoke_step(0, None, None, role, state))
+            .into_invoke_state()
             .unwrap_or_else(EffectResult::failure)
+            .map_success(|new_state| {
+                *state = new_state;
+            })
     }
 
     fn handle_acquire(
@@ -226,9 +223,11 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         evidence: &Value,
         state: &[Value],
     ) -> EffectResult<()> {
-        self.handle_effect(EffectRequest::release(0, sid, None, role, layer, evidence, state))
-            .into_unit("handle_release")
-            .unwrap_or_else(EffectResult::failure)
+        self.handle_effect(EffectRequest::release(
+            0, sid, None, role, layer, evidence, state,
+        ))
+        .into_unit("handle_release")
+        .unwrap_or_else(EffectResult::failure)
     }
 
     fn topology_events(&self, tick: u64) -> EffectResult<Vec<TopologyPerturbation>> {
@@ -243,10 +242,12 @@ impl EffectHandler for ReplayEffectHandler<'_> {
         role: &str,
         state: &[Value],
     ) -> Option<OutputConditionHint> {
-        self.handle_effect(EffectRequest::output_condition_hint(0, sid, None, role, state))
-            .into_output_condition_hint()
-            .ok()
-            .flatten()
+        self.handle_effect(EffectRequest::output_condition_hint(
+            0, sid, None, role, state,
+        ))
+        .into_output_condition_hint()
+        .ok()
+        .flatten()
     }
 
     fn supports_wal_sync(&self) -> bool {
@@ -528,5 +529,4 @@ mod tests {
             EffectFailureKind::InvalidInput
         );
     }
-
 }

@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 /-! # Distributed.Families.Coordination.API
 
-High-level API for automatic coordination characterization.
+High-level API for the coordination (CALM) characterization.
 -/
 
 namespace Distributed
@@ -12,35 +12,20 @@ namespace Coordination
 
 universe u v
 
-/-- Certified protocol package for coordination characterization. -/
+/-- Protocol package for coordination characterization. No assumptions are
+needed: the characterization is proved for every query model. -/
 structure CoordinationProtocol where
-  State : Type u
-  Update : Type v
-  model : Model State Update
-  assumptions : Assumptions model
-  premises : Premises model
+  Input : Type u
+  Output : Type v
+  [decEq : DecidableEq Input]
+  model : Model Input Output
 
-/-- Extract coordination characterization from a certified protocol bundle. -/
+attribute [instance] CoordinationProtocol.decEq
+
+/-- Coordination characterization for a protocol bundle. -/
 theorem characterization_of_protocol (P : CoordinationProtocol) :
     CoordinationCharacterization P.model :=
-  coordination_characterization_of_assumptions P.assumptions P.premises
-
-/-- Monotone side of the characterization. -/
-theorem coordination_free_of_monotone (P : CoordinationProtocol)
-    (hMono : MonotoneUpdates P.model) :
-    CoordinationFreeSafety P.model :=
-  (characterization_of_protocol P).1 hMono
-
-/-- Non-monotone side of the characterization. -/
-theorem coordination_required_of_non_monotone (P : CoordinationProtocol)
-    (hNonMono : ¬ MonotoneUpdates P.model) :
-    CoordinationRequired P.model :=
-  (characterization_of_protocol P).2 hNonMono
-
-/-- Core assumptions are always validated for a certified protocol. -/
-theorem core_assumptions_all_passed (P : CoordinationProtocol) :
-    (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
+  coordination_characterization P.model
 
 end Coordination
 end Distributed

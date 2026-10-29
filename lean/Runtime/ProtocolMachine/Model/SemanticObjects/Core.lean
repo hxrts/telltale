@@ -1,3 +1,5 @@
+import SessionTypes.Authority
+
 set_option autoImplicit false
 
 /-!
@@ -116,10 +118,9 @@ inductive FinalizationOutcome where
   | timedOut
   deriving Repr, DecidableEq
 
-inductive OwnershipScope where
-  | session
-  | fragments (roles : List String)
-  deriving Repr, DecidableEq
+/-- Canonical scope shape shared with typed evidence values. This alias adds no
+host-issued ownership capability to the endpoint small-step model. -/
+abbrev OwnershipScope := SessionTypes.OwnershipScope
 
 inductive DelegationStatus where
   | committed
@@ -128,7 +129,18 @@ inductive DelegationStatus where
 
 /-! ## Core Semantic Objects -/
 
+structure AgreementProfile where
+  profileName : String
+  visibility : OperationVisibility
+  rule : AgreementRule
+  usableAt : AgreementLevel
+  finalizedAt : AgreementLevel
+  requiredEvidenceKind : AgreementEvidenceKind
+  deriving Repr, DecidableEq
+
+
 structure OperationInstance where
+  agreementProfile : Option AgreementProfile := none
   operationId : String
   session : Option Nat
   ownerId : Option String
@@ -253,14 +265,6 @@ structure PrestateBinding where
   participantDigest : Option String
   deriving Repr, DecidableEq
 
-structure AgreementProfile where
-  profileName : String
-  visibility : OperationVisibility
-  rule : AgreementRule
-  usableAt : AgreementLevel
-  finalizedAt : AgreementLevel
-  requiredEvidenceKind : AgreementEvidenceKind
-  deriving Repr, DecidableEq
 
 structure AgreementContract where
   contractName : String

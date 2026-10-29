@@ -284,7 +284,7 @@ theorem occupancy_set_bdd_above_of_global_bound (C₀ : Config)
 
 /-- Critical buffer size: supremum of buffer occupancies over all reachable configs.
     This is the minimum buffer capacity needed for deadlock-free execution. -/
-def criticalBufferSize (C₀ : Config) : Nat :=
+noncomputable def criticalBufferSize (C₀ : Config) : Nat :=
   sSup (occupancySet C₀)
 
 /-! ## Terminal and Deadlocked -/

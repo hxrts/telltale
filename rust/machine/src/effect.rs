@@ -44,3 +44,7 @@ include!("effect/runtime_types.rs");
 include!("effect/handler_trait.rs");
 include!("effect/recording_impl.rs");
 include!("effect/replay_impl.rs");
+
+#[cfg(test)]
+#[path = "../tests/unit/effect_outcome_acceptance.rs"]
+mod outcome_acceptance_tests;

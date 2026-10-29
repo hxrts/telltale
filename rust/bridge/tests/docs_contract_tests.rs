@@ -164,32 +164,32 @@ fn authority_language_source_derived_support_matrix_matches_fixture_statuses() {
         (
             "choice_observational_binding",
             "`choice` with observational binding",
-            None,
+            Some("AuthorityBinding"),
         ),
         (
             "loop_authoritative_binding",
             "counted `loop` with authoritative binding",
-            None,
+            Some("AuthorityBinding"),
         ),
         (
             "recursion_authoritative_binding",
             "recursion with authoritative binding",
-            None,
+            Some("AuthorityBinding"),
         ),
         (
             "parallel_observational_binding",
             "`par` with observational binding",
-            Some("Parallel"),
+            Some("AuthorityBinding"),
         ),
         (
             "case_authoritative_binding",
             "`case/of` with authoritative binding",
-            Some("Case"),
+            Some("AuthorityBinding"),
         ),
         (
             "timeout_observational_binding",
             "`timeout` with observational binding",
-            Some("Timeout"),
+            Some("AuthorityBinding"),
         ),
     ] {
         let path = authority_fixture_path(fixture);

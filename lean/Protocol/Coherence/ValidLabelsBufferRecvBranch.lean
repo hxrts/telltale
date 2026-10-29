@@ -63,6 +63,7 @@ private theorem has_type_val_update_g_weaken {G : GEnv} {ep : Endpoint} {Lnew : 
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod h₁ h₂ =>
     exact HasTypeVal.prod (has_type_val_update_g_weaken h₁) (has_type_val_update_g_weaken h₂)
   | chan h =>
@@ -129,7 +130,7 @@ private theorem buffers_typed_enqueue_local {G : GEnv} {D : DEnv} {bufs : Buffer
           have hi' := hi
 /- ## Structured Block 3 -/
           simp [List.length_append] at hi'
-          exact hi'
+          omega
         exact Nat.le_of_lt_succ hi'
       have hEq : i = (lookupBuf bufs a).length := Nat.le_antisymm hLe' hLe
       have hTraceEq : i = (lookupD D a).length := hLen ▸ hEq

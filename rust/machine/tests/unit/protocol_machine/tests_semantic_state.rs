@@ -340,7 +340,7 @@
             None,
             "test/handler",
             serde_json::json!({ "session": 0 }),
-        );
+        ).expect("unit fixture has fresh occurrence capacity");
         machine.complete_runtime_effect(
             effect_id,
             OutstandingEffectStatus::Succeeded,

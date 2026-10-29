@@ -4,7 +4,7 @@ set_option autoImplicit false
 
 /-! # Distributed.Families.Coordination.Profile
 
-Profile constructors for coordination/CALM theorem-pack attachment.
+Profile constructors for coordination theorem-pack attachment.
 -/
 
 namespace Distributed
@@ -13,18 +13,12 @@ namespace Profile
 
 universe u v
 
-/-- Build a coordination characterization profile from semantic assumptions and premises. -/
-def mk
-    {State : Type u} {Update : Type v}
-    (model : Model State Update)
-    (assumptions : Assumptions model)
-    (premises : Premises model) :
-    CoordinationProtocol where
-  State := State
-  Update := Update
+/-- Build a coordination characterization profile from a query model. -/
+def mk {Input : Type u} {Output : Type v} [DecidableEq Input]
+    (model : Model Input Output) : CoordinationProtocol where
+  Input := Input
+  Output := Output
   model := model
-  assumptions := assumptions
-  premises := premises
 
 end Profile
 end Coordination

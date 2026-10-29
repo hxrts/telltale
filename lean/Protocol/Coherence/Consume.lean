@@ -187,7 +187,7 @@ theorem consume_append (from_ : Role) (Lr : LocalType) (ts : List ValType) (T : 
     | none =>
       -- consumeOne failed, so Consume returns none, h becomes none = some L'
       simp only [hOne] at h
-      exact Option.noConfusion h
+      first | cases h | simp at h
     | some L'' =>
       simp only [hOne] at h ⊢
       exact ih L'' h
@@ -246,7 +246,7 @@ theorem consume_single_branch_string {from_ : Role} {bs : List (String × LocalT
   simp only [Consume, consumeOne] at h
   cases T with
   | string => rfl
-  | _ => exact Option.noConfusion h
+  | _ => first | cases h | simp at h
 
 /-- For non-recv/branch types, Consume only succeeds on empty trace.
     This is because consumeOne only handles recv and branch. -/
@@ -261,11 +261,11 @@ theorem consume_non_recv_empty {from_ : Role} {L : LocalType} {ts : List ValType
     simp only [Consume] at h
     -- consumeOne from_ t L only succeeds for L = .recv or L = .branch
     cases L with
-    | end_ => simp only [consumeOne] at h; exact Option.noConfusion h
-    | send _ _ _ => simp only [consumeOne] at h; exact Option.noConfusion h
-    | select _ _ => simp only [consumeOne] at h; exact Option.noConfusion h
-    | var _ => simp only [consumeOne] at h; exact Option.noConfusion h
-    | mu _ => simp only [consumeOne] at h; exact Option.noConfusion h
+    | end_ => simp only [consumeOne] at h; first | cases h | simp at h
+    | send _ _ _ => simp only [consumeOne] at h; first | cases h | simp at h
+    | select _ _ => simp only [consumeOne] at h; first | cases h | simp at h
+    | var _ => simp only [consumeOne] at h; first | cases h | simp at h
+    | mu _ => simp only [consumeOne] at h; first | cases h | simp at h
     | recv r T L'' => exact absurd rfl (hNotRecv r T L'')
     | branch r bs => exact absurd rfl (hNotBranch r bs)
 
@@ -283,7 +283,7 @@ theorem consume_other_empty {from_ r : Role} {T : ValType} {L : LocalType}
     simp only [Consume, consumeOne] at h
     have hNeq : (from_ == r) = false := beq_eq_false_iff_ne.mpr hNe
     simp only [hNeq, Bool.false_and] at h
-    exact Option.noConfusion h
+    simp at h
 
 /-! ## Consume Head-Constraint Lemmas -/
 
@@ -302,9 +302,9 @@ theorem consume_recv_head_match {from_ r : Role} {T : ValType} {L : LocalType}
     · simp only [hType] at hConsume
       exact ⟨eq_of_beq hRole, eq_of_beq hType⟩
     · simp only [hType] at hConsume
-      exact Option.noConfusion hConsume
+      simp at hConsume
   · simp only [hRole, Bool.false_and] at hConsume
-    exact Option.noConfusion hConsume
+    simp at hConsume
 
 /-- For branch type: Consume on non-empty trace always fails because consumeOne
     doesn't handle branch type. This lemma extracts the contradiction. -/
@@ -312,7 +312,7 @@ theorem consume_branch_nonempty_false {from_ : Role} {r : Role} {bs : List (Stri
     {t : ValType} {ts : List ValType} {L' : LocalType}
     (hConsume : Consume from_ (.branch r bs) (t :: ts) = some L') : False := by
   simp only [Consume, consumeOne] at hConsume
-  exact Option.noConfusion hConsume
+  simp at hConsume
 
 
 end

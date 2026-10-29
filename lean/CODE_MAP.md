@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-10-08
+**Last Updated:** 2026-10-23
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -35,17 +35,17 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 <!-- GENERATED_OVERVIEW_TABLE:BEGIN -->
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
-| SessionTypes   |    48 |  10,040 | Global/local type definitions, de Bruijn, participation    |
+| SessionTypes   |    49 |  10,153 | Global/local type definitions, de Bruijn, participation    |
 | SessionCoTypes |    78 |  16,302 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    89 |  19,361 | Projection, harmony, blindness, embedding, erasure         |
+| Choreography   |    89 |  19,362 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |    14 |   2,359 | Operational semantics, determinism, deadlock freedom       |
-| Classical      |    17 |   2,439 | Transported theorems (queueing, large deviations, mixing)  |
+| Classical      |    17 |   2,439 | Conditional interfaces over assumed classical inputs       |
 | ClassicalAnalysis |     3 |   1,508 | Real analysis concrete models for classical transport      |
 | Distributed    |    80 |   9,715 | Distributed assumptions, validation, FLP/CAP theorem packaging |
-| Protocol       |   170 |  40,152 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   199 |  39,301 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Protocol       |   170 |  40,192 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |   202 |  40,750 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     830 | Iris ghost state and program logic extraction              |
-| **Total**      | **701** | **142,007** |                                                            |
+| **Total**      | **705** | **143,610** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -100,11 +100,12 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 
 | File | Lines | Description |
 |------|-------|-------------|
-| LocalTypeConv.lean | 187 | Named ↔ de Bruijn conversions |
+| LocalTypeConv.lean | 234 | Named ↔ de Bruijn conversions; roundtrip/contractiveness over `GeneratedContext` |
 | LocalTypeConvDefs.lean | 210 | Conversion definition predicates |
 | LocalTypeConvProofs/Helpers.lean | 433 | Soundness of named → de Bruijn |
 | LocalTypeConvProofs/ClosedRoundtrip.lean | 404 | Completeness of named → de Bruijn |
-| LocalTypeConvProofs/Roundtrip.lean | 575 | Substitution equivalence under conversion |
+| LocalTypeConvProofs/Roundtrip/General.lean | 380 | Guardedness/contractiveness preservation (named → DB) |
+| LocalTypeConvProofs/Roundtrip/Contractive.lean | 225 | Guardedness/contractiveness preservation (DB → named, generated contexts) |
 | LocalTypeRDBBridge.lean | 47 | Bridge between LocalTypeR and LocalTypeDB |
 
 ### Supporting Modules
@@ -213,7 +214,8 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 | Observable.lean | 394 | Membership predicates for observable behavior |
 | Dual.lean | 266 | Duality lemmas |
 | FullUnfold.lean | 265 | Full unfolding with termination argument |
-| Quotient.lean | 111 | Quotient by EQ2 equivalence |
+| EQ2/HeadInversion.lean | 120 | EQ2 head inversion through `fullUnfold` (send/recv), BranchesRel membership transfer |
+| Quotient.lean | 132 | Quotient by EQ2 (warning: subsingleton via `eq2_mu_var_self`; not used semantically) |
 | DBBridge.lean | 50 | Bridge lemmas for de Bruijn |
 | Coinductive/Bisim.lean | 84 | Coinductive bisimulation definition |
 | Coinductive/BisimHelpers.lean | 322 | Bisimulation helpers |
@@ -228,8 +230,8 @@ Sidecar: FisherInformation → Finite-discrete information geometry API and inst
 | File | Lines | Description |
 |------|-------|-------------|
 | AsyncSubtyping.lean | 39 | Re-export wrapper for async subtyping module |
-| AsyncSubtyping/Core.lean | 382 | AsyncTriple, MsgBuffer, 7 async step rules, AsyncSubtypeRel coinductive relation |
-| AsyncSubtyping/Decidable.lean | 381 | checkAsync worklist algorithm, isAsyncSubtype decision function, soundness/completeness |
+| AsyncSubtyping/Core.lean | 344 | AsyncTriple, MsgBuffer, 7 async step rules, AsyncSubtypeRel coinductive relation |
+| AsyncSubtyping/Decidable.lean | 395 | Sound bounded checker: checkAsync worklist exploration (accepted/stuck/outOfFuel), check_async_sound; async subtyping is undecidable, no completeness claimed |
 
 Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.lean, Coinductive/BisimDecidable.lean, Coinductive/Roundtrip.lean.
 
@@ -294,15 +296,16 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 
 | File | Lines | Description |
 |------|-------|-------------|
-| Harmony.lean | 150 | Main harmony structure |
+| Harmony.lean | 161 | Main harmony structure |
 | Harmony/MuUnfoldLemmas.lean | 257 | Mu-unfolding auxiliary lemmas |
 | Harmony/StepProjection.lean | 255 | Projection preserves stepping semantics |
 | Harmony/SubstEndUnguarded.lean | 239 | Substitution with guardedness constraints |
-| Harmony/StepHarmony.lean | 423 | Main structure |
+| Harmony/StepHarmony.lean | 409 | Projection coherence and trans/CProject bridge |
 | Harmony/Substitution.lean | 519 | Communication handling |
 | Harmony/ParticipantSteps.lean | 533 | Branching |
 | Harmony/NonParticipantHelpers.lean | 126 | Recursion |
-| Harmony/NonParticipantSteps.lean | 147 | Final properties |
+| Harmony/NonParticipantSteps.lean | 138 | Non-participant projection stability |
+| Harmony/EnvStepHarmony.lean | 172 | step_harmony (head steps ⇒ EnvStep), envstep_realizable (converse), Claims |
 
 ### Supporting Modules
 
@@ -335,35 +338,35 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | File | Lines | Description |
 |------|-------|-------------|
 | Environment.lean | 299 | Environment configuration (message queues, timeouts, actions) |
-| EnvStep.lean | 191 | Environment-step relation |
+| EnvStep.lean | 203 | projEnv / EnvStep on representative (`LocalTypeR`) envs |
 | Typing.lean | 23 | Typing judgment interface |
 | Determinism/Core.lean | 600 | Determinism proof part 1 |
 | Determinism/Diamond.lean | 516 | Determinism proof part 2 |
-| DeadlockFreedom.lean | 293 | Deadlock freedom with fairness |
-| SubjectReduction.lean | 201 | Subject reduction for well-typed processes |
+| DeadlockFreedom.lean | 415 | Deadlock freedom for comm-headed configs; `advanceProcess` steps each participant's own type (`ownCont`) |
+| SubjectReduction.lean | 403 | Head-step subject reduction; typing = WF ∧ EQ2 to projection; `LocalAdvance` steps the process's own `fullUnfold` |
 
 ---
 
 ## Classical
 
 **Root Module:** `Classical.lean`
-**Description:** Transported theorems from queueing theory, probability, and stochastic processes, organized into family kernels and a layered transport API.
+**Description:** Honest conditional interfaces (Option B) for classical results from queueing theory, probability, and stochastic processes. Named classical theorems are assumed inputs carried by `*Witness`/`*Input` fields; Lean proves only consequences derived from them or elementary identities. Organized into family kernels and a layered transport API.
 
 ### Families
 
 | File | Description |
 |------|-------------|
-| Families/FosterLyapunovHarris.lean | Foster-Lyapunov-Harris theorem for stability/recurrence |
-| Families/MaxWeightBackpressure.lean | MaxWeight scheduling optimality and backpressure |
-| Families/LargeDeviationPrinciple.lean | Large deviation bounds for rare events |
-| Families/HeavyTrafficDiffusion.lean | Heavy traffic diffusion limits |
-| Families/MixingTimeBounds.lean | Mixing-time bounds for Markov chains |
-| Families/FluidLimitStability.lean | Fluid-limit stability analysis |
-| Families/ConcentrationInequalities.lean | Concentration inequalities |
-| Families/LittlesLaw.lean | Little's law identities |
-| Families/FunctionalCLT.lean | Functional central limit theorem |
-| Families/PropagationOfChaos.lean | Mean-field limits and propagation of chaos |
-| Families/SpectralGapTermination.lean | Spectral-gap / Cheeger / hitting-time interfaces |
+| Families/FosterLyapunovHarris.lean | Deterministic drift systems; potential reaches zero within `V s` steps (no stochastic Harris recurrence) |
+| Families/MaxWeightBackpressure.lean | MaxWeight weight function; optimality is an assumed input |
+| Families/LargeDeviationPrinciple.lean | Exponential envelopes; tail bound is an assumed input |
+| Families/HeavyTrafficDiffusion.lean | √n-scaling identities (`scaled_variance_identity`); no diffusion limit |
+| Families/MixingTimeBounds.lean | Geometric envelopes; distance bound is an assumed input |
+| Families/FluidLimitStability.lean | Energy monotonicity from an assumed descent inequality |
+| Families/ConcentrationInequalities.lean | Sub-Gaussian tail form; tail bound is an assumed input |
+| Families/LittlesLaw.lean | Rearrangements of L = λW; the law itself is an assumed input |
+| Families/FunctionalCLT.lean | Centering/partial-sum identities; no functional CLT |
+| Families/PropagationOfChaos.lean | Finite-average identities (`mean_permutation_invariant`); no mean-field limit |
+| Families/SpectralGapTermination.lean | Spectral-gap vocabulary; Cheeger/hitting-time/stationarity are assumed witnesses |
 
 ### Transport Layers
 
@@ -398,7 +401,7 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Families/QuorumGeometry.lean | Quorum-intersection safety family: no-conflict commits, fork exclusion, safe finality |
 | Families/PartialSynchrony.lean | Partial-synchrony liveness family: eventual decision and bounded post-GST termination |
 | Families/Responsiveness.lean | Responsiveness family: optimistic post-GST latency bound independent of timeout |
-| Families/Nakamoto.lean | Nakamoto security family: probabilistic safety, settlement-depth finality, churn-liveness |
+| Families/Nakamoto.lean | Nakamoto security family: probabilistic safety, settlement-depth finality (common prefix), chain-growth liveness transported from the longest-chain model |
 | Families/Reconfiguration.lean | Reconfiguration safety family: no split-brain, safe handoff, liveness preservation |
 | Families/AtomicBroadcast.lean | Atomic-broadcast family: total-order consistency, log-prefix compatibility, consensus bridge |
 | Families/AccountableSafety.lean | Accountable-safety family: safety-or-evidence theorem with slashable fault evidence |
@@ -543,7 +546,7 @@ Central invariant replacing traditional duality for multiparty async settings.
 | File | Lines | Description |
 |------|-------|-------------|
 | Preservation.lean | 1,933 | `preservation_typed`, `progress_*`, `subject_reduction` |
-| Determinism.lean | 359 | `stepBase_det`, `diamond_independent`, `session_isolation` |
+| Determinism.lean | 359 | `step_base_deterministic_strong`, `session_isolation` (no diamond: `StepBase` acts only on the head process) |
 | DeadlockFreedom.lean | 7 | Re-export wrapper for DeadlockFreedomCore and DeadlockFreedomReachability |
 | DeadlockFreedomCore.lean | 291 | `Guarded`, `ReachesComm`, core deadlock freedom definitions |
 | DeadlockFreedomReachability.lean | 380 | `deadlock_free`, `not_stuck`, reachability-based proofs |
@@ -578,7 +581,9 @@ Central invariant replacing traditional duality for multiparty async settings.
 | Simulation.lean | 540 | `stepDecide`, `runSteps`, `traceSteps`, soundness/completeness |
 | Decidability.lean | 108 | DecidableEq instances |
 | Examples.lean | 19 | Protocol examples (stubbed) |
-| CrashTolerance.lean | 225 | `CommGraph`, `CrashTolerant`, `Critical`, crash tolerance predicates |
+| CrashToleranceDrain.lean | 284 | `removeCrashed`, `DeliverStep`, `SessionCanComplete`, `survivors_can_complete`, `drainMeasure` |
+| CrashToleranceCore.lean | 368 | `CommGraph`, `CrashTolerant`, `Critical`, `reachClosure`, `crashTolerantDec` (sound + complete) |
+| CrashTolerance.lean | 377 | site-to-role crash projection, `ProtocolMachineCrashTolerant`, `f_step_preserves_tolerance` |
 | Noninterference.lean | 8 | Re-export wrapper for Noninterference* modules |
 | NoninterferenceCore.lean | 471 | `CEquiv`, `BlindTo`, core noninterference definitions |
 | NoninterferenceExtensions.lean | 178 | `blind_step_preserves_CEquiv` and extended noninterference proofs |
@@ -594,8 +599,8 @@ Protocol-specific instantiation of the classical transport framework.
 |------|-------|-------------|
 | Classical/Regime.lean | 74 | Classical regime definition, totality, determinism, exchangeability |
 | Classical/Framework.lean | 126 | TransportFramework, step induction, classical regime instantiation |
-| Classical/TransportLedger.lean | 88 | Ledger bookkeeping for transported theorem discharge planning |
-| Classical/SpectralGap.lean | 97 | Spectral gap bounds, mixing time analysis, Cheeger inequality interface |
+| Classical/TransportLedger.lean | 88 | Ledger bookkeeping; entries marked conditional-on-assumed-input or elementary |
+| Classical/SpectralGap.lean | 97 | Deterministic 0/1 protocol chain (degenerate spectrum; no spectral claims) |
 | Classical/Instantiation.lean | 474 | Protocol-facing instantiation (Foster-Lyapunov, MaxWeight, Mean-field) |
 
 ---
@@ -687,7 +692,7 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 |------|-------|-------------|
 | Resources/ResourceModel.lean | 179 | Resource model interface and profiles |
 | Resources/SessionRA.lean | 88 | Session resource algebra with auth/frag |
-| Resources/BufferRA.lean | 317 | Message buffer resource algebra with auth/frag |
+| Resources/BufferRA.lean | 435 | Edge-buffer ghost map (`ghost_map` auth/frag); shared ⊂ reliable (FIFO, lossless, duplicate-free) ⊂ unreliable delivery models |
 | Resources/Arena.lean | 1,379 | Memory arena with pointsto, allocation, and ownership tracking |
 | Resources/ProfilesV1.lean | 42 | V1 resource profile definitions |
 
@@ -698,10 +703,10 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | ProgramLogic/LanguageInstance.lean | 93 | Iris `Language`/`EctxLanguage` instances |
 | ProgramLogic/SessionWP.lean | 122 | Session-level WP rules |
 | ProgramLogic/GhostState.lean | 281 | Ghost state management (session maps, buffer maps) |
-| ProgramLogic/CodeLoading.lean | 99 | Code loading and program verification |
+| ProgramLogic/CodeLoading.lean | 153 | Code loading with full-image content ids/signatures (`code_image_id_injective`) and `hotSwap_preserves_coherent` |
 | ProgramLogic/ProofInterfaces.lean | 91 | Proof interface typeclasses |
 | ProgramLogic/WPPair.lean | 131 | WP pairing for send/recv duality |
-| ProgramLogic/WPPipeline.lean | 25 | WP pipeline composition |
+| ProgramLogic/WPPipeline.lean | 89 | Sequential (continuation-style) WP pipeline composition with bind rule `wp_seq_compose` |
 | ProgramLogic/FinalizationWP.lean | 39 | Finalization and cleanup WP rules |
 
 ### Invariants and Transport
@@ -722,8 +727,8 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/BridgeStrengthening.lean | 143 | Protocol-machine bridge premise bundle (`ProtocolMachineBridgePremises`), handler local/trace/step typing bridge, composed `ConfigEquiv`→`EffectBisim`→observational transport |
 | Proofs/ProtocolMachine/MonitorContracts.lean | 23 | Proof-only monitor contract predicates moved out of `Runtime/ProtocolMachine/Runtime/Monitor.lean` |
 | Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |
-| Proofs/ProtocolMachine/SchedulerContracts.lean | 91 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
-| Proofs/ProtocolMachine/Scheduler.lean | 265 | Scheduler proof infrastructure, including single-lane/policy determinism compatibility lemmas |
+| Proofs/ProtocolMachine/SchedulerContracts.lean | 94 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
+| Proofs/ProtocolMachine/Scheduler.lean | 326 | Scheduler proofs: selection determinism, independent-step confluence (`LocalStepSystem.independent_steps_commute`), single-lane/policy lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean | 116 | Outstanding-effect admissibility, late-result rejection, and observer / `EffectBisim` lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean | 171 | Semantic-handoff theorems and delegation / envelope bridge lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/AuthoritativeReadsPublication.lean | 185 | Authoritative-read/publication theorems and observer-projection consequences |
@@ -774,16 +779,16 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Adequacy/Adequacy.lean | 297 | Adequacy theorem connecting WP to execution |
 | Adequacy/CompileRefinesEffectBisim.lean | 39 | Compilation refinement via effect bisimulation |
 | Adequacy/EnvelopeCore.lean | 54 | V2: Envelope core re-exports |
-| Adequacy/EnvelopeCore/CoreFoundations.lean | 267 | V2: Core envelope definitions and axioms |
+| Adequacy/EnvelopeCore/CoreFoundations.lean | 267 | V2: Core envelope definitions; E1 soundness/realizability are assumed premises, maximality is proved (definitional) |
 | Adequacy/EnvelopeCore/AdmissionLogic.lean | 379 | V2: Runtime admission checks and capability gates |
-| Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence proofs for determinism envelope |
-| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration with coherence |
+| Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence; adequacy/full abstraction derived, spatial and capability monotonicity assumed |
+| Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration; E2 protocol bridge properties are assumed premises (`assumed*`) |
 | Adequacy/EnvelopeCore/FailureTaxonomy.lean | 7 | V2: Failure taxonomy re-exports |
 | Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification plus explicit progress-failure taxonomy mapping |
 | Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | 112 | V2: Protocol-specific failure handling |
 
 ### Proofs
-| Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade unifying proof exports |
+| Proofs/Contracts/RuntimeTheorems.lean | 493 | Runtime theorem facade: scheduler step facts (not refinements), handler-spec premise projections (`*_of_handler_spec`) |
 | Proofs/Contracts/DeterminismApi.lean | 105 | Determinism profile artifacts and hypothesis bundles for runtime gating |
 | Proofs/Contracts/RuntimeContracts.lean | 274 | Runtime admission/capability contract surfaces for theorem-guided protocol machine policy |
 | Proofs/Concurrency.lean | 109 | Iris-backed N-invariance and policy-invariance proofs |
@@ -796,8 +801,9 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Delegation.lean | 6 | Re-export wrapper importing `Protocol.Coherence.Delegation` |
 | Proofs/Progress.lean | 7 | Re-export wrapper for Progress* modules |
 | Proofs/ProgressCore.lean | 395 | `CoherentVMState`, `ProgressVMState`, core progress definitions |
-| Proofs/ProgressTheorems.lean | 233 | `protocol_machine_progress`, instruction enablement theorems |
-| Proofs/ProgressApi.lean | 185 | Bundle-oriented liveness API with required progress hypothesis and explicit scheduler/fairness linkage |
+| Proofs/ProgressTheorems.lean | 252 | `protocol_machine_progress` (pending output ⇒ enabled instruction), fair termination from one-step ranking obligations |
+| Proofs/FairTermination.lean | 144 | Generic k-fair termination: `FairRanking` one-step obligations ⇒ `k * measure` completion bound |
+| Proofs/ProgressApi.lean | 181 | Bundle-oriented liveness API with required progress hypothesis and explicit scheduler/fairness linkage |
 | Proofs/ObserverProjection.lean | 206 | Observer projection for trace equivalence |
 | Proofs/ReconfigurationObserver.lean | 253 | Canonical proof-facing surface for region layering, linking/delegation harmony, observer equivalence, and replay/cross-target observer alignment |
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
@@ -812,7 +818,10 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 |------|------:|-------------|
 | Proofs/TheoremPack/API.lean | 368 | Public theorem-pack interface including proof-carrying metadata, semantic-object composition, inventory, and runtime gate APIs |
 | Proofs/TheoremPack/AdmissionBoundary.lean | 273 | Explicit admission-boundary ledger for transported theorem usage |
-| Proofs/TheoremPack/Artifacts.lean | 591 | Artifact generation plus semantic-object packaging and proof-carrying metadata surfaces |
+| Proofs/TheoremPack/Artifacts.lean | 21 | Re-export aggregator for the artifact schema |
+| Proofs/TheoremPack/Artifacts/Core.lean | 157 | Semantic-object packaging and proof-carrying artifact metadata |
+| Proofs/TheoremPack/Artifacts/Distributed.lean | 321 | Distributed-family artifact records (FLP, CAP, quorum, Nakamoto, CRDT, envelopes) |
+| Proofs/TheoremPack/Artifacts/Envelope.lean | 181 | Protocol-machine envelope adherence/admission, bridge, and runtime artifacts |
 | Proofs/TheoremPack/Build.lean | 453 | Theorem-pack construction plus execution-profile/adherence correspondence theorems |
 | Proofs/TheoremPack/Inventory.lean | 114 | Capability inventory management including semantic-object and proof-carrying metadata inventories |
 | Proofs/TheoremPack/Profiles.lean | 416 | Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
@@ -841,7 +850,9 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Examples/ComposedProofPack.lean | 356 | End-to-end theorem-pack example showing semantic-object witness bundles flowing through the canonical composition and inventory path |
 | Proofs/Examples/CrossTargetProgressDependentWork.lean | 198 | Cross-target progress and dependent-work examples |
 | Proofs/Examples/DistributedLoweringProfiles.lean | 110 | Lowering-backed distributed theorem-pack profile examples |
-| Proofs/Examples/DistributedProfiles.lean | 178 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
+| Proofs/Examples/DistributedProfiles.lean | 12 | Re-export aggregator for distributed profile examples |
+| Proofs/Examples/DistributedProfiles/Models.lean | 303 | Concrete distributed models and profiles (BFT, timed, Nakamoto, DA, accountable safety) |
+| Proofs/Examples/DistributedProfiles/Attachment.lean | 228 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
 | Proofs/Examples/EffectContracts.lean | 114 | Effect-contract theorem-pack examples |
 | Proofs/Examples/InvariantBundle.lean | 144 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
 | Proofs/Examples/PublicationMaterialization.lean | 266 | Publication and materialization examples |
@@ -1004,7 +1015,7 @@ Four executables defined in lakefile.lean:
 
 | Library | Sorry Count | Status |
 |---------|------------:|--------|
-| SessionCoTypes | 0 | AsyncSubtyping/Core.lean, Decidable.lean — complete |
+| SessionCoTypes | 0 | AsyncSubtyping/Core.lean, Decidable.lean — sound bounded checker (async subtyping undecidable) |
 | Protocol | 0 | Coherence, CrashTolerance, Noninterference — complete |
 | Runtime | 0 | Progress, SchedulingBound, WeightedMeasure, Diamond — complete |
 | **Total** | **0** | **Fully proved** |
@@ -1081,7 +1092,7 @@ Unforgeable tokens tied to endpoints enforce linear resource usage. The monitor 
 - **protocol machine failure proofs/predicates?** → Runtime/Proofs/ProtocolMachine/Failure.lean, Runtime/Proofs/ProtocolMachine/FailurePredicates.lean
 - **Buffer boundedness?** → Protocol/BufferBoundedness.lean
 - **Protocol symmetry?** → Protocol/Symmetry.lean
-- **Spectral gap bounds?** → Protocol/Classical/SpectralGap.lean
+- **Spectral gap interface (assumed witnesses)?** → Classical/Families/SpectralGapTermination.lean
 - **protocol machine JSON runner?** → Runtime/Tests/ProtocolMachineRunner.lean
 - **What is axiomatized?** → [Axiom Inventory](#axiom-inventory)
 

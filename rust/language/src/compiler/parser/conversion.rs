@@ -121,6 +121,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                 continuation: Box::new(current),
             },
             Statement::Let {
+                execution_role,
                 name,
                 mode,
                 expr,
@@ -132,6 +133,7 @@ pub(crate) fn convert_statements_to_protocol(statements: &[Statement], roles: &[
                     current
                 };
                 Protocol::Let {
+                    execution_role: execution_role.clone(),
                     name: name.clone(),
                     mode: *mode,
                     expr: convert_authority_expr(expr),

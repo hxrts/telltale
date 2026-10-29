@@ -35,7 +35,7 @@ theorem lookup_g_rename_inv (ρ : SessionRenaming) (G : GEnv) (e : Endpoint) (L 
   induction G with
   | nil =>
     simp only [renameGEnv, lookupG, List.lookup, List.map] at h
-    exact Option.noConfusion h
+    cases h
   | cons hd tl ih =>
     simp only [renameGEnv, List.map, lookupG, List.lookup] at h
     by_cases heq : e = renameEndpoint ρ hd.1
@@ -69,7 +69,7 @@ theorem lookup_d_rename_inv (ρ : SessionRenaming) (D : DEnv) (e : Edge) :
         intro p hp hEq
         have hsome : preimageEdge ρ e = some p.1 := by
           simpa [hEq] using (preimage_edge_rename ρ p.1)
-        exact Option.noConfusion (hpre ▸ hsome)
+        cases (hpre ▸ hsome : (none : Option Edge) = some p.1)
       have hlookup :
           lookupD (renameDEnv ρ D) e = lookupD (∅ : DEnv) e := by
         simpa [renameDEnv] using
@@ -197,7 +197,7 @@ theorem rename_d_env_update_d (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts :
           intro p hp hEq
           have hsome : preimageEdge ρ e' = some p.1 := by
             simpa [hEq] using (preimage_edge_rename ρ p.1)
-          exact Option.noConfusion (hpre ▸ hsome)
+          cases (hpre ▸ hsome : (none : Option Edge) = some p.1)
         have hLhs : (renameDEnv ρ (updateD D e ts)).find? e' = none := by
           simpa [renameDEnv] using
             (find?_foldl_update_neq (ρ := ρ) (l := (updateD D e ts).list)
@@ -206,7 +206,7 @@ theorem rename_d_env_update_d (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts :
           intro p hp hEq
           have hsome : preimageEdge ρ e' = some p.1 := by
             simpa [hEq] using (preimage_edge_rename ρ p.1)
-          exact Option.noConfusion (hpre ▸ hsome)
+          cases (hpre ▸ hsome : (none : Option Edge) = some p.1)
         have hRhsBase : (renameDEnv ρ D).find? e' = none := by
 /- ## Structured Block 1 -/
           simpa [renameDEnv] using
@@ -232,7 +232,8 @@ theorem rename_d_env_update_d (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts :
               match (updateD D e ts).find? e'' with
               | some ts' => some (ts'.map (renameValType ρ))
               | none => none := by
-          simpa [renameDEnv, he'_eq, hEqUpd] using hL
+          simp only [renameDEnv, he'_eq, hEqUpd] at hL ⊢
+          exact hL
         have hFindUpd : (updateD D e ts).find? e'' = D.find? e'' :=
           find?_update_d_neq D e e'' ts hne.symm
         have hR :=
@@ -246,7 +247,8 @@ theorem rename_d_env_update_d (ρ : SessionRenaming) (D : DEnv) (e : Edge) (ts :
               match D.find? e'' with
               | some ts' => some (ts'.map (renameValType ρ))
               | none => none := by
-          simpa [renameDEnv, he'_eq, hEqD] using hR
+          simp only [renameDEnv, he'_eq, hEqD] at hR ⊢
+          exact hR
         have hL'' :
             (renameDEnv ρ (updateD D e ts)).find? e' =
               match D.find? e'' with

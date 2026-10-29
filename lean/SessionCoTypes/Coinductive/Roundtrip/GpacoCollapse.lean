@@ -28,7 +28,7 @@ open Paco
 /-- gpaco closure of EQ2C_mu_paco with explicit mu-closure. -/
 def GpacoRel : LocalTypeC → LocalTypeC → Prop :=
   -- Use gupaco_clo to wrap mu-paco with a guarded closure.
-  Paco.gupaco_clo EQ2CMono mu_clo EQ2C_mu_paco
+  Paco.gupacoClo EQ2CMono mu_clo EQ2C_mu_paco
 
 /-! ## Observability lift -/
 
@@ -47,8 +47,8 @@ theorem mu_paco_obs_to_gpaco {a b : LocalTypeC}
   have hle : ∀ x y, EQ2C_mu_paco x y → GpacoRel x y := by
     intro x y hx
     -- r_le_gpaco_clo embeds the base relation into the gpaco closure.
-    have h' := Paco.r_le_gpaco_clo EQ2CMono mu_clo EQ2C_mu_paco EQ2C_mu_paco x y hx
-    simpa [Paco.gupaco_clo_def] using h'
+    have h' := Paco.r_le_gpacoClo EQ2CMono mu_clo EQ2C_mu_paco EQ2C_mu_paco x y hx
+    exact h'
   -- Step 3: apply monotonicity of ObservableRelC.
   exact observable_rel_c_mono hle hobs
 
@@ -58,8 +58,8 @@ theorem mu_paco_obs_to_gpaco {a b : LocalTypeC}
 theorem mu_paco_to_gpaco {a b : LocalTypeC} (h : EQ2C_mu_paco a b) :
     GpacoRel a b := by
   -- Use r_le_gpaco_clo to inject the base relation.
-  have h' := Paco.r_le_gpaco_clo EQ2CMono mu_clo EQ2C_mu_paco EQ2C_mu_paco a b h
-  simpa [Paco.gupaco_clo_def] using h'
+  have h' := Paco.r_le_gpacoClo EQ2CMono mu_clo EQ2C_mu_paco EQ2C_mu_paco a b h
+  exact h'
 
 /-- Extract observability from an observable relation. -/
 lemma observable_of_observable_rel_c {R : LocalTypeC → LocalTypeC → Prop}

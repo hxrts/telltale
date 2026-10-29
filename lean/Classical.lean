@@ -10,13 +10,18 @@ and queueing theory, adapted for session-typed protocol verification.
 ## Purpose
 
 Many properties of distributed protocols (liveness, throughput, tail bounds)
-have analogues in classical applied mathematics. Rather than reproving these
-from scratch, the transport layer instantiates well-known results with
-protocol-specific definitions.
+have analogues in classical applied mathematics. This layer exposes them as
+**honest conditional interfaces (Option B)**: each named classical theorem
+(Little's law, MaxWeight optimality, sub-Gaussian tails, LDP/mixing envelopes,
+spectral-gap termination, Cheeger) is an *assumed input* carried by a
+`*Witness`/`*Input` field and is **not proved** here. Lemmas only derive
+elementary consequences from those inputs. The heavy-traffic, mean-field and
+functional-CLT families contain only elementary identities (the functional-CLT
+input is a degenerate constant path); no limit theorem is proved.
 
 ## Theorem Families
 
-| Family                 | Classical Origin           | Protocol Application                |
+| Family                 | Classical Origin (not proved) | Protocol Application             |
 |-----------------------|---------------------------|-------------------------------------|
 | Foster-Lyapunov-Harris | Markov chain stability     | Liveness via progress measures      |
 | MaxWeight Backpressure | Network scheduling         | Throughput-optimal processing       |
@@ -36,9 +41,9 @@ Import this module to access the stable `Classical.Transport` API:
 ```lean
 import Classical
 
--- Use transported theorems
-example := Classical.Transport.transported_foster_lyapunov
-example := Classical.Transport.transported_littles_law
+-- Conditional lemmas over assumed inputs
+example := Classical.Transport.foster_conclusion_of_input
+example := Classical.Transport.littles_law_wait_time_of_input
 ```
 
 ## See Also

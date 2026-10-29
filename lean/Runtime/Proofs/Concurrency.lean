@@ -25,31 +25,48 @@ universe u
 
 variable [Telltale.TelltaleIris]
 
-/-! ## Iris invariance helper -/
+/-! ## Iris adequacy for the protocol machine -/
 
-theorem state_interp_invariant {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
+section IrisAdequacy
+
+open Iris Iris.BI Iris.ProgramLogic Language.Notation
+
+local bi (IProp Telltale.TelltaleIris.GF)
+
+variable {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
-    (e : Expr) (σ : ProtocolMachineState ι γ π ε ν) (Φ : SessionVMVal → iProp)
-    (hWP : iProp.entails iProp.emp
-      (iProp.wand
-        (Iris.state_interp
-          (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) σ)
-        (Iris.wp
-          (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) Mask.top e Φ))) :
-    ∀ e' σ',
-      Iris.MultiStep' (Λ:=instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
-        e σ e' σ' →
-      iProp.entails iProp.emp
-        (bupd
-          (Iris.state_interp
-            (instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν)) σ')) :=
-  -- Delegate to the generic Iris invariance lemma.
-  Iris.wp_invariance
-    (Λ:=instLanguageSessionVM (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν))
-    (e:=e) (σ:=σ) (Φ:=Φ) hWP
+
+/-- The premise of Iris's `wp_invariance`, instantiated at the protocol-machine
+language: under any invariant-resource instance one can allocate a state
+interpretation for `σ₁`, a weakest precondition for `e`, and a proof that the
+state interpretation of `σ₂` yields `φ`. -/
+def SessionVMWPPremise (s : Stuckness) (e : SessionVMExpr ι γ π ε ν)
+    (σ₁ σ₂ : ProtocolMachineState ι γ π ε ν) (t₂ : List (SessionVMExpr ι γ π ε ν))
+    (φ : Prop) : Prop :=
+  ∀ [InvGS_gen .hasLC Telltale.TelltaleIris.GF] (κs : List Unit),
+    ⊢ iprop(|={⊤}=>
+      ∃ (stateI : ProtocolMachineState ι γ π ε ν → List Unit → Nat →
+            IProp Telltale.TelltaleIris.GF)
+        (forkPost : SessionVMVal → IProp Telltale.TelltaleIris.GF),
+      letI _ : IrisGS_gen .hasLC (SessionVMExpr ι γ π ε ν) Telltale.TelltaleIris.GF :=
+        .mk (toStateInterp := ⟨fun σ _ => stateI σ⟩)
+          (fun _ => 0) forkPost (fun _ _ _ _ => fupd_intro)
+      iprop(stateI σ₁ κs 0 ∗ WP e @ s ; ⊤ {{ _v, iprop(True) }} ∗
+            (stateI σ₂ [] (.pred (List.length t₂)) -∗ ∃ (E : CoPset), |={⊤,E}=> ⌜φ⌝)))
+
+/-- Protocol-machine adequacy: if the Iris premise holds, then `φ` holds after
+any erased multi-step execution of the protocol machine from `([e], σ₁)` to
+`(t₂, σ₂)`. This is upstream Iris's `wp_invariance` at the session-VM language. -/
+theorem session_vm_wp_invariance (s : Stuckness) (e : SessionVMExpr ι γ π ε ν)
+    (σ₁ σ₂ : ProtocolMachineState ι γ π ε ν) (t₂ : List (SessionVMExpr ι γ π ε ν))
+    (φ : Prop) (hwp : SessionVMWPPremise s e σ₁ σ₂ t₂ φ)
+    (hsteps : ([e], σ₁) -·->ₜₚ* (t₂, σ₂)) : φ :=
+  wp_invariance (GF := Telltale.TelltaleIris.GF) s e σ₁ σ₂ t₂ φ hwp hsteps
+
+end IrisAdequacy
 
 /-! ## Scheduler invariance helpers -/
 

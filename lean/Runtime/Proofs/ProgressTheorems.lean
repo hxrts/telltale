@@ -1,5 +1,6 @@
 
 import Runtime.Proofs.ProgressCore
+import Runtime.Proofs.FairTermination
 
 /-! # Runtime.Proofs.ProgressTheorems
 
@@ -9,7 +10,12 @@ Protocol-machine progress, fairness-based termination, and HeadCoherent frame pr
 /-
 The Problem. Derive executable progress and termination consequences from protocol-machine invariants.
 
-Solution Structure. State enabled-frontier progress, fairness termination, and frame-preservation theorems.
+Solution Structure. Progress: well-formedness discharges the readiness side
+conditions, so any pending output (send, or select with a branch) or matching
+frontier yields an enabled instruction. The step from "not all sessions
+complete" to "some output is pending" needs global deadlock freedom and is not
+proved here. Termination: `FairTermination.fair_termination` derives the
+`k * measure` bound from one-step ranking obligations on the step function.
 -/
 
 /- ## Structured Block 1 -/
@@ -49,38 +55,52 @@ def EnabledInstruction (store : SessionStore ν) : Prop :=
   (∃ ep target ℓ, SelectEnabled store ep target ℓ) ∨
   (∃ ep source, BranchEnabled store ep source)
 
-/-- Progress: non-terminal well-formed state has an enabled communication.
+/-- Some endpoint has a pending output: a send, or a select with at least one branch. -/
+def HasPendingOutput (store : SessionStore ν) : Prop :=
+  (∃ ep target T L', SessionStore.lookupType store ep = some (.send target T L')) ∨
+  (∃ ep target ℓ L' bs,
+    SessionStore.lookupType store ep = some (.select target ((ℓ, L') :: bs)))
 
-    This lifts Protocol.Typing.Progress.progress_typed to the protocol-machine level.
-    The Protocol theorem says: WellFormedComplete → (skip ∨ can step ∨ blocked).
-    Here we translate: well-formed protocol-machine state → has enabled instruction.
-
-    The key insight is that "blocked" at Protocol level means waiting for
-    a receive, which will be enabled once a send happens. Under fair
-    scheduling, the send will happen, so blocked is temporary. -/
-theorem protocol_machine_progress {store : SessionStore ν}
-    (hWF : WellFormedVMState store)
-    (_hNonTerminal : ¬ AllSessionsComplete store) :
-    (hFrontier : FrontierEnabled store) →
+/-- Frontier-to-instruction: a well-formed state's enabled frontier is an
+enabled instruction (send/select readiness is discharged from `ProgressVMState`). -/
+theorem enabled_instruction_of_frontier {store : SessionStore ν}
+    (hWF : WellFormedVMState store) (hFrontier : FrontierEnabled store) :
     EnabledInstruction store := by
-  intro hFrontier
   have hSendReady : SendReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
     send_ready_of_progress_vm_state hWF.progress
   have hSelectReady : SelectReady (SessionStore.toGEnv store) (SessionStore.toDEnv store) :=
     select_ready_of_progress_vm_state hWF.progress
   rcases hFrontier with hSend | hRecv | hSelect | hBranch
   · rcases hSend with ⟨ep, target, T, L', hTy⟩
-    left
-    exact ⟨ep, target, T, ⟨L', hTy, hSendReady⟩⟩
+    exact Or.inl ⟨ep, target, T, ⟨L', hTy, hSendReady⟩⟩
   · rcases hRecv with ⟨ep, source, T, L', rest, hTy, hTrace⟩
-    right; left
-    exact ⟨ep, source, T, ⟨L', hTy, rest, hTrace⟩⟩
+    exact Or.inr (Or.inl ⟨ep, source, T, ⟨L', hTy, rest, hTrace⟩⟩)
   · rcases hSelect with ⟨ep, target, ℓ, bs, L', hTy, hFind⟩
-    right; right; left
-    exact ⟨ep, target, ℓ, ⟨bs, L', hTy, hFind, hSelectReady⟩⟩
+    exact Or.inr (Or.inr (Or.inl ⟨ep, target, ℓ, ⟨bs, L', hTy, hFind, hSelectReady⟩⟩))
   · rcases hBranch with ⟨ep, source, bs, ℓ, L', rest, hTy, hBuf, hFind⟩
-    right; right; right
-    exact ⟨ep, source, ⟨bs, hTy, ℓ, L', rest, hBuf, hFind⟩⟩
+    exact Or.inr (Or.inr (Or.inr ⟨ep, source, ⟨bs, hTy, ℓ, L', rest, hBuf, hFind⟩⟩))
+
+/-- A pending output is an enabled frontier (the first select branch is enabled). -/
+theorem frontier_of_pending_output {store : SessionStore ν}
+    (h : HasPendingOutput store) : FrontierEnabled store := by
+  rcases h with ⟨ep, target, T, L', hTy⟩ | ⟨ep, target, ℓ, L', bs, hTy⟩
+  · exact Or.inl ⟨ep, target, T, L', hTy⟩
+  · exact Or.inr (Or.inr (Or.inl ⟨ep, target, ℓ, (ℓ, L') :: bs, L', hTy, by simp⟩))
+
+/-- Progress: a well-formed state with a pending output has an enabled instruction.
+
+    Input-only states (every live endpoint waits on recv/branch) need global
+    deadlock freedom to rule out cyclic waiting; that fact is not derived here.
+    Exact remaining hypothesis: for a coherent store whose sessions are
+    projections of well-formed, delegate-free global types, `¬ AllSessionsComplete
+    store → FrontierEnabled store` (a non-terminated global type has a projected
+    sender, or a receiver whose buffer head is pending). Deriving it needs a
+    store-to-global-type correspondence invariant maintained by `execInstr`,
+    which the Runtime layer does not yet carry. -/
+theorem protocol_machine_progress {store : SessionStore ν}
+    (hWF : WellFormedVMState store) (hOut : HasPendingOutput store) :
+    EnabledInstruction store :=
+  enabled_instruction_of_frontier hWF (frontier_of_pending_output hOut)
 
 -- Termination Under Fairness
 
@@ -98,18 +118,28 @@ def protocolMachineMeasure (store : SessionStore ν) : Nat :=
   protocolMachineTypeMeasure store + protocolMachineTraceMeasure store
 
 /-- Execute `n` scheduler-indexed steps from an initial session store. -/
-def executeSchedule
+abbrev executeSchedule
     (step : SessionStore ν → Nat → SessionStore ν)
-    (store₀ : SessionStore ν) (sched : Nat → Nat) : Nat → SessionStore ν
-  | 0 => store₀
-  | n + 1 => step (executeSchedule step store₀ sched n) (sched n)
+    (store₀ : SessionStore ν) (sched : Nat → Nat) : Nat → SessionStore ν :=
+  Runtime.Proofs.FairTermination.run step store₀ sched
 
 /-- k-fairness over role indices: every role is scheduled in every k-window. -/
-def FairScheduler (numRoles k : Nat) (sched : Nat → Nat) : Prop :=
-  ∀ blockStart r, r < numRoles →
-    ∃ j, blockStart ≤ j ∧ j < blockStart + k ∧ sched j = r
+abbrev FairScheduler (numRoles k : Nat) (sched : Nat → Nat) : Prop :=
+  Runtime.Proofs.FairTermination.KFair numRoles k sched
 
-/-- Minimal termination model needed to convert fair scheduling into completion. -/
+/-- One-step ranking obligations for a protocol-machine step function, with the
+Lyapunov measure `protocolMachineMeasure`. Every field is a single-step fact;
+the termination bound is derived, not assumed.
+
+Remaining obligation (not yet discharged): no instance is constructed for the
+concrete machine. Instantiating it requires (a) a `step` function factoring
+`execInstr`/`schedStep` through the session store, (b) `nonincreasing` and
+`enabled_decreases` for each instruction (a `send`/`receive` commit replaces
+`L` by its continuation, so the type measure drops, but `send` grows the trace
+measure by one; the measure must weight types above traces, cf.
+`Runtime/Proofs/WeightedMeasure`), (c) `enabled_stable`, which fails for
+blocked receives unless enabledness is defined relative to buffer contents, and
+(d) `progress`, which is global deadlock freedom (see `HasPendingOutput`). -/
 structure ProtocolMachineTerminationModel where
   /-- Finite role universe used by the scheduler. -/
   numRoles : Nat
@@ -117,39 +147,44 @@ structure ProtocolMachineTerminationModel where
   numRoles_pos : numRoles > 0
   /-- One-step semantics indexed by scheduled role. -/
   step : SessionStore ν → Nat → SessionStore ν
-  /-- Decidable terminal predicate used by termination reasoning. -/
-  isTerminal : SessionStore ν → Bool
-  /-- Terminal boolean implies proposition-level completion. -/
-  terminal_complete : ∀ store, isTerminal store = true → AllSessionsComplete store
-  /-- Quantitative termination bound under k-fair scheduling. -/
-  termination_bound :
-    ∀ store₀ sched k, k ≥ numRoles → FairScheduler numRoles k sched →
-      isTerminal (executeSchedule step store₀ sched (k * protocolMachineMeasure store₀)) = true
+  /-- Role `r` has an enabled (productive) instruction. -/
+  Enabled : SessionStore ν → Nat → Prop
+  /-- No step increases the measure. -/
+  nonincreasing : ∀ s r, protocolMachineMeasure (step s r) ≤ protocolMachineMeasure s
+  /-- Running an enabled role strictly decreases the measure. -/
+  enabled_decreases : ∀ s r, Enabled s r →
+    protocolMachineMeasure (step s r) < protocolMachineMeasure s
+  /-- Unproductive steps do not disable other roles. -/
+  enabled_stable : ∀ s r r', Enabled s r →
+    protocolMachineMeasure (step s r') = protocolMachineMeasure s → Enabled (step s r') r
+  /-- A state that is not complete has an enabled role. -/
+  progress : ∀ s, ¬ AllSessionsComplete s → ∃ r, r < numRoles ∧ Enabled s r
 
-/-- Under fair scheduling, well-typed programs terminate.
+/-- The generic ranking induced by a termination model. -/
+def ProtocolMachineTerminationModel.toRanking (model : ProtocolMachineTerminationModel (ν := ν)) :
+    Runtime.Proofs.FairTermination.FairRanking (SessionStore ν) where
+  numRoles := model.numRoles
+  step := model.step
+  measure := protocolMachineMeasure
+  Done := AllSessionsComplete
+  Enabled := model.Enabled
+  nonincreasing := model.nonincreasing
+  enabled_decreases := model.enabled_decreases
+  enabled_stable := model.enabled_stable
+  progress := model.progress
 
-    Combined with protocol_machine_progress, this gives termination:
-    1. protocol_machine_progress: non-terminal → some instruction enabled
-    2. Fair scheduler: enabled → eventually executed
-    3. Lyapunov: each step decreases measure by ≥ 1
-    4. Initial measure bounded → terminates in ≤ W₀ steps -/
+/-- Under k-fair scheduling, completion is reached within `k * measure` steps. -/
 theorem protocol_machine_termination_under_fairness {store₀ : SessionStore ν}
-    (model : ProtocolMachineTerminationModel)
+    (model : ProtocolMachineTerminationModel (ν := ν))
     {sched : Nat → Nat} {k : Nat}
-    (_hWF : WellFormedVMState store₀)
-    (hk : k ≥ model.numRoles)
     (hFair : FairScheduler model.numRoles k sched) :
     ∃ (n : Nat) (store_final : SessionStore ν),
       store_final = executeSchedule model.step store₀ sched n ∧
       AllSessionsComplete store_final ∧
       n ≤ k * protocolMachineMeasure store₀ := by
-  let n := k * protocolMachineMeasure store₀
-  let store_final := executeSchedule model.step store₀ sched n
-  have hterm : model.isTerminal store_final = true := by
-    simpa [n, store_final] using model.termination_bound store₀ sched k hk hFair
-  have hcomplete : AllSessionsComplete store_final :=
-    model.terminal_complete _ hterm
-  exact ⟨n, store_final, rfl, hcomplete, le_rfl⟩
+  obtain ⟨n, hn, hDone⟩ :=
+    Runtime.Proofs.FairTermination.FairRanking.fair_termination model.toRanking store₀ sched hFair
+  exact ⟨n, _, rfl, hDone, hn⟩
 
 -- HeadCoherent Maintenance
 
@@ -227,7 +262,8 @@ theorem instr_preserves_head_coherent_other {store store' : SessionStore ν}
     · have hR := hActive'.2
       simpa [receiverEp, hReceiverEq] using hR
   have hOld := hHead e hActive
-  simpa [receiverEp, hReceiverEq, hTraceEq] using hOld
+  rw [hReceiverEq, hTraceEq]
+  exact hOld
 
 
 end

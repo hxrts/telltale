@@ -18,7 +18,11 @@ def semanticObjectInventory
     (pack : ProtocolMachineTheoremPack (space := space)) : List (String × Bool) :=
   SemanticObjectArtifacts.inventory pack.semanticObjects?
 
-/-- Proof-carrying artifact metadata inventory extracted from one theorem pack. -/
+/-- Proof-carrying artifact metadata inventory extracted from one theorem pack.
+
+`profile_*` keys report declared execution-profile assumptions. `metadata_*`
+keys report that a premise bundle was supplied (`*_premise_supplied`); none
+of them asserts that a property was proved. -/
 def proofCarryingMetadataInventory
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
@@ -35,24 +39,25 @@ def proofCarryingMetadataInventory
   , ("profile_protocol_bridge_bounded",
       ProtocolMachineEscalationWindowClass.protocolBridgeBounded ∈
         pack.proofCarryingMetadata.profile.executionProfile.escalationWindowClasses)
-  , ("metadata_requires_explicit_progress_contracts",
-      pack.proofCarryingMetadata.progress.requiresExplicitProgressContracts)
-  , ("metadata_parity_critical_progress_protected",
+  , ("metadata_progress_contracts_premise_supplied",
       pack.proofCarryingMetadata.progress.parityCriticalOperationsProtected)
-  , ("metadata_failure_taxonomy_linked",
+  , ("metadata_replay_failure_exactness_premise_supplied",
       pack.proofCarryingMetadata.progress.failureTaxonomyLinked)
-  , ("metadata_protocol_machine_envelope_adherence",
+  , ("metadata_envelope_adherence_premise_supplied",
       pack.proofCarryingMetadata.envelope.protocolMachineEnvelopeAdherence)
-  , ("metadata_protocol_machine_envelope_admission",
+  , ("metadata_envelope_admission_premise_supplied",
       pack.proofCarryingMetadata.envelope.protocolMachineEnvelopeAdmission)
-  , ("metadata_protocol_envelope_bridge",
+  , ("metadata_envelope_bridge_premise_supplied",
       pack.proofCarryingMetadata.envelope.protocolEnvelopeBridge)
-  , ("metadata_envelope_adequacy_linked",
+  , ("metadata_adherence_or_admission_premise_supplied",
       pack.proofCarryingMetadata.envelope.adequacyLinked)
-  , ("metadata_envelope_adherence_linked",
+  , ("metadata_adherence_and_bridge_premise_supplied",
       pack.proofCarryingMetadata.envelope.adherenceLinked)
   ]
 
+/-- Flat theorem-pack inventory. Each Bool is `true` iff the corresponding
+artifact's premise bundle was supplied to the invariant space; it is a presence
+flag, not a proof status. Key strings are consumed by Rust and kept stable. -/
 def theoremInventory
     {store₀ : SessionStore ν} {State : Type v}
     {space : ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State}
@@ -84,6 +89,8 @@ def theoremInventory
   , ("protocol_envelope_bridge", pack.protocolEnvelopeBridge?.isSome)
   , ("effect_interface_bridge",
       pack.protocolMachineEnvelopeAdherence?.isSome && pack.protocolEnvelopeBridge?.isSome)
+  -- `classical_*` flags record artifact presence only; see
+  -- `classicalEvidenceInventory` for which are assumed classical inputs.
   , ("classical_foster", pack.foster?.isSome)
   , ("classical_maxweight", pack.maxWeight?.isSome)
   , ("classical_ldp", pack.ldp?.isSome)
@@ -97,6 +104,43 @@ def theoremInventory
   , ("classical_spectral_gap_termination", pack.spectralGapTermination?.isSome)
   ] ++ semanticObjectInventory (pack := pack) ++
     proofCarryingMetadataInventory (pack := pack)
+
+/-! ## Classical Evidence Classification -/
+
+/-- Honest evidence class of a `classical_*` theorem-pack entry (Option B).
+An inventory flag being `true` means the artifact is *present*, not that the
+named classical theorem was proved. -/
+inductive ClassicalEvidenceKind where
+  /-- The named classical theorem is a caller-supplied witness field; the
+  artifact's conclusion is that field (nothing derived). -/
+  | assumedClassicalInput
+  /-- The named classical theorem is an assumed witness field; the artifact
+  carries an elementary consequence derived from it. -/
+  | derivedFromAssumedInput
+  /-- Only an elementary identity is proved; no classical theorem is involved. -/
+  | elementaryIdentity
+  /-- Deterministic fact proved outright (no stochastic content). -/
+  | provedDeterministic
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Classification of every `classical_*` key of `theoremInventory`. -/
+def classicalEvidenceInventory : List (String × ClassicalEvidenceKind) :=
+  [ ("classical_foster", .provedDeterministic)
+  , ("classical_maxweight", .assumedClassicalInput)
+  , ("classical_ldp", .derivedFromAssumedInput)
+  , ("classical_mean_field", .elementaryIdentity)
+  , ("classical_heavy_traffic", .elementaryIdentity)
+  , ("classical_mixing", .derivedFromAssumedInput)
+  , ("classical_fluid", .derivedFromAssumedInput)
+  , ("classical_concentration", .assumedClassicalInput)
+  , ("classical_littles_law", .assumedClassicalInput)
+  , ("classical_functional_clt", .elementaryIdentity)
+  , ("classical_spectral_gap_termination", .assumedClassicalInput)
+  ]
+
+/-- Keys whose named classical theorem is an assumed (unproved) input. -/
+def assumedClassicalInputKeys : List String :=
+  (classicalEvidenceInventory.filter (fun e => e.2 = .assumedClassicalInput)).map Prod.fst
 
 /-! ## Determinism Extension -/
 

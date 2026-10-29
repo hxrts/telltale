@@ -295,6 +295,10 @@ private def allVarsBound_implies_freeVars_subset_aux (g : GlobalType) (bound : L
       cases hmem with
       | inl hxt => exact absurd hxt hxnet
       | inr hbound => exact hbound
+  | .delegate _ _ _ _ cont => by
+      simp only [GlobalType.freeVars] at hx
+      simp only [GlobalType.allVarsBound] at h
+      exact allVarsBound_implies_freeVars_subset_aux cont bound h x hx
 termination_by sizeOf g
 
 private def allVarsBoundBranches_implies_freeVars_subset_aux
@@ -399,8 +403,8 @@ private theorem trans_muve_of_not_part_of2_aux_base (g : GlobalType) (role : Str
   -- Base cases follow directly from trans and isMuve definitions.
   intro h
   cases h with
-  | inl hEnd => cases hEnd; simp [trans, isMuve]
-  | inr hVar => rcases hVar with ⟨t, rfl⟩; simp [trans, isMuve]
+  | inl hEnd => cases hEnd; simp [Choreography.Projection.Trans.trans, isMuve]
+  | inr hVar => rcases hVar with ⟨t, rfl⟩; simp [Choreography.Projection.Trans.trans, isMuve]
 
 -- Auxiliary Mu Case
 private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalType) (role : String)
@@ -410,7 +414,8 @@ private theorem trans_muve_of_not_part_of2_aux_mu (t : String) (body : GlobalTyp
     (hbody : isMuve (trans body role) = true) :
     isMuve (trans (.mu t body) role) = true := by
   -- The mu case reduces to the body when the projection is guarded.
-  rw [trans.eq_3]
+  unfold trans
+  rw [Choreography.Projection.Trans.trans.eq_3]
   by_cases hguard : (trans body role).isGuarded t
   · simp only [hguard, ↓reduceIte, isMuve]
     exact hbody
@@ -456,9 +461,10 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
           | false =>
               cases branches with
               | nil =>
-                  simp [trans, hrole_sender, hrole_receiver, isMuve]
+                  simp [Choreography.Projection.Trans.trans, hrole_sender, hrole_receiver, isMuve]
               | cons first rest =>
-                  rw [trans.eq_5]
+                  unfold trans
+                  rw [Choreography.Projection.Trans.trans.eq_5]
                   simp only [hrole_sender, Bool.false_eq_true, ↓reduceIte, hrole_receiver]
                   have hnotpart_cont : ¬ part_of2 role first.2 := by
                     intro hcont
@@ -474,6 +480,28 @@ private theorem trans_muve_of_not_part_of2_aux (g : GlobalType) (role : String)
                       Bool.and_eq_true] at hnsc
                     exact hnsc.2.1
                   exact trans_muve_of_not_part_of2_aux first.2 role hnotpart_cont hne_cont hnsc_cont
+  | .delegate p q sid r cont =>
+      have hrp : (role == p) = false := by
+        cases h : role == p
+        · rfl
+        · exact (hnotpart (part_of2.intro _ (part_ofF.delegate_direct p q sid r cont
+            (by simp [is_participant, h])))).elim
+      have hrq : (role == q) = false := by
+        cases h : role == q
+        · rfl
+        · exact (hnotpart (part_of2.intro _ (part_ofF.delegate_direct p q sid r cont
+            (by simp [is_participant, h])))).elim
+      have hnotpart_cont : ¬ part_of2 role cont := fun hc =>
+        hnotpart (part_of2.intro _ (part_ofF.delegate_cont p q sid r cont hc))
+      have hne_cont : cont.allCommsNonEmpty = true := by
+        simpa [GlobalType.allCommsNonEmpty] using hne
+      have hnsc_cont : cont.noSelfComm = true := by
+        simp only [GlobalType.noSelfComm, Bool.and_eq_true] at hnsc
+        exact hnsc.2
+      have hcont := trans_muve_of_not_part_of2_aux cont role hnotpart_cont hne_cont hnsc_cont
+      unfold trans
+      rw [Choreography.Projection.Trans.trans.eq_def]
+      simpa [hrp, hrq] using hcont
 termination_by sizeOf g
 decreasing_by
   all_goals

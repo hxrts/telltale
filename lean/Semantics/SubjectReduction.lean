@@ -1,8 +1,11 @@
 import Mathlib.Data.List.Basic
+import Mathlib.Data.List.Forall2
 import Semantics.Typing
 import Semantics.EnvStep
 import Choreography.Harmony
 import SessionCoTypes.EQ2
+import SessionCoTypes.EQ2Props
+import SessionCoTypes.EQ2.HeadInversion
 
 
 /-
@@ -30,7 +33,8 @@ The following definitions form the semantic interface for proofs:
 
 - `Configuration`: a process configuration (global type + role processes)
 - `WellTypedConfig`: typing judgment for configurations
-- `step_preserves_typing`: subject reduction theorem
+- `ConfigStep`: global step plus per-process local advancement (`ProcessAdvance`)
+- `step_preserves_typing`: subject reduction for head communication steps
 - `Claims`: bundle of safety properties
 -/
 
@@ -41,18 +45,18 @@ open SessionTypes.LocalTypeR
 open Choreography.Projection.Project
 open Choreography.Projection.Project
 open SessionCoTypes.EQ2
-open SessionCoTypes.Quotient
 open Semantics.EnvStep
 open Semantics.Typing
 open Choreography.Harmony
+open SessionCoTypes.EQ2.HeadInversion
 
 /-! ## Configuration -/
 
-/-- A process is abstracted as having a local type. -/
+/-- A process is abstracted as having a (representative) local type. -/
 structure Process where
   -- Each process is identified by a role and its local type.
   role : String
-  localType : QLocalTypeR
+  localType : LocalTypeR
   deriving Inhabited
 
 /-- A configuration consists of a global type and a list of processes. -/
@@ -68,10 +72,11 @@ Following the ECOOP 2025 Coq mechanization, we use a fixed role set S that conta
 all roles of the global type. This handles the case where roles can shrink during
 stepping (Remark 10 in the paper). -/
 
-/-- A process is well-typed if its local type matches the projection of the global type. -/
+/-- A process is well-typed if its local type is well-formed and `EQ2`-equivalent
+to the projection of the global type. Comparison is on representatives, restricted
+to well-formed types where `EQ2` is an equivalence. -/
 def Process.wellTyped (p : Process) (g : GlobalType) : Prop :=
-  -- Typing means the local type matches the projection of the global type.
-  p.localType = QLocalTypeR.ofLocal (trans g p.role)
+  p.localType.WellFormed ∧ EQ2 p.localType (trans g p.role)
 
 /-- A configuration is well-typed relative to a fixed role set S if:
     1. All processes are well-typed under the global type
@@ -89,6 +94,44 @@ structure WellTypedConfig (c : Configuration) : Prop where
   /-- No duplicate roles in processes. -/
   roles_unique : (c.processes.map Process.role).Nodup
 
+/-! ## Local Advancement
+
+A participant's *own* local type advances: it is fully unfolded to its head
+normal form, and the branch selected by the global action's label is taken
+from that form. A non-participant's local type is left untouched. The
+projection of the global type plays no role in the step. -/
+
+/-- A role participates in `act` when it is the sender or the receiver. -/
+def Participant (act : GlobalActionR) (role : String) : Prop :=
+  role = act.sender ∨ role = act.receiver
+
+instance (act : GlobalActionR) (role : String) : Decidable (Participant act role) := by
+  unfold Participant; infer_instance
+
+/-- Local advancement of `role` by the global action `act`, on the role's own
+local type `lt`: the sender takes the `act.label` branch of the `send` that
+`lt.fullUnfold` exposes, the receiver that of the exposed `recv`. -/
+inductive LocalAdvance (act : GlobalActionR) (role : String) :
+    LocalTypeR → LocalTypeR → Prop where
+  | send {lt : LocalTypeR} {bs : List BranchR} {cont : LocalTypeR} :
+      role = act.sender → lt.fullUnfold = .send act.receiver bs →
+      (∃ vt, (act.label, vt, cont) ∈ bs) → LocalAdvance act role lt cont
+  | recv {lt : LocalTypeR} {bs : List BranchR} {cont : LocalTypeR} :
+      role = act.receiver → role ≠ act.sender → lt.fullUnfold = .recv act.sender bs →
+      (∃ vt, (act.label, vt, cont) ∈ bs) → LocalAdvance act role lt cont
+
+/-- How one process evolves across a configuration step. Participants advance
+their own local type by the action (`LocalAdvance` on `p.localType`);
+non-participants keep their local type verbatim. No projection is mentioned. -/
+structure ProcessAdvance (act : GlobalActionR) (p p' : Process) : Prop where
+  /-- The process keeps its role. -/
+  role_eq : p'.role = p.role
+  /-- Participants advance their own local type by the action. -/
+  advance : Participant act p.role →
+    ∃ lt, LocalAdvance act p.role p.localType lt ∧ p'.localType = lt
+  /-- Non-participants are unchanged. -/
+  frame : ¬ Participant act p.role → p'.localType = p.localType
+
 /-! ## Configuration Stepping -/
 
 /-- A configuration can step when the global type can step. -/
@@ -96,89 +139,88 @@ def Configuration.canStep (c : Configuration) (act : GlobalActionR) : Prop :=
   -- A configuration steps when its global type can step.
   SessionTypes.GlobalType.canStep c.globalType act
 
-/-- Configuration stepping: update the global type and the affected processes. -/
+/-- Configuration stepping: the global type steps and each process evolves
+locally (pointwise, in order) according to `ProcessAdvance`. -/
 structure ConfigStep (c c' : Configuration) (act : GlobalActionR) : Prop where
-  -- Bundle the global step with updated process projections.
   /-- The global type steps. -/
   global_step : step c.globalType act c'.globalType
-  /-- Process roles are preserved. -/
-  roles_preserved : c.processes.map Process.role = c'.processes.map Process.role
-  /-- Each process's new type matches the stepped projection. -/
-  processes_stepped : ∀ p' ∈ c'.processes,
-      p'.localType = QLocalTypeR.ofLocal (trans c'.globalType p'.role)
+  /-- Each process advances locally by the action. -/
+  processes_advance :
+    List.Forall₂ (ProcessAdvance act) c.processes c'.processes
+
+/-! ## List Helpers -/
+
+/-- Pointwise process advancement preserves the role list. -/
+theorem forall2_roles {act : GlobalActionR} :
+    ∀ {ps ps' : List Process}, List.Forall₂ (ProcessAdvance act) ps ps' →
+      ps.map Process.role = ps'.map Process.role
+  | [], [], .nil => rfl
+  | _ :: _, _ :: _, .cons h hs => by
+      simp [h.role_eq, forall2_roles hs]
+
+/-- Every target process has a source process related by advancement. -/
+theorem forall2_exists_left {act : GlobalActionR} :
+    ∀ {ps ps' : List Process}, List.Forall₂ (ProcessAdvance act) ps ps' →
+      ∀ p' ∈ ps', ∃ p ∈ ps, ProcessAdvance act p p'
+  | [], [], .nil => by simp
+  | p :: _, _ :: _, .cons h hs => by
+      intro q hq
+      rcases List.mem_cons.mp hq with rfl | hq
+      · exact ⟨p, List.mem_cons_self, h⟩
+      · obtain ⟨r, hr, hr'⟩ := forall2_exists_left hs q hq
+        exact ⟨r, List.mem_cons_of_mem _ hr, hr'⟩
+
+/-! ## Head-Step Inversion -/
+
+/-- A step of a communication whose head matches the action takes a branch. -/
+theorem head_step_mem {s r : String} {bs : List (Label × GlobalType)}
+    {act : GlobalActionR} {g' : GlobalType}
+    (h : step (.comm s r bs) act g') (hs : act.sender = s) (hr : act.receiver = r) :
+    (act.label, g') ∈ bs := by
+  cases h with
+  | comm_head _ _ _ _ _ hmem => exact hmem
+  | comm_async _ _ _ _ _ _ _ _ hcond _ _ _ => exact absurd hr (hcond hs)
+
+/-- Membership in projected branches comes from a global branch. -/
+theorem mem_transBranches_inv {role : String} {label : Label}
+    {vt : Option SessionTypes.ValType} {cont : LocalTypeR} :
+    ∀ {bs : List (Label × GlobalType)}, (label, vt, cont) ∈ transBranches bs role →
+      ∃ g0, (label, g0) ∈ bs ∧ cont = trans g0 role
+  | [], h => by simp [transBranches, Choreography.Projection.Trans.transBranches] at h
+  | (l, g0) :: rest, h => by
+      have h' : (label, vt, cont) = (l, none, trans g0 role) ∨
+          (label, vt, cont) ∈ transBranches rest role := by
+        simpa [transBranches, Choreography.Projection.Trans.transBranches] using h
+      rcases h' with h' | h'
+      · simp only [Prod.mk.injEq] at h'
+        exact ⟨g0, by simp [h'.1], h'.2.2⟩
+      · obtain ⟨g1, hm, he⟩ := mem_transBranches_inv h'
+        exact ⟨g1, List.mem_cons_of_mem _ hm, he⟩
 
 /-! ## Claims -/
 
+/-- Hypotheses under which the head-step subject reduction theorem is proved. -/
+structure HeadStepHyps (c : Configuration) (act : GlobalActionR) : Prop where
+  /-- The global type is a communication whose head is `act`. -/
+  head : ∃ bs, c.globalType = .comm act.sender act.receiver bs
+  /-- Branch labels are unique (so the label picks one continuation). -/
+  unique : c.globalType.uniqueBranchLabels = true
+  /-- The global type is closed. -/
+  closed : c.globalType.isClosed = true
+  /-- The global type is well-formed. -/
+  wf : c.globalType.wellFormed = true
+  /-- The global type is blind (needed for non-participant coherence). -/
+  blind : Choreography.Projection.Blind.isBlind c.globalType = true
+
 /-- Claims bundle for subject reduction. -/
 structure Claims where
-  /-- Subject reduction preserves typing. -/
-  subject_reduction : ∀ c c' act, WellTypedConfig c → ConfigStep c c' act → WellTypedConfig c'
-  /-- Subject reduction preserves well-formedness. -/
-  wellformed_preserved : ∀ c c' act, WellTypedConfig c → ConfigStep c c' act →
-      WellFormedEnv (projEnv c'.globalType)
+  /-- Subject reduction for head communication steps. -/
+  subject_reduction : ∀ c c' act, WellTypedConfig c → HeadStepHyps c act →
+      ConfigStep c c' act → WellTypedConfig c'
+  /-- Projected environments are always well-formed. -/
+  projEnv_wellformed : ∀ g, WellFormedEnv (projEnv g)
 
-/-! ## Subject Reduction -/
-
-/-- Subject reduction: well-typed configurations step to well-typed configurations.
-
-This is the main safety theorem. It states that if a configuration is well-typed
-and can take a step, then the resulting configuration is also well-typed.
-
-The proof relies on:
-1. Harmony (step_harmony): global steps induce environment steps
-2. Projection coherence: projections commute with stepping
-3. Role containment: step_roles_subset shows roles(g') ⊆ roles(g) -/
-theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
-    (htyped : WellTypedConfig c)
-    (hstep : ConfigStep c c' act) :
-    WellTypedConfig c' where
-  processes_typed := by
-    -- Each process type is updated by the step definition.
-    intro p' hp'
-    exact hstep.processes_stepped p' hp'
-  roles_contained := by
-    -- Key insight: roles(g') ⊆ roles(g) ⊆ S
-    intro r hr
-    have hroles := step_roles_subset c.globalType c'.globalType act hstep.global_step r hr
-    have hcontained := htyped.roles_contained r hroles
-    rw [← hstep.roles_preserved]
-    exact hcontained
-  roles_unique := by
-    -- Role uniqueness is preserved by the role-preservation field.
-    rw [← hstep.roles_preserved]
-    exact htyped.roles_unique
-
-/-- Subject reduction preserves well-formedness of the environment.
-
-Note: projEnv g has domain g.roles, which uses eraseDups and is always Nodup. -/
-theorem step_preserves_wellformed {c c' : Configuration} {act : GlobalActionR}
-    (_htyped : WellTypedConfig c)
-    (_hstep : ConfigStep c c' act) :
-    WellFormedEnv (projEnv c'.globalType) := by
-  -- projEnv uses GlobalType.roles, which is always nodup.
-  constructor
-  rw [proj_env_dom]
-  -- GlobalType.roles always produces Nodup lists
-  exact GlobalType.roles_nodup _
-
-/-! ## Type Preservation via EQ2 -/
-
-/-- After a step, the sender's local type is EQ2-equivalent to its projection.
-
-This theorem connects the abstract stepping to the concrete type evolution.
-The sender performs a send action and its type evolves accordingly. -/
-theorem sender_type_after_step (g g' : GlobalType) (act : GlobalActionR)
-    (_hstep : step g act g') :
-    EQ2 (trans g' act.sender) (trans g' act.sender) :=
-  -- Reflexivity suffices since both sides are the same projection.
-  eq2_refl _
-
-/-- After a step, the receiver's local type is EQ2-equivalent to its projection. -/
-theorem receiver_type_after_step (g g' : GlobalType) (act : GlobalActionR)
-    (_hstep : step g act g') :
-    EQ2 (trans g' act.receiver) (trans g' act.receiver) :=
-  -- Reflexivity suffices since both sides are the same projection.
-  eq2_refl _
+/-! ## Type Preservation Lemmas -/
 
 /-- Non-participants have unchanged types (up to EQ2) after a step.
 
@@ -193,10 +235,169 @@ theorem other_type_preserved (g g' : GlobalType) (act : GlobalActionR) (role : S
   -- Delegate to the projection harmony lemma for non-participants.
   exact proj_trans_other_step g g' act role hstep hclosed hwf hns hnr hblind
 
+/-- Sender harmony for head steps: the sender's projection of `g` advances by
+the send action to (exactly) its projection of `g'`. -/
+theorem sender_type_after_step {bs : List (Label × GlobalType)} {g' : GlobalType}
+    {act : GlobalActionR} (hstep : step (.comm act.sender act.receiver bs) act g') :
+    LocalAdvance act act.sender (trans (.comm act.sender act.receiver bs) act.sender)
+      (trans g' act.sender) := by
+  rw [trans_comm_sender _ _ _ bs rfl]
+  exact .send rfl rfl ⟨none, mem_trans_branches_of_mem bs _ g' _ (head_step_mem hstep rfl rfl)⟩
+
+/-- Receiver harmony for head steps (no self-communication): the receiver's
+projection of `g` advances by the receive action to its projection of `g'`. -/
+theorem receiver_type_after_step {bs : List (Label × GlobalType)} {g' : GlobalType}
+    {act : GlobalActionR} (hne : act.receiver ≠ act.sender)
+    (hstep : step (.comm act.sender act.receiver bs) act g') :
+    LocalAdvance act act.receiver (trans (.comm act.sender act.receiver bs) act.receiver)
+      (trans g' act.receiver) := by
+  rw [trans_comm_receiver _ _ _ bs rfl hne]
+  exact .recv rfl hne rfl
+    ⟨none, mem_trans_branches_of_mem bs _ g' _ (head_step_mem hstep rfl rfl)⟩
+
+/-! ## Subject Reduction -/
+
+/-- The stepped global type of a configuration step is well-formed. -/
+theorem stepped_trans_wf {c c' : Configuration} {act : GlobalActionR}
+    (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act) (role : String) :
+    (trans c'.globalType role).WellFormed :=
+  trans_well_formed_of_well_formed _ role
+    (step_preserves_well_formed _ _ act hstep.global_step hh.wf)
+
+/-- Branch labels of a head communication satisfying `HeadStepHyps` are unique. -/
+theorem head_labels_nodup {c : Configuration} {act : GlobalActionR}
+    {bs : List (Label × GlobalType)} (hh : HeadStepHyps c act)
+    (hg : c.globalType = .comm act.sender act.receiver bs) : (branchLabels bs).Nodup := by
+  have hu := hh.unique
+  rw [hg] at hu
+  simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true, decide_eq_true_eq] at hu
+  exact hu.1
+
+/-- A typed sender's own type exposes, after full unfolding, a `send` to the
+receiver whose branches are pairwise `EQ2` to the projected branches. -/
+theorem own_head_send {p : Process} {act : GlobalActionR} {bs : List (Label × GlobalType)}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed)
+    (hs : p.role = act.sender) :
+    ∃ as, p.localType.fullUnfold = .send act.receiver as ∧
+      BranchesRel EQ2 as (transBranches bs p.role) := by
+  have he := trans_comm_sender _ act.receiver _ bs hs
+  exact eq2_full_unfold_send_inv ht.1 hwf ht.2 (by rw [he]; rfl)
+
+/-- A typed receiver's own type exposes, after full unfolding, a `recv` from the
+sender whose branches are pairwise `EQ2` to the projected branches. -/
+theorem own_head_recv {p : Process} {act : GlobalActionR} {bs : List (Label × GlobalType)}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed)
+    (hr : p.role = act.receiver) (hs : p.role ≠ act.sender) :
+    ∃ as, p.localType.fullUnfold = .recv act.sender as ∧
+      BranchesRel EQ2 as (transBranches bs p.role) := by
+  have he := trans_comm_receiver act.sender _ _ bs hr hs
+  exact eq2_full_unfold_recv_inv ht.1 hwf ht.2 (by rw [he]; rfl)
+
+/-- A branch of the process's own type carrying the stepped label is
+well-formed and `EQ2` to the projection of the stepped global continuation. -/
+theorem own_cont_typed {role : String} {as : List BranchR} {bs : List (Label × GlobalType)}
+    {label : Label} {vt : Option SessionTypes.ValType} {cont : LocalTypeR} {g' : GlobalType}
+    (hWFas : ∀ lb ∈ as, lb.2.2.WellFormed) (hrel : BranchesRel EQ2 as (transBranches bs role))
+    (hm : (label, vt, cont) ∈ as) (huniq : (branchLabels bs).Nodup)
+    (hg' : (label, g') ∈ bs) : cont.WellFormed ∧ EQ2 cont (trans g' role) := by
+  obtain ⟨y, hy, hl, hE⟩ := branches_rel_mem_left hrel hm
+  obtain ⟨g0, hg0, hy2⟩ := mem_transBranches_inv (label := y.1) (vt := y.2.1) hy
+  rw [← hl] at hg0
+  rw [mem_branch_unique_label huniq hg0 hg'] at hy2
+  exact ⟨hWFas _ hm, hy2 ▸ hE⟩
+
+/-- Core of participant preservation: the own-type continuation chosen by
+`LocalAdvance` is well-formed and `EQ2` to the projection of `g'`. -/
+theorem local_advance_typed {p : Process} {act : GlobalActionR}
+    {bs : List (Label × GlobalType)} {lt : LocalTypeR} {gc : GlobalType}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed)
+    (huniq : (branchLabels bs).Nodup) (hg' : (act.label, gc) ∈ bs)
+    (hadv : LocalAdvance act p.role p.localType lt) :
+    lt.WellFormed ∧ EQ2 lt (trans gc p.role) := by
+  cases hadv with
+  | send hs hfu hm =>
+      obtain ⟨vt, hm⟩ := hm
+      obtain ⟨as, has, hrel⟩ := own_head_send ht hwf hs
+      rw [hfu] at has; cases has
+      exact own_cont_typed (wf_cont_of_full_unfold_send ht.1 hfu) hrel hm huniq hg'
+  | recv hr hs hfu hm =>
+      obtain ⟨vt, hm⟩ := hm
+      obtain ⟨as, has, hrel⟩ := own_head_recv ht hwf hr hs
+      rw [hfu] at has; cases has
+      exact own_cont_typed (wf_cont_of_full_unfold_recv ht.1 hfu) hrel hm huniq hg'
+
+/-- A participant's advanced own type is well-typed under the stepped global
+type: it is `EQ2` to the projection of the stepped global type. -/
+theorem participant_typed {c c' : Configuration} {act : GlobalActionR}
+    (htyped : WellTypedConfig c) (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act)
+    {p p' : Process} (hpm : p ∈ c.processes)
+    (hadv : ProcessAdvance act p p') (hp : Participant act p.role) :
+    p'.wellTyped c'.globalType := by
+  obtain ⟨bs, hg⟩ := hh.head
+  obtain ⟨lt, hlt, hpl⟩ := hadv.advance hp
+  have ht := htyped.processes_typed p hpm
+  have hwf := trans_well_formed_of_well_formed _ p.role hh.wf
+  have hstep' := hstep.global_step
+  rw [hg] at ht hwf hstep'
+  have h := local_advance_typed ht hwf (head_labels_nodup hh hg)
+    (head_step_mem hstep' rfl rfl) hlt
+  rw [Process.wellTyped, hpl, hadv.role_eq]
+  exact h
+
+/-- A non-participant's unchanged type is still `EQ2` to the projection of the
+stepped global type (via `other_type_preserved` and `eq2_trans_wf`). -/
+theorem nonparticipant_typed {c c' : Configuration} {act : GlobalActionR}
+    (htyped : WellTypedConfig c) (hh : HeadStepHyps c act) (hstep : ConfigStep c c' act)
+    {p p' : Process} (hpm : p ∈ c.processes)
+    (hadv : ProcessAdvance act p p') (hp : ¬ Participant act p.role) :
+    p'.wellTyped c'.globalType := by
+  have hns : p.role ≠ act.sender := fun h => hp (Or.inl h)
+  have hnr : p.role ≠ act.receiver := fun h => hp (Or.inr h)
+  have hE := other_type_preserved _ _ act p.role hstep.global_step hh.closed hh.wf hns hnr
+    hh.blind
+  obtain ⟨hwfp, hEp⟩ := htyped.processes_typed p hpm
+  rw [Process.wellTyped, hadv.frame hp, hadv.role_eq]
+  exact ⟨hwfp, SessionCoTypes.EQ2Props.eq2_trans_wf hEp (eq2_symm hE) hwfp
+    (trans_well_formed_of_well_formed _ _ hh.wf) (stepped_trans_wf hh hstep _)⟩
+
+/-- Subject reduction for head communication steps: a well-typed configuration
+whose global type is a communication headed by `act` steps (with each process
+advancing locally per `ProcessAdvance`) to a well-typed configuration.
+
+Async (`comm_async`) and `mu`-headed steps are not covered: there the local
+types are related to the stepped projection only up to EQ2 through unfolding. -/
+theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
+    (htyped : WellTypedConfig c) (hh : HeadStepHyps c act)
+    (hstep : ConfigStep c c' act) :
+    WellTypedConfig c' where
+  processes_typed := by
+    intro p' hp'
+    obtain ⟨p, hpm, hadv⟩ := forall2_exists_left hstep.processes_advance p' hp'
+    by_cases hp : Participant act p.role
+    · exact participant_typed htyped hh hstep hpm hadv hp
+    · exact nonparticipant_typed htyped hh hstep hpm hadv hp
+  roles_contained := by
+    intro r hr
+    have hroles := step_roles_subset c.globalType c'.globalType act hstep.global_step r hr
+    rw [← forall2_roles hstep.processes_advance]
+    exact htyped.roles_contained r hroles
+  roles_unique := by
+    rw [← forall2_roles hstep.processes_advance]
+    exact htyped.roles_unique
+
+/-- The projected environment of any global type is well-formed (its domain is
+`g.roles`, which is duplicate-free). This holds unconditionally. -/
+theorem projEnv_wellformed (g : GlobalType) : WellFormedEnv (projEnv g) := by
+  constructor
+  rw [proj_env_dom]
+  exact GlobalType.roles_nodup _
+
 /-- Build the claims bundle from proven theorems. -/
 def claims : Claims where
-  -- Package the main theorems into the Claims structure.
-  subject_reduction := fun _ _ _ h1 h2 => step_preserves_typing h1 h2
-  wellformed_preserved := fun _ _ _ h1 h2 => step_preserves_wellformed h1 h2
+  subject_reduction := fun _ _ _ h1 h2 h3 => step_preserves_typing h1 h2 h3
+  projEnv_wellformed := projEnv_wellformed
 
 end Semantics.SubjectReduction

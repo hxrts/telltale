@@ -35,6 +35,10 @@ abbrev classicalBaseSpace :
 
 /-! ## Concrete Profiles -/
 
+/-- Degenerate smoke-test transport context over `Unit`: identity step and
+trivially-true coherence/harmony/finiteness. It only checks that the profile
+plumbing typechecks; it is NOT evidence that any real protocol satisfies the
+transported classical theorems. -/
 def unitFosterCtx : Classical.Transport.TransportCtx Unit :=
   { step := id
   , coherent := fun _ => True
@@ -395,23 +399,6 @@ example (m : ProtocolClassical.ProtocolMeanFieldModel) :
         (classicalBaseSpace (ν := ν) (store₀ := store₀)).withMeanField
           (Adapters.mkProtocolMeanFieldProfile m))
     ).meanField?.isSome = true := by
-  rfl
-
-example
-    [DecidableEq ProtocolClassical.WTConfigN] [Fintype ProtocolClassical.WTConfigN]
-    (step : ProtocolClassical.FStep)
-    (gap_pos :
-      Classical.SpectralGapTermination.SpectralGapPos
-        (ProtocolClassical.wtConfigNMarkovChain step))
-    (termination :
-      Classical.SpectralGapTermination.TerminationWitness
-        (ProtocolClassical.wtConfigNMarkovChain step)) :
-    (buildProtocolMachineTheoremPack
-      (space :=
-        (classicalBaseSpaceFor (ν := ν) (store₀ := store₀)
-          ProtocolClassical.WTConfigN).withSpectralGap
-          (Adapters.mkProtocolSpectralGapProfile step gap_pos termination))
-    ).spectralGapTermination?.isSome = true := by
   rfl
 
 end

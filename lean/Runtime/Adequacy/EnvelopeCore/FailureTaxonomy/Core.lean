@@ -168,6 +168,8 @@ def failureClassOfLeanFault {γ : Type u} : _root_.Fault γ → FailureClass
   | .invalidSignature _ => .signatureInvalid
   | .acquireFault _ _ => .guardFault
   | .invokeFault _ => .invokeFault
+  | .effectFault _ _ => .invokeFault
+  | .outputCondition _ => .outputConditionFault
   | .transferFault _ => .transferFault
   | .closeFault _ => .closeFault
   | .specFault _ => .specFault
@@ -489,7 +491,9 @@ structure FailureEnvelopePremises (State : Type u) (Obs : Type v) where
   crossTargetConformanceWitness :
     CrossTargetFailureConformance
       failureVisible singleThreadRun multiThreadRun shardedRun
-  recoveryActionSafetyWitness :
+  /-- Assumed input: `Safe` and `recoveryStep` are arbitrary, so recovery-action
+  safety is not derivable here and must be discharged by the instantiation. -/
+  assumedRecoveryActionSafety :
     RecoveryActionSafety Safe recoveryStep
   noUnsafeReplayWitness :
     NoUnsafeReplay Safe replayPre replay

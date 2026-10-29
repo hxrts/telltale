@@ -559,10 +559,15 @@ theorem reduced_state_of_full_state_preserves_machine_invariants
     · exact hParentScore
     · exact hChildScore
     · exact hScoreEq
-  · simpa [ReducedIncumbentCoherent, reducedStateOfFullState,
-      FullPublicationTraceGoalCoherent] using hInv.publicationTraceGoalCoherent
-  · simpa [FrontierNodesNodup, reducedStateOfFullState, reducedFrontierOfFullState] using
-      hInv.openNodesNodup
+  · have hCoh := hInv.publicationTraceGoalCoherent
+    unfold FullPublicationTraceGoalCoherent at hCoh
+    unfold ReducedIncumbentCoherent
+    simp only [reducedStateOfFullState]
+    split <;> split at hCoh <;> simp_all
+  · have hNodup := hInv.openNodesNodup
+    unfold FullOpenNodesNodup at hNodup
+    simpa [FrontierNodesNodup, reducedStateOfFullState, reducedFrontierOfFullState,
+      Function.comp_def] using hNodup
 
 /-- Contract bundle for batch-activation invariant preservation. -/
 structure FullActivateBatchPreservationPremises

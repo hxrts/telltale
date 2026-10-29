@@ -1,4 +1,5 @@
 import Choreography.Projection.Project.ImplConstructors
+import Choreography.Projection.DelegateFree
 
 /-! # Choreography.Projection.Project.ImplTransRelComp.Core
 
@@ -129,11 +130,13 @@ theorem branches_rel_trans_chain {R : Rel}
 
 /-! ## CProjectTransRel Core Relations -/
 
-/-- Witness relation for CProject_implies_EQ2_trans coinduction.
+/-- Witness relation for c_project_implies_eq2_trans coinduction.
     Pairs local type lt with trans output when lt is a valid CProject output.
-    Uses GlobalType.wellFormed (Coq gInvPred analogue) to derive allCommsNonEmpty. -/
+    Uses GlobalType.wellFormed (Coq gInvPred analogue) to derive allCommsNonEmpty.
+    Delegation is excluded (`g.delegateFree`): the send/recv agreement lemmas go through
+    `transBranches`, which cannot express the `some (.chan sid r)` delegation annotation. -/
 def CProjectTransRel : Rel := fun lt t =>
-  ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.wellFormed = true
+  ∃ g role, CProject g role lt ∧ t = trans g role ∧ g.wellFormed = true ∧ g.delegateFree = true
 
 /-- CProject preserves well-formedness under well-formed globals. -/
 theorem c_project_well_formed_of_well_formed {g : GlobalType} {role : String} {lt : LocalTypeR}
@@ -142,30 +145,30 @@ theorem c_project_well_formed_of_well_formed {g : GlobalType} {role : String} {l
   have hne : g.allCommsNonEmpty = true := by
     simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
     exact hwf.1.1.2
-  have htrans : trans g role = lt := trans_eq_of_CProject g role lt hproj hne
+  have htrans : trans g role = lt := trans_eq_of_c_project g role lt hproj hne
   have hWFtrans : LocalTypeR.WellFormed (trans g role) :=
-    Choreography.Projection.Project.trans_wellFormed_of_wellFormed g role hwf
+    Choreography.Projection.Project.trans_well_formed_of_well_formed g role hwf
   simpa [htrans] using hWFtrans
 
 /-- Left endpoint of CProjectTransRel is well-formed. -/
 theorem c_project_trans_rel_wf_left {a b : LocalTypeR} (h : CProjectTransRel a b) :
     LocalTypeR.WellFormed a := by
-  rcases h with ⟨g, role, hproj, _htrans, hwf⟩
+  rcases h with ⟨g, role, hproj, _htrans, hwf, _hdf⟩
   exact c_project_well_formed_of_well_formed (g := g) (role := role) (lt := a) hproj hwf
 
 /-- Right endpoint of CProjectTransRel is well-formed. -/
 theorem c_project_trans_rel_wf_right {a b : LocalTypeR} (h : CProjectTransRel a b) :
     LocalTypeR.WellFormed b := by
-  rcases h with ⟨g, role, _hproj, htrans, hwf⟩
-  have hWF := trans_wellFormed_of_wellFormed g role hwf
+  rcases h with ⟨g, role, _hproj, htrans, hwf, _hdf⟩
+  have hWF := trans_well_formed_of_well_formed g role hwf
   simpa [htrans] using hWF
 
 /-- Composition witness: extends CProjectTransRel with EQ2 transitivity.
 
     This is needed for the mu case where we have:
-    - EQ2 (lbody.unfold) (.mu v lbody) from EQ2_refl
+    - EQ2 (lbody.unfold) (.mu v lbody) from eq2_refl
     - CProjectTransRel (.mu v lbody) (.mu v (trans gbody role))
-    - EQ2 (.mu v (trans gbody role)) ((trans gbody role).unfold) from EQ2_refl
+    - EQ2 (.mu v (trans gbody role)) ((trans gbody role).unfold) from eq2_refl
 
     The composition allows chaining these through intermediates:
     - 2-hop: EQ2 → CProjectTransRel or CProjectTransRel → EQ2
@@ -208,27 +211,28 @@ private theorem all_comms_non_empty_of_mem_branch
 theorem branches_proj_rel_to_branches_rel_c_project_trans_rel
     (gbs : List (Label × GlobalType)) (role : String)
     (lbs : List BranchR)
-    (h : BranchesProjRel CProject gbs role lbs) (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true) :
+    (h : BranchesProjRel CProject gbs role lbs)
+    (hwf : ∀ gb, gb ∈ gbs → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) :
     BranchesRel CProjectTransRel lbs (transBranches gbs role) := by
   induction h with
-  | nil => simp [BranchesRel, transBranches]
+  | nil => simp [BranchesRel, transBranches, Choreography.Projection.Trans.transBranches]
   | cons hpair _hrest ih =>
       rename_i gb lb gbs_tail lbs_tail
       cases gb with
       | mk gLabel gCont =>
           obtain ⟨lLabel, lVt, lCont⟩ := lb
-          simp only [transBranches, BranchesRel]
+          simp only [transBranches, BranchesRel, Choreography.Projection.Trans.transBranches]
           constructor
           · -- Pair relation: labels match and continuations are in CProjectTransRel
             constructor
             · -- Labels match
               exact hpair.1.symm
             · -- CProjectTransRel lCont (trans gCont role)
-              have hwf_cont : gCont.wellFormed = true := by
+              have hwf_cont : gCont.wellFormed = true ∧ gCont.delegateFree = true := by
                 exact hwf (gLabel, gCont) (by simp)
               exact ⟨gCont, role, hpair.2.2, rfl, hwf_cont⟩
           · -- Tail relation
-            have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true := by
+            have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true ∧ gb'.2.delegateFree = true := by
               intro gb' hmem
               exact hwf gb' (List.mem_cons_of_mem _ hmem)
             exact ih hwf_tail
@@ -241,10 +245,10 @@ theorem c_project_trans_rel_postfix_mu_closure
   -- Build EQ2_closure witnesses using eq2_refl on both mu sides.
   simp [EQ2F, EQ2_closure]
   have heq_unfold_left : EQ2 ((LocalTypeR.mu v lbody).unfold) (LocalTypeR.mu v lbody) := by
-    have hrefl := EQ2_refl (LocalTypeR.mu v lbody)
+    have hrefl := eq2_refl (LocalTypeR.mu v lbody)
     exact (EQ2.destruct hrefl).1
   have heq_unfold_right : EQ2 (LocalTypeR.mu v t') ((LocalTypeR.mu v t').unfold) := by
-    have hrefl := EQ2_refl (LocalTypeR.mu v t')
+    have hrefl := eq2_refl (LocalTypeR.mu v t')
     exact (EQ2.destruct hrefl).2
   constructor
   · left; right; left
@@ -258,7 +262,7 @@ theorem c_project_trans_rel_postfix_end
     EQ2F (EQ2_closure CProjectTransRelComp) LocalTypeR.end t := by
   -- Reduce by rewriting the trans target.
   subst htrans
-  simp [trans, EQ2F]
+  simp [trans, EQ2F, Choreography.Projection.Trans.trans]
 
 theorem c_project_trans_rel_postfix_var
     {vt vlt : String} {role : String} {t : LocalTypeR}
@@ -268,36 +272,37 @@ theorem c_project_trans_rel_postfix_var
   -- Use CProjectF to identify the variable and reduce trans.
   simp [CProjectF] at hf
   subst htrans hf
-  simp [trans, EQ2F]
+  simp [trans, EQ2F, Choreography.Projection.Trans.trans]
 
 /-! ## Postfix Mu Constructors -/
 
-/-- Helper: guarded mu/mu case for CProjectTransRel_postfix_mu_mu. -/
+/-- Helper: guarded mu/mu case for c_project_trans_rel_postfix_mu_mu. -/
 private theorem c_project_trans_rel_postfix_mu_mu_guarded
     {muvar : String} {gbody : GlobalType} {lbody t : LocalTypeR} {role : String}
     (hbody_proj : CProject gbody role lbody)
     (hguard : lbody.isGuarded muvar = true)
     (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hwf : (GlobalType.mu muvar gbody).wellFormed = true)
-    (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true) :
+    (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true)
+    (hdf : (GlobalType.mu muvar gbody).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu muvar lbody) t := by
   -- Compute trans for mu and wrap via the mu closure helper.
   have hwf_body : gbody.allCommsNonEmpty = true := by
     simpa [GlobalType.allCommsNonEmpty] using hne
   have htrans_guard : (trans gbody role).isGuarded muvar = true :=
-    CProject_isGuarded_trans hbody_proj hwf_body hguard
+    c_project_is_guarded_trans hbody_proj hwf_body hguard
   have htrans_mu :
       trans (GlobalType.mu muvar gbody) role =
         LocalTypeR.mu muvar (trans gbody role) := by
-    simp [trans, htrans_guard]
+    simp [trans, htrans_guard, Choreography.Projection.Trans.trans]
   have hmu_rel :
       CProjectTransRel (LocalTypeR.mu muvar lbody)
         (LocalTypeR.mu muvar (trans gbody role)) := by
     -- Package CProject with the concrete trans equality.
     have hmu_proj :
         CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu muvar lbody) :=
-      CProject_mu muvar gbody lbody role hguard hbody_proj
-    exact ⟨GlobalType.mu muvar gbody, role, hmu_proj, htrans_mu.symm, hwf⟩
+      c_project_mu muvar gbody lbody role hguard hbody_proj
+    exact ⟨GlobalType.mu muvar gbody, role, hmu_proj, htrans_mu.symm, hwf, hdf⟩
   subst htrans
   simpa [htrans_mu] using c_project_trans_rel_postfix_mu_closure hmu_rel
 
@@ -307,7 +312,8 @@ theorem c_project_trans_rel_postfix_mu_mu
     (htrans : t = trans (GlobalType.mu muvar gbody) role)
     (hwf : (GlobalType.mu muvar gbody).wellFormed = true)
     (hne : (GlobalType.mu muvar gbody).allCommsNonEmpty = true)
-    (hf : CProjectF CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu ltvar lbody)) :
+    (hf : CProjectF CProject (GlobalType.mu muvar gbody) role (LocalTypeR.mu ltvar lbody))
+    (hdf : (GlobalType.mu muvar gbody).delegateFree = true) :
     EQ2F (EQ2_closure CProjectTransRelComp) (LocalTypeR.mu ltvar lbody) t := by
   -- Use the guarded mu branch and lift to EQ2_closure via mu refls.
   simp only [CProjectF] at hf
@@ -315,7 +321,7 @@ theorem c_project_trans_rel_postfix_mu_mu
   rcases hcase with ⟨hguard, hmu_eq⟩ | ⟨_hguard, hend_eq⟩
   · -- Guarded case: rewrite lbody and defer to the helper.
     cases hmu_eq
-    exact c_project_trans_rel_postfix_mu_mu_guarded hbody_proj hguard htrans hwf hne
+    exact c_project_trans_rel_postfix_mu_mu_guarded hbody_proj hguard htrans hwf hne hdf
   · -- Unguarded case contradicts the mu candidate.
     have : False := by simpa using hend_eq
     exact this.elim
@@ -339,10 +345,10 @@ theorem c_project_trans_rel_postfix_mu_end
   ·
     cases hend_eq
     have htrans_guard : (trans gbody role).isGuarded muvar = false :=
-      CProject_unguarded_trans hbody_proj
+      c_project_unguarded_trans hbody_proj
         (by simpa [GlobalType.allCommsNonEmpty] using hne) hguard
     have htrans_end : trans (GlobalType.mu muvar gbody) role = LocalTypeR.end := by
-      simp [trans, htrans_guard]
+      simp [trans, htrans_guard, Choreography.Projection.Trans.trans]
     subst htrans
     simpa [htrans_end, EQ2F]
 

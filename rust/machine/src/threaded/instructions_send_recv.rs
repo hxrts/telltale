@@ -78,7 +78,9 @@ fn step_send(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
     let prepared = {
-        let session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+        let session_guard = session
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
         step_send_prepare(coro, &session_guard, role, chan).map_err(ThreadedExecFault::new)?
     };
 
@@ -163,7 +165,9 @@ fn step_send(
             } else {
                 payload
             };
-            let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+            let mut session_guard = session
+                .lock()
+                .expect("threaded ProtocolMachine lock poisoned");
             session_guard
                 .send_with_sequence(role, &prepared.partner, payload, sequence_no)
                 .map_err(|e| {
@@ -364,7 +368,9 @@ fn step_recv(
     ctx: &ThreadedStepCtx<'_>,
 ) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
     let (prepared, edge, val, sequence_no) = {
-        let mut session_guard = session.lock().expect("threaded ProtocolMachine lock poisoned");
+        let mut session_guard = session
+            .lock()
+            .expect("threaded ProtocolMachine lock poisoned");
         let prepared =
             step_recv_prepare(coro, &session_guard, role, chan).map_err(ThreadedExecFault::new)?;
         if !session_guard.has_message(&prepared.partner, role) {
@@ -402,6 +408,12 @@ fn step_recv(
     )
     .map_err(ThreadedExecFault::new)?;
 
+    // Match the cooperative VM fault before invoking a host receive effect while
+    // retaining signature, replay and payload validation precedence above.
+    if dst_reg >= ctx.config.num_registers || coro.regs.get(usize::from(dst_reg)).is_none() {
+        return Err(ThreadedExecFault::new(Fault::OutOfRegisters));
+    }
+
     let request = EffectRequest::receive(
         ctx.tick,
         Some(prepared.sid),
@@ -411,23 +423,23 @@ fn step_recv(
         &prepared.label,
         &coro.regs,
         val.clone(),
-    );
+    )
+    .with_receive_destination(dst_reg)
+    .with_register_width(ctx.config.num_registers);
     let recv_outcome = ctx.handler.handle_effect(request.clone());
     let observation = EffectObservation {
-        request,
+        request: request.clone(),
         outcome: recv_outcome.clone(),
     };
-    if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
-        coro.regs = state;
-    }
-    recv_outcome
+    let state = recv_outcome
         .clone()
-        .into_unit("handle_recv")
+        .into_receive_state_for(&request.body)
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("handle_recv returned blocked"))
         .map_err(|failure| {
             ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone())
         })?;
+    coro.regs = state;
 
     let (_resolved, type_update) =
         resolve_type_update(&prepared.continuation, &prepared.original, &prepared.ep);
@@ -480,8 +492,36 @@ fn step_invoke(
     action: InvokeAction,
     handler: &dyn EffectHandler,
     tick: u64,
+    register_width: u16,
 ) -> Result<(StepPack, Vec<EffectObservation>), ThreadedExecFault> {
     let _action_repr = match action {
+        InvokeAction::OperationLifecycle(action) => {
+            return Ok((
+                StepPack {
+                    coro_update: CoroUpdate::OperationLifecycle(*action),
+                    type_update: None,
+                    events: Vec::new(),
+                },
+                Vec::new(),
+            ))
+        }
+        InvokeAction::DeclareCommand(_) => {
+            return Ok((
+                StepPack {
+                    coro_update: CoroUpdate::AdvancePc,
+                    type_update: None,
+                    events: vec![],
+                },
+                vec![],
+            ))
+        }
+        InvokeAction::NominalCommand(_) => {
+            return Err(ThreadedExecFault::new(Fault::Invoke {
+                failure: EffectFailure::contract_violation(
+                    "nominal commands must use their pre-issued worker dispatch",
+                ),
+            }))
+        }
         InvokeAction::Named(name) => name,
         InvokeAction::Reg(reg) => format!(
             "{:?}",
@@ -497,30 +537,23 @@ fn step_invoke(
         }));
     }
     let coro_id = coro.id;
-    let request = EffectRequest::invoke_step(
-        tick,
-        Some(session.sid),
-        None,
-        role,
-        &coro.regs,
-    );
+    let request = EffectRequest::invoke_step(tick, Some(session.sid), None, role, &coro.regs)
+        .with_register_width(register_width);
     // Threaded step paths share the same canonical request admissibility rules.
     let step_outcome = handler.handle_effect(request.clone());
     let observation = EffectObservation {
-        request,
+        request: request.clone(),
         outcome: step_outcome.clone(),
     };
-    if let Some(EffectResponse::InvokeStep { state }) = step_outcome.response.clone() {
-        coro.regs = state;
-    }
-    step_outcome
+    let state = step_outcome
         .clone()
-        .into_unit("invoke_step")
+        .into_invoke_state_for(&request.body)
         .unwrap_or_else(EffectResult::failure)
         .expect_success(|| EffectFailure::contract_violation("step returned blocked"))
         .map_err(|failure| {
             ThreadedExecFault::with_observation(Fault::Invoke { failure }, observation.clone())
         })?;
+    coro.regs = state;
 
     Ok((
         StepPack {

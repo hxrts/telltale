@@ -46,7 +46,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &types,
-        );
+        ).expect("fresh fixture session allocation");
 
         let ep_a = Endpoint {
             sid,
@@ -76,7 +76,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &types,
-        );
+        ).expect("fresh fixture session allocation");
 
         let ep_a = Endpoint {
             sid,
@@ -118,7 +118,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let ep_a = Endpoint {
             sid,
             role: "A".into(),
@@ -167,7 +167,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &single_send_recv_types(),
-        );
+        ).expect("fresh fixture session allocation");
 
         let session = store.get_mut(sid).expect("session should exist");
         session
@@ -198,7 +198,7 @@
             vec!["A".into(), "B".into(), "C".into()],
             &BufferConfig::default(),
             &types,
-        );
+        ).expect("fresh fixture session allocation");
 
         let session = store.get_mut(sid).expect("session exists");
         assert_eq!(session.buffers.len(), 1);
@@ -223,7 +223,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &single_send_recv_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let edge = Edge::new(sid, "A", "B");
         store
             .get_mut(sid)
@@ -246,7 +246,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
 
         store.close(sid).expect("close session");
         let summaries = store.reap_closed();
@@ -264,7 +264,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
 
         let before_close = store.memory_usage();
         assert_eq!(before_close.live_sessions, 1);
@@ -301,7 +301,7 @@
                 types.insert("C".to_string(), LocalTypeR::End);
                 types
             },
-        );
+        ).expect("fresh fixture session allocation");
 
         let session = store.get_mut(sid).expect("session exists");
         session.default_handler = "handler/default".to_string();
@@ -348,12 +348,12 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &single_send_recv_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let sid2 = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &single_send_recv_types(),
-        );
+        ).expect("fresh fixture session allocation");
 
         assert_ne!(sid1, sid2);
 
@@ -376,7 +376,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &types,
-        );
+        ).expect("fresh fixture session allocation");
 
         let ep_a = Endpoint {
             sid,
@@ -395,12 +395,12 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &single_send_recv_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let sid2 = store.open(
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &single_send_recv_types(),
-        );
+        ).expect("fresh fixture session allocation");
 
         let e1 = Edge::new(sid1, "A", "B");
         let e2 = Edge::new(sid2, "A", "B");
@@ -424,7 +424,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &BTreeMap::new(),
-        );
+        ).expect("fresh fixture session allocation");
         let edge = Edge::new(sid, "A", "B");
         let owner = store
             .claim_ownership(sid, "runtime/owner", OwnershipScope::Session)
@@ -485,7 +485,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
 
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
@@ -511,7 +511,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let edge = Edge::new(sid, "A", "B");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
@@ -562,7 +562,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let edge = Edge::new(sid, "A", "B");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
@@ -624,7 +624,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
@@ -664,7 +664,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
@@ -717,7 +717,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let edge = Edge::new(sid, "A", "B");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
@@ -759,7 +759,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
@@ -791,7 +791,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
@@ -830,7 +830,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
@@ -857,7 +857,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let owner2 = store
             .claim_ownership(sid2, "owner/c", OwnershipScope::Session)
             .expect("claim ownership");
@@ -891,7 +891,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
             .expect("claim ownership");
@@ -961,7 +961,7 @@
             vec!["A".into(), "B".into()],
             &BufferConfig::default(),
             &default_types(),
-        );
+        ).expect("fresh fixture session allocation");
         let edge = Edge::new(sid, "A", "B");
         let owner = store
             .claim_ownership(sid, "owner/a", OwnershipScope::Session)
@@ -1027,3 +1027,87 @@
         assert_eq!(e2, Edge::new(11, "A", "B"));
 
     }
+
+#[test]
+fn finite_session_ids_refuse_max_and_reissue_without_mutation() {
+    let mut store = SessionStore::new();
+    let roles = vec!["A".to_string()];
+    let types = BTreeMap::from([("A".to_string(), LocalTypeR::End)]);
+    let config = BufferConfig::default();
+    assert_eq!(
+        store.open_with_sid(usize::MAX - 2, roles.clone(), &config, &types),
+        Ok(usize::MAX - 2)
+    );
+    assert_eq!(
+        store.open(roles.clone(), &config, &types),
+        Ok(usize::MAX - 1)
+    );
+    assert_eq!(store.next_session_id(), usize::MAX);
+    let before = crate::serialization::binary_encode(&store).expect("actual complete store");
+    assert_eq!(
+        store.open(roles.clone(), &config, &types),
+        Err(SessionAllocationError::Exhausted)
+    );
+    assert_eq!(
+        store.open_with_sid(usize::MAX, roles.clone(), &config, &types),
+        Err(SessionAllocationError::Exhausted)
+    );
+    for sid in [0, usize::MAX - 2, usize::MAX - 1] {
+        assert_eq!(
+            store.open_with_sid(sid, roles.clone(), &config, &types),
+            Err(SessionAllocationError::NotFresh {
+                session_id: sid,
+                next_session_id: usize::MAX
+            })
+        );
+    }
+    assert_eq!(crate::serialization::binary_encode(&store).unwrap(), before);
+}
+
+#[test]
+fn session_collision_preserves_actual_current_owner_and_reaped_high_water() {
+    let mut store = SessionStore::new();
+    let roles = vec!["A".to_string()];
+    let types = BTreeMap::from([("A".to_string(), LocalTypeR::End)]);
+    let config = BufferConfig::default();
+    let sid = store
+        .open(roles.clone(), &config, &types)
+        .expect("original fresh session");
+    let owner = store
+        .claim_ownership(sid, "original", OwnershipScope::Session)
+        .expect("actual resident claim");
+    let before = crate::serialization::binary_encode(&store).unwrap();
+    assert_eq!(
+        store.open_with_sid(sid, roles.clone(), &config, &types),
+        Err(SessionAllocationError::NotFresh {
+            session_id: sid,
+            next_session_id: 1
+        })
+    );
+    assert_eq!(crate::serialization::binary_encode(&store).unwrap(), before);
+    assert!(SessionState::validate_current_owner(store.get(sid).unwrap(), &owner).is_ok());
+    // A malformed counter cannot overwrite a resident even if it bypassed
+    // whole-machine decoded-state validation. No new public counter setter.
+    store.next_id = sid;
+    let corrupt = crate::serialization::binary_encode(&store).unwrap();
+    assert_eq!(
+        store.open(roles.clone(), &config, &types),
+        Err(SessionAllocationError::NotFresh {
+            session_id: sid,
+            next_session_id: sid
+        })
+    );
+    assert_eq!(crate::serialization::binary_encode(&store).unwrap(), corrupt);
+    store.next_id = 1;
+    store.close(sid).unwrap();
+    assert_eq!(store.reap_closed().len(), 1);
+    let reaped = crate::serialization::binary_encode(&store).unwrap();
+    assert_eq!(
+        store.open_with_sid(sid, roles, &config, &types),
+        Err(SessionAllocationError::NotFresh {
+            session_id: sid,
+            next_session_id: 1
+        })
+    );
+    assert_eq!(crate::serialization::binary_encode(&store).unwrap(), reaped);
+}

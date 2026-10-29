@@ -61,9 +61,9 @@ theorem c_project_trans_rel_comp_end_not_var
   · have hb : b = .end := c_project_trans_rel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .var v) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .var v) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## End Source Cases (Send/Recv Targets) -/
 
@@ -115,9 +115,9 @@ theorem c_project_trans_rel_comp_end_not_recv
   · have hb : b = .end := c_project_trans_rel_source_end hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .recv p bs) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .end) (c := .recv p bs) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Var Source Cases -/
 
@@ -142,9 +142,9 @@ theorem c_project_trans_rel_comp_var_not_end
   · have hb : b = .var v := c_project_trans_rel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .end) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .end) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Var Source Cases (Send/Recv Targets) -/
 
@@ -196,9 +196,9 @@ theorem c_project_trans_rel_comp_var_not_recv
   · have hb : b = .var v := c_project_trans_rel_source_var (v := v) hrel
     subst hb
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .recv p bs) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .var v) (c := .recv p bs) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Send Source Cases -/
 
@@ -226,9 +226,9 @@ theorem c_project_trans_rel_comp_send_not_end
   · rcases c_project_trans_rel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p bs) (c := .end) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p bs) (c := .end) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Send Source Cases (Var/Recv Targets) -/
 
@@ -256,9 +256,9 @@ theorem c_project_trans_rel_comp_send_not_var
   · rcases c_project_trans_rel_source_send (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p bs) (c := .var v) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p bs) (c := .var v) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Send Source Cases (Recv Target) -/
 
@@ -288,9 +288,9 @@ theorem c_project_trans_rel_comp_send_not_recv
   · rcases c_project_trans_rel_source_send (p := p1) (bs := bs1) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p1 bs1) (c := .recv p2 bs2) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .send p1 bs1) (c := .recv p2 bs2) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Recv Source Cases -/
 
@@ -318,9 +318,9 @@ theorem c_project_trans_rel_comp_recv_not_end
   · rcases c_project_trans_rel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .recv p bs) (c := .end) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .recv p bs) (c := .end) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Recv Source Cases (Var/Send Targets) -/
 
@@ -348,9 +348,9 @@ theorem c_project_trans_rel_comp_recv_not_var
   · rcases c_project_trans_rel_source_recv (p := p) (bs := bs) hrel with ⟨cs, hEq⟩
     cases hEq
     simpa [EQ2F] using (EQ2.destruct heq)
-    · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .recv p bs) (c := .var v) heq hrel heq'
-        hWFa hWFc
-      simpa [EQ2F] using hcomp
+  · have hcomp := eq2_c_project_trans_rel_eq2_compose (a := .recv p bs) (c := .var v) heq hrel heq'
+      hWFa hWFc
+    simpa [EQ2F] using hcomp
 
 /-! ## Recv Source Cases (Send Target) -/
 

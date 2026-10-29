@@ -4,12 +4,23 @@ set_option autoImplicit false
 
 /-! # Classical.Transport.Theorems
 
-Facade theorem wrappers from family-level witnesses.
--/
+Conditional theorem wrappers over the transport contracts (Option B).
 
-/-
-The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
-Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+Every family falls into exactly one of three honest categories:
+
+* **Derived from an assumed input.** The classical result is a field of the
+  input's witness; the lemma here derives a *new* consequence from it
+  (Foster iterate bound, LDP/mixing one-step tightening, fluid energy
+  monotonicity, concentration at zero, Little's-law rearrangements).
+  Names end in `_of_input`.
+* **Assumed input, no derived lemma.** The conclusion *is* a premise field
+  (MaxWeight optimality `input.choice.optimal`, Little's law `input.law`,
+  the sub-Gaussian tail `input.witness.tail_upper`, spectral termination
+  `input.termination.bounded_by_gap`). No restating theorem is provided;
+  callers use the field directly.
+* **Elementary identity.** No classical theorem is involved (heavy-traffic
+  scaled-variance identity, mean-field permutation invariance, constant-path
+  scaled process). Names state the identity.
 -/
 
 namespace Classical
@@ -19,241 +30,137 @@ universe u
 
 variable [EntropyAPI.AnalysisLaws]
 
-theorem transported_foster_lyapunov {State : Type u} {ctx : TransportCtx State}
+/-! ## Derived From Assumed Inputs -/
+
+/-- Conditional on the drift-system input, the potential never increases along
+iterates (deterministic; not the stochastic Foster-Lyapunov theorem). -/
+theorem foster_conclusion_of_input {State : Type u} {ctx : TransportCtx State}
     (input : FosterInput State ctx) :
     FosterConclusion input := by
   intro s n
   exact FosterLyapunovHarris.DriftSystem.iterate_nonincrease (S := input.system) s n
 
-theorem transported_max_weight {ι : Type} [Fintype ι]
-    (input : MaxWeightInput ι) :
-    MaxWeightConclusion input := by
-  intro ν
-  exact input.choice.optimal ν
-
-theorem transported_ldp (input : LDPInput) :
+/-- Conditional on the assumed `LDPWitness`, one-step envelope tightening. -/
+theorem ldp_conclusion_of_input (input : LDPInput) :
     LDPConclusion input := by
   intro n
-  exact LargeDeviationPrinciple.one_step_tightening input.witness n
+  exact LargeDeviationPrinciple.one_step_tightening_of_ldp_witness input.witness n
 
-theorem transported_mean_field {n : Nat} (input : MeanFieldInput n) :
-    MeanFieldConclusion input := by
-  intro σ
-  exact PropagationOfChaos.empirical_mean_perm (σ := σ) (x := input.x)
-
-theorem transported_heavy_traffic (input : HeavyTrafficInput) :
-    HeavyTrafficConclusion input := by
-  simpa [HeavyTrafficConclusion] using
-    HeavyTrafficDiffusion.variance_scaling input.σ input.n
-
-/-- Runtime-facing heavy-traffic diffusion-scale law. -/
-theorem transported_heavy_traffic_diffusion_scale_law (input : HeavyTrafficInput) :
-    HeavyTrafficDiffusionScaleLaw input := by
-  exact transported_heavy_traffic input
-
-theorem transported_mixing (input : MixingInput) :
+/-- Conditional on the assumed `MixingWitness`, one-step envelope bound. -/
+theorem mixing_conclusion_of_input (input : MixingInput) :
     MixingConclusion input := by
   intro n
-  exact MixingTimeBounds.one_step_bound input.witness n
+  exact MixingTimeBounds.one_step_bound_of_mixing_witness input.witness n
 
-theorem transported_fluid_limit (input : FluidInput) :
+/-- Conditional on the assumed `FluidDescentWitness`, energy is non-increasing. -/
+theorem fluid_conclusion_of_input (input : FluidInput) :
     FluidConclusion input := by
   intro n
-  exact FluidLimitStability.nonincreasing_energy input.witness n
+  exact FluidLimitStability.energy_nonincreasing_of_descent_witness input.witness n
 
-theorem transported_concentration (input : ConcentrationInput) :
+/-- Conditional on the assumed `ConcentrationWitness`, `p 0 ≤ 2`. -/
+theorem concentration_conclusion_of_input (input : ConcentrationInput) :
     ConcentrationConclusion input := by
-  exact ConcentrationInequalities.at_zero_bound input.witness
+  exact ConcentrationInequalities.at_zero_bound_of_concentration_witness input.witness
 
-/-- Runtime-facing concentration theorem exposing the full sub-Gaussian tail. -/
-theorem transported_concentration_tail (input : ConcentrationInput) :
-    ConcentrationTailConclusion input := by
-  intro t ht
-  exact input.witness.tail_upper t ht
-
-theorem transported_littles_law (input : LittlesLawInput) :
-    LittlesLawConclusion input := by
-  exact LittlesLaw.queue_length input
-
-/-- Runtime-facing Little's-law wait-time corollary. -/
-theorem transported_littles_law_wait_time (input : LittlesLawInput) :
+/-- Conditional on the assumed `input.law`, the wait-time rearrangement. -/
+theorem littles_law_wait_time_of_input (input : LittlesLawInput) :
     LittlesLawWaitTimeConclusion input := by
   intro hlam
-  exact LittlesLaw.wait_time input hlam
+  exact LittlesLaw.wait_time_of_little_input input hlam
 
-/-- Runtime-facing Little's-law throughput corollary. -/
-theorem transported_littles_law_throughput (input : LittlesLawInput) :
+/-- Conditional on the assumed `input.law`, the throughput rearrangement. -/
+theorem littles_law_throughput_of_input (input : LittlesLawInput) :
     LittlesLawThroughputConclusion input := by
   intro hW
-  exact LittlesLaw.throughput input hW
+  exact LittlesLaw.throughput_of_little_input input hW
 
-theorem transported_functional_clt (input : FunctionalCLTInput) :
+/-! ## Elementary Identities -/
+
+/-- Mean-field contract is reindexing invariance of a finite average (elementary;
+not propagation of chaos). -/
+theorem mean_field_permutation_invariant {n : Nat} (input : MeanFieldInput n) :
+    MeanFieldConclusion input := by
+  intro σ
+  exact PropagationOfChaos.mean_permutation_invariant (σ := σ) (x := input.x)
+
+/-- Heavy-traffic contract is the identity `(σ√n)² = σ²n` (elementary; not a
+diffusion limit). -/
+theorem heavy_traffic_scaled_variance_identity (input : HeavyTrafficInput) :
+    HeavyTrafficConclusion input := by
+  simpa [HeavyTrafficConclusion] using
+    HeavyTrafficDiffusion.scaled_variance_identity input.σ input.n
+
+/-- Functional-CLT contract is degenerate: the input forces a constant path
+centred at its own value, whose scaled process is identically zero. This is
+not a functional CLT. -/
+theorem constant_path_scaled_process_zero (input : FunctionalCLTInput) :
     FunctionalCLTConclusion input := by
   rw [FunctionalCLTConclusion, input.path_eq_const, input.mean_eq_const]
   simpa using
     FunctionalCLT.scaled_process_const_zero input.c input.N input.t input.N_ne_zero
 
-/-- Runtime-facing functional-CLT scaled-process law. -/
-theorem transported_functional_clt_scaled_process_law (input : FunctionalCLTInput) :
-    FunctionalCLTScaledProcessLaw input := by
-  exact transported_functional_clt input
-
-theorem transported_spectral_gap_termination
-    {State : Type u} [Fintype State] [DecidableEq State]
-    (input : SpectralGapInput State) :
-    SpectralGapConclusion input := by
-  have hGap :
-      0 < SpectralGapTermination.spectralGap input.chain :=
-    SpectralGapTermination.spectral_gap_pos input.chain input.gap_pos
-  exact SpectralGapTermination.expected_termination_bound input.chain hGap input.termination
-
-/-! ## Naming-normalized theorem wrappers -/
-
-/-- Canonical Foster theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem foster_conclusion_of_input {State : Type u} {ctx : TransportCtx State}
-    (input : FosterInput State ctx) :
-    FosterConclusion input :=
-  transported_foster_lyapunov input
-
-/-- Canonical MaxWeight theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem max_weight_conclusion_of_input {ι : Type} [Fintype ι]
-    (input : MaxWeightInput ι) :
-    MaxWeightConclusion input :=
-  transported_max_weight input
-
-/-- Canonical LDP theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem ldp_conclusion_of_input (input : LDPInput) :
-    LDPConclusion input :=
-  transported_ldp input
-
-/-- Canonical mean-field theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem mean_field_conclusion_of_input {n : Nat} (input : MeanFieldInput n) :
-    MeanFieldConclusion input :=
-  transported_mean_field input
-
-/-- Canonical heavy-traffic theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem heavy_traffic_conclusion_of_input (input : HeavyTrafficInput) :
-    HeavyTrafficConclusion input :=
-  transported_heavy_traffic input
-
-/-! ### Naming-Normalized Wrappers (Mixing Through Functional CLT) -/
-
-/-- Canonical mixing-time theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem mixing_conclusion_of_input (input : MixingInput) :
-    MixingConclusion input :=
-  transported_mixing input
-
-/-- Canonical fluid-limit theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem fluid_conclusion_of_input (input : FluidInput) :
-    FluidConclusion input :=
-  transported_fluid_limit input
-
-/-- Canonical concentration theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem concentration_conclusion_of_input (input : ConcentrationInput) :
-    ConcentrationConclusion input :=
-  transported_concentration input
-
-/-- Canonical Little's-law theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem littles_law_conclusion_of_input (input : LittlesLawInput) :
-    LittlesLawConclusion input :=
-  transported_littles_law input
-
-/-- Canonical functional-CLT theorem wrapper: derive a conclusion from its input assumptions. -/
-theorem functional_clt_conclusion_of_input (input : FunctionalCLTInput) :
-    FunctionalCLTConclusion input :=
-  transported_functional_clt input
-
-/-- Canonical spectral-gap termination wrapper: derive a conclusion from its input assumptions. -/
-theorem spectral_gap_conclusion_of_input
-    {State : Type u} [Fintype State] [DecidableEq State]
-    (input : SpectralGapInput State) :
-    SpectralGapConclusion input :=
-  transported_spectral_gap_termination input
-
 /-! ## Certificate Builders -/
 
-/-- Build a Foster certificate from input assumptions. -/
+/-- Foster certificate (derived from the assumed drift-system input). -/
 def foster_certificate {State : Type u} {ctx : TransportCtx State}
     (input : FosterInput State ctx) :
     Certificate (FosterInput State ctx) FosterConclusion :=
-  { input := input
-  , proof := foster_conclusion_of_input input
-  }
+  { input := input, proof := foster_conclusion_of_input input }
 
-/-- Build a MaxWeight certificate from input assumptions. -/
+/-- MaxWeight certificate: the proof *is* the assumed `choice.optimal` field. -/
 def maxWeight_certificate {ι : Type} [Fintype ι]
     (input : MaxWeightInput ι) :
     Certificate (MaxWeightInput ι) MaxWeightConclusion :=
-  { input := input
-  , proof := max_weight_conclusion_of_input input
-  }
+  { input := input, proof := input.choice.optimal }
 
-/-- Build an LDP certificate from input assumptions. -/
+/-- LDP certificate (derived from the assumed `LDPWitness`). -/
 def ldp_certificate (input : LDPInput) :
     Certificate LDPInput LDPConclusion :=
-  { input := input
-  , proof := ldp_conclusion_of_input input
-  }
+  { input := input, proof := ldp_conclusion_of_input input }
 
-/-- Build a mean-field certificate from input assumptions. -/
+/-- Mean-field certificate (elementary permutation identity). -/
 def meanField_certificate {n : Nat} (input : MeanFieldInput n) :
     Certificate (MeanFieldInput n) MeanFieldConclusion :=
-  { input := input
-  , proof := mean_field_conclusion_of_input input
-  }
+  { input := input, proof := mean_field_permutation_invariant input }
 
-/-- Build a heavy-traffic certificate from input assumptions. -/
+/-- Heavy-traffic certificate (elementary scaled-variance identity). -/
 def heavyTraffic_certificate (input : HeavyTrafficInput) :
     Certificate HeavyTrafficInput HeavyTrafficConclusion :=
-  { input := input
-  , proof := heavy_traffic_conclusion_of_input input
-  }
+  { input := input, proof := heavy_traffic_scaled_variance_identity input }
 
-/-! ### Certificate Builders (Mixing Through Functional CLT) -/
-
-/-- Build a mixing certificate from input assumptions. -/
+/-- Mixing certificate (derived from the assumed `MixingWitness`). -/
 def mixing_certificate (input : MixingInput) :
     Certificate MixingInput MixingConclusion :=
-  { input := input
-  , proof := mixing_conclusion_of_input input
-  }
+  { input := input, proof := mixing_conclusion_of_input input }
 
-/-- Build a fluid-limit certificate from input assumptions. -/
+/-- Fluid certificate (derived from the assumed `FluidDescentWitness`). -/
 def fluid_certificate (input : FluidInput) :
     Certificate FluidInput FluidConclusion :=
-  { input := input
-  , proof := fluid_conclusion_of_input input
-  }
+  { input := input, proof := fluid_conclusion_of_input input }
 
-/-- Build a concentration certificate from input assumptions. -/
+/-- Concentration certificate (derived from the assumed `ConcentrationWitness`). -/
 def concentration_certificate (input : ConcentrationInput) :
     Certificate ConcentrationInput ConcentrationConclusion :=
-  { input := input
-  , proof := concentration_conclusion_of_input input
-  }
+  { input := input, proof := concentration_conclusion_of_input input }
 
-/-- Build a Little's-law certificate from input assumptions. -/
+/-- Little's-law certificate: the proof *is* the assumed `law` field. -/
 def littlesLaw_certificate (input : LittlesLawInput) :
     Certificate LittlesLawInput LittlesLawConclusion :=
-  { input := input
-  , proof := littles_law_conclusion_of_input input
-  }
+  { input := input, proof := input.law }
 
-/-- Build a functional-CLT certificate from input assumptions. -/
+/-- Functional-CLT certificate (degenerate constant-path identity). -/
 def functionalCLT_certificate (input : FunctionalCLTInput) :
     Certificate FunctionalCLTInput FunctionalCLTConclusion :=
-  { input := input
-  , proof := functional_clt_conclusion_of_input input
-  }
+  { input := input, proof := constant_path_scaled_process_zero input }
 
-/-- Build a spectral-gap termination certificate from input assumptions. -/
+/-- Spectral-gap certificate: the proof *is* the assumed
+`termination.bounded_by_gap` field. -/
 def spectralGap_certificate
     {State : Type u} [Fintype State] [DecidableEq State]
     (input : SpectralGapInput State) :
     Certificate (SpectralGapInput State) SpectralGapConclusion :=
-  { input := input
-  , proof := spectral_gap_conclusion_of_input input
-  }
+  { input := input, proof := input.termination.bounded_by_gap }
 
 end Transport
 end Classical

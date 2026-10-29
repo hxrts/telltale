@@ -67,7 +67,10 @@ def isSkip : Process → Bool
   | .skip => true
   | _ => false
 
-/-- Get immediate free variables in a process (non-recursive for branches). -/
+mutual
+/-- Free variables of a process, recursing through every subprocess
+    (including all branch continuations). Binders introduced by `recv`
+    and `newSession` are not removed (over-approximation for `seq`). -/
 def freeVarsImmediate : Process → List Var
   | .skip => []
   | .seq P Q => P.freeVarsImmediate ++ Q.freeVarsImmediate
@@ -75,9 +78,35 @@ def freeVarsImmediate : Process → List Var
   | .send k x => [k, x]
   | .recv k _ => [k]  -- x is bound
   | .select k _ => [k]
-  | .branch k _ => [k]  -- simplified: don't recurse into branch processes
+  | .branch k bs => k :: freeVarsBranches bs
   | .newSession _ _ P => P.freeVarsImmediate  -- f's range is bound
   | .assign _ _ => []
+
+/-- Free variables of all continuations in a branch list. -/
+def freeVarsBranches : List (Label × Process) → List Var
+  | [] => []
+  | (_, P) :: bs => P.freeVarsImmediate ++ freeVarsBranches bs
+end
+
+/-- Every branch continuation's free variables occur in the branch's free variables. -/
+theorem free_vars_branches_mem {bs : List (Label × Process)} {ℓ : Label} {P : Process}
+    {x : Var} (hmem : (ℓ, P) ∈ bs) (hx : x ∈ P.freeVarsImmediate) :
+    x ∈ freeVarsBranches bs := by
+  induction bs with
+  | nil => cases hmem
+  | cons b bs ih =>
+      obtain ⟨ℓ', P'⟩ := b
+      simp only [freeVarsBranches, List.mem_append]
+      rcases List.mem_cons.mp hmem with h | h
+      · cases h; exact Or.inl hx
+      · exact Or.inr (ih h)
+
+/-- `freeVarsImmediate` of a `branch` includes the free variables of every arm. -/
+theorem free_vars_branch_arm {k : Var} {bs : List (Label × Process)} {ℓ : Label}
+    {P : Process} {x : Var} (hmem : (ℓ, P) ∈ bs) (hx : x ∈ P.freeVarsImmediate) :
+    x ∈ (Process.branch k bs).freeVarsImmediate := by
+  simp only [freeVarsImmediate]
+  exact List.mem_cons_of_mem _ (free_vars_branches_mem hmem hx)
 
 end Process
 

@@ -114,7 +114,7 @@ theorem regular_bisim_is_bisimulation (t : LocalTypeC) (h : Regular t) :
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
-        simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
+        exact (PFunctor.M.dest_corec ..).trans hmap
       · intro i
         cases i
   -- Head Case: var
@@ -127,7 +127,7 @@ theorem regular_bisim_is_bisimulation (t : LocalTypeC) (h : Regular t) :
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
-        simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
+        exact (PFunctor.M.dest_corec ..).trans hmap
       · intro i
         cases i
   -- Head Case: mu
@@ -140,7 +140,7 @@ theorem regular_bisim_is_bisimulation (t : LocalTypeC) (h : Regular t) :
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
-        simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
+        exact (PFunctor.M.dest_corec ..).trans hmap
       · intro i
         cases i
         refine ⟨f (), hchild_mem (), rfl, rfl⟩
@@ -155,7 +155,7 @@ theorem regular_bisim_is_bisimulation (t : LocalTypeC) (h : Regular t) :
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
-        simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
+        exact (PFunctor.M.dest_corec ..).trans hmap
       · intro i
         refine ⟨f i, hchild_mem i, rfl, rfl⟩
   -- Head Case: recv
@@ -168,7 +168,7 @@ theorem regular_bisim_is_bisimulation (t : LocalTypeC) (h : Regular t) :
         simp [hdest] at hsys
         have hmap :=
           congrArg (LocalTypeF.map (PFunctor.M.corec (RegularSystem w))) hsys
-        simpa [SystemToCoind, PFunctor.M.dest_corec, g, Function.comp] using hmap
+        exact (PFunctor.M.dest_corec ..).trans hmap
       · intro i
         refine ⟨f i, hchild_mem i, rfl, rfl⟩
 

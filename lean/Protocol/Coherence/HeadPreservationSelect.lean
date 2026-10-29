@@ -122,7 +122,7 @@ theorem head_coherent_select_preserved
           -- Non-empty trace: Consume on .select fails
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume, consumeOne] at hConsumeOrig
-          exact Option.noConfusion hConsumeOrig
+          first | cases hConsumeOrig | simp at hConsumeOrig
       | branch r bs' =>
         -- Same as recv case - hRecvReady requires Consume on SELECT which fails
         have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.select selectorEp.role bs) hG
@@ -138,7 +138,7 @@ theorem head_coherent_select_preserved
         | cons t ts =>
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume, consumeOne] at hConsumeOrig
-          exact Option.noConfusion hConsumeOrig
+          first | cases hConsumeOrig | simp at hConsumeOrig
     -- Select Updated-Edge Subcase: Distinct Target
     · -- Normal case: target ≠ selector
       have hTargetNeq : selectorEp ≠ { sid := selectorEp.sid, role := targetRole } := by
@@ -302,7 +302,7 @@ theorem head_coherent_branch_preserved
       | nil =>
         rw [hTraceVal] at hTrace
         simp only [List.head?] at hTrace
-        exact Option.noConfusion hTrace
+        first | cases hTrace | simp at hTrace
 /- ## Structured Block 3 -/
       | cons t ts =>
         rw [hTraceVal] at hTrace

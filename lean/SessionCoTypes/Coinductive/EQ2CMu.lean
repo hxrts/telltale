@@ -107,28 +107,30 @@ lemma eq2_c_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
         subst hna
         subst hnb
         have hstep := Paco.paco_unfold EQ2CMuMono ⊥ a b hmu
-        have hstep' : EQ2C_mu_step EQ2C_mu_paco a b := by
-          simpa only [Paco.upaco_bot] using hstep
+        rw [Paco.upaco_bot] at hstep
+        have hstep' : EQ2C_mu_step EQ2C_mu_paco a b := hstep
         cases hstep' with
         | obs hobs => exact hobs
         | mu_left hstep _ =>
             rcases hstep with ⟨x, f, hdest, rfl⟩
             have hnonmu : hasNonMuHead a = true := by
               simpa [fullUnfoldN] using ha
-            have : False := by simp [hasNonMuHead, head, hdest] at hnonmu
+            have : False := by
+                  simp only [hasNonMuHead, head, hdest] at hnonmu; exact Bool.false_ne_true hnonmu
             cases this
         | mu_right hstep _ =>
             rcases hstep with ⟨x, f, hdest, rfl⟩
             have hnonmu : hasNonMuHead b = true := by
               simpa [fullUnfoldN] using hb
-            have : False := by simp [hasNonMuHead, head, hdest] at hnonmu
+            have : False := by
+                  simp only [hasNonMuHead, head, hdest] at hnonmu; exact Bool.false_ne_true hnonmu
             cases this
     -- Bounds Induction: Successor Case
     | succ n ih =>
         intro a b na nb hsum ha hb hmu
         have hstep := Paco.paco_unfold EQ2CMuMono ⊥ a b hmu
-        have hstep' : EQ2C_mu_step EQ2C_mu_paco a b := by
-          simpa only [Paco.upaco_bot] using hstep
+        rw [Paco.upaco_bot] at hstep
+        have hstep' : EQ2C_mu_step EQ2C_mu_paco a b := hstep
         cases hstep' with
         | obs hobs => exact hobs
         | mu_left hstep hrel =>
@@ -137,7 +139,8 @@ lemma eq2_c_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
                 rcases hstep with ⟨x, f, hdest, rfl⟩
                 have hnonmu : hasNonMuHead a = true := by
                   simpa [fullUnfoldN] using ha
-                have : False := by simp [hasNonMuHead, head, hdest] at hnonmu
+                have : False := by
+                  simp only [hasNonMuHead, head, hdest] at hnonmu; exact Bool.false_ne_true hnonmu
                 cases this
             | succ na' =>
                 rcases hstep with ⟨x, f, hdest, rfl⟩
@@ -168,7 +171,8 @@ lemma eq2_c_mu_paco_to_obs_of_bounds {a b : LocalTypeC} {na nb : Nat}
                 rcases hstep with ⟨x, f, hdest, rfl⟩
                 have hnonmu : hasNonMuHead b = true := by
                   simpa [fullUnfoldN] using hb
-                have : False := by simp [hasNonMuHead, head, hdest] at hnonmu
+                have : False := by
+                  simp only [hasNonMuHead, head, hdest] at hnonmu; exact Bool.false_ne_true hnonmu
                 cases this
             | succ nb' =>
                 rcases hstep with ⟨x, f, hdest, rfl⟩

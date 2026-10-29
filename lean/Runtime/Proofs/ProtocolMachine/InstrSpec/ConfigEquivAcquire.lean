@@ -85,6 +85,7 @@ def AcquireSpec_respects_renaming (ρ : SessionRenaming)
         | bool => simp only [renameValType] at hT; nomatch hT
         | nat => simp only [renameValType] at hT; nomatch hT
         | string => simp only [renameValType] at hT; nomatch hT
+        | readiness => simp only [renameValType] at hT; nomatch hT
         | prod _ _ => simp only [renameValType] at hT; nomatch hT
 /- ## Structured Block 2 -/
       | send _ _ _ => simp only [renameLocalType] at hEq; nomatch hEq
@@ -119,11 +120,11 @@ theorem acquire_spec_respects_config_equiv
   let hDeleg₂ := hSpec₂.delegation_applied
   have hATypeEq : hDeleg₂.A_type = renameLocalType ρ hDeleg₁.A_type := by
     have hAlookup₂ : lookupG G₂ { sid := ρ.f delegatedSession, role := r } = some hDeleg₂.A_type := by
-      simpa [ρ] using hDeleg₂.A_lookup
+      exact hDeleg₂.A_lookup
     have hLookupEq :
         lookupG G₂ { sid := ρ.f delegatedSession, role := r } =
           (lookupG G₁ { sid := delegatedSession, role := r }).map (renameLocalType ρ) := by
-      simpa [ρ] using hG { sid := delegatedSession, role := r }
+      exact hG { sid := delegatedSession, role := r }
     have hLookupEq' : some hDeleg₂.A_type = (some hDeleg₁.A_type).map (renameLocalType ρ) := by
       rw [← hAlookup₂, hLookupEq, hDeleg₁.A_lookup]
     simpa using Option.some.inj hLookupEq'
@@ -141,7 +142,7 @@ theorem acquire_spec_respects_config_equiv
         rw [hA']
         simp only [renameEndpoint]
         have hAremoved₂ : lookupG G₂' { sid := ρ.f delegatedSession, role := r } = none := by
-          simpa [ρ] using hDeleg₂.A_removed
+          exact hDeleg₂.A_removed
         rw [hDeleg₁.A_removed, hAremoved₂]
         simp
       · by_cases hB : e.role = ep.role
@@ -155,7 +156,7 @@ theorem acquire_spec_respects_config_equiv
           have hBadded₂ :
               lookupG G₂' { sid := ρ.f delegatedSession, role := ep.role } =
                 some (renameLocalTypeRole (ρ.f delegatedSession) r ep.role hDeleg₂.A_type) := by
-            simpa [ρ] using hDeleg₂.B_added
+            exact hDeleg₂.B_added
           rw [hDeleg₁.B_added, hBadded₂]
           simp only [Option.map_some]
           rw [hATypeEq]

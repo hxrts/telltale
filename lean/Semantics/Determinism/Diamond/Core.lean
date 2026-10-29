@@ -151,9 +151,8 @@ theorem branches_step_preserves_branch_labels {bs bs' : List (Label × GlobalTyp
       simp only [List.map_cons]
       rw [ih]
 
-/-- uniqueBranchLabels is preserved by a single global step. -/
-
 /-! #### Motives for uniqueness-preservation recursion -/
+/-- uniqueBranchLabels is preserved by a single global step. -/
 
 private abbrev UniqueStepMotive (g : GlobalType) (act : GlobalActionR) (g' : GlobalType)
     (_ : step g act g') : Prop :=
@@ -202,7 +201,7 @@ private theorem unique_branch_labels_preserved_mu
   -- Push uniqueness through substitution, then apply IH.
   simp only [GlobalType.uniqueBranchLabels] at huniq
   have huniq_sub : (body.substitute t (GlobalType.mu t body)).uniqueBranchLabels = true :=
-    GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq huniq
+    GlobalType.unique_branch_labels_substitute body t (.mu t body) huniq huniq
   exact ih huniq_sub
 
 /-! #### Branch-step uniqueness lemmas -/
@@ -301,7 +300,7 @@ private theorem diamond_comm_head {act₂ : GlobalActionR}
   | comm_head _ _ _ _ _ _ =>
       exact absurd rfl hind'.1
   | comm_async _ _ _ branches' _ _ _ _ _ _ _ hbs₂ =>
-      obtain ⟨cont₁', hstep_cont, hmem₁'⟩ := BranchesStep_mem hbs₂ hmem₁
+      obtain ⟨cont₁', hstep_cont, hmem₁'⟩ := branches_step_mem hbs₂ hmem₁
       simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
       refine ⟨cont₁', hstep_cont, ?_, ?_⟩
       · exact step.comm_head sender receiver branches' label₁ cont₁' hmem₁'
@@ -320,11 +319,11 @@ private theorem diamond_comm_async_head {act₂ : GlobalActionR}
     ∃ g₃, step (.comm sender receiver branches₁) act₂ g₃ ∧
       step cont₂ act₁' g₃ ∧ g₃.uniqueBranchLabels = true := by
   -- Use branches_step_mem to find the stepped continuation in branches₁.
-  obtain ⟨cont₂', hstep_cont, hmem₂'⟩ := BranchesStep_mem hbs₁ hmem₂
+  obtain ⟨cont₂', hstep_cont, hmem₂'⟩ := branches_step_mem hbs₁ hmem₂
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
   refine ⟨cont₂', ?_, hstep_cont, ?_⟩
-    · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
-    exact unique_branch_labels_preserved_by_step (unique_branch_labels_branches_mem huniq'.2 hmem₂) hstep_cont
+  · simpa [hact₂] using (step.comm_head sender receiver branches₁ label₂ cont₂' hmem₂')
+  · exact unique_branch_labels_preserved_by_step (unique_branch_labels_branches_mem huniq'.2 hmem₂) hstep_cont
 
 /-! #### Async-async and mu cases -/
 
@@ -334,7 +333,7 @@ private theorem can_step_of_branches_step_mem
     (hbs : BranchesStep step bs act bs') (hmem : (label, cont) ∈ bs) :
     canStep cont act := by
   -- Extract the step from BranchesStep, then use step_implies_can_step.
-    obtain ⟨_, hstep, _⟩ := BranchesStep_mem hbs hmem
+    obtain ⟨_, hstep, _⟩ := branches_step_mem hbs hmem
     exact step_implies_can_step hstep
 
 /-! #### Async composition helpers -/
@@ -372,8 +371,8 @@ private theorem diamond_comm_async_async {act₂ : GlobalActionR}
   -- Use the BranchesStep diamond IH and then rewrap comm_async.
   simp only [GlobalType.uniqueBranchLabels, Bool.and_eq_true] at huniq'
   obtain ⟨branches₃, hbs₁_to_3, hbs₂_to_3, huniq_bs₃⟩ := ih_bs huniq'.2 hind' branches₂ hbs₂
-  obtain ⟨cont₂', hstep_cont₂, hmem₂_in_bs₁⟩ := BranchesStep_mem hbs₁ hmem₂
-  obtain ⟨cont₁', hstep_cont₁, hmem₁_in_bs₂⟩ := BranchesStep_mem hbs₂ hmem₁
+  obtain ⟨cont₂', hstep_cont₂, hmem₂_in_bs₁⟩ := branches_step_mem hbs₁ hmem₂
+  obtain ⟨cont₁', hstep_cont₁, hmem₁_in_bs₂⟩ := branches_step_mem hbs₂ hmem₁
   have hcan₂' : canStep cont₂' act₂ := can_step_of_branches_step_mem hbs₁_to_3 hmem₂_in_bs₁
   have hcan₁' : canStep cont₁' act₁' := can_step_of_branches_step_mem hbs₂_to_3 hmem₁_in_bs₂
   refine ⟨.comm sender receiver branches₃,
@@ -418,7 +417,7 @@ private theorem diamond_mu {act₂ : GlobalActionR}
   cases h₂' with
   | mu _ _ _ g₂'' hstep₂ =>
       simp only [GlobalType.uniqueBranchLabels] at huniq'
-      have huniq_sub := GlobalType.uniqueBranchLabels_substitute body t (.mu t body) huniq' huniq'
+      have huniq_sub := GlobalType.unique_branch_labels_substitute body t (.mu t body) huniq' huniq'
       exact ih_step huniq_sub hind' _ hstep₂
 
 /-! #### Branch-level diamond composition -/
@@ -453,8 +452,8 @@ private theorem diamond_branches_cons {act₂ : GlobalActionR}
       refine ⟨(label, head₃) :: rest₃,
         .cons label head₁ head₃ rest₁ rest₃ act₂ hh₁_to_h₃ hr₁_to_r₃,
         .cons label head₂ head₃ rest₂ rest₃ act₁' hh₂_to_h₃ hr₂_to_r₃, ?_⟩
-        simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
-        exact ⟨huniq_h₃, huniq_r₃⟩
+      simp only [uniqueBranchLabelsBranches, Bool.and_eq_true]
+      exact ⟨huniq_h₃, huniq_r₃⟩
 
 /-! ### Global and configuration diamond theorems -/
 

@@ -15,24 +15,25 @@ package telltale where
     "-Dlinter.unusedVariables=false"
   ]
 
+-- Paco provides parametrized coinduction for EQ2 proofs.
+require paco from git
+  "https://github.com/hxrts/paco-lean" @ "v0.2.0"
+
+-- Iris separation logic framework (revision-pinned for drift control).
+require iris from git
+  "https://github.com/leanprover-community/iris-lean" @ "ac6e3745f735496e6db0592b17f78a4f9dbba384" / "Iris"
+
+-- Lean 4 code formatter.
+require leanfmt from git
+  "https://github.com/toku-sa-n/leanfmt" @ "main"
+
+-- Mathlib is required last so its transitive pins take precedence.
 -- Mathlib provides standard lemmas and automation for proofs.
 -- Revision is pinned to the exact commit used during development.
 -- Run `lake exe cache get` to fetch prebuilt oleans — Mathlib is never
 -- rebuilt from source when the cache is available.
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4" @ "2df2f0150c275ad53cb3c90f7c98ec15a56a1a67"
-
--- Paco provides parametrized coinduction for EQ2 proofs.
-require paco from git
-  "https://github.com/hxrts/paco-lean" @ "v0.1.3"
-
--- Iris separation logic framework (revision-pinned for drift control).
-require iris from git
-  "https://github.com/hxrts/iris-lean" @ "e1e7a78c3a38f9371e4c4f431a34ecc65bda2363"
-
--- Lean 4 code formatter.
-require leanfmt from git
-  "https://github.com/toku-sa-n/leanfmt" @ "main"
+  "https://github.com/leanprover-community/mathlib4" @ "56a005855ea17e0b0958f73ec801ae140b0a1679"
 
 /-! ## Libraries -/
 
@@ -84,6 +85,7 @@ lean_lib Entropy where
 lean_lib FisherInformation where
   globs := #[
     `FisherInformationAPI,
+    `FisherInformationAPI.*,
     `FisherInformationInstance,
     `FisherInformationInstance.*
   ]

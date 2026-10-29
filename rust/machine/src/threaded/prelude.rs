@@ -108,7 +108,7 @@ pub struct ThreadedProtocolMachine {
     clock: SimClock,
     next_coro_id: usize,
     non_terminal_coroutines: usize,
-    pool: ThreadPool,
+    pool: OwnedNativeWorkerPool,
     workers: usize,
     lane_count: usize,
     guard_resources: Arc<Mutex<BTreeMap<String, Value>>>,
@@ -189,21 +189,28 @@ impl ThreadedSessionStore {
         roles: Vec<String>,
         buffer_config: &BufferConfig,
         initial_types: &BTreeMap<String, LocalTypeR>,
-    ) -> SessionId {
+    ) -> Result<SessionId, crate::session::SessionAllocationError> {
         let plan = SessionOpenPlan::new(&roles, initial_types);
         self.open_from_plan(&plan, buffer_config)
     }
 
-    fn open_from_plan(&self, plan: &SessionOpenPlan, buffer_config: &BufferConfig) -> SessionId {
-        let sid = self.next_id.fetch_add(1, Ordering::SeqCst);
-        let state = SessionState::from_open_plan(sid, plan, buffer_config);
-
+    fn open_from_plan(
+        &self,
+        plan: &SessionOpenPlan,
+        buffer_config: &BufferConfig,
+    ) -> Result<SessionId, crate::session::SessionAllocationError> {
+        // The existing exclusive map lock makes allocation plus insertion one
+        // transaction for concurrent source Open instructions and host loading.
         let mut sessions = self
             .sessions
             .write()
             .expect("threaded ProtocolMachine lock poisoned");
+        let sid = self.next_id.load(Ordering::SeqCst);
+        let next = crate::session::admit_session_id(sid, sid, sessions.contains_key(&sid))?;
+        let state = SessionState::from_open_plan(sid, plan, buffer_config);
         sessions.insert(sid, Arc::new(Mutex::new(state)));
-        sid
+        self.next_id.store(next, Ordering::SeqCst);
+        Ok(sid)
     }
 
     fn get(&self, sid: SessionId) -> Option<Arc<Mutex<SessionState>>> {
@@ -304,6 +311,10 @@ fn write_coro_reg(coro: &mut Coroutine, reg: u16, value: Value) -> Result<(), Fa
 
 /// How to update the coroutine after an instruction.
 enum CoroUpdate {
+    /// Consume the original typed result after main-thread commit gates.
+    CompleteNominal,
+    /// Apply explicit source lifecycle against actual main-owner canonical records.
+    OperationLifecycle(crate::operation_lifecycle::OperationAction),
     /// Advance PC by 1, status = Ready.
     AdvancePc,
     /// Set PC to target (for Jmp), status = Ready.

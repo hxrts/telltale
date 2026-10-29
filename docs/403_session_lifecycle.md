@@ -28,6 +28,21 @@ entry is exclusive with respect to machine execution. No worker wave remains
 active across that mutable entry. Host code does not receive a raw mutable
 threaded session store.
 
+Owned host-frame ingress uses `OwnedSession::inject_message_with_sequence`.
+Both backends validate the live capability and full-session mutation scope in
+the same resident-session entry that signs and enqueues the frame. The supplied
+edge sequence is preserved. A stale, terminal, missing or fragment-scoped owner
+cannot enqueue through this boundary. Ownership rejections retain their typed
+source and the existing authority journal. Ownership and enqueue refusals remain
+distinct variants of `OwnedSessionEnqueueError`. Backpressure or drop results
+retain their actual `EnqueueResult`. This new API does not extend the existing exhaustive
+`ProtocolMachineError` enum.
+This entry does not advance endpoint local types, manufacture send-completion
+evidence, issue authority or acknowledge host-resource cleanup. It adds a host
+adapter for the existing signed-buffer operation, not a choreography instruction
+or a new Lean ownership theorem. The raw simulation injection API remains a
+separate testing surface.
+
 Owned commit, rollback, owner-death and abandoned-transfer operations validate
 the calling handle's live capability. Receipt operations also require the
 receipt's session to match the calling handle, so possession of an unrelated
@@ -69,11 +84,17 @@ the original error chain. This host-construction error precedes admitted protoco
 sessions and changes no instruction, capability or protocol outcome.
 
 A failed pool constructor can follow partial native worker startup. Rayon requests
-termination on failure but returns no worker-join acknowledgment. Retaining its
-error therefore proves neither resource-free failure nor completed teardown.
-Targeted session disposal also leaves the shared pool available. It is a separate
-acknowledgment. Tests that retain and join actual worker handles establish only
-their own host-owned settlement, not a stronger production constructor contract.
+termination on failure but returns no worker-join acknowledgment. The production
+owned constructor therefore retains its original native handles alongside the
+actual Rayon cause. Only explicit `NativeWorkerPoolBuildFailure::settle_original_workers`
+issues the retained join receipt. Observing the constructor error or dropping a
+pool does not acknowledge settlement. Targeted session disposal leaves a live
+shared pool available and remains a separate acknowledgment.
+
+The original direct-Rayon error fixtures establish their own host-owned joins.
+The canonical owned-constructor fixtures additionally exercise the production
+handle custodian. Neither fixture family proves signed protocol termination or
+settlement of unrelated application resources.
 
 ## Session Status Values
 
@@ -331,8 +352,201 @@ Risk notes:
 - [Rust-Lean Bridge and Parity](802_rust_lean_parity.md)
 
 Required host integration coverage is part of `just check-session-disposal`: the
-Rust-native inventory requires all 24 nonignored declarations, actual harness
+Rust-native inventory requires all 35 nonignored declarations, actual harness
 discovery and successful execution across the two binary targets. The ownership
 aggregate reuses that gate. Opaque-handle and metadata-substitution compile-fail
 doctests additionally protect the public owned API. CI acceptance runs with
 `CARGO_INCREMENTAL=0`. This does not change the host's independent cleanup duties.
+
+## Explicit private worker-pool settlement
+
+`ThreadedProtocolMachine::shutdown_worker_pool` consumes the original machine,
+requests termination of its private Rayon pool and joins every original native
+worker handle retained by the production spawn handler. The returned opaque
+`NativeWorkerPoolDisposal` acknowledges those joins, including workers that
+terminated with a retained original panic payload. It does not certify protocol
+success, signed-terminal publication, or host resource settlement outside that
+pool. Callers settle their session obligations before consuming the machine.
+
+This host operation blocks until the actual workers exit. It cannot interrupt a
+handler. Ordinary pool Drop remains an unacknowledged termination request.
+Construction failures retain the actual Rayon error and partial native worker
+handles in `NativeWorkerPoolBuildFailure`. Explicit `settle_original_workers`
+joins those original handles and retains the first actual disposal receipt.
+Repeated receipt observation neither restarts workers nor consumes panic payloads.
+
+Both normal shutdown and failed construction use the same resident native-worker
+settlement custodian. It removes only the next original handle at the consuming
+join boundary, without holding its state mutex across the join. Actual worker
+panic results acknowledge their completed joins and retain original payloads.
+A panic of the join operation itself instead returns retained custody and the
+exact panic payload. Its consumed handle remains permanently unproven. Untouched
+original handles, completed-join counts and chronological independent causes
+survive for same-original retry. Settling those remaining workers cannot erase
+the earlier uncertainty or issue a whole-pool acknowledgment.
+
+`NativeWorkerPoolShutdownFailure::OriginalWorker` retains the untouched machine.
+`NativeWorkerPoolShutdownFailure::Unproven` retains the native settlement owner.
+Failed-constructor settlement returns that same resident owner by reference on
+refusal. Every settlement entry rejects an actual original-worker caller, including a still-live worker whose consumed handle has\nunproven settlement, or a
+concurrent settler before consuming another handle. Progress snapshots expose
+observations and retained causes, never reconstructed authority or cleanup ACK.
+No external callback runs under the resident state mutex. The host operation is
+still blocking and cannot interrupt a stuck worker or provide async Drop cleanup.
+
+Eleven native component fixtures are required. Five additions exercise injected
+unwind at the canonical consuming join boundary, preservation of earlier and
+later worker panic causes with real pending workers, same-original remaining
+joins, actual-worker refusal, retained consumed-worker identity across unwind, and\nobservation during a pending join. Injection
+does not establish an actual operating-system deadlock refusal or settlement of
+the handle whose join unwound. Actual compilation and execution remain required.
+
+Shutdown checks the actual original worker handles before requesting termination.
+A caller executing on one of those workers receives the unchanged original
+machine in the refusal result and must transfer it to an external owning context
+for same-original retry. This prevents self-join without discarding custody.
+
+`CARGO_INCREMENTAL=0`. This does not change the host's independent cleanup duties.
+
+## Typed Host Outcome State Commit
+
+InvokeStep and Receive results update coroutine registers only after successful
+status and exact response-kind acceptance. The failed instruction does not
+advance its continuation, and an attached payload on a failure or blocked result
+does not replace the original register file. A raw successful exchange with the
+wrong response kind remains observable but is a Failed lifecycle result and
+cannot publish effect.succeeded.
+
+This state-commit rule is not a receive-buffer rollback guarantee. It does not
+undo a dequeued message, validate a domain label, acknowledge a host future, or
+implement a generation-bound asynchronous completion. Those are separate
+protocol and host-resource obligations.
+
+VM Invoke and Receive requests retain their actual configured register width as
+optional instruction context. All VM state-replacing responses, including branch
+Choose/Receive, must preserve that width before register replacement or effect-
+success publication. This enforces the canonical Rust `wf_coroutine_state`
+register-width invariant, not an inferred equal-length convention. Receive also
+retains its actual destination and requires that register to exist. Branch receive
+omits the destination because it performs no destination write, but retains width.
+After existing signature, replay and payload validation, both VM receive backends reject an out-of-range instruction destination with `OutOfRegisters` before invoking the host receive handler. This preserves the VM fault taxonomy and prevents host receive mutation for that invalid destination. It does not roll back earlier dequeue or replay work. Handler-only wrappers omit both instruction contexts. Missing fields on older
+serialized requests decode as absent and do not invent historical VM context. The original raw outcome remains observational evidence. This check
+is not rollback of earlier buffer dequeue, replay consumption, clock or type work.
+Optional observability retention cannot replace an original host failure: the
+canonical recorded exchange supplies lifecycle status without a second synthetic
+issue/complete cycle. Blocked remains a Blocked observation while the synchronous
+instruction reports its existing blocked-contract fault.
+
+Host-response acceptance is distinct from whole-instruction commit. In particular,
+Invoke may apply its accepted register state and host-success observation before
+persistence-delta application faults. No rollback of that state, emitted events,
+or earlier communication work is implied by the response-kind/destination guard.
+The prior cooperative owner could evict live enforcement inputs under diagnostic
+retention, while the prior threaded owner used untrimmed vectors. The canonical
+live/resident retention rule below repairs that storage boundary in both existing
+owners. Response/error preservation alone was insufficient. Neither correction
+claims nominal authority, a disposal acknowledgment or a Lean correspondence proof.
+
+Serialized request context is an observation used to validate response shape, not
+proof of original request ownership or nominal authority. The replay handler
+selects by expected entry kind. It does not establish full incoming request
+identity. Actual VM producers attach current configured width before execution,
+including when replay supplies the response. Lean's abstract effect-context step
+and spawn register copying are not a proof of this concrete Rust register ABI.
+
+Canonical host exchanges also supply Acquire/Release/SendDecision outcome
+observations directly. Duplicate synthetic issue/complete cycles must not replace
+the original typed failure under optional diagnostic retention. Existing policy
+is preserved: cooperative Acquire Blocked waits on AcquireDenied, threaded Acquire
+Blocked reports its synchronous blocked-contract fault, and Release/SendDecision
+Blocked remain synchronous faults. The separate Send buffer WouldBlock producer
+retains its actual live capacity obligation: successful host decision is not queue
+admission, so that issue/complete pair is not a duplicate host outcome.
+
+Live outstanding effects and their operation/progress records survive Disabled
+and Capped observability settings in the same canonical owner fields. Targeted
+session invalidation updates those originals before terminal-history pruning.
+Other live sessions remain untouched. Retention pruning is not a completion,
+cleanup acknowledgment, owner transfer or proof that a host future stopped.
+
+Resident-session terminal records remain canonical inputs to agreement/WAL gates
+and cannot be discarded as history. Successful targeted reap or actual closed
+session reap establishes their nonresidency before terminal-history pruning.
+The next real WalSync gate must see the same original operation and evidence
+under Full, Capped1 and Disabled retention. Loss must not silently select the
+synthetic fallback operation or its default agreement level.
+
+The composed required native ownership/disposal inventory contains 59 unique
+fixtures: the original 35 plus 17 strict-outcome/error, six live/resident retention
+and one cooperative full-queue/Disabled regression. The existing canonical checker
+requires their nonignored declarations, actual harness discovery and successful
+execution. Declarations alone are not passing evidence. Module filters can also
+execute required fixtures appearing in a narrower sub-suite, without changing the
+unique required count. Authority guard DSL/compiler/bridge fixtures and formal
+examples remain separate targets and obligations.
+
+### Authoritative-read reference identity
+
+Readiness and cancellation witness numbers are local to a session. New semantic
+exports use opaque content references covering every exported AuthoritativeRead
+field except read_id itself: session, owner, kind, lifecycle, predicate, witness
+number, generation and reason. Fields have explicit None/Some discriminants and
+UTF-8 byte-length framing. Equal complete content may alias. Distinct complete
+content does not, including distinct rejected submissions for one witness.
+Operation and region read references use those same canonical producer IDs.
+These observations do not replace the actual issued witness or its consumption
+checks and confer no additional runtime authority.
+
+The v1 semantic-object field schema remains readable: existing unambiguous
+serialized references keep their original bytes and can still be looked up.
+Lookup accepts repeated identical read records, but rejects different records
+under one reference rather than choosing the first. This includes ambiguous
+historical cross-session references. No migration reconstructs witness authority
+from a reference. Consumers must not parse read-reference strings as a stable
+wire grammar. Newly generated references are deliberately session-qualified.
+Output-condition references remain content-addressed by predicate and output
+digest: identical reobservations are allowed. Contradictory records refuse
+lookup. This does not assign an occurrence identity or claim that every check
+has a distinct audit event.
+
+### Timeout-witness identifier exhaustion
+
+The cooperative topology timeout producer allocates witness numbers within its
+original machine, separately from session-local readiness/cancellation numbers.
+It refuses an exhausted successor before replacing an existing timeout, changing
+eligibility, or publishing timeout evidence. A returned topology batch is
+preflighted for all required witness numbers before any event in that batch is
+applied. The host callback's already-observed outcome remains retained. Refusal
+does not undo that observation, renew a window or acknowledge pending work.
+The existing contract-violation error reports exhaustion. The threaded topology
+path currently records timeout horizons without issuing these TimeoutWitness
+objects. This correction does not invent threaded witness parity or new
+physical-time behavior. SimClock admission and original timeout horizons remain
+unchanged.
+
+## Finite session-identifier admission
+
+Rust session identifiers are finite `usize` values. Fresh open reserves the maximum
+value as its exhausted high-water mark, and rejects that boundary before inserting
+a session or replacing an existing resident. Explicit-id open is fresh allocation,
+not restoration: it rejects an id below the original high-water mark or already in
+the resident map. Restore/resume retains the original complete store and counter.
+It must not replay fresh open with a previous session id.
+
+Both stores use the same checked admission rule. The cooperative exclusive borrow
+and threaded existing map write lock cover counter admission plus insertion.
+Failure preserves the original counter, resident session, capability and original
+outcomes. Host loading returns the typed `SessionAllocationError`. Source `Open`
+retains it in `Fault::SessionAllocation`, classified under the existing close fault
+category and propagated through the canonical fault/trace path. No external handler
+is called by this allocation boundary. Existing arity, role and handler checks
+precede allocation as before. A public round can already have advanced its selected
+clock and run topology ingress before dispatch. This refusal does not rewind those
+actual observations. No `Opened` occurrence is produced for a refused allocation.
+
+`OwnedSession` private construction prevents callers from fabricating a handle,
+but its resident capability check is not an independent per-machine nonce. Fresh
+session ids must therefore remain fresh. Resetting a session by overwriting its id
+could reset its resident ownership generation, and must not be treated as a safe
+way to retire or restore original custody. This finite-admission preparation is not
+a proof of arbitrary serialized snapshot provenance or cross-machine owner scope.

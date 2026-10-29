@@ -13,6 +13,7 @@ set_option autoImplicit false
 namespace Semantics.Determinism
 
 open Semantics.Environment
+open SessionTypes.GlobalType
 
 /-- Embed a subject-reduction configuration into the determinism interface by
 fixing an environment snapshot. -/

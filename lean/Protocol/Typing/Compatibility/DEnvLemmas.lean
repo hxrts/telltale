@@ -18,7 +18,7 @@ set_option autoImplicit false
 set_option linter.unnecessarySimpa false
 
 open scoped Classical
-open Batteries
+open Batteries RBTree
 
 section
 
@@ -137,7 +137,8 @@ theorem find_d_append_left {D₁ D₂ : DEnv} {e : Edge} {ts : List ValType} :
       (RBMap.foldl (fun acc k v => insertIfMissing acc k v) D₁.map D₂.map).find? e = some ts := by
     simpa [RBMap.foldl_eq_foldl_toList] using hfold_list
   change (DEnvUnion D₁ D₂).find? e = some ts
-  simpa [DEnvUnion, insertIfMissing] using hfold
+  simp only [DEnvUnion, d_env_find?_of_map]
+  exact hfold
 
 theorem find_d_append_right {D₁ D₂ : DEnv} {e : Edge} :
     D₁.find? e = none →
@@ -160,7 +161,8 @@ theorem find_d_append_right {D₁ D₂ : DEnv} {e : Edge} :
         D₂.map.find? e := by
     simpa [hlookup] using hfold
   change (DEnvUnion D₁ D₂).find? e = D₂.map.find? e
-  simpa [DEnvUnion, insertIfMissing] using hfold'
+  simp only [DEnvUnion, d_env_find?_of_map]
+  exact hfold'
 
 /-! ## DEnv Session-Set Consequences -/
 

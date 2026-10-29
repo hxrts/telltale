@@ -270,7 +270,7 @@ theorem exists_minPriority_of_frontier_ne_nil
             intro other hOther
             rcases List.mem_cons.mp hOther with rfl | hOtherTail
             · exact Nat.le_refl _
-            · exact le_trans hHeadLeast (hTailLeast other hOtherTail)
+            · exact Nat.le_trans hHeadLeast (hTailLeast other hOtherTail)
           · refine ⟨tailMin, ?_⟩
             refine ⟨by simp [hTailPresent], ?_⟩
             intro other hOther
@@ -374,7 +374,7 @@ theorem executable_canonical_step_preserves_invariants
             simpa [hCommitGoal] using
               (List.mem_append.mpr <|
                 Or.inr (mem_executableGScoreUpdates_of_mem_normalizedCommits hCommitMemNormalized))
-  · simpa [executableCanonicalStep, executableNextFrontier] using
+  · simpa [FrontierNodesNodup, executableCanonicalStep, executableNextFrontier] using
       hInv.frontierNodup.sublist (executableNextFrontierNodes_sublist_frontierNodes state)
   · have hFresh :
         ∀ ⦃node : Nat⦄, node ∈ executableServicedNodes state → node ∉ state.closedNodes := by

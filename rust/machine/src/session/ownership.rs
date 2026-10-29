@@ -1,6 +1,18 @@
 // Canonical host-ownership transitions shared by both storage backends.
 // Store adapters select and exclusively borrow the real resident session.
 impl SessionState {
+    pub(crate) fn send_owned_with_sequence(
+        &mut self,
+        capability: &OwnershipCapability,
+        from: &str,
+        to: &str,
+        value: Value,
+        sequence_no: u64,
+    ) -> Result<Result<crate::buffer::EnqueueResult, String>, OwnershipError> {
+        Self::require_session_scope(self, capability)?;
+        Ok(self.send_with_sequence(from, to, value, sequence_no))
+    }
+
     pub(crate) fn authority_records_since(&mut self, start: usize) -> &mut [AuthorityAuditRecord] {
         &mut self.ownership.audit_log[start..]
     }
@@ -71,12 +83,19 @@ impl SessionState {
             });
         };
         if !current.scope.allows_session_mutation() {
-            return Err(OwnershipError::ScopeViolation {
+            let error = OwnershipError::ScopeViolation {
                 session_id: session.sid,
                 owner_id: current.owner_id.clone(),
                 required: OwnershipScope::Session,
                 actual: current.scope.clone(),
-            });
+            };
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipCapability(capability.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some(error.to_string()),
+            );
+            return Err(error);
         }
         Ok(())
     }
@@ -101,7 +120,8 @@ impl SessionState {
     }
 
     fn require_attenuation(
-        session: &SessionState,
+        session: &mut SessionState,
+        capability: &OwnershipCapability,
         new_scope: &OwnershipScope,
     ) -> Result<(), OwnershipError> {
         let current = session
@@ -112,12 +132,19 @@ impl SessionState {
                 session_id: session.sid,
             })?;
         if !new_scope.is_attenuation_of(&current.scope) {
-            return Err(OwnershipError::ScopeViolation {
+            let error = OwnershipError::ScopeViolation {
                 session_id: session.sid,
                 owner_id: current.owner_id.clone(),
                 required: new_scope.clone(),
                 actual: current.scope.clone(),
-            });
+            };
+            Self::push_authority_audit(
+                session,
+                AuthorityArtifact::OwnershipCapability(capability.clone()),
+                AuthorityAuditEvent::Rejected,
+                Some(error.to_string()),
+            );
+            return Err(error);
         }
         Ok(())
     }
@@ -227,7 +254,7 @@ impl SessionState {
                 claim_id: pending.receipt.claim_id,
             });
         }
-        Self::require_attenuation(session, &new_scope)?;
+        Self::require_attenuation(session, capability, &new_scope)?;
         let to_generation = Self::advance_counter(session, capability.generation, "generation")?;
         let claim_id = session.ownership.next_claim_id;
         session.ownership.next_claim_id = Self::advance_counter(session, claim_id, "claim")?;
@@ -379,7 +406,7 @@ impl SessionState {
                 claim_id: pending.receipt.claim_id,
             });
         }
-        Self::require_attenuation(session, &new_scope)?;
+        Self::require_attenuation(session, capability, &new_scope)?;
         let generation = Self::advance_counter(session, capability.generation, "generation")?;
         let next = OwnershipCapability {
             session_id: capability.session_id,
@@ -754,21 +781,35 @@ mod ownership_preflight_tests {
                 OwnershipScope::Fragments(BTreeSet::from(["A".into()])),
             )
             .unwrap();
-        let before = session.ownership.clone();
+        let mut expected = session.ownership.clone();
         for scope in [
             OwnershipScope::Session,
             OwnershipScope::Fragments(BTreeSet::from(["B".into()])),
         ] {
+            let error = OwnershipError::ScopeViolation {
+                session_id: session.sid,
+                owner_id: narrow.owner_id.clone(),
+                required: scope.clone(),
+                actual: narrow.scope.clone(),
+            };
+            let rejection = AuthorityAuditRecord {
+                tick: None,
+                artifact: AuthorityArtifact::OwnershipCapability(narrow.clone()),
+                event: AuthorityAuditEvent::Rejected,
+                reason: Some(error.to_string()),
+            };
             assert!(matches!(
                 session.attenuate_ownership_scope(&narrow, scope.clone()),
-                Err(OwnershipError::ScopeViolation { .. })
+                Err(actual) if actual == error
             ));
-            assert_eq!(before, session.ownership);
+            expected.audit_log.push(rejection.clone());
+            assert_eq!(expected, session.ownership);
             assert!(matches!(
                 session.begin_ownership_transfer(&narrow, "next", scope),
-                Err(OwnershipError::ScopeViolation { .. })
+                Err(actual) if actual == error
             ));
-            assert_eq!(before, session.ownership);
+            expected.audit_log.push(rejection.clone());
+            assert_eq!(expected, session.ownership);
         }
     }
 

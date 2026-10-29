@@ -414,6 +414,32 @@ impl Choreography {
             }
         }
 
+        self.validate_body()
+    }
+
+    /// Validate an original selected operation in its inherited role scope.
+    /// Parent roles need not communicate in an operation-local body; its
+    /// explicit original owner must still be declared in that scope.
+    pub(crate) fn validate_selected_operation(
+        &self,
+        operation: &OperationDeclaration,
+    ) -> Result<(), ValidationError> {
+        if !self.operation_declarations().contains(operation) {
+            return Err(ValidationError::ExtensionError(
+                "selected operation is absent from its original declarations".into(),
+            ));
+        }
+        if !self
+            .roles
+            .iter()
+            .any(|role| role.name() == operation.owner_role.as_str())
+        {
+            return Err(ValidationError::UndefinedRole(operation.owner_role.clone()));
+        }
+        self.validate_body()
+    }
+
+    fn validate_body(&self) -> Result<(), ValidationError> {
         // Check protocol is well-formed
         self.protocol.validate(&self.roles)?;
         self.validate_proof_bundles()?;
@@ -845,7 +871,11 @@ impl Choreography {
     #[must_use]
     pub fn language_tier_status(&self) -> LanguageTierStatus {
         let theory_convertible = super::convert::protocol_to_global(&self.protocol).is_ok();
-        let session_blocker = find_session_projection_blocker(&self.protocol);
+        let session_blocker = if self.protocol.contains_execution_placement() {
+            Some("explicit binding placement requires nominal machine lowering")
+        } else {
+            find_session_projection_blocker(&self.protocol)
+        };
         let missing_progress = self
             .operation_declarations()
             .iter()
@@ -863,6 +893,11 @@ impl Choreography {
                 )
             });
 
+        let missing_progress = if self.protocol.contains_execution_placement() {
+            Some("explicit binding placement requires nominal machine lowering".to_string())
+        } else {
+            missing_progress
+        };
         let protocol_machine_executable = missing_progress.is_none();
         let session_projectable = session_blocker.is_none();
         let strongest_tier = match (session_projectable, protocol_machine_executable) {
@@ -870,7 +905,9 @@ impl Choreography {
             (false, true) => LanguageTier::ProtocolMachineExecutable,
             (_, false) => LanguageTier::ProofOnly,
         };
-        let diagnostic = if let Some(blocker) = session_blocker {
+        let diagnostic = if self.protocol.contains_execution_placement() {
+            "explicit binding placement is retained in the source but executable nominal lowering is unavailable".to_string()
+        } else if let Some(blocker) = session_blocker {
             format!(
                 "full spec is valid, protocol-machine execution is available, but session projection is blocked: {blocker}"
             )

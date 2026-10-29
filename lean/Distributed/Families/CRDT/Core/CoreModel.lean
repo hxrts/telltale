@@ -1,3 +1,5 @@
+import Distributed.Families.CRDT.Core.Semilattice
+
 set_option autoImplicit false
 
 /-! # Distributed.Families.CRDT
@@ -8,7 +10,7 @@ Reusable CRDT theorem-family infrastructure:
 - principal capability/admission claims,
 - op/state equivalence,
 - GC safety and bounded-approximation claims,
-- CRDT hypothesis bundles from the research plan.
+- the CRDT model as a join-semilattice with delta updates (`Model`).
 -/
 
 /-
@@ -27,7 +29,10 @@ universe u v w x y z
 
 /-! ## Model Interface and Core Relations -/
 
-/-- Minimal model interface for CRDT-envelope and equivalence reasoning. -/
+/-- CRDT model: a join-semilattice of replica states, and for each update the
+state-delta it contributes. A replica applies update `o` by joining `effect o`
+(delta-state CRDT semantics). `observe`/`distance` are the safety-visible
+projection and a convergence distance used by envelope statements. -/
 structure Model
     (State : Type u)
     (Op : Type v)
@@ -36,20 +41,58 @@ structure Model
     (Program : Type y) where
   observe : State → Obs
   distance : State → State → Nat
-  semilatticeCoreClass : Prop
-  opContextLayerClass : Prop
-  minimalOpStateEquivalenceAssumptions : Prop
-  canonicalConvergenceDistanceClass : Prop
-  mixingTimeControlledClass : Prop
-  hotspotSlowModesClass : Prop
-  driftDecayClass : Prop
-  sequenceSubclassClass : Prop
-  epochBarrierClass : Prop
-  boundedMetadataApproxClass : Prop
-  multiscaleObservablesClass : Prop
-  metadataTradeoffFrontierClass : Prop
-  gcCausalDominanceClass : Prop
-  stabilizationLowerBoundClass : Prop
+  lattice : StateBasedCRDT State
+  effect : Op → State
+
+/-- Apply one update at a replica: join its delta. -/
+def Model.apply
+    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
+    (M : Model State Op Context Obs Program) (o : Op) (s : State) : State :=
+  M.lattice.join s (M.effect o)
+
+/-- Replica state after delivering a list of updates to `base`, in list order. -/
+def Model.deliver
+    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
+    (M : Model State Op Context Obs Program) (base : State) (ops : List Op) : State :=
+  ops.foldl (fun s o => M.apply o s) base
+
+/-! ## Update Laws and Strong Eventual Consistency -/
+
+section UpdateLaws
+
+variable {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
+  (M : Model State Op Context Obs Program)
+
+/-- Updates are inflationary: a replica never loses information. -/
+theorem Model.apply_inflationary (o : Op) (s : State) : M.lattice.le s (M.apply o s) :=
+  M.lattice.join_left s (M.effect o)
+
+/-- Updates are monotone in the replica state. -/
+theorem Model.apply_monotone (o : Op) {s t : State} (h : M.lattice.le s t) :
+    M.lattice.le (M.apply o s) (M.apply o t) :=
+  merge_monotone_of_state_based_crdt M.lattice h (M.lattice.le_refl _)
+
+/-- Re-delivering an update is a no-op (idempotence). -/
+theorem Model.apply_idem (o : Op) (s : State) : M.apply o (M.apply o s) = M.apply o s := by
+  simp only [Model.apply, M.lattice.join_assoc, M.lattice.join_idem]
+
+/-- Delivering updates is merging their deltas. -/
+theorem Model.deliver_eq_mergeAll (ops : List Op) :
+    ∀ base, M.deliver base ops = mergeAll M.lattice base (ops.map M.effect) := by
+  induction ops with
+  | nil => intro base; rfl
+  | cons o os ih => intro base; exact ih (M.apply o base)
+
+/-- Strong eventual consistency for the model: replicas from the same base that
+delivered the same set of updates (any order, duplicates allowed) are equal. -/
+theorem Model.sec (base : State) (ops₁ ops₂ : List Op)
+    (hSame : ∀ o, o ∈ ops₁ ↔ o ∈ ops₂) : M.deliver base ops₁ = M.deliver base ops₂ := by
+  rw [M.deliver_eq_mergeAll, M.deliver_eq_mergeAll]
+  apply strong_eventual_convergence_of_state_based_crdt
+  intro x
+  simp only [List.mem_map, hSame]
+
+end UpdateLaws
 
 /-- Canonical run type used in CRDT envelope statements. -/
 abbrev Run (State : Type u) := Nat → State
@@ -136,80 +179,6 @@ def AdmissionCompleteness
   ∀ dUser, dUser ≤ dProg ↔ CapabilityAdmissible envelopeBudget dUser
 
 /-! ## Equivalence and Approximation Forms -/
-
-/-! ## State-Based CRDT Semantics -/
-
-/-- Reusable state-based CRDT algebra: a join-semilattice with bottom. -/
-structure StateBasedCRDT (State : Type u) where
-  le : State → State → Prop
-  join : State → State → State
-  bottom : State
-  le_refl : ∀ s, le s s
-  le_trans : ∀ {a b c}, le a b → le b c → le a c
-  le_antisymm : ∀ {a b}, le a b → le b a → a = b
-  join_assoc : ∀ a b c, join (join a b) c = join a (join b c)
-  join_comm : ∀ a b, join a b = join b a
-  join_idem : ∀ a, join a a = a
-  join_left : ∀ a b, le a (join a b)
-  join_right : ∀ a b, le b (join a b)
-  join_lub : ∀ {a b c}, le a c → le b c → le (join a b) c
-  bottom_le : ∀ a, le bottom a
-
-/-- Merge is inflationary in both inputs. -/
-def MergeInflationary {State : Type u} (S : StateBasedCRDT State) : Prop :=
-  ∀ a b, S.le a (S.join a b) ∧ S.le b (S.join a b)
-
-/-- Merge is monotone in both inputs. -/
-def MergeMonotone {State : Type u} (S : StateBasedCRDT State) : Prop :=
-  ∀ {a b c d}, S.le a c → S.le b d → S.le (S.join a b) (S.join c d)
-
-/-- Strong eventual convergence for two replicas after exchanging the same states. -/
-def StrongEventualConvergence {State : Type u} (S : StateBasedCRDT State) : Prop :=
-  ∀ a b, S.join a b = S.join b a
-
-/-- Sequentially merge a finite delivered state/update frontier. -/
-def mergeAll {State : Type u} (S : StateBasedCRDT State) (base : State)
-    (updates : List State) : State :=
-  updates.foldl S.join base
-
-/-- Two replicas have received the same finite causal frontier from the same base. -/
-def SameFiniteCausalDelivery {State : Type u} (S : StateBasedCRDT State)
-    (base : State) (updates : List State) (left right : State) : Prop :=
-  left = mergeAll S base updates ∧ right = mergeAll S base updates
-
-/-- Same finite causal delivery yields convergence. -/
-def FiniteCausalDeliveryConverges {State : Type u} (S : StateBasedCRDT State) : Prop :=
-  ∀ base updates left right,
-    SameFiniteCausalDelivery S base updates left right → left = right
-
-/-- Join laws imply inflationary merge. -/
-theorem merge_inflationary_of_state_based_crdt
-    {State : Type u} (S : StateBasedCRDT State) :
-    MergeInflationary S := by
-  intro a b
-  exact ⟨S.join_left a b, S.join_right a b⟩
-
-/-- Join laws imply merge monotonicity in both inputs. -/
-theorem merge_monotone_of_state_based_crdt
-    {State : Type u} (S : StateBasedCRDT State) :
-    MergeMonotone S := by
-  intro a b c d hAC hBD
-  apply S.join_lub
-  · exact S.le_trans hAC (S.join_left c d)
-  · exact S.le_trans hBD (S.join_right c d)
-
-/-- Join commutativity gives the two-replica SEC shape after state exchange. -/
-theorem strong_eventual_convergence_of_state_based_crdt
-    {State : Type u} (S : StateBasedCRDT State) :
-    StrongEventualConvergence S :=
-  S.join_comm
-
-/-- Replicas with the same finite delivered causal frontier converge. -/
-theorem finite_causal_delivery_converges_of_state_based_crdt
-    {State : Type u} (S : StateBasedCRDT State) :
-    FiniteCausalDeliveryConverges S := by
-  intro _base _updates _left _right hDelivered
-  exact hDelivered.1.trans hDelivered.2.symm
 
 /-- Op-vs-state semantics equivalence theorem form. -/
 def OpStateEquivalence
@@ -344,109 +313,13 @@ def evalCoreNoGuard
     (k : OpCore OpTag Args) (_ctx : Context) (s : State) : State :=
   interp.delta k.opTag k.args s
 
-/-- Simple concrete CRDT model used for OpCore boundary counterexamples. -/
-structure NatSemilatticeCoreLaw : Prop where
-  comm : ∀ a b : Nat, Nat.max a b = Nat.max b a
-
-@[simp] theorem natSemilatticeCoreLaw : NatSemilatticeCoreLaw := by
-  exact ⟨fun a b => Nat.max_comm a b⟩
-
-structure UnitOpContextLayerLaw : Prop where
-  unitContext : ∀ c : Unit, c = ()
-
-@[simp] theorem unitOpContextLayerLaw : UnitOpContextLayerLaw := by
-  exact ⟨by intro c; cases c; rfl⟩
-
-structure NatOpStateEquivalenceLaw : Prop where
-  refl : ∀ s : Nat, s = s
-
-@[simp] theorem natOpStateEquivalenceLaw : NatOpStateEquivalenceLaw := by
-  exact ⟨fun _ => rfl⟩
-
-structure NatConvergenceDistanceLaw : Prop where
-  selfZero : ∀ s : Nat, (if s = s then 0 else 1) = 0
-
-@[simp] theorem natConvergenceDistanceLaw : NatConvergenceDistanceLaw := by
-  exact ⟨by intro s; simp⟩
-
-structure NatMixingControlLaw : Prop where
-  reflexiveBound : ∀ t : Nat, t ≤ t
-
-@[simp] theorem natMixingControlLaw : NatMixingControlLaw := by
-  exact ⟨fun t => Nat.le_refl t⟩
-
-structure NatHotspotSlowModeLaw : Prop where
-  oneStepBound : ∀ s : Nat, s ≤ s + 1
-
-@[simp] theorem natHotspotSlowModeLaw : NatHotspotSlowModeLaw := by
-  exact ⟨fun s => Nat.le_succ s⟩
-
-structure NatDriftDecayLaw : Prop where
-  selfSubZero : ∀ s : Nat, s - s = 0
-
-@[simp] theorem natDriftDecayLaw : NatDriftDecayLaw := by
-  exact ⟨by intro s; simp⟩
-
-structure NatSequenceSubclassLaw : Prop where
-  successorFresh : ∀ i : Nat, i < i + 1
-
-@[simp] theorem natSequenceSubclassLaw : NatSequenceSubclassLaw := by
-  exact ⟨fun i => Nat.lt_succ_self i⟩
-
-structure NatEpochBarrierLaw : Prop where
-  epochReflexive : ∀ e : Nat, e ≤ e
-
-@[simp] theorem natEpochBarrierLaw : NatEpochBarrierLaw := by
-  exact ⟨fun e => Nat.le_refl e⟩
-
-structure NatBoundedMetadataApproxLaw : Prop where
-  oneStepBudget : ∀ t : Nat, t ≤ t + 1
-
-@[simp] theorem natBoundedMetadataApproxLaw : NatBoundedMetadataApproxLaw := by
-  exact ⟨fun t => Nat.le_succ t⟩
-
-structure NatMultiscaleObservableLaw : Prop where
-  observableRefl : ∀ s : Nat, s = s
-
-@[simp] theorem natMultiscaleObservableLaw : NatMultiscaleObservableLaw := by
-  exact ⟨fun _ => rfl⟩
-
-structure NatMetadataFrontierLaw : Prop where
-  frontierReflexive : ∀ t : Nat, t ≤ t
-
-@[simp] theorem natMetadataFrontierLaw : NatMetadataFrontierLaw := by
-  exact ⟨fun t => Nat.le_refl t⟩
-
-structure NatGCCausalDominanceLaw : Prop where
-  dominanceRefl : ∀ s : Nat, s = s
-
-@[simp] theorem natGCCausalDominanceLaw : NatGCCausalDominanceLaw := by
-  exact ⟨fun _ => rfl⟩
-
-structure NatStabilizationLowerBoundLaw : Prop where
-  nonnegativeTail : ∀ churn : Nat, 0 ≤ churn
-
-@[simp] theorem natStabilizationLowerBoundLaw : NatStabilizationLowerBoundLaw := by
-  exact ⟨fun churn => Nat.zero_le churn⟩
-
-/-- Simple concrete CRDT model used for OpCore boundary counterexamples. -/
+/-- Simple concrete CRDT model (grow-only max register) used for OpCore boundary
+counterexamples. -/
 def natUnitModel : Model Nat Unit Unit Nat Unit where
   observe := fun s => s
   distance := fun s₁ s₂ => if s₁ = s₂ then 0 else 1
-  semilatticeCoreClass := NatSemilatticeCoreLaw
-  opContextLayerClass := UnitOpContextLayerLaw
-  minimalOpStateEquivalenceAssumptions := NatOpStateEquivalenceLaw
-  canonicalConvergenceDistanceClass := NatConvergenceDistanceLaw
-  mixingTimeControlledClass := NatMixingControlLaw
-  hotspotSlowModesClass := NatHotspotSlowModeLaw
-  driftDecayClass := NatDriftDecayLaw
-  sequenceSubclassClass := NatSequenceSubclassLaw
-  epochBarrierClass := NatEpochBarrierLaw
-  boundedMetadataApproxClass := NatBoundedMetadataApproxLaw
-  multiscaleObservablesClass := NatMultiscaleObservableLaw
-  metadataTradeoffFrontierClass := NatMetadataFrontierLaw
-  gcCausalDominanceClass := NatGCCausalDominanceLaw
-  stabilizationLowerBoundClass := NatStabilizationLowerBoundLaw
+  lattice := natMaxCRDT
+  effect := fun _ => 1
 
 end CRDT
 end Distributed

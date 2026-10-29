@@ -162,20 +162,10 @@ private theorem head_coherent_merge_link {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
           (lookup_d_append_left_of_right_none (D₁ := D₁) (D₂ := D₂) (e := e) hD2none)
       have hActiveLeft : ActiveEdge G₁ e := active_edge_of_endpoints hSenderLeft hLeft
       have hHeadLeft := hHead₁ e hActiveLeft
-      have hHeadLeft' :
-          match some Lrecv with
-          | some (.recv _ T _) =>
-              match lookupD D₁ e with
-              | [] => True
-/- ## Structured Block 4 -/
-              | T' :: _ => T = T'
-          | some (.branch _ _) =>
-              match lookupD D₁ e with
-              | [] => True
-              | T' :: _ => T' = .string
-          | _ => True := by
-        simpa [HeadCoherent, hLeft] using hHeadLeft
-      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadLeft'
+      dsimp only at hHeadLeft ⊢
+      rw [hLeft] at hHeadLeft
+      rw [hGrecv, hTraceEq]
+      exact hHeadLeft
   -- head_coherent_merge: Receiver-Origin in Right Component
   | inr hRight =>
       have hSid : e.sid ∈ SessionsOf G₂ :=
@@ -200,19 +190,10 @@ private theorem head_coherent_merge_link {G₁ G₂ : GEnv} {D₁ D₂ : DEnv}
           (lookup_d_append_right (D₁ := D₁) (D₂ := D₂) (e := e) hD1none)
       have hActiveRight : ActiveEdge G₂ e := active_edge_of_endpoints hSenderRight hRight.2
       have hHeadRight := hHead₂ e hActiveRight
-      have hHeadRight' :
-          match some Lrecv with
-          | some (.recv _ T _) =>
-              match lookupD D₂ e with
-              | [] => True
-              | T' :: _ => T = T'
-          | some (.branch _ _) =>
-              match lookupD D₂ e with
-              | [] => True
-              | T' :: _ => T' = .string
-          | _ => True := by
-        simpa [HeadCoherent, hRight.2] using hHeadRight
-      simpa [HeadCoherent, hGrecv, hTraceEq] using hHeadRight'
+      dsimp only at hHeadRight ⊢
+      rw [hRight.2] at hHeadRight
+      rw [hGrecv, hTraceEq]
+      exact hHeadRight
 
 -- ValidLabels Merge Lemma
 private theorem valid_labels_merge {G₁ G₂ : GEnv} {D₁ D₂ : DEnv} {B₁ B₂ : Buffers}
@@ -275,17 +256,17 @@ theorem link_preserves_wt_mon_full (p₁ p₂ : DeployedProtocol)
   constructor
   · -- coherent
 /- ## Structured Block 6 -/
-    simpa [composeMonitorState] using link_ok_full_coherent p₁ p₂ hLink
+    simpa [composeMonitorState, DeployedProtocol.initMonitorState] using link_ok_full_coherent p₁ p₂ hLink
   · -- head_coherent
-    simpa [composeMonitorState] using
+    simpa [composeMonitorState, DeployedProtocol.initMonitorState] using
       head_coherent_merge_link hWT₁.headCoherent hWT₂.headCoherent hDisjG
         p₁.dConsistent_cert p₂.dConsistent_cert
   · -- validLabels
-    simpa [composeMonitorState] using
+    simpa [composeMonitorState, DeployedProtocol.initMonitorState] using
       valid_labels_merge hWT₁.validLabels hWT₂.validLabels hDisjG
         p₁.bConsistent_cert p₂.bConsistent_cert
   · -- buffers_typed
-    simpa [composeMonitorState] using
+    simpa [composeMonitorState, DeployedProtocol.initMonitorState] using
       merge_bufs_typed p₁.initGEnv p₂.initGEnv p₁.initDEnv p₂.initDEnv
         p₁.initBufs p₂.initBufs
         hWT₁.buffers_typed hWT₂.buffers_typed
@@ -293,11 +274,11 @@ theorem link_preserves_wt_mon_full (p₁ p₂ : DeployedProtocol)
   -- link_preserves_wt_mon_full: Linear-Context Obligations
   · -- lin_valid
     intro e S hMem
-    simpa [composeMonitorState] using
+    simpa [composeMonitorState, DeployedProtocol.initMonitorState] using
       merge_lin_valid p₁.initGEnv p₂.initGEnv p₁.initLin p₂.initLin
         hWT₁.lin_valid hWT₂.lin_valid hDisjG e S hMem
   · -- lin_unique
-    simpa [composeMonitorState] using
+    simpa [composeMonitorState, DeployedProtocol.initMonitorState] using
       merge_lin_unique p₁.initLin p₂.initLin hWT₁.lin_unique hWT₂.lin_unique
         (fun e hIn =>
           by
@@ -350,7 +331,7 @@ theorem link_preserves_wt_mon_complete (p₁ p₂ : DeployedProtocol)
     (hWT₂ : WTMonComplete p₂.initMonitorState) :
     WTMonComplete (composeMonitorState p₁.initMonitorState p₂.initMonitorState) := by
   refine ⟨link_preserves_wt_mon_full p₁ p₂ hLink hDisjG hWT₁.1 hWT₂.1, ?_⟩
-  simpa [composeMonitorState] using
+  simpa [composeMonitorState, DeployedProtocol.initMonitorState] using
     (role_complete_merge_g_env p₁.initGEnv p₂.initGEnv hWT₁.2 hWT₂.2)
 
 theorem link_preserves_wt_mon_complete_full (p₁ p₂ : DeployedProtocol)

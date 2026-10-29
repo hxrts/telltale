@@ -32,10 +32,11 @@ theorem bounded_post_gst_of_protocol (P : LivenessProtocol) :
       P.model P.assumptions.FairRun P.assumptions.gst P.assumptions.postGSTBound :=
   bounded_post_gst_termination_of_assumptions P.assumptions
 
-/-- Core assumptions are always validated for a certified protocol. -/
+/-- Core assumptions validate for a certified protocol (timing is decided). -/
 theorem core_assumptions_all_passed (P : LivenessProtocol) :
     (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
+  simp [runAssumptionValidation, allAssumptionsPassed, validateAssumptions, coreAssumptions,
+    validateAssumption, proofCarriedNoRuntimeCheck, P.assumptions.timing]
 
 end PartialSynchrony
 end Distributed

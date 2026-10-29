@@ -115,7 +115,7 @@ but EQ2 allows mu-wrapping (e.g., `EQ2 .end (.mu t .end)`). The extraction lemma
 
 **Possible approaches**:
 1. Strengthen extraction lemmas to provide constructor equality (not just unfolding)
-2. Use Bisim.toBisim and prove CProject is closed under Bisim
+2. Use Bisim.to_bisim and prove CProject is closed under Bisim
 3. Modify CProjectF to accept mu-wrapped candidates (major change)
 4. Prove auxiliary lemmas showing EQ2 preserves "canonical forms" for each constructor
 
@@ -124,15 +124,22 @@ We now proceed without this EQ2-closed projection setup and rely on the
 
 /-- CProject implies EQ2 between the candidate and `trans` (wrapper lemma). -/
 theorem c_project_implies_eq2_trans (g : GlobalType) (role : String) (lt : LocalTypeR)
-    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) :=
-  c_project_implies_eq2_trans_thm g role lt h hwf
+    (h : CProject g role lt) (hwf : g.wellFormed = true) : EQ2 lt (trans g role) := by
+  -- `trans_eq_of_c_project` gives syntactic equality (covering delegation too),
+  -- so this does not need the delegate-free coinductive proof.
+  have hne : g.allCommsNonEmpty = true := by
+    simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+    exact hwf.1.1.2
+  have heqt : trans g role = lt := trans_eq_of_c_project g role lt h hne
+  rw [heqt]
+  exact eq2_refl lt
 
 /-- BranchesRel for EQ2 implies branch-wise EQ2.
 
 If BranchesProjRel CProject gbs role lbs holds, and gbs are transBranches'd,
 then the local branches are EQ2-related. -/
 private theorem branches_proj_rel_implies_branches_rel_eq2_cons
-    {gLabel : Label} {gCont : GlobalType} {lLabel : Label} {lVt : Option ValType} {lCont : LocalTypeR}
+    {gLabel : Label} {gCont : GlobalType} {lLabel : Label} {lVt : Option SessionTypes.ValType} {lCont : LocalTypeR}
     {gbs_tail : List (Label × GlobalType)} {lbs_tail : List BranchR}
     (role : String)
     (hlab : gLabel = lLabel) (_hnone : lVt = none) (hproj : CProject gCont role lCont)
@@ -152,7 +159,7 @@ private theorem branches_proj_rel_implies_branches_rel_eq2_cons
   have htb :
       transBranches ((gLabel, gCont) :: gbs_tail) role =
         (gLabel, none, trans gCont role) :: transBranches gbs_tail role := by
-    simp [transBranches]
+    simp [transBranches, Choreography.Projection.Trans.transBranches]
   have hcons :
       List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
         ((lLabel, lVt, lCont) :: lbs_tail)
@@ -171,7 +178,7 @@ theorem branches_proj_rel_implies_branches_rel_eq2
   -- By induction on BranchesProjRel, show each pair is EQ2-related
   induction h with
   | nil =>
-      simp [BranchesRel, transBranches]
+      simp [BranchesRel, transBranches, Choreography.Projection.Trans.transBranches]
   | cons hpair hrest ih =>
       rename_i gb lb gbs_tail lbs_tail
       cases gb with
@@ -319,7 +326,7 @@ theorem project_r?_some_iff_c_project
       ∃ body', e = .mu t body' ∧ EQ2 body body')
     (g : GlobalType) (role : String) (hwf : g.wellFormed = true) :
     (∃ result, projectR? g role = some result) ↔ (∃ lt, CProject g role lt) := by
-  -- Split directions; forward is immediate, backward uses projectR?_complete.
+  -- Split directions; forward is immediate, backward uses project_r?_complete.
   constructor
   · intro ⟨result, _⟩
     exact ⟨result.val, result.property⟩

@@ -139,7 +139,7 @@ infixr:100 " <$$> " => ITreeMvFunctor.map
 
 structure ITreeMvPFunctor (n : Nat) where
   A : Type u
-  B : A → ITreeTypeVec.{u} n
+  B : A → ITreeTypeVec.{u, u} n
 
 def ITreeMvPFunctor.Obj {n : Nat} (P : ITreeMvPFunctor.{u} n) (α : ITreeTypeVec.{u} n) : Type u := Σ a : P.A, P.B a ⟹ α
 
@@ -287,6 +287,7 @@ def instMvQPF_Prj {n : Nat} (i : PFin2 n) : ITreeMvQPF (PrjF i) :=
   -- Unpack the lifted equality witness.
   obtain ⟨p_eq⟩ := p.down.down;
   congr) (by
-  -- The reverse composite is definitional.
-  simp [unbox_Prj, box_Prj]) (by
+  -- The reverse composite is definitional: the transport is along `rfl`.
+  intro α x
+  rfl) (by
   exact fun α β f a => rfl)

@@ -162,7 +162,7 @@ theorem coherent_send_preserved
         rw [hTrace] at hL'
         simp only [Consume, consumeOne] at hL'
         -- hL' : none = some L' is a contradiction
-        exact Option.noConfusion hL'
+        first | exact Option.noConfusion hL' | cases hL' | simp at hL'
     -- Case 1B: Updated Edge Distinct Receiver
     · -- Normal case: receiver ≠ sender
 /- ## Structured Block 2 -/

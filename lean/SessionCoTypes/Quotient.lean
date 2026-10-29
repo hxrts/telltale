@@ -7,6 +7,13 @@ import SessionTypes.LocalTypeR
 
 Quotient of local types by EQ2.
 
+**Warning.** `QLocalTypeR := Quot EQ2` ranges over *all* local types, including
+non-contractive ones. `EQ2` relates every type to `μx. x` (`eq2_mu_var_self`), so
+the quotient is a subsingleton (`QLocalTypeR.of_local_eq`) and carries no
+local-type information. Semantic statements must therefore use representative
+`LocalTypeR`s, compared up to `EQ2` only between `WellFormed` types (where `EQ2`
+is an equivalence via `eq2_refl`/`eq2_symm`/`eq2_trans_wf`). `Semantics` does so.
+
 ## Expose
 
 The following definitions form the semantic interface for proofs:
@@ -38,6 +45,20 @@ abbrev QLocalTypeR : Type := Quot EQ2
 /-- Inject a local type into the quotient. -/
 def QLocalTypeR.ofLocal (t : LocalTypeR) : QLocalTypeR :=
   Quot.mk _ t
+
+/-! ## Triviality of the Unrestricted Quotient -/
+
+/-- Every local type is `EQ2`-related to the non-contractive `μx. x`. -/
+theorem eq2_mu_var_self (a : LocalTypeR) : EQ2 a (.mu "x" (.var "x")) := by
+  refine eq2_coind (R := fun _ b => b = .mu "x" (.var "x")) ?_ a _ rfl
+  rintro a b rfl
+  cases a <;> simp [EQ2F, LocalTypeR.substitute]
+
+/-- `QLocalTypeR` identifies all local types (it is a subsingleton). This is a
+documented warning: do not state semantic properties over `QLocalTypeR`. -/
+theorem QLocalTypeR.of_local_eq (a b : LocalTypeR) :
+    QLocalTypeR.ofLocal a = QLocalTypeR.ofLocal b :=
+  (Quot.sound (eq2_mu_var_self a)).trans (Quot.sound (eq2_mu_var_self b)).symm
 
 /-- Unfold on the quotient (well-defined by EQ2). -/
 def QLocalTypeR.unfold : QLocalTypeR → QLocalTypeR :=

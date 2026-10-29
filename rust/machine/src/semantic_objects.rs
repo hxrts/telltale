@@ -251,6 +251,9 @@ impl OperationVisibility {
 /// First-class view of one operation instance.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OperationInstance {
+    /// Explicit source-selected agreement policy. Legacy observations omit it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agreement_profile: Option<AgreementProfile>,
     pub operation_id: String,
     pub session: Option<SessionId>,
     pub owner_id: Option<FragmentOwnerId>,
@@ -981,12 +984,15 @@ impl<'a> ProtocolMachineFinalization<'a> {
         self,
         read_id: &str,
     ) -> Result<&'a AuthoritativeRead, String> {
-        if let Some(read) = self
+        let mut matches = self
             .objects
             .authoritative_reads
             .iter()
-            .find(|read| read.read_id == read_id)
-        {
+            .filter(|read| read.read_id == read_id);
+        if let Some(read) = matches.next() {
+            if matches.any(|other| other != read) {
+                return Err(format!("semantic read `{read_id}` is ambiguous"));
+            }
             return Ok(read);
         }
         if self
@@ -1251,11 +1257,70 @@ fn authority_read_lifecycle(event: AuthorityAuditEvent) -> Option<AuthoritativeR
     }
 }
 
+// Content identity, not a new authority or audit-occurrence counter. Byte-length
+// framing keeps delimiters, Unicode and None/Some("") unambiguous.
+fn authority_read_content_id(read: &AuthoritativeRead) -> String {
+    let AuthoritativeRead {
+        read_id: _,
+        session,
+        owner_id,
+        kind,
+        lifecycle,
+        predicate_ref,
+        witness_id,
+        generation,
+        reason,
+    } = read;
+    fn field(out: &mut String, value: Option<&str>) {
+        match value {
+            None => out.push('N'),
+            Some(value) => {
+                out.push('S');
+                out.push_str(&value.len().to_string());
+                out.push(':');
+                out.push_str(value);
+            }
+        }
+    }
+    let mut out = String::from("authority_read:content:1:");
+    field(&mut out, session.map(|value| value.to_string()).as_deref());
+    field(&mut out, owner_id.as_deref());
+    field(
+        &mut out,
+        Some(match kind {
+            AuthoritativeReadKind::Readiness => "readiness",
+            AuthoritativeReadKind::Cancellation => "cancellation",
+            AuthoritativeReadKind::Timeout => "timeout",
+            AuthoritativeReadKind::OutputCondition => "output_condition",
+        }),
+    );
+    field(
+        &mut out,
+        Some(match lifecycle {
+            AuthoritativeReadLifecycle::Issued => "issued",
+            AuthoritativeReadLifecycle::Consumed => "consumed",
+            AuthoritativeReadLifecycle::Rejected => "rejected",
+            AuthoritativeReadLifecycle::Verified => "verified",
+        }),
+    );
+    field(&mut out, predicate_ref.as_deref());
+    field(
+        &mut out,
+        witness_id.map(|value| value.to_string()).as_deref(),
+    );
+    field(
+        &mut out,
+        generation.map(|value| value.to_string()).as_deref(),
+    );
+    field(&mut out, reason.as_deref());
+    out
+}
+
 fn authority_read_from_record(record: &AuthorityAuditRecord) -> Option<AuthoritativeRead> {
     let lifecycle = authority_read_lifecycle(record.event)?;
-    match &record.artifact {
+    let mut read = match &record.artifact {
         AuthorityArtifact::Readiness(witness) => Some(AuthoritativeRead {
-            read_id: format!("readiness:{}:{:?}", witness.witness_id, record.event),
+            read_id: String::new(),
             session: Some(witness.session_id),
             owner_id: Some(witness.owner_id.clone()),
             kind: AuthoritativeReadKind::Readiness,
@@ -1266,7 +1331,7 @@ fn authority_read_from_record(record: &AuthorityAuditRecord) -> Option<Authorita
             reason: record.reason.clone(),
         }),
         AuthorityArtifact::Cancellation(witness) => Some(AuthoritativeRead {
-            read_id: format!("cancellation:{}:{:?}", witness.witness_id, record.event),
+            read_id: String::new(),
             session: Some(witness.session_id),
             owner_id: Some(witness.owner_id.clone()),
             kind: AuthoritativeReadKind::Cancellation,
@@ -1288,7 +1353,14 @@ fn authority_read_from_record(record: &AuthorityAuditRecord) -> Option<Authorita
             reason: record.reason.clone(),
         }),
         AuthorityArtifact::OwnershipCapability(_) | AuthorityArtifact::OwnershipReceipt(_) => None,
+    }?;
+    if matches!(
+        read.kind,
+        AuthoritativeReadKind::Readiness | AuthoritativeReadKind::Cancellation
+    ) {
+        read.read_id = authority_read_content_id(&read);
     }
+    Some(read)
 }
 
 fn proof_id(check: &OutputConditionCheck) -> String {
@@ -1351,6 +1423,9 @@ fn agreement_level_rank(level: AgreementLevel) -> u8 {
 }
 
 fn operation_visibility(operation: &OperationInstance) -> OperationVisibility {
+    if let Some(profile) = &operation.agreement_profile {
+        return profile.visibility;
+    }
     if operation.requires_proof {
         OperationVisibility::BlockedUntilFinalized
     } else if operation.terminal_publication.is_some() {
@@ -1361,6 +1436,9 @@ fn operation_visibility(operation: &OperationInstance) -> OperationVisibility {
 }
 
 fn agreement_rule(operation: &OperationInstance) -> AgreementRule {
+    if let Some(profile) = &operation.agreement_profile {
+        return profile.rule.clone();
+    }
     if operation.requires_proof {
         AgreementRule::Named {
             rule_name: "proof_finalization".to_string(),
@@ -1375,6 +1453,9 @@ fn agreement_rule(operation: &OperationInstance) -> AgreementRule {
 }
 
 fn agreement_profile_name(operation: &OperationInstance) -> String {
+    if let Some(profile) = &operation.agreement_profile {
+        return profile.profile_name.clone();
+    }
     if operation.requires_proof {
         "ProofFinalization".to_string()
     } else if !operation.dependent_operation_ids.is_empty() {
@@ -1387,6 +1468,9 @@ fn agreement_profile_name(operation: &OperationInstance) -> String {
 }
 
 fn required_agreement_evidence_kind(operation: &OperationInstance) -> AgreementEvidenceKind {
+    if let Some(profile) = &operation.agreement_profile {
+        return profile.required_evidence_kind;
+    }
     if operation.requires_proof || operation.terminal_publication.is_some() {
         AgreementEvidenceKind::Publication
     } else {
@@ -1395,6 +1479,9 @@ fn required_agreement_evidence_kind(operation: &OperationInstance) -> AgreementE
 }
 
 fn usable_agreement_level(operation: &OperationInstance) -> AgreementLevel {
+    if let Some(profile) = &operation.agreement_profile {
+        return profile.usable_at;
+    }
     match operation_visibility(operation) {
         OperationVisibility::Immediate => AgreementLevel::None,
         OperationVisibility::Pending => AgreementLevel::Provisional,
@@ -1403,6 +1490,9 @@ fn usable_agreement_level(operation: &OperationInstance) -> AgreementLevel {
 }
 
 fn finalized_agreement_level(operation: &OperationInstance) -> AgreementLevel {
+    if let Some(profile) = &operation.agreement_profile {
+        return profile.finalized_at;
+    }
     match operation_visibility(operation) {
         OperationVisibility::Immediate => AgreementLevel::None,
         OperationVisibility::Pending | OperationVisibility::BlockedUntilFinalized => {
@@ -1670,6 +1760,7 @@ pub fn protocol_machine_semantic_objects(
         .collect();
 
     operation_instances.extend(semantic_handoffs.iter().map(|handoff| OperationInstance {
+        agreement_profile: None,
         operation_id: format!("handoff:{}", handoff.handoff_id),
         session: Some(handoff.session),
         owner_id: None,
@@ -1736,6 +1827,7 @@ pub fn protocol_machine_semantic_objects(
         materialization_proofs
             .iter()
             .map(|proof| OperationInstance {
+                agreement_profile: None,
                 operation_id: format!("materialization:{}", proof.proof_id),
                 session: proof.session,
                 owner_id: None,
@@ -2141,6 +2233,7 @@ mod semantic_object_tests {
         phase: OperationPhase,
     ) -> OperationInstance {
         OperationInstance {
+            agreement_profile: None,
             operation_id: operation_id.to_string(),
             session: Some(1),
             owner_id: Some("owner/A".to_string()),
@@ -2195,6 +2288,7 @@ mod semantic_object_tests {
             &[],
             &[],
             &[OperationInstance {
+                agreement_profile: None,
                 operation_id: "materialization:proof".to_string(),
                 session: Some(1),
                 owner_id: None,
@@ -2278,5 +2372,79 @@ mod semantic_object_tests {
             transition.operation_id == "degraded:op"
                 && transition.to_state == ProgressState::Degraded
         }));
+    }
+}
+
+#[cfg(all(test, not(target_arch = "wasm32")))]
+mod semantic_read_content_identity_tests {
+    use super::*;
+
+    #[test]
+    fn framed_read_identity_distinguishes_all_exported_content() {
+        let original = AuthoritativeRead {
+            read_id: "ignored/original/reference".into(),
+            session: Some(1),
+            owner_id: Some("owner:雪N:S".into()),
+            kind: AuthoritativeReadKind::Readiness,
+            lifecycle: AuthoritativeReadLifecycle::Issued,
+            predicate_ref: Some("p:é".into()),
+            witness_id: Some(1),
+            generation: Some(0),
+            reason: None,
+        };
+        let identity = authority_read_content_id(&original);
+        let mut alias = original.clone();
+        alias.read_id = "different/ignored/reference".into();
+        assert_eq!(authority_read_content_id(&alias), identity);
+        let mut variants = Vec::new();
+        let mut changed = original.clone();
+        changed.session = None;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.owner_id = None;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.owner_id = Some(String::new());
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.kind = AuthoritativeReadKind::Cancellation;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.lifecycle = AuthoritativeReadLifecycle::Rejected;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.predicate_ref = None;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.predicate_ref = Some(String::new());
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.witness_id = None;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.generation = None;
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.reason = Some(String::new());
+        variants.push(changed);
+        let mut changed = original.clone();
+        changed.reason = Some("N:S0:雪".into());
+        variants.push(changed);
+        for changed in variants {
+            assert_ne!(authority_read_content_id(&changed), identity);
+        }
+        let mut left = original.clone();
+        left.owner_id = Some("a".into());
+        left.predicate_ref = Some("b:c".into());
+        let mut right = original.clone();
+        right.owner_id = Some("a:b".into());
+        right.predicate_ref = Some("c".into());
+        assert_ne!(
+            authority_read_content_id(&left),
+            authority_read_content_id(&right)
+        );
+        // UTF-8 byte length, not character count: é occupies two bytes.
+        left.owner_id = Some("é".into());
+        assert!(authority_read_content_id(&left).contains("S2:é"));
     }
 }

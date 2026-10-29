@@ -44,6 +44,7 @@ pub const RESERVED_RULE_NAMES: &[&str] = &[
     "await_stmt",
     "resolve_stmt",
     "invalidate_stmt",
+    "binding_placement",
     "authority_let_in_stmt",
     "authority_let_stmt",
     "observe_let_in_stmt",

@@ -156,16 +156,26 @@ impl ProtocolMachine {
         let edge = Edge::new(sid, partner.clone(), role.to_string());
         let (val, sequence_no) =
             self.recv_verified_signed_payload(sid, &ep, &edge, &partner, role)?;
-        self.consume_receive_replay_identity(&edge, &label, expected_type.as_ref(), &val, sequence_no)?;
-
-        self.validate_payload(
-            role,
-            "receive",
+        self.consume_receive_replay_identity(
+            &edge,
             &label,
             expected_type.as_ref(),
             &val,
-            true,
+            sequence_no,
         )?;
+
+        self.validate_payload(role, "receive", &label, expected_type.as_ref(), &val, true)?;
+
+        // Preserve the VM register fault before any host receive mutation. Signature,
+        // replay and payload checks above retain their existing fault precedence.
+        if dst_reg >= self.config.num_registers
+            || self.coroutines[coro_idx]
+                .regs
+                .get(usize::from(dst_reg))
+                .is_none()
+        {
+            return Err(Fault::OutOfRegisters);
+        }
 
         // Process via handler.
         let handler_identity = handler.handler_identity();
@@ -178,71 +188,31 @@ impl ProtocolMachine {
             &label,
             &self.coroutines[coro_idx].regs,
             val.clone(),
-        );
+        )
+        .with_receive_destination(dst_reg)
+        .with_register_width(self.config.num_registers);
         self.ensure_effect_request_allowed(&request)
             .map_err(|failure| Fault::Invoke { failure })?;
         let predicted_effect_id = self.next_effect_id;
         let recv_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &recv_outcome, &handler_identity, predicted_effect_id);
-        if let Some(EffectResponse::Receive { state }) = recv_outcome.response.clone() {
-            self.coroutines[coro_idx].regs = state;
-        }
+        self.record_effect_exchange(
+            &request,
+            &recv_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         match recv_outcome
-            .into_unit("handle_recv")
+            .into_receive_state_for(&request.body)
             .unwrap_or_else(EffectResult::failure)
         {
-            EffectResult::Success(()) => {}
+            EffectResult::Success(state) => self.coroutines[coro_idx].regs = state,
             EffectResult::Blocked => {
-                let effect_id = self.issue_runtime_effect(
-                    "handle_recv",
-                    Some(sid),
-                    &handler_identity,
-                    json!({
-                        "session": sid,
-                        "from": partner,
-                        "to": role,
-                        "label": label,
-                    }),
-                );
-                let failure = EffectFailure::contract_violation("handle_recv returned blocked");
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
+                return Err(Fault::Invoke {
+                    failure: EffectFailure::contract_violation("handle_recv returned blocked"),
+                })
             }
-            EffectResult::Failure(failure) => {
-                let effect_id = self.issue_runtime_effect(
-                    "handle_recv",
-                    Some(sid),
-                    &handler_identity,
-                    json!({
-                        "session": sid,
-                        "from": partner,
-                        "to": role,
-                        "label": label,
-                    }),
-                );
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
-            }
+            EffectResult::Failure(failure) => return Err(Fault::Invoke { failure }),
         }
 
         let original = self.sessions.original_type(&ep).unwrap_or(&LocalTypeR::End);
@@ -263,7 +233,8 @@ impl ProtocolMachine {
     }
 
     /// Halt: verify type is End → remove type entry.
-    pub(crate) fn step_halt(&self, ep: &Endpoint) -> Result<StepPack, Fault> {
+    pub(crate) fn step_halt(&self, coro_idx: usize, ep: &Endpoint) -> Result<StepPack, Fault> {
+        crate::operation_lifecycle::require_operation_terminal(&self.coroutines[coro_idx])?;
         // Optionally verify type is End (permissive in V1).
         if let Some(lt) = self.sessions.lookup_type(ep) {
             if !matches!(lt, LocalTypeR::End) {
@@ -344,7 +315,32 @@ impl ProtocolMachine {
         action: InvokeAction,
         handler: &dyn EffectHandler,
     ) -> Result<StepPack, Fault> {
+        let action = match action {
+            InvokeAction::OperationLifecycle(action) => {
+                return Ok(StepPack {
+                    coro_update: CoroUpdate::OperationLifecycle(*action),
+                    type_update: None,
+                    events: Vec::new(),
+                })
+            }
+            InvokeAction::DeclareCommand(_) => {
+                return Ok(StepPack {
+                    coro_update: CoroUpdate::AdvancePc,
+                    type_update: None,
+                    events: vec![],
+                })
+            }
+            InvokeAction::NominalCommand(call) => {
+                return self.step_nominal_command(coro_idx, role, &call, handler)
+            }
+            other => other,
+        };
         let action_repr = match action {
+            InvokeAction::DeclareCommand(_)
+            | InvokeAction::NominalCommand(_)
+            | InvokeAction::OperationLifecycle(_) => {
+                unreachable!("nominal dispatch handled above")
+            }
             InvokeAction::Named(name) => name,
             InvokeAction::Reg(reg) => {
                 let action_value = self.read_reg_checked(coro_idx, reg)?;
@@ -369,69 +365,30 @@ impl ProtocolMachine {
             None,
             role,
             &self.coroutines[coro_idx].regs,
-        );
+        )
+        .with_register_width(self.config.num_registers);
         self.ensure_effect_request_allowed(&request)
             .map_err(|failure| Fault::Invoke { failure })?;
         let predicted_effect_id = self.next_effect_id;
         let step_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &step_outcome, &handler_identity, predicted_effect_id);
-        if let Some(EffectResponse::InvokeStep { state }) = step_outcome.response.clone() {
-            self.coroutines[coro_idx].regs = state;
-        }
+        self.record_effect_exchange(
+            &request,
+            &step_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         match step_outcome
-            .into_unit("invoke_step")
+            .into_invoke_state_for(&request.body)
             .unwrap_or_else(EffectResult::failure)
         {
-            EffectResult::Success(()) => {}
+            EffectResult::Success(state) => self.coroutines[coro_idx].regs = state,
             EffectResult::Blocked => {
-                let effect_id = self.issue_runtime_effect(
-                    "invoke_step",
-                    Some(sid),
-                    &handler_identity,
-                    json!({
-                        "session": sid,
-                        "role": role,
-                        "action": action_repr,
-                    }),
-                );
-                let failure = EffectFailure::contract_violation("step returned blocked");
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
+                return Err(Fault::Invoke {
+                    failure: EffectFailure::contract_violation("step returned blocked"),
+                })
             }
-            EffectResult::Failure(failure) => {
-                let effect_id = self.issue_runtime_effect(
-                    "invoke_step",
-                    Some(sid),
-                    &handler_identity,
-                    json!({
-                        "session": sid,
-                        "role": role,
-                        "action": action_repr,
-                    }),
-                );
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Invoke {
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
-                return Err(Fault::Invoke { failure });
-            }
+            EffectResult::Failure(failure) => return Err(Fault::Invoke { failure }),
         }
         self.apply_invoke_delta(sid, &action_repr)
             .map_err(|e| Fault::Invoke {
@@ -503,7 +460,13 @@ impl ProtocolMachine {
         let predicted_effect_id = self.next_effect_id;
         let handler_identity = handler.handler_identity();
         let acquire_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &acquire_outcome, &handler_identity, predicted_effect_id);
+        self.record_effect_exchange(
+            &request,
+            &acquire_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         let decision = acquire_outcome
             .into_value("acquire")
             .unwrap_or_else(EffectResult::failure);
@@ -512,10 +475,7 @@ impl ProtocolMachine {
                 self.guard_layer
                     .resources
                     .insert(layer_id, evidence.clone());
-                let state = self
-                    .resource_states
-                    .entry(input.sid)
-                    .or_default();
+                let state = self.resource_states.entry(input.sid).or_default();
                 let _commitment = state.commit(&evidence);
                 Ok(StepPack {
                     coro_update: CoroUpdate::AdvancePcWriteReg {
@@ -532,62 +492,15 @@ impl ProtocolMachine {
                 })
             }
             EffectResult::Blocked => Ok(StepPack {
-                coro_update: {
-                    let effect_id = self.issue_runtime_effect(
-                        "handle_acquire",
-                        Some(input.sid),
-                        &handler_identity,
-                        json!({
-                            "session": input.sid,
-                            "role": input.role,
-                            "layer": input.layer,
-                        }),
-                    );
-                    self.complete_runtime_effect(
-                        effect_id,
-                        OutstandingEffectStatus::Blocked,
-                        json!({
-                            "status": "blocked",
-                        }),
-                    )
-                    .map_err(|err| Fault::Acquire {
-                        layer: input.layer.to_string(),
-                        failure: EffectFailure::contract_violation(err.to_string()),
-                    })?;
-                    CoroUpdate::Block(BlockReason::AcquireDenied {
-                        layer: input.layer.to_string(),
-                    })
-                },
+                coro_update: CoroUpdate::Block(BlockReason::AcquireDenied {
+                    layer: input.layer.to_string(),
+                }),
                 type_update: None,
                 events: vec![],
             }),
             EffectResult::Failure(failure) => Err(Fault::Acquire {
                 layer: input.layer.to_string(),
-                failure: {
-                    let effect_id = self.issue_runtime_effect(
-                        "handle_acquire",
-                        Some(input.sid),
-                        &handler_identity,
-                        json!({
-                            "session": input.sid,
-                            "role": input.role,
-                            "layer": input.layer,
-                        }),
-                    );
-                    self.complete_runtime_effect(
-                        effect_id,
-                        OutstandingEffectStatus::Failed,
-                        json!({
-                            "status": "failure",
-                            "failure": failure,
-                        }),
-                    )
-                    .map_err(|err| Fault::Acquire {
-                        layer: input.layer.to_string(),
-                        failure: EffectFailure::contract_violation(err.to_string()),
-                    })?;
-                    failure
-                },
+                failure,
             }),
         }
     }
@@ -631,69 +544,29 @@ impl ProtocolMachine {
             })?;
         let predicted_effect_id = self.next_effect_id;
         let release_outcome = handler.handle_effect(request.clone());
-        self.record_effect_exchange(&request, &release_outcome, &handler_identity, predicted_effect_id);
+        self.record_effect_exchange(
+            &request,
+            &release_outcome,
+            &handler_identity,
+            predicted_effect_id,
+        )
+        .map_err(|failure| Fault::Invoke { failure })?;
         match release_outcome
             .into_unit("handle_release")
             .unwrap_or_else(EffectResult::failure)
         {
             EffectResult::Success(()) => {}
             EffectResult::Blocked => {
-                let effect_id = self.issue_runtime_effect(
-                    "handle_release",
-                    Some(input.sid),
-                    &handler_identity,
-                    json!({
-                        "session": input.sid,
-                        "role": input.role,
-                        "layer": input.layer,
-                    }),
-                );
-                let failure =
-                    EffectFailure::contract_violation("handle_release returned blocked");
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Acquire {
-                    layer: input.layer.to_string(),
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
                 return Err(Fault::Acquire {
                     layer: input.layer.to_string(),
-                    failure,
-                });
+                    failure: EffectFailure::contract_violation("handle_release returned blocked"),
+                })
             }
             EffectResult::Failure(failure) => {
-                let effect_id = self.issue_runtime_effect(
-                    "handle_release",
-                    Some(input.sid),
-                    &handler_identity,
-                    json!({
-                        "session": input.sid,
-                        "role": input.role,
-                        "layer": input.layer,
-                    }),
-                );
-                self.complete_runtime_effect(
-                    effect_id,
-                    OutstandingEffectStatus::Failed,
-                    json!({
-                        "status": "failure",
-                        "failure": failure,
-                    }),
-                )
-                .map_err(|err| Fault::Acquire {
-                    layer: input.layer.to_string(),
-                    failure: EffectFailure::contract_violation(err.to_string()),
-                })?;
                 return Err(Fault::Acquire {
                     layer: input.layer.to_string(),
                     failure,
-                });
+                })
             }
         }
         self.guard_layer
@@ -877,16 +750,16 @@ impl ProtocolMachine {
         let ep = receipt.endpoint.clone();
         if coro_idx == target_idx {
             let source_before = self.coroutines[coro_idx].clone();
-            let result = move_endpoint_bundle(&ep, &mut self.coroutines[coro_idx], None).and_then(
-                |_| {
-                    if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id]
+            let result =
+                move_endpoint_bundle(&ep, &mut self.coroutines[coro_idx], None).and_then(|_| {
+                    if endpoint_owner_ids(&self.coroutines, &ep)
+                        == vec![self.coroutines[target_idx].id]
                     {
                         Ok(())
                     } else {
                         Err(transfer_fault_delegation_guard_violation("after"))
                     }
-                },
-            );
+                });
             if let Err(err) = result {
                 self.coroutines[coro_idx] = source_before;
                 self.record_delegation_audit(
@@ -904,7 +777,8 @@ impl ProtocolMachine {
                 move_endpoint_bundle(&ep, &mut left[coro_idx], Some(&mut right[0]))
             }
             .and_then(|_| {
-                if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id] {
+                if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id]
+                {
                     Ok(())
                 } else {
                     Err(transfer_fault_delegation_guard_violation("after"))
@@ -928,7 +802,8 @@ impl ProtocolMachine {
                 move_endpoint_bundle(&ep, &mut right[0], Some(&mut left[target_idx]))
             }
             .and_then(|_| {
-                if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id] {
+                if endpoint_owner_ids(&self.coroutines, &ep) == vec![self.coroutines[target_idx].id]
+                {
                     Ok(())
                 } else {
                     Err(transfer_fault_delegation_guard_violation("after"))
@@ -996,5 +871,4 @@ impl ProtocolMachine {
             }],
         })
     }
-
 }

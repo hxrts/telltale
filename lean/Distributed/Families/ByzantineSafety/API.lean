@@ -10,7 +10,7 @@ High-level API for automatic Byzantine safety characterization certification.
 namespace Distributed
 namespace ByzantineSafety
 
-universe u v w x
+universe u v w x y
 
 /-- Certified protocol package for Byzantine safety characterization. -/
 structure SafetyProtocol where
@@ -19,8 +19,7 @@ structure SafetyProtocol where
   Certificate : Type w
   Obs : Type x
   model : Model State Decision Certificate Obs
-  safetyAssumptions : SafetyAssumptions model
-  livenessAssumptions? : Option LivenessAssumptions := none
+  safetyAssumptions : SafetyAssumptions.{u, v, w, x, y} model
   protocolSpec : ProtocolSpec
   assumptionsPassed :
     (runAssumptionValidation

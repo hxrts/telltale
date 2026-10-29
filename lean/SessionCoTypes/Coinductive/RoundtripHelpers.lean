@@ -24,7 +24,7 @@ recursive descent termination, visited set invariants for cycle detection.
 
 Solution Structure. Proves child_rel_to_coind for children of toCoind images,
 size bounds for branches in send/recv, child_rel_to_coind_size combining bounds,
-VisitedLt for visited set invariant, and free variable hygiene lemmas.
+shapeSize (payload-insensitive size) and VisitedLt for visited set invariant, and free variable hygiene lemmas.
 -/
 
 namespace SessionCoTypes.Coinductive
@@ -49,14 +49,15 @@ lemma child_rel_to_coind {t : LocalTypeR} {c : LocalTypeC}
       cases i
       refine ⟨body, ?_⟩
       -- The unique child of a mu node is its body.
-      simpa [toCoind, children, mkMu] using hi.symm
+      exact hi.symm
   | send p bs =>
       rcases child_rel_to_children h with ⟨i, hi⟩
       have hi' : children (mkSend p (toCoindBranches bs)) i = c := by
         simpa [toCoind] using hi
       have hchild : c = ((toCoindBranches bs).get (castFin (by simp) i)).2 := by
         symm
-        simpa [children_mk_send] using hi'
+        rw [← hi']
+        exact (children_mk_send p (toCoindBranches bs) i).symm
       let i' : Fin bs.length :=
         castFin (to_coind_branches_length bs) (castFin (by simp) i)
       refine ⟨(bs.get i').2.2, ?_⟩
@@ -77,7 +78,8 @@ lemma child_rel_to_coind {t : LocalTypeR} {c : LocalTypeC}
         simpa [toCoind] using hi
       have hchild : c = ((toCoindBranches bs).get (castFin (by simp) i)).2 := by
         symm
-        simpa [children_mk_recv] using hi'
+        rw [← hi']
+        exact (children_mk_recv p (toCoindBranches bs) i).symm
       let i' : Fin bs.length :=
         castFin (to_coind_branches_length bs) (castFin (by simp) i)
       refine ⟨(bs.get i').2.2, ?_⟩
@@ -181,7 +183,7 @@ lemma child_rel_to_coind_size {t : LocalTypeR} {c : LocalTypeC}
       rcases child_rel_to_children h with ⟨i, hi⟩
       cases i
       refine ⟨body, ?_, ?_⟩
-      · simpa [toCoind, children, mkMu] using hi.symm
+      · exact hi.symm
       · exact size_of_body_lt_size_of_mu x body
   | send p bs =>
       rcases child_rel_to_children h with ⟨i, hi⟩
@@ -189,7 +191,8 @@ lemma child_rel_to_coind_size {t : LocalTypeR} {c : LocalTypeC}
         simpa [toCoind] using hi
       have hchild : c = ((toCoindBranches bs).get (castFin (by simp) i)).2 := by
         symm
-        simpa [children_mk_send] using hi'
+        rw [← hi']
+        exact (children_mk_send p (toCoindBranches bs) i).symm
       let i' : Fin bs.length :=
         castFin (to_coind_branches_length bs) (castFin (by simp) i)
       refine ⟨(bs.get i').2.2, ?_, ?_⟩
@@ -213,7 +216,8 @@ lemma child_rel_to_coind_size {t : LocalTypeR} {c : LocalTypeC}
         simpa [toCoind] using hi
       have hchild : c = ((toCoindBranches bs).get (castFin (by simp) i)).2 := by
         symm
-        simpa [children_mk_recv] using hi'
+        rw [← hi']
+        exact (children_mk_recv p (toCoindBranches bs) i).symm
       let i' : Fin bs.length :=
         castFin (to_coind_branches_length bs) (castFin (by simp) i)
       refine ⟨(bs.get i').2.2, ?_, ?_⟩
@@ -230,22 +234,63 @@ lemma child_rel_to_coind_size {t : LocalTypeR} {c : LocalTypeC}
       · have hlt : sizeOf (bs.get i').2.2 < sizeOf bs := size_of_get_lt_size_of_branches i'
         exact lt_trans hlt (size_of_branches_lt_size_of_recv p bs)
 
+-- Payload-insensitive size
+
+/-- Size of a local type after erasing branch payloads (insensitive to `ValType`s). -/
+noncomputable def shapeSize (t : LocalTypeR) : Nat := sizeOf (erasePayloads t)
+
+/-- Equal coinductive images have equal shape sizes. -/
+lemma shape_size_eq_of_to_coind_eq {t u : LocalTypeR} (h : toCoind t = toCoind u) :
+    shapeSize t = shapeSize u := by
+  simp only [shapeSize, to_coind_injective_erase h]
+
+lemma shape_size_body_lt_mu (x : String) (body : LocalTypeR) :
+    shapeSize body < shapeSize (.mu x body) := by
+  simp only [shapeSize, erasePayloads]
+  exact size_of_body_lt_size_of_mu x (erasePayloads body)
+
+private lemma shape_size_get_lt_branches {bs : List BranchR} (i : Fin bs.length) :
+    shapeSize (bs.get i).2.2 < sizeOf (erasePayloadsBranches bs) := by
+  induction bs with
+  | nil => exact Fin.elim0 i
+  | cons b tail ih =>
+      obtain ⟨lb, vt, cont⟩ := b
+      cases i using Fin.cases with
+      | zero =>
+          simpa [shapeSize, erasePayloadsBranches] using
+            size_of_cont_lt_size_of_branches lb none (erasePayloads cont) (erasePayloadsBranches tail)
+      | succ i =>
+          have htail := size_of_tail_lt_size_of_branches (lb, none, erasePayloads cont)
+            (erasePayloadsBranches tail)
+          simpa [erasePayloadsBranches] using lt_trans (ih i) htail
+
+lemma shape_size_get_lt_send {p : String} {bs : List BranchR} (i : Fin bs.length) :
+    shapeSize (bs.get i).2.2 < shapeSize (.send p bs) := by
+  have h := size_of_branches_lt_size_of_send p (erasePayloadsBranches bs)
+  simp only [shapeSize, erasePayloads] at h ⊢
+  exact lt_trans (shape_size_get_lt_branches i) h
+
+lemma shape_size_get_lt_recv {p : String} {bs : List BranchR} (i : Fin bs.length) :
+    shapeSize (bs.get i).2.2 < shapeSize (.recv p bs) := by
+  have h := size_of_branches_lt_size_of_recv p (erasePayloadsBranches bs)
+  simp only [shapeSize, erasePayloads] at h ⊢
+  exact lt_trans (shape_size_get_lt_branches i) h
+
 -- VisitedLt invariants
 
-/-- Visited nodes correspond to strictly larger inductive terms. -/
+/-- Visited nodes correspond to inductive terms of strictly larger shape. -/
 def VisitedLt (t : LocalTypeR) (visited : Finset LocalTypeC) : Prop :=
-  ∀ c ∈ visited, ∃ u : LocalTypeR, c = toCoind u ∧ sizeOf t < sizeOf u
+  ∀ c ∈ visited, ∃ u : LocalTypeR, c = toCoind u ∧ shapeSize t < shapeSize u
 
 lemma visited_lt_not_mem {t : LocalTypeR} {visited : Finset LocalTypeC}
     (hvis : VisitedLt t visited) : toCoind t ∉ visited := by
   intro hmem
   rcases hvis _ hmem with ⟨u, hu, hlt⟩
-  have : t = u := to_coind_injective hu
-  subst this
+  rw [shape_size_eq_of_to_coind_eq hu] at hlt
   exact lt_irrefl _ hlt
 
 lemma visited_lt_insert {t u : LocalTypeR} {visited : Finset LocalTypeC}
-    (hsize : sizeOf u < sizeOf t) (hvis : VisitedLt t visited) :
+    (hsize : shapeSize u < shapeSize t) (hvis : VisitedLt t visited) :
     VisitedLt u (insert (toCoind t) visited) := by
   intro c hc
   have hc' := Finset.mem_insert.mp hc

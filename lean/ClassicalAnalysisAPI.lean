@@ -760,7 +760,9 @@ class AnalysisLaws extends AnalysisModel where
   normalized_cumulative_const_zero :
     ∀ (c : ℝ) (N t : Nat), N ≠ 0 →
       toAnalysisModel.normalizedCumulative (fun _ => c) c N t = 0
-  /-- Spectral gap is 1 minus the second eigenvalue modulus. -/
+  /-- Spectral gap is 1 minus the second eigenvalue modulus. This is a
+  *definitional* bookkeeping law (the concrete model defines the gap this way);
+  it carries no spectral-theoretic content. -/
   spectral_gap_eq :
     ∀ {State : Type*} [Fintype State] [DecidableEq State]
       (kernel : State → State → ℝ),
@@ -806,7 +808,8 @@ theorem normalized_cumulative_const_zero (c : ℝ) (N t : Nat) (hN : N ≠ 0) :
     normalizedCumulative (fun _ => c) c N t = 0 :=
   AnalysisLaws.normalized_cumulative_const_zero (self := inferInstance) c N t hN
 
-/-- Re-export relation between spectral gap and second spectral value. -/
+/-- Re-export of the definitional identity `gap = 1 - second spectral value`
+(true by definition in the concrete model; no spectral theorem is involved). -/
 theorem spectral_gap_eq {State : Type*} [Fintype State] [DecidableEq State]
     (kernel : State → State → ℝ) :
     spectralGapValue kernel = 1 - secondSpectrumValue kernel :=

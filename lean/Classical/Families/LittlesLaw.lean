@@ -2,6 +2,9 @@ import Mathlib
 
 /-! # Little's Law
 
+**Scope (Option B, honest conditional interface).** Little's Law itself is an assumed input (`LittleInput.law`); only the
+algebraic rearrangements W = L/λ and λ = L/W are proved.
+
 This module provides the mathematical foundation for relating queue length,
 arrival rate, and waiting time in session-typed distributed systems. Little's
 Law is one of the most fundamental results in queueing theory, remarkable for
@@ -109,41 +112,36 @@ namespace LittlesLaw
     - lam (λ) is the message sending rate
     - W is the average message latency (time in buffer)
     - L is the average buffer occupancy
-    - law is the proof that L = λ · W holds
+    - law is the *assumed* identity L = λ · W
 
-    The structure witnesses that the system is in a stable regime where
-    Little's Law applies. -/
+    Assumed classical input (Option B): `law` is supplied by the caller; this
+    module does not prove Little's Law. A real proof would define L, λ and W as
+    long-run time/customer averages of a sample path and prove the identity
+    from conservation of customer-time under existence of the limits. Use
+    `h.law` directly for the identity itself. -/
 structure LittleInput where
   lam : Real
   W : Real
   L : Real
   law : L = lam * W
 
-/-- Queue length equals arrival rate times waiting time.
-
-    This is Little's Law in its direct form. For protocols: the average
-    number of messages in buffers equals the sending rate times the
-    average time each message waits to be received. -/
-theorem queue_length (h : LittleInput) : h.L = h.lam * h.W :=
-  h.law
-
-/-- Waiting time equals queue length divided by arrival rate.
+/-- Conditional on the assumed `h.law`, waiting time equals L / λ (algebra).
 
     For protocols: if you know the average buffer occupancy L and the
     sending rate λ, you can compute average latency as W = L / λ. This
     avoids having to time individual messages. -/
-theorem wait_time (h : LittleInput) (hlam : h.lam ≠ 0) :
+theorem wait_time_of_little_input (h : LittleInput) (hlam : h.lam ≠ 0) :
     h.W = h.L / h.lam := by
   have : h.lam * h.W = h.L := by simp [h.law]
   apply (eq_div_iff hlam).2
   simpa [mul_comm, mul_left_comm, mul_assoc] using this
 
-/-- Throughput equals queue length divided by waiting time.
+/-- Conditional on the assumed `h.law`, throughput equals L / W (algebra).
 
     For protocols: if you measure buffer occupancy L and message latency W,
     you can infer the effective message rate λ = L / W. This is useful for
     monitoring throughput without counting individual messages. -/
-theorem throughput (h : LittleInput) (hW : h.W ≠ 0) :
+theorem throughput_of_little_input (h : LittleInput) (hW : h.W ≠ 0) :
     h.lam = h.L / h.W := by
   have : h.lam * h.W = h.L := by simp [h.law]
   apply (eq_div_iff hW).2

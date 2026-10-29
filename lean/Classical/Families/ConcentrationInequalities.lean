@@ -3,6 +3,9 @@ import ClassicalAnalysisAPI
 
 /-! # Concentration Inequalities
 
+**Scope (Option B, honest conditional interface).** The sub-Gaussian tail bound is an assumed input
+(`ConcentrationWitness.tail_upper`); only the value at `t = 0` is derived.
+
 This module provides the mathematical foundation for tail probability bounds
 on deviations from expected behavior in session-typed distributed systems.
 Concentration inequalities quantify how tightly random quantities cluster
@@ -121,7 +124,9 @@ theorem sub_gaussian_tail_nonneg [EntropyAPI.AnalysisLaws] (σ t : Real) :
     0 ≤ subGaussianTail σ t := by
   simpa [subGaussianTail] using EntropyAPI.exponential_tail_nonneg σ t
 
-/-- A `ConcentrationWitness` certifies that a tail function has sub-Gaussian decay.
+/-- Assumed classical input (Option B): a sub-Gaussian tail bound for `p`.
+    `tail_upper` is supplied by the caller; no concentration inequality
+    (Hoeffding/Azuma/Chernoff via moment-generating functions) is proved here.
 
     The witness provides:
     - σ: the sub-Gaussian parameter (must be > 0)
@@ -134,11 +139,11 @@ structure ConcentrationWitness [EntropyAPI.AnalysisModel] (p : Real → Real) wh
   sigma_pos : 0 < σ
   tail_upper : ∀ t, 0 ≤ t → p t ≤ subGaussianTail σ t
 
-/-- At zero deviation, the bound is trivially 2.
+/-- Conditional on an assumed `ConcentrationWitness`: `p 0 ≤ 2`.
 
     For protocols: P(|X - μ| > 0) ≤ 2, which is vacuously true since
     probabilities are at most 1. The bound becomes meaningful for t > 0. -/
-theorem at_zero_bound [EntropyAPI.AnalysisLaws] {p : Real → Real}
+theorem at_zero_bound_of_concentration_witness [EntropyAPI.AnalysisLaws] {p : Real → Real}
     (h : ConcentrationWitness p) :
     p 0 ≤ 2 := by
   have h0 := h.tail_upper 0 (le_rfl : (0 : Real) ≤ 0)

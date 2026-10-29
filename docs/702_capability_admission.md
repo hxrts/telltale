@@ -90,7 +90,7 @@ Non-full profiles also require `can_use_mixed_determinism_profiles`.
 
 ## Theorem-Pack Capability Inventory
 
-The theorem-pack inventory publishes machine-readable capability keys.
+The theorem-pack inventory publishes machine-readable capability keys. Keys are strings defined in `lean/Runtime/Proofs/TheoremPack/Inventory.lean`, not Lean theorem names. A key is present when the corresponding profile artifact is attached. For example, `quorum_geometry_safety` is backed by `Distributed.QuorumGeometry.no_conflicting_commits_of_protocol`, `fork_exclusion_of_protocol`, and `safe_finality_of_protocol`.
 
 | Inventory family | Example keys |
 |---|---|
@@ -137,6 +137,8 @@ The following rows are source-derived and checked against
 | `protocol_machine_envelope_adherence` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
 | `protocol_machine_envelope_admission` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
 | `protocol_envelope_bridge` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
+
+Rust admission of these three envelope keys requires Lean-produced evidence. `execution_profile_supported` consults the profile's `LeanEvidenceInventory` (loaded from the Lean `theoremInventory` export) rather than self-asserted eligibility flags. Default profiles carry no evidence and are not admitted. `assume_envelope_evidence_for_testing()` is the explicit test-only opt-in. See `docs/804_theorem_pack_inputs.md`.
 
 ## Composition Admission
 

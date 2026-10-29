@@ -76,9 +76,13 @@ structure Configuration where
   env : EnvConfig
   deriving Inhabited
 
-/-- Configuration step relation.
-    A configuration steps when its global type steps and the environment is preserved.
-    This is a simplified version that doesn't model message queue updates. -/
+/-- Global-only configuration step relation.
+
+    A configuration steps when its global type steps; the environment snapshot is
+    held fixed (`c'.env = c.env`). Message-queue / environment evolution is NOT
+    modeled here, so determinism results over this relation (e.g.
+    `global_config_step_det`) are determinism of the global-type component only;
+    environment determinism is the separate `env_step_det`. -/
 def ConfigStep (c c' : Configuration) (act : GlobalActionR) : Prop :=
   c.globalType.uniqueBranchLabels = true ∧
   step c.globalType act c'.globalType ∧
@@ -106,6 +110,10 @@ private theorem payload_beq_refl (p : PayloadSort) : (p == p) = true := by
   | nat => rfl
   | bool => rfl
   | string => rfl
+  | real => rfl
+  | vector n =>
+      have heq : (PayloadSort.vector n == PayloadSort.vector n) = (n == n) := rfl
+      simp only [heq, beq_self_eq_true]
   | prod p1 p2 ih1 ih2 =>
       have heq : (PayloadSort.prod p1 p2 == PayloadSort.prod p1 p2) = ((p1 == p1) && (p2 == p2)) := rfl
       simp only [heq, ih1, ih2, Bool.true_and]
@@ -159,13 +167,13 @@ private theorem unique_branch_labels_branches_l_cons {hd : BranchR}
         have : False := by
           simpa [h] using h1.1
         cases this
-  | false =>
+    | false =>
         rfl
   exact ⟨hnodup, h1.2⟩
 
 /-! ### Branch-membership helper lemmas -/
 
-private theorem mem_map_fst_of_mem {lbl : Label} {rest : Option ValType × LocalTypeR}
+private theorem mem_map_fst_of_mem {lbl : Label} {rest : Option SessionTypes.ValType × LocalTypeR}
     {branches : List BranchR} (hmem : (lbl, rest) ∈ branches) :
     lbl ∈ branches.map Prod.fst := by
   -- Lift pair membership to membership of first components.
@@ -179,7 +187,7 @@ private theorem contains_true_of_mem {lbl : Label} {branches : List BranchR}
   rw [List.contains_iff_exists_mem_beq]
   exact ⟨lbl, hmem, beq_self_eq_true lbl⟩
 
-private theorem contains_false_contradiction {lbl : Label} {rest : Option ValType × LocalTypeR}
+private theorem contains_false_contradiction {lbl : Label} {rest : Option SessionTypes.ValType × LocalTypeR}
     {branches : List BranchR} (hnodup : (branches.map Prod.fst).contains lbl = false)
     (hmem : (lbl, rest) ∈ branches) : False := by
   -- Membership forces contains = true, contradicting hnodup.
@@ -190,7 +198,7 @@ private theorem contains_false_contradiction {lbl : Label} {rest : Option ValTyp
   cases hnodup
 
 /-- If branches have unique labels, then membership determines the continuation. -/
-theorem mem_branch_l_unique_label {lbl : Label} {rest₁ rest₂ : Option ValType × LocalTypeR}
+theorem mem_branch_l_unique_label {lbl : Label} {rest₁ rest₂ : Option SessionTypes.ValType × LocalTypeR}
     {branches : List BranchR} (huniq : uniqueBranchLabelsBranchesL branches = true)
     (hmem₁ : (lbl, rest₁) ∈ branches) (hmem₂ : (lbl, rest₂) ∈ branches) : rest₁ = rest₂ := by
   -- Induct on the branch list and use the head/ tail contradiction.
@@ -247,7 +255,7 @@ there is exactly one next global type.
 Each constructor (comm_head, comm_async, mu) uniquely determines the result.
 -/
 
-/-- Global step is deterministic given the same action (requires unique branch labels).
+/- Global step is deterministic given the same action (requires unique branch labels).
 
 Proof sketch: by case analysis on step constructors via @step.rec.
 - comm_head/comm_head: both select same label (from action), uniqueness gives same cont

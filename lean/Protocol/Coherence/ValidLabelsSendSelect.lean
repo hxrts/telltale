@@ -66,7 +66,7 @@ theorem valid_labels_send_preserved
       | cons t ts =>
           rw [hTrace] at hConsume
           simp only [Consume, consumeOne] at hConsume
-          exact Option.noConfusion hConsume
+          first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
     have hSend : lookupG G recvEp = some (.send receiverRole T L) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
@@ -116,7 +116,7 @@ theorem valid_labels_send_preserved
       | cons t ts =>
           rw [hTrace] at hConsume
           simp only [Consume, consumeOne] at hConsume
-          exact (False.elim (Option.noConfusion hConsume))
+          first | cases hConsume | simp at hConsume
     · -- Edge unaffected: buffer unchanged, use old ValidLabels.
       have hBufEq :
           lookupBuf (updateBuf bufs sendEdge (lookupBuf bufs sendEdge ++ [v])) e =
@@ -168,7 +168,7 @@ theorem valid_labels_select_preserved
       | cons t ts =>
           rw [hTrace] at hConsume
           simp only [Consume, consumeOne] at hConsume
-          exact Option.noConfusion hConsume
+          first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
     have hSelect : lookupG G recvEp = some (.select targetRole selectBranches) := by
       simpa [hRecvEq] using hG
     have hTraceEmpty : lookupD D e = [] :=
@@ -218,7 +218,7 @@ theorem valid_labels_select_preserved
       | cons t ts =>
           rw [hTrace] at hConsume
           simp only [Consume, consumeOne] at hConsume
-          exact (False.elim (Option.noConfusion hConsume))
+          first | cases hConsume | simp at hConsume
     · -- Edge unaffected: buffer unchanged, use old ValidLabels.
       have hBufEq :
           lookupBuf (updateBuf bufs selectEdge (lookupBuf bufs selectEdge ++ [.string ℓ])) e =

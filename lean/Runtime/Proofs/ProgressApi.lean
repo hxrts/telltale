@@ -55,10 +55,12 @@ def ProgressEnabled (store : SessionStore ν) : Prop :=
   (∃ ep target ℓ, SelectEnabled store ep target ℓ) ∨
   (∃ ep source, BranchEnabled store ep source)
 
-/-- Required progress hypothesis at the initial state.
-It discharges the frontier premise of `protocol_machine_progress`. -/
+/-- Required progress hypothesis at the initial state: a non-complete state has
+a pending output. This is the global deadlock-freedom fact that
+`protocol_machine_progress` does not derive; it is strictly weaker than the
+enabled-instruction conclusion (readiness is discharged from well-formedness). -/
 abbrev ProgressHypothesis (store : SessionStore ν) : Prop :=
-  ¬ AllSessionsComplete store → ProgressFrontier store
+  ¬ AllSessionsComplete store → HasPendingOutput store
 
 /-! ## Liveness Bundles -/
 
@@ -120,7 +122,7 @@ def validateProtocolMachineLivenessHypothesis {store₀ : SessionStore ν}
   | .terminationModel =>
       { hypothesis := h
       , passed := true
-      , detail := "A protocol-machine termination model is provided in the bundle."
+      , detail := "One-step ranking obligations for the protocol-machine step are provided in the bundle."
       }
   | .fairScheduler =>
       { hypothesis := h
@@ -130,7 +132,7 @@ def validateProtocolMachineLivenessHypothesis {store₀ : SessionStore ν}
   | .progressHypothesis =>
       { hypothesis := h
       , passed := true
-      , detail := "Explicit progress hypothesis (non-terminal implies frontier-enabled) is provided."
+      , detail := "Explicit progress hypothesis (non-terminal implies a pending output) is provided."
       }
 
 /-- Validate an arbitrary liveness hypothesis bundle. -/
@@ -156,10 +158,8 @@ theorem protocol_machine_termination_from_bundle {store₀ : SessionStore ν}
       store_final = executeSchedule bundle.model.step store₀ bundle.fairness.sched n ∧
       AllSessionsComplete store_final ∧
       n ≤ bundle.fairness.k * protocolMachineMeasure store₀ := by
-  simpa using
-    (protocol_machine_termination_under_fairness (store₀ := store₀) bundle.model
-      (sched := bundle.fairness.sched) (k := bundle.fairness.k)
-      bundle.wellFormed bundle.fairness.k_ge_numRoles bundle.fairness.fair)
+  exact protocol_machine_termination_under_fairness (store₀ := store₀) bundle.model
+    (sched := bundle.fairness.sched) (k := bundle.fairness.k) bundle.fairness.fair
 
 /-- The required progress hypothesis can be used directly to derive
 initial-state enabledness. -/
@@ -167,8 +167,7 @@ theorem protocol_machine_progress_from_bundle {store₀ : SessionStore ν}
     (bundle : ProtocolMachineLivenessBundle store₀)
     (hNonTerminal : ¬ AllSessionsComplete store₀) :
     ProgressEnabled store₀ := by
-  simpa [ProgressEnabled] using
-    (protocol_machine_progress bundle.wellFormed hNonTerminal
+  exact (protocol_machine_progress bundle.wellFormed
       (bundle.progressHypothesis.proof hNonTerminal))
 
 /-- Progress theorems are explicitly tied to the scheduler/fairness side of the

@@ -161,7 +161,8 @@ private lemma unfolds_c_right_unique : Relator.RightUnique UnfoldsC := by
 private lemma unfolds_c_head_mu {t u : LocalTypeC} (h : UnfoldsC t u) : ∃ x, head t = .mu x := by
   rcases h with ⟨x, f, hdest, _⟩
   refine ⟨x, ?_⟩
-  simp [head, hdest]
+  simp only [head, hdest]
+  rfl
 
 /-- If a type's head is not mu, UnfoldsToC leads only to itself. -/
 private lemma unfolds_to_c_eq_of_head_ne_mu {l l' : LocalTypeC} (h : UnfoldsToC l l')

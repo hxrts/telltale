@@ -89,23 +89,23 @@ noncomputable instance realLaws : Laws where
   shannon_entropy_nonneg := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ d
-    simpa [realModel] using shannon_entropy_nonneg_real d
+    exact shannon_entropy_nonneg_real d
   shannon_entropy_le_log_card := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ _ d
-    simpa [realModel] using shannon_entropy_le_log_card_real d
+    exact shannon_entropy_le_log_card_real d
   kl_divergence_nonneg := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ p q habs
-    simpa [realModel] using kl_divergence_nonneg_real p q habs
+    exact kl_divergence_nonneg_real p q habs
   kl_divergence_eq_zero_iff := by
     -- Discharge this field using the specialized helper theorem.
     intro α _ p q habs
-    simpa [realModel] using kl_divergence_eq_zero_iff_real p q habs
+    exact kl_divergence_eq_zero_iff_real p q habs
   mutual_info_zero_of_erasure := by
     -- Discharge this field using the specialized helper theorem.
     intro L O _ _ _ labelDist h_nn h_sum joint hErase
-    simpa [realModel] using
+    exact
       mutual_info_zero_of_erasure_real labelDist h_nn h_sum joint hErase
 
 /-! ## Extended Real-Analysis Model -/
@@ -137,12 +137,13 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
   exponential_tail_nonneg := by
     -- Exponential tails are nonnegative because `exp` is positive.
     intro σ t
-    simp [realAnalysisModel]
+    change 0 ≤ 2 * Real.exp (-(t ^ 2) / (2 * σ ^ 2))
     positivity
   exponential_tail_zero := by
     -- At zero threshold, the tail form evaluates to `2`.
     intro σ
-    simp [realAnalysisModel]
+    change 2 * Real.exp (-((0 : ℝ) ^ 2) / (2 * σ ^ 2)) = 2
+    simp
   fluctuation_scale_pos := by
     -- Square roots of positive reals are positive.
     intro n hn
@@ -192,7 +193,7 @@ noncomputable instance realAnalysisLaws : AnalysisLaws where
   -- Extended Laws: Spectral Gap Identity
 
   spectral_gap_eq := by
-    -- The gap field is defined as `1 - secondSpectrumValue`.
+    -- Definitional: the gap field is defined as `1 - secondSpectrumValue`.
     intro State _ _ kernel
     simp [realAnalysisModel]
 

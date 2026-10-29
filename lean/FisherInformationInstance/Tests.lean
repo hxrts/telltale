@@ -62,19 +62,19 @@ example [Laws] :
     NaturalGradientExists (Laws.toModel (self := inferInstance)) :=
   natural_gradient_exists
 
-example :
+noncomputable example :
     Model := finiteDiscreteModel
 
-example :
+noncomputable example :
     Laws := finiteDiscreteLaws
 
 /-! ## Theorem-Pack Checks -/
 
-example :
+noncomputable example :
     TheoremPack.FisherTheoremPack finiteDiscreteModel :=
   TheoremPack.buildFisherTheoremPack finiteDiscreteModel
 
-example :
+noncomputable example :
     TheoremPack.DOptimalDesignArtifact finiteDiscreteModel :=
   TheoremPack.dOptimalDesignArtifact finiteDiscreteModel
 
@@ -258,16 +258,16 @@ example :
       ∀ j : Fin 1,
         TheoremPack.fisherDeterminant finiteDiscreteModel
             ((fun _ : Fin 1 =>
-              (⟨fun i => Fin.elim0 i⟩ :
+              (⟨fun _ => 0⟩ :
                 naturalParameter finiteDiscreteModel.family.d)) j) ≤
           TheoremPack.fisherDeterminant finiteDiscreteModel
             ((fun _ : Fin 1 =>
-              (⟨fun i => Fin.elim0 i⟩ :
+              (⟨fun _ => 0⟩ :
                 naturalParameter finiteDiscreteModel.family.d)) idx) := by
   -- The finite D-optimal theorem produces a maximizer for indexed designs.
   exact TheoremPack.dOptimalDesign_exists finiteDiscreteModel
     (fun _ : Fin 1 =>
-      (⟨fun i => Fin.elim0 i⟩ :
+      (⟨fun _ => 0⟩ :
         naturalParameter finiteDiscreteModel.family.d))
 
 end Tests

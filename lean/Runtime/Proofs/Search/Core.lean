@@ -155,17 +155,6 @@ def canonicalStepArtifact (frontier : List FrontierEntry) : StepArtifact :=
   , nextFrontier := frontierAfterCanonicalStep frontier
   }
 
-/-- Reduced one-step model for the threaded exact single-lane scheduler. The
-runtime may parallelize successor enumeration, but the frozen legal batch and
-post-normalization commit are the same as canonical serial search. -/
-def frontierAfterThreadedExactSingleLaneStep
-    (frontier : List FrontierEntry) : List FrontierEntry :=
-  frontierAfterCanonicalStep frontier
-
-/-- Reduced threaded exact single-lane step artifact. -/
-def threadedExactSingleLaneStepArtifact (frontier : List FrontierEntry) : StepArtifact :=
-  canonicalStepArtifact frontier
-
 /-- Reduced authoritative state slice derived from one step artifact. -/
 def stateSliceOfStepArtifact (artifact : StepArtifact) : StateSlice :=
   { frontier := artifact.nextFrontier

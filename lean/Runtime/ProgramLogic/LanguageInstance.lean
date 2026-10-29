@@ -10,9 +10,9 @@ Connects protocol machine execution to Iris program logic.
 ## Definitions
 
 - `SessionVM` — the language tag
-- `instance : Language SessionVM`
+- `instance : Iris.ProgramLogic.Language (SessionVMExpr ι γ π ε ν) …`
 - `to_val` / `of_val` / `prim_step`
-- `LanguageMixin` proofs
+- `ToVal` round-trip and `val_stuck` proofs
 
 Dependencies: Task 11, IrisExtractionInstance.
 -/
@@ -28,10 +28,6 @@ small-step behavior as `prim_step`, then package the laws in the language mixin.
 set_option autoImplicit false
 
 /-! ## Core Language Carrier -/
-
-inductive SessionVM (ι γ π ε ν : Type) : Type where
-  -- Tag type for the protocol machine language instance.
-  | mk
 
 /-! ## Value Conversion -/
 
@@ -68,39 +64,46 @@ def SessionVM.prim_step {ι γ π ε ν : Type}
         | none => true
       e' = { cid := e.cid, halted := halted' } ∧ σ' = σ1 ∧ efs = []
 
-/-! ## Iris Language Instance -/
+/-! ## Iris Language Instance
 
-def instLanguageSessionVM {ι γ π ε ν : Type}
+Upstream Iris indexes a language by its expression type, with the state type
+determined by it (an `outParam`). The protocol machine state depends on the
+model parameters, so expressions are wrapped in `SessionVMExpr`, which
+carries those parameters in its type. -/
+
+/-- Protocol-machine expressions tagged with the machine's model parameters. -/
+structure SessionVMExpr (ι γ π ε ν : Type) where
+  expr : Expr
+
+instance instLanguageSessionVM {ι γ π ε ν : Type}
     [IdentityModel ι] [GuardLayer γ] [PersistenceModel π] [EffectRuntime ε]
     [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν] :
-    Iris.ProgramLogic.Language where
-  expr := Expr
-  val := SessionVMVal
-  state := ProtocolMachineState ι γ π ε ν
-  observation := Unit
-  of_val := SessionVM.of_val
-  to_val := SessionVM.to_val
-  prim_step := SessionVM.prim_step
-  mixin :=
-    { to_of_val := by
-        intro v
-        cases v with
-        | mk v hv =>
-            simp [SessionVM.to_val, SessionVM.of_val, hv]
-      of_to_val := by
-        intro e v h
+    Iris.ProgramLogic.Language (SessionVMExpr ι γ π ε ν)
+      (ProtocolMachineState ι γ π ε ν) Unit SessionVMVal where
+  primStep := fun (e, σ) κ (e', σ', efs) =>
+    SessionVM.prim_step e.expr σ κ e'.expr σ' (efs.map SessionVMExpr.expr)
+  toVal := fun e => SessionVM.to_val e.expr
+  ofVal := fun v => ⟨SessionVM.of_val v⟩
+  coe_of_toVal_eq_some := by
+    intro e v h
+    cases e with
+    | mk e =>
         by_cases hhalted : e.halted
         · simp [SessionVM.to_val, hhalted] at h
-          cases h
+          subst h
           rfl
         · simp [SessionVM.to_val, hhalted] at h
-      val_stuck := by
-        intro e σ κ e' σ' efs hstep
-        rcases hstep with ⟨_, hhalted, _⟩
-        simp [SessionVM.to_val, hhalted] }
+  toVal_coe := by
+    intro v
+    cases v with
+    | mk v hv => simp [SessionVM.to_val, SessionVM.of_val, hv]
+  val_stuck := by
+    intro e σ κ e' σ' efs hstep
+    rcases hstep with ⟨_, hhalted, _⟩
+    simp [SessionVM.to_val, hhalted]
 
 /-! ## Conversion Lemmas -/
 

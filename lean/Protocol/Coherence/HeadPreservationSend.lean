@@ -161,7 +161,7 @@ theorem head_coherent_send_preserved
           -- Non-empty trace: Consume on .send fails
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume, consumeOne] at hConsumeOrig
-          exact Option.noConfusion hConsumeOrig
+          first | exact Option.noConfusion hConsumeOrig | cases hConsumeOrig | simp at hConsumeOrig
       | branch r bs =>
         -- Same as recv case - hRecvReady requires Consume on SEND which fails
         have ⟨L'', hConsumeOrig, hConsumeSingle⟩ := hRecvReady (.send senderEp.role T (.branch r bs)) hG
@@ -176,7 +176,7 @@ theorem head_coherent_send_preserved
         | cons t ts =>
           rw [hOrigTrace] at hConsumeOrig
           simp only [Consume, consumeOne] at hConsumeOrig
-          exact Option.noConfusion hConsumeOrig
+          first | exact Option.noConfusion hConsumeOrig | cases hConsumeOrig | simp at hConsumeOrig
     -- Updated Edge: Receiver Distinct from Sender
     · -- Normal case: receiver ≠ sender
       have hRecvNeq : senderEp ≠ { sid := senderEp.sid, role := receiverRole } := by

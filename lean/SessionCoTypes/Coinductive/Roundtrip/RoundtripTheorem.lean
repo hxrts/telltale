@@ -6,7 +6,7 @@ namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 
-local instance : DecidableEq LocalTypeC := by
+noncomputable local instance : DecidableEq LocalTypeC := by
   classical
   infer_instance
 

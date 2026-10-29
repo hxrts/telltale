@@ -176,10 +176,11 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
 /- ## Structured Block 1 -/
                             subst hvt
                             simp [projectb, hp]
-                            refine And.intro ?_ (And.intro ?_ ?_)
+                            have hpc : projectb cont p contCand = true := by
+                              simpa [hp] using hproj_cont
+                            refine ⟨?_, ?_⟩
                             · simp [reduceBEq]
-                            · simp [reduceBEq]
-                            · simpa [hp] using hproj_cont
+                            · simp [reduceBEq, hpc]
                 | cons b2 bs2 =>
                     simp [CProjectF, hp] at hf
         | recv _ _ =>
@@ -220,10 +221,11 @@ theorem projectb_complete (g : GlobalType) (role : String) (cand : LocalTypeR)
                               subst hlbl
                               subst hvt
                               simp [projectb, hq, hnp]
-                              refine And.intro ?_ (And.intro ?_ ?_)
+                              have hpc : projectb cont q contCand = true := by
+                                simpa [hq] using hproj_cont
+                              refine ⟨?_, ?_⟩
                               · simp [reduceBEq]
-                              · simp [reduceBEq]
-                              · simpa [hq] using hproj_cont
+                              · simp [reduceBEq, hpc]
                   | cons b2 bs2 =>
 /- ## Structured Block 2 -/
                       simp [CProjectF, hq, hnp] at hf

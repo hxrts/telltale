@@ -10,13 +10,13 @@ A type like `mu t .end` is well-formed (contractive) but loops forever
 without communication. We need a separate predicate `ReachesComm` that
 says the type can reach a communication constructor.
 
-Solution Structure. The proof separates two concerns:
-1. `reaches_comm_implies_can_step`: types that reach a comm can step (global level)
-2. `can_step_implies_config_step`: configs with steppable global types can step
-3. `deadlock_free`: combines (1) and (2) for the main result
-
-This mirrors the Coq split between `gcontractive` (well-formedness) and
-`goodG` (progress predicate) in subject_reduction/theories/Process/Congruence.v.
+Solution Structure.
+1. `wf_trichotomy`: from well-formedness (closed, non-empty comms, productive),
+   a global type unfolds to `end`, to a delegation, or reaches a communication
+   (by well-founded recursion on the number of leading `mu` binders).
+2. `wf_global_progress` / `deadlock_free_trichotomy`: global-level progress.
+3. `deadlock_free`: communication-headed well-typed configurations step (via the
+   honest `ConfigStep`) to well-typed configurations.
 -/
 
 /-! # Semantics.DeadlockFreedom
@@ -41,16 +41,19 @@ The following definitions form the semantic interface for proofs:
 - `Done`: terminal configuration predicate
 - `Stuck`: stuck configuration predicate
 - `CanProgress`: existence of a step
-- `deadlock_free`: main theorem (requires ReachesComm)
+- `wf_trichotomy`, `deadlock_free_trichotomy`: progress derived from well-formedness
+- `deadlock_free`: configuration-level progress for communication heads
 - `Claims`: bundle of deadlock freedom properties
 -/
 
 namespace Semantics.DeadlockFreedom
 
 open SessionTypes.GlobalType
-open SessionCoTypes.Quotient
 open Choreography.Projection.Project
 open Semantics.SubjectReduction
+open SessionTypes.LocalTypeR
+open SessionCoTypes.EQ2
+open SessionCoTypes.EQ2.HeadInversion
 
 /-! ## Progress Predicate: ReachesComm
 
@@ -81,12 +84,97 @@ def reachesCommBool (g : GlobalType) (fuel : Nat := 100) : Bool :=
     | .var _ => false
     | .mu t body => reachesCommBool (body.substitute t (.mu t body)) fuel
     | .comm _ _ branches => !branches.isEmpty
+    | .delegate _ _ _ _ _ => false
+
+/-- Soundness of the fuel-bounded check: a `true` answer witnesses `ReachesComm`. -/
+theorem reachesCommBool_sound : ∀ (fuel : Nat) (g : GlobalType),
+    reachesCommBool g fuel = true → ReachesComm g
+  | 0, _, h => by simp [reachesCommBool] at h
+  | n + 1, g, h => by
+      cases g with
+      | «end» => simp [reachesCommBool] at h
+      | var _ => simp [reachesCommBool] at h
+      | delegate _ _ _ _ _ => simp [reachesCommBool] at h
+      | mu t body => exact .mu t body (reachesCommBool_sound n _ (by simpa [reachesCommBool] using h))
+      | comm s r bs =>
+          refine .comm s r bs ?_
+          simpa [reachesCommBool] using h
+
+/-! ## Terminal Shapes -/
+
+/-- A global type unfolds (through `mu`) to `end`. -/
+inductive UnfoldsToEnd : GlobalType → Prop where
+  | done : UnfoldsToEnd .end
+  | mu (t : String) (body : GlobalType) :
+      UnfoldsToEnd (body.substitute t (.mu t body)) → UnfoldsToEnd (.mu t body)
+
+/-- A global type unfolds (through `mu`) to a delegation, which `step` does not model. -/
+inductive UnfoldsToDelegate : GlobalType → Prop where
+  | delegate {p q : String} {sid r} {cont : GlobalType} :
+      UnfoldsToDelegate (.delegate p q sid r cont)
+  | mu (t : String) (body : GlobalType) :
+      UnfoldsToDelegate (body.substitute t (.mu t body)) → UnfoldsToDelegate (.mu t body)
+
+/-- Number of leading `mu` binders. -/
+def muHeight : GlobalType → Nat
+  | .mu _ body => muHeight body + 1
+  | _ => 0
+
+/-- Substituting a variable that is unguarded-productive does not change the
+number of leading binders (the variable cannot occur in head position). -/
+theorem muHeight_substitute (t : String) (repl : GlobalType) :
+    ∀ (g : GlobalType) (U : List String), g.isProductive (t :: U) = true →
+      muHeight (g.substitute t repl) = muHeight g
+  | .end, _, _ => by simp [GlobalType.substitute, muHeight]
+  | .comm _ _ _, _, _ => by simp [GlobalType.substitute, muHeight]
+  | .delegate _ _ _ _ _, _, _ => by simp [GlobalType.substitute, muHeight]
+  | .var x, U, h => by
+      have hx : x ≠ t := by
+        intro hx; subst hx; simp [GlobalType.isProductive] at h
+      simp [GlobalType.substitute, hx]
+  | .mu s inner, U, h => by
+      by_cases hs : s = t
+      · simp [GlobalType.substitute, hs]
+      · have h' : inner.isProductive (t :: s :: U) = true :=
+          is_productive_swap inner s t U (by simpa [GlobalType.isProductive] using h)
+        simp [GlobalType.substitute, hs, muHeight, muHeight_substitute t repl inner (s :: U) h']
+
+/-- One `mu`-unfolding of a well-formed type strictly lowers `muHeight`. -/
+theorem muHeight_unfold_lt (t : String) (body : GlobalType)
+    (hwf : (GlobalType.mu t body).wellFormed = true) :
+    muHeight (body.substitute t (.mu t body)) < muHeight (.mu t body) := by
+  have hprod : body.isProductive [t] = true := by
+    simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
+    simpa [GlobalType.isProductive] using hwf.2
+  rw [muHeight_substitute t _ body [] hprod]
+  simp [muHeight]
+
+/-- Progress trichotomy for well-formed global types, derived from closedness,
+non-empty communications and productivity (no `ReachesComm` assumption):
+a well-formed type unfolds to `end`, to a delegation, or reaches a communication. -/
+theorem wf_trichotomy (g : GlobalType) (hwf : g.wellFormed = true) :
+    UnfoldsToEnd g ∨ UnfoldsToDelegate g ∨ ReachesComm g :=
+  match g with
+  | .end => Or.inl .done
+  | .delegate _ _ _ _ _ => Or.inr (Or.inl .delegate)
+  | .var _ => by simp [GlobalType.wellFormed, GlobalType.allVarsBound] at hwf
+  | .comm s r bs => by
+      refine Or.inr (Or.inr (.comm s r bs ?_))
+      intro hnil; subst hnil
+      simp [GlobalType.wellFormed, GlobalType.allCommsNonEmpty] at hwf
+  | .mu t body =>
+      have _hlt := muHeight_unfold_lt t body hwf
+      match wf_trichotomy _ (well_formed_mu_unfold t body hwf) with
+      | .inl h => .inl (.mu t body h)
+      | .inr (.inl h) => .inr (.inl (.mu t body h))
+      | .inr (.inr h) => .inr (.inr (.mu t body h))
+termination_by muHeight g
 
 /-! ## Terminal and Stuck Predicates -/
 
-/-- A configuration is done (terminal) when the global type is End. -/
+/-- A configuration is done (terminal) when its global type unfolds to `end`. -/
 def Done (c : Configuration) : Prop :=
-  c.globalType = .end
+  UnfoldsToEnd c.globalType
 
 /-- A configuration can make progress if there exists a valid step. -/
 def CanProgress (c : Configuration) : Prop :=
@@ -143,151 +231,185 @@ theorem reaches_comm_implies_can_step (g : GlobalType)
     ∃ act, canStep g act := by
   -- Get SyncCanStep, then convert to canStep.
   have ⟨act, hsync⟩ := reaches_comm_implies_sync_can_step g hwf hcomm
-  exact ⟨act, hsync.toCanStep⟩
+  exact ⟨act, hsync.to_can_step⟩
 
-/-! ## Configuration Progress
+/-- Global progress: a well-formed global type that is neither finished nor a
+(unmodeled) delegation can take a step. Reaching a communication is derived
+from well-formedness, not assumed. -/
+theorem wf_global_progress (g : GlobalType) (hwf : g.wellFormed = true)
+    (hend : ¬UnfoldsToEnd g) (hdel : ¬UnfoldsToDelegate g) :
+    ∃ act g', step g act g' := by
+  rcases wf_trichotomy g hwf with h | h | h
+  · exact absurd h hend
+  · exact absurd h hdel
+  · obtain ⟨act, hs⟩ := reaches_comm_implies_sync_can_step g hwf h
+    obtain ⟨g', hst⟩ := sync_can_step_implies_step g act hs
+    exact ⟨act, g', hst⟩
 
-Lift global type steps to configuration steps. -/
+/-- Trichotomy for configurations of a well-formed global type: done, blocked
+on an unmodeled delegation, or the global type can step. -/
+theorem deadlock_free_trichotomy (c : Configuration) (hwf : c.globalType.wellFormed = true) :
+    Done c ∨ UnfoldsToDelegate c.globalType ∨ ∃ act g', step c.globalType act g' := by
+  by_cases hend : Done c
+  · exact Or.inl hend
+  by_cases hdel : UnfoldsToDelegate c.globalType
+  · exact Or.inr (Or.inl hdel)
+  exact Or.inr (Or.inr (wf_global_progress _ hwf hend hdel))
 
-/-- Helper: build the stepped configuration from global step.
+/-! ## Configuration Progress (Head Communications) -/
 
-Given a global type step `g → g'`, construct the stepped configuration
-with updated process projections. -/
-private def buildSteppedConfig (c : Configuration) (g' : GlobalType) : Configuration where
-  globalType := g'
-  processes := c.processes.map fun p => { p with
-    localType := QLocalTypeR.ofLocal (trans g' p.role)
-  }
+/-- The continuation of the first branch labelled `label`, if any. -/
+def branchCont (label : Label) (bs : List BranchR) : Option LocalTypeR :=
+  (bs.find? (fun b => decide (b.1 = label))).map (·.2.2)
 
-/-- Helper: the built configuration preserves roles (in ConfigStep order). -/
-private theorem build_stepped_config_roles (c : Configuration) (g' : GlobalType) :
-    c.processes.map Process.role = (buildSteppedConfig c g').processes.map Process.role := by
-  -- Mapping preserves roles since we only update localType.
-  simp only [buildSteppedConfig, List.map_map]
-  -- The composed function extracts role, which is unchanged.
-  rfl
+/-- The continuation of a local type's own head-normal form (`fullUnfold`) for
+`label`; the type itself is returned if no such branch exists. -/
+def ownCont (label : Label) (lt : LocalTypeR) : LocalTypeR :=
+  match lt.fullUnfold with
+  | .send _ bs => (branchCont label bs).getD lt
+  | .recv _ bs => (branchCont label bs).getD lt
+  | _ => lt
 
-/-- Helper: the built configuration has correct projections. -/
-private theorem build_stepped_config_projections (c : Configuration) (g' : GlobalType) :
-    ∀ p' ∈ (buildSteppedConfig c g').processes,
-      p'.localType = QLocalTypeR.ofLocal (trans g' p'.role) := by
-  -- Each process has its localType set to the projection.
-  intro p' hp'
-  simp only [buildSteppedConfig, List.mem_map] at hp'
-  obtain ⟨p, _, rfl⟩ := hp'
-  rfl
+/-- Advance one process by `act`: participants step their own local type. -/
+def advanceProcess (act : GlobalActionR) (p : Process) : Process :=
+  if Participant act p.role then { p with localType := ownCont act.label p.localType }
+  else p
 
-/-- If a global type has SyncCanStep, a well-typed configuration can step.
+/-- If some branch of `as` carries `label`, `branchCont` returns the
+continuation of a member branch carrying that label. -/
+theorem branchCont_some {as : List BranchR} {label : Label} {x : BranchR}
+    (hx : x ∈ as) (hl : x.1 = label) :
+    ∃ vt cont, branchCont label as = some cont ∧ (label, vt, cont) ∈ as := by
+  cases h : as.find? (fun b => decide (b.1 = label)) with
+  | none =>
+      have := List.find?_eq_none.mp h x hx
+      simp [hl] at this
+  | some y =>
+      have hy := List.mem_of_find?_eq_some h
+      have hyl : y.1 = label := by simpa using List.find?_some h
+      refine ⟨y.2.1, y.2.2, by simp [branchCont, h], ?_⟩
+      rw [← hyl]; exact hy
 
-This version uses SyncCanStep which has a complete proof without async machinery. -/
-theorem sync_can_step_implies_config_step (c : Configuration) (act : GlobalActionR)
-    (_htyped : WellTypedConfig c)
-    (hcan : SyncCanStep c.globalType act) :
-    ∃ c', ConfigStep c c' act := by
-  -- From SyncCanStep, we know there exists g' with step c.globalType act g'.
-  have ⟨g', hstep⟩ := sync_can_step_implies_step c.globalType act hcan
-  -- Build the stepped configuration.
-  let c' := buildSteppedConfig c g'
-  refine ⟨c', ?_⟩
-  constructor
-  · exact hstep
-  · exact build_stepped_config_roles c g'
-  · exact build_stepped_config_projections c g'
+/-- The own-type branch list of a typed participant contains the stepped label. -/
+theorem own_label_mem {as : List BranchR} {bs : List (Label × GlobalType)} {role : String}
+    {label : Label} {g' : GlobalType} (hrel : BranchesRel EQ2 as (transBranches bs role))
+    (hmem : (label, g') ∈ bs) :
+    ∃ vt cont, branchCont label as = some cont ∧ (label, vt, cont) ∈ as := by
+  obtain ⟨x, hx, hl, -⟩ := branches_rel_mem_right hrel
+    (Choreography.Harmony.mem_trans_branches_of_mem bs label g' role hmem)
+  exact branchCont_some hx hl
 
-/-- If a global type can step, a well-typed configuration can step.
+/-- `advanceProcess` realizes `ProcessAdvance` for a typed participant of a head
+communication: the chosen continuation comes from the process's own type. -/
+theorem advance_participant {bs : List (Label × GlobalType)} {g' : GlobalType}
+    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs) {p : Process}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed)
+    (hp : Participant act p.role) :
+    LocalAdvance act p.role p.localType (ownCont act.label p.localType) := by
+  by_cases hs : p.role = act.sender
+  · obtain ⟨as, has, hrel⟩ := own_head_send ht hwf hs
+    obtain ⟨vt, cont, hc, hm⟩ := own_label_mem hrel hmem
+    have he : ownCont act.label p.localType = cont := by simp [ownCont, has, hc]
+    exact he ▸ .send hs has ⟨vt, hm⟩
+  · have hr := hp.resolve_left hs
+    obtain ⟨as, has, hrel⟩ := own_head_recv ht hwf hr hs
+    obtain ⟨vt, cont, hc, hm⟩ := own_label_mem hrel hmem
+    have he : ownCont act.label p.localType = cont := by simp [ownCont, has, hc]
+    exact he ▸ .recv hr hs has ⟨vt, hm⟩
 
-This requires the environment to provide message delivery for the action.
-Under fair environment, pending messages are eventually delivered. -/
-theorem can_step_implies_config_step (c : Configuration) (act : GlobalActionR)
-    (_htyped : WellTypedConfig c)
-    (hcan : canStep c.globalType act) :
-    ∃ c', ConfigStep c c' act := by
-  -- From canStep, we know there exists g' with step c.globalType act g'.
-  have ⟨g', hstep⟩ := can_step_implies_step c.globalType act hcan
-  -- Build the stepped configuration.
-  let c' := buildSteppedConfig c g'
-  refine ⟨c', ?_⟩
-  constructor
-  · exact hstep
-  · exact build_stepped_config_roles c g'
-  · exact build_stepped_config_projections c g'
+/-- `advanceProcess` realizes `ProcessAdvance` for a typed process of a head
+communication step. -/
+theorem advanceProcess_spec {bs : List (Label × GlobalType)} {g' : GlobalType}
+    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs) {p : Process}
+    (ht : p.wellTyped (.comm act.sender act.receiver bs))
+    (hwf : (trans (.comm act.sender act.receiver bs) p.role).WellFormed) :
+    ProcessAdvance act p (advanceProcess act p) where
+  role_eq := by unfold advanceProcess; split <;> rfl
+  advance := fun hp =>
+    ⟨_, advance_participant hmem ht hwf hp, by simp [advanceProcess, hp]⟩
+  frame := by intro hp; simp [advanceProcess, hp]
 
-/-! ## Deadlock Freedom Theorem
+/-- Pointwise advancement along a mapped list of typed processes. -/
+theorem forall2_map_advance {bs : List (Label × GlobalType)} {g' : GlobalType}
+    {act : GlobalActionR} (hmem : (act.label, g') ∈ bs)
+    (hwf : (GlobalType.comm act.sender act.receiver bs).wellFormed = true) :
+    ∀ ps : List Process, (∀ p ∈ ps, p.wellTyped (.comm act.sender act.receiver bs)) →
+      List.Forall₂ (ProcessAdvance act) ps (ps.map (advanceProcess act))
+  | [], _ => .nil
+  | p :: ps, ht =>
+      .cons (advanceProcess_spec hmem (ht p List.mem_cons_self)
+          (trans_well_formed_of_well_formed _ _ hwf))
+        (forall2_map_advance hmem hwf ps (fun q hq => ht q (List.mem_cons_of_mem _ hq)))
 
-The main theorem requires both well-formedness AND reachesComm.
-This mirrors Coq's `coherentG` which combines `gcontractive` and `goodG`. -/
+/-- A well-typed configuration headed by a communication steps along any of its
+branches, each participant advancing its own local type. -/
+theorem head_config_step (c : Configuration) {s r : String} {bs : List (Label × GlobalType)}
+    {label : Label} {cont : GlobalType} (htyped : WellTypedConfig c)
+    (hwf : c.globalType.wellFormed = true) (hg : c.globalType = .comm s r bs)
+    (hmem : (label, cont) ∈ bs) :
+    ConfigStep c ⟨cont, c.processes.map (advanceProcess ⟨s, r, label⟩)⟩ ⟨s, r, label⟩ where
+  global_step := by rw [hg]; exact step.comm_head s r bs label cont hmem
+  processes_advance := by
+    have ht := htyped.processes_typed
+    rw [hg] at ht hwf
+    exact forall2_map_advance (act := ⟨s, r, label⟩) hmem hwf c.processes ht
 
-/-- Deadlock freedom: well-typed configurations that reach a comm can progress.
+/-! ## Deadlock Freedom Theorem -/
 
-**Assumptions:**
-- `htyped`: configuration is well-typed
-- `hwf`: global type is well-formed
-- `hcomm`: global type reaches a communication (progress predicate)
-- Implicit: fair environment (not modeled explicitly)
+/-- Deadlock freedom for communication-headed configurations: a well-typed
+configuration whose (closed, well-formed, blind, label-unique) global type is a
+communication can step, and the result is again well-typed. Non-emptiness of
+the branches is derived from well-formedness.
 
-**Proof sketch:**
-1. By `reaches_comm_implies_sync_can_step`, the global type has a sync step
-2. By `sync_can_step_implies_config_step`, the configuration can step
-3. Therefore CanProgress holds
-
-Note: Uses SyncCanStep for a complete proof without async machinery. -/
-theorem deadlock_free (c : Configuration)
-    (htyped : WellTypedConfig c)
+`mu`-headed configurations are not covered at the configuration level (see
+`deadlock_free_trichotomy` for the global-level statement). -/
+theorem deadlock_free (c : Configuration) {s r : String} {bs : List (Label × GlobalType)}
+    (htyped : WellTypedConfig c) (hg : c.globalType = .comm s r bs)
+    (huniq : c.globalType.uniqueBranchLabels = true) (hclosed : c.globalType.isClosed = true)
     (hwf : c.globalType.wellFormed = true)
-    (hcomm : ReachesComm c.globalType) :
-    CanProgress c := by
-  -- Step 1: global type has sync canStep (from ReachesComm).
-  have ⟨act, hsync⟩ := reaches_comm_implies_sync_can_step c.globalType hwf hcomm
-  -- Step 2: configuration can step (using sync version for complete proof).
-  have ⟨c', hstep⟩ := sync_can_step_implies_config_step c act htyped hsync
-  -- Step 3: conclude CanProgress.
-  exact ⟨c', act, hstep⟩
+    (hblind : Choreography.Projection.Blind.isBlind c.globalType = true) :
+    ∃ c' act, ConfigStep c c' act ∧ WellTypedConfig c' := by
+  have hcomm : ReachesComm c.globalType := by
+    rcases wf_trichotomy _ hwf with h | h | h <;> rw [hg] at h
+    · cases h
+    · cases h
+    · exact hg ▸ h
+  rw [hg] at hcomm
+  cases hcomm with
+  | comm _ _ _ hne =>
+    obtain ⟨label, cont, hmem⟩ := first_branch_mem hne
+    have hstep := head_config_step c htyped hwf hg hmem
+    exact ⟨_, _, hstep, step_preserves_typing htyped ⟨⟨bs, hg⟩, huniq, hclosed, hwf, hblind⟩ hstep⟩
 
-/-- Corollary: well-typed configurations that reach a comm are not stuck. -/
-theorem not_stuck (c : Configuration)
-    (htyped : WellTypedConfig c)
+/-- Corollary: such configurations are not stuck. -/
+theorem not_stuck (c : Configuration) {s r : String} {bs : List (Label × GlobalType)}
+    (htyped : WellTypedConfig c) (hg : c.globalType = .comm s r bs)
+    (huniq : c.globalType.uniqueBranchLabels = true) (hclosed : c.globalType.isClosed = true)
     (hwf : c.globalType.wellFormed = true)
-    (hcomm : ReachesComm c.globalType) :
+    (hblind : Choreography.Projection.Blind.isBlind c.globalType = true) :
     ¬Stuck c := by
-  -- Stuck means not done AND not can progress.
   intro ⟨_, hnp⟩
-  -- But we have CanProgress.
-  have hp := deadlock_free c htyped hwf hcomm
-  exact hnp hp
-
-/-! ## Weaker Formulations -/
-
-/-- Weaker deadlock freedom: well-formed configs are done, reach comm, or neither.
-
-This version doesn't require the `ReachesComm` hypothesis, but gives a weaker
-conclusion. For types that don't reach a communication (like `mu t .end`),
-this doesn't guarantee progress. -/
-theorem deadlock_free_trichotomy (c : Configuration)
-    (_htyped : WellTypedConfig c)
-    (_hwf : c.globalType.wellFormed = true) :
-    Done c ∨ ReachesComm c.globalType ∨ ¬ReachesComm c.globalType := by
-  -- Law of excluded middle on ReachesComm.
-  by_cases hcomm : ReachesComm c.globalType
-  · right; left; exact hcomm
-  · right; right; exact hcomm
+  obtain ⟨c', act, hstep, _⟩ := deadlock_free c htyped hg huniq hclosed hwf hblind
+  exact hnp ⟨c', act, hstep⟩
 
 /-! ## Claims Bundle -/
 
-/-- Claims bundle for deadlock freedom.
-
-Note: requires `ReachesComm` hypothesis, mirroring Coq's separation of
-`gcontractive` (well-formedness) and `goodG` (progress). -/
+/-- Claims bundle for deadlock freedom. -/
 structure Claims where
-  /-- Main deadlock freedom theorem. -/
-  deadlock_free : ∀ c, WellTypedConfig c → c.globalType.wellFormed = true →
-      ReachesComm c.globalType → CanProgress c
-  /-- Corollary: not stuck. -/
-  not_stuck : ∀ c, WellTypedConfig c → c.globalType.wellFormed = true →
-      ReachesComm c.globalType → ¬Stuck c
+  /-- Global progress trichotomy for well-formed types. -/
+  trichotomy : ∀ c, c.globalType.wellFormed = true →
+      Done c ∨ UnfoldsToDelegate c.globalType ∨ ∃ act g', step c.globalType act g'
+  /-- Communication-headed configurations step to well-typed configurations. -/
+  deadlock_free : ∀ c s r bs, WellTypedConfig c → c.globalType = .comm s r bs →
+      c.globalType.uniqueBranchLabels = true → c.globalType.isClosed = true →
+      c.globalType.wellFormed = true →
+      Choreography.Projection.Blind.isBlind c.globalType = true →
+      ∃ c' act, ConfigStep c c' act ∧ WellTypedConfig c'
 
 /-- Build the claims bundle from proven theorems. -/
 def claims : Claims where
-  deadlock_free := deadlock_free
-  not_stuck := not_stuck
+  trichotomy := deadlock_free_trichotomy
+  deadlock_free := fun c _ _ _ h1 h2 h3 h4 h5 h6 => deadlock_free c h1 h2 h3 h4 h5 h6
 
 end Semantics.DeadlockFreedom

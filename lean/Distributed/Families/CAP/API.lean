@@ -1,40 +1,43 @@
 import Distributed.Families.CAP.Core
+import Distributed.Families.CAP.Theorem
 
 set_option autoImplicit false
 
 /-! # Distributed.Families.CAP.API
 
-High-level API for automatic CAP impossibility certification.
+High-level API for the CAP impossibility (Gilbert–Lynch 2002).
 
-When a protocol bundle includes the reusable CAP assumptions and impossibility
-premises, the CAP impossibility theorem is derived automatically.
+A bundle supplies a concrete two-node register algorithm and two distinct
+register values; the CAP theorem (not available-under-partition and atomic at
+once) is derived from `Register.cap_impossible`.
 -/
 
 namespace Distributed
 namespace CAP
 
-universe u v
-
-/-- Full CAP-certified protocol package.
-
-Users provide model assumptions and premises once, then receive the theorem
-through `impossibility_of_protocol`. -/
+/-- A register algorithm packaged for CAP certification. -/
 structure ImpossibilityProtocol where
-  State : Type u
-  Party : Type v
-  model : Model State Party
-  assumptions : Assumptions model
-  premises : ImpossibilityPremises model
+  Val : Type
+  Msg : Type
+  St : Type
+  algorithm : Register.Algorithm Val Msg St
+  initialValue : Val
+  otherValue : Val
+  distinct : otherValue ≠ initialValue
 
-/-- Extract the full CAP impossibility theorem from a certified protocol bundle. -/
-theorem impossibility_of_protocol (P : ImpossibilityProtocol) :
-    ¬ CAPGuarantee P.model P.premises.PartitionRun :=
-  impossibility_of_assumptions P.assumptions P.premises
+/-- The CAP guarantee for a bundle: availability under partition plus atomicity. -/
+def CAPGuarantee (P : ImpossibilityProtocol) : Prop :=
+  Register.Available P.algorithm ∧ Register.Atomic P.algorithm P.initialValue
 
-/-- FLP-style summary: core CAP assumptions are validated for a certified protocol. -/
-theorem core_assumptions_all_passed (P : ImpossibilityProtocol) :
-    (runAssumptionValidation P.assumptions coreAssumptions).allPassed = true := by
-  rfl
+/-- CAP impossibility for a certified bundle. -/
+theorem impossibility_of_protocol (P : ImpossibilityProtocol) : ¬ CAPGuarantee P :=
+  Register.cap_impossible P.algorithm P.initialValue P.otherValue P.distinct
+
+/-- Corollary: an available algorithm is not atomic. -/
+theorem consistency_impossible_with_availability (P : ImpossibilityProtocol)
+    (hAvail : Register.Available P.algorithm) :
+    ¬ Register.Atomic P.algorithm P.initialValue :=
+  fun hAt => impossibility_of_protocol P ⟨hAvail, hAt⟩
 
 end CAP
 end Distributed

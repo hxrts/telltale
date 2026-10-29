@@ -45,8 +45,8 @@ open SessionTypes.LocalTypeR
 
 -- Re-exports from ToCoindInjectivity
 
--- to_coind_injective is available from ToCoindInjectivity
--- to_coind_branches_injective is available from ToCoindInjectivity
+-- to_coind_injective_erase, to_coind_eq_iff_erase_payloads are available from ToCoindInjectivity
+-- to_coind_branches_injective_erase is available from ToCoindInjectivity
 -- to_coind_branches_length, to_coind_branches_get are available from ToCoindInjectivity
 
 -- Re-exports from RoundtripHelpers
@@ -122,18 +122,18 @@ lemma branches_rel_c_gupaco_clo {rr : LocalTypeC → LocalTypeC → Prop}
     {bs cs : List (Label × LocalTypeC)}
 /- ## Structured Block 2 -/
     (hbr : BranchesRelC rr bs cs) :
-    BranchesRelC (Paco.gupaco_clo EQ2CMono mu_clo rr) bs cs := by
+    BranchesRelC (Paco.gupacoClo EQ2CMono mu_clo rr) bs cs := by
   refine branches_rel_c_mono ?_ hbr
   intro a b h
-  have h' := Paco.r_le_gpaco_clo EQ2CMono mu_clo rr rr a b h
-  simpa [Paco.gupaco_clo_def] using h'
+  have h' := Paco.r_le_gpacoClo EQ2CMono mu_clo rr rr a b h
+  simpa [Paco.gupacoClo_def] using h'
 
 lemma gupaco_clo_obs_of_rr {rr : LocalTypeC → LocalTypeC → Prop}
-    (hrr : ∀ a b, rr a b → ObservableRelC (Paco.gupaco_clo EQ2CMono mu_clo rr) a b)
-    {a b : LocalTypeC} (h : Paco.gupaco_clo EQ2CMono mu_clo rr a b) :
-    ObservableRelC (Paco.gupaco_clo EQ2CMono mu_clo rr) a b := by
+    (hrr : ∀ a b, rr a b → ObservableRelC (Paco.gupacoClo EQ2CMono mu_clo rr) a b)
+    {a b : LocalTypeC} (h : Paco.gupacoClo EQ2CMono mu_clo rr a b) :
+    ObservableRelC (Paco.gupacoClo EQ2CMono mu_clo rr) a b := by
   -- Unfold gupaco_clo to expose the underlying rclo proof.
-  simp [Paco.gupaco_clo_def, Paco.gpaco_clo_def] at h
+  simp [Paco.gupacoClo_def, Paco.gpacoClo_def] at h
   -- Now: h : rclo mu_clo (paco (composeRclo EQ2CMono mu_clo) rr ⊔ rr) a b
   revert a b
   intro a b h
@@ -146,7 +146,7 @@ lemma gupaco_clo_obs_of_rr {rr : LocalTypeC → LocalTypeC → Prop}
           rcases hstep with ⟨obs_a, obs_b, hrel⟩
           -- composeRclo = EQ2CMono.F ∘ rclo mu_clo; upaco = paco ⊔ rr
           -- So this is exactly ObservableRelC with gupaco_clo as the relation.
-          simpa [Paco.composeRclo_def, Paco.gupaco_clo_def, Paco.gpaco_clo_def] using hrel
+          simpa [Paco.composeRclo_def, Paco.gupacoClo_def, Paco.gpacoClo_def, Paco.upaco] using hrel
       | inr hrr' =>
           exact hrr _ _ hrr'
   | clo R' _ hclo ih =>

@@ -1,21 +1,28 @@
 import Distributed.Families.CRDT.Core.ExtensionsAndLimits
 
-/-! # CRDT Assumptions and Premises
+/-! # CRDT Premises
 
-Bundled assumption records and validation infrastructure for CRDT model
-verification. Provides structured access to the 14 core model class
-predicates required for convergence and envelope theorems. -/
+Premise bundle for CRDT envelope/budget theorem forms over abstract run sets.
+The algebraic CRDT laws are not premises: they live in `Model.lattice` and are
+proved in `Semilattice`/`CoreModel`. The former fourteen free `Prop` class tags
+and their constant-`true` validator were removed because they constrained nothing.
+Adequacy over abstract `RefRun`/`ImplRun` remains conditional
+(`adequacy_of_refinement_hypothesis`); for step-relation models it is proved in
+`Distributed.Families.CRDT.Core.Adequacy`.
 
-/-
-The Problem. CRDT convergence proofs require checking multiple assumption
-classes (semilattice core, op-context layer, distance bounds, etc.). Each
-theorem lists its prerequisites individually, making assumption tracking
-error-prone and validation verbose.
-
-Solution Structure. Bundle assumptions into `Assumptions` record. Provide
-`Assumption` enumeration for programmatic validation. Define `coreAssumptions`
-list and `AssumptionResult` for structured validation reporting.
--/
+Of the remaining theorem forms:
+- op/state equivalence is proved: `opRun`/`stateRun` are defined from an op
+  log as op-based delivery and state-based merging, equal by
+  `Model.deliver_eq_mergeAll`,
+- GC safety iff causal dominance is proved: `GCSafe s` (discarding the
+  buffered deltas `gcBuffer` loses nothing) and causal dominance (`s` dominates
+  every buffered delta) are defined in the lattice and shown equivalent,
+- exact SEC as a limit is proved from the metric law `distanceSelf` and a
+  common start `sameStart`,
+- the bounded-metadata distance bound is *not* derivable (`distance` is
+  uninterpreted); it is the explicitly named assumption
+  `assumedDistanceBound`, and `bounded_approximation_of_assumptions` merely
+  exposes it. -/
 
 set_option autoImplicit false
 
@@ -23,188 +30,6 @@ namespace Distributed
 namespace CRDT
 
 universe u v w x y z
-
-/-! ## Assumption Bundle -/
-
-structure Assumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    (M : Model State Op Context Obs Program) : Prop where
-  semilatticeCoreClass : M.semilatticeCoreClass
-  opContextLayerClass : M.opContextLayerClass
-  minimalOpStateEquivalenceAssumptions : M.minimalOpStateEquivalenceAssumptions
-  canonicalConvergenceDistanceClass : M.canonicalConvergenceDistanceClass
-  mixingTimeControlledClass : M.mixingTimeControlledClass
-  hotspotSlowModesClass : M.hotspotSlowModesClass
-  driftDecayClass : M.driftDecayClass
-  sequenceSubclassClass : M.sequenceSubclassClass
-  epochBarrierClass : M.epochBarrierClass
-  boundedMetadataApproxClass : M.boundedMetadataApproxClass
-  multiscaleObservablesClass : M.multiscaleObservablesClass
-  metadataTradeoffFrontierClass : M.metadataTradeoffFrontierClass
-  gcCausalDominanceClass : M.gcCausalDominanceClass
-  stabilizationLowerBoundClass : M.stabilizationLowerBoundClass
-
-/-! ## Assumption Labels -/
-
-/-- Built-in assumption labels for summary/validation APIs. -/
-inductive Assumption where
-  | semilatticeCoreClass
-  | opContextLayerClass
-  | minimalOpStateEquivalenceAssumptions
-  | canonicalConvergenceDistanceClass
-  | mixingTimeControlledClass
-  | hotspotSlowModesClass
-  | driftDecayClass
-  | sequenceSubclassClass
-  | epochBarrierClass
-  | boundedMetadataApproxClass
-  | multiscaleObservablesClass
-  | metadataTradeoffFrontierClass
-  | gcCausalDominanceClass
-  | stabilizationLowerBoundClass
-  deriving Repr, DecidableEq, Inhabited
-
-/-! ## Validation Result Types -/
-
-/-- Validation result for one assumption atom. -/
-structure AssumptionResult where
-  assumption : Assumption
-  passed : Bool
-  detail : String
-  deriving Repr, DecidableEq, Inhabited
-
-/-! ## Core Assumption Catalog -/
-
-/-- Core reusable CRDT assumption set. -/
-def coreAssumptions : List Assumption :=
-  [ .semilatticeCoreClass
-  , .opContextLayerClass
-  , .minimalOpStateEquivalenceAssumptions
-  , .canonicalConvergenceDistanceClass
-  , .mixingTimeControlledClass
-  , .hotspotSlowModesClass
-  , .driftDecayClass
-  , .sequenceSubclassClass
-  , .epochBarrierClass
-  , .boundedMetadataApproxClass
-  , .multiscaleObservablesClass
-  , .metadataTradeoffFrontierClass
-  , .gcCausalDominanceClass
-  , .stabilizationLowerBoundClass
-  ]
-
-/-! ## Validation Functions -/
-
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
-
-
-/-- Validate one assumption against an assumption bundle. -/
-def validateAssumption
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (_a : Assumptions M) (h : Assumption) : AssumptionResult :=
-  match h with
-  | .semilatticeCoreClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Semilattice core premise is provided."
-      }
-  | .opContextLayerClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Op-context layer premise is provided."
-      }
-  | .minimalOpStateEquivalenceAssumptions =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Minimal op/state equivalence assumptions are provided."
-      }
-  | .canonicalConvergenceDistanceClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Canonical convergence-distance class premise is provided."
-      }
-  | .mixingTimeControlledClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Mixing-time control premise is provided."
-      }
-  -- Validation cases: dynamics and limits.
-  | .hotspotSlowModesClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Hotspot slow-mode premise is provided."
-      }
-  | .driftDecayClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Drift-decay premise is provided."
-      }
-  | .sequenceSubclassClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Sequence-subclass premise is provided."
-      }
-  | .epochBarrierClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Epoch-barrier premise is provided."
-      }
-/- ## Structured Block 1 -/
-  | .boundedMetadataApproxClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Bounded-metadata approximation premise is provided."
-      }
-  | .multiscaleObservablesClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Multiscale-observables premise is provided."
-      }
-  | .metadataTradeoffFrontierClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Metadata tradeoff-frontier premise is provided."
-      }
-  | .gcCausalDominanceClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "GC/causal-dominance premise is provided."
-      }
-  | .stabilizationLowerBoundClass =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Stabilization lower-bound premise is provided."
-      }
-
-/-- Validate a list of assumptions. -/
-def validateAssumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) (hs : List Assumption) : List AssumptionResult :=
-  hs.map (validateAssumption a)
-
-/-! ## Validation Summary -/
-
-/-- True iff every validation atom passed. -/
-def allAssumptionsPassed (rs : List AssumptionResult) : Bool :=
-  rs.all (fun r => r.passed)
-
-/-- Summary of assumption validation. -/
-structure AssumptionSummary where
-  results : List AssumptionResult
-  allPassed : Bool
-  deriving Repr, DecidableEq, Inhabited
-
-/-- Summary API for assumption validation. -/
-def runAssumptionValidation
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) (hs : List Assumption) : AssumptionSummary :=
-  let rs := validateAssumptions a hs
-  { results := rs, allPassed := allAssumptionsPassed rs }
 
 /-! ## Theorem Premises Bundle -/
 
@@ -217,31 +42,50 @@ structure Premises
   envelopeBudget : DiffBudget
   inferredBudget : DiffBudget
   stateSemantics : StateBasedCRDT State
-  opRun : Run State
-  stateRun : Run State
-  GCSafe : State → Prop
-  CausalDominanceEstablished : State → Prop
+  /-- Base state of the op/state comparison. -/
+  opBase : State
+  /-- Updates delivered by time `n` in the op/state comparison. -/
+  opLog : Nat → List Op
+  /-- Buffered deltas a garbage collector would discard. -/
+  gcBuffer : List State
   approxPolicy : Nat → Nat
   horizon : Nat
   epsilon : Nat
   referenceRun : Run State
   deployedRun : Run State
-  implementationMatchesReference :
+  /-- Refinement hypothesis (not derived from the CRDT model). -/
+  refinementHypothesis :
     ∀ ref impl n, RefRun ref → ImplRun impl → EqSafe M (ref n) (impl n)
   realizableWhenMatches :
     ∀ ref impl, RefRun ref → (∀ n, EqSafe M (ref n) (impl n)) → ImplRun impl
   budgetAligned : inferredBudget = envelopeBudget
-  opStateMatches : ∀ n, EqSafe M (opRun n) (stateRun n)
-  gcSafetyImpliesCausalDominance :
-    ∀ s, GCSafe s → CausalDominanceEstablished s
-  causalDominanceImpliesGCSafety :
-    ∀ s, CausalDominanceEstablished s → GCSafe s
-  distanceBoundUnderPolicy :
+  /-- Explicit assumption (not derived; `distance` is uninterpreted): the
+  deployed run stays within `epsilon + approxPolicy t` of the reference. -/
+  assumedDistanceBound :
     ∀ t, t ≤ horizon →
       M.distance (referenceRun t) (deployedRun t) ≤ epsilon + approxPolicy t
-  exactSECZeroBudget :
-    (∀ t, approxPolicy t = 0) →
-      M.distance (referenceRun 0) (deployedRun 0) ≤ 0
+  /-- Metric law: a state is at distance `0` from itself. -/
+  distanceSelf : ∀ s, M.distance s s = 0
+  /-- Reference and deployed runs start from the same state. -/
+  sameStart : referenceRun 0 = deployedRun 0
+
+variable {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
+  {M : Model State Op Context Obs Program}
+
+/-- Op-based run: sequential delivery of the op log. -/
+def Premises.opRun (p : Premises M) : Run State := fun n => M.deliver p.opBase (p.opLog n)
+
+/-- State-based run: merging the deltas of the op log. -/
+def Premises.stateRun (p : Premises M) : Run State :=
+  fun n => mergeAll M.lattice p.opBase ((p.opLog n).map M.effect)
+
+/-- GC safety: merging the buffered deltas back changes nothing. -/
+def Premises.GCSafe (p : Premises M) (s : State) : Prop :=
+  mergeAll M.lattice s p.gcBuffer = s
+
+/-- Causal dominance: `s` dominates every buffered delta. -/
+def Premises.CausalDominanceEstablished (p : Premises M) (s : State) : Prop :=
+  ∀ x ∈ p.gcBuffer, M.lattice.le x s
 
 /-! ## Envelope and Adequacy Derivations -/
 
@@ -249,33 +93,31 @@ structure Premises
 theorem exact_envelope_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     ExactEnvelopeCharacterization M p.RefRun p.ImplRun := by
   constructor
   · intro ref impl hRef hImpl n
-    exact p.implementationMatchesReference ref impl n hRef hImpl
+    exact p.refinementHypothesis ref impl n hRef hImpl
   constructor
   · intro ref impl hRef hEnvelope
     exact p.realizableWhenMatches ref impl hRef hEnvelope
   · intro R hR ref impl hRef hImpl hRel n
     exact hR ref impl hRef hImpl hRel n
 
-/-- Observational adequacy modulo envelope follows from assumptions + premises. -/
-theorem adequacy_of_assumptions
+/-- Conditional adequacy: restates the premise `refinementHypothesis`; the CRDT
+model has no step semantics from which it could be proved. -/
+theorem adequacy_of_refinement_hypothesis
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     ObservationalAdequacyModuloEnvelope M p.RefRun p.ImplRun := by
   intro ref impl hRef hImpl n
-  exact p.implementationMatchesReference ref impl n hRef hImpl
+  exact p.refinementHypothesis ref impl n hRef hImpl
 
 /-- Principal capability theorem follows from assumptions + premises. -/
 theorem principal_capability_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     PrincipalCapability p.inferredBudget p.envelopeBudget :=
   p.budgetAligned
@@ -286,7 +128,6 @@ theorem principal_capability_of_assumptions
 theorem admission_soundness_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     AdmissionSoundness p.inferredBudget p.envelopeBudget := by
   intro _dUser hLe
@@ -296,7 +137,6 @@ theorem admission_soundness_of_assumptions
 theorem admission_completeness_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     AdmissionCompleteness p.inferredBudget p.envelopeBudget := by
   intro _dUser
@@ -306,104 +146,65 @@ theorem admission_completeness_of_assumptions
   · intro hAdmit
     simpa [CapabilityAdmissible, p.budgetAligned] using hAdmit
 
-/-- Op/state equivalence theorem follows from assumptions + premises. -/
+/-- Op/state equivalence, proved: op delivery is merging deltas. -/
 theorem op_state_equivalence_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     OpStateEquivalence M p.opRun p.stateRun :=
-  p.opStateMatches
+  fun n => congrArg M.observe (M.deliver_eq_mergeAll (p.opLog n) p.opBase)
 
-/-- GC safety iff causal dominance follows from assumptions + premises. -/
+/-- GC safety iff causal dominance, proved from the lub characterization of
+`mergeAll` and antisymmetry. -/
 theorem gc_safety_iff_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     GCSafetyIffCausalDominance p.GCSafe p.CausalDominanceEstablished := by
   intro s
-  exact ⟨p.gcSafetyImpliesCausalDominance s, p.causalDominanceImpliesGCSafety s⟩
+  have hUb := (mergeAll_le_iff M.lattice p.gcBuffer s _).1 (M.lattice.le_refl _)
+  constructor
+  · intro h x hx
+    have := hUb.2 x hx
+    unfold Premises.GCSafe at h
+    rwa [h] at this
+  · intro h
+    exact M.lattice.le_antisymm
+      ((mergeAll_le_iff M.lattice p.gcBuffer s s).2 ⟨M.lattice.le_refl s, h⟩) hUb.1
 
 /-! ## Approximation and Limit Derivations -/
 
-/-- Bounded-metadata approximation bound follows from assumptions + premises. -/
+/-- Bounded-metadata approximation: exposes the named assumption
+`assumedDistanceBound` (not derived). -/
 theorem bounded_approximation_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     BoundedMetadataApproximation M p.approxPolicy p.horizon p.epsilon
       p.referenceRun p.deployedRun :=
-  p.distanceBoundUnderPolicy
+  p.assumedDistanceBound
 
 /-- Approximation monotonicity theorem follows from assumptions + premises. -/
 theorem approximation_monotone_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     ApproximationMonotoneUnderPolicyTightening M p.approxPolicy p.approxPolicy
       p.horizon p.epsilon p.referenceRun p.deployedRun := by
   intro _hTight hApprox
   exact hApprox
 
-/-- Exact-SEC recovery-as-limit theorem follows from assumptions + premises. -/
+/-- Exact SEC as a limit, proved from `distanceSelf` and `sameStart`. -/
 theorem exact_sec_as_limit_of_assumptions
     {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
     {M : Model State Op Context Obs Program}
-    (_a : Assumptions M)
     (p : Premises M) :
     ExactSECRecoveryAsLimit M p.approxPolicy p.referenceRun p.deployedRun := by
   intro hPolicyZero t ht
   have ht0 : t = 0 := Nat.le_zero.mp ht
   subst ht0
-  simpa [hPolicyZero 0] using p.exactSECZeroBudget hPolicyZero
-
-/-! ## Derived Bundle Projections -/
-
-/-- `H_crdt_core` from CRDT assumptions. -/
-theorem hcrdt_core_of_assumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) :
-    HcrdtCore M :=
-  ⟨a.semilatticeCoreClass, a.opContextLayerClass⟩
-
-/-- `H_crdt_foundation` from CRDT assumptions. -/
-theorem hcrdt_foundation_of_assumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) :
-    HcrdtFoundation M :=
-  ⟨a.minimalOpStateEquivalenceAssumptions, a.canonicalConvergenceDistanceClass⟩
-
-/-- `H_crdt_dynamics` from CRDT assumptions. -/
-theorem hcrdt_dynamics_of_assumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) :
-    HcrdtDynamics M :=
-  ⟨a.mixingTimeControlledClass, a.hotspotSlowModesClass, a.driftDecayClass⟩
-
-/-- `H_crdt_extensions` from CRDT assumptions. -/
-theorem hcrdt_extensions_of_assumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) :
-    HcrdtExtensions M :=
-  ⟨a.sequenceSubclassClass, a.epochBarrierClass,
-    a.boundedMetadataApproxClass, a.multiscaleObservablesClass⟩
-
-/-- `H_crdt_limits` from CRDT assumptions. -/
-theorem hcrdt_limits_of_assumptions
-    {State : Type u} {Op : Type v} {Context : Type w} {Obs : Type x} {Program : Type y}
-    {M : Model State Op Context Obs Program}
-    (a : Assumptions M) :
-    HcrdtLimits M :=
-  ⟨a.metadataTradeoffFrontierClass, a.gcCausalDominanceClass,
-    a.stabilizationLowerBoundClass⟩
-
+  rw [p.sameStart, p.distanceSelf]
+  exact Nat.zero_le _
 
 end CRDT
 end Distributed

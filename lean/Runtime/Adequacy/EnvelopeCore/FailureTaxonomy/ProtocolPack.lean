@@ -22,13 +22,6 @@ theorem cross_target_failure_conformance_of_failure_premises
       p.failureVisible p.singleThreadRun p.multiThreadRun p.shardedRun :=
   p.crossTargetConformanceWitness
 
-/-- Extract abstract recovery-action safety theorem from failure premises. -/
-theorem recovery_action_safety_of_failure_premises
-    {State : Type u} {Obs : Type v}
-    (p : FailureEnvelopePremises State Obs) :
-    RecoveryActionSafety p.Safe p.recoveryStep :=
-  p.recoveryActionSafetyWitness
-
 /-- Extract abstract no-harmful-replay theorem from failure premises. -/
 theorem no_unsafe_replay_of_failure_premises
     {State : Type u} {Obs : Type v}
@@ -83,9 +76,10 @@ structure FailureEnvelopeProtocol where
       premises.multiThreadRun
       premises.shardedRun :=
       cross_target_failure_conformance_of_failure_premises premises
+  /-- Assumed (re-exposed from `premises.assumedRecoveryActionSafety`). -/
   recoveryActionSafety :
     RecoveryActionSafety premises.Safe premises.recoveryStep :=
-      recovery_action_safety_of_failure_premises premises
+      premises.assumedRecoveryActionSafety
   noUnsafeReplay :
     NoUnsafeReplay premises.Safe premises.replayPre premises.replay :=
       no_unsafe_replay_of_failure_premises premises

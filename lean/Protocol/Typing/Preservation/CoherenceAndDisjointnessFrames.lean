@@ -428,7 +428,7 @@ theorem disjoint_s_preserved_typed_step_left
       simpa [hEraseEq] using hNoneErase
     have hDisj' :=
       disjoint_s_preserved_typed_step_left_recv (k:=k) (x:=x) (T:=T) hPre hNoOwnR hDisj hSub
-    simpa [hSout] using hDisj'
+    simpa [hSout, OwnedEnv.updateLeft] using hDisj'
   case assign G D Ssh Sown store bufs x v T S' store' hv hSout hStoreOut =>
     have hUpdRightEq : (OwnedEnv.updateLeft Sown x T).right = Sown.right := by
       simpa [hSout] using hRightEq
@@ -440,7 +440,7 @@ theorem disjoint_s_preserved_typed_step_left
       simpa [hEraseEq] using hNoneErase
     have hDisj' :=
       disjoint_s_preserved_typed_step_left_assign (x:=x) (v:=v) (T:=T) hPre hNoOwnR hDisj hSub
-    simpa [hSout] using hDisj'
+    simpa [hSout, OwnedEnv.updateLeft] using hDisj'
   -- # Structural Cases (Seq/Par)
   case seq_step _ ih =>
     cases hPre with

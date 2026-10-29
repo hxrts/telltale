@@ -140,7 +140,7 @@ theorem is_closed_at_subst (t e : LocalTypeDB) (k : Nat) :
       · simp [LocalTypeDB.subst, LocalTypeDB.isClosedAt, hnk, he]
       · by_cases hgt : n > k
         · have hge : k + 1 ≤ n := Nat.succ_le_of_lt hgt
-          have hcontra : False := (Nat.not_lt_of_ge hge) ht
+          have hcontra : False := by omega
           exact (False.elim hcontra)
         · have hle : n ≤ k := Nat.le_of_not_gt hgt
           have hlt : n < k := Nat.lt_of_le_of_ne hle hnk

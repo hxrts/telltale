@@ -272,7 +272,7 @@ def runtimeCriticalTransportedTheoremsExplicit : Bool :=
 
 theorem runtimeCriticalTransportedTheoremsExplicit_true :
     runtimeCriticalTransportedTheoremsExplicit = true := by
-  native_decide
+  decide
 
 end Proofs
 end Runtime

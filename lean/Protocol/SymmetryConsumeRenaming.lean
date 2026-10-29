@@ -37,6 +37,7 @@ theorem rename_val_type_pr_inj (σ : ProtocolRenaming) :
           cases h
       | string =>
           cases h
+      | readiness => cases h
       | prod _ _ =>
           cases h
       | chan _ _ =>
@@ -51,6 +52,7 @@ theorem rename_val_type_pr_inj (σ : ProtocolRenaming) :
           cases h
       | string =>
           cases h
+      | readiness => cases h
       | prod _ _ =>
           cases h
       | chan _ _ =>
@@ -65,6 +67,7 @@ theorem rename_val_type_pr_inj (σ : ProtocolRenaming) :
           cases h
       | string =>
           cases h
+      | readiness => cases h
       | prod _ _ =>
           cases h
       | chan _ _ =>
@@ -80,11 +83,14 @@ theorem rename_val_type_pr_inj (σ : ProtocolRenaming) :
           cases h
       | nat =>
           cases h
+      | readiness => cases h
       | prod _ _ =>
           cases h
       | chan _ _ =>
           cases h
   -- Injectivity: product constructor
+  | readiness =>
+      cases T2 <;> simp_all [renameValTypePR]
   | prod T1 T2 ih1 ih2 =>
       cases T2 <;> simp [renameValTypePR] at h
       case prod T1' T2' =>
@@ -315,11 +321,13 @@ theorem lookup_d_rename_pr (σ : ProtocolRenaming) (D : DEnv) (e : Edge) :
   cases h : D.list.lookup e with
   | none =>
       simp [h] at hFold
-      simpa [hLookup, h] using hFold
+      simp only [hLookup, h]
+      exact hFold
   | some ts =>
       simp [h] at hFold
 /- ## Structured Block 6 -/
-      simpa [hLookup, h] using hFold
+      simp only [hLookup, h]
+      exact hFold
 
 /-- The coherence invariant is preserved under protocol renaming.
     This is the main conservation theorem. -/

@@ -35,7 +35,7 @@ open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 open SessionCoTypes.CoinductiveRel
 open Choreography.Projection.Projectb
-open Choreography.Projection.Project (lcontractive)
+open Choreography.Projection.Trans (lcontractive)
 
 /-! ## Embedding Relations -/
 

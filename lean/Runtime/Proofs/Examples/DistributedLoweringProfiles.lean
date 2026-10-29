@@ -99,8 +99,8 @@ example (bundle : ProtocolMachineLivenessBundle store₀)
     let ast := emptyDistributedAST
     let space := (loweringBackedDistributedSpace
       (ν := ν) (store₀ := store₀) (State := State) ast bundle).withDistributedProfiles profiles
-    (buildProtocolMachineTheoremPack (space := space)).proofCarryingMetadata.progress.requiresExplicitProgressContracts =
-      true := by
+    (buildProtocolMachineTheoremPack (space := space)).proofCarryingMetadata.envelope.protocolEnvelopeBridge =
+      (buildProtocolMachineTheoremPack (space := space)).protocolEnvelopeBridge?.isSome := by
   rfl
 
 end

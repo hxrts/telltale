@@ -154,6 +154,7 @@ private lemma valid_labels_branch_transfer {bufs : Buffers} {e : Edge}
       | unit => simp
       | bool _ => simp
       | nat _ => simp
+      | readiness _ => simp
       | prod _ _ => simp
       | chan _ => simp
       | string ℓ =>

@@ -36,7 +36,6 @@ Each `@[implemented_by]` follows the pattern:
 | Construct | Logical | Runtime | Justification |
 |-----------|---------|---------|---------------|
 | `fupd E₁ E₂ P` | Fancy update modality | `P` | Mask changes are proof-only |
-| `uPredFupd E₁ E₂ P` | UPred fancy update | `P` | Same as above, at uPred level |
 | `inv N P` | Invariant assertion | `P` | Invariant content only |
 | `cinv N ct P` | Cancelable invariant | `P` | Invariant content only |
 | `cancel_token_own ct` | Cancellation token | `emp` | Token is ghost ownership |
@@ -66,30 +65,7 @@ The `@[implemented_by]` pattern implements this erasure:
 
 set_option autoImplicit false
 
-namespace Telltale
-
-variable [ti : TelltaleIris]
-
-/-! ## UPred Fancy Update Erasure
-
-Fancy updates `|={E₁,E₂}=> P` allow mask-changing view shifts — logical
-operations that open/close invariants. At runtime, mask manipulation is
-purely logical framing, so we erase to identity.
--/
-
-/-- Runtime implementation: fancy update erases to identity on `P`. -/
-def uPredFupdImpl (_E₁ _E₂ : Mask) (P : iProp) : iProp := P
-
-/-- Fancy update at UPred level.
-
-**Logical**: Full Iris fancy update modality with mask tracking.
-**Runtime**: Identity (masks are proof-only). -/
-@[implemented_by uPredFupdImpl]
-def uPredFupd (E₁ E₂ : Mask) (P : iProp) : iProp :=
-  Iris.BaseLogic.uPred_fupd
-    (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E₁ E₂ P
-
-end Telltale
+open Iris Iris.BI
 
 variable [ti : Telltale.TelltaleIris]
 
@@ -111,66 +87,65 @@ def «forall» {α : Type} (Φ : α → iProp) : iProp :=
 
 end iProp
 
-/-! ## Big Separation over Maps -/
-
-def big_sepM {K : Type _} {V : Type _} {M' : Type _ → Type _}
-    [Iris.Std.FiniteMap K M'] (Φ : K → V → iProp) (m : M' V) : iProp :=
-  Iris.BI.big_sepM (PROP := iProp) Φ m
-
 /-! ## Entailment Helpers -/
 
 private theorem entails_refl (P : iProp) : iProp.entails P P :=
-  (Iris.BI.BIBase.BiEntails.rfl (P := P)).1
+  BI.entails_refl
 
 private theorem eq_entails {P Q : iProp} (h : P ⊣⊢ Q) : iProp.entails P Q := h.1
+
+/-- Turn an upstream `⊢ P -∗ Q -∗ R` lemma into `P ∗ Q ⊢ R`. -/
+private theorem wand2_entails {P Q R : iProp} (h : ⊢ P -∗ Q -∗ R) :
+    iProp.entails (iProp.sep P Q) R :=
+  BI.wand_elim (wand_entails h)
 
 /-! ## Separation Logic Laws -/
 
 theorem sep_comm (P Q : iProp) :
     iProp.entails (iProp.sep P Q) (iProp.sep Q P) :=
-  eq_entails Iris.BI.sep_comm
+  eq_entails BI.sep_comm
 
 theorem sep_assoc (P Q R : iProp) :
     iProp.entails (iProp.sep (iProp.sep P Q) R)
       (iProp.sep P (iProp.sep Q R)) :=
-  eq_entails Iris.BI.sep_assoc
+  eq_entails BI.sep_assoc
 
 theorem sep_mono (P P' Q Q' : iProp) :
     iProp.entails P P' → iProp.entails Q Q' →
     iProp.entails (iProp.sep P Q) (iProp.sep P' Q') :=
-  fun h1 h2 => Iris.BI.sep_mono h1 h2
+  fun h1 h2 => BI.sep_mono h1 h2
 
 theorem wand_intro (P Q R : iProp) :
     iProp.entails (iProp.sep P Q) R →
     iProp.entails P (iProp.wand Q R) :=
-  fun h => Iris.BI.wand_intro h
+  fun h => BI.wand_intro h
 
 theorem wand_elim (P Q : iProp) :
-    iProp.entails (iProp.sep (iProp.wand P Q) P) Q := by
-  simpa using (Iris.BI.wand_elim_l (P := P) (Q := Q))
+    iProp.entails (iProp.sep (iProp.wand P Q) P) Q :=
+  BI.wand_elim BI.entails_refl
 
 theorem pure_intro (φ : Prop) (P : iProp) :
     φ → iProp.entails P (iProp.sep (iProp.pure φ) P) := by
   intro hφ
-  have hEmp : iProp.entails P (iProp.sep iProp.emp P) :=
-    Iris.BI.emp_sep.symm.1
+  have hEmp : iProp.entails P (iProp.sep iProp.emp P) := BI.emp_sep.2
   have hSep : iProp.entails (iProp.sep iProp.emp P) (iProp.sep (iProp.pure φ) P) :=
-    Iris.BI.sep_mono (Iris.BI.pure_intro (P := iProp.emp) hφ) (entails_refl P)
-  exact hEmp.trans hSep
+    BI.sep_mono (BI.pure_intro hφ) (entails_refl P)
+  exact BI.entails_trans hEmp hSep
 
 theorem pure_elim (φ : Prop) (P : iProp) :
     (φ → iProp.entails iProp.emp P) → iProp.entails (iProp.pure φ) P :=
-  fun h => Iris.BI.pure_elim' h
+  fun h => BI.pure_elim φ BI.entails_refl
+    (fun hφ => BI.entails_trans Affine.affine (h hφ))
 
 theorem persistently_idemp (P : iProp) :
     iProp.entails (iProp.persistently (iProp.persistently P))
       (iProp.persistently P) :=
-  eq_entails Iris.BI.persistently_idem
+  eq_entails BI.persistently_idem
 
 theorem persistently_sep_dup (P : iProp) :
     iProp.entails (iProp.persistently P)
       (iProp.sep (iProp.persistently P) (iProp.persistently P)) :=
-  eq_entails Iris.BI.persistently_sep_persistently.symm
+  BI.persistently_sep_persistently.2
 
 /-! ## Basic Update Modality -/
 
@@ -178,18 +153,18 @@ def bupd (P : iProp) : iProp := Iris.BUpd.bupd P
 
 theorem bupd_mono (P Q : iProp) :
     iProp.entails P Q → iProp.entails (_root_.bupd P) (_root_.bupd Q) :=
-  fun h => Iris.BIUpdate.mono h
+  fun h => Iris.bupd_mono h
 
 theorem bupd_intro (P : iProp) : iProp.entails P (_root_.bupd P) :=
-  Iris.BIUpdate.intro
+  Iris.bupd_intro
 
 theorem bupd_trans (P : iProp) :
     iProp.entails (_root_.bupd (_root_.bupd P)) (_root_.bupd P) :=
-  Iris.BIUpdate.trans
+  Iris.bupd_trans
 
 theorem bupd_frame_r (P Q : iProp) :
     iProp.entails (iProp.sep (_root_.bupd P) Q) (_root_.bupd (iProp.sep P Q)) :=
-  Iris.BIUpdate.frame_r
+  Iris.bupd_frame_right
 
 /-! ## Big Separating Conjunction (Lists) -/
 
@@ -210,48 +185,42 @@ theorem big_sep_l_app {α : Type} (Φ : α → iProp) (l₁ l₂ : List α) :
   induction l₁ with
   | nil =>
     simp only [big_sepL, List.foldr, List.nil_append]
-    exact Iris.BI.emp_sep.symm.1
+    exact BI.emp_sep.2
   | cons x xs ih =>
     simp only [big_sepL, List.foldr, List.cons_append]
-    refine (Iris.BI.sep_mono (entails_refl _) ih).trans ?_
-    exact (Iris.BI.sep_assoc (P := Φ x)).symm.1
+    refine BI.entails_trans (BI.sep_mono (entails_refl _) ih) ?_
+    exact (BI.sep_assoc (P := Φ x)).2
 
-/-! ## Masks and Namespaces -/
+/-! ## Masks and Namespaces
+
+Masks are upstream `CoPset`s; namespaces map to masks via `nclose`. -/
 
 namespace Mask
 
-def top : Mask := fun _ => True
-def empty : Mask := fun _ => False
-def diff (E₁ E₂ : Mask) : Mask := fun x => E₁ x ∧ ¬E₂ x
-def union (E₁ E₂ : Mask) : Mask := fun x => E₁ x ∨ E₂ x
-def subseteq (E₁ E₂ : Mask) : Prop := ∀ x, E₁ x → E₂ x
-def disjoint (E₁ E₂ : Mask) : Prop := ∀ x, ¬(E₁ x ∧ E₂ x)
-def singleton (n : Nat) : Mask :=
-  fun p => p = [Iris.Countable.encode n]
+def top : Mask := CoPset.full
+def empty : Mask := ∅
+def diff (E₁ E₂ : Mask) : Mask := E₁ \ E₂
+def union (E₁ E₂ : Mask) : Mask := E₁ ∪ E₂
+def subseteq (E₁ E₂ : Mask) : Prop := E₁ ⊆ E₂
+def disjoint (E₁ E₂ : Mask) : Prop := E₁ ## E₂
 
 end Mask
 
 namespace Namespace
 
-def root : Telltale.Namespace := Iris.nroot
-def append (N : Telltale.Namespace) (s : String) : Telltale.Namespace := Iris.ndot N s
-def append_nat (N : Telltale.Namespace) (n : Nat) : Telltale.Namespace := Iris.ndot N n
+def root : Telltale.Namespace := nroot
+def append (N : Telltale.Namespace) (s : String) : Telltale.Namespace := ndot N s
+def append_nat (N : Telltale.Namespace) (n : Nat) : Telltale.Namespace := ndot N n
 
 end Namespace
 
-def namespace_to_mask (N : Telltale.Namespace) : Mask := (Iris.nclose N).mem
+def namespace_to_mask (N : Telltale.Namespace) : Mask := nclose N
 
 /-! ## Fancy Update Modality
 
 Fancy updates `|={E₁,E₂}=> P` are mask-changing view shifts that enable
-atomic access to invariants. The mask tracks which invariants are "open"
-(temporarily accessed) vs "closed" (protected).
-
-**Logical behavior**: Opening invariant `N` removes it from the mask,
-allowing access to its content. Closing restores it to the mask.
-
-**Runtime behavior**: Masks are proof-only bookkeeping. The runtime
-implementation is identity: `fupd E₁ E₂ P ↝ P`.
+atomic access to invariants. At runtime masks are proof-only bookkeeping,
+so the runtime implementation is identity: `fupd E₁ E₂ P ↝ P`.
 -/
 
 /-- Runtime implementation: fancy update erases to identity on `P`. -/
@@ -259,79 +228,57 @@ def fupdImpl (_E₁ _E₂ : Mask) (P : iProp) : iProp := P
 
 /-- Fancy update modality `|={E₁,E₂}=> P`.
 
-**Logical**: Mask-changing view shift enabling invariant access.
+**Logical**: upstream Iris fancy update (`uPred_fupd` over world satisfaction).
 **Runtime**: Identity (mask tracking is proof-only). -/
 @[implemented_by fupdImpl]
 def fupd (E₁ E₂ : Mask) (P : iProp) : iProp :=
-  Telltale.uPredFupd E₁ E₂ P
+  Iris.FUpd.fupd E₁ E₂ P
 
 theorem fupd_intro (E : Mask) (P : iProp) :
     iProp.entails P (_root_.fupd E E P) :=
-  (Iris.BaseLogic.fupd_intro_mask (W := ti.W) E E (fun _ hx => hx) P).trans
-    (Iris.BaseLogic.fupd_trans (W := ti.W) E E E P)
+  Iris.fupd_intro
 
 theorem fupd_mono (E₁ E₂ : Mask) (P Q : iProp) :
     iProp.entails P Q → iProp.entails (_root_.fupd E₁ E₂ P) (_root_.fupd E₁ E₂ Q) :=
-  fun h => Iris.BaseLogic.fupd_mono (W := ti.W) E₁ E₂ h
+  fun h => Iris.fupd_mono h
 
 theorem fupd_trans (E₁ E₂ E₃ : Mask) (P : iProp) :
     iProp.entails (_root_.fupd E₁ E₂ (_root_.fupd E₂ E₃ P)) (_root_.fupd E₁ E₃ P) :=
-  Iris.BaseLogic.fupd_trans (W := ti.W) E₁ E₂ E₃ P
+  Iris.fupd_trans
 
 theorem fupd_frame_r (E₁ E₂ : Mask) (P Q : iProp) :
     iProp.entails (iProp.sep (_root_.fupd E₁ E₂ P) Q)
       (_root_.fupd E₁ E₂ (iProp.sep P Q)) :=
-  Iris.BaseLogic.fupd_frame_r (W := ti.W) E₁ E₂ P Q
+  Iris.fupd_frame_right
 
 theorem fupd_mask_subseteq (E₁ E₂ : Mask) (hSub : Mask.subseteq E₂ E₁) :
     iProp.entails iProp.emp (_root_.fupd E₁ E₂ (_root_.fupd E₂ E₁ iProp.emp)) :=
-  Iris.BaseLogic.fupd_mask_subseteq (W := ti.W) E₁ E₂ hSub
+  Iris.fupd_mask_subseteq hSub
 
 /-! ## Invariants
 
-Invariants `inv N P` assert that proposition `P` is maintained throughout
-execution. The namespace `N` identifies the invariant for mask tracking.
-
-**Logical behavior**: An invariant can be "opened" to access `P` during
-a fancy update, then must be "closed" by re-establishing `P`.
-
-**Runtime behavior**: The invariant machinery is proof-only. At runtime,
-we only care about the content `P`, so `inv N P ↝ P`.
+`inv N P` asserts that `P` is maintained, openable during a fancy update.
+At runtime only the content matters, so `inv N P ↝ P`.
 -/
 
 /-- Runtime implementation: invariant erases to its content `P`. -/
-def invImpl (_N : Namespace) (P : iProp) : iProp := P
+def invImpl (_N : Telltale.Namespace) (P : iProp) : iProp := P
 
-/-- Invariant assertion `inv N P`.
-
-**Logical**: Persistent assertion that `P` is maintained, openable via fancy update.
-**Runtime**: Just the content `P` (namespace/mask tracking is proof-only). -/
+/-- Invariant assertion `inv N P` (upstream `Iris.inv`). -/
 @[implemented_by invImpl]
-def inv (N : Namespace) (P : iProp) : iProp :=
-  Iris.BaseLogic.inv (M := ti.M) (F := ti.F) ti.W N P
+def inv (N : Telltale.Namespace) (P : iProp) : iProp :=
+  Iris.inv N P
 
-theorem inv_persistent (N : Namespace) (P : iProp) :
+theorem inv_persistent (N : Telltale.Namespace) (P : iProp) :
     iProp.entails (_root_.inv N P) (iProp.persistently (_root_.inv N P)) :=
-  Iris.BaseLogic.inv_persistent (W := ti.W) N P
+  (Iris.inv_persistent N P).persistent
 
 /-! ## Cancelable Invariants
 
-Cancelable invariants extend regular invariants with the ability to be
-"canceled" (permanently closed) by consuming a cancellation token.
-
-**Components**:
-- `cinv N ct P`: The cancelable invariant assertion
-- `cancel_token_own ct`: Ownership of the cancellation token
-
-**Logical behavior**: Opening requires the token; canceling consumes it.
-This enables patterns where an invariant is valid only for a limited
-scope or until a specific event.
-
-**Runtime behavior**: Both the invariant and token are proof-only.
-The invariant erases to its content; the token erases to `emp`.
+`cinv N ct P` is an invariant that can be permanently canceled by consuming
+the full cancellation token `cancel_token_own ct`. Both are proof-only: the
+invariant erases to its content and the token to `emp`.
 -/
-
-/-! ## Cancelable Invariant Definitions -/
 
 /-- Cancelable invariant token handle. -/
 abbrev CancelToken := GhostName
@@ -339,89 +286,51 @@ abbrev CancelToken := GhostName
 /-- Runtime implementation: cancel token erases to `emp`. -/
 def cancel_token_ownImpl (_ct : CancelToken) : iProp := iProp.emp
 
-/-- Cancellation token ownership.
-
-**Logical**: Fractional ownership of the cancellation capability.
-**Runtime**: `emp` (ghost ownership has no runtime representation). -/
+/-- Full ownership of the cancellation token (`cinv_own ct 1`). -/
 @[implemented_by cancel_token_ownImpl]
-def cancel_token_own (_ct : CancelToken) : iProp :=
-  Iris.BaseLogic.cinv_own (GF := ti.GF) (F := ti.F) ti.W _ct (1 : ti.F)
+def cancel_token_own (ct : CancelToken) : iProp :=
+  CancelableInvariant.own ct 1
 
 /-- Runtime implementation: cancelable invariant erases to content `P`. -/
-def cinvImpl (_N : Namespace) (_ct : CancelToken) (P : iProp) : iProp := P
+def cinvImpl (_N : Telltale.Namespace) (_ct : CancelToken) (P : iProp) : iProp := P
 
-/-- Cancelable invariant `cinv N ct P`.
-
-**Logical**: Invariant `P` that can be accessed with token `ct` and
-eventually canceled by consuming the full token.
-**Runtime**: Just the content `P` (token/namespace is proof-only). -/
+/-- Cancelable invariant `cinv N ct P` (upstream `CancelableInvariant.cinv`). -/
 @[implemented_by cinvImpl]
-def cinv (N : Namespace) (_ct : CancelToken) (P : iProp) : iProp :=
-  Iris.BaseLogic.cinv (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W N _ct P
+def cinv (N : Telltale.Namespace) (ct : CancelToken) (P : iProp) : iProp :=
+  CancelableInvariant.cinv N ct P
 
 /-! ## Namespace and Allocation Lemmas -/
 
 /-- Distinct `Nat` children of the same namespace are disjoint. -/
-theorem namespace_disjoint (N : Namespace) (n₁ n₂ : Nat) (hNe : n₁ ≠ n₂) :
+theorem namespace_disjoint (N : Telltale.Namespace) (n₁ n₂ : Nat) (hNe : n₁ ≠ n₂) :
     Mask.disjoint (namespace_to_mask (Namespace.append_nat N n₁))
-      (namespace_to_mask (Namespace.append_nat N n₂)) := by
-  simpa [namespace_to_mask, Namespace.append_nat] using
-    (Iris.ndot_ne_disjoint (A := Nat) N (x := n₁) (y := n₂) hNe)
+      (namespace_to_mask (Namespace.append_nat N n₂)) :=
+  ndot_ne_disjoint N hNe
 
 /-- Allocate a cancelable invariant from `▷ P`. -/
-theorem cinv_alloc :
-  ∀ (N : Namespace) (E : Mask) (P : iProp),
-    (∀ E' : Iris.GSet, ∃ i, ¬E'.mem i ∧ (namespace_to_mask N) i) →
+theorem cinv_alloc (N : Telltale.Namespace) (E : Mask) (P : iProp) :
     iProp.entails (iProp.later P)
-      (fupd E E (iProp.exist fun ct =>
-        iProp.sep (cinv N ct P) (cancel_token_own ct)))
-  := by
-    intro N E P hFresh
-    simpa [cinv, cancel_token_own, namespace_to_mask] using
-      (Iris.BaseLogic.cinv_alloc (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E N P hFresh)
+      (_root_.fupd E E (iProp.exist fun ct =>
+        iProp.sep (cinv N ct P) (cancel_token_own ct))) :=
+  wand_entails (CancelableInvariant.alloc E N P)
 
 /-! ## Access and Cancel Lemmas -/
 
 /-- Open a cancelable invariant using its full cancel token. -/
-theorem cinv_acc :
-  ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
-    Mask.subseteq (namespace_to_mask N) E →
+theorem cinv_acc (N : Telltale.Namespace) (E : Mask) (ct : CancelToken) (P : iProp)
+    (hSub : Mask.subseteq (namespace_to_mask N) E) :
     iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
-      (fupd E (Mask.diff E (namespace_to_mask N))
+      (_root_.fupd E (Mask.diff E (namespace_to_mask N))
         (iProp.sep (iProp.later P)
           (iProp.sep (cancel_token_own ct)
             (iProp.wand (iProp.later P)
-              (fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True))))))
-  := by
-    intro N E ct P hSub
-    let post :=
-      fupd E (Mask.diff E (namespace_to_mask N))
-        (iProp.sep (iProp.later P)
-          (iProp.sep (cancel_token_own ct)
-            (iProp.wand (iProp.later P)
-              (fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True)))))
-    have hOpen :
-        iProp.entails (cinv N ct P) (iProp.wand (cancel_token_own ct) post) := by
-      simpa [post, cinv, cancel_token_own, namespace_to_mask, Mask.diff] using
-        (Iris.BaseLogic.cinv_acc (GF := ti.GF) (M := ti.M) (F := ti.F) ti.W E N ct (1 : ti.F) P hSub)
-    have hFrame :
-        iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
-          (iProp.sep (iProp.wand (cancel_token_own ct) post) (cancel_token_own ct)) :=
-      sep_mono (P:=cinv N ct P) (P':=iProp.wand (cancel_token_own ct) post)
-        (Q:=cancel_token_own ct) (Q':=cancel_token_own ct)
-        hOpen (entails_refl _)
-    exact hFrame.trans (wand_elim _ _)
+              (_root_.fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True)))))) :=
+  wand2_entails (CancelableInvariant.acc hSub)
 
-/-- Cancel/consume step for a cancelable invariant with its full token. -/
-theorem cinv_cancel :
-  ∀ (N : Namespace) (E : Mask) (ct : CancelToken) (P : iProp),
-    Mask.subseteq (namespace_to_mask N) E →
+/-- Cancel a cancelable invariant: consuming the full token yields `▷ P`
+back permanently, and the invariant can never be opened again. -/
+theorem cinv_cancel (N : Telltale.Namespace) (E : Mask) (ct : CancelToken) (P : iProp)
+    (hSub : Mask.subseteq (namespace_to_mask N) E) :
     iProp.entails (iProp.sep (cinv N ct P) (cancel_token_own ct))
-      (fupd E (Mask.diff E (namespace_to_mask N))
-        (iProp.sep (iProp.later P)
-          (iProp.sep (cancel_token_own ct)
-            (iProp.wand (iProp.later P)
-              (fupd (Mask.diff E (namespace_to_mask N)) E (iProp.pure True))))))
-  := by
-    intro N E ct P hSub
-    exact cinv_acc N E ct P hSub
+      (_root_.fupd E E (iProp.later P)) :=
+  wand2_entails (CancelableInvariant.cancel E hSub)

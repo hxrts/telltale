@@ -23,7 +23,7 @@ namespace SessionCoTypes.Coinductive
 open SessionTypes.GlobalType
 open SessionTypes.LocalTypeR
 
-local instance : DecidableEq LocalTypeC := by
+noncomputable local instance : DecidableEq LocalTypeC := by
   classical
   infer_instance
 
@@ -44,7 +44,7 @@ def roundtripRel
 
 lemma roundtrip_hpost_body_case
     (t : LocalTypeC) (all : Finset LocalTypeC) (h_closed : IsClosedSet all)
-    {ρ a b : LocalTypeC}
+    {ρ : EnvPair} {a b : LocalTypeC}
     {visited : Finset LocalTypeC} {h_visited : visited ⊆ all} {h_current : b ∈ all}
     (hsub' : EnvOfSub all ρ)
     (hcore : b ∉ visited ∧
@@ -85,7 +85,7 @@ lemma roundtrip_hpost_body_case
             -- Body Case: `mu` Head
             | mu x =>
                 have hb : PFunctor.M.dest b = ⟨LocalTypeHead.mu x, f⟩ := by
-                  simp [hdest]
+                  rw [hdest]; rfl
                 have hrel : R (envInsertR ρ x (mkVar x)) a (f ()) := by
                   have hchild : childRel b (f ()) := ⟨.mu x, f, (), hdest, rfl⟩
                   have hchild_mem : f () ∈ all := mem_of_closed_child h_closed h_current hchild
@@ -104,11 +104,11 @@ lemma roundtrip_hpost_body_case
                 exact EQ2CE_step.mu_right hb hrel
             -- Body Case: `send` Head
             | send p labels =>
-                let fR : Fin labels.length → (Label × LocalTypeR) := fun i =>
+                let fR : Fin labels.length → BranchR := fun i =>
                   let child := f i
                   have hchild : childRel b child := ⟨.send p labels, f, i, hdest, rfl⟩
                   have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-                  (labels[i],
+                  (labels[i], none,
                     toInductiveAux t all (Insert.insert b visited) child h_closed
                       (subset_insert_of_mem h_current h_visited) hchild_mem)
                 have hbody_send :
@@ -131,11 +131,11 @@ lemma roundtrip_hpost_body_case
                 have hbranches_a :
                     branchesOf a =
 /- ## Structured Block 3 -/
-                      List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
+                      List.ofFn (fun i => ((fR i).1, toCoind (fR i).2.2)) := by
                   simpa [hcore_send] using (branches_of_to_coind_send_of_fn (p := p) fR)
                 have hbr' :
                     BranchesRelCE R ρ
-                      (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
+                      (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2.2)))
                       (List.ofFn (fun i => (labels[i], f i))) := by
                   refine branches_rel_ce_of_fn ?_
                   intro i
@@ -153,11 +153,11 @@ lemma roundtrip_hpost_body_case
                 exact EQ2CE_step.send ha hb hbr
             -- Body Case: `recv` Head
             | recv p labels =>
-                let fR : Fin labels.length → (Label × LocalTypeR) := fun i =>
+                let fR : Fin labels.length → BranchR := fun i =>
                   let child := f i
                   have hchild : childRel b child := ⟨.recv p labels, f, i, hdest, rfl⟩
                   have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
-                  (labels[i],
+                  (labels[i], none,
                     toInductiveAux t all (Insert.insert b visited) child h_closed
                       (subset_insert_of_mem h_current h_visited) hchild_mem)
                 have hbody_recv :
@@ -179,12 +179,12 @@ lemma roundtrip_hpost_body_case
                   exact head_of_dest hdest
                 have hbranches_a :
                     branchesOf a =
-                      List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)) := by
+                      List.ofFn (fun i => ((fR i).1, toCoind (fR i).2.2)) := by
                   simpa [hcore_recv] using (branches_of_to_coind_recv_of_fn (p := p) fR)
                 have hbr' :
 /- ## Structured Block 4 -/
                     BranchesRelCE R ρ
-                      (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2)))
+                      (List.ofFn (fun i => ((fR i).1, toCoind (fR i).2.2)))
                       (List.ofFn (fun i => (labels[i], f i))) := by
                   refine branches_rel_ce_of_fn ?_
                   intro i

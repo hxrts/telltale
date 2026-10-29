@@ -1,3 +1,4 @@
+import Runtime.Tests.NominalImageRunner
 
 import Lean.Data.Json
 import Runtime.ProtocolMachine.Model.UnitModel
@@ -127,6 +128,7 @@ def blockReasonTag : BlockReason UnitGuard → String
   | .consensusWait _ => "consensus_wait"
   | .spawnWait => "spawn_wait"
   | .closeWait _ => "close_wait"
+  | .operationAwait _ => "operation_await"
 
 def blockedStateJson (sched : SchedState UnitGuard) : Json :=
   Json.mkObj <|
@@ -290,7 +292,7 @@ def validationResponse (errors : List Json) : Json :=
     , ("errors", Json.arr errors.toArray) ]
 
 mutual
-  partial def collectTraceActions : GlobalType → List (String × String × String)
+  def collectTraceActions : GlobalType → List (String × String × String)
     | .end => []
     | .var _ => []
     | .mu _ body => collectTraceActions body
@@ -298,7 +300,7 @@ mutual
         collectTraceActionsBranches sender receiver branches
     | .delegate _ _ _ _ cont => collectTraceActions cont
 
-  partial def collectTraceActionsBranches (sender receiver : String)
+  def collectTraceActionsBranches (sender receiver : String)
       : List (SessionTypes.GlobalType.Label × GlobalType) → List (String × String × String)
     | [] => []
     | (label, cont) :: rest =>
@@ -717,6 +719,10 @@ def simulationResponse (roles : List String) (actions : List (String × String �
 
 def dispatchOperation (operation : String) (payload : Json) : IO Unit := do
   match operation with
+  | "runNominalImage" =>
+      match Runtime.Tests.NominalImageRunner.runNominalImage payload with
+      | .ok response => IO.println response.compress
+      | .error reason => throw (IO.userError s!"nominal executable image refused: {reason}")
   | "validateTrace" =>
       let response :=
         match parseValidateTracePayload payload with

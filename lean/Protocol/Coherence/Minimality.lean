@@ -187,7 +187,8 @@ theorem minimality_counterexample_not_coherent :
   have : False := by
     have hConsumeBool :
         (Consume "A" minimalityBType [.unit]).isSome = true := by
-      simpa [minimalityEdgeAB, hTrace, minimalityBType] using hConsume
+      rw [hTrace] at hConsume
+      exact hConsume
     simp [minimalityBType, Consume, consumeOne] at hConsumeBool
   exact this
 

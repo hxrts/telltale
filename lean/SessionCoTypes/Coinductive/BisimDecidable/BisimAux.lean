@@ -26,7 +26,7 @@ namespace SessionCoTypes.Coinductive
 -- Decidable Bisimulation Definitions
 
 /-- Local decidable equality for visited membership. -/
-local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
+noncomputable local instance : DecidableEq (LocalTypeC × LocalTypeC) := by
   -- Use classical choice to decide equality on pairs.
   classical
   infer_instance
@@ -50,7 +50,7 @@ def bisimAll (bisimFn : LocalTypeC × LocalTypeC → Bool)
     - `p`: Current pair to check
 
     Returns `true` if the pair is bisimilar (or already visited). -/
-def bisimAux (fuel : Nat) (bound : Nat)
+noncomputable def bisimAux (fuel : Nat) (bound : Nat)
     (visited : Finset (LocalTypeC × LocalTypeC))
     (p : LocalTypeC × LocalTypeC) : Bool :=
   match fuel with
@@ -100,13 +100,13 @@ lemma children_of_send_eq_snd_branches_of {t : LocalTypeC} {p : String} {labels 
   match hdest : PFunctor.M.dest t with
   | ⟨LocalTypeHead.send p' labels', f⟩ =>
       simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
+      have : p = p' ∧ labels = labels' := by cases hhead; exact ⟨rfl, rfl⟩
       simp only [List.map_ofFn]
       rfl
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+  | ⟨LocalTypeHead.end, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.var _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.recv _ _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.mu _, _⟩ => rw [hdest] at hhead; cases hhead
 
 /-- Helper: childrenOf for recv equals the second components of branchesOf. -/
 lemma children_of_recv_eq_snd_branches_of {t : LocalTypeC} {p : String} {labels : List Label}
@@ -117,13 +117,13 @@ lemma children_of_recv_eq_snd_branches_of {t : LocalTypeC} {p : String} {labels 
   match hdest : PFunctor.M.dest t with
   | ⟨LocalTypeHead.recv p' labels', f⟩ =>
       simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
+      have : p = p' ∧ labels = labels' := by cases hhead; exact ⟨rfl, rfl⟩
       simp only [List.map_ofFn]
       rfl
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+  | ⟨LocalTypeHead.end, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.var _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.send _ _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.mu _, _⟩ => rw [hdest] at hhead; cases hhead
 
 -- Constructing `BranchesRelC` from Pointwise Child Evidence
 
@@ -189,15 +189,15 @@ lemma branches_of_labels_eq {t : LocalTypeC} {p : String} {labels : List Label}
   match hdest : PFunctor.M.dest t with
   | ⟨LocalTypeHead.send p' labels', f⟩ =>
       simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
+      have : p = p' ∧ labels = labels' := by cases hhead; exact ⟨rfl, rfl⟩
       have ⟨_, hlabels⟩ := this
       subst hlabels
       simp only [List.map_ofFn]
       exact List.ofFn_get labels
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.recv _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+  | ⟨LocalTypeHead.end, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.var _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.recv _ _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.mu _, _⟩ => rw [hdest] at hhead; cases hhead
 
 -- Branch Label Reconstruction (Recv)
 
@@ -209,15 +209,15 @@ lemma branches_of_labels_eq_recv {t : LocalTypeC} {p : String} {labels : List La
   match hdest : PFunctor.M.dest t with
   | ⟨LocalTypeHead.recv p' labels', f⟩ =>
       simp only [hdest] at hhead ⊢
-      have : p = p' ∧ labels = labels' := by simp_all
+      have : p = p' ∧ labels = labels' := by cases hhead; exact ⟨rfl, rfl⟩
       have ⟨_, hlabels⟩ := this
       subst hlabels
       simp only [List.map_ofFn]
       exact List.ofFn_get labels
-  | ⟨LocalTypeHead.end, _⟩ => simp_all
-  | ⟨LocalTypeHead.var _, _⟩ => simp_all
-  | ⟨LocalTypeHead.send _ _, _⟩ => simp_all
-  | ⟨LocalTypeHead.mu _, _⟩ => simp_all
+  | ⟨LocalTypeHead.end, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.var _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.send _ _, _⟩ => rw [hdest] at hhead; cases hhead
+  | ⟨LocalTypeHead.mu _, _⟩ => rw [hdest] at hhead; cases hhead
 
 -- Send-Case Bridge from `bisimAll` to `BranchesRelC`
 

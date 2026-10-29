@@ -52,7 +52,7 @@ private lemma system_to_coind_child_closed {n : Nat} (sys : FiniteSystem n)
       have hdestCorec :
           PFunctor.M.dest (SystemToCoind sys i) =
             ⟨hs, PFunctor.M.corec sys ∘ hf⟩ := by
-        simp [SystemToCoind, hsys, PFunctor.M.dest_corec]
+        exact (PFunctor.M.dest_corec ..).trans (by rw [hsys]; rfl)
       have hpair :
           (⟨s, f⟩ : LocalTypeF LocalTypeC) =
             ⟨hs, PFunctor.M.corec sys ∘ hf⟩ := by
@@ -234,11 +234,11 @@ private def muStream (n : Nat) : LocalTypeC :=
 private lemma mu_stream_dest (n : Nat) :
     PFunctor.M.dest (muStream n) =
       ⟨.mu (muStreamName n), PFunctor.M.corec muStreamStep ∘ (fun _ => n + 1)⟩ := by
-  simp [muStream, muStreamStep, PFunctor.M.dest_corec]
+  simp only [muStream, muStreamStep, PFunctor.M.dest_corec]; rfl
 
 private lemma mu_stream_head (n : Nat) :
     head (muStream n) = .mu (muStreamName n) := by
-  simp [head, mu_stream_dest]
+  simp only [head, mu_stream_dest]; rfl
 
 private lemma mu_stream_child (n : Nat) :
     childRel (muStream n) (muStream (n + 1)) := by

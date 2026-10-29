@@ -195,17 +195,12 @@ def ExactByzantineSafetyCharacterization
 
 /-! ## Assumption Taxonomy -/
 
-/-- Safety-side assumptions for Byzantine safety characterization. -/
+/-- Safety-side assumptions: an embedding into a quorum-geometry model whose
+fault model (`n + f < 2q`, at most `f` Byzantine, honest non-equivocation) is
+carried by `quorumAssumptions`. Safety is then a theorem of that fault model. -/
 structure SafetyAssumptions
     {State : Type u} {Decision : Type v} {Certificate : Type w} {Obs : Type x}
     (M : Model State Decision Certificate Obs) where
-  byzantineFaultModel : Prop
-  evidencePrimitiveConsistent : Prop
-  conflictExclusionPrimitiveConsistent : Prop
-  finalizationWitnessPrimitiveConsistent : Prop
-  quorumIntersectionWitnessed : Prop
-  timingAuthCompatible : Prop
-  adversarialBudgetBounded : Prop
   Party : Type y
   quorumModel : Distributed.QuorumGeometry.Model State Decision Certificate Party
   quorumAssumptions : Distributed.QuorumGeometry.Assumptions quorumModel
@@ -213,12 +208,6 @@ structure SafetyAssumptions
     ∀ {s d c}, M.certified s d c → quorumModel.certified s d c
   conflictToQuorum :
     ∀ {d₁ d₂}, M.conflicts d₁ d₂ → quorumModel.conflicts d₁ d₂
-
-/-- Liveness-side assumptions tracked separately from safety characterization. -/
-structure LivenessAssumptions where
-  eventualSynchrony : Prop
-  fairness : Prop
-  pacemakerQuality : Prop
 
 /-- Finalization predicate selected by declared evidence-accumulation regime. -/
 def finalizationPredicateFor
@@ -368,18 +357,8 @@ def modelOfQuorumGeometry
 
 /-- Quorum-geometry profiles induce Byzantine safety assumptions for the embedded model. -/
 def safetyAssumptionsOfQuorumGeometry
-    (P : Distributed.QuorumGeometry.SafetyProtocol)
-    (protocolSpec : ProtocolSpec) :
+    (P : Distributed.QuorumGeometry.SafetyProtocol) :
     SafetyAssumptions (modelOfQuorumGeometry P.model) where
-  byzantineFaultModel := protocolSpec.faultModel = .byzantine
-  evidencePrimitiveConsistent := evidencePrimitiveConsistentCheck protocolSpec = true
-  conflictExclusionPrimitiveConsistent :=
-    conflictExclusionPrimitiveConsistentCheck protocolSpec = true
-  finalizationWitnessPrimitiveConsistent :=
-    finalizationWitnessPrimitiveConsistentCheck protocolSpec = true
-  quorumIntersectionWitnessed := quorumIntersectionWitnessedCheck protocolSpec = true
-  timingAuthCompatible := timingAuthCompatibleCheck protocolSpec = true
-  adversarialBudgetBounded := adversarialBudgetBoundedCheck protocolSpec = true
   Party := P.Party
   quorumModel := P.model
   quorumAssumptions := P.assumptions

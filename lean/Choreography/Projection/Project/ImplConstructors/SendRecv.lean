@@ -1,4 +1,5 @@
 import Choreography.Projection.Project.ImplConstructors.Base
+import Choreography.Projection.DelegateFree
 
 /-! # Choreography.Projection.Project.ImplConstructors.SendRecv
 
@@ -48,11 +49,12 @@ private theorem c_project_send_implies_trans_send_comm_cons_sender
     (role partner : String) (lbs : List BranchR)
     (hf : CProjectF CProject (GlobalType.comm sender receiver (first :: rest)) role
       (LocalTypeR.send partner lbs))
-    (hrs : role = sender) (hwf : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true) :
+    (hrs : role = sender) (hwf : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver (first :: rest)).delegateFree = true) :
     ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- Sender case is direct from CProjectF.
   simp [CProjectF, hrs] at hf
   obtain ⟨hpartner, hbranches⟩ := hf
@@ -61,7 +63,8 @@ private theorem c_project_send_implies_trans_send_comm_cons_sender
   refine ⟨(first :: rest), ?_, hbranches', ?_⟩
   · rw [hrs, trans_comm_sender sender receiver sender (first :: rest) rfl, hpartner]
   · intro gb hmem
-    exact GlobalType.well_formed_comm_branches sender receiver (first :: rest) hwf gb hmem
+    exact ⟨GlobalType.well_formed_comm_branches sender receiver (first :: rest) hwf gb hmem,
+      delegate_free_of_mem (by simpa using hdf) hmem⟩
 
 /-! ## Send Agreement: Receiver Contradiction Helper -/
 
@@ -87,11 +90,11 @@ private theorem c_project_send_implies_trans_send_comm_other
     (hrec :
       ∃ gbs', trans first.2 role = .send partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
-        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true)) :
+        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true)) :
     ∃ gbs', trans (.comm sender receiver (first :: rest)) role =
         .send partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- Non-participants use trans_comm_other to select the head branch.
   obtain ⟨gbs', htrans', hbranches', hwf'⟩ := hrec
   refine ⟨gbs', ?_, hbranches', hwf'⟩
@@ -107,15 +110,16 @@ mutual
 private theorem c_project_send_implies_trans_send_comm_cons (g : GlobalType) (sender receiver : String)
       (first : Label × GlobalType) (rest : List (Label × GlobalType)) (role partner : String)
       (lbs : List BranchR) (hproj : CProject g role (.send partner lbs))
-      (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true) :
+      (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true)
+      (hdf : g.delegateFree = true) :
       ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .send partner (transBranches gbs' role) ∧
-        BranchesProjRel CProject gbs' role lbs ∧ (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+        BranchesProjRel CProject gbs' role lbs ∧ (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
     subst hg
     -- Sender case is direct; non-participant recurses on the first branch.
     by_cases hrs : role = sender
     · exact c_project_send_implies_trans_send_comm_cons_sender
-        sender receiver first rest role partner lbs (c_project_destruct hproj) hrs hwf
+        sender receiver first rest role partner lbs (c_project_destruct hproj) hrs hwf hdf
     · by_cases hrr : role = receiver
       · exact (c_project_send_implies_trans_send_comm_receiver_contra sender receiver role partner
           (first :: rest) lbs hproj hrr hrs).elim
@@ -126,7 +130,11 @@ private theorem c_project_send_implies_trans_send_comm_cons (g : GlobalType) (se
           c_project_first_of_all_branches_proj hf'
         have hwf_first : first.2.wellFormed = true :=
           well_formed_first_of_comm sender receiver first rest hwf
-        have hrec := c_project_send_implies_trans_send first.2 role partner lbs hfirst hwf_first
+        have hdf_first : first.2.delegateFree = true := by
+          obtain ⟨l1, g1⟩ := first
+          simp only [delegate_free_comm, delegate_free_branches_cons, Bool.and_eq_true] at hdf
+          exact hdf.1
+        have hrec := c_project_send_implies_trans_send first.2 role partner lbs hfirst hwf_first hdf_first
         exact c_project_send_implies_trans_send_comm_other sender receiver role partner first rest lbs
           hrs hrr hrec
 termination_by (sizeOf g) * 3
@@ -134,17 +142,18 @@ decreasing_by
       all_goals
         simpa [hg] using size_of_snd_lt_comm_head_mul3 sender receiver first rest
 
-/-! ## Send Agreement: Comm Dispatcher -/
+/- ## Send Agreement: Comm Dispatcher -/
 
 /-- Helper: comm case for send projection agreement. -/
 private theorem c_project_send_implies_trans_send_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List BranchR)
       (hproj : CProject (.comm sender receiver gbs) role (.send partner lbs))
-      (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+      (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+      (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
       ∃ gbs', trans (.comm sender receiver gbs) role =
           .send partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
-        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
     -- Split on the branch list; empty is impossible under wellFormed.
     cases hgb : gbs with
     | nil =>
@@ -160,23 +169,26 @@ private theorem c_project_send_implies_trans_send_comm (sender receiver : String
         have hwf' : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true := by
           simpa [hgb] using hwf
         exact c_project_send_implies_trans_send_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role partner lbs hproj' rfl hwf'
+          sender receiver first rest role partner lbs hproj' rfl hwf' (by simpa [hgb] using hdf)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
       all_goals
         simp [hgb, GlobalType.comm.sizeOf_spec]
 
-/-! ## Send Agreement: Main Theorem -/
+/- ## Send Agreement: Main Theorem -/
 
-/-- If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
+/-- Delegation is excluded (`g.delegateFree`): a delegator projects to a branch annotated
+      with `some (.chan sid r)`, which `transBranches`/`BranchesProjRel` cannot express.
+
+      If CProject g role (.send partner lbs) holds, then g must be a comm where role is sender
       (possibly through non-participant layers), and trans g role = .send partner (transBranches ...). -/
 theorem c_project_send_implies_trans_send (g : GlobalType) (role : String)
       (partner : String) (lbs : List BranchR)
       (hproj : CProject g role (.send partner lbs))
-      (hwf : g.wellFormed = true) :
+      (hwf : g.wellFormed = true) (hdf : g.delegateFree = true) :
       ∃ gbs', trans g role = .send partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
-        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
     -- Dispatch by constructor; comm uses the helper above.
     cases hg : g with
     | «end» =>
@@ -189,7 +201,9 @@ theorem c_project_send_implies_trans_send (g : GlobalType) (role : String)
     | comm sender receiver gbs =>
         simpa [hg] using
           (c_project_send_implies_trans_send_comm sender receiver gbs role partner lbs
-            (by simpa [hg] using hproj) (by simpa [hg] using hwf))
+            (by simpa [hg] using hproj) (by simpa [hg] using hwf) (by simpa [hg] using hdf))
+    | delegate _ _ _ _ _ =>
+        simp [hg] at hdf
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
       all_goals
@@ -204,7 +218,7 @@ private theorem c_project_recv_implies_trans_recv_end (role partner : String)
     (hproj : CProject .end role (.recv partner lbs)) :
     ∃ gbs', trans .end role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- CProjectF forbids .end → .recv.
   have hf := c_project_destruct hproj
   have : False := by simpa [CProjectF] using hf
@@ -216,7 +230,7 @@ private theorem c_project_recv_implies_trans_recv_var (v role partner : String)
     (hproj : CProject (.var v) role (.recv partner lbs)) :
     ∃ gbs', trans (.var v) role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- CProjectF forbids .var → .recv.
   have hf := c_project_destruct hproj
   have : False := by simpa [CProjectF] using hf
@@ -228,7 +242,7 @@ private theorem c_project_recv_implies_trans_recv_mu (t : String) (body : Global
     (hproj : CProject (.mu t body) role (.recv partner lbs)) :
     ∃ gbs', trans (.mu t body) role = .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- CProjectF forbids .mu → .recv.
   have hf := c_project_destruct hproj
   have : False := by simpa [CProjectF] using hf
@@ -243,11 +257,12 @@ private theorem c_project_recv_implies_trans_recv_comm_cons_receiver
     (hf : CProjectF CProject (GlobalType.comm sender receiver (first :: rest)) role
       (LocalTypeR.recv partner lbs))
     (hrs : role ≠ sender) (hrr : role = receiver)
-    (hwf : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true) :
+    (hwf : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true)
+    (hdf : (GlobalType.comm sender receiver (first :: rest)).delegateFree = true) :
     ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- Receiver case is direct from CProjectF.
   subst hrr
   simp [CProjectF, hrs] at hf
@@ -255,7 +270,8 @@ private theorem c_project_recv_implies_trans_recv_comm_cons_receiver
   refine ⟨(first :: rest), ?_, hbranches, ?_⟩
   · rw [trans_comm_receiver sender role role (first :: rest) rfl hrs, hpartner]
   · intro gb hmem
-    exact GlobalType.well_formed_comm_branches sender role (first :: rest) hwf gb hmem
+    exact ⟨GlobalType.well_formed_comm_branches sender role (first :: rest) hwf gb hmem,
+      delegate_free_of_mem (by simpa using hdf) hmem⟩
 
 /-! ## Recv constructor agreement -/
 
@@ -276,11 +292,11 @@ private theorem c_project_recv_implies_trans_recv_comm_other
     (hrec :
       ∃ gbs', trans first.2 role = .recv partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
-        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true)) :
+        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true)) :
     ∃ gbs', trans (.comm sender receiver (first :: rest)) role =
         .recv partner (transBranches gbs' role) ∧
       BranchesProjRel CProject gbs' role lbs ∧
-      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+      (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
   -- Non-participants use trans_comm_other to select the head branch.
   obtain ⟨gbs', htrans', hbranches', hwf'⟩ := hrec
   refine ⟨gbs', ?_, hbranches', hwf'⟩
@@ -297,17 +313,18 @@ mutual
 private theorem c_project_recv_implies_trans_recv_comm_cons (g : GlobalType) (sender receiver : String)
       (first : Label × GlobalType) (rest : List (Label × GlobalType)) (role partner : String)
       (lbs : List BranchR) (hproj : CProject g role (.recv partner lbs))
-      (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true) :
+      (hg : g = (GlobalType.comm sender receiver (first :: rest))) (hwf : g.wellFormed = true)
+      (hdf : g.delegateFree = true) :
       ∃ gbs', trans (GlobalType.comm sender receiver (first :: rest)) role =
         .recv partner (transBranches gbs' role) ∧
-        BranchesProjRel CProject gbs' role lbs ∧ (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+        BranchesProjRel CProject gbs' role lbs ∧ (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
     subst hg -- Receiver case is direct; non-participant recurses on the first branch.
     by_cases hrs : role = sender
     · exact (c_project_recv_implies_trans_recv_comm_sender_contra sender receiver role partner
         (first :: rest) lbs hproj hrs).elim
     · by_cases hrr : role = receiver
       · exact c_project_recv_implies_trans_recv_comm_cons_receiver sender receiver first rest role
-          partner lbs (c_project_destruct hproj) hrs hrr hwf
+          partner lbs (c_project_destruct hproj) hrs hrr hwf hdf
       · have hf' : AllBranchesProj CProject (first :: rest) role (.recv partner lbs) := by
           exact (c_project_f_comm_other_iff sender receiver role (first :: rest)
             (.recv partner lbs) hrs hrr).1 (c_project_destruct hproj)
@@ -315,8 +332,12 @@ private theorem c_project_recv_implies_trans_recv_comm_cons (g : GlobalType) (se
           c_project_first_of_all_branches_proj hf'
         have hwf_first : first.2.wellFormed = true := by
           exact well_formed_first_of_comm sender receiver first rest hwf
+        have hdf_first : first.2.delegateFree = true := by
+          obtain ⟨l1, g1⟩ := first
+          simp only [delegate_free_comm, delegate_free_branches_cons, Bool.and_eq_true] at hdf
+          exact hdf.1
         have hrec :=
-          c_project_recv_implies_trans_recv first.2 role partner lbs hfirst hwf_first
+          c_project_recv_implies_trans_recv first.2 role partner lbs hfirst hwf_first hdf_first
         exact c_project_recv_implies_trans_recv_comm_other sender receiver role partner first rest lbs
           hrs hrr hrec
 termination_by (sizeOf g) * 3
@@ -324,17 +345,18 @@ decreasing_by
       all_goals
         simpa [hg] using size_of_snd_lt_comm_head_mul3 sender receiver first rest
 
-/-! ## Recv Agreement: Comm Dispatcher -/
+/- ## Recv Agreement: Comm Dispatcher -/
 
 /-- Helper: comm case for recv projection agreement. -/
 private theorem c_project_recv_implies_trans_recv_comm (sender receiver : String)
       (gbs : List (Label × GlobalType)) (role partner : String) (lbs : List BranchR)
       (hproj : CProject (.comm sender receiver gbs) role (.recv partner lbs))
-      (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true) :
+      (hwf : (GlobalType.comm sender receiver gbs).wellFormed = true)
+      (hdf : (GlobalType.comm sender receiver gbs).delegateFree = true) :
       ∃ gbs', trans (.comm sender receiver gbs) role =
           .recv partner (transBranches gbs' role) ∧
         BranchesProjRel CProject gbs' role lbs ∧
-        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
     -- Split on the branch list; empty is impossible under wellFormed.
     cases hgb : gbs with
     | nil =>
@@ -350,19 +372,20 @@ private theorem c_project_recv_implies_trans_recv_comm (sender receiver : String
         have hwf' : (GlobalType.comm sender receiver (first :: rest)).wellFormed = true := by
           simpa [hgb] using hwf
         exact c_project_recv_implies_trans_recv_comm_cons (.comm sender receiver (first :: rest))
-          sender receiver first rest role partner lbs hproj' rfl hwf'
+          sender receiver first rest role partner lbs hproj' rfl hwf' (by simpa [hgb] using hdf)
 termination_by (sizeOf (GlobalType.comm sender receiver gbs)) * 3 + 1
 decreasing_by
       all_goals
         simp [hgb, GlobalType.comm.sizeOf_spec]
 
-/-! ## Recv Agreement: Main Theorem -/
+/- ## Recv Agreement: Main Theorem -/
 
-/-- Symmetric version for recv. -/
+/-- Symmetric version for recv. Delegation is excluded (`g.delegateFree`), as for send. -/
 theorem c_project_recv_implies_trans_recv (g : GlobalType) (role : String) (partner : String)
-      (lbs : List BranchR) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true) :
+      (lbs : List BranchR) (hproj : CProject g role (.recv partner lbs)) (hwf : g.wellFormed = true)
+      (hdf : g.delegateFree = true) :
       ∃ gbs', trans g role = .recv partner (transBranches gbs' role) ∧ BranchesProjRel CProject gbs' role lbs ∧
-        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true) := by
+        (∀ gb, gb ∈ gbs' → gb.2.wellFormed = true ∧ gb.2.delegateFree = true) := by
     cases hg : g with -- Dispatch by constructor; comm uses the helper above.
     | «end» => exact c_project_recv_implies_trans_recv_end role partner lbs (by simpa [hg] using hproj)
     | var v => exact c_project_recv_implies_trans_recv_var v role partner lbs (by simpa [hg] using hproj)
@@ -371,7 +394,9 @@ theorem c_project_recv_implies_trans_recv (g : GlobalType) (role : String) (part
     | comm sender receiver gbs =>
         simpa [hg] using
           (c_project_recv_implies_trans_recv_comm sender receiver gbs role partner lbs
-            (by simpa [hg] using hproj) (by simpa [hg] using hwf))
+            (by simpa [hg] using hproj) (by simpa [hg] using hwf) (by simpa [hg] using hdf))
+    | delegate _ _ _ _ _ =>
+        simp [hg] at hdf
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
       all_goals

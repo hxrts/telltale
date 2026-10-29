@@ -378,7 +378,11 @@ def ProtocolShardCutPreservation
 
 /-! ## Protocol Envelope Premises -/
 
-/-- Premises bundle for protocol bridge theorem extraction (Phase E2). -/
+/-- Premises bundle for the Phase E2 protocol bridge.
+
+The `assumed*` fields are assumed inputs: the semantics objects are
+arbitrary, so none of these properties is derivable here. Callers must
+discharge them for a concrete protocol instantiation. -/
 structure ProtocolEnvelopeBridgePremises
     (Protocol : Type u) (Placement : Type v)
     (Deployment : Type (max u v))
@@ -396,79 +400,31 @@ structure ProtocolEnvelopeBridgePremises
   interaction : EnvelopeBound State
   total : EnvelopeBound State
   obligation : Placement → Run State → Run State → Prop
-  roleRenamingInvariantWitness :
+  /-- Assumed input: not derived from the protocol semantics. -/
+  assumedRoleRenamingInvariant :
     ProtocolRoleRenamingEnvelopeInvariant localEnvelope roleRenaming
-  compositionalEnvelopeWitness :
+  /-- Assumed input: not derived from the protocol semantics. -/
+  assumedCompositionalEnvelope :
     ProtocolCompositionalEnvelope component₁ component₂ interaction total composition
-  delegationPreservesWitness :
+  /-- Assumed input: not derived from the protocol semantics. -/
+  assumedDelegationPreserves :
     ProtocolDelegationPreservesEnvelope localEnvelope delegation
-  spatialMonotonicityWitness :
+  /-- Assumed input: not derived from the protocol semantics. -/
+  assumedSpatialMonotonicity :
     ProtocolSpatialMonotonicity spatial obligation
-  exchangeNormalizationWitness :
+  /-- Assumed input: not derived from the protocol semantics. -/
+  assumedExchangeNormalization :
     ProtocolExchangeNormalization localEnvelope exchange
-  shardCutPreservationWitness :
+  /-- Assumed input: not derived from the protocol semantics. -/
+  assumedShardCutPreservation :
     ProtocolShardCutPreservation shardedEnvelope shardCut
-
-/-! ## Protocol Bridge Theorem Projections -/
-
-/-- Extract E2 role-renaming invariance from protocol bridge premises. -/
-theorem protocol_role_renaming_invariant_of_premises
-    {Protocol : Type u} {Placement : Type v}
-    {Deployment : Type (max u v)}
-    {State : Type (max u v)} {Obs : Type (max u v)}
-    (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
-    ProtocolRoleRenamingEnvelopeInvariant p.localEnvelope p.roleRenaming :=
-  p.roleRenamingInvariantWitness
-
-/-- Extract E2 compositional-envelope theorem from protocol bridge premises. -/
-theorem protocol_compositional_envelope_of_premises
-    {Protocol : Type u} {Placement : Type v}
-    {Deployment : Type (max u v)}
-    {State : Type (max u v)} {Obs : Type (max u v)}
-    (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
-    ProtocolCompositionalEnvelope
-      p.component₁ p.component₂ p.interaction p.total p.composition :=
-  p.compositionalEnvelopeWitness
-
-/-- Extract E2 delegation-preserves-envelope from protocol bridge premises. -/
-theorem protocol_delegation_preserves_of_premises
-    {Protocol : Type u} {Placement : Type v}
-    {Deployment : Type (max u v)}
-    {State : Type (max u v)} {Obs : Type (max u v)}
-    (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
-    ProtocolDelegationPreservesEnvelope p.localEnvelope p.delegation :=
-  p.delegationPreservesWitness
-
-/-- Extract E2 spatial-monotonicity instantiation from protocol bridge premises. -/
-theorem protocol_spatial_monotonicity_of_premises
-    {Protocol : Type u} {Placement : Type v}
-    {Deployment : Type (max u v)}
-    {State : Type (max u v)} {Obs : Type (max u v)}
-    (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
-    ProtocolSpatialMonotonicity p.spatial p.obligation :=
-  p.spatialMonotonicityWitness
-
-/-- Extract E2 exchange-normalization instantiation from protocol bridge premises. -/
-theorem protocol_exchange_normalization_of_premises
-    {Protocol : Type u} {Placement : Type v}
-    {Deployment : Type (max u v)}
-    {State : Type (max u v)} {Obs : Type (max u v)}
-    (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
-    ProtocolExchangeNormalization p.localEnvelope p.exchange :=
-  p.exchangeNormalizationWitness
-
-/-- Extract E2 shard-cut preservation theorem from protocol bridge premises. -/
-theorem protocol_shard_cut_preservation_of_premises
-    {Protocol : Type u} {Placement : Type v}
-    {Deployment : Type (max u v)}
-    {State : Type (max u v)} {Obs : Type (max u v)}
-    (p : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs) :
-    ProtocolShardCutPreservation p.shardedEnvelope p.shardCut :=
-  p.shardCutPreservationWitness
 
 /-! ## Protocol Bridge Bundle -/
 
-/-- E2.7: protocol-level theorem bundle collecting all bridge instantiations. -/
+/-- E2.7: protocol-level bundle re-exposing the assumed bridge premises.
+
+Every field defaults to the corresponding `assumed*` premise; nothing in
+this bundle is proved from the envelope semantics. -/
 structure ProtocolEnvelopeBridgeBundle
     (Protocol : Type u) (Placement : Type v)
     (Deployment : Type (max u v))
@@ -476,24 +432,24 @@ structure ProtocolEnvelopeBridgeBundle
   premises : ProtocolEnvelopeBridgePremises Protocol Placement Deployment State Obs
   roleRenamingInvariant :
     ProtocolRoleRenamingEnvelopeInvariant premises.localEnvelope premises.roleRenaming :=
-      protocol_role_renaming_invariant_of_premises premises
+      premises.assumedRoleRenamingInvariant
   compositionalEnvelope :
     ProtocolCompositionalEnvelope
       premises.component₁ premises.component₂
       premises.interaction premises.total premises.composition :=
-      protocol_compositional_envelope_of_premises premises
+      premises.assumedCompositionalEnvelope
   delegationPreserves :
     ProtocolDelegationPreservesEnvelope premises.localEnvelope premises.delegation :=
-      protocol_delegation_preserves_of_premises premises
+      premises.assumedDelegationPreserves
   spatialMonotonicity :
     ProtocolSpatialMonotonicity premises.spatial premises.obligation :=
-      protocol_spatial_monotonicity_of_premises premises
+      premises.assumedSpatialMonotonicity
   exchangeNormalization :
     ProtocolExchangeNormalization premises.localEnvelope premises.exchange :=
-      protocol_exchange_normalization_of_premises premises
+      premises.assumedExchangeNormalization
   shardCutPreservation :
     ProtocolShardCutPreservation premises.shardedEnvelope premises.shardCut :=
-      protocol_shard_cut_preservation_of_premises premises
+      premises.assumedShardCutPreservation
 
 end Adequacy
 end Runtime

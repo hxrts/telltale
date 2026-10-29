@@ -55,7 +55,7 @@ private theorem eq_end_closed (g : GlobalType) (role : String)
   rw [is_closed_eq_true_iff]
   simp only [GlobalType.wellFormed, Bool.and_eq_true] at hwf
   rcases hwf with ⟨⟨⟨hbound, _hne⟩, _hnsc⟩, _hprod⟩
-  have hsub := trans_free_vars_subset role g
+  have hsub := Choreography.Projection.Trans.trans_free_vars_subset role g
   have gclosed : g.freeVars = [] := all_vars_bound_nil_implies_free_vars_nil g hbound
   simp only [List.eq_nil_iff_forall_not_mem]
   intro x hx
@@ -91,8 +91,8 @@ the local type candidate to be a "muve" type (mu-var-end chain). This is because
 Combined with wellFormedness (which implies closedness), this means non-participant
 projections are closed muve types, which are EQ2-equivalent to .end. -/
 
-/-- Helper: comm allCommsNonEmpty implies branch allCommsNonEmpty. -/
 /-! ## allCommsNonEmpty Branch Helper -/
+/-- Helper: comm allCommsNonEmpty implies branch allCommsNonEmpty. -/
 private theorem all_comms_non_empty_branches_of_comm {sender receiver : String}
     {branches : List (Label × GlobalType)}
     (hne : (GlobalType.comm sender receiver branches).allCommsNonEmpty = true) :
@@ -104,10 +104,10 @@ private theorem all_comms_non_empty_branches_of_comm {sender receiver : String}
     exact hne'
   exact hne'.2
 
+/-! ## Muve Classification Helpers: End/Var -/
 /-- Auxiliary: Non-participant projections are muve types.
     Uses structural properties only (allCommsNonEmpty, noSelfComm) to avoid the semantic gap
     where body.allVarsBound [t] does not imply body.allVarsBound []. -/
-/-! ## Muve Classification Helpers: End/Var -/
 private theorem c_project_muve_of_not_part_of2_aux_end (role : String) (lt : LocalTypeR)
     (hproj : CProject .end role lt) : isMuve lt = true := by
   -- Reduce CProjectF for `.end` and discharge non-end constructors by contradiction.
@@ -208,8 +208,8 @@ private theorem c_project_muve_of_not_part_of2_aux_comm_cons_data (sender receiv
   have hbranches' : first.2.allCommsNonEmpty = true ∧ allCommsNonEmptyBranches rest = true := by
     simpa [allCommsNonEmptyBranches, Bool.and_eq_true] using hbranches
   exact ⟨hfirst_proj, hnotpart_first, hbranches'.1⟩
-/-- CProject for non-participants enforces a muve local type. -/
 /-! ## Muve Classification Auxiliary Theorem -/
+/-- CProject for non-participants enforces a muve local type. -/
 theorem c_project_muve_of_not_part_of2_aux : (g : GlobalType) → (role : String) → (lt : LocalTypeR) →
     CProject g role lt → ¬ part_of2 role g → g.allCommsNonEmpty = true → isMuve lt = true
   | GlobalType.end, role, lt, hproj, _, _ =>
@@ -230,17 +230,30 @@ theorem c_project_muve_of_not_part_of2_aux : (g : GlobalType) → (role : String
       rcases c_project_muve_of_not_part_of2_aux_comm_cons_data sender receiver first rest role lt hproj hnotpart hne with
         ⟨hfirst_proj, hnotpart_first, hne_first⟩
       exact c_project_muve_of_not_part_of2_aux first.2 role lt hfirst_proj hnotpart_first hne_first
+  | GlobalType.delegate p q sid r cont, role, lt, hproj, hnotpart, hne => by
+      have hF := c_project_destruct hproj
+      have hnp : role ≠ p := by
+        intro heq; subst heq
+        exact hnotpart (part_of2.intro _ (part_ofF.delegate_direct _ _ _ _ _ (by simp [is_participant])))
+      have hnq : role ≠ q := by
+        intro heq; subst heq
+        exact hnotpart (part_of2.intro _ (part_ofF.delegate_direct _ _ _ _ _ (by simp [is_participant])))
+      simp [CProjectF, hnp, hnq] at hF
+      have hnotpart_cont : ¬ part_of2 role cont := fun hc =>
+        hnotpart (part_of2.intro _ (part_ofF.delegate_cont _ _ _ _ _ hc))
+      have hne_cont : cont.allCommsNonEmpty = true := by simpa [GlobalType.allCommsNonEmpty] using hne
+      exact c_project_muve_of_not_part_of2_aux cont role lt hF hnotpart_cont hne_cont
 termination_by g _ _ _ _ _ => sizeOf g
 decreasing_by
   all_goals simp_wf; simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega
 
+/-! ## Muve Classification Public Theorem -/
 /-- Non-participant projections are muve types.
 
 If a role doesn't participate in a global type, any CProject candidate
 for that role must be a muve type (only mu/var/end constructors).
 
 Proof by well-founded induction on global type size. -/
-/-! ## Muve Classification Public Theorem -/
 theorem c_project_muve_of_not_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
@@ -253,12 +266,12 @@ theorem c_project_muve_of_not_part_of2 (g : GlobalType) (role : String) (lt : Lo
     exact hne
   exact c_project_muve_of_not_part_of2_aux g role lt hproj hnotpart hne
 
+/-! ## Free-Variable Containment Helpers -/
 /-- Auxiliary: Non-participant projections have free vars contained in bound vars.
     This is the generalized version that tracks bound variables through mu bindings.
 
     Key insight: allVarsBound bvars means freeVars ⊆ bvars. For mu, the bound var is
     added to bvars, allowing the recursive call to track that var properly. -/
-/-! ## Free-Variable Containment Helpers -/
 private theorem c_project_free_vars_subset_bvars_end (role : String) (lt : LocalTypeR)
     (hproj : CProject .end role lt) : ∀ v, v ∈ lt.freeVars → v ∈ [] := by
   -- CProjectF forces lt = .end, whose freeVars are empty.
@@ -404,15 +417,29 @@ private theorem c_project_free_vars_subset_bvars :
       rcases c_project_free_vars_subset_bvars_comm_cons_data sender receiver first rest role lt bvars hproj hnotpart havb hne with
         ⟨hfirst_proj, hnotpart_first, havb_first, hne_first⟩
       exact c_project_free_vars_subset_bvars first.2 role lt bvars hfirst_proj hnotpart_first havb_first hne_first
+  | GlobalType.delegate p q sid r cont, role, lt, bvars, hproj, hnotpart, havb, hne => by
+      have hF := c_project_destruct hproj
+      have hnp : role ≠ p := by
+        intro heq; subst heq
+        exact hnotpart (part_of2.intro _ (part_ofF.delegate_direct _ _ _ _ _ (by simp [is_participant])))
+      have hnq : role ≠ q := by
+        intro heq; subst heq
+        exact hnotpart (part_of2.intro _ (part_ofF.delegate_direct _ _ _ _ _ (by simp [is_participant])))
+      simp [CProjectF, hnp, hnq] at hF
+      have hnotpart_cont : ¬ part_of2 role cont := fun hc =>
+        hnotpart (part_of2.intro _ (part_ofF.delegate_cont _ _ _ _ _ hc))
+      have hne_cont : cont.allCommsNonEmpty = true := by simpa [GlobalType.allCommsNonEmpty] using hne
+      have havb_cont : cont.allVarsBound bvars = true := by simpa [GlobalType.allVarsBound] using havb
+      exact c_project_free_vars_subset_bvars cont role lt bvars hF hnotpart_cont havb_cont hne_cont
 termination_by g _ _ _ _ _ _ _ => sizeOf g
 decreasing_by
   all_goals simp_wf; simp only [sizeOf, GlobalType._sizeOf_1, List._sizeOf_1, Prod._sizeOf_1]; omega
+/-! ## Closedness Auxiliary Theorem -/
 /-- Auxiliary: Non-participant projections are closed types.
     Uses allVarsBound to show freeVars = [] for the candidate.
 
     Key insight: c_project_free_vars_subset_bvars with bvars = [] gives freeVars ⊆ [],
     which means freeVars = []. -/
-/-! ## Closedness Auxiliary Theorem -/
 private theorem c_project_closed_of_not_part_of2_aux (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)
@@ -424,13 +451,13 @@ private theorem c_project_closed_of_not_part_of2_aux (g : GlobalType) (role : St
   have hsub := c_project_free_vars_subset_bvars g role lt [] hproj hnotpart havb hne
   exact List.subset_nil.mp (fun v hv => hsub v hv)
 
+/-! ## Closedness Public Theorem -/
 /-- Non-participant projections are closed types.
 
 If a role doesn't participate in a well-formed (closed) global type,
 any CProject candidate for that role must be closed (no free variables).
 
 Proof by well-founded induction on global type size. -/
-/-! ## Closedness Public Theorem -/
 theorem c_project_closed_of_not_part_of2 (g : GlobalType) (role : String) (lt : LocalTypeR)
     (hproj : CProject g role lt)
     (hnotpart : ¬part_of2 role g)

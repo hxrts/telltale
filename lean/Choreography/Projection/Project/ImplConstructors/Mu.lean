@@ -71,7 +71,7 @@ private theorem c_project_mu_implies_trans_mu_mu (t : String) (gbody : GlobalTyp
     have htrans_guard : (trans gbody role).isGuarded t = true := by
       simpa using c_project_is_guarded_trans hbody_proj hwf_body hguard
     refine ⟨gbody, ?_, hguard, hbody_proj, hwf_body⟩
-    simp [trans, htrans_guard]
+    simp [trans, Choreography.Projection.Trans.trans, htrans_guard]
   · have : False := by simpa using hend_eq
     exact this.elim
 
@@ -146,7 +146,7 @@ decreasing_by
     all_goals
       simpa [hg] using size_of_snd_lt_comm_head_mul3 sender receiver first rest
 
-/-! ## Mu constructor agreement: comm case -/
+/- ## Mu constructor agreement: comm case -/
 
 /-- Helper: comm case for mu projection agreement. -/
 private theorem c_project_mu_implies_trans_mu_comm (sender receiver : String)
@@ -175,7 +175,7 @@ decreasing_by
     all_goals
       simp [hgb, GlobalType.comm.sizeOf_spec]
 
-/-! ## Mu constructor agreement: main theorem -/
+/- ## Mu constructor agreement: main theorem -/
 
 /-- If CProject g role (.mu v body) holds, then trans g role has matching mu structure.
       Returns the global body and proof that trans produces `.mu v (trans gbody role)`. -/
@@ -197,10 +197,23 @@ theorem c_project_mu_implies_trans_mu (g : GlobalType) (role : String)
         simpa [hg] using
           (c_project_mu_implies_trans_mu_comm sender receiver gbs role v body
             (by simpa [hg] using hproj) (by simpa [hg] using hwf))
+    | delegate p q sid r cont =>
+        have h' : CProject (.delegate p q sid r cont) role (.mu v body) := by simpa [hg] using hproj
+        have hf := c_project_destruct h'
+        have hnp : role ≠ p := by intro e; subst e; simp [CProjectF] at hf
+        have hnq : role ≠ q := by intro e; subst e; simp [CProjectF, hnp] at hf
+        simp only [CProjectF, hnp, hnq, if_false] at hf
+        obtain ⟨gbody, htr, hg2, hpb, hne⟩ := c_project_mu_implies_trans_mu cont role v body hf
+          (by simpa [hg, GlobalType.allCommsNonEmpty] using hwf)
+        have hp' : (role == p) = false := by simpa using hnp
+        have hq' : (role == q) = false := by simpa using hnq
+        refine ⟨gbody, ?_, hg2, hpb, hne⟩
+        simp [trans, Choreography.Projection.Trans.trans, hp', hq']
+        exact htr
 termination_by (sizeOf g) * 3 + 2
 decreasing_by
     all_goals
-      simp [hg, GlobalType.comm.sizeOf_spec]
+      simp [hg, GlobalType.comm.sizeOf_spec] <;> omega
 end
 
 

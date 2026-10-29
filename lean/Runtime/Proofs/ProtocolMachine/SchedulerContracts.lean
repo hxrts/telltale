@@ -27,7 +27,10 @@ def single_lane_schedule_compat {ι γ π ε ν : Type u} [IdentityModel ι] [Gu
       laneBlocked := laneBlocked'
       crossLaneHandoffs := handoffs' } } = schedule st
 
-def schedule_confluence {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- `schedule` is a function, so its result is unique. This is determinism of
+coroutine selection, not confluence; see `IndependentStepsCommute` in
+`Runtime.Proofs.ProtocolMachine.Scheduler` for the confluence statement. -/
+def schedule_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
@@ -39,7 +42,7 @@ def policy_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] 
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
     (policy : SchedPolicy) (st : ProtocolMachineState ι γ π ε ν) : Prop :=
-  st.sched.policy = policy → schedule_confluence st
+  st.sched.policy = policy → schedule_deterministic st
 
 def roundRobin_selection_deterministic {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
@@ -79,7 +82,10 @@ def cooperative_refines_concurrent {ι γ π ε ν : Type u} [IdentityModel ι] 
     pickRunnableInQueue .roundRobin st' st'.sched.readyQueue =
       pickRunnableInQueue st'.sched.policy st' st'.sched.readyQueue
 
-def starvation_free {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
+/-- One-step non-blocking scheduling: if some ready coroutine is queued, `schedule`
+returns a step. This is NOT fairness or starvation freedom; it says nothing
+about which coroutine runs or whether a given one eventually runs. -/
+def schedule_nonblocking {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
     [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]

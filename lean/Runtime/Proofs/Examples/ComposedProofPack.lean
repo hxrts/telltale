@@ -115,7 +115,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
         subst hEvent₂
         simp [successPublication]
     , canonicalPublicationSurfaceExclusive := by
-        simpa [publicationObjectsWithRead] using publicationObjects_exclusive
+        exact publicationObjects_exclusive
     , publicationObserverClassDisciplined := by
         intro event hMem hCanon hPublished
         have hMem' : event = successPublication ∨ event = auditPublication := by
@@ -267,7 +267,7 @@ def semanticWitnessBundle : SemanticObjectWitnessBundle :=
   , crossTargetProgressDependentWork? := some crossTargetWitness
   }
 
-def semanticComposedSpace :
+noncomputable def semanticComposedSpace :
     ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   Runtime.Proofs.TheoremPackAPI.composeProofSpacesWithSemanticObjects
     (space := baseComposedSpace (ν := ν) (store₀ := store₀) (State := State))
@@ -277,7 +277,7 @@ def semanticComposedSpace :
     (output? := none)
     (semanticObjects? := some semanticWitnessBundle)
 
-def composedSpace (bundle : ProtocolMachineLivenessBundle store₀) (ow : OutputConditionWitness) :
+noncomputable def composedSpace (bundle : ProtocolMachineLivenessBundle store₀) (ow : OutputConditionWitness) :
     ProtocolMachineInvariantSpaceWithProfiles (ν := ν) store₀ State :=
   Runtime.Proofs.TheoremPackAPI.composeProofSpaces
     (space := baseComposedSpace (ν := ν) (store₀ := store₀) (State := State))

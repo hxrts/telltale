@@ -72,6 +72,12 @@ private lemma all_branches_proj_c_mono {R S : ProjRelC}
 
 -- Projection step generator
 
+/-- Delegation `p → q : (sid, r). cont` projects like a single-branch communication
+labelled `_delegate` (cf. `Choreography.Projection.trans`); the channel payload is not
+observable in `LocalTypeC`. -/
+def delegateBranches (cont : GlobalType) : List (Label × GlobalType) :=
+  [(⟨"_delegate", .unit⟩, cont)]
+
 -- # Communication-Case Helper
 
 private def ProjectC_comm (R : ProjRelC) (sender receiver : String)
@@ -114,6 +120,7 @@ def ProjectC_step (R : ProjRelC) : ProjRelC := fun g role cand =>
     | .var t => head l' = .var t
     | .mu _ _ => False
     | .comm sender receiver gbs => ProjectC_comm R sender receiver gbs role l'
+    | .delegate p q _ _ cont => ProjectC_comm R p q (delegateBranches cont) role l'
 
 -- # Step Operator Monotonicity
 
@@ -128,6 +135,8 @@ private theorem project_c_step_mono : Monotone ProjectC_step := by
       simpa using hstep
   | mu t body =>
       cases hstep
+  | delegate p q sid r cont =>
+      exact project_c_comm_mono h hstep
   | comm sender receiver gbs =>
       cases hstep with
       | inl hsender =>
@@ -197,7 +206,8 @@ private lemma unfolds_to_g_compare_nonmu {g g1 g' : GlobalType} (hg1 : UnfoldsTo
 private lemma unfolds_c_head_mu {t u : LocalTypeC} (h : UnfoldsC t u) : ∃ x, head t = .mu x := by
   rcases h with ⟨x, f, hdest, _⟩
   refine ⟨x, ?_⟩
-  simp [head, hdest]
+  simp only [head, hdest]
+  rfl
 
 private lemma unfolds_c_right_unique : Relator.RightUnique UnfoldsC := by
   intro a b c hab hac
@@ -246,6 +256,10 @@ theorem project_c_unfold_g {g g' : GlobalType} {role : String} {l : LocalTypeC}
       have hcomp : UnfoldsToG g' (.comm sender receiver gbs) :=
         unfolds_to_g_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
       exact project_c_fold ⟨.comm sender receiver gbs, l1, hcomp, hl1, by simpa using hmatch⟩
+  | delegate p q sid r cont =>
+      have hcomp : UnfoldsToG g' (.delegate p q sid r cont) :=
+        unfolds_to_g_compare_nonmu hg1 hg (by intro t body hmu; cases hmu)
+      exact project_c_fold ⟨.delegate p q sid r cont, l1, hcomp, hl1, hmatch⟩
 
 -- ProjectC Stability under Local Unfolding
 
@@ -272,6 +286,8 @@ theorem project_c_unfold_c {g : GlobalType} {role : String} {l l' : LocalTypeC}
         | var t =>
             simpa using hmatch
         | comm sender receiver gbs =>
+            exact project_c_comm_mono hinc hmatch
+        | delegate sender receiver sid r cont =>
             exact project_c_comm_mono hinc hmatch
     -- Local Unfolding: Witness Unfolds to Candidate
     | inl h_l1_cand =>
@@ -323,11 +339,41 @@ theorem project_c_unfold_c {g : GlobalType} {role : String} {l l' : LocalTypeC}
                       exact ⟨l1, hall gb hmem, h_l1_cand⟩
                     refine ⟨.comm sender receiver gbs, cand, hg1, Relation.ReflTransGen.refl, ?_⟩
                     exact Or.inr (Or.inr ⟨hns, hnr, hall'⟩)
+        -- Local Unfolding: Delegation Subcases
+        | delegate sender receiver sid r cont =>
+            cases hmatch with
+            | inl hsender =>
+                rcases hsender with ⟨hrole, labels, hhead, hbr⟩
+                have hne : ∀ x, head l1 ≠ .mu x := by
+                  intro x hx
+                  simp_all
+                have hEq : cand = l1 := unfolds_to_c_eq_of_head_ne_mu h_l1_cand hne
+                subst cand
+                refine ⟨.delegate sender receiver sid r cont, l1, hg1, Relation.ReflTransGen.refl, ?_⟩
+                exact Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono hinc hbr⟩
+            | inr hrest =>
+                cases hrest with
+                | inl hreceiver =>
+                    rcases hreceiver with ⟨hrole, labels, hhead, hbr⟩
+                    have hne : ∀ x, head l1 ≠ .mu x := by
+                      intro x hx
+                      simp_all
+                    have hEq : cand = l1 := unfolds_to_c_eq_of_head_ne_mu h_l1_cand hne
+                    subst cand
+                    refine ⟨.delegate sender receiver sid r cont, l1, hg1, Relation.ReflTransGen.refl, ?_⟩
+                    exact Or.inr (Or.inl ⟨hrole, labels, hhead, branches_proj_rel_c_mono hinc hbr⟩)
+                | inr hother =>
+                    rcases hother with ⟨hns, hnr, hall⟩
+                    have hall' : AllBranchesProjC R (delegateBranches cont) role cand := by
+                      intro gb hmem
+                      exact ⟨l1, hall gb hmem, h_l1_cand⟩
+                    refine ⟨.delegate sender receiver sid r cont, cand, hg1, Relation.ReflTransGen.refl, ?_⟩
+                    exact Or.inr (Or.inr ⟨hns, hnr, hall'⟩)
   have hle : R ≤ ProjectC_step R := by
     intro g role cand hR
     exact hpost g role cand hR
   have hco : R ≤ ProjectC := by
-    simpa [ProjectC] using (SessionCoTypes.CoinductiveRel.coind (F := ProjectC_step) hle)
+    exact SessionCoTypes.CoinductiveRel.coind (F := ProjectC_step) hle
   exact hco _ _ _ ⟨l, hproj, hl⟩
 
 theorem project_c_mu_lift {g : GlobalType} {role : String} {x : String} {body : LocalTypeC}

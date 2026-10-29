@@ -170,14 +170,14 @@ private theorem trans_branches_proj_subst_rel (t : String) (G : GlobalType) (rol
         Choreography.Projection.Project.transBranches,
         SessionTypes.GlobalType.substituteBranches,
         SessionTypes.LocalTypeR.substituteBranches,
-        -SessionTypes.LocalTypeR.substitute_branches_eq_map]
+        -SessionTypes.LocalTypeR.substitute_branches_eq_map, Choreography.Projection.Trans.transBranches]
   | cons hd tl ih =>
       obtain ⟨label, cont⟩ := hd
       simp [BranchesRel, gSubstBranches, lSubstBranches, projTransBranches,
         Choreography.Projection.Project.transBranches,
         SessionTypes.GlobalType.substituteBranches,
         SessionTypes.LocalTypeR.substituteBranches,
-        -SessionTypes.LocalTypeR.substitute_branches_eq_map]
+        -SessionTypes.LocalTypeR.substitute_branches_eq_map, Choreography.Projection.Trans.transBranches]
       constructor
       · -- head relation
         exact Or.inl ⟨cont, rfl, rfl⟩
@@ -186,7 +186,7 @@ private theorem trans_branches_proj_subst_rel (t : String) (G : GlobalType) (rol
           Choreography.Projection.Project.transBranches,
           SessionTypes.GlobalType.substituteBranches,
           SessionTypes.LocalTypeR.substituteBranches,
-          -SessionTypes.LocalTypeR.substitute_branches_eq_map] using ih
+          -SessionTypes.LocalTypeR.substitute_branches_eq_map, Choreography.Projection.Trans.transBranches] using ih
 
 /-! ## EQ2F Base Cases -/
 
@@ -196,7 +196,7 @@ private theorem proj_subst_rel_eq2_f_end (t : String) (G : GlobalType) (role : S
       (projTrans (GlobalType.end.substitute t G) role)
       ((projTrans GlobalType.end role).substitute t (projTrans G role)) := by
   -- Both sides reduce to `.end`.
-  simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, EQ2F]
+  simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, EQ2F, Choreography.Projection.Trans.trans]
 
 /-- Helper: EQ2F for projection-substitution on `.var`. -/
 private theorem proj_subst_rel_eq2_f_var (v t : String) (G : GlobalType) (role : String) :
@@ -206,10 +206,10 @@ private theorem proj_subst_rel_eq2_f_var (v t : String) (G : GlobalType) (role :
   -- Split on whether the variable is the substitution target.
   by_cases hvt : v = t
   · subst hvt
-    simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans]
+    simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans]
     exact EQ2F.mono (fun _ _ h => Or.inr h) _ _ (EQ2.destruct (eq2_refl _))
   · have hvt' : (v == t) = false := beq_eq_false_iff_ne.mpr hvt
-    simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, hvt']
+    simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, hvt', Choreography.Projection.Trans.trans]
     rfl
 
 /-! ## EQ2F Mu Shadow Case -/
@@ -223,7 +223,7 @@ private theorem proj_subst_rel_eq2_f_mu_shadow
   -- Substitution is shadowed; both sides project the same mu.
   have hst' : (s == t) = true := by
     simpa [beq_iff_eq] using hst
-  simp [GlobalType.substitute, hst', projTrans, Choreography.Projection.Project.trans]
+  simp [GlobalType.substitute, hst', projTrans, Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans]
   by_cases hguard : (Choreography.Projection.Project.trans inner role).isGuarded s = true
   ·
     have hguard_t : (Choreography.Projection.Project.trans inner role).isGuarded t = true := by
@@ -251,7 +251,7 @@ private theorem proj_subst_rel_eq2_f_mu_noshadow_guarded
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Both sides are guarded mu; relate via crossed unfold lemmas.
-  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR, Choreography.Projection.Trans.trans]
   simp [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
   constructor
   · exact Or.inr (eq2_mu_crossed_unfold_left hGclosed hguardL hguardR)
@@ -269,7 +269,7 @@ private theorem proj_subst_rel_eq2_f_mu_noshadow_guarded_end
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Guarded mu relates to end via the mismatched guardedness lemma.
-  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR, Choreography.Projection.Trans.trans]
   exact Or.inr (eq2_mu_unguarded_to_end hsne hGclosed hguardL hguardR)
 
 /-! ## End/Guarded Crossover -/
@@ -284,7 +284,7 @@ private theorem proj_subst_rel_eq2_f_mu_noshadow_end_guarded
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- End relates to guarded mu via the mismatched guardedness lemma.
-  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR, Choreography.Projection.Trans.trans]
   simp [LocalTypeR.substitute, beq_eq_false_iff_ne.mpr hsne]
   exact Or.inr (eq2_end_to_mu_unguarded hGclosed hguardL hguardR)
 
@@ -300,7 +300,7 @@ private theorem proj_subst_rel_eq2_f_mu_noshadow_end_end
       (projTrans (GlobalType.mu s (inner.substitute t G)) role)
       ((projTrans (GlobalType.mu s inner) role).substitute t (projTrans G role)) := by
   -- Both sides collapse to end.
-  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR, EQ2F]
+  simp [projTrans, Choreography.Projection.Project.trans, hguardL, hguardR, EQ2F, Choreography.Projection.Trans.trans]
 
 /-! ## Guardedness Dispatch -/
 
@@ -449,10 +449,26 @@ private theorem proj_subst_rel_eq2_f_of_witness (g : GlobalType) (t : String) (G
                   have ih := proj_subst_rel_eq2_f_of_witness cont t G role hGclosed
                   exact proj_subst_rel_eq2_f_comm_other_cons
                     sender receiver label cont rest t G role hrs hrr ih
+  | .delegate p q sid r cont =>
+      by_cases hp : role = p
+      · have hp' : (role == p) = true := by simpa using hp
+        simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans, hp', LocalTypeR.substitute, EQ2F, BranchesRel]
+        exact Or.inl ⟨cont, rfl, rfl⟩
+      · have hp' : (role == p) = false := by simpa using hp
+        by_cases hq : role = q
+        · have hq' : (role == q) = true := by simpa using hq
+          simp [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans, hp', hq', LocalTypeR.substitute, EQ2F, BranchesRel]
+          exact Or.inl ⟨cont, rfl, rfl⟩
+        · have hq' : (role == q) = false := by simpa using hq
+          have ih := proj_subst_rel_eq2_f_of_witness cont t G role hGclosed
+          simpa [GlobalType.substitute, projTrans, Choreography.Projection.Project.trans, Choreography.Projection.Trans.trans, hp', hq'] using ih
 termination_by sizeOf g
 decreasing_by
   all_goals
-    simp_wf; first | simpa [GlobalType.comm.sizeOf_spec] using (size_of_cont_lt_comm sender receiver label cont rest)
+    simp_wf
+    first
+      | simpa [GlobalType.comm.sizeOf_spec] using (size_of_cont_lt_comm sender receiver label cont rest)
+      | omega
 
 /-! ## Postfix and Paco Bridge -/
 

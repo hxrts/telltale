@@ -225,7 +225,10 @@
 	certificates for transition choreographies. The behavioral boundary is characterized by an exact
 	determinism envelope with soundness, realizability, and maximality. Exchange-normalized determinism
 	with spatial-subtyping monotonicity is established. Observational adequacy links abstract and
-	protocol proofs to VM adherence modulo envelope. All results are mechanized in Lean~4.
+	protocol proofs to VM adherence modulo envelope. The development is mechanized in Lean~4 (v4.35.0);
+	where a mechanized statement is narrower than the paper-level statement, or rests on an explicitly
+	assumed premise (envelope soundness and realizability, exchange and spatial normalization, and the
+	minimality hypothesis of Theorem~D), the corresponding section says so.
 \end{abstract}
 
 % ============================================================================
@@ -394,12 +397,12 @@ Our contributions are as follows:
 \begin{enumerate}
 	\item A reconfiguration commutation theorem that covers both static composition and dynamic delegation.
 	\item An exact characterization of Coherence by active-edge erasure realizability and a relative-minimality theorem over admissible invariants.
-	\item A determinism-envelope theory with soundness, realizability, maximality, and exchange and spatial normalization consequences.
+	\item A determinism-envelope theory with soundness, realizability, maximality, and exchange and spatial normalization consequences; in the mechanization, soundness, realizability and the normalization laws are explicit assumed premises.
 	\item An abstract-to-VM adequacy bridge that ties profile claims to theorem-pack capability evidence.
 	\item A Byzantine envelope extension with exact characterization, converse counterexample families, and capability-gated VM adherence.
 \end{enumerate}
 
-Main text proofs are proof sketches; full machine-checked derivations are provided by the Lean anchors indexed in Appendix~\ref{app:index}.
+Main text proofs are proof sketches. Lean anchors are indexed in Appendix~\ref{app:index}; each theorem section ends with a mechanization-status paragraph stating exactly which part is machine-checked and which premises are assumed rather than derived.
 Proof-sketch template used throughout the series: state proof mode
 (compositional/induction/coinduction/witness construction), give one concrete
 intermediate transformation, then conclude with the claim interface.
@@ -573,6 +576,11 @@ Figure~\ref{fig:p3-commuting-square} gives the explicit commuting-square instanc
 	Write $\mathsf{WF}_\rho(C)$ for the side-condition predicate used by reconfiguration theorems:
 	\texttt{LinkWF(C,$\rho$)} for static linking, \texttt{DelegationWF(C,$\rho$)} for delegation,
 	and \texttt{TransitionWF(C,$\rho$)} for transition choreographies.
+	Of these, only \texttt{DelegationWF} is a Lean definition
+	(\texttt{Protocol/\allowbreak Coherence/\allowbreak Delegation/\allowbreak Core/}); linking side
+	conditions appear in Lean as the explicit hypotheses of the linking theorems
+	(\texttt{LinkOKFull}, \texttt{DisjointG}, \texttt{DConsistent}), and \texttt{TransitionWF} is a
+	paper-level judgment without a mechanized counterpart.
 \end{definition}
 
 \begin{definition}[Transition Well-Formedness Obligations]
@@ -739,6 +747,17 @@ $\Obs$, so \ConfigEquiv\ is an observational quotient.
 	Then $\ExchangeEq(C_1,C_2)$ holds when $C_1$ and $C_2$ are connected by a finite sequence of such admissible swaps plus \ConfigEquiv closure.
 	$C \sqsubseteq_{\mathsf{sp}} C'$ is the spatial-subtyping preorder used in Theorem~\ref{thm:normalization}.
 \end{definition}
+
+Mechanization note on diamonds. The diamond clause above is a premise of
+admissible swaps, not a derived fact. The Lean development proves a diamond for
+independent actions on global types (\nolinkurl{step_diamond_independent} and its
+configuration-level form \nolinkurl{diamond_independent} in
+\texttt{Semantics/\allowbreak Determinism/\allowbreak Diamond/\allowbreak Core.lean}), under unique
+branch labels. It does not prove a diamond for independent sessions in the
+protocol-level operational semantics: there \texttt{StepBase} acts only on the
+head process and is deterministic (\nolinkurl{step_base_deterministic_strong} in
+\texttt{Protocol/\allowbreak Determinism.lean}); a diamond would need the contextual
+step through parallel composition, which is not formalized.
 
 Relation inclusion and role split. Because \ExchangeEq\ is closed under
 \ConfigEquiv, we have
@@ -988,7 +1007,7 @@ operators in this theorem.
 
 The lemma packages the delegate case used in Theorem~\ref{thm:harmony}. On footprint edges $e\in F$, projection follows delegation update witnesses. On non-footprint edges $e\notin F$, projection follows frame preservation. These two clauses are exactly the commutation link from update discipline to projected-step equality.
 
-The proof has two components: static Harmony via \texttt{link}, where composition-level commutation and coherence preservation are established in deployment theorems such as \nolinkurl{link_harmony_through_link} and \nolinkurl{link_preserves_coherent}; and dynamic Harmony via delegation, where delegation preservation and footprint lemmas establish commutation for topology-changing transfers. At the effect-observation boundary, the coinductive bridge supplies the composition-facing
+The proof has two components: static Harmony via \texttt{link}, whose mechanized ingredients are the deployment theorems \nolinkurl{link_preserves_coherent} (coherence of the merged environments of two coherent, disjoint, consistent components) and \nolinkurl{link_harmony_through_link} (preservation of complete monitor typing under linking); and dynamic Harmony via delegation, whose mechanized ingredient is coherence preservation under a delegation step (\nolinkurl{delegation_preserves_coherent}). At the effect-observation boundary, the coinductive bridge supplies the composition-facing
 congruence and quotient lift used by this section: \nolinkurl{effect_bisim_congr_link} and
 \nolinkurl{config_equiv_iff_effect_bisim_silent}.
 
@@ -1005,8 +1024,9 @@ of the reconfiguration bridge layer.
 
 	\textbf{Case $\rho=\mathsf{link}$.}
 	From $\mathsf{WF}_\rho$ we obtain a well-formed composition object and enabled post-link step.
-	Apply \nolinkurl{link_preserves_coherent} to preserve coherence across the link update, then apply
-	\nolinkurl{link_harmony_through_link} to obtain commutation of projection with the link step:
+	Apply \nolinkurl{link_preserves_coherent} to preserve coherence across the link update and
+	\nolinkurl{link_harmony_through_link} to preserve monitor typing of the composed system; the
+	paper-level argument then reads off commutation of projection with the link step:
 	\[
 		\begin{aligned}[t]
 			\mathsf{project}(\mathsf{step}_{\mathsf{reconfig}}(C,\mathsf{link}))
@@ -1043,6 +1063,20 @@ Equation~\ref{eq:p3-commutation-instances} separates static-link and dynamic-del
 		\ProjDelegate{C} & = \LocDelegate{C}.
 	\end{aligned}
 \end{equation}
+
+Mechanization status. The commuting square of Theorem~\ref{thm:harmony} is not
+itself a single Lean theorem. What is machine-checked is: coherence and monitor
+typing are preserved by linking and by delegation (the anchors above, and
+\nolinkurl{flagship_composed_system_conservation} for delegation inside a
+composed system); an abstract harmony square follows from a supplied
+local-obligation bridge
+(\nolinkurl{reconfiguration_harmony_of_local_obligation_bridge}, whose bridge is a
+hypothesis); and projection harmony for ordinary communication steps,
+\nolinkurl{step_harmony} with converse \nolinkurl{envstep_realizable}
+(\texttt{Choreography/\allowbreak Harmony/\allowbreak EnvStepHarmony.lean}), holds only when the
+global type is a closed, well-formed, blind \texttt{comm} at its head.
+Asynchronous steps beneath a prefix and \texttt{mu}-unfolding steps are not
+covered. Lemma~\ref{lem:p3-deleg-proj-shape} is a paper-level argument.
 
 % ============================================================================
 \section{Theorem A: Projection-Erasure Characterization of Coherence}
@@ -1099,6 +1133,13 @@ This theorem gives the formal content of the quotient-first claim: erasure is no
 	Therefore Coherence is exactly characterized by active-edge realizability of projected views.
 \end{proof}
 
+Mechanization status. Only the class-erasure part is machine-checked:
+\nolinkurl{coherent_erasure_stable} (Coherence is invariant under \ConfigEquiv) and
+\nolinkurl{coherence_erasure_characterization} ($\Coherent(C)$ iff every
+\ConfigEquiv-equivalent configuration is coherent). The biconditional with
+$\JointActive{\mathsf{project}(C)}$ in Theorem~\ref{thm:erasure} has no Lean
+counterpart; directions~1 and~2 of the sketch are paper-level arguments.
+
 % ============================================================================
 \section{Theorem C: Safe Delegation with Footprint Corollary}
 \label{sec:theorem-c}
@@ -1146,7 +1187,9 @@ Section~\ref{sec:example} is a direct instance of this theorem's premise shape.
 \end{proof}
 
 \begin{proof}[Proof sketch]
-	For the forward direction, apply \nolinkurl{safe_delegation_to_footprint} to project $\mathsf{SafeDelegation}$ obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safe_delegation} to reconstruct global safety from footprint obligations. Strictness witnesses from \nolinkurl{safe_delegation_local_necessity} show necessity of the side conditions. The full equivalence is packaged as \nolinkurl{safe_delegation_iff_footprint}.
+	For the forward direction, apply \nolinkurl{safe_delegation_to_footprint} to project $\mathsf{SafeDelegation}$ obligations to the declared delegation footprint. For the reverse direction, apply \nolinkurl{footprint_to_safe_delegation} to reconstruct global safety from footprint obligations. \nolinkurl{safe_delegation_local_necessity} shows that every safe delegation carries the source coherence and $\mathsf{DelegationWF}$ side conditions, and \nolinkurl{dropped_condition_counterexample_not_footprint_safe} packages the dropped-condition counterexample interface. The full equivalence is packaged as \nolinkurl{safe_delegation_iff_footprint}.
+
+	Mechanization status. Theorem~\ref{thm:delegation} is \nolinkurl{delegation_sufficiency}, proved from \nolinkurl{delegation_preserves_coherent}; in Lean, $\mathsf{SafeDelegation}$ is source coherence, existence of a delegation step, and target coherence. In Lean, $\mathsf{SafeDelegationFootprint}$ is $\mathsf{SafeDelegation}$ with $\mathsf{DelegationWF}$ made explicit, so the corollary's equivalence is a repackaging rather than a locality theorem.
 \end{proof}
 
 % ============================================================================
@@ -1186,8 +1229,20 @@ It is a characterization-style minimality theorem relative to the admissibility 
 		\item Convert these obligations into Coherence via erasure-characterization lemmas.
 	\end{enumerate}
 
-	The full minimality statement is packaged as \nolinkurl{relative_minimality}. Hence every admissible safety-guaranteeing invariant implies Coherence, making Coherence relatively minimal.
+	Hence every admissible safety-guaranteeing invariant implies Coherence, making Coherence relatively minimal.
 \end{proof}
+
+Mechanization status. The implication $\Admissible(I)\implies(\forall C,\ I(C)\Rightarrow\Coherent(C))$
+is \emph{not} derived in Lean; it enters as an explicit hypothesis
+(\texttt{hMinimal}) of \nolinkurl{theorem_d_tightness_closure} and
+\nolinkurl{theorem_df_exact_boundary_duality}. The mechanized Lean \texttt{Admissible}
+bundle is also weaker than the definition above: its locality and frame-stability
+fields are tautological as currently stated ($I\Rightarrow I$). What is proved is: (i) Coherence is admissible, given
+those two obligations (\nolinkurl{coherence_invariant_core_admissible}); and (ii)
+\nolinkurl{relative_minimality}: an invariant that is both conservative
+($I\Rightarrow\Coherent$) and complete ($\Coherent\Rightarrow I$) is pointwise
+equivalent to Coherence. Theorem~\ref{thm:minimality} should therefore be read as a
+paper-level claim whose key step is assumed in the mechanization.
 
 Equation~\ref{eq:p3-admissible-order} summarizes the admissible-invariant order behind Theorem~\ref{thm:minimality}.
 The display below separates the invariant implication layer from its delegation
@@ -1272,6 +1327,19 @@ This theorem combines composition, delegation, and quantitative invariants in on
 	\end{enumerate}
 \end{proof}
 
+Mechanization status. \nolinkurl{flagship_composed_system_conservation} proves the
+coherence clause for one delegation step inside one component of a linked pair,
+assuming disjointness and consistency before and after the step. The
+measure clause is mechanized as
+\nolinkurl{lyapunov_conserved_under_balanced_delegation}: if the sender's and
+receiver's type and buffer measures are redistributed with preserved totals, the
+summed Lyapunov value is preserved. Balance is a hypothesis, not derived from
+the delegation step. The transition-choreography clause is imported from the
+quantitative premises of Paper~2 and is not separately mechanized here. The
+concrete protocol machine has no mechanized termination instance; the
+termination bound in \texttt{Runtime/\allowbreak Proofs/\allowbreak FairTermination.lean} is
+proved from abstract one-step ranking facts.
+
 \begin{corollary}[Compositional Exactness Under Non-Interference]
 	\label{cor:compositional}
 	For all compositions $C_1 \otimes C_2$, if Assumption Block~\ref{assump:p3-envelope} holds for both components and $\mathsf{NonInterf}(C_1,C_2)$ holds, then envelope exactness is preserved by composition:
@@ -1287,6 +1355,7 @@ This theorem combines composition, delegation, and quantitative invariants in on
 
 \begin{proof}[Proof sketch]
 	$\mathsf{NonInterf}(C_1,C_2)$ gives a check criterion through footprint disjointness and boundary commutation, and a semantic criterion through witness factorization. These clauses factor composed traces into component traces with no cross-boundary interference steps. Apply envelope exactness to each component and recompose to obtain exactness of the composition. For strictness, use the dropped-assumption witness family to exhibit an interfering trace that violates factorization and therefore exactness.
+	This corollary is a paper-level argument; in Lean, the compositional envelope property enters as the assumed premise \texttt{assumedCompositionalEnvelope} of the reconfiguration-bridge bundle.
 \end{proof}
 
 Interference example. If both components perform delegation rewrites that target the same boundary edge in one macro-step window, footprint disjointness fails. The two execution orders can then induce different certified boundary traces, so composed exactness can fail.
@@ -1362,11 +1431,29 @@ Conceptually, this is dual to Theorem~\ref{thm:minimality}:
 		      \end{itemize}
 	\end{enumerate}
 
-	Core formal structures come from envelope foundations (\texttt{LocalExactEnvelopeCharacterization}, \texttt{ShardedExactEnvelopeCharacterization}) and profile-level extraction theorems (\nolinkurl{consensus_envelope_exact_of_profile},\allowbreak\ \nolinkurl{failure_envelope_maximality_of_profile}).
+	Core formal structures come from envelope foundations (\texttt{LocalExactEnvelopeCharacterization}, \texttt{ShardedExactEnvelopeCharacterization}) and the packaging theorems \nolinkurl{local_exact_envelope_characterization_of_e1_premises} and \nolinkurl{sharded_exact_envelope_characterization_of_e1_premises}; the failure-envelope extension is \nolinkurl{failure_envelope_maximality_of_failure_premises}.
 	Method split. Soundness/maximality steps are compositional consequence
 	packaging over certified-step obligations, while realizability is a witness
 	construction argument that builds executions from admitted traces.
 \end{proof}
+
+Mechanization status. In Lean, envelope soundness and realizability are
+\emph{assumed} inputs (\texttt{assumedLocalSoundness},
+\texttt{assumedLocalRealizability} and their sharded analogues in
+\texttt{EnvelopePhaseE1Premises},
+\texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak CoreFoundations.lean}).
+Local and sharded exactness are proved equivalent under an explicit collapse
+hypothesis (\nolinkurl{local_exact_iff_sharded_exact_of_collapse}). The mechanized maximality
+schema is definitional: as stated it has the form $P\Rightarrow P$ and holds for
+every envelope (\nolinkurl{local_envelope_maximality}). The strict-superset
+maximality clause~3 of Theorem~\ref{thm:envelope} is therefore a paper-level
+claim, not a mechanized one. Failure-envelope maximality is likewise projected from a
+supplied premise bundle.
+Corollaries~\ref{cor:transportability}--\ref{cor:embedding} are paper-level
+arguments. For Corollary~\ref{cor:embedding}, note that \texttt{toCoind} is
+injective only up to payload erasure
+(\texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak ToCoindInjectivity.lean}), so the
+transport holds only for payload-insensitive envelope obligations.
 
 \begin{corollary}[Finite-State Erasure-Transportability Boundary]
 	\label{cor:transportability}
@@ -1483,6 +1570,17 @@ This theorem sharpens what ``determinism modulo envelope'' means operationally.
 	\end{enumerate}
 \end{proof}
 
+Mechanization status. Both anchors project a witness field
+(\texttt{exchangeNormalizationWitness}, \texttt{spatialMonotonicityWitness}) out of
+the supplied premise bundle \texttt{EnvelopePhaseE1BridgePremises}; at the
+protocol level the same laws are the \texttt{assumed*} fields of the E2 bridge
+bundle. Theorem~\ref{thm:normalization} is therefore mechanized only as an
+assumed interface. It is not derived from the operational semantics. At the scheduler level,
+only buffer operations on distinct edges are proved to commute
+(\texttt{Runtime/\allowbreak Proofs/\allowbreak ProtocolMachine/\allowbreak BufferConfluence.lean});
+full-state confluence of the machine step is false, because the observation
+trace, clock and replay bookkeeping record step order.
+
 % ============================================================================
 \section{Theorem H: Observational Adequacy and VM Adherence Modulo Envelope}
 \label{sec:theorem-h}
@@ -1526,21 +1624,40 @@ paired prefixes used by adequacy and adherence.
 		      \begin{itemize}
 			      \item connect observational equality and effect-bisim (\nolinkurl{protocol_outcome_effect_bisim_of_observational_eq}).
 		      \end{itemize}
-		\item Compile/runtime refinement bridge:
+		\item Compile/runtime bridge:
 		      \begin{itemize}
-			      \item lift effect-bisim to compile-time observational refinement (\nolinkurl{compile_refines_observational_eq_of_effect_bisim}).
+			      \item effect-bisimilar states are observationally equal (\nolinkurl{compile_refines_observational_eq_of_effect_bisim}); this step needs no compiler-refinement premise, and the bisimulation itself must be supplied.
 		      \end{itemize}
 		\item VM view bridge:
 		      \begin{itemize}
-			      \item connect VM configuration equivalence and effect-bisim (\nolinkurl{vm_view_effect_bisim_of_vmc_equiv},\allowbreak\ \nolinkurl{vm_c_equiv_of_vm_view_effect_bisim},\allowbreak\ \nolinkurl{topology_change_preserves_vmc_equiv_via_effect_bisim}).
+			      \item connect per-coroutine view equivalence and effect-bisim (\nolinkurl{effect_bisim_of_coroutine_view_equiv},\allowbreak\ \nolinkurl{coroutine_view_equiv_of_effect_bisim}), and show topology changes preserve each coroutine's view (\nolinkurl{topology_change_preserves_coroutine_view_equiv_via_effect_bisim}).
 		      \end{itemize}
 	\end{enumerate}
 
-	Adequacy follows from trace-consistency theorem (\nolinkurl{vm_adequacy_of_trace_consistency}). Adherence follows from profile-capability extraction and theorem-pack gating.
-	Method split. The bridge composition itself is compositional. The
-	trace-consistency discharge uses the existing finite-trace induction packaged in
-	\nolinkurl{vm_adequacy_of_trace_consistency}.
+	Adequacy modulo envelope follows from adherence (\nolinkurl{protocol_machine_local_adequacy_of_adherence} and its sharded analogue). Adherence follows from profile-capability extraction and theorem-pack gating.
+	Method split. The bridge composition itself is compositional. Trace-level
+	consistency of the concrete machine is discharged for real send and receive
+	steps (\nolinkurl{stepSend_trace_adequacy}, \nolinkurl{stepReceive_trace_adequacy}).
 \end{proof}
+
+Mechanization status. The adherence statement is not derived from the machine
+semantics. \nolinkurl{protocol_machine_local_adherence_of_hypotheses} returns the
+adherence witness carried by the supplied hypothesis bundle, and adequacy modulo
+envelope is a direct consequence of that witness. The machine-checked semantic
+content is as follows. (i) Trace adequacy (causal and per-edge FIFO consistency) and
+per-edge message conservation hold after the real \texttt{stepSend} and
+\texttt{stepReceive} from reachable states in FIFO buffer mode
+(\texttt{Runtime/\allowbreak Adequacy/\allowbreak CommTraceMachine.lean}); latest-value buffers,
+speculation rollback, loader buffer resets and offer/choose instructions are not
+covered. (ii) An Iris adequacy theorem,
+\nolinkurl{session_vm_wp_invariance} (\texttt{Runtime/\allowbreak Proofs/\allowbreak Concurrency.lean}),
+is upstream iris-lean's \texttt{wp\_invariance} instantiated at the session-VM
+language. Its weakest-precondition premise is a hypothesis. (iii) Compilation
+refinement, \nolinkurl{compile_refines}
+(\texttt{Runtime/\allowbreak Adequacy/\allowbreak CompileRefines.lean}), is proved only for linear
+(single-branch, non-recursive) local types. Branch tables, \texttt{mu}/\texttt{var}
+loops and multi-role image layout are not covered. No Lean statement relates the Lean
+semantics to the Rust implementation; Rust--Lean parity is test-based.
 
 Running-example instantiation. The adequacy derivation for $C_3$ in
 Section~\ref{sec:example} is a direct instance of this theorem.
@@ -1567,6 +1684,19 @@ VM instruction-layer note. This section reuses the instruction-form interface an
 	corresponding theorem-pack witness under Assumption
 	Block~\ref{assump:p3-adequacy}.
 \end{proof}
+
+Mechanization status. Capability bits and theorem-inventory flags
+(\texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak Inventory.lean}) and runtime gates
+such as \nolinkurl{canOperateUnderByzantineEnvelope} are \emph{presence} flags.
+A bit is set exactly when the corresponding artifact, built from a supplied premise
+bundle, is present in the theorem pack. Proposition~\ref{prop:capability} is
+sound in that sense: an advertised bit has a witness object, but that object may
+consist of assumed premises. Release gates check that distinct evidence objects
+are present. On the Rust side, envelope admission treats a theorem-pack key as
+admitted only when a Lean-produced evidence inventory marks it as supplied
+(\texttt{LeanEvidenceInventory} in
+\texttt{rust/\allowbreak machine/\allowbreak src/\allowbreak runtime\_contracts.rs}). Corollary~\ref{cor:principal}
+is a paper-level argument.
 
 \begin{corollary}[Principal Capability and Admission Completeness]
 	\label{cor:principal}
@@ -1634,11 +1764,25 @@ Theorem~\ref{thm:adequacy}.
 	First instantiate the profile package under
 	Assumption Block~\ref{assump:p3-byzantine}. Second, extract soundness,
 	completeness, and maximality components from
-	\nolinkurl{byzantine_safety_exact_of_profile}. Third, reinterpret those
+	\nolinkurl{exact_byzantine_safety_characterization_of_assumptions}. Third, reinterpret those
 	components through the same safety-visible interface used by
 	Theorem~\ref{thm:adequacy}. This yields the exact iff characterization.
 	The argument is compositional package projection rather than a fresh induction.
 \end{proof}
+
+Mechanization status. In Lean
+(\texttt{Distributed/\allowbreak Families/\allowbreak ByzantineSafety/\allowbreak Core/\allowbreak Base.lean}),
+the exact characterization relates a certificate-level conflict-exclusion
+condition to committed-level safety and holds for every model of the core
+interface (\nolinkurl{exact_byzantine_safety_characterization}). The substantive
+fault-model result is \nolinkurl{byzantine_safety_of_assumptions}: safety
+follows from a quorum-geometry assumption bundle (quorum intersection under the
+declared fault budget) via maps from certificates and conflicts into that
+geometry. The four-way conjunction $\ByzChar$ above, the converse counterexample
+families of Corollary~\ref{cor:byzantine-converse}, and the lift to the
+VM-adherence boundary are paper-level packaging. In particular, the
+VM-adherence side inherits the assumed adherence premise discussed after
+Theorem~\ref{thm:adequacy}.
 
 \begin{corollary}[Converse Counterexample Families]
 	\label{cor:byzantine-converse}
@@ -1964,6 +2108,17 @@ Higher-order results depend on channel-payload semantics. First-order collapse i
 
 Quantitative constants and base decidability primitives are reused assumptions from earlier results in the series rather than re-derived in this paper.
 
+Mechanization boundary. Several results are mechanized only conditionally:
+envelope soundness and realizability, exchange normalization, spatial and
+capability monotonicity, the compositional envelope property, and the
+minimality hypothesis of Theorem~\ref{thm:minimality} are explicit assumed
+premises; envelope maximality is definitional in its mechanized form; projection
+harmony and subject reduction cover head-communication steps only; compilation
+refinement covers linear local types only. Progress and termination of the
+concrete protocol machine are not mechanized: the progress theorem assumes
+that some session is enabled whenever not all sessions are complete. Rust--Lean
+correspondence is established by tests, not by a Lean theorem.
+
 Excluded protocol classes in this paper include non-admitted envelope
 extensions, non-checkable non-interference witnesses outside finite-witness
 encodings, and Byzantine liveness claims beyond the declared timing and
@@ -2005,7 +2160,8 @@ Implementation pointer. Reconfiguration and envelope interfaces are implemented
 in \texttt{Runtime/Adequacy/EnvelopeCore/*.lean}; theorem-pack capability
 surfaces are exported from \texttt{Runtime/Proofs/TheoremPack/API.lean}; and VM
 admission and adherence checks are consumed by runtime gates in the
-\texttt{rust/vm} layer.
+\texttt{rust/machine} layer, which admits an envelope claim only when a
+Lean-produced theorem-pack evidence inventory supplies it.
 
 % ============================================================================
 \section{Conclusion}
@@ -2265,7 +2421,11 @@ Reproduction workflow and expected outputs are documented in
 \texttt{ARTIFACT.md}. The one-command supplement check is
 \texttt{just artifact-check}. Pinned-commit, DOI, and Lean-statistics rows are
 synchronized via
-\texttt{bash scripts/paper\_repro\_rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex}.
+\texttt{just paper-repro-sync} (\texttt{scripts/ops/paper-repro-rows.sh}).
+The Lean development builds with Lean v4.35.0 and Mathlib v4.35.0
+(commit \texttt{56a00585}), upstream \texttt{leanprover-community/iris-lean}
+at commit \texttt{ac6e3745}, and \texttt{paco-lean} v0.2.0, all pinned in
+\texttt{lean/lakefile.lean} and \texttt{lean/lake-manifest.json}.
 Artifact semantics note. The Lean artifact exposes an explicit trace-level
 strong fairness predicate (\texttt{StrongFairEnv}) refining weak fairness, and
 the default in-memory runtime transport implements minimal per-edge FIFO
@@ -2279,9 +2439,9 @@ enqueue/dequeue behavior.
 		\thead{Artifact Field} & \thead{Value}                                                                             \\
 		\midrule
 		Repository             & \url{https://github.com/hxrts/telltale}                                                   \\
-		Pinned commit & \texttt{ccddc8ea843684c4}\allowbreak\texttt{d2d018f673c4861d}\allowbreak\texttt{0664e008} \\
+		Pinned commit & \texttt{e23bfd9b2857b1d4}\allowbreak\texttt{0756bd3cfdfd54f6}\allowbreak\texttt{cf930567} \\
 		Archival DOI & \texttt{DOI-UNSET} \\
-		Lean source statistics & 1303 files, 206913 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		Lean source statistics & 783 files, 156747 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact identity and verification statistics for this draft snapshot.}
@@ -2309,16 +2469,14 @@ Functional categories in the table are: Theorems and Runtime Gates. Reading
 guide for long names:
 \texttt{exchange\_normalization\_of\_e1\_bridge\_premises} packages the
 exchange-normalization bridge used in Theorem~\ref{thm:normalization};
-\texttt{consensus\_envelope\_exact\_of\_profile} lifts envelope exactness to
-profile-indexed distributed settings; and
-\texttt{topology\_change\_preserves\_vmc\_equiv\_via\_effect\_bisim} gives the
-topology-change preservation law at the VM observational quotient.
-Nickname note. For scanning, read
-\texttt{exchange\_normalization\_of\_e1\_bridge\_premises} as
-``ENorm-bridge'' and
-\texttt{topology\_change\_preserves\_vmc\_equiv\_via\_effect\_bisim} as
-``Topo-VMC-preservation.'' Long anchors generally follow
-\texttt{object\_claim\_via\_bridge} naming.
+\texttt{local\_exact\_envelope\_characterization\_of\_e1\_premises} packages
+envelope exactness from the assumed soundness/realizability premises; and
+\texttt{topology\_change\_preserves\_coroutine\_view\_equiv\_via\_effect\_bisim} gives the
+topology-change preservation law at the per-coroutine observational view.
+Anchors whose name ends in \texttt{\_of\_\ldots\_premises} or
+\texttt{\_of\_hypotheses} project a field of a supplied premise bundle; the
+corresponding claim is assumed, not derived (see the mechanization-status
+paragraphs).
 
 \begin{table}[H]
 	\centering
@@ -2345,27 +2503,31 @@ Nickname note. For scanning, read
 		\texttt{footprint\_to\_\allowbreak safe\_delegation}                                         & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}}                                   & \S\ref{sec:theorem-c} & Cor.~\ref{cor:footprint} [A1]                                                                 \\
 		\rowcolor{gray!8}
 		\texttt{safe\_delegation\_\allowbreak iff\_footprint}                                        & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}}                                   & \S\ref{sec:theorem-c} & Cor.~\ref{cor:footprint} [A1]                                                                 \\
-		\texttt{relative\_minimality}                                                                & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}}                                   & \S\ref{sec:theorem-d} & Thm.~\ref{thm:minimality} [A1]                                                                \\
+		\texttt{relative\_minimality} & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{ErasureCharacterization.lean}} & \S\ref{sec:theorem-d} & Thm.~\ref{thm:minimality} [A1] (key step assumed) \\
 		\rowcolor{gray!8}
 		\texttt{flagship\_composed\_\allowbreak system\_conservation}                                & \texttt{Protocol/\allowbreak Deployment/\allowbreak}\mbox{\texttt{LinkingTheorems.lean}}                                          & \S\ref{sec:theorem-e} & Thm.~\ref{thm:conservation} [A1]                                                              \\
 		\texttt{lyapunov\_conserved\_\allowbreak under\_balanced\_\allowbreak delegation}            & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Lyapunov.lean}}                                                      & \S\ref{sec:theorem-e} & ---                                                                                           \\
 		\rowcolor{gray!8}
-		\texttt{consensus\_envelope\_\allowbreak exact\_of\_profile}                                 & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:theorem-f} & Thm.~\ref{thm:envelope}, Cors.~\ref{cor:transportability}--\ref{cor:embedding} [A2]           \\
-		\texttt{failure\_envelope\_\allowbreak maximality\_of\_profile}                              & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:theorem-f} & ---                                                                                           \\
+		\texttt{local\_exact\_envelope\_\allowbreak characterization\_of\_e1\_premises} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{CoreFoundations.lean}} & \S\ref{sec:theorem-f} & Thm.~\ref{thm:envelope} [A2] (assumed soundness/realizability) \\
+		\texttt{failure\_envelope\_\allowbreak maximality\_of\_failure\_premises} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{FailureTaxonomy/ProtocolPack.lean}} & \S\ref{sec:theorem-f} & --- \\
 		\rowcolor{gray!8}
 		\texttt{exchange\_normalization\_\allowbreak of\_e1\_bridge\_premises}                       & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{ReconfigurationBridge.lean}}              & \S\ref{sec:theorem-g} & Thm.~\ref{thm:normalization} [A2]                                                             \\
 		\texttt{spatial\_subtyping\_\allowbreak monotonicity\_of\_e1\_\allowbreak bridge\_premises}  & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{ReconfigurationBridge.lean}}              & \S\ref{sec:theorem-g} & Thm.~\ref{thm:normalization} [A2]                                                             \\
 		\rowcolor{gray!8}
-		\texttt{vm\_adequacy\_of\_\allowbreak trace\_consistency}                                    & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{Adequacy.lean}}                                                    & \S\ref{sec:theorem-h} & Thm.~\ref{thm:adequacy} [A3]                                                                  \\
+		\texttt{protocol\_machine\_local\_\allowbreak adequacy\_of\_adherence} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak EnvelopeCore/\allowbreak}\mbox{\texttt{ProtocolMachineAdherence.lean}} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:adequacy} [A3] (assumed adherence) \\
 		\texttt{protocol\_outcome\_\allowbreak effect\_bisim\_of\_\allowbreak observational\_eq}     & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{HandlerEquivalence.lean}}                                            & \S\ref{sec:theorem-h} & ---                                                                                           \\
 		\rowcolor{gray!8}
 		\texttt{compile\_refines\_\allowbreak observational\_eq\_\allowbreak of\_effect\_bisim}      & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CompileRefinesEffectBisim.lean}}                                   & \S\ref{sec:theorem-h} & ---                                                                                           \\
-		\texttt{vm\_view\_effect\_bisim\_\allowbreak of\_vmc\_equiv}                                 & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ObserverProjectionEffectBisim.lean}}                                 & \S\ref{sec:theorem-h} & ---                                                                                           \\
+		\texttt{effect\_bisim\_of\_\allowbreak coroutine\_view\_equiv} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ReconfigurationObserver.lean}} & \S\ref{sec:theorem-h} & --- \\
 		\rowcolor{gray!8}
-		\texttt{vm\_c\_equiv\_of\_\allowbreak vm\_view\_effect\_bisim}                               & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ObserverProjectionEffectBisim.lean}}                                 & \S\ref{sec:theorem-h} & ---                                                                                           \\
-		\texttt{topology\_change\_\allowbreak preserves\_vmc\_equiv\_\allowbreak via\_effect\_bisim} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ObserverProjectionEffectBisim.lean}}                                 & \S\ref{sec:theorem-h} & ---                                                                                           \\
+		\texttt{coroutine\_view\_equiv\_\allowbreak of\_effect\_bisim} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ReconfigurationObserver.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\texttt{topology\_change\_\allowbreak preserves\_coroutine\_view\_\allowbreak equiv\_via\_effect\_bisim} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{ReconfigurationObserver.lean}} & \S\ref{sec:theorem-h} & --- \\
 		\rowcolor{gray!8}
-		\texttt{byzantine\_safety\_\allowbreak exact\_of\_profile}                                   & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:byzantine-converse} [A4]                              \\
+		\texttt{stepSend\_trace\_\allowbreak adequacy} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CommTraceMachine.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\texttt{session\_vm\_wp\_\allowbreak invariance} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Concurrency.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\rowcolor{gray!8}
+		\texttt{compile\_refines} (linear types) & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CompileRefines.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\texttt{byzantine\_safety\_\allowbreak of\_assumptions} & \texttt{Distributed/\allowbreak Families/\allowbreak ByzantineSafety/\allowbreak}\mbox{\texttt{Core/Base.lean}} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine} [A4] \\
 		\midrule
 		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                                                                                            \\
 		\rowcolor{gray!8}

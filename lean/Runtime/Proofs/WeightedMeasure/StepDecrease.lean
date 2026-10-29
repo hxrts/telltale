@@ -33,7 +33,7 @@ lemma find?_mem_aux {r : Role} {L : LocalType} (types : List (Role × LocalType)
   | nil =>
     simp only [List.find?]
     intro hContra
-    exact Option.noConfusion hContra
+    nomatch hContra
   | cons hd tl ih =>
     simp only [List.find?]
     by_cases hEq : hd.1 == r

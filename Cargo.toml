@@ -74,6 +74,7 @@ syn = { workspace = true }
 rand = { workspace = true, optional = true }
 
 [dev-dependencies]
+ciborium = { workspace = true }
 futures = { workspace = true, features = ["thread-pool"] }
 num-complex = "0.4"
 rand = { workspace = true }
@@ -92,6 +93,9 @@ criterion = { workspace = true }
 
 [features]
 default = []
+
+# Explicitly enable the canonical machine threaded backend for compiler consumers.
+multi-thread = ["telltale-machine/multi-thread"]
 
 # Testing utilities (random generation, etc.)
 test-utils = ["rand"]
@@ -214,7 +218,7 @@ exclude = ["examples/wasm", "external-demo", "external-demo-macros"]
 [workspace.dependencies]
 # Core async/concurrency
 futures = "0.3"
-tokio = { version = "1.35", default-features = false, features = ["macros", "rt", "rt-multi-thread", "sync", "time", "net", "io-util"] }
+tokio = { version = "1.53.3", default-features = false, features = ["macros", "rt", "rt-multi-thread", "sync", "time", "net", "io-util"] }
 async-trait = "0.1"
 async-recursion = "1.0"
 

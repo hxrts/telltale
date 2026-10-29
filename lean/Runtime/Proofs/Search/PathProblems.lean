@@ -1,4 +1,4 @@
-import Runtime.Proofs.Search.Liveness
+import Runtime.Proofs.Search.AStarOptimality
 import Runtime.Proofs.Search.ProfileClaims
 import Runtime.Proofs.Search.Problem
 
@@ -28,9 +28,10 @@ theorem path_problem_goal_window_service_has_exact_suffix_bound
 
 theorem path_problem_threaded_goal_window_service_has_exact_suffix_bound
     {frontier : List FrontierEntry} {entry : FrontierEntry}
+    (schedule : LaneSchedule frontier)
     (hMin : IsMinPriority frontier entry) :
-    entry ∉ frontierAfterThreadedExactSingleLaneStep frontier :=
-  threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound hMin
+    entry ∉ frontierAfterThreadedExactSingleLaneStep frontier schedule :=
+  threaded_exact_single_lane_goal_window_service_has_exact_suffix_bound schedule hMin
 
 theorem path_problem_goal_reachability_connects_to_publication
     {goal start bound : Nat}

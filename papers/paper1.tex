@@ -312,7 +312,7 @@ More precisely, our contributions in this paper are as follows:
 	\item A mechanized operational Coherence architecture with a reusable three-way edge split and typed-step wrappers that lift edge-local lemmas to preservation and progress interfaces.
 	\item A message-alignment proof kernel based on \Consume, with lemmas \nolinkurl{consume_append} and \nolinkurl{consume_cons}.
 	\item A subtype-replacement theorem stack from \nolinkurl{consume_mono} that preserves edge Coherence, global Coherence, and progress-side conditions under receive-compatibility premises.
-	\item A typed effect bridge connecting protocol semantics to runtime execution, parametric in delivery model and premises.
+	\item A premise-conditional typed effect bridge: under explicit monitor premises, handler invocations are well typed at the protocol-machine boundary, and configuration equivalence transports to observational equivalence.
 \end{enumerate}
 
 Main text proofs are proof sketches; full machine-checked derivations are provided by the Lean anchors indexed in Appendix~\ref{app:index}.
@@ -465,7 +465,7 @@ Mechanized anchors for this block are
 \nolinkurl{mu_height_substitute_guarded}.
 
 \begin{definition}[Byzantine Interface Well-Formedness]
-	$\ByzIfaceWF(G, D)$ is the interface predicate used for Byzantine-facing statements in this paper, and is mechanized as a definitional alias of $\Coherent(G, D)$.
+	$\ByzIfaceWF(G, D)$ is the interface predicate used for Byzantine-facing statements in this paper. It is defined on paper as an alias of $\Coherent(G, D)$; the current Lean artifact has no separate anchor for it.
 \end{definition}
 
 Delivery behavior is parameterized by \DeliveryModel. This gives one theorem shape across FIFO, causal, and lossy instances. The interface laws and instance examples appear in Appendix~\ref{app:delivery}.
@@ -873,7 +873,7 @@ This replacement argument follows a standard commutation intuition from trace-eq
 
 \begin{assumption}[Replacement Compatibility]
 	\label{assump:p1-replacement}
-	The subtype-evolution theorem assumes endpoint replacement at $ep$ satisfies typing-domain preservation, receive-side monotonicity side conditions, and environment consistency for unaffected endpoints.
+	The subtype-evolution theorem assumes $G(ep)=\mathsf{some}(L_1)$, $G_{\mathrm{rep}} = G[ep\mapsto L_2]$ (so the typing domain is preserved and all other endpoints are unchanged), and $\RecvCompatible(r,L_1,L_2)$ for every sender role $r$ (every trace $L_1$ can consume, $L_2$ can also consume).
 \end{assumption}
 
 \begin{theorem}[Session Evolution via \nolinkurl{consume_mono}]
@@ -895,7 +895,7 @@ receiver continuation by a compatible subtype is an instance of this theorem.
 		\item Local monotonicity: establish receive-compatibility ($\RecvCompatible$) between old and replacement local types; apply \nolinkurl{consume_mono} to show every successful old consumption remains successful after replacement.
 		\item Edge lift: use \nolinkurl{edge_coherent_type_replacement} on edges targeting the replaced endpoint; for non-target edges, transport coherence by environment agreement.
 		\item Global lift: combine edge cases to derive \nolinkurl{coherent_type_replacement}.
-		\item Progress compatibility: use liveness-side lemmas (\nolinkurl{progress_conditions_type_replacement}) to preserve operational side conditions.
+		\item Progress compatibility: \nolinkurl{progress_conditions_type_replacement} preserves the progress-side conditions $\mathsf{HeadCoherent}$, $\mathsf{RoleComplete}$, and $\mathsf{ValidLabels}$ under the same replacement.
 	\end{enumerate}
 	In the running example, this appears as refining the continuation after the
 	first request/grant exchange while preserving all edge checks.
@@ -922,22 +922,26 @@ with compatibility discharged by \nolinkurl{consume_mono} and replacement side c
 \label{sec:bridge}
 % ============================================================================
 
-\texttt{EffectSpec.handlerType} records typed effect obligations at the VM boundary.
-The VM instruction layer used in this paper has \texttt{send}, \texttt{recv}, \texttt{select},
-\texttt{branch}, and \texttt{invoke} forms. \texttt{WellTypedInstr} maps each instruction form to a
-session-side obligation. Send and select forms use sender-side continuation obligations. Receive and
-branch forms use \Consume-side alignment obligations. Invoke form lifts handler obligations to instruction fragments.
+\texttt{EffectSpec.handlerType} records typed effect obligations at the VM (protocol-machine) boundary.
+The session-facing instruction forms used in this paper are \texttt{send}, \texttt{receive}, \texttt{offer},
+\texttt{choose}, and \texttt{invoke} (the Lean \texttt{WellTypedInstr} relation also covers guard
+\texttt{acquire}/\texttt{release} and session \texttt{open}). \texttt{WellTypedInstr} relates each
+instruction to a pre- and post-local type: \texttt{send} and \texttt{receive} advance a send/recv
+type to its continuation, \texttt{offer} advances a select type along a listed branch, \texttt{choose}
+requires every jump-table label to be covered by a branch, and \texttt{invoke} types a handler step from
+\texttt{EffectSpec.handlerType} to \texttt{end}. \Consume-alignment is not part of \texttt{WellTypedInstr};
+it is carried by the Coherence layer of Sections~\ref{sec:preservation}--\ref{sec:evolution}.
 Write this mapping as
 \begin{equation}
 	\begin{aligned}[t]
 		\mathsf{WTObl}(\texttt{send})   & = \mathsf{SendCont},         \\
-		\mathsf{WTObl}(\texttt{recv})   & = \mathsf{RecvConsumeCont},  \\
-		\mathsf{WTObl}(\texttt{select}) & = \mathsf{SelectBranchCont}, \\
-		\mathsf{WTObl}(\texttt{branch}) & = \mathsf{BranchCaseCont},   \\
+		\mathsf{WTObl}(\texttt{receive}) & = \mathsf{RecvCont},         \\
+		\mathsf{WTObl}(\texttt{offer})   & = \mathsf{SelectBranchCont}, \\
+		\mathsf{WTObl}(\texttt{choose})  & = \mathsf{BranchCover},      \\
 		\mathsf{WTObl}(\texttt{invoke}) & = \mathsf{InvokeLift}.
 	\end{aligned}
 \end{equation}
-where each right-hand side names the corresponding session obligation family in \texttt{WellTypedInstr}.
+where each right-hand side names the corresponding constructor family of \texttt{WellTypedInstr}.
 
 Effect-bisimulation primer. Two configurations are effect-bisimilar when they
 match on the same observable effect trace up to silent internal steps. In this
@@ -952,10 +956,11 @@ that claim.
 		\toprule
 		\thead{Instruction Form}         & \thead{Session-Side Typing Obligation}              \\
 		\midrule
-		\texttt{send}                    & continuation typing with enqueue witness            \\
-		\texttt{recv}                    & \Consume-alignment witness with continuation typing \\
-		\texttt{select}, \texttt{branch} & label agreement with continuation typing            \\
-		\texttt{invoke}                  & handler-obligation lift to typed VM fragment        \\
+		\texttt{send}                    & send type advances to its continuation              \\
+		\texttt{receive}                 & recv type advances to its continuation              \\
+		\texttt{offer}                   & select type advances along a listed branch          \\
+		\texttt{choose}                  & jump-table labels covered by branch labels          \\
+		\texttt{invoke}                  & \texttt{EffectSpec.handlerType} to \texttt{end}     \\
 		\bottomrule
 	\end{tabularx}
 	\caption{VM instruction-layer summary used by the bridge theorem.}
@@ -963,15 +968,15 @@ that claim.
 
 \begin{proposition}[Bridge Soundness]
 	\label{prop:bridge-soundness}
-	Under Assumption Block~\ref{assump:p1-core}, for any selected handler $h$, if choreography obligations for $h$ are discharged, \texttt{EffectSpec.handlerType} holds for $h$, \nolinkurl{monitor_sound} and \nolinkurl{unified_monitor_preserves} hold for the active monitor, and the configuration-equivalence/effect-bisimulation bridge assumptions hold, then VM-side typing obligations generated from $h$ are satisfied in the corresponding runtime instruction layer and transport to the observational interface.
+	Under Assumption Block~\ref{assump:p1-core}, let $m$ be a session monitor satisfying the predicates \nolinkurl{monitor_sound} and \nolinkurl{unified_monitor_preserves} (these are premises, not proved properties of a particular monitor). Then for any handler $h$ and effect action $a$: (i) \texttt{invoke}~$a$ on $h$ is well typed from \texttt{EffectSpec.handlerType}~$a$ to \texttt{end}, as is every action of any handler fragment or declared effect interface; (ii) if $m$ steps from handler $h$ then the session identifier is preserved; and (iii) for any configurations $C_1,C_2$ with $\texttt{ConfigEquiv}(C_1,C_2)$, $C_1$ and $C_2$ are observationally equivalent under the configuration-erasure observation.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
 	The bridge composition has three steps.
 	\begin{enumerate}
-		\item Build \texttt{VMBridgePremises} from \nolinkurl{monitor_sound}, \nolinkurl{unified_monitor_preserves}, and the \nolinkurl{WellTypedInstr.wt_invoke} witness.
-		\item Lift choreography obligations to instruction fragments and VM-step typing through \nolinkurl{handler_obligation_local}, \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_vm_step_typing}.
-		\item Transport typed VM steps to observations via \nolinkurl{vm_bridge_soundness_composed}, \nolinkurl{config_equiv_iff_effect_bisim_silent}, and \nolinkurl{effect_bisim_implies_observational_equivalence}.
+		\item Build \texttt{ProtocolMachineBridgePremises} from \nolinkurl{monitor_sound}, \nolinkurl{unified_monitor_preserves}, and the \nolinkurl{WellTypedInstr.wt_invoke} constructor (\nolinkurl{protocol_machine_bridge_premises_of_monitor}).
+		\item Lift handler typing to fragments and monitor steps through \nolinkurl{handler_obligation_local}, \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_protocol_machine_step_typing}.
+		\item Compose with observational transport via \nolinkurl{protocol_machine_bridge_soundness_composed}, which uses \nolinkurl{config_equiv_iff_effect_bisim_silent} and \nolinkurl{effect_bisim_implies_observational_equivalence}.
 	\end{enumerate}
 	Equivalently, with $\mathsf{BridgePrem}(h)$ abbreviating the listed premises,
 	\[
@@ -989,20 +994,20 @@ that claim.
 	The interface statements in this section assume shared notation for \Hbyz, \Obssafe, \Eqsafe, and \Ebyz, plus theorem-pack capability naming consistency between abstract and runtime layers.
 \end{assumption}
 
-\begin{theorem}[Byzantine Interface Well-Formedness (BZ-1)]
+\begin{remark}[Byzantine Interface Convention (BZ-1)]
 	\label{thm:bz1}
-	Under Assumption Block~\ref{assump:p1-byzantine}, Byzantine safety-track statements in this paper are interpreted on configurations $(G,D)$ satisfying $\ByzIfaceWF(G,D)$ (definitional alias of $\Coherent(G,D)$). For any active edge, this interface yields the same sender-existence and $\Consume$ obligations as the Coherence layer.
-\end{theorem}
+	Under Assumption Block~\ref{assump:p1-byzantine}, Byzantine safety-track statements in this series are interpreted on configurations $(G,D)$ satisfying $\ByzIfaceWF(G,D)$, i.e.\ $\Coherent(G,D)$. Unfolding the definition, every active edge carries the same sender-existence and $\Consume$ obligations as the Coherence layer. This is a definitional convention, not a separate theorem; the current Lean artifact does not mechanize a dedicated Byzantine interface layer.
+\end{remark}
 
-\begin{corollary}[Dropped-Assumption Witness Interface (BZ-1.1)]
+\begin{remark}[Dropped-Assumption Witnesses (BZ-1.1)]
 	\label{cor:bz1-1}
-	Under Assumption Block~\ref{assump:p1-byzantine}, let $\mathcal{A}$ be any assumption class named in \Hbyz. If a later construction provides a witness violating \ByzSafe when $\mathcal{A}$ is dropped, then that witness can be expressed against the same active-edge Coherence interface used in this paper.
-\end{corollary}
+	Under Assumption Block~\ref{assump:p1-byzantine}, if a later construction provides a witness violating \ByzSafe when an assumption class named in \Hbyz{} is dropped, we intend that witness to be stated against the same active-edge Coherence interface. This is a scoping convention for later papers, not a mechanized result.
+\end{remark}
 
-\begin{proposition}[Capability-Gated VM Interface (BZ-1.2)]
+\begin{remark}[Capability-Gated VM Interface (BZ-1.2)]
 	\label{prop:bz1-2}
-	Under Assumption Block~\ref{assump:p1-byzantine}, if a runtime profile includes Byzantine characterization and envelope-adherence capability evidence, then safety-visible runtime obligations are interpreted through \Eqsafe modulo \Ebyz, and profile admission is blocked when required evidence is absent.
-\end{proposition}
+	The Lean theorem pack defines a Boolean runtime gate \texttt{canOperateUnderByzantineEnvelope} that holds exactly when a theorem pack carries both a Byzantine-safety profile and protocol-machine envelope-adherence evidence; operation under the Byzantine envelope is refused otherwise. The gate checks the presence of evidence only. Interpretation of safety-visible obligations through \Eqsafe{} modulo \Ebyz{} is not mechanized in this artifact.
+\end{remark}
 
 % ============================================================================
 \section{Related Work}
@@ -1045,7 +1050,7 @@ receive-side monotonicity, and keeps unaffected endpoints environment-consistent
 conditional on explicit monitor and quotient-transport premises rather than unconditional runtime
 metatheorems.
 
-Byzantine material in this paper is interface-layer only (Theorem~\ref{thm:bz1} and its corollary/proposition wrappers), not a full fault-characterization envelope theorem.
+Byzantine material in this paper is interface-layer only (Remarks~\ref{thm:bz1}--\ref{prop:bz1-2}): a definitional convention plus a mechanized evidence-presence gate, not a fault-characterization or envelope theorem.
 Quantitative, full fault-characterization, and envelope-level claims are proved in later papers within this series.
 
 Excluded protocol classes in this paper include unguarded recursive local types,
@@ -1065,9 +1070,9 @@ evidence is missing.
 
 Implementation pointer. The theorem-facing interfaces map to
 \texttt{Protocol/\allowbreak Coherence/\allowbreak *.lean} for the core
-invariant and \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak
+invariant and \texttt{Runtime/\allowbreak Proofs/\allowbreak
 	BridgeStrengthening.lean} with
-\texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak Monitor.lean}
+\texttt{Runtime/\allowbreak ProtocolMachine/\allowbreak Runtime/\allowbreak Monitor.lean}
 for VM bridge obligations.
 
 % ============================================================================
@@ -1149,6 +1154,7 @@ L ::= end
     | recv r T L
     | select r {li : Li}i
     | branch r {li : Li}i
+    | var n
     | mu L
 \end{lstlisting}
 \end{minipage}
@@ -1165,14 +1171,14 @@ ActiveEdge G e := (G (src e) != none) and (G (dst e) != none)
 \end{lstlisting}
 \end{minipage}
 
-Edge coherence is a local receive-side compatibility judgment:
+Edge coherence is a local receive-side compatibility judgment (it also requires the sender endpoint to be present):
 
 \noindent\begin{minipage}{\columnwidth}
 	\begin{lstlisting}
 EdgeCoherent G D e :=
-  exists Lr,
-    G (dst e) = some Lr and
-    Consume (role (src e)) Lr (D e) != none
+  forall Lr, G (dst e) = some Lr ->
+    exists Ls, G (src e) = some Ls and
+      Consume (role (src e)) Lr (D e) != none
 \end{lstlisting}
 \end{minipage}
 
@@ -1210,24 +1216,16 @@ This appendix records compact proof skeletons for theorem-level claims. Each ste
 \subsection{Proposition 7.1: Bridge Soundness}
 
 \begin{enumerate}
-	\item Build a \texttt{VMBridgePremises} bundle from \nolinkurl{monitor_sound} and \nolinkurl{unified_monitor_preserves}.
-	\item Lift handler obligations via \nolinkurl{handler_obligation_local}, \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_vm_step_typing}.
-	\item Compose via \nolinkurl{vm_bridge_soundness_composed}, \nolinkurl{config_equiv_iff_effect_bisim_silent}, and \nolinkurl{effect_bisim_implies_observational_equivalence}.
+	\item Build a \texttt{ProtocolMachineBridgePremises} bundle from the \nolinkurl{monitor_sound} and \nolinkurl{unified_monitor_preserves} premises via \nolinkurl{protocol_machine_bridge_premises_of_monitor}.
+	\item Lift handler obligations via \nolinkurl{handler_obligation_local}, \nolinkurl{handler_fragment_typing_of_premises}, and \nolinkurl{handler_protocol_machine_step_typing}.
+	\item Compose via \nolinkurl{protocol_machine_bridge_soundness_composed}, \nolinkurl{config_equiv_iff_effect_bisim_silent}, and \nolinkurl{effect_bisim_implies_observational_equivalence}.
 \end{enumerate}
 
-\subsection{Theorem BZ-1: Byzantine Interface Well-Formedness}
+\subsection{Remarks BZ-1 and BZ-1.2: Byzantine Interface}
 
 \begin{enumerate}
-	\item Expand \ByzIfaceWF to \Coherent via \nolinkurl{byz_iface_wf_iff_coherent}.
-	\item On each active edge, extract sender witness and \Consume success via \nolinkurl{bz1_byzantine_interface_well_formedness}.
-\end{enumerate}
-
-\subsection{Proposition BZ-1.2: Capability-Gated VM Interface}
-
-\begin{enumerate}
-	\item Gate runtime operation via \texttt{canOperateUnderByzantineEnvelope}.
-	\item Extract Byzantine envelope adherence via \nolinkurl{vm_byzantine_envelope_adherence_of_witness}.
-	\item Package cross-target conformance via \nolinkurl{byzantine_cross_target_conformance_of_witnesses}.
+	\item BZ-1 is definitional: unfold \ByzIfaceWF{} to \Coherent{} and then to \EdgeCoherent{} on each active edge. No separate Lean anchor is retained.
+	\item BZ-1.2: the only mechanized component is the gate \texttt{canOperateUnderByzantineEnvelope}, which checks presence of Byzantine-safety and envelope-adherence evidence in the theorem pack.
 \end{enumerate}
 
 \section{Delivery Parametricity and Runtime Bridge}
@@ -1264,11 +1262,16 @@ discipline enters the \Consume-based proof kernel.
 FIFO instance. Delivered traces keep send order on each edge. This instance is
 provided by \nolinkurl{fifo_delivery_laws}.
 
-Lossy instance. Delivered traces are order-preserving subsequences of sent traces
-on each edge. This instance is provided by \nolinkurl{lossy_delivery_laws}.
+Causal and lossy instances. In the current artifact, \texttt{CausalDelivery} and
+\texttt{LossyDelivery} are defined as aliases of the FIFO model, so
+\nolinkurl{causal_delivery_laws} and \nolinkurl{lossy_delivery_laws} (and the
+corresponding \texttt{coherent\_causal\_*}/\texttt{coherent\_lossy\_*}
+preservation wrappers) are instances of the FIFO laws. Genuinely reordering or
+lossy \Consume{} semantics are not yet mechanized; any \DeliveryModel{} instance
+that discharges the laws above inherits the preservation results.
 
 Safety scope under message loss. Coherence-preservation claims are stated on the
-post-step delayed-trace environment $D'$. If a delivery instance drops a message,
+post-step delayed-trace environment $D'$. If a (future) delivery instance drops a message,
 the dropped message is absent from $D'$. The proof checks \Consume obligations on
 that actual $D'$. This preserves the same safety statement and does not claim
 liveness or eventual delivery.
@@ -1280,7 +1283,7 @@ Reproduction workflow and expected outputs are documented in
 \texttt{ARTIFACT.md}. The one-command supplement check is
 \texttt{just artifact-check}. Pinned-commit, DOI, and Lean-statistics rows are
 synchronized via
-\texttt{bash scripts/paper\_repro\_rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex}.
+\texttt{bash scripts/ops/paper-repro-rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex}.
 Artifact semantics note. The Lean artifact exposes an explicit trace-level
 strong fairness predicate (\texttt{StrongFairEnv}) refining weak fairness, and
 the default in-memory runtime transport implements minimal per-edge FIFO
@@ -1294,9 +1297,9 @@ enqueue/dequeue behavior.
 		\thead{Artifact Field} & \thead{Value}                                                                             \\
 		\midrule
 		Repository             & \url{https://github.com/hxrts/telltale}                                                   \\
-		Pinned commit & \texttt{ccddc8ea843684c4}\allowbreak\texttt{d2d018f673c4861d}\allowbreak\texttt{0664e008} \\
+		Pinned commit & \texttt{e23bfd9b2857b1d4}\allowbreak\texttt{0756bd3cfdfd54f6}\allowbreak\texttt{cf930567} \\
 		Archival DOI & \texttt{DOI-UNSET} \\
-		Lean source statistics & 1303 files, 206913 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		Lean source statistics & 783 files, 156747 LOC (excluding \texttt{.lake}), axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact identity and verification statistics for this draft snapshot.}
@@ -1345,15 +1348,13 @@ Name-pattern note. Most anchors use
 		\texttt{EdgeCoherent}                                                     & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}}                                         & \S\ref{sec:model}        & ---                                        \\
 		\rowcolor{gray!8}
 		\texttt{Coherent}                                                         & \texttt{Protocol/\allowbreak Coherence/\allowbreak}\mbox{\texttt{EdgeCoherenceCore.lean}}                                         & \S\ref{sec:model}        & ---                                        \\
-		\texttt{VMBridgePremises}                                                 & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & ---                                        \\
-		\rowcolor{gray!8}
-		\texttt{ByzIfaceWF}                                                       & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Thm.~\ref{thm:bz1} [A3]                    \\
-		\texttt{WellTypedInstr}                                                   & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{ProtocolMachine\allowbreak BridgePremises}                                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & ---                                        \\
+		\texttt{WellTypedInstr}                                                   & \texttt{Runtime/\allowbreak ProtocolMachine/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
 		\midrule
 		\multicolumn{4}{@{}l}{\textit{Predicates}}                                                                                                                                                                                                                                            \\
 		\rowcolor{gray!8}
-		\texttt{monitor\_sound}                                                   & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
-		\texttt{unified\_monitor\_\allowbreak preserves}                          & \texttt{Runtime/\allowbreak VM/\allowbreak Runtime/\allowbreak}\mbox{\texttt{Monitor.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{monitor\_sound}                                                   & \texttt{Runtime/\allowbreak Proofs/\allowbreak ProtocolMachine/\allowbreak}\mbox{\texttt{MonitorContracts.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{unified\_monitor\_\allowbreak preserves}                          & \texttt{Runtime/\allowbreak Proofs/\allowbreak ProtocolMachine/\allowbreak}\mbox{\texttt{MonitorContracts.lean}}                                       & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
 		\midrule
 		\multicolumn{4}{@{}l}{\textit{Theorems}}                                                                                                                                                                                                                                              \\
 		\rowcolor{gray!8}
@@ -1384,24 +1385,18 @@ Name-pattern note. Most anchors use
 		\texttt{causal\_delivery\_laws}                                           & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                                                                   & \S\ref{sec:model}        & ---                                        \\
 		\texttt{lossy\_delivery\_laws}                                            & \texttt{Protocol/\allowbreak}\mbox{\texttt{DeliveryModel.lean}}                                                                   & \S\ref{sec:model}        & ---                                        \\
 		\rowcolor{gray!8}
-		\texttt{handler\_obligation\_\allowbreak local}                           & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
-		\texttt{handler\_fragment\_typing\_\allowbreak of\_premises}              & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{handler\_obligation\_\allowbreak local}                           & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{handler\_fragment\_typing\_\allowbreak of\_premises}              & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
 		\rowcolor{gray!8}
-		\texttt{handler\_vm\_step\_typing}                                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
-		\texttt{vm\_bridge\_soundness\_\allowbreak composed}                      & \texttt{Runtime/\allowbreak Proofs/\allowbreak VM/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{handler\_protocol\_machine\_\allowbreak step\_typing}                                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
+		\texttt{protocol\_machine\_bridge\_\allowbreak soundness\_composed}                      & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{BridgeStrengthening.lean}}                            & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
 		\rowcolor{gray!8}
 		\texttt{effect\_bisim\_implies\_\allowbreak observational\_equivalence}   & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{Bridge.lean}}                                & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
 		\texttt{config\_equiv\_iff\_\allowbreak effect\_bisim\_silent}            & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{ConfigEquivBridge.lean}}                     & \S\ref{sec:bridge}       & Prop.~\ref{prop:bridge-soundness} [A1]     \\
-		\rowcolor{gray!8}
-		\texttt{byz\_iface\_wf\_iff\_\allowbreak coherent}                        & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Thm.~\ref{thm:bz1} [A3]                    \\
-		\texttt{bz1\_byzantine\_interface\_\allowbreak well\_formedness}          & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Thm.~\ref{thm:bz1} [A3]                    \\
-		\rowcolor{gray!8}
-		\texttt{vm\_byzantine\_envelope\_\allowbreak adherence\_of\_witness}      & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Prop.~\ref{prop:bz1-2} [A3]                \\
-		\texttt{byzantine\_cross\_target\_\allowbreak conformance\_of\_witnesses} & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:bridge}       & Prop.~\ref{prop:bz1-2} [A3]                \\
 		\midrule
 		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                         \\
 		\rowcolor{gray!8}
-		\texttt{canOperateUnder\allowbreak ByzantineEnvelope}                     & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}}                                   & \S\ref{sec:bridge}       & Prop.~\ref{prop:bz1-2} [A3]                \\
+		\texttt{canOperateUnder\allowbreak ByzantineEnvelope}                     & \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak}\mbox{\texttt{API.lean}}                                   & \S\ref{sec:bridge}       & Rem.~\ref{prop:bz1-2} [A3]                 \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Anchor index.}

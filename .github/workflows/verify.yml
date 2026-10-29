@@ -45,20 +45,26 @@ jobs:
           sudo chown -R "$USER":"$USER" /Users/hxrts
           ./scripts/bootstrap/dependency-checkouts.sh
 
+      - name: Install native tooling
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Install just
         run: cargo install just --locked
 
       - name: Run PR-critical assurance lane
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           just check-pr-critical | tee artifacts/check-pr-critical.log
 
       - name: Run parity gate
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           just check-parity | tee artifacts/check-parity.log
 
       - name: Upload fast-lane artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: fast-pr-lane-artifacts
@@ -100,25 +106,32 @@ jobs:
           sudo chown -R "$USER":"$USER" /Users/hxrts
           ./scripts/bootstrap/dependency-checkouts.sh
 
+      - name: Install native tooling
+        run: sudo apt-get update && sudo apt-get install -y ripgrep
+
       - name: Install just
         run: cargo install just --locked
 
       - name: Run PR-critical assurance lane
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           just check-pr-critical | tee artifacts/check-pr-critical.log
 
       - name: Run parity gate
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           just check-parity | tee artifacts/check-parity.log
 
       - name: Run scheduled deep-assurance lane
         run: |
+          set -euo pipefail
           mkdir -p artifacts
           just check-deep-assurance | tee artifacts/check-deep-assurance.log
 
       - name: Upload heavy-lane artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: scheduled-heavy-lane-artifacts

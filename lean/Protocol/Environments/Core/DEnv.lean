@@ -1,4 +1,5 @@
 import Mathlib
+import Batteries.Data.RBMap
 import Protocol.Environments.Core.VarsAndBuffers
 
 /-! # Protocol.Environments.Core.DEnv
@@ -18,7 +19,7 @@ set_option relaxedAutoImplicit false
 set_option autoImplicit false
 
 open scoped Classical
-open Batteries
+open Batteries RBTree
 
 section
 

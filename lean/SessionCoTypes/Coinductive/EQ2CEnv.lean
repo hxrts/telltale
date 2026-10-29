@@ -151,8 +151,7 @@ lemma env_resolves_env_insert_r {ρ : EnvPair} {x : String} {a : LocalTypeC}
 lemma env_resolves_l_insert_r {ρ : EnvPair} {x : String} {a : LocalTypeC}
     (hρ : EnvResolvesL ρ) : EnvResolvesL (envInsertR ρ x a) := by
   intro y c hmem
-  have hmem' : c ∈ envL ρ y := by
-    simpa [envInsertR] using hmem
+  have hmem' : c ∈ envL ρ y := hmem
   exact hρ _ _ hmem'
 
 /-! ## EnvVarR preservation -/

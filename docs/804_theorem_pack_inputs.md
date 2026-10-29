@@ -18,11 +18,11 @@ Three input families enter the pack directly from the invariant space. They do n
 | output condition soundness | `outputConditionWitness?` | `withOutputCondition` | `output_condition_soundness` |
 | semantic objects | `semanticObjectWitnesses?` | `withSemanticObjectWitnesses` | `semantic_object_*` |
 
-Termination artifacts use `Adapters.toLivenessBundle?` from `lean/Runtime/Proofs/Adapters/Progress.lean` and the theorem `protocol_machine_termination_from_invariant_space`. Output-condition artifacts lift soundness from `outputConditionWitness?` into `OutputConditionArtifact`. Semantic-object artifacts are built by `SemanticObjectArtifacts.ofWitnessBundle` and cover core invariants, outstanding effects, semantic handoffs, authoritative-read publication, materialization success, progress contracts, effect contracts, replay failure exactness, cross-target progress-dependent work, and transformation-local obligations.
+Termination artifacts use `Adapters.toLivenessBundle?` from `lean/Runtime/Proofs/Adapters/Progress.lean` and the theorem `protocol_machine_termination_from_invariant_space`. The termination bound is derived (`FairTermination.fair_termination`) from one-step ranking obligations in `ProtocolMachineTerminationModel` (measure non-increasing, strict decrease on enabled steps, enabledness stable under unproductive steps, non-complete ⇒ some role enabled); those obligations are not yet discharged for the concrete `execInstr` step. Output-condition artifacts lift soundness from `outputConditionWitness?` into `OutputConditionArtifact`. Semantic-object artifacts are built by `SemanticObjectArtifacts.ofWitnessBundle` and cover core invariants, outstanding effects, semantic handoffs, authoritative-read publication, materialization success, progress contracts, effect contracts, replay failure exactness, cross-target progress-dependent work, and transformation-local obligations.
 
 ## Distributed Families
 
-Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean`. Each family attaches through a `with*` setter on the combined space.
+Distributed profile wrappers are defined in `lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean`. Each family attaches through a `with*` setter on the combined space. Inventory keys are string labels from `lean/Runtime/Proofs/TheoremPack/Inventory.lean`, not Lean theorem names. Each key reports whether the profile artifact is present. The theorems are carried by the family profile. For example, `quorum_geometry_safety` corresponds to `Distributed.QuorumGeometry.no_conflicting_commits_of_protocol`, and `accountable_safety` corresponds to `Distributed.AccountableSafety.accountable_safety_of_protocol`.
 
 | Family | Profile setter | Inventory key |
 |---|---|---|
@@ -53,7 +53,7 @@ Three inventory keys are derived from other profiles and have no distinct setter
 
 ## Classical Families
 
-Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`. Each classical family has a per-family setter on `ProtocolMachineInvariantSpaceWithProfiles`. `withClassicalProfiles` remains available as a batch replacement API when a caller wants to replace the whole `ClassicalProfiles` record.
+Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`. The inventory keys below are string labels, not Lean theorem names. Each classical family has a per-family setter on `ProtocolMachineInvariantSpaceWithProfiles`. `withClassicalProfiles` remains available as a batch replacement API when a caller wants to replace the whole `ClassicalProfiles` record.
 
 | Family | Setter | Wrapper type | Inventory key |
 |---|---|---|---|
@@ -69,13 +69,27 @@ Classical wrappers are defined in `lean/Runtime/Proofs/Adapters/Classical.lean`.
 | functional CLT | `withFunctionalCLT` | `FunctionalCLTProfile` | `classical_functional_clt` |
 | spectral-gap termination | `withSpectralGap` | `SpectralGapProfile` | `classical_spectral_gap_termination` |
 
-Classical artifacts carry small semantic obligations such as Lyapunov descent, backpressure optimality, or mixing-time bounds. They do not assert stronger system-level claims beyond their declared assumptions.
+Classical families are honest conditional interfaces ("Option B"). The named classical theorems (Little's law, MaxWeight optimality, sub-Gaussian tails, large-deviation and mixing envelopes, spectral-gap termination, Cheeger) are not proved in Lean. They enter as caller-supplied witness fields, and an inventory flag of `true` only records that an artifact is present. `classicalEvidenceInventory` in `Runtime.Proofs.TheoremPack.Inventory` classifies each key:
+
+| Inventory key | Evidence class |
+|---|---|
+| `classical_foster` | `provedDeterministic` (deterministic drift; no Harris recurrence) |
+| `classical_maxweight` | `assumedClassicalInput` |
+| `classical_ldp` | `derivedFromAssumedInput` |
+| `classical_mean_field` | `elementaryIdentity` (finite-average reindexing) |
+| `classical_heavy_traffic` | `elementaryIdentity` (`(σ√n)² = σ²n`) |
+| `classical_mixing` | `derivedFromAssumedInput` |
+| `classical_fluid` | `derivedFromAssumedInput` |
+| `classical_concentration` | `assumedClassicalInput` (tail bound) |
+| `classical_littles_law` | `assumedClassicalInput` |
+| `classical_functional_clt` | `elementaryIdentity` (degenerate constant path; not a CLT) |
+| `classical_spectral_gap_termination` | `assumedClassicalInput` |
 
 ## Execution Profile
 
 `ProtocolMachineExecutionProfile` is the proof-carrying execution context derived from the invariant space. It fixes fairness assumptions, admissibility classes, escalation-window classes, a theorem-pack eligibility list, and a necessity catalog. The builder function is `ProtocolMachineInvariantSpaceWithProfiles.executionProfile`.
 
-Fairness assumptions enumerate `scheduleConfluence`, `starvationFreedom`, and `livenessFairness`. Admissibility classes cover `localEnvelope`, `shardedEnvelope`, and `protocolEnvelopeBridge`. Escalation-window classes cover `progressContractBounded`, `admissionComplexityBounded`, and `protocolBridgeBounded`.
+Fairness assumptions enumerate `scheduleConfluence`, `starvationFreedom`, and `livenessFairness`; these are declared assumptions. The proved scheduler fact is `schedule_nonblocking` (one-step: a queued ready coroutine means `schedule` steps), which is not starvation freedom. The scheduler artifact's `scheduleDeterministic` field records selection determinism; confluence of independent steps is `LocalStepSystem.independent_steps_commute` and is not yet instantiated for `execInstr`. Admissibility classes cover `localEnvelope`, `shardedEnvelope`, and `protocolEnvelopeBridge`. Escalation-window classes cover `progressContractBounded`, `admissionComplexityBounded`, and `protocolBridgeBounded`.
 
 The execution profile also carries a list of `TransportNecessityProfile` values. `executionProfile_necessity_hardened_of_all_proven_necessary` and `executionProfile_necessity_minimal_basis_of_hardened_and_oracles` lift per-profile necessity into catalog-level hardening and minimal-basis closure. Both theorems are stated in `lean/Runtime/Proofs/TheoremPack/Profiles.lean`.
 
@@ -89,11 +103,11 @@ The execution profile also carries a list of `TransportNecessityProfile` values.
 | progress contracts and failure taxonomy | `ProgressArtifactMetadata` | semantic-object witnesses |
 | envelope adherence, admission, bridge | `EnvelopeArtifactMetadata` | derived distributed profiles |
 
-`ProofCarryingArtifactMetadata.ofInvariantSpace` assembles these from the combined space and the three envelope-presence booleans. Metadata inventory keys are enumerated in `proofCarryingMetadataInventory` in `lean/Runtime/Proofs/TheoremPack/Inventory.lean`.
+`ProofCarryingArtifactMetadata.ofInvariantSpace` assembles these from the combined space and the three envelope-presence booleans. Metadata inventory keys are enumerated in `proofCarryingMetadataInventory` in `lean/Runtime/Proofs/TheoremPack/Inventory.lean`. The `metadata_*` keys end in `_premise_supplied` and record presence only. `metadata_progress_contracts_premise_supplied` tracks semantic-object witnesses, while `metadata_replay_failure_exactness_premise_supplied` tracks the replay/failure-exactness witness specifically.
 
 ## Inventory and Capability Keys
 
-`theoremInventory` in `lean/Runtime/Proofs/TheoremPack/Inventory.lean` projects the pack into a flat list of `(key, Bool)` pairs. Keys cover termination, output-condition soundness, every distributed family, every classical family, the effect-interface bridge, and each semantic-object component. Release and admission paths consume this inventory rather than the pack directly.
+`theoremInventory` in `lean/Runtime/Proofs/TheoremPack/Inventory.lean` projects the pack into a flat list of `(key, Bool)` pairs. Keys cover termination, output-condition soundness, every distributed family, every classical family, the effect-interface bridge, and each semantic-object component. Release and admission paths consume this inventory rather than the pack directly. Each Bool is a presence flag meaning "premise bundle supplied", not "proved"; key strings are kept stable because Rust consumes them.
 
 `theoremInventoryWithDeterminism` augments the inventory with determinism-policy booleans. The semantic-object sub-inventory is produced by `SemanticObjectArtifacts.inventory` and folds each semantic witness into a capability key under the `semantic_object_*` prefix.
 
@@ -103,6 +117,12 @@ The execution profile also carries a list of `TransportNecessityProfile` values.
 
 `runtimeCriticalTransportedTheoremBoundaryInventory` narrows the ledger to families that gate runtime admission. `rustRuntimeCriticalTransportedTheoremKeys` and `leanRuntimeCriticalTransportedTheoremKeys` expose the Rust and Lean subsets consumed by admission paths. `runtimeCriticalTransportedTheoremsExplicit_true` certifies that the Rust and Lean lists agree.
 
+### Lean Evidence for Envelope Keys
+
+Rust admission of the three envelope keys (`protocol_machine_envelope_adherence`, `protocol_machine_envelope_admission`, `protocol_envelope_bridge`) is evidence-backed. `ProtocolMachineExecutionProfile` and `TheoremPackCapabilities` carry a `LeanEvidenceInventory` (key to Bool), parsed by `LeanEvidenceInventory::from_json_str` from the Lean `theoremInventory` export, either as a `{key: bool}` object or as the `List (String × Bool)` encoding `[[key, bool], ...]`. `execution_profile_supported` admits a required envelope key only when that inventory reports `true`. Self-asserted `theorem_pack_eligibility` Bools without evidence are rejected. Missing keys are not admitted.
+
+The defaults (`ProtocolMachineExecutionProfile::full()`, `TheoremPackCapabilities::full()`) carry an empty inventory, so they do not admit any envelope key. Callers attach evidence with `with_lean_evidence`. The explicit test and development opt-in is `assume_envelope_evidence_for_testing()` on either type. It asserts all three keys without Lean evidence and must not be used in production admission paths. An inventory flag records that a premise bundle was supplied, not that the premise was proved.
+
 ### Transport Contracts
 
 Theorem-backed distributed claims also require selected transport contracts. The Rust machine consumes `RuntimeTransportContract` values as semantic evidence, not as TCP-, TLS-, or key-management-specific implementation details. Concrete transport crates are responsible for mapping their configured mode into those fields.
@@ -111,7 +131,7 @@ The standard protocol-origin profile requires role-addressed routing, authentica
 
 ## Release Conformance
 
-`buildReleaseConformanceReport` in `lean/Runtime/Proofs/TheoremPack/ReleaseConformance.lean` assembles a `ReleaseConformanceReport` from the pack and a replay trace. Report fields include the theorem inventory, a transformation-eligibility snapshot, replay conformance, cross-target failure-envelope witness presence, restart-adequacy witness presence, and single-thread, multi-thread, and sharded evidence flags. `releaseBuildGate` derives the build-gate Boolean from the report when release-tagged.
+`buildReleaseConformanceReport` in `lean/Runtime/Proofs/TheoremPack/ReleaseConformance.lean` assembles a `ReleaseConformanceReport` from the pack, a `ReleaseRunEvidence` record, and a replay trace. Each gate checks distinct evidence. The cross-target and restart gates require the failure-envelope premise bundle plus the `crossTargetRunsAgree` and `restartReplayPassed` run bits respectively. The single-thread gate requires the adherence premise bundle plus `singleThreadRunPassed`. The multi-thread gate requires `multiThreadRunPassed`. The sharded gate requires the protocol-bridge premise bundle plus `shardedRunPassed`. `releaseReady` is always the conjunction of replay conformance and all five gates; there is no untagged bypass, and `ReleaseRunEvidence.none` fails every gate. `releaseBuildGate_sound` proves that a passing gate implies each piece of evidence. Gates report that premises were supplied and runs passed, not that the premises were proved.
 
 Optimization transformations are enumerated by `RuntimeTransformationEnvelopeClass`. The four classes are `schedulerPermutation`, `waveWidening`, `effectReordering`, and `failureReplayNormalization`. `transformationClassRequiredCapabilities` defines the inventory keys each class requires, and `transformationClassEligible` is the inventory gate.
 

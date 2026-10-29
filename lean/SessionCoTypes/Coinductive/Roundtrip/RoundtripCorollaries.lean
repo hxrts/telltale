@@ -10,6 +10,10 @@ Final round-trip statements and aliases.
 namespace SessionCoTypes.Coinductive
 open SessionTypes.LocalTypeR
 
+noncomputable local instance : DecidableEq LocalTypeC := by
+  classical
+  infer_instance
+
 /-! ## Core Roundtrip EQ2C Corollaries -/
 
 theorem to_coind_to_inductive_eq2c_of_eq2ce (t : LocalTypeC) (h : Regular t)
@@ -55,33 +59,33 @@ theorem to_coind_to_inductive_eq2c_of_env (t : LocalTypeC) (h : Regular t)
 /-- Round-trip in EQ2C for `toCoind` images, discharging productivity. -/
 theorem to_coind_to_inductive_eq2c_of_env_to_coind (t : LocalTypeR)
     (hEnv : EnvResolves
-      (envOf (Set.Finite.toFinset (toCoind_regular t))
-        (Set.Finite.toFinset (toCoind_regular t)))) :
+      (envOf ((toCoind_regular t).states.toFinset)
+        ((toCoind_regular t).states.toFinset))) :
     EQ2C (toCoind (toInductive (toCoind t) (toCoind_regular t))) (toCoind t) :=
 by
   -- Use the toCoind erasure lemma to avoid explicit productivity hypotheses.
   have hce := to_coind_to_inductive_eq2ce (toCoind t) (toCoind_regular t)
-  have hEnvR : EnvVarR (envOf (Set.Finite.toFinset (toCoind_regular t))
-      (Set.Finite.toFinset (toCoind_regular t))) :=
-    env_of_var_r (Set.Finite.toFinset (toCoind_regular t))
-      (Set.Finite.toFinset (toCoind_regular t))
-  exact eq2_ce_to_eq2_c'_to_coind (ρ := envOf (Set.Finite.toFinset (toCoind_regular t))
-      (Set.Finite.toFinset (toCoind_regular t))) (a := toInductive (toCoind t) (toCoind_regular t))
+  have hEnvR : EnvVarR (envOf ((toCoind_regular t).states.toFinset)
+      ((toCoind_regular t).states.toFinset)) :=
+    env_of_var_r ((toCoind_regular t).states.toFinset)
+      ((toCoind_regular t).states.toFinset)
+  exact eq2_ce_to_eq2_c'_to_coind (ρ := envOf ((toCoind_regular t).states.toFinset)
+      ((toCoind_regular t).states.toFinset)) (a := toInductive (toCoind t) (toCoind_regular t))
       (b := t) hce hEnv.1 hEnvR
 
 /-! ## toCoind Back-edge Corollary -/
 
 /-- Round-trip in EQ2C for `toCoind` images with explicit back-edge resolution. -/
 theorem to_coind_to_inductive_eq2c_of_backedge_to_coind (t : LocalTypeR)
-    (hback : ∀ c ∈ Set.Finite.toFinset (toCoind_regular t),
-      EQ2C (mkVar (nameOf c (Set.Finite.toFinset (toCoind_regular t)))) c) :
+    (hback : ∀ c ∈ (toCoind_regular t).states.toFinset,
+      EQ2C (mkVar (nameOf c ((toCoind_regular t).states.toFinset))) c) :
     EQ2C (toCoind (toInductive (toCoind t) (toCoind_regular t))) (toCoind t) := by
   -- Convert back-edge resolution to EnvResolves and reuse the toCoind erasure lemma.
   have hEnv : EnvResolves
-      (envOf (Set.Finite.toFinset (toCoind_regular t))
-        (Set.Finite.toFinset (toCoind_regular t))) :=
-    env_of_resolves_of_backedge (all := Set.Finite.toFinset (toCoind_regular t))
-      (visited := Set.Finite.toFinset (toCoind_regular t)) hback
+      (envOf ((toCoind_regular t).states.toFinset)
+        ((toCoind_regular t).states.toFinset)) :=
+    env_of_resolves_of_backedge (all := (toCoind_regular t).states.toFinset)
+      (visited := (toCoind_regular t).states.toFinset) hback
   exact to_coind_to_inductive_eq2c_of_env_to_coind t hEnv
 
 /-! ## Canonical Alias -/

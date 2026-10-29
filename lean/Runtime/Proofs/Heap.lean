@@ -2,7 +2,7 @@ import Runtime.Resources.HeapModel
 
 /-! # Runtime.Proofs.Heap
 
-Small determinism lemmas for the executable Lean heap model used by the
+Replay-compositionality and order-independence lemmas for the executable Lean heap model used by the
 Rust↔Lean parity lane.
 -/
 
@@ -27,19 +27,15 @@ theorem preimages_congr
   cases hCounter
   rfl
 
-theorem apply_op_deterministic (state : HeapState) (op : HeapOp) :
-    applyOp state op = applyOp state op := rfl
+/-- Replaying a log in two chunks reconstructs the same heap as one replay. -/
+theorem replay_split (ops₁ ops₂ : List HeapOp) (state : HeapState := {}) :
+    applyOps (ops₁ ++ ops₂) state = applyOps ops₂ (applyOps ops₁ state) :=
+  applyOps_append ops₁ ops₂ state
 
-theorem apply_ops_deterministic (ops : List HeapOp) (state : HeapState := {}) :
-    applyOps ops state = applyOps ops state := rfl
-
-theorem replay_outputs_match (ops : List HeapOp) (state : HeapState := {}) :
-    let first := applyOps ops state
-    let second := applyOps ops state
-    first = second := by
-  rfl
-
-theorem proof_path_deterministic (levels : List (List DigestHex)) (index : Nat) :
-    proofPathFromLevels levels index = proofPathFromLevels levels index := rfl
+/-- Consume order does not affect the active heap. -/
+theorem replay_consume_order_independent (state : HeapState) (a b : ResourceId) :
+    activeEntries (applyOps [.consume a, .consume b] state) =
+      activeEntries (applyOps [.consume b, .consume a] state) :=
+  consume_comm_activeEntries state a b
 
 end Runtime.Proofs.Heap

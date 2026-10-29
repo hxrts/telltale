@@ -287,6 +287,7 @@ theorem has_type_val_frame_right {G₁ G₂ : GEnv} {v : Value} {T : ValType} :
   | bool b => exact HasTypeVal.bool b
   | nat n => exact HasTypeVal.nat n
   | string s => exact HasTypeVal.string s
+  | readiness witness => exact HasTypeVal.readiness witness
   | prod h₁ h₂ ih₁ ih₂ => exact HasTypeVal.prod ih₁ ih₂
   | chan h =>
       exact HasTypeVal.chan (lookup_g_append_left h)

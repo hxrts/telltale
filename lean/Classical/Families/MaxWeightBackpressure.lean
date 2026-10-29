@@ -2,6 +2,9 @@ import Mathlib
 
 /-! # MaxWeight Backpressure Scheduling
 
+**Scope (Option B, honest conditional interface).** MaxWeight optimality is an assumed input (`MaxWeightChoice.optimal`);
+only `weight_nonneg` is proved. No throughput-optimality theorem is proved.
+
 This module provides the mathematical foundation for throughput-optimal scheduling
 in session-typed distributed systems. The MaxWeight algorithm originates from
 queueing theory and network scheduling, where it achieves the maximum possible
@@ -110,27 +113,18 @@ theorem weight_nonneg (q μ : ι → Real)
     intro i hi
     exact mul_nonneg (hq i) (hμ i))
 
-/-- A `MaxWeightChoice` certifies that a scheduling decision is optimal.
+/-- Assumed classical input (Option B): a schedule `sched` together with the
+    hypothesis `optimal` that it maximises `weight q` over *all* `ν : ι → ℝ`.
 
-    The `sched` field gives the chosen service rates, and `optimal` proves that
-    no alternative choice achieves higher weight. In the Telltale setting, this
-    corresponds to a scheduling proof that says "processing these sessions first
-    is provably optimal for clearing backlogs." -/
+    Optimality is supplied by the caller, not derived; use `h.optimal` directly.
+    Nothing here proves the MaxWeight throughput-optimality theorem
+    (Tassiulas-Ephremides), which would require a stochastic queueing model,
+    a capacity region, and a quadratic-Lyapunov drift argument. Note also that
+    over unconstrained `ν` the hypothesis is only satisfiable when `q = 0`
+    or the caller restricts attention to a bounded schedule set. -/
 structure MaxWeightChoice (q : ι → Real) where
   sched : ι → Real
   optimal : ∀ ν : ι → Real, weight q ν ≤ weight q sched
-
-variable (q : ι → Real)
-
-/-- MaxWeight dominates all alternatives.
-
-    This is the key theorem: any scheduling choice ν achieves at most the weight
-    of the MaxWeight choice. For protocols, this means the MaxWeight scheduler
-    clears backlogs at least as fast as any alternative. -/
-theorem maxweight_dominates
-    (h : MaxWeightChoice q) (ν : ι → Real) :
-    weight q ν ≤ weight q h.sched :=
-  h.optimal ν
 
 end MaxWeightBackpressure
 end Classical

@@ -26,9 +26,12 @@ for protocol machine execution.
 - `Violation`, `ViolationPolicy`
 - `CausallyConsistent`, `FIFOConsistent`
 - `session_state_interp`
-- `protocol_machine_adequacy` — WP proof ⊢ trace is valid linearization
+- `causallyConsistent_of_fifo` — per-edge FIFO implies causality
 - `no_phantom_events`
-- `compile_refines`
+
+The reachability-based adequacy theorem lives in
+`Runtime.Adequacy.CommTraceAdequacy`; compiler refinement lives in
+`Runtime.Adequacy.CompileRefines`.
 
 Dependencies: Task 12, Task 19, IrisExtractionInstance.
 -/
@@ -74,12 +77,6 @@ theorem ObsEq.trans {ε : Type u} [EffectRuntime ε]
   intro h₁₂ h₂₃
   exact Eq.trans h₁₂ h₂₃
 
-private def listGet? {α : Type} : List α → Nat → Option α
-  -- Total list lookup by index.
-  | [], _ => none
-  | x :: _, 0 => some x
-  | _ :: xs, n + 1 => listGet? xs n
-
 /-! ## Differential Harness Contract -/
 
 /--
@@ -90,9 +87,9 @@ per-step traces must be observationally equivalent under `ObsEq`.
 def StepDiffHarness {ε : Type u} [EffectRuntime ε]
     (leanSteps rustSteps : List (ObsTrace ε)) : Prop :=
   leanSteps.length = rustSteps.length ∧
-  ∀ i leanTrace rustTrace,
-    listGet? leanSteps i = some leanTrace →
-    listGet? rustSteps i = some rustTrace →
+  ∀ (i : Nat) (leanTrace rustTrace : ObsTrace ε),
+    leanSteps[i]? = some leanTrace →
+    rustSteps[i]? = some rustTrace →
     ObsEq leanTrace rustTrace
 
 /-! ## Trace Observation Utilities -/
@@ -131,12 +128,12 @@ def obsTraceOf {ε : Type u} [EffectRuntime ε]
 def SentAt {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
   -- Event at idx is a send of v on e (seqNo ignored).
-  ∃ n seq, listGet? trace idx = some (n, ObsEvent.sent e v seq)
+  ∃ n seq, (trace)[idx]? = some (n, ObsEvent.sent e v seq)
 
 def RecvAt {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
   -- Event at idx is a receive of v on e (seqNo ignored).
-  ∃ n seq, listGet? trace idx = some (n, ObsEvent.received e v seq)
+  ∃ n seq, (trace)[idx]? = some (n, ObsEvent.received e v seq)
 
 def SendBeforeObs {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) (e : Edge) (v1 v2 : Value) : Prop :=
@@ -153,10 +150,67 @@ def CausallyConsistent {ε : Type u} [EffectRuntime ε]
   -- Every receive is preceded by a matching send.
   ∀ j e v, RecvAt trace j e v → ∃ i, i < j ∧ SentAt trace i e v
 
+/-- Payloads sent on edge `e`, in trace order. -/
+def sentOn {ε : Type u} [EffectRuntime ε] (e : Edge) (trace : ObsTrace ε) : List Value :=
+  trace.filterMap fun p => match p.2 with
+    | .sent e' v _ => if e' = e then some v else none
+    | _ => none
+
+/-- Payloads received on edge `e`, in trace order. -/
+def recvOn {ε : Type u} [EffectRuntime ε] (e : Edge) (trace : ObsTrace ε) : List Value :=
+  trace.filterMap fun p => match p.2 with
+    | .received e' v _ => if e' = e then some v else none
+    | _ => none
+
+/-- Per-edge FIFO: at every point of the trace, the payloads received on each
+edge form a prefix of the payloads sent on it. (The earlier value-pair
+formulation demanded that every send be received, which fails for any trace
+with in-flight messages, and was unsound for repeated payload values.) -/
 def FIFOConsistent {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) : Prop :=
-  -- Receive order respects send order for each edge.
-  ∀ e v1 v2, SendBeforeObs trace e v1 v2 → RecvBeforeObs trace e v1 v2
+  ∀ k e, recvOn e (trace.take k) <+: sentOn e (trace.take k)
+
+/-! ### FIFO implies causality -/
+
+omit [Telltale.TelltaleIris] in
+/-- Taking one more element past a known index appends that element. -/
+private theorem take_succ_of_getElem? {α : Type} {l : List α} {j : Nat} {x : α}
+    (h : l[j]? = some x) : l.take (j + 1) = l.take j ++ [x] := by
+  rw [List.take_succ, h]; rfl
+
+omit [Telltale.TelltaleIris] in
+/-- A payload sent within the first `j` entries has a send index below `j`. -/
+private theorem sentAt_of_mem_sentOn {ε : Type u} [EffectRuntime ε]
+    {trace : ObsTrace ε} {j : Nat} {e : Edge} {v : Value}
+    (h : v ∈ sentOn e (trace.take j)) : ∃ i, i < j ∧ SentAt trace i e v := by
+  obtain ⟨p, hp, hpv⟩ := List.mem_filterMap.mp h
+  obtain ⟨i, hi, hget⟩ := List.getElem_of_mem hp
+  have hij : i < j := by simp at hi; omega
+  have hlt : i < trace.length := by simp at hi; omega
+  have hg : (trace)[i]? = some p := by
+    rw [← hget, List.getElem_take, List.getElem?_eq_getElem hlt]
+  obtain ⟨n, ev⟩ := p
+  cases ev with
+  | sent e' v' s =>
+      by_cases he : e' = e
+      · subst he
+        simp at hpv
+        subst hpv
+        exact ⟨i, hij, n, s, hg⟩
+      · simp [he] at hpv
+  | _ => simp at hpv
+
+omit [Telltale.TelltaleIris] in
+/-- Per-edge FIFO consistency implies causal consistency. -/
+theorem causallyConsistent_of_fifo {ε : Type u} [EffectRuntime ε]
+    {trace : ObsTrace ε} (hF : FIFOConsistent trace) : CausallyConsistent trace := by
+  intro j e v ⟨n, seq, hj⟩
+  have hpre := hF (j + 1) e
+  rw [take_succ_of_getElem? hj] at hpre
+  simp only [sentOn, recvOn, List.filterMap_append, List.filterMap_cons,
+    List.filterMap_nil, eq_self_iff_true, ↓reduceIte, List.append_nil] at hpre
+  exact sentAt_of_mem_sentOn
+    (List.IsPrefix.subset hpre (List.mem_append_right _ (List.mem_singleton_self v)))
 
 /-! ## protocol machine Adequacy Statement -/
 
@@ -187,10 +241,11 @@ def ghost_speculation_resources {ι γ π ε ν : Type u}
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     [GhostMapSlot Nat]
-    (γsp : GhostName) (st : ProtocolMachineState ι γ π ε ν) : iProp :=
-  -- Session-scoped speculation resources for active ghost sessions.
+    (γsp : SessionId → GhostName) (st : ProtocolMachineState ι γ π ε ν) : iProp :=
+  -- Session-scoped speculation resources: each active ghost session owns its
+  -- own authoritative speculation map under its own ghost name.
   sepList (st.ghostSessions.sessions.toList.map
-    (fun p => speculation_session_inv γsp p.snd.realSid))
+    (fun p => speculation_session_inv (γsp p.snd.realSid) p.snd.realSid))
 
 /-! ### Session-State Interpretation -/
 
@@ -204,37 +259,13 @@ def session_state_interp {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer 
   iProp.exist fun γs =>
     iProp.exist fun γp =>
       iProp.exist fun γk =>
-        iProp.exist fun γsp =>
+        iProp.exist fun (γsp : SessionId → GhostName) =>
           iProp.sep (iProp.pure (WFVMState st))
             (iProp.sep (iProp.pure (sessionStore_refines_envs st.sessions))
               (iProp.sep (session_endpoint_resources γs st.sessions)
                 (iProp.sep (coroutine_progress_resources γp st.coroutines)
                   (iProp.sep (coroutine_knowledge_resources γk st.coroutines)
                     (ghost_speculation_resources γsp st)))))
-
-/-! ### Adequacy Statement -/
-
-def protocol_machine_adequacy {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν] : Prop :=
-  -- V1 adequacy: observable traces are causally and FIFO consistent.
-  ∀ (st : ProtocolMachineState ι γ π ε ν), WFVMState st →
-    let obs := obsTraceOf (ε:=ε) st.obsTrace;
-    CausallyConsistent obs ∧ FIFOConsistent obs
-
-theorem protocol_machine_adequacy_of_trace_consistency
-    {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
-    [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    [IdentityGuardBridge ι γ] [EffectGuardBridge ε γ]
-    [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π] [IdentityVerificationBridge ι ν]
-    (hCausal : ∀ st : ProtocolMachineState ι γ π ε ν, WFVMState st →
-      CausallyConsistent (obsTraceOf (ε:=ε) st.obsTrace))
-    (hFIFO : ∀ st : ProtocolMachineState ι γ π ε ν, WFVMState st →
-      FIFOConsistent (obsTraceOf (ε:=ε) st.obsTrace)) :
-    protocol_machine_adequacy (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
-  intro st hWF
-  exact ⟨hCausal st hWF, hFIFO st hWF⟩
 
 /-! ## No-Phantom-Events Bridge -/
 
@@ -270,28 +301,3 @@ theorem no_phantom_events_holds {ι γ π ε ν : Type} [IdentityModel ι] [Guar
     no_phantom_events (ι:=ι) (γ:=γ) (π:=π) (ε:=ε) (ν:=ν) := by
   intro st idx ev hmem
   exact go_mem hmem
-
-/-! ## Compilation Refinement Witness -/
-
-def compile_refines {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    (_p : Process) (_roles : RoleSet) (_types : Role → LocalType)
-    (_chain : GuardChain γ) : Prop :=
-  -- V1 refinement witness: there exists a program image matching projected
-  -- local types and role entry points.
-  ∃ prog : Program γ ε,
-    prog.localTypes = programLocalTypes _roles _types ∧
-    prog.entryPoints = _roles.map (fun r => (r, 0)) ∧
-    prog.code.size = 1
-
-theorem compile_refines_holds {γ ε ν : Type} [GuardLayer γ] [EffectRuntime ε]
-    [VerificationModel ν] [AuthTree ν] [AccumulatedSet ν]
-    (p : Process) (roles : RoleSet) (types : Role → LocalType) (chain : GuardChain γ) :
-    compile_refines (γ:=γ) (ε:=ε) (ν:=ν) p roles types chain := by
-  unfold compile_refines
-  refine ⟨{ code := #[Instr.halt]
-          , entryPoints := roles.map (fun r => (r, 0))
-          , localTypes := programLocalTypes roles types
-          , handlerTypes := []
-          , metadata := ProgramMeta.empty }, ?_⟩
-  simp [programLocalTypes]

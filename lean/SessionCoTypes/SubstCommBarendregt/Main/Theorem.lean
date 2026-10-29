@@ -14,8 +14,9 @@ from `Postfix`.
 -/
 
 namespace SessionCoTypes.SubstCommBarendregt
-
-/-! ## Main Theorem -/
+open SessionTypes.LocalTypeR
+open SessionCoTypes.EQ2
+open SessionTypes.GlobalType
 
 /-! ## Main Theorem -/
 

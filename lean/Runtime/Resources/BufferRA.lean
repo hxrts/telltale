@@ -10,7 +10,7 @@ Ghost state for bounded buffers and refinement chain.
 
 ## Definitions
 
-- `BufferRA` — ghost gmap from Edge to buffer state
+- `BufferRA` — upstream Iris ghost map (auth + fragments) from encoded edges to buffer state
 - `BoundedBuffer`, `enqueue`, `dequeue`
 - `BufferConfig` — capacity, backpressure policy
 - `bounded_refines_unbounded`
@@ -261,37 +261,89 @@ def BoundedBuffer.drainEpoch (buf : BoundedBuffer) (newEpoch : Nat) : BoundedBuf
   -- Clear the buffer and bump the epoch.
   { buf with data := Array.replicate buf.capacity none, head := 0, tail := 0, count := 0, epoch := newEpoch }
 
-/-! ## Refinement stubs -/
+/-! ## Buffer Ghost Resource -/
 
-/-- Ghost map for edge buffers.
-    Keys (Edge) encoded to Positive via pattern similar to encodeEndpoint.
-    Stub: actual implementation needs GhostMapSlot BoundedBuffer instance. -/
-abbrev BufferRA := List (Positive × BoundedBuffer)
+section BufferGhost
+
+variable [Telltale.TelltaleIris] [GhostMapSlot BoundedBuffer]
+
+/-- Ghost map for edge buffers: keys are encoded edges, values are buffer states.
+This is the upstream Iris `ghost_map` resource (authoritative map + per-key
+exclusive fragments), not a plain list. -/
+abbrev BufferRA := GhostMap BoundedBuffer
+
+/-- Authoritative ownership of all edge buffers. -/
+def buffer_auth (γ : GhostName) (m : BufferRA) : iProp :=
+  ghost_map_auth γ m
+
+/-- Exclusive ownership of the buffer stored under key `k`. -/
+def buffer_frag (γ : GhostName) (k : Positive) (b : BoundedBuffer) : iProp :=
+  ghost_map_elem γ k b
+
+/-- Agreement: the authoritative map contains every owned fragment. -/
+theorem buffer_frag_included (γ : GhostName) (m : BufferRA) (k : Positive) (b : BoundedBuffer) :
+    iProp.entails (iProp.sep (buffer_auth γ m) (buffer_frag γ k b))
+      (iProp.pure (Iris.Std.get? m k = some b)) :=
+  ghost_map_lookup γ k b m
+
+/-- Frame-preserving update of one owned buffer (e.g. after enqueue/dequeue). -/
+theorem buffer_frag_update (γ : GhostName) (m : BufferRA) (k : Positive) (b b' : BoundedBuffer) :
+    iProp.entails (iProp.sep (buffer_auth γ m) (buffer_frag γ k b))
+      (_root_.bupd (iProp.sep (buffer_auth γ (Iris.Std.insert m k b')) (buffer_frag γ k b'))) :=
+  ghost_map_update γ k b b' m
+
+/-- Allocate a fresh buffer key. -/
+theorem buffer_alloc (γ : GhostName) (m : BufferRA) (k : Positive) (b : BoundedBuffer)
+    (hFresh : Iris.Std.get? m k = none) :
+    iProp.entails (buffer_auth γ m)
+      (_root_.bupd (iProp.sep (buffer_auth γ (Iris.Std.insert m k b)) (buffer_frag γ k b))) :=
+  ghost_map_insert γ k b m hFresh
+
+end BufferGhost
+
+/-! ## Delivery Models -/
 
 def tracePayloads {ν : Type} [VerificationModel ν]
     (trace : SignedBuffer ν) : Buffer :=
   -- Project a signed trace to its payload sequence.
   trace.map (fun sv => sv.payload)
 
+/-- Shared-memory delivery: the receiver observes exactly the sender's signed
+values (payloads and signatures), in order. -/
 def IsSharedTrace {ν : Type} [VerificationModel ν]
-    (trace : SignedBuffer ν) : Prop :=
-  -- Shared traces preserve unique payload order in V1.
-  List.Nodup (tracePayloads trace)
+    (sent delivered : SignedBuffer ν) : Prop :=
+  delivered = sent
 
+/-- Reliable (FIFO, lossless, duplicate-free) delivery: the delivered payload
+sequence is exactly the sent payload sequence. Signatures may be re-attached by
+the transport, so only payloads are constrained. -/
 def IsReliableTrace {ν : Type} [VerificationModel ν]
-    (trace : SignedBuffer ν) : Prop :=
-  -- Reliable traces preserve unique payload order in V1.
-  List.Nodup (tracePayloads trace)
+    (sent delivered : SignedBuffer ν) : Prop :=
+  tracePayloads delivered = tracePayloads sent
 
+/-- Unreliable delivery of `sent` as `delivered`: every delivered payload was
+actually sent. Drops, duplications, and reorderings are permitted; fabricated
+payloads are not. -/
 def IsUnreliableTrace {ν : Type} [VerificationModel ν]
-    (_trace : SignedBuffer ν) : Prop :=
-  -- Unreliable traces place no additional ordering constraints in V1.
-  True
+    (sent delivered : SignedBuffer ν) : Prop :=
+  tracePayloads delivered ⊆ tracePayloads sent
 
+/-- Handler-backed delivery is reliable delivery. -/
 def IsHandledTrace {ν : Type} [VerificationModel ν]
-    (_handler : HandlerId) (trace : SignedBuffer ν) : Prop :=
-  -- Handler-backed traces are reliable in V1.
-  IsReliableTrace trace
+    (_handler : HandlerId) (sent delivered : SignedBuffer ν) : Prop :=
+  IsReliableTrace sent delivered
+
+/-- Reliable delivery admits no loss: each sent payload is delivered as often as sent. -/
+theorem reliable_no_loss_no_dup {ν : Type} [VerificationModel ν]
+    {sent delivered : SignedBuffer ν} (h : IsReliableTrace sent delivered) (v : Value) :
+    (tracePayloads delivered).count v = (tracePayloads sent).count v := by
+  rw [h]
+
+/-- Reliable delivery is FIFO: the `i`-th delivered payload is the `i`-th sent one. -/
+theorem reliable_fifo {ν : Type} [VerificationModel ν]
+    {sent delivered : SignedBuffer ν} (h : IsReliableTrace sent delivered) (i : Nat) :
+    (tracePayloads delivered)[i]? = (tracePayloads sent)[i]? := by
+  rw [h]
 
 def IsBoundedTrace {ν : Type} [VerificationModel ν]
     (cap : Nat) (trace : SignedBuffer ν) : Prop :=
@@ -310,21 +362,22 @@ def SameMessages {ν : Type} [VerificationModel ν]
 
 def shared_refines_reliable {ν : Type} [VerificationModel ν] : Prop :=
   -- Shared backing refines reliable backing.
-  ∀ trace, IsSharedTrace (ν:=ν) trace → IsReliableTrace trace
+  ∀ sent delivered, IsSharedTrace (ν:=ν) sent delivered → IsReliableTrace sent delivered
 
 def reliable_refines_unreliable {ν : Type} [VerificationModel ν] : Prop :=
   -- Reliable backing refines unreliable backing.
-  ∀ trace, IsReliableTrace (ν:=ν) trace → IsUnreliableTrace trace
+  -- (a reliable channel delivers exactly what was sent, which the unreliable
+  -- model admits).
+  ∀ sent delivered, IsReliableTrace (ν:=ν) sent delivered → IsUnreliableTrace sent delivered
 
 def handled_refines_any {ν : Type} [VerificationModel ν] : Prop :=
   -- Handler-backed traces refine any backing satisfying the transport spec.
-  ∀ handler trace,
-    IsHandledTrace (ν:=ν) handler trace →
-      ∃ backingTrace, SameMessages trace backingTrace
+  ∀ handler sent delivered,
+    IsHandledTrace (ν:=ν) handler sent delivered → SameMessages delivered sent
 
 def spatial_le_backing_refines {ν : Type} [VerificationModel ν] : Prop :=
   -- Spatial subtyping lifts to buffer backing refinement.
-  ∀ trace, IsSharedTrace (ν:=ν) trace → IsUnreliableTrace trace
+  ∀ sent delivered, IsSharedTrace (ν:=ν) sent delivered → IsUnreliableTrace sent delivered
 
 def bounded_refines_unbounded {ν : Type} [VerificationModel ν] : Prop :=
   -- Bounded FIFO refines unbounded FIFO by preserving messages.
@@ -335,3 +388,54 @@ def latest_value_refines_unbounded {ν : Type} [VerificationModel ν] : Prop :=
   -- Latest-value buffers refine unbounded FIFO by preserving final messages.
   ∀ cap trace, IsBoundedTrace (ν:=ν) cap trace →
     ∃ unboundedTrace, IsUnboundedTrace unboundedTrace ∧ SameMessages trace unboundedTrace
+
+/-! ## Unreliable-Model Refinement Proofs -/
+
+/-- Reliable delivery is an admissible unreliable delivery. -/
+theorem reliable_refines_unreliable_holds {ν : Type} [VerificationModel ν] :
+    reliable_refines_unreliable (ν := ν) :=
+  by
+    intro sent delivered h
+    have h' : tracePayloads delivered = tracePayloads sent := h
+    unfold IsUnreliableTrace
+    intro x hx
+    rw [h'] at hx
+    exact hx
+
+/-- Shared delivery is reliable delivery. -/
+theorem shared_refines_reliable_holds {ν : Type} [VerificationModel ν] :
+    shared_refines_reliable (ν := ν) :=
+  fun _ _ h => by simp only [IsReliableTrace, IsSharedTrace] at h ⊢; rw [h]
+
+/-- Handler-backed delivery reproduces the sent messages. -/
+theorem handled_refines_any_holds {ν : Type} [VerificationModel ν] :
+    handled_refines_any (ν := ν) :=
+  fun _ _ _ h => h
+
+/-- Shared-backing delivery is an admissible unreliable delivery. -/
+theorem spatial_le_backing_refines_holds {ν : Type} [VerificationModel ν] :
+    spatial_le_backing_refines (ν := ν) :=
+  fun s d h => reliable_refines_unreliable_holds s d (shared_refines_reliable_holds s d h)
+
+/-- Dropping messages (delivering a sublist) is admitted by the unreliable model. -/
+theorem unreliable_admits_drops {ν : Type} [VerificationModel ν]
+    (sent delivered : SignedBuffer ν) (h : delivered.Sublist sent) :
+    IsUnreliableTrace sent delivered :=
+  (h.map _).subset
+
+/-- Duplicating a delivered message is admitted by the unreliable model. -/
+theorem unreliable_admits_duplication {ν : Type} [VerificationModel ν]
+    (sent delivered : SignedBuffer ν) (sv : SignedValue ν)
+    (h : IsUnreliableTrace sent (sv :: delivered)) :
+    IsUnreliableTrace sent (sv :: sv :: delivered) := by
+  intro v hv
+  simp only [IsUnreliableTrace, tracePayloads, List.map_cons] at h hv ⊢
+  rcases List.mem_cons.1 hv with hEq | hRest
+  · exact h (hEq ▸ List.mem_cons_self ..)
+  · exact h hRest
+
+/-- The unreliable model rejects fabricated payloads. -/
+theorem unreliable_rejects_fabrication {ν : Type} [VerificationModel ν]
+    (sent delivered : SignedBuffer ν) (h : IsUnreliableTrace sent delivered)
+    (v : Value) (hv : v ∈ tracePayloads delivered) : v ∈ tracePayloads sent :=
+  h hv

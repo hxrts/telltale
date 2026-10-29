@@ -19,10 +19,16 @@ inductive LedgerPlacement where
   | appendixD
   deriving DecidableEq, Repr
 
+/-- Discharge status of a ledger entry. `conditionalOnAssumedInput` marks a
+family whose named classical theorem is an assumed witness field (Option B):
+Lean derives only consequences from it. `elementaryIdentityOnly` marks a family
+that proves only an elementary identity, no classical theorem. -/
 inductive LedgerStatus where
   | planned
   | inProgress
   | discharged
+  | conditionalOnAssumedInput
+  | elementaryIdentityOnly
   deriving DecidableEq, Repr
 
 structure TransportLedgerEntry where
@@ -36,14 +42,14 @@ structure TransportLedgerEntry where
 
 /-! ## Canonical Entries -/
 
-/-- Main-text discharged exemplar (SLA tails via LDP). -/
+/-- Main-text exemplar (SLA tails via LDP), conditional on an assumed `LDPWitness`. -/
 def mainTextExemplar : TransportLedgerEntry :=
   { id := "ldp_sla_tail"
     theoremName := "Large Deviations / SLA Tail Bounds"
     moduleName := "Classical.LargeDeviationPrinciple"
     placement := .mainText
-    status := .discharged
-    notes := "Discharged by Protocol.Classical.Instantiation.mainText_ldp_sla_tail." }
+    status := .conditionalOnAssumedInput
+    notes := "Assumed exponential tail (LDPWitness); derived by main_text_ldp_sla_tail_of_witness." }
 
 /-- Appendix D discharge set (current shortlist). -/
 def appendixDDischargeSet : List TransportLedgerEntry :=
@@ -51,36 +57,39 @@ def appendixDDischargeSet : List TransportLedgerEntry :=
       theoremName := "Foster-Lyapunov-Harris Stability"
       moduleName := "Classical.FosterLyapunovHarris"
       placement := .appendixD
-      status := .discharged
-      notes := "Discharged by appendixD_foster_discharge." }
+      status := .conditionalOnAssumedInput
+      notes := "Deterministic drift input; appendix_d_foster_discharge. No Harris recurrence." }
   , { id := "maxweight_backpressure"
       theoremName := "MaxWeight Backpressure"
       moduleName := "Classical.MaxWeightBackpressure"
       placement := .appendixD
-      status := .discharged
-      notes := "Discharged by appendixD_maxWeight_discharge." }
+      status := .conditionalOnAssumedInput
+      notes := "Optimality is the assumed MaxWeightChoice.optimal field; not proved." }
   , { id := "mixing_time_bounds"
       theoremName := "Mixing Time Bounds"
       moduleName := "Classical.MixingTimeBounds"
       placement := .appendixD
-      status := .discharged
-      notes := "Discharged by appendixD_mixing_discharge." }
+      status := .conditionalOnAssumedInput
+      notes := "Assumed geometric envelope (MixingWitness); appendix_d_mixing_discharge." }
   , { id := "mean_field_propagation_of_chaos"
       theoremName := "Mean-Field / Propagation of Chaos"
       moduleName := "Classical.PropagationOfChaos"
       placement := .appendixD
-      status := .discharged
-      notes := "Discharged by appendixD_meanField_discharge." } ]
+      status := .elementaryIdentityOnly
+      notes := "Finite-average reindexing identity only; no mean-field limit." } ]
 
 /-! ## Aggregated Ledger and Basic Facts -/
 
+/-- Full ledger: main-text exemplar followed by the Appendix D set. -/
 def transportLedger : List TransportLedgerEntry :=
   mainTextExemplar :: appendixDDischargeSet
 
+/-- The main-text exemplar is in the ledger. -/
 theorem main_text_exemplar_in_ledger :
     mainTextExemplar ∈ transportLedger := by
   simp [transportLedger]
 
+/-- Every Appendix D entry is tagged with the Appendix D placement. -/
 theorem appendix_entries_tagged :
     ∀ e ∈ appendixDDischargeSet, e.placement = .appendixD := by
   intro e hMem

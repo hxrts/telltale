@@ -299,7 +299,7 @@ on behalf of each scheduler profile:
 | Profile | `FairnessClaimClass` | Proof basis |
 |---|---|---|
 | `canonicalSerial` | `exactOneStep` | proved unconditionally |
-| `threadedExactSingleLane` | `exactOneStepUnderRefinement` | proved via artifact equality |
+| `threadedExactSingleLane` | `exactOneStepUnderRefinement` | proved via merge-refinement to canonical (any lane width, any lane completion order) |
 | `batchedParallelExact` | `premisedWindowBounded` | proved under `BatchedExactWindowCertificate` |
 | `batchedParallelEnvelopeBounded` | `premisedWindowBounded` | proved under `BatchedEnvelopeWindowCertificate` |
 
@@ -359,11 +359,20 @@ there is no unconditional all-entry fairness theorem in this module.
 
 ### Refinement Proofs (Refinement)
 
-`Runtime.Proofs.Search.Refinement` proves that `threadedExactSingleLane` is
-identical to canonical serial at every reduced artifact boundary. These are
-equalities, not simulations: parallelisation of successor enumeration within a
-batch produces no observable difference in batch nodes, normalized commits,
-state, or observations.
+`Runtime.Proofs.Search.Threaded` models the threaded step independently of
+the canonical step, following `NativeParallelExecutor::generate`: the frozen
+canonical batch is tagged with batch indices, split into contiguous lanes of
+non-zero width (`laneChunks`, mirroring `par_chunks`), each lane computes its
+commits independently, lanes may complete in any order (a `LaneSchedule`
+carries an arbitrary permutation of the lanes), and results are merged
+deterministically by batch index. `threadedMergedResults_eq_canonical` proves
+the merged result equals the canonical indexed batch for every width and
+completion order; `threaded_step_artifact_eq_canonical` lifts this to the step
+artifact. The model does not cover successor proposals or authority conflicts,
+which the reduced artifact does not carry.
+
+`Runtime.Proofs.Search.Refinement` then derives equality at every reduced
+artifact boundary, each quantified over the `LaneSchedule`:
 
 - `threaded_exact_single_lane_step_artifact_refines_canonical` - the full
   `StepArtifact` is equal.
@@ -376,7 +385,8 @@ state, or observations.
 - `threaded_exact_single_lane_multi_step_state_trace_refines_canonical`,
   `..._observation_trace_..._canonical`, and
   `..._state_artifact_trace_..._canonical` - all three multi-step trace
-  functions agree across arbitrary `FrontierTrace` inputs.
+  functions agree across arbitrary `FrontierTrace` inputs and per-step lane
+  schedules.
 
 ### Executable Semantics (Executable)
 
@@ -501,8 +511,12 @@ Non-min fairness:
   - stronger variants using a finite better-entry universe rather than a
   numeric preemption bound.
 - `canonical_serial_nonmin_entry_eventually_serviced_under_scheduler_fairness` -
-  public scheduler-facing non-min fairness theorem with no internal preemption
-  terminology exposed.
+  public scheduler-facing non-min fairness theorem. Its only premises are that
+  the trace follows the canonical serial scheduler and the entry is present;
+  the service horizon (number of strictly better competitors at the start) is
+  computed, and the strict drain of better work is proved
+  (`strictlyBetterEntryCount_canonical_step_lt`), not assumed. The reduced
+  frontier model has no new arrivals, so preemption is automatically bounded.
 
 Completeness:
 
@@ -513,17 +527,24 @@ Completeness:
   version: executable canonical stepping closes the goal node within the
   witness-path horizon.
 - `canonical_machine_goal_reached_from_graph_reachability` - completeness
-  driven by an explicit graph-reachability premise bundle naming reachable-node
-  path, finiteness, and heuristic assumptions.
+  driven by an explicit graph-reachability premise bundle naming a
+  reachable-node path and its ready entry path.
 - `canonical_machine_goal_reached_from_raw_successor_semantics` - public
   completeness theorem phrased over the raw successor contract, with
   ready-entry progress internalized behind an explicit refinement premise.
 - `goal_reachability_connects_to_incumbent_publication` - machine-level bridge
   from bounded goal reachability to incumbent publication under an explicit
   publication premise bundle.
-- `eventual_optimal_goal_publication_under_admissible_consistent_heuristic` -
-  under explicit admissibility and consistency premises, eventual goal
-  publication strengthens to eventual optimal-goal publication.
+- `eventual_optimal_goal_publication_under_admissible_consistent_heuristic`
+  (`AStarOptimality`) - A*-style optimality. `HeuristicConsistent`
+  (`h n ≤ c(n,n') + h n'`) and `HeuristicAdmissible` (`h n ≤` cost of any path
+  to the goal) are concrete; admissibility is proved from consistency and
+  `h goal = 0`. Optimal cost of the published incumbent is proved from the
+  machine's min-priority expansion order, g-score soundness of goal entries,
+  and `optimalCost` being a lower bound on source-to-goal path costs. The
+  standard A* frontier invariant (before publication some frontier entry lies
+  on an optimal path with exact `g`) remains an explicit premise, because the
+  reduced machine does not model successor expansion.
 
 ### Envelope Surface (Envelope)
 
@@ -548,13 +569,16 @@ from the upstream proof modules, indexing each result by `SearchSchedulerProfile
 and `FairnessClaimClass`. The claim table at the top of this section shows what
 each profile carries.
 
-- `canonical_serial_profile_has_exact_one_step_fairness` and
-  `canonical_serial_goal_window_service_has_exact_suffix_bound` - restate the
-  `Fairness` results at profile granularity.
+- `canonical_serial_profile_has_exact_one_step_fairness` - pairs the
+  `exactOneStep` claim tag with `OneStepFair frontier` for every frozen
+  frontier (from `canonical_serial_batch_is_one_step_fair`).
+- `canonical_serial_goal_window_service_has_exact_suffix_bound` - every
+  min-priority entry is gone after one canonical step.
 - `threaded_exact_single_lane_has_exact_one_step_fairness` - derives one-step
   fairness for the threaded profile by composing the `Refinement` equalities.
 - `threaded_exact_single_lane_has_exact_observation_equivalence` -
-  observation slices match canonical serial exactly.
+  observation slices of the lane-partitioned, merge-normalized threaded step
+  match canonical serial exactly for every `LaneSchedule`.
 - `certified_batched_exact_window_is_fair` - given a
   `BatchedExactWindowCertificate`, every `IsMinPriority` entry is removed
   within the certified window.

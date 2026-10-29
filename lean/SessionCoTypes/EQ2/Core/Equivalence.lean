@@ -183,7 +183,7 @@ private theorem refl_rel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := 
           have hEq := refl_rel_eq_of_nonmu nonmu_end (nonmu_recv p bs) h
           cases hEq
       | mu t body =>
-          simpa [EQ2F] using (refl_rel_unfold_right h)
+          exact refl_rel_unfold_right h
   | var x =>
       cases b with
       | «end» =>
@@ -200,7 +200,7 @@ private theorem refl_rel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := 
           have hEq := refl_rel_eq_of_nonmu (nonmu_var x) (nonmu_recv p bs) h
           cases hEq
       | mu t body =>
-          simpa [EQ2F] using (refl_rel_unfold_right h)
+          exact refl_rel_unfold_right h
 
 -- ReflRel Postfixpoint: Send/Recv Cases
 
@@ -223,7 +223,7 @@ private theorem refl_rel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := 
           have hEq := refl_rel_eq_of_nonmu (nonmu_send p bs) (nonmu_recv q cs) h
           cases hEq
       | mu t body =>
-          simpa [EQ2F] using (refl_rel_unfold_right h)
+          exact refl_rel_unfold_right h
   | recv p bs =>
       cases b with
       | «end» =>
@@ -242,20 +242,20 @@ private theorem refl_rel_postfix : ∀ a b, ReflRel a b → EQ2F ReflRel a b := 
             branches_rel_refl (R := ReflRel) hrefl bs
           exact ⟨rfl, hbr⟩
       | mu t body =>
-          simpa [EQ2F] using (refl_rel_unfold_right h)
+          exact refl_rel_unfold_right h
 
 -- ReflRel Postfixpoint: mu Cases
 
   | mu t body =>
       cases b with
       | «end» =>
-          simpa [EQ2F] using (refl_rel_unfold_left h)
+          exact refl_rel_unfold_left h
       | var y =>
-          simpa [EQ2F] using (refl_rel_unfold_left h)
+          exact refl_rel_unfold_left h
       | send q cs =>
-          simpa [EQ2F] using (refl_rel_unfold_left h)
+          exact refl_rel_unfold_left h
       | recv q cs =>
-          simpa [EQ2F] using (refl_rel_unfold_left h)
+          exact refl_rel_unfold_left h
       | mu s body' =>
           simp [EQ2F]
           exact ⟨refl_rel_unfold_left h, refl_rel_unfold_right h⟩

@@ -168,19 +168,22 @@ def commitPack {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   -- Gate protocol-visible outputs on output-condition verification.
   match pack'.res.event.bind outputConditionClaimOfEvent with
   | none =>
-      let st' := updateCoro pack'.st coroId pack'.coro
-      (appendEvent st' pack'.res.event, pack'.res)
+      let admitted := retainSourceOperationFailure (commitNominalCommand pack')
+      let st' := updateCoro admitted.st coroId admitted.coro
+      (appendEvent st' admitted.res.event, admitted.res)
   | some claim =>
       let passed := stBase.config.outputCondition.verify claim
       let check : OutputConditionCheck := { claim := claim, passed := passed }
       if passed then
-        let st' := updateCoro pack'.st coroId pack'.coro
+        let admitted := retainSourceOperationFailure (commitNominalCommand pack')
+        let st' := updateCoro admitted.st coroId admitted.coro
         let st'' := appendOutputConditionCheck st' check
-        (appendEvent st'' pack'.res.event, pack'.res)
+        (appendEvent st'' admitted.res.event, admitted.res)
       else
-        let err : Fault γ := .specFault s!"output condition rejected: {claim.predicateRef}"
-        let coro' := { pack'.coro with status := .faulted err }
-        let st' := updateCoro stBase coroId coro'
+        let err : Fault γ := .outputCondition claim.predicateRef
+        let original := if pack'.nominalCommit then pack'.st else stBase
+        let retained := retainSourceOperationFailure (faultPack original pack'.coro err "output condition refused")
+        let st' := updateCoro retained.st coroId retained.coro
         let st'' := appendOutputConditionCheck st' check
         (st'', mkRes (.faulted err) (some StepEvent.internal))
 
@@ -233,15 +236,11 @@ def execAtPC {ι γ π ε ν : Type u} [IdentityModel ι] [GuardLayer γ]
   | _ =>
       match st.programs[coro.programId]? with
       | none =>
-          let coro' := { coro with status := .faulted (.closeFault "unknown program") }
-          let st' := updateCoro st coroId coro'
-          (st', mkRes (.faulted (.closeFault "unknown program")) (some StepEvent.internal))
+          commitPack st coroId (faultPack st coro (.closeFault "unknown program") "unknown program")
       | some prog =>
           match prog.code[coro.pc]? with
           | none =>
-              let coro' := { coro with status := .faulted (.closeFault "pc out of range") }
-              let st' := updateCoro st coroId coro'
-              (st', mkRes (.faulted (.closeFault "pc out of range")) (some StepEvent.internal))
+              commitPack st coroId (faultPack st coro (.closeFault "pc out of range") "pc out of range")
           | some instr => execWithInstr st coroId coro instr
 
 /-! ## Main stepper -/

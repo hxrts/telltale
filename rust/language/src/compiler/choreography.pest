@@ -193,12 +193,14 @@ resolve_timeout = { "Timeout" ~ ctor_value_payload? }
 resolve_cancelled = { "Cancelled" }
 invalidate_stmt = { "invalidate" ~ ident }
 
-authority_let_in_stmt = { "authoritative" ~ "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
-authority_let_stmt = { "authoritative" ~ "let" ~ ident ~ "=" ~ authority_expr }
-observe_let_in_stmt = { "observe" ~ "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
-observe_let_stmt = { "observe" ~ "let" ~ ident ~ "=" ~ authority_expr }
-let_in_stmt = { "let" ~ ident ~ "=" ~ authority_expr ~ "in" ~ block }
-let_stmt = { "let" ~ ident ~ "=" ~ authority_expr }
+binding_placement = { "at" ~ role_ref }
+
+authority_let_in_stmt = { "authoritative" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr ~ "in" ~ block }
+authority_let_stmt = { "authoritative" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr }
+observe_let_in_stmt = { "observe" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr ~ "in" ~ block }
+observe_let_stmt = { "observe" ~ "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr }
+let_in_stmt = { "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr ~ "in" ~ block }
+let_stmt = { "let" ~ ident ~ binding_placement? ~ "=" ~ authority_expr }
 case_stmt = { "case" ~ authority_expr ~ "of" ~ case_block }
 case_block = { "{" ~ case_branch+ ~ "}" | "(" ~ case_branch+ ~ ")" }
 case_branch = { "|" ~ match_pattern ~ "=>" ~ branch_body }
@@ -215,8 +217,11 @@ authority_expr = { check_expr | observe_expr | transfer_expr | result_ctor_expr 
 check_expr = { "check" ~ effect_call }
 observe_expr = { "observe" ~ effect_call }
 transfer_expr = { "transfer" ~ ident ~ "from" ~ role_ref ~ "to" ~ role_ref }
-result_ctor_expr = { ("Ok" | "Err") ~ ctor_value_payload? }
-maybe_ctor_expr = { ("Just" ~ ctor_value_payload) | "Nothing" }
+result_ctor_expr = { result_ctor_name ~ ctor_value_payload? }
+result_ctor_name = { "Ok" | "Err" }
+maybe_ctor_expr = { (just_ctor_name ~ ctor_value_payload) | nothing_ctor_name }
+just_ctor_name = { "Just" }
+nothing_ctor_name = { "Nothing" }
 ctor_value_payload = { "(" ~ ident_expr ~ ")" }
 effect_call = { ident ~ "." ~ ident ~ "(" ~ argument_list? ~ ")" }
 call_expr = { ident ~ "(" ~ argument_list? ~ ")" }

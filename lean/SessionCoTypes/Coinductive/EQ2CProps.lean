@@ -29,8 +29,7 @@ private lemma eq_of_dest_eq {a b : LocalTypeC} (h : PFunctor.M.dest a = PFunctor
   intro x y hxy
   cases hx : x.dest with
   | mk a f =>
-      have hy : y.dest = ⟨a, f⟩ := by
-        simpa [hx] using hxy.symm
+      have hy : y.dest = ⟨a, f⟩ := hxy.symm.trans hx
       refine ⟨a, f, f, rfl, hy, ?_⟩
       intro i
       rfl
@@ -169,10 +168,10 @@ lemma eq2_c_send {p : String} {bs cs : List (Label × LocalTypeC)}
   refine ⟨R', hR', ?_⟩
   exact Or.inl ⟨rfl, rfl⟩
 
+/-! ### Recv Congruence -/
+
 /-- EQ2C is closed under recv, given branch-wise EQ2C.
     Communication congruence: recv case. -/
-
-/-! ### Recv Congruence -/
 
 lemma eq2_c_recv {p : String} {bs cs : List (Label × LocalTypeC)}
     (hbr : BranchesRelC EQ2C bs cs) : EQ2C (mkRecv p bs) (mkRecv p cs) := by
@@ -266,10 +265,10 @@ lemma eq2_c_unfold_left {t u : LocalTypeC} (h : EQ2C t u) (x : String) :
   refine ⟨R', hR', ?_⟩
   exact Or.inl ⟨rfl, rfl⟩
 
+/-! ### Right Mu Wrapper -/
+
 /-- Wrap a bisimulation on the right with a μ constructor.
     Mu-unfolding congruence: right wrapper. -/
-
-/-! ### Right Mu Wrapper -/
 
 lemma eq2_c_unfold_right {t u : LocalTypeC} (h : EQ2C t u) (x : String) :
     EQ2C t (mkMu x u) := by
@@ -398,7 +397,7 @@ private lemma unfolds_to_c_tail_of_step {a a' u : LocalTypeC}
     subst hEq
     rcases hstep with ⟨x, f, hdest, rfl⟩
     have hmu : head a = .mu x := by
-      simp [head, hdest]
+      simp only [head, hdest]; rfl
     exact (hnomu ⟨x, hmu⟩).elim
   · rcases hstep' with ⟨c, hstep', hrest⟩
     have hc : c = a' := by

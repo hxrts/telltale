@@ -42,7 +42,7 @@ theorem progress_contract_is_scheduling_bound_compatible
     contract.schedulingBoundCompatible :=
   Runtime.ProtocolMachine.Model.schedulingBoundCompatible_of_progressContract contract
 
-theorem scheduler_is_starvation_free
+theorem scheduler_is_nonblocking
     {ι γ π ε ν : Type} [IdentityModel ι] [GuardLayer γ]
     [PersistenceModel π] [EffectRuntime ε] [VerificationModel ν]
     [AuthTree ν] [AccumulatedSet ν]
@@ -50,8 +50,8 @@ theorem scheduler_is_starvation_free
     [PersistenceEffectBridge π ε] [IdentityPersistenceBridge ι π]
     [IdentityVerificationBridge ι ν]
     (st : ProtocolMachineState ι γ π ε ν) :
-    starvation_free st :=
-  starvation_free_holds st
+    schedule_nonblocking st :=
+  schedule_nonblocking_holds st
 
 theorem fairness_bundle_yields_termination
     {ν : Type} [VerificationModel ν]

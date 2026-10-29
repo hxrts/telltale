@@ -150,7 +150,7 @@ theorem head_coherent_recv_preserved
       | nil =>
           rw [hTraceVal] at hTrace
           simp only [List.head?] at hTrace
-          exact Option.noConfusion hTrace
+          first | cases hTrace | simp at hTrace
       | cons t ts =>
           rw [hTraceVal] at hTrace
           simp only [List.head?, Option.some.injEq] at hTrace

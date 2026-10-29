@@ -11,20 +11,17 @@ namespace Distributed
 namespace CAP
 namespace Profile
 
-universe u v
-
-/-- Build a CAP impossibility profile from semantic assumptions and premises. -/
-def mk
-    {State : Type u} {Party : Type v}
-    (model : Model State Party)
-    (assumptions : Assumptions model)
-    (premises : ImpossibilityPremises model) :
-    ImpossibilityProtocol where
-  State := State
-  Party := Party
-  model := model
-  assumptions := assumptions
-  premises := premises
+/-- Build a CAP impossibility profile from a register algorithm and two
+distinct register values. -/
+def mk {Val Msg St : Type} (algorithm : Register.Algorithm Val Msg St)
+    (v₀ v₁ : Val) (h : v₁ ≠ v₀) : ImpossibilityProtocol where
+  Val := Val
+  Msg := Msg
+  St := St
+  algorithm := algorithm
+  initialValue := v₀
+  otherValue := v₁
+  distinct := h
 
 end Profile
 end CAP

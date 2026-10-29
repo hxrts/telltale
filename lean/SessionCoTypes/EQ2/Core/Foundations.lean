@@ -101,7 +101,8 @@ theorem eq2_gfp : EQ2 = SessionCoTypes.CoinductiveRel.gfp (F := EQ2F) := rfl
 
 /-- Alias: coinduction via CoinductiveRel. -/
 theorem eq2_coind' {R : Rel} (h : R ≤ EQ2F R) : R ≤ EQ2 := by
-  simpa [EQ2] using (SessionCoTypes.CoinductiveRel.coind (F := EQ2F) h)
+  change R ≤ (OrderHom.gfp ⟨EQ2F, eq2_f_mono⟩)
+  exact SessionCoTypes.CoinductiveRel.coind (F := EQ2F) h
 
 /-- Alias: unfold via CoinductiveRel. -/
 theorem eq2_unfold' : EQ2 ≤ EQ2F EQ2 := by

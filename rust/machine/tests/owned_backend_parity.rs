@@ -166,6 +166,29 @@ fn assert_audit(records: &[ProtocolCriticalCapabilityLifecycleRecord]) {
         );
         assert_eq!(record.tick, Some(0));
     }
+    let expected_scope = OwnershipScope::Fragments(BTreeSet::from(["A".into()]));
+    let reason = OwnershipError::ScopeViolation {
+        session_id: 0,
+        owner_id: "worker".into(),
+        required: OwnershipScope::Session,
+        actual: expected_scope.clone(),
+    }
+    .to_string();
+    let scope_rejections: Vec<_> = records
+        .iter()
+        .filter(|record| {
+            matches!(
+                &record.artifact,
+                ProtocolCriticalCapabilityArtifact::OwnershipCapability(capability)
+                if capability.session_id == 0 && capability.owner_id == "worker"
+                    && capability.generation == 2 && capability.scope == expected_scope
+                    && record.lifecycle == ProtocolCriticalCapabilityLifecycleState::Rejected
+                    && record.reason.as_deref() == Some(reason.as_str())
+            )
+        })
+        .collect();
+    assert_eq!(scope_rejections.len(), 3);
+    assert!(scope_rejections.iter().all(|record| record.tick == Some(0)));
     for state in [
         ProtocolCriticalCapabilityLifecycleState::Issued,
         ProtocolCriticalCapabilityLifecycleState::Consumed,
@@ -252,28 +275,38 @@ fn threaded_owned_transactions_match_cooperative_evidence() {
         .load_choreography_owned(&image, "trailing")
         .unwrap();
     exercise_transaction(&mut threaded, &owner, &other);
-    assert_audit(&threaded.capability_lifecycle_audit_log());
-    assert_eq!(expected, threaded.capability_lifecycle_audit_log());
-    assert_eq!(
-        cooperative.semantic_audit_log(),
-        threaded.semantic_audit_log()
-    );
-    assert_eq!(cooperative.semantic_objects(), threaded.semantic_objects());
+    let before_audit = threaded.capability_lifecycle_audit_log();
+    let cooperative_semantic = cooperative.semantic_audit_log();
+    let threaded_semantic = threaded.semantic_audit_log();
+    let cooperative_objects = cooperative.semantic_objects();
+    let threaded_objects = threaded.semantic_objects();
     threaded
         .close_and_reap_session(trailing.session_id())
         .unwrap();
     cooperative
         .close_and_reap_session(coop_trailing.session_id())
         .unwrap();
-    assert_eq!(expected, threaded.capability_lifecycle_audit_log());
-    assert_eq!(expected, cooperative.capability_lifecycle_audit_log());
+    let threaded_after_trailing = threaded.capability_lifecycle_audit_log();
+    let cooperative_after_trailing = cooperative.capability_lifecycle_audit_log();
     threaded.close_and_reap_session(owner.session_id()).unwrap();
-    assert_eq!(expected, threaded.capability_lifecycle_audit_log());
+    let after_owner = threaded.capability_lifecycle_audit_log();
     threaded.close_and_reap_session(owner.session_id()).unwrap();
-    assert_eq!(expected, threaded.capability_lifecycle_audit_log());
+    let after_repeated_disposal = threaded.capability_lifecycle_audit_log();
     other
         .apply_host_mutation(&mut threaded, mutation())
         .unwrap();
+    let joined = threaded
+        .shutdown_worker_pool()
+        .expect("same original worker pool joined");
+    assert_eq!(joined.joined_workers(), 2);
+    assert_audit(&before_audit);
+    assert_eq!(expected, before_audit);
+    assert_eq!(cooperative_semantic, threaded_semantic);
+    assert_eq!(cooperative_objects, threaded_objects);
+    assert_eq!(expected, threaded_after_trailing);
+    assert_eq!(expected, cooperative_after_trailing);
+    assert_eq!(expected, after_owner);
+    assert_eq!(expected, after_repeated_disposal);
 }
 
 #[test]

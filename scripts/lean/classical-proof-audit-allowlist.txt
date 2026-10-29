@@ -10,14 +10,33 @@
 # - External analysis laws belong in explicit API/Instance trust boundaries.
 
 # Existing explicit real-analysis trust boundary documented in lean/CODE_MAP.md.
+# Category: assumed input (Option B). The ClassicalAnalysisAPI/Instance laws are
+# assumed real-analysis inputs (or definitional identities such as
+# `spectral_gap_eq`); classical theorem families consume them as honest
+# conditional interfaces and do not claim to prove the named classical results.
 ^lean/ClassicalAnalysisAPI\.lean:
 ^lean/ClassicalAnalysisInstance\.lean:
 ^lean/ClassicalAnalysisInstance/
 
 # Non-classical theorem-pack artifact fields share the artifact schema file.
-^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*safeFinality[[:space:]]*:
-^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*probabilisticSafety[[:space:]]*:
-^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*settlementFinality[[:space:]]*:
-^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*accountableSafety[[:space:]]*:
-^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*byzantineSafety[[:space:]]*:
-^lean/Runtime/Proofs/TheoremPack/Artifacts\.lean:.*recoveryActionSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*safeFinality[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*probabilisticSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*settlementFinality[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*accountableSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*byzantineSafety[[:space:]]*:
+^lean/Runtime/Proofs/TheoremPack/Artifacts/Distributed\.lean:.*recoveryActionSafety[[:space:]]*:
+
+# Induction motives: auxiliary motives for mutual/nested recursors over branch
+# lists. `True` is the correct motive for components the theorem says nothing
+# about; these are proof-internal `let` bindings, not exported guarantees.
+^lean/SessionTypes/LocalTypeDB/Preservation/Contractiveness\.lean:[0-9]+:  let P2 : List \(Label × LocalTypeDB\) → Prop := fun _ => True$
+^lean/SessionTypes/LocalTypeConvProofs/Roundtrip/Contractive\.lean:[0-9]+:  let P[23] : .* → Prop := fun _ => True$
+^lean/SessionTypes/LocalTypeConvProofs/Roundtrip/General\.lean:[0-9]+:  let P[234] : .* → Prop := fun _ => True$
+
+# Coinduction witness: the total relation is the post-fixed point used to show
+# every pair of naturals is EffectBisim-related under unit observation.
+^lean/Runtime/Proofs/EffectBisim/Examples\.lean:[0-9]+:.*fun _ _ : Nat => True\)
+
+# Documented degenerate smoke-test transport context over `Unit` (profile
+# plumbing typecheck only; docstring states it is not evidence of anything).
+^lean/Runtime/Proofs/Examples/ClassicalProfiles\.lean:[0-9]+:  , (coherent := fun _ => True|harmony := True|finiteState := True)$

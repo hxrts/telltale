@@ -240,6 +240,8 @@ private theorem dual_rel_postfix_mu_mu {t s : String} {body body' : LocalTypeR}
 
 /-! ## DualRel Postfixpoint Proof -/
 
+-- Asymmetric μ cases are handled at the end of the proof below.
+
 /-- DualRel is a post-fixpoint of EQ2F up to EQ2 closure. -/
 private theorem dual_rel_postfix_upto :
     ∀ a' b', DualRel a' b' → EQ2F (EQ2_closure DualRel) a' b' := by
@@ -252,8 +254,6 @@ private theorem dual_rel_postfix_upto :
     obtain ⟨hp, hbranches⟩ := hf; exact dual_rel_postfix_recv_recv hp hbranches
   case mu.mu t body s body' =>
     obtain ⟨hleft, hright⟩ := hf; exact dual_rel_postfix_mu_mu hleft hright
-
-/-! ## DualRel Postfixpoint Proof: Asymmetric μ Cases -/
 
   case mu.end t body =>
     simp [LocalTypeR.dual]

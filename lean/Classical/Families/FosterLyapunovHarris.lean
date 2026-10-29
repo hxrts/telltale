@@ -2,6 +2,12 @@ import Mathlib
 
 /-! # Foster-Lyapunov-Harris Stability Theory
 
+**Scope (Option B, honest conditional interface).** Only deterministic facts about a `DriftSystem` (a step map with a
+nat-valued potential that never increases and strictly decreases when
+positive) are proved, including that the potential reaches zero within
+`V s` steps. There is no probability, Markov kernel, petite set or Harris
+recurrence here; the stochastic Foster-Lyapunov theorem is not proved.
+
 This module provides the mathematical foundation for proving liveness in session-typed
 distributed systems. The Foster-Lyapunov method originates from the theory of Markov
 chains, where it establishes conditions under which a stochastic system returns to a
@@ -44,8 +50,10 @@ ensures that every protocol step either:
   3. Resolves a choice (decreasing send_potential)
 
 This gives us the drift condition. The set C corresponds to completed sessions
-(where V = 0). The transported theorem `DriftSystem.iterate_nonincrease` then
-guarantees that every coherent protocol execution eventually terminates.
+(where V = 0). For a *deterministic* `DriftSystem`, `DriftSystem.reaches_zero_within_rank`
+proves the potential reaches zero within `V s₀` steps. Whether a concrete protocol
+step actually satisfies the drift fields is a separate obligation (see
+`Protocol.Classical.Instantiation.FosterDrain` for one genuine instance).
 
 ## Key Properties
 
@@ -114,22 +122,31 @@ theorem iterate_nonincrease (s : α) :
         _ ≤ S.V (S.step^[n] s) := S.nonincrease _
         _ ≤ S.V s := ih
 
-/-- When V > 0, every step makes strict progress.
+/-- Bounded-rank form of `reaches_zero_within_rank`, by induction on the bound. -/
+theorem reaches_zero_of_rank_le :
+    ∀ k s, S.V s ≤ k → ∃ n ≤ S.V s, S.V (S.step^[n] s) = 0 := by
+  intro k
+  induction k with
+  | zero =>
+      intro s hs
+      exact ⟨0, Nat.zero_le _, by simpa using Nat.le_zero.mp hs⟩
+  | succ k ih =>
+      intro s hs
+      by_cases h0 : S.V s = 0
+      · exact ⟨0, Nat.zero_le _, by simpa using h0⟩
+      · have hlt := S.strict_on_pos s h0
+        obtain ⟨n, hn, hz⟩ := ih (S.step s) (by omega)
+        exact ⟨n + 1, by omega, by simpa [Function.iterate_succ_apply] using hz⟩
 
-    For protocols: a coherent configuration with pending work (non-empty buffers or
-    nonterminal types) can always take a step that reduces the progress measure. -/
-theorem strictly_decreases_on_pos (s : α) (hpos : S.V s ≠ 0) :
-    S.V (S.step s) < S.V s :=
-  S.strict_on_pos s hpos
+/-- Deterministic termination: from any state the potential reaches zero within
+    `V s` steps (strict decrease on positive potential, `V : α → ℕ`).
 
-/-- States with V = 0 are fixed points (already at the minimum).
-
-    For protocols: completed sessions have V = 0 and no further steps are needed. -/
-theorem reaches_zero_of_zero_rank (s : α) (hzero : S.V s = 0) :
-    ∃ n ≤ S.V s, S.V (S.step^[n] s) = 0 := by
-  refine ⟨0, ?_, ?_⟩
-  · simp [hzero]
-  · simpa using hzero
+    This is a deterministic well-founded-descent fact, not the stochastic
+    Foster-Lyapunov theorem (which needs a Markov kernel, an expected-drift
+    condition and a petite set, and concludes positive Harris recurrence). -/
+theorem reaches_zero_within_rank (s : α) :
+    ∃ n ≤ S.V s, S.V (S.step^[n] s) = 0 :=
+  reaches_zero_of_rank_le S (S.V s) s le_rfl
 
 end DriftSystem
 

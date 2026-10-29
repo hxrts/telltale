@@ -42,7 +42,7 @@ theorem branches_rel_substitute (var : String) (repl : LocalTypeR)
     · exact ih hbarAs hbarBs'
 
 /-- Helper to convert htvar/hsvar proofs to the expected form. -/
-private theorem bne_of_not_bound_at_mu {v t : String} {body : LocalTypeR}
+theorem bne_of_not_bound_at_mu {v t : String} {body : LocalTypeR}
     (hbar : notBoundAt v (.mu t body) = true) :
     (t == v) = false := by
   unfold notBoundAt at hbar

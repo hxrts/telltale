@@ -30,6 +30,7 @@ pub(crate) enum Statement {
         operation: String,
     },
     Let {
+        execution_role: Option<Role>,
         name: String,
         mode: AuthorityBindingMode,
         expr: AuthorityExprSpec,

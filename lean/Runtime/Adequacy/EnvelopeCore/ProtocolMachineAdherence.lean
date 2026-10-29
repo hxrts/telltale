@@ -153,94 +153,67 @@ def CapabilityMonotonicity
 
 -- Protocol-Machine Adherence Premises
 
-/-- E3: protocol-machine adherence + adequacy premise bundle for theorem extraction. -/
+/-- E3: protocol-machine adherence premise bundle.
+
+Observational adequacy and full abstraction are not premises: they are
+derived below from the hypothesis bundles and the definition of `EqEnv*`.
+The `assumed*` fields remain genuinely assumed inputs. -/
 structure ProtocolMachineEnvelopeAdherencePremises
     (State : Type u) (Obs : Type v) (Placement : Type (max u v)) where
   localHypotheses : ProtocolMachineLocalEnvelopeHypotheses State Obs
   shardedHypotheses : ProtocolMachineShardedEnvelopeHypotheses State Obs
   subtype : SpatialSubtype Placement
   obligation : Placement → Run State → Run State → Prop
-  monotonicityWitness :
+  /-- Assumed input: spatial-subtyping monotonicity of `obligation`. -/
+  assumedSpatialMonotonicity :
     SpatialSubtypingMonotonicity subtype obligation
-  localAdequacyWitness :
-/- ## Structured Block 3 -/
-    ProtocolMachineObservationalAdequacyModuloEnvelope
-      (EqEnvLocal localHypotheses.localEnvelope)
-      localHypotheses.refRun localHypotheses.vmRun
-  shardedAdequacyWitness :
-    ProtocolMachineObservationalAdequacyModuloEnvelope
-      (EqEnvShard shardedHypotheses.shardedEnvelope)
-      shardedHypotheses.refRun shardedHypotheses.vmRun
-  localFullAbstractionWitness :
-    EnvelopeFullAbstraction
-      localHypotheses.localEnvelope.toEnvelope.observe
-      (EqEnvLocal localHypotheses.localEnvelope)
-  shardedFullAbstractionWitness :
-    EnvelopeFullAbstraction
-      shardedHypotheses.shardedEnvelope.toEnvelope.observe
-      (EqEnvShard shardedHypotheses.shardedEnvelope)
   guarantee : CertifiedEnvelopeCapability → Prop
   weakCapability : CertifiedEnvelopeCapability
   strongCapability : CertifiedEnvelopeCapability
-  capabilityMonotonicityWitness : CapabilityMonotonicity guarantee
+  /-- Assumed input: monotonicity of `guarantee` in capability strength. -/
+  assumedCapabilityMonotonicity : CapabilityMonotonicity guarantee
   strongStrengthensWeak :
     CapabilityStrengthens strongCapability weakCapability
 
--- Premise Projections
+-- Derived Adequacy and Full Abstraction
 
-/-- E3: extract local observational adequacy modulo envelope from protocol-machine premises. -/
-theorem protocol_machine_local_adequacy_of_premises
-    {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
+/-- E3: local observational adequacy follows from local adherence (soundness). -/
+theorem protocol_machine_local_adequacy_of_adherence
+    {State : Type u} {Obs : Type v}
+    (h : ProtocolMachineLocalEnvelopeHypotheses State Obs) :
     ProtocolMachineObservationalAdequacyModuloEnvelope
-      (EqEnvLocal p.localHypotheses.localEnvelope)
-      p.localHypotheses.refRun p.localHypotheses.vmRun :=
-  p.localAdequacyWitness
+      (EqEnvLocal h.localEnvelope) h.refRun h.vmRun :=
+  fun ref pm hRef hPm => h.adherenceWitness ref pm hRef hPm
 
-/-- E3: extract sharded observational adequacy modulo envelope from protocol-machine premises. -/
-theorem protocol_machine_sharded_adequacy_of_premises
-    {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
+/-- E3: sharded observational adequacy follows from sharded adherence (soundness). -/
+theorem protocol_machine_sharded_adequacy_of_adherence
+    {State : Type u} {Obs : Type v}
+    (h : ProtocolMachineShardedEnvelopeHypotheses State Obs) :
     ProtocolMachineObservationalAdequacyModuloEnvelope
-      (EqEnvShard p.shardedHypotheses.shardedEnvelope)
-      p.shardedHypotheses.refRun p.shardedHypotheses.vmRun :=
-  p.shardedAdequacyWitness
+      (EqEnvShard h.shardedEnvelope) h.refRun h.vmRun :=
+  fun ref pm hRef hPm => h.adherenceWitness ref pm hRef hPm
 
-/-- E3: extract local full-abstraction/adequacy witness from protocol-machine premises. -/
-theorem protocol_machine_local_full_abstraction_of_premises
-    {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
-    EnvelopeFullAbstraction
-      p.localHypotheses.localEnvelope.toEnvelope.observe
-      (EqEnvLocal p.localHypotheses.localEnvelope) :=
-  p.localFullAbstractionWitness
+/-- E3: every local envelope is fully abstract for its own erased observations. -/
+theorem local_envelope_full_abstraction
+    {State : Type u} {Obs : Type v} (E : LocalEnvelope State Obs) :
+    EnvelopeFullAbstraction E.toEnvelope.observe (EqEnvLocal E) :=
+  ⟨fun _ _ h => h, fun _ _ h => h⟩
 
-/-- E3: extract sharded full-abstraction/adequacy witness from protocol-machine premises. -/
-theorem protocol_machine_sharded_full_abstraction_of_premises
-    {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
-    EnvelopeFullAbstraction
-      p.shardedHypotheses.shardedEnvelope.toEnvelope.observe
-      (EqEnvShard p.shardedHypotheses.shardedEnvelope) :=
-  p.shardedFullAbstractionWitness
-
-/-- E3: extract protocol-machine adherence monotonicity under spatial refinement. -/
-theorem protocol_machine_adherence_monotonicity_of_premises
-/- ## Structured Block 4 -/
-    {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
-    (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
-    SpatialSubtypingMonotonicity p.subtype p.obligation :=
-  p.monotonicityWitness
+/-- E3: every sharded envelope is fully abstract for its own erased observations. -/
+theorem sharded_envelope_full_abstraction
+    {State : Type u} {Obs : Type v} (E : ShardedEnvelope State Obs) :
+    EnvelopeFullAbstraction E.toEnvelope.observe (EqEnvShard E) :=
+  ⟨fun _ _ h => h, fun _ _ h => h⟩
 
 -- Capability-Monotonicity Projection
 
-/-- E3: extract capability monotonicity theorem from protocol-machine premises. -/
+/-- E3: instantiate the assumed capability monotonicity at the strong/weak pair. -/
 theorem protocol_machine_capability_monotonicity_of_premises
     {State : Type u} {Obs : Type v} {Placement : Type (max u v)}
     (p : ProtocolMachineEnvelopeAdherencePremises State Obs Placement) :
     p.guarantee p.weakCapability → p.guarantee p.strongCapability := by
   intro hWeak
-  exact p.capabilityMonotonicityWitness
+  exact p.assumedCapabilityMonotonicity
     p.weakCapability p.strongCapability p.strongStrengthensWeak hWeak
 
 -- Packaged Protocol-Machine Adherence Protocol
@@ -276,22 +249,23 @@ structure ProtocolMachineEnvelopeAdherenceProtocol where
 
   -- Packaged Protocol-Machine Adherence Protocol: Adequacy Fields
 
+  /-- Assumed (re-exposed from `premises.assumedSpatialMonotonicity`). -/
   monotonicity :
     SpatialSubtypingMonotonicity premises.subtype premises.obligation :=
-      protocol_machine_adherence_monotonicity_of_premises premises
+      premises.assumedSpatialMonotonicity
   localAdequacy :
     ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvLocal premises.localHypotheses.localEnvelope)
       premises.localHypotheses.refRun
       premises.localHypotheses.vmRun :=
-        protocol_machine_local_adequacy_of_premises premises
+        protocol_machine_local_adequacy_of_adherence premises.localHypotheses
   shardedAdequacy :
     ProtocolMachineObservationalAdequacyModuloEnvelope
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope)
 /- ## Structured Block 5 -/
       premises.shardedHypotheses.refRun
       premises.shardedHypotheses.vmRun :=
-        protocol_machine_sharded_adequacy_of_premises premises
+        protocol_machine_sharded_adequacy_of_adherence premises.shardedHypotheses
 
   -- Packaged Protocol-Machine Adherence Protocol: Full-Abstraction Fields
 
@@ -299,12 +273,12 @@ structure ProtocolMachineEnvelopeAdherenceProtocol where
     EnvelopeFullAbstraction
       premises.localHypotheses.localEnvelope.toEnvelope.observe
       (EqEnvLocal premises.localHypotheses.localEnvelope) :=
-        protocol_machine_local_full_abstraction_of_premises premises
+        local_envelope_full_abstraction premises.localHypotheses.localEnvelope
   shardedFullAbstraction :
     EnvelopeFullAbstraction
       premises.shardedHypotheses.shardedEnvelope.toEnvelope.observe
       (EqEnvShard premises.shardedHypotheses.shardedEnvelope) :=
-        protocol_machine_sharded_full_abstraction_of_premises premises
+        sharded_envelope_full_abstraction premises.shardedHypotheses.shardedEnvelope
   capabilityMonotonicity :
     premises.guarantee premises.weakCapability →
     premises.guarantee premises.strongCapability :=

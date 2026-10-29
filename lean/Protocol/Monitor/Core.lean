@@ -275,7 +275,7 @@ theorem mem_of_consume_token (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : Local
   induction ctx generalizing ctx' with
   | nil =>
     simp only [LinCtx.consumeToken] at hConsume
-    exact Option.noConfusion hConsume
+    first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
   | cons hd tl ih =>
     simp only [LinCtx.consumeToken] at hConsume
     split_ifs at hConsume with heq
@@ -287,7 +287,7 @@ theorem mem_of_consume_token (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' : Local
       cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume
-        exact Option.noConfusion hConsume
+        first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
       | some result =>
         simp only [hConsume', Option.some.injEq, Prod.mk.injEq] at hConsume
         obtain ⟨rfl, rfl⟩ := hConsume
@@ -307,7 +307,7 @@ theorem mem_consume_token_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' 
   induction ctx generalizing ctx' with
   | nil =>
     simp only [LinCtx.consumeToken] at hConsume
-    exact Option.noConfusion hConsume
+    first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
 /- ## Structured Block 3 -/
   | cons hd tl ih =>
     simp only [LinCtx.consumeToken] at hConsume
@@ -327,7 +327,7 @@ theorem mem_consume_token_preserved (ctx ctx' : LinCtx) (e e' : Endpoint) (S S' 
       cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume
-        exact Option.noConfusion hConsume
+        first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
       | some result =>
         simp only [hConsume', Option.some.injEq, Prod.mk.injEq] at hConsume
         obtain ⟨rfl, rfl⟩ := hConsume
@@ -347,7 +347,7 @@ theorem consume_token_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
   induction ctx generalizing ctx' with
   | nil =>
     simp only [LinCtx.consumeToken] at hConsume
-    exact Option.noConfusion hConsume
+    first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
   | cons hd tl ih =>
     simp only [LinCtx.consumeToken] at hConsume
     split_ifs at hConsume with heq
@@ -367,7 +367,7 @@ theorem consume_token_not_mem (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType)
       cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume
-        exact Option.noConfusion hConsume
+        first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
 /- ## Structured Block 4 -/
       | some result =>
         simp only [hConsume', Option.some.injEq, Prod.mk.injEq] at hConsume
@@ -393,7 +393,7 @@ theorem consume_token_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType
   induction ctx generalizing ctx' with
   | nil =>
     simp only [LinCtx.consumeToken] at hConsume
-    exact Option.noConfusion hConsume
+    first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
   | cons hd tl ih =>
     simp only [LinCtx.consumeToken] at hConsume
     split_ifs at hConsume with heq
@@ -406,7 +406,7 @@ theorem consume_token_pairwise (ctx ctx' : LinCtx) (e : Endpoint) (S : LocalType
       cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume
-        exact Option.noConfusion hConsume
+        first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
       | some result =>
         simp only [hConsume', Option.some.injEq, Prod.mk.injEq] at hConsume
         obtain ⟨rfl, rfl⟩ := hConsume
@@ -446,7 +446,7 @@ theorem consume_token_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Lo
   induction ctx generalizing ctx' with
   | nil =>
     simp only [LinCtx.consumeToken] at hConsume
-    exact Option.noConfusion hConsume
+    first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
   | cons hd tl ih =>
     simp only [LinCtx.consumeToken] at hConsume
     split_ifs at hConsume with heq
@@ -459,7 +459,7 @@ theorem consume_token_endpoint_in_ctx (ctx ctx' : LinCtx) (e : Endpoint) (S : Lo
     · cases hConsume' : LinCtx.consumeToken tl e with
       | none =>
         simp only [hConsume'] at hConsume
-        exact Option.noConfusion hConsume
+        first | exact Option.noConfusion hConsume | cases hConsume | simp at hConsume
       | some result =>
         simp only [hConsume', Option.some.injEq, Prod.mk.injEq] at hConsume
         obtain ⟨rfl, rfl⟩ := hConsume

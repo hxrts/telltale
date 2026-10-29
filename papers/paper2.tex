@@ -198,9 +198,12 @@
 	decision schemas over regular fragments supply the algorithmic analysis. The weighted measure is
 	$W = 2 \cdot \Sigma\text{depth} + \Sigma\text{buffer}$. Productive steps strictly decrease $W$,
 	which yields explicit productive-step bounds and scheduler-lifted total-step bounds under stated
-	assumptions. Finite-reachability schemas then yield decidability for asynchronous subtyping,
-	regular type equivalence, crash-stop tolerance, and branching feasibility. All core claims are
-	mechanized in Lean~4. This paper builds directly on \emph{Coherence for Asynchronous Buffered MPST},
+	assumptions. Finite-reachability schemas then yield decision results for regular type
+	equivalence and crash-stop tolerance and an exact criterion for branching feasibility.
+	Asynchronous subtyping is undecidable even for regular types, so for it we give a sound
+	bounded checker whose acceptance implies subtyping. The descent lemmas and decision lemmas are
+	mechanized in Lean~4; scheduler-lift, capacity-threshold, and Byzantine results are stated
+	relative to explicit premises recorded in the paper. This paper builds directly on \emph{Coherence for Asynchronous Buffered MPST},
 	providing a quantitative and decision layer.
 \end{abstract}
 
@@ -226,8 +229,8 @@ invariant over local environments and buffered traces.
 
 \subsection{Contribution}
 
-This paper studies what can be computed from that kernel statically and during runtime. Our contribution is twofold. We first give explicit quantitative bounds, then develop uniform
-decidability transfer through one finite-state schema.
+This paper studies what can be computed from that kernel statically and during runtime. Our contribution is twofold. We first give explicit quantitative bounds, then develop a uniform
+decision schema over finite reachable structure, together with its limits.
 
 The quantitative branch uses a classical Lyapunov template from stability theory (Lyapunov, 1892).
 The method chooses a nonnegative potential and proves strict decrease under productive transitions.
@@ -247,24 +250,27 @@ The algorithmic branch follows a standard regularity-to-decidability strategy fr
 analysis. Regularity assumptions are used to bound reachable structure, then one terminating
 exploration yields decision procedures by soundness and completeness transfer (Karp and Miller,
 1969; Brand and Zafiropulo, 1983; Hopcroft and Ullman, 1979; Baier and Katoen, 2008). What is new
-here is a single reusable schema that instantiates to asynchronous subtyping, regular equivalence,
-crash tolerance, and branching feasibility without changing the core proof pattern.
+here is a single reusable schema that instantiates to regular equivalence, crash tolerance, and
+branching feasibility without changing the core proof pattern. Asynchronous subtyping falls outside
+the schema: it is undecidable even on regular session types (Bravetti et al., 2017; Lange and
+Yoshida, 2017), and we mechanize only a sound, fuel-bounded checker for it.
 
 Capacity thresholds follow a standard phase-boundary intuition in buffered and queue-like systems,
 where behavior classes change when load or backlog crosses a boundary. The standard point is
 qualitative phase separation between safe and unstable regions. What is new here is a theorem-level
-threshold boundary $\Bc$ with an exact interface-level characterization under explicit MPST assumptions.
+threshold boundary $\Bc$, characterized under explicit determinism and finite-occupancy premises.
 
 Operationally, $\Bc$ is a regime split. Below $\Bc$ one behavior class is admitted by the theorem
 profile. Above $\Bc$ a different class appears and may require stronger conditions. The boundary
 statement is exact under the paper's assumptions.
 
 An information-theoretic view helps interpret the decision layer. Regularity hypotheses induce
-finite summaries that preserve exactly the predicates this paper decides, which is a sufficiency
+finite summaries that preserve the predicates this paper decides, which is a sufficiency
 claim rather than heuristic compression (Cover and Thomas, 2006). In that sense the finite
-exploration graph is an analysis channel with no decision loss for the targeted properties.
+exploration graph is an analysis channel with no decision loss for the targeted properties;
+asynchronous subtyping is the instructive exception, where no such finite summary exists in general.
 
-The paper presents a single operational kernel with two branch-specific lifts. Equation~\ref{eq:p2-proof-split} summarizes this split: quantitative bounds use weighted-measure descent laws, while algorithmic decidability uses regular finite reachability and finite exploration.
+The paper presents a single operational kernel with two branch-specific lifts. Equation~\ref{eq:p2-proof-split} summarizes this split: quantitative bounds use weighted-measure descent laws, while algorithmic decision results use regular finite reachability and finite exploration.
 
 \begingroup
 \setlength{\abovedisplayskip}{3pt}
@@ -383,16 +389,16 @@ maximality are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 
 In Table~\ref{tab:p2-series-dependencies}, Quantitative, Algorithmic, Crash, and Byzantine correspond to Theorem~\ref{thm:quantitative}, Theorem~\ref{thm:algorithmic}, Theorem~\ref{thm:crash}, and Theorem~\ref{thm:byzantine} with Corollary~\ref{cor:converse} and Proposition~\ref{prop:vm-bridge}.
 Byzantine progression note. Paper 1 provides the BZ interface obligations and
-their bridge-facing shape. This paper adds exact safety characterization at the
-declared profile interface, converse witness families, and profile-gated VM
-admission linkage.
+their bridge-facing shape. This paper adds an exact certified-versus-committed safety
+characterization for the declared model, refuters for supplied contradiction
+witnesses, and a capability gate for VM admission.
 
 Our contributions in this paper are as follows:
 \begin{enumerate}
 	\item A quantitative descent theorem with explicit productive-step and scheduler-lifted total-step bounds from one weighted measure.
-	\item A uniform algorithmic schema that turns regular finite reachability into reusable decidability procedures.
-	\item A crash-stop tolerance characterization with decision and residual-graph exactness under stated side conditions.
-	\item A Byzantine safety characterization interface with exact iff form, converse counterexample families, and VM-bridge handoff obligations.
+	\item A uniform algorithmic schema that turns regular finite reachability into reusable decision procedures (regular equivalence, crash tolerance, branching feasibility), and a sound bounded checker for asynchronous subtyping, which is undecidable in general.
+	\item A sound and complete decider for crash-stop tolerance, defined as residual-graph connectivity.
+	\item A Byzantine safety interface: an exact iff between certified-side and committed-side safety for the declared model, safety from an explicit quorum-assumption bundle, refuters for supplied contradiction witnesses, and a capability gate for VM admission.
 	\item A mechanized architecture that shares one operational kernel while making branch-specific premises explicit (weighted-descent premises for quantitative claims, regular finite reachability premises for decision claims).
 \end{enumerate}
 
@@ -842,13 +848,31 @@ Expressiveness note. This fragment includes finite-control request response work
 			\iff\ \mathcal{P}(x).
 		\end{aligned}
 	\end{equation}
-	In particular, asynchronous subtyping and regular type equivalence are decidable on the regular fragment.
+	In particular, regular type equivalence is decidable on the regular fragment.
 \end{theorem}
+
+\begin{remark}[Asynchronous Subtyping Is Not an Instance]
+	\label{rem:p2-async}
+	Asynchronous subtyping does not satisfy Definition~\ref{def:p2-admissible-family}: its
+	exploration triples carry unbounded buffers, and the relation is undecidable even for regular
+	session types (Bravetti et al., 2017; Lange and Yoshida, 2017). The mechanization instead provides
+	a fuel-bounded exploration \texttt{checkAsync} returning \texttt{accepted}, \texttt{stuck}, or
+	\texttt{outOfFuel}. Soundness, \nolinkurl{check_async_sound}, states that
+	\texttt{accepted} implies $S \le_a T$ for any sound equality test used to close cycles; the
+	Boolean form \texttt{isAsyncSubtypeBounded} inherits this. The results \texttt{stuck} and
+	\texttt{outOfFuel} are inconclusive and do not refute subtyping.
+\end{remark}
 
 Schema/instance boundary. Theorem~\ref{thm:algorithmic} is a schema claim for
 families satisfying Definition~\ref{def:p2-admissible-family}. The instantiated
-claims in this paper are asynchronous subtyping and regular type equivalence
-only; other families require an explicit admissibility witness.
+claim in this section is regular type equivalence only (asynchronous subtyping
+is covered only by the sound bounded checker of
+Remark~\ref{rem:p2-async}); other families require an explicit admissibility
+witness. For regular equivalence, the mechanized terminating bisimulation
+checker is sound (\nolinkurl{regular_type_eq_check_sound}); the total wrapper
+specified by \nolinkurl{regular_type_eq_decide_spec} falls back to a classical
+decision when the checker rejects, so completeness of the executable checker
+itself is not mechanized.
 
 Running-example instantiation. The request/grant/report witness in
 Section~\ref{sec:example} is an instance where the finite-state checker side of
@@ -859,7 +883,7 @@ the regular finite-reachability fragment in this paper and does not require
 Paper 3 for correctness. Effect-level transport is restricted to the
 witness-carrying rational subclass via
 \nolinkurl{rational_effect_transport_bridge}; witness-check
-soundness/completeness is provided by
+soundness and witness existence are provided by
 \nolinkurl{check_rational_effect_witness_sound} and
 \nolinkurl{check_rational_effect_witness_complete}; strict outside
 non-transportability is witnessed by
@@ -869,11 +893,12 @@ consumes this as a boundary interface and does not back-propagate new premises
 into this theorem.
 
 \begin{proof}[Proof sketch]
-	Proof mode: compositional reduction with finite exploration. By Definition~\ref{def:p2-admissible-family}, fix $\mathsf{obj}_{\mathcal{P}}$ and $\mathsf{check}_{\mathcal{P}}$ with closure/correctness witnesses. Build finite reachable triple/pair structures from regularity (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{reachable_pairs_finite}), run terminating exploration/checkers, and apply reduction correctness. Instantiating this schema yields deciders for async subtyping (\nolinkurl{async_subtype_decidable}) and regular equivalence (\nolinkurl{regular_type_eq_check_sound},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
+	Proof mode: compositional reduction with finite exploration. By Definition~\ref{def:p2-admissible-family}, fix $\mathsf{obj}_{\mathcal{P}}$ and $\mathsf{check}_{\mathcal{P}}$ with closure/correctness witnesses. Build the finite reachable pair structure from regularity (\nolinkurl{reachable_pairs_finite}), run the terminating checker, and apply reduction correctness. Instantiating this schema yields the regular-equivalence decision result (\nolinkurl{regular_type_eq_check_sound},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
 	Compositional part: finite-reachability construction plus terminating checker
-	execution. Coinductive part: regular-equivalence correctness identifies a
-	greatest fixed-point relation on the finite reachable graph, then proves the
-	checker coincides with that relation by soundness/completeness.
+	execution. Coinductive part: an accepted run of the checker is a
+	bisimulation on the finite reachable graph, hence contained in the greatest
+	fixed point \texttt{EQ2C}; the total wrapper closes the converse direction
+	classically.
 \end{proof}
 
 Equation~\ref{eq:p2-algorithmic-workflow} records the generic workflow.
@@ -906,7 +931,7 @@ family used for crash and Byzantine interface readings in this section.
 
 \begin{assumption}[Crash-Stop Characterization Premises]
 	\label{assump:p2-crash}
-	Crash-tolerance characterization assumes crash-stop faults, finite role graphs, and the residual-graph side conditions used by the decision profile.
+	Crash-tolerance characterization assumes crash-stop faults and finite role graphs; $\mathsf{CrashTolerant}(R,F)$ is defined as connectivity of the residual graph after removing $F$.
 \end{assumption}
 
 \begin{theorem}[Crash-Stop Tolerance Characterization]
@@ -928,7 +953,7 @@ family used for crash and Byzantine interface readings in this section.
 			\iff\ \mathsf{ResidualReachable}(R,F).
 		\end{aligned}
 	\end{equation}
-	The theorem also includes witness families where topology changes flip tolerance outcomes within the stated side-condition class.
+	The second equivalence holds by definition of $\mathsf{CrashTolerant}$; the substantive content is that the executable decider is sound and complete.
 \end{theorem}
 
 Running-example instantiation. For the running protocol shape in
@@ -936,7 +961,7 @@ Section~\ref{sec:example}, crash removal is read as residual reachability over
 the same finite role graph.
 
 \begin{proof}[Proof sketch]
-	Construct the residual graph after removing crashed roles and edges, and define \texttt{crashTolerantDec} as reachability over that residual object. Soundness is provided by \nolinkurl{crash_tolerant_dec_sound}, which turns a positive decider result into crash tolerance. Completeness and exact characterization come from \nolinkurl{crash_tolerance_iff}, and witness families are obtained by topology perturbations that cross the connectivity boundary.
+	Construct the residual graph after removing crashed roles and edges, and define \texttt{crashTolerantDec} as reachability over that residual object. Soundness is provided by \nolinkurl{crash_tolerant_dec_sound}, which turns a positive decider result into crash tolerance, and completeness by \nolinkurl{crash_tolerant_dec_complete}; both reduce to correctness of the connectivity check. The residual-graph equivalence \nolinkurl{crash_tolerance_iff} unfolds the definition.
 \end{proof}
 
 \begin{assumption}[Byzantine Characterization Premises]
@@ -970,17 +995,20 @@ Define
 \end{equation}
 where each conjunct names the corresponding requirement class in \Hbyz.
 
-New in this paper: exact profile-indexed Byzantine safety characterization for
-the dynamics layer, plus converse witness families for dropped assumption
-classes.
+New in this paper: an exact Byzantine safety characterization for the
+declared model, a safety theorem from the explicit quorum bundle, and refuters
+for supplied contradiction witnesses. Here we write $\ByzChar$ for the
+certified-side condition (no two certified decisions at a state conflict) used
+by the mechanization; the conjunction above is the profile-level reading of
+the premises that establish it.
 
 \begin{theorem}[Exact Byzantine Safety Characterization]
 	\label{thm:byzantine}
-	Under Assumption Block~\ref{assump:p2-byzantine}, profile extraction yields an exact-characterization package for the declared Byzantine model. At this paper interface, the package gives
+	For a declared Byzantine model whose committed decisions are exactly those backed by certificates, the certified-side condition and committed-side safety coincide,
 	\begin{equation}
-		\ByzChar \iff \ByzSafe.
+		\ByzChar \iff \ByzSafe,
 	\end{equation}
-	with relative maximality for the same characterization relation.
+	with relative maximality for the same characterization relation. Under Assumption Block~\ref{assump:p2-byzantine}, instantiated as a quorum-geometry assumption bundle, $\ByzSafe$ holds.
 \end{theorem}
 
 Running-example instantiation. In Section~\ref{sec:example}, the same trace
@@ -990,13 +1018,13 @@ characterization is enabled.
 Series scope note. This theorem is the dynamics-layer Byzantine safety interface. \emph{Harmony from Coherence in Asynchronous MPST} reuses the same bundle and extends it to envelope-level maximality and adherence transport.
 
 \begin{proof}[Proof sketch]
-	Fix the Byzantine assumption bundle as a typed profile and apply \nolinkurl{byzantine_safety_exact_of_profile} to obtain \texttt{ExactByzantineSafetyCharacterization} for the profile model.
+	Apply \nolinkurl{exact_byzantine_safety_characterization} to obtain \texttt{ExactByzantineSafetyCharacterization} for the model.
 
 	\begin{enumerate}
-		\item Pin the Byzantine assumption bundle as a typed profile (\Hbyz components).
-		\item Project soundness, completeness, and maximality from the extracted exact-characterization object.
-		\item Interpret soundness and completeness as the two interface implications between \ByzChar and \ByzSafe in this paper's model scope.
-		\item Record explicit assumption classes for converse sharpness (Corollary~\ref{cor:converse}).
+		\item Soundness lifts each committed decision to a certificate and applies the certified-side condition.
+		\item Completeness projects each certificate to a commitment and applies committed-side safety.
+		\item Maximality follows from completeness.
+		\item Safety under the bundle is \nolinkurl{byzantine_safety_of_assumptions}, which excludes certified conflicts by quorum intersection.
 	\end{enumerate}
 
 	The full envelope-maximality development is deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
@@ -1004,44 +1032,36 @@ Series scope note. This theorem is the dynamics-layer Byzantine safety interface
 
 \begin{corollary}[Converse Counterexample Families]
 	\label{cor:converse}
-	Under Assumption Block~\ref{assump:p2-byzantine}, if any required class in \Hbyz is dropped, there exists a counterexample family that violates \ByzSafe. The dropped classes are quorum or intersection obligations, authentication or evidence-validity obligations, adversarial-budget obligations, and primitive-consistency obligations.
+	For each assumption class in \Hbyz (quorum or intersection, authentication or evidence validity, adversarial budget, primitive consistency), a supplied contradiction witness tagged with that class refutes $\ByzChar$, and hence $\ByzSafe$, for the model in which it lives.
 \end{corollary}
 
 \begin{proof}[Proof sketch]
-	Proof mode: witness construction.
-	For each dropped class $\mathcal{A}\in\Hbyz$, build witness family
-	$\mathsf{ctr}_{\mathcal{A}}$ with an explicit violated premise map
-	$\delta_{\mathcal{A}}:\mathcal{A}\mapsto \neg \mathsf{Prem}_{\mathcal{A}}$.
-	Intermediate step: execute $\mathsf{ctr}_{\mathcal{A}}$ to produce a
-	safety-visible trace $\tau_{\mathcal{A}}$ with
-	$\ByzChar(\tau_{\mathcal{A}})$ false at the dropped class boundary and
-	$\neg \ByzSafe(\tau_{\mathcal{A}})$. This gives class-indexed converse
-	witnesses and establishes sharpness of Assumption
-	Block~\ref{assump:p2-byzantine} at this interface scope.
+	Proof mode: witness forwarding.
+	A contradiction witness supplies two certified, conflicting decisions at one
+	state, which contradicts $\ByzChar$
+	(\nolinkurl{contradiction_witness_refutes_characterization}); the
+	class-tagged refuters forward to this lemma. Constructing a concrete
+	witness for each dropped class is not mechanized, so this corollary
+	records the refutation interface rather than a sharpness theorem for
+	Assumption Block~\ref{assump:p2-byzantine}.
 \end{proof}
 
 \begin{proposition}[Byzantine VM-Bridge Interface]
 	\label{prop:vm-bridge}
-	Under Assumption Block~\ref{assump:p2-byzantine}, if theorem-pack capabilities include Byzantine characterization and VM envelope-adherence evidence, then runtime profile claims are constrained by \Eqsafe under \Ebyz, and claims lacking required capability evidence are rejected by profile admission.
+	The runtime gate admits a Byzantine profile claim only if the theorem pack carries both Byzantine-safety evidence and VM envelope-adherence evidence; claims lacking either are rejected. Relating admitted claims to \Eqsafe under \Ebyz relies on envelope soundness, which is an explicit assumption of the envelope layer rather than a theorem of this paper.
 \end{proposition}
 
 \begin{proof}[Proof sketch]
-	Proof mode: compositional bridge.
-	First, \texttt{canOperateUnderByzantineEnvelope} validates theorem-pack
-	evidence and yields intermediate gate predicate
-	$\mathsf{GateOK}(p,\Pi)$. Second, profile extraction maps
-	$\mathsf{GateOK}(p,\Pi)$ to envelope-side obligation
-	$\mathsf{ByzEnvOK}(p,\Pi)$. Third, admission/conformance theorems discharge
-	\[
-		\mathsf{ByzEnvOK}(p,\Pi)\implies \Eqsafe\ \text{under}\ \Ebyz.
-	\]
-	Requests missing required evidence fail at the first step, so interface claims
-	are both executable and proof-carrying.
+	Proof mode: executable gate.
+	\texttt{canOperateUnderByzantineEnvelope} returns \texttt{true} exactly
+	when both evidence fields of the theorem pack are present. Requests missing
+	either field fail this check. The step from present evidence to \Eqsafe
+	under \Ebyz uses the assumed envelope-soundness premise.
 \end{proof}
 
 VM instruction-layer note. This paper reuses the instruction-form interface and \texttt{WellTypedInstr} mapping from the Effect-Typed Bridge in \emph{Coherence for Asynchronous Buffered MPST} (Section 7, Proposition 7.1). At this interface, \texttt{send}/\texttt{select} carry sender-continuation obligations, \texttt{recv}/\texttt{branch} carry consume-alignment obligations, and \texttt{invoke} carries handler-fragment lift obligations. The contribution here is computable profile extraction and safety-interface packaging on top of that shared VM typing layer.
 
-Table~\ref{tab:p2-decidability-summary} summarizes the decidability results.
+Table~\ref{tab:p2-decidability-summary} summarizes the decision-layer results.
 
 \begin{table}[H]
 	\centering
@@ -1050,14 +1070,14 @@ Table~\ref{tab:p2-decidability-summary} summarizes the decidability results.
 		\toprule
 		\thead{Predicate}   & \thead{Method}           & \thead{Result}  \\
 		\midrule
-		Async subtyping     & finite reachable triples & decidable       \\
-		Regular type equiv. & finite bisim checker     & decidable       \\
-		Crash-stop toler.   & residual graph decider   & decidable + iff \\
-		Byzantine safety    & bundle + counterex.      & exact iff       \\
-		Branching feasib.   & chromatic criterion      & decidable       \\
+		Async subtyping     & bounded triple exploration & sound, incomplete \\
+		Regular type equiv. & finite bisim checker     & decidable$^{*}$ \\
+		Crash-stop toler.   & residual graph decider   & sound + complete \\
+		Byzantine safety    & certified/committed      & exact iff       \\
+		Branching feasib.   & chromatic criterion      & exact criterion \\
 		\bottomrule
 	\end{tabularx}
-	\caption{Decidability results summary.}
+	\caption{Decision-layer results. $^{*}$Checker soundness is mechanized; the total decision wrapper is classical.}
 	\label{tab:p2-decidability-summary}
 \end{table}
 
@@ -1070,7 +1090,7 @@ Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the 
 		\toprule
 		\thead{Predicate}   & \thead{Driver}        & \thead{Complexity}                                \\
 		\midrule
-		async subtyping     & reachable triples     & checker: $\mathrm{poly}(N_s+N_e)$                 \\
+		async subtyping     & bounded exploration   & checker: $O(\text{fuel})$ steps                 \\
 		regular type equiv. & finite bisim graph    & checker: $\mathrm{poly}(N_s+N_e)$                 \\
 		crash-stop toler.   & residual connectivity & checker: $O(N_s+N_e)$                             \\
 		branching feasib.   & coloring checks       & checker: $\mathrm{poly}(N_s+N_e)$ (fixed profile) \\
@@ -1080,7 +1100,8 @@ Table~\ref{tab:p2-complexity-envelopes} summarizes complexity envelopes for the 
 	\label{tab:p2-complexity-envelopes}
 \end{table}
 
-Complexity context. For this fragment, any sound complete checker must inspect
+Complexity context. These envelopes are analytic estimates and are not
+mechanized. For this fragment, any sound complete checker must inspect
 the explored finite object, so linear graph-traversal in $(N_s,N_e)$ is a
 baseline lower bound. Table~\ref{tab:p2-complexity-envelopes} reports
 checker/verifier complexity only; runtime transition-step cost is a separate
@@ -1089,7 +1110,7 @@ envelopes. Witness-bearing checks may add a multiplicative
 $\mathrm{poly}(W_{\max})$ factor.
 Outside the regular finite-reachability fragment, known
 communicating-automata-style analyses can lose decidability (Brand and
-Zafiropulo, 1983).
+Zafiropulo, 1983), and asynchronous subtyping is undecidable even inside it.
 
 % ============================================================================
 \section{Quantitative Corollaries}
@@ -1111,10 +1132,10 @@ scheduler fairness profile through $\kappa_\sigma$.
 
 \begin{corollary}[Critical Capacity Boundary]
 	\label{cor:capacity}
-	Under Assumption Block~\ref{assump:p2-quantitative}, there exists a computable threshold $\Bc$ such that the declared phase classifier over buffer capacity is exact at the theorem interface.
+	Let $C_0$ be an initial configuration with empty buffers whose unbounded-reachable configurations have bounded buffer occupancy and are deadlock-free, under a deterministic step relation in which terminal configurations do not step and every unbounded run within capacity $B$ is a $B$-bounded run. Then there is a threshold $\Bc$, the maximum reachable buffer occupancy (attained by some reachable configuration), such that for $B \ge \Bc$ no $B$-bounded reachable configuration is deadlocked, and for $B < \Bc$ some $B$-bounded reachable configuration is stuck.
 \end{corollary}
 
-Operational interpretation. $\Phase(B)=\mathsf{Low}$ means capacity is below the certified boundary and profile-side branch obligations are not all realizable. $\Phase(B)=\mathsf{Critical}$ means capacity is exactly at the certified boundary. $\Phase(B)=\mathsf{High}$ means capacity is above the boundary and the same obligations remain realizable with slack.
+Operational interpretation. $\Phase(B)=\mathsf{Low}$ means capacity is below the boundary and bounded execution can get stuck. $\Phase(B)=\mathsf{Critical}$ means capacity is exactly at the boundary, the least capacity at which bounded execution is deadlock-free. $\Phase(B)=\mathsf{High}$ means capacity is above the boundary, with slack.
 
 \begin{proof}[Proof sketch]
 	Corollary~\ref{cor:productive} is the first clause of Theorem~\ref{thm:quantitative} with notation specialized to productive-step count. Instantiating Theorem~\ref{thm:quantitative} at the same trace and premises yields the stated inequality directly.
@@ -1125,7 +1146,7 @@ Operational interpretation. $\Phase(B)=\mathsf{Low}$ means capacity is below the
 \end{proof}
 
 \begin{proof}[Proof sketch]
-	\nolinkurl{critical_buffer_computable} provides a computable witness value $\Bc$ from the capacity predicate over \texttt{ConfGraph}. \nolinkurl{phase_transition_sharp} proves exact classifier behavior below, at, and above that boundary. Composing these two lemmas yields the stated threshold characterization.
+	\nolinkurl{critical_buffer_computable} shows that $\Bc$, defined as the supremum of reachable buffer occupancy, is attained by a reachable configuration whenever occupancy is bounded. \nolinkurl{phase_transition_sharp} proves deadlock freedom at and above $\Bc$ and a stuck bounded configuration below it, under the stated premises. The threshold is defined as a supremum, so an effective procedure for $\Bc$ additionally needs a finite reachable configuration space.
 \end{proof}
 
 Table~\ref{tab:p2-exact-vs-conservative} separates exact and conservative consequences.
@@ -1205,7 +1226,7 @@ concurrency (Castellan et al., 2023).
 
 On the quantitative side, our use of descent functions follows the classical drift and stochastic-stability lineage (Lyapunov, 1892; Foster, 1953; Meyn and Tweedie, 2009). On the algorithmic side, the finite-reachability posture follows communicating-automata and model-checking lines (Brand and Zafiropulo, 1983; Baier and Katoen, 2008). Fault-side interfaces are compatible with standard crash and Byzantine theory baselines (Fischer et al., 1985; Chandra and Toueg, 1996; Lamport et al., 1982; Castro and Liskov, 1999).
 
-This paper differs in structure. It unifies quantitative bounds and algorithmic decidability through one regularity kernel. The result is a single reusable theorem program instead of isolated predicate proofs.
+This paper differs in structure. It unifies quantitative bounds and algorithmic decision results through one regularity kernel, and it is explicit about where decidability fails (asynchronous subtyping). The result is a single reusable theorem program instead of isolated predicate proofs.
 
 % ============================================================================
 \section{Limitations and Scope}
@@ -1216,7 +1237,7 @@ Quantitative bounds require the Assumption Block~\ref{assump:p2-quantitative} pr
 
 Crash-stop characterization is exact only under Assumption Block~\ref{assump:p2-crash}, with crash-stop faults, finite role graph, and residual-graph side conditions. Byzantine results are exact safety characterizations only under Assumption Block~\ref{assump:p2-byzantine}, with \Hbyz fault-model, authentication and evidence-validity, conflict-exclusion primitive consistency, and adversarial-budget side conditions, and they do not imply Byzantine liveness.
 
-Decidability and finite exploration require the Assumption Block~\ref{assump:p2-regular} regular finite-reachability premises. Non-regular fragments and stronger adversarial models require different constructions.
+Decidability and finite exploration require the Assumption Block~\ref{assump:p2-regular} regular finite-reachability premises. Asynchronous subtyping is undecidable even on regular types; the mechanized checker is sound but incomplete, and its \texttt{stuck} and \texttt{outOfFuel} results are inconclusive. For regular equivalence, executable-checker completeness is not mechanized (the total wrapper is classical). The capacity threshold is characterized under determinism and finite-occupancy premises, and Byzantine converse witnesses are supplied rather than constructed. Non-regular fragments and stronger adversarial models require different constructions.
 
 Reconfiguration commutation and envelope maximality claims are out of scope for this paper and handled separately in the series.
 
@@ -1238,7 +1259,10 @@ bundle evidence classes.
 Implementation pointer. Quantitative kernels are in
 \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak
 	*.lean}, decision kernels are in
-\texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak *.lean}, and
+\texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak *.lean},
+\texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak Decidable.lean} (bounded checker), and
+\texttt{Protocol/\allowbreak CrashToleranceCore.lean}, Byzantine characterization is in
+\texttt{Distributed/\allowbreak Families/\allowbreak ByzantineSafety/\allowbreak *.lean}, and
 capability-gated Byzantine interfaces are exposed via
 \texttt{Runtime/\allowbreak Proofs/\allowbreak TheoremPack/\allowbreak API.lean}.
 
@@ -1247,7 +1271,7 @@ capability-gated Byzantine interfaces are exposed via
 \label{sec:conclusion}
 % ============================================================================
 
-This paper turns Coherence-preserving dynamics into computable dynamics. Quantitative bounds and decision procedures come from the same regularity source. That result provides the computational bridge between \emph{Coherence for Asynchronous Buffered MPST} and the reconfiguration and envelope claims in \emph{Harmony from Coherence in Asynchronous MPST}.
+This paper turns Coherence-preserving dynamics into computable dynamics. Quantitative bounds and decision procedures come from the same regularity source, and asynchronous subtyping marks where that source stops yielding decidability: there we obtain a sound bounded checker. That result provides the computational bridge between \emph{Coherence for Asynchronous Buffered MPST} and the reconfiguration and envelope claims in \emph{Harmony from Coherence in Asynchronous MPST}.
 
 Byzantine contribution in this paper is the exact safety-characterization interface and converse counterexample family packaging. Byzantine liveness beyond the stated assumptions remains open and is tracked as future work.
 
@@ -1257,6 +1281,7 @@ Byzantine contribution in this paper is the exact safety-characterization interf
 
 \begin{citelist}
 	\item Baier, C., and Katoen, J.-P. (2008). Principles of Model Checking. MIT Press.
+	\item Bravetti, M., Carbone, M., and Zavattaro, G. (2017). Undecidability of Asynchronous Session Subtyping. Information and Computation, 256, 300--320.
 	\item Brand, D., and Zafiropulo, P. (1983). On Communicating Finite-State Machines. Journal of the ACM, 30(2), 323--342.
 	\item Caires, L., and Pfenning, F. (2010). Session Types as Intuitionistic Linear Propositions. CONCUR 2010.
 	\item Carbone, M., Lindley, S., Montesi, F., Sch\"urmann, C., and Wadler, P. (2016). Coherence Generalises Duality: A Logical Explanation of Multiparty Session Types. CONCUR 2016.
@@ -1276,6 +1301,7 @@ Byzantine contribution in this paper is the exact safety-characterization interf
 	\item Hopcroft, J. E., and Ullman, J. D. (1979). Introduction to Automata Theory, Languages, and Computation. Addison-Wesley.
 	\item Karp, R. M., and Miller, R. E. (1969). Parallel Program Schemata. Journal of Computer and System Sciences, 3(2), 147--195.
 	\item Lamport, L., Shostak, R., and Pease, M. (1982). The Byzantine Generals Problem. ACM Transactions on Programming Languages and Systems, 4(3), 382--401.
+	\item Lange, J., and Yoshida, N. (2017). On the Undecidability of Asynchronous Session Subtyping. FoSSaCS 2017.
 	\item Majumdar, R., Mukund, M., Stutz, F., and Zufferey, D. (2021). Generalising Projection in Asynchronous Multiparty Session Types. CONCUR 2021.
 	\item Lynch, N. A. (1996). Distributed Algorithms. Morgan Kaufmann.
 	\item Lyapunov, A. M. (1892). The General Problem of the Stability of Motion. Kharkov Mathematical Society.
@@ -1408,8 +1434,8 @@ not in raw syntax size. Runtime transition-step cost is separate.
 \subsection{Instantiations}
 
 \begin{enumerate}
-	\item Async subtyping: reachable triple graph (\nolinkurl{reachable_triples_finite},\allowbreak\ \nolinkurl{async_subtype_decidable}).
-	\item Regular equivalence: reachable pair/bisim graph (\nolinkurl{regular_type_eq_check_sound},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
+	\item Regular equivalence: reachable pair/bisim graph (\nolinkurl{reachable_pairs_finite},\allowbreak\ \nolinkurl{regular_type_eq_check_sound},\allowbreak\ \nolinkurl{regular_type_eq_decide_spec}).
+	\item Not an instance: async subtyping. Its triple graph need not be finite and the relation is undecidable; only soundness of the bounded checker is proved (\nolinkurl{check_async_sound},\allowbreak\ \nolinkurl{is_async_subtype_bounded_sound}).
 \end{enumerate}
 
 \section{Instantiated Decision Theorems}
@@ -1431,13 +1457,12 @@ Given role graph $R$ and crash set $F$, let $\mathrm{Residual}(R,F)$ remove cras
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	Proof mode: bidirectional reduction.
-	($\Rightarrow$) If residual reachability fails, choose disconnected components
-	$U,V$ with required endpoint pair $(u,v)\in U\times V$; intermediate cut
-	obligation shows no compliant continuation path, so crash tolerance fails.
-	($\Leftarrow$) If residual reachability holds, construct continuation witness
-	paths for each required communication edge and compose them into a global crash
-	tolerance witness. Combining both directions yields the equivalence.
+	In the mechanization, $\mathsf{CrashTolerant}(R,F)$ is defined as
+	connectivity of $\mathrm{Residual}(R,F)$, so the equivalence holds by
+	unfolding (\nolinkurl{crash_tolerance_iff}). The operational reading,
+	that survivors can drain all in-flight messages, is a separate result in
+	\texttt{Protocol/\allowbreak CrashToleranceDrain.lean}; it does not claim
+	that survivors reach \texttt{end}.
 \end{proof}
 
 \subsection{Branching Feasibility Instantiation}
@@ -1473,7 +1498,7 @@ Define the phase classifier
 \end{equation}
 \begin{theorem}[Sharp Capacity Boundary]
 	\label{thm:app-p2-sharp-capacity}
-	There exists a computable threshold $\Bc$ such that
+	Under the premises of Corollary~\ref{cor:capacity}, there exists a threshold $\Bc$ such that
 	\begin{equation}
 		\begin{aligned}[t]
 			\forall B,\quad
@@ -1482,16 +1507,16 @@ Define the phase classifier
 			 & \land (B > \Bc \Rightarrow \Phase(B)=\mathsf{High}).
 		\end{aligned}
 	\end{equation}
-	with exactness at the theorem interface.
+	where $\mathsf{Low}$ is witnessed by a stuck $B$-bounded configuration and $\mathsf{Critical}$/$\mathsf{High}$ by deadlock freedom of $B$-bounded execution.
 \end{theorem}
 
 \begin{proof}[Proof sketch]
-	\nolinkurl{critical_buffer_computable} yields a computable candidate threshold. \nolinkurl{phase_transition_sharp} proves that the classifier is exact below, at, and above this threshold. Therefore the phase boundary is both computable and sharp.
+	\nolinkurl{critical_buffer_computable} shows the threshold is attained. \nolinkurl{phase_transition_sharp} gives the behavior below and at or above it. The boundary is therefore sharp; it is effective when the reachable configuration space is finite.
 \end{proof}
 
 \subsection{Byzantine Safety Interface (Scope of This Paper)}
 
-Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact safety-side interface and converse counterexample packaging; full envelope maximality and transport are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
+Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact certified-versus-committed safety interface and refuters for supplied contradiction witnesses; full envelope maximality and transport are deferred to \emph{Harmony from Coherence in Asynchronous MPST}.
 
 \section{Exactness and Boundary Notes}
 \label{app:exactness}
@@ -1500,9 +1525,10 @@ Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact 
 
 \begin{enumerate}
 	\item Productive-step decrease and productive-step bounds (Assumption Block~\ref{assump:p2-quantitative}).
-	\item Critical-capacity boundary characterization (Corollary~\ref{cor:capacity}) under its stated profile assumptions.
-	\item Crash-stop characterization (Assumption Block~\ref{assump:p2-crash}).
-	\item Byzantine safety characterization at paper interface scope (Assumption Block~\ref{assump:p2-byzantine}).
+	\item Critical-capacity boundary characterization (Corollary~\ref{cor:capacity}) under its determinism and finite-occupancy premises.
+	\item Crash-stop decider soundness and completeness (Assumption Block~\ref{assump:p2-crash}).
+	\item Byzantine certified-versus-committed safety characterization for the declared model (Assumption Block~\ref{assump:p2-byzantine}).
+	\item Soundness (only) of the bounded asynchronous-subtyping checker.
 \end{enumerate}
 
 \subsection{Conservative or Profile-Indexed Claims}
@@ -1516,6 +1542,7 @@ Under Assumption Block~\ref{assump:p2-byzantine}, this paper provides the exact 
 
 \begin{enumerate}
 	\item Non-regular fragments for decision transfer.
+	\item Completeness or decidability of asynchronous subtyping (undecidable in general).
 	\item Byzantine liveness under weaker timing/adversary assumptions.
 	\item Reconfiguration commutation and envelope maximality (\emph{Harmony from Coherence in Asynchronous MPST}).
 \end{enumerate}
@@ -1527,7 +1554,7 @@ Reproduction workflow and expected outputs are documented in
 \texttt{ARTIFACT.md}. The one-command supplement check is
 \texttt{just artifact-check}. Pinned-commit, DOI, and Lean-statistics rows are
 synchronized via
-\texttt{bash scripts/paper\_repro\_rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex}.
+\texttt{bash scripts/ops/paper-repro-rows.sh --sync papers/paper1.tex papers/paper2.tex papers/paper3.tex}.
 Artifact semantics note. The Lean artifact exposes an explicit trace-level
 strong fairness predicate (\texttt{StrongFairEnv}) refining weak fairness, and
 the default in-memory runtime transport implements minimal per-edge FIFO
@@ -1543,7 +1570,7 @@ enqueue/dequeue behavior.
 		Repository             & \url{https://github.com/hxrts/telltale}                                                   \\
 		Pinned commit & \texttt{ccddc8ea843684c4}\allowbreak\texttt{d2d018f673c4861d}\allowbreak\texttt{0664e008} \\
 		Archival DOI & \texttt{DOI-UNSET} \\
-		Lean source statistics & 1303 files, 206913 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
+		Lean source statistics & 783 files, 156747 LOC, axioms: 0, unresolved proof holes (\texttt{sorry}): 0 \\
 		\bottomrule
 	\end{tabularx}
 	\caption{Artifact identity and verification statistics for this draft snapshot.}
@@ -1574,12 +1601,13 @@ rule-local $\Delta W$ lemmas; \texttt{regular\_type\_eq\_decide\_spec} states
 checker iff semantics for regular-type equivalence;
 \texttt{check\_rational\_effect\_witness\_complete} is completeness of the
 rational witness checker for the transport boundary; and
-\texttt{byzantine\_safety\_exact\_of\_profile} is the profile-indexed exactness
-bridge for Byzantine safety claims.
+\texttt{exact\_byzantine\_safety\_characterization} is the exactness theorem
+for Byzantine safety claims; and \texttt{check\_async\_sound} is soundness of
+the bounded asynchronous-subtyping checker.
 Name-pattern note. Parse long anchors as
 \texttt{object\_claim\_qualifier}: e.g., suffixes like
-\texttt{\_of\_profile} and \texttt{\_decide\_spec} indicate profile-indexed
-packaging vs checker-specification theorems.
+\texttt{\_of\_assumptions} and \texttt{\_decide\_spec} indicate
+assumption-indexed results vs checker-specification theorems.
 
 \begin{table}[H]
 	\centering
@@ -1604,9 +1632,9 @@ packaging vs checker-specification theorems.
 		\texttt{branch\_step\_decreases}                                & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & ---                                                                               \\
 		\rowcolor{gray!8}
 		\texttt{total\_measure\_\allowbreak decreasing}                 & \texttt{Runtime/\allowbreak Proofs/\allowbreak WeightedMeasure/\allowbreak}\mbox{\texttt{TotalBound.lean}}                        & \S\ref{sec:theorem1}     & Thm.~\ref{thm:quantitative}, Cors.~\ref{cor:productive}--\ref{cor:scheduler} [A1] \\
-		\texttt{reachable\_triples\_\allowbreak finite}                 & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}}                                           & \S\ref{sec:theorem2}     & ---                                                                               \\
+		\texttt{checkAsync}                                             & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Decidable.lean}}                                      & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
-		\texttt{async\_subtype\_\allowbreak decidable}                  & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Core.lean}}                                           & \S\ref{sec:theorem2}     & Thm.~\ref{thm:algorithmic} [A2]                                                   \\
+		\texttt{check\_async\_\allowbreak sound}                        & \texttt{SessionCoTypes/\allowbreak AsyncSubtyping/\allowbreak}\mbox{\texttt{Decidable.lean}}                                      & \S\ref{sec:theorem2}     & Rem.~\ref{rem:p2-async}                                                           \\
 		\texttt{reachable\_pairs\_\allowbreak finite}                   & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Correctness.lean}}            & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
 		\texttt{regular\_type\_eq\_\allowbreak check\_sound}            & \texttt{SessionCoTypes/\allowbreak Coinductive/\allowbreak BisimDecidable/\allowbreak}\mbox{\texttt{Decidable.lean}}              & \S\ref{sec:theorem2}     & ---                                                                               \\
@@ -1618,14 +1646,16 @@ packaging vs checker-specification theorems.
 		\texttt{check\_rational\_effect\_\allowbreak witness\_complete} & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\texttt{strict\_boundary\_\allowbreak witness\_effect}          & \texttt{Runtime/\allowbreak Proofs/\allowbreak EffectBisim/\allowbreak}\mbox{\texttt{RationalFragment.lean}}                      & \S\ref{sec:theorem2}     & ---                                                                               \\
 		\rowcolor{gray!8}
-		\texttt{crash\_tolerant\_\allowbreak dec\_sound}                & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}}                                                                  & \S\ref{sec:decidability} & ---                                                                               \\
-		\texttt{crash\_tolerance\_iff}                                  & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashTolerance.lean}}                                                                  & \S\ref{sec:decidability} & Thm.~\ref{thm:crash} [A3]                                                         \\
+		\texttt{crash\_tolerant\_\allowbreak dec\_sound}                & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashToleranceCore.lean}}                                                                  & \S\ref{sec:decidability} & ---                                                                               \\
+		\texttt{crash\_tolerant\_\allowbreak dec\_complete}             & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashToleranceCore.lean}}                                                              & \S\ref{sec:decidability} & Thm.~\ref{thm:crash} [A3]                                                         \\
+		\texttt{crash\_tolerance\_iff}                                  & \texttt{Protocol/\allowbreak}\mbox{\texttt{CrashToleranceCore.lean}}                                                                  & \S\ref{sec:decidability} & Thm.~\ref{thm:crash} [A3]                                                         \\
 		\rowcolor{gray!8}
-		\texttt{byzantine\_safety\_\allowbreak exact\_of\_profile}      & \texttt{Runtime/\allowbreak Proofs/\allowbreak Adapters/\allowbreak Distributed/\allowbreak}\mbox{\texttt{EnvelopeTheorems.lean}} & \S\ref{sec:decidability} & Thm.~\ref{thm:byzantine}, Cor.~\ref{cor:converse} [A4]                            \\
+		\texttt{exact\_byzantine\_safety\_\allowbreak characterization} & \texttt{Distributed/\allowbreak Families/\allowbreak ByzantineSafety/\allowbreak Core/\allowbreak}\mbox{\texttt{Base.lean}}      & \S\ref{sec:decidability} & Thm.~\ref{thm:byzantine} [A4]                                                     \\
+		\texttt{contradiction\_witness\_\allowbreak refutes\_characterization} & \texttt{Distributed/\allowbreak Families/\allowbreak ByzantineSafety/\allowbreak Core/\allowbreak}\mbox{\texttt{Extensions.lean}} & \S\ref{sec:decidability} & Cor.~\ref{cor:converse} [A4]                                                      \\
 		\texttt{branching\_iff\_\allowbreak chromatic\_capacity}        & \texttt{Protocol/\allowbreak}\mbox{\texttt{SpatialBranching.lean}}                                                                & \S\ref{app:instantiated} & Thm.~\ref{thm:app-p2-branching}                                                   \\
 		\rowcolor{gray!8}
 		\texttt{critical\_buffer\_\allowbreak computable}               & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}                                    & \S\ref{sec:corollaries}  & ---                                                                               \\
-		\texttt{phase\_transition\_sharp}                               & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}                                    & \S\ref{sec:corollaries}  & Cor.~\ref{cor:capacity} [A1]                                                      \\
+		\texttt{phase\_transition\_sharp}                               & \texttt{Protocol/\allowbreak BufferBoundedness/\allowbreak}\mbox{\texttt{PhaseSharpness.lean}}                                    & \S\ref{sec:corollaries}  & Cor.~\ref{cor:capacity}                                                              \\
 		\midrule
 		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                                                      \\
 		\rowcolor{gray!8}

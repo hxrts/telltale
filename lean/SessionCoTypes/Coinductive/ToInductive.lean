@@ -64,14 +64,14 @@ lemma length_le_max_len {avoid : Finset String} {x : String} (hs : x ∈ avoid) 
   simpa [maxLen] using Finset.le_sup (s := avoid.image String.length) (f := id) hx
 
 /-- Base name prefix derived from a node's index in the reachable set. -/
-def baseName (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
+noncomputable def baseName (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
   match indexOf t all.toList with
   | some i => "s" ++ toString i
   | none   => "sunknown"
 
 /-- Generate a fresh name for a state that doesn't clash with any existing name.
     Works by appending a suffix longer than any existing name. -/
-def nameFor (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
+noncomputable def nameFor (t : LocalTypeC) (all : Finset LocalTypeC) : String :=
   let base := baseName t all
   let avoid := namesIn all
   let suffixLen := maxLen avoid + 1
@@ -106,7 +106,7 @@ lemma name_for_not_mem_names_in (t : LocalTypeC) (all : Finset LocalTypeC) :
     - If current node is visited, emit a variable reference (back-edge)
     - Otherwise, recurse into children with current added to visited
     - Wrap in mu if a recursive reference was generated -/
-def toInductiveAux (root : LocalTypeC) (all visited : Finset LocalTypeC)
+noncomputable def toInductiveAux (root : LocalTypeC) (all visited : Finset LocalTypeC)
     (current : LocalTypeC)
     (h_closed : IsClosedSet all)
     (h_visited : visited ⊆ all) (h_current : current ∈ all) : LocalTypeR :=
@@ -129,22 +129,22 @@ def toInductiveAux (root : LocalTypeC) (all visited : Finset LocalTypeC)
           toInductiveAux root all visited' child h_closed
             (subset_insert_of_mem h_current h_visited) hchild_mem
       | ⟨.send p labels, k⟩ =>
-          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+          let f : Fin labels.length → BranchR := fun i =>
             let child := k i
             have hchild : childRel current child := ⟨.send p labels, k, i, hdest, rfl⟩
             have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
             let body := toInductiveAux root all visited' child h_closed
               (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels[i], body)
+            (labels[i], none, body)
           LocalTypeR.send p (List.ofFn f)
       | ⟨.recv p labels, k⟩ =>
-          let f : Fin labels.length → (Label × LocalTypeR) := fun i =>
+          let f : Fin labels.length → BranchR := fun i =>
             let child := k i
             have hchild : childRel current child := ⟨.recv p labels, k, i, hdest, rfl⟩
             have hchild_mem : child ∈ all := mem_of_closed_child h_closed h_current hchild
             let body := toInductiveAux root all visited' child h_closed
               (subset_insert_of_mem h_current h_visited) hchild_mem
-            (labels[i], body)
+            (labels[i], none, body)
           LocalTypeR.recv p (List.ofFn f)
     -- Wrap in mu if needed
     match head current with
@@ -161,7 +161,7 @@ decreasing_by
 /-! ## Entry Point -/
 
 /-- Convert a regular coinductive local type to its inductive representation. -/
-def toInductive (t : LocalTypeC) (h : Regular t) : LocalTypeR :=
+noncomputable def toInductive (t : LocalTypeC) (h : Regular t) : LocalTypeR :=
   let all := h.states.toFinset
   toInductiveAux t all ∅ t (reachable_is_closed_set t h)
     (Finset.empty_subset _)

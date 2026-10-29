@@ -43,12 +43,13 @@ variable [GhostMapSlot LocalType]
 
 /-! ## Send/Receive Rules -/
 
-def wp_send (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+def wp_send (γn : SessionGhostNames) (sid : SessionId) (ct : CancelToken)
     (e : Endpoint) (L : LocalType) : iProp :=
   -- Send requires the session invariant and endpoint ownership.
-  iProp.sep (session_inv γn sid ct) (endpoint_frag γn e L)
+  iProp.sep (session_inv γn sid ct) (endpoint_frag γn.session e L)
 
-def wp_send_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+def wp_send_delegation [GhostMapSlot (GuardLayer.Resource γ)]
+    [GhostVarSlot (EffectRuntime.EffectCtx ε)] (γn : SessionGhostNames) (sid : SessionId) (ct : CancelToken)
     (b : ResourceBundle γ ε) : iProp :=
   -- Delegating send requires ordinary send resources plus a transferable bundle.
   iProp.sep (wp_send γn sid ct b.endpoint b.localType) (bundle_owns γn b)
@@ -57,7 +58,8 @@ def wp_receive : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (receivePair (γ:=γ) (ε:=ε))
 
-def wp_receive_delegation (γn : GhostName) (sid : SessionId) (ct : CancelToken)
+def wp_receive_delegation [GhostMapSlot (GuardLayer.Resource γ)]
+    [GhostVarSlot (EffectRuntime.EffectCtx ε)] (γn : SessionGhostNames) (sid : SessionId) (ct : CancelToken)
     (b : ResourceBundle γ ε) : iProp :=
   -- Delegating receive consumes from the session invariant and installs bundle ownership.
   iProp.sep (session_inv γn sid ct) (bundle_owns γn b)
@@ -76,7 +78,7 @@ def wp_open : iProp :=
   -- WP rule derived from the generic pair rule.
   wp_pair (openPair (γ:=γ) (ε:=ε))
 
-def wp_close (γn : GhostName) (sid : SessionId) (ct : CancelToken) : iProp :=
+def wp_close (γn : SessionGhostNames) (sid : SessionId) (ct : CancelToken) : iProp :=
   -- Close requires the cancel token and the session invariant.
   iProp.sep (session_inv γn sid ct) (cancel_token_own ct)
 
@@ -96,42 +98,42 @@ def wp_invoke (action : EffectRuntime.EffectAction ε) : iProp :=
 
 /-! ## Concurrency Rules -/
 
-def wp_fork (γn : GhostName) (sid ghostSid : SessionId) (ct : CancelToken)
+def wp_fork (γn : SessionGhostNames) (sid ghostSid : SessionId) (ct : CancelToken)
     (depth : Nat) : iProp :=
   -- Fork opens the session invariant and allocates/specifies speculation ownership.
   wp_pair (γ:=γ) (ε:=ε) ({
       instr := Instr.fork 0
       openCtx := session_inv γn sid ct
-      interact := speculation_token_own γn sid ghostSid depth
+      interact := speculation_token_own γn.speculation sid ghostSid depth
       closeCtx := session_inv γn sid ct
       pre := session_inv γn sid ct
       post := iProp.sep (session_inv γn sid ct)
-        (speculation_token_own γn sid ghostSid depth)
+        (speculation_token_own γn.speculation sid ghostSid depth)
     } : InstrPair γ ε)
 
-def wp_join (γn : GhostName) (sid ghostSid : SessionId) (ct : CancelToken)
+def wp_join (γn : SessionGhostNames) (sid ghostSid : SessionId) (ct : CancelToken)
     (depth : Nat) : iProp :=
   -- Join consumes the active speculation token and restores plain session ownership.
   wp_pair (γ:=γ) (ε:=ε) ({
       instr := Instr.join
       openCtx := session_inv γn sid ct
-      interact := speculation_token_own γn sid ghostSid depth
+      interact := speculation_token_own γn.speculation sid ghostSid depth
       closeCtx := session_inv γn sid ct
       pre := iProp.sep (session_inv γn sid ct)
-        (speculation_token_own γn sid ghostSid depth)
+        (speculation_token_own γn.speculation sid ghostSid depth)
       post := session_inv γn sid ct
     } : InstrPair γ ε)
 
-def wp_abort (γn : GhostName) (sid ghostSid : SessionId) (ct : CancelToken)
+def wp_abort (γn : SessionGhostNames) (sid ghostSid : SessionId) (ct : CancelToken)
     (depth : Nat) : iProp :=
   -- Abort mirrors join at the ownership layer: token is discharged, invariant remains.
   wp_pair (γ:=γ) (ε:=ε) ({
       instr := Instr.abort
       openCtx := session_inv γn sid ct
-      interact := speculation_token_own γn sid ghostSid depth
+      interact := speculation_token_own γn.speculation sid ghostSid depth
       closeCtx := session_inv γn sid ct
       pre := iProp.sep (session_inv γn sid ct)
-        (speculation_token_own γn sid ghostSid depth)
+        (speculation_token_own γn.speculation sid ghostSid depth)
       post := session_inv γn sid ct
     } : InstrPair γ ε)
 

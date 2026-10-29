@@ -361,7 +361,7 @@ lemma to_digits_eq_singleton_zero_iff (n : Nat) : Nat.toDigits 10 n = ['0'] ↔ 
           simp at hd
           subst hd
           decide
-        · simpa using hrev
+        · exact hrev
       have hdigits : Nat.digits 10 n = [0] := by
         simpa using congrArg List.reverse hrev'
       have : n = 0 := by

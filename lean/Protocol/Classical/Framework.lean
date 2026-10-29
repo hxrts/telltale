@@ -94,12 +94,13 @@ def mkFosterInput (fw : TransportFramework)
 
 /-! ## Foster-Lyapunov Transport -/
 
-theorem transport_foster_lyapunov (fw : TransportFramework)
+/-- Conditional on the drift-system input, the potential is non-increasing along
+iterates of the framework step (deterministic; not stochastic Foster-Lyapunov). -/
+theorem foster_conclusion_of_framework (fw : TransportFramework)
     (system : Classical.FosterLyapunovHarris.DriftSystem CoherenceState)
     (hStep : system.step = fw.step) :
-    Classical.Transport.FosterConclusion (mkFosterInput fw system hStep) := by
-  exact Classical.Transport.transported_foster_lyapunov
-    (input := mkFosterInput fw system hStep)
+    Classical.Transport.FosterConclusion (mkFosterInput fw system hStep) :=
+  Classical.Transport.foster_conclusion_of_input (input := mkFosterInput fw system hStep)
 
 /-! ## Transport Input Aliases -/
 
@@ -112,43 +113,10 @@ abbrev FluidInput := Classical.Transport.FluidInput
 abbrev LittlesLawInput := Classical.Transport.LittlesLawInput
 abbrev FunctionalCLTInput := Classical.Transport.FunctionalCLTInput
 
-/-! ## Transport API Wrappers -/
-
-/-- Transport API wrappers re-exported from the protocol-facing framework. -/
-theorem transport_max_weight {ι : Type} [Fintype ι] (input : MaxWeightInput ι) :
-    Classical.Transport.MaxWeightConclusion input :=
-  Classical.Transport.transported_max_weight input
-
-theorem transport_ldp (input : LDPInput) :
-    Classical.Transport.LDPConclusion input :=
-  Classical.Transport.transported_ldp input
-
-theorem transport_mean_field {n : Nat} (input : MeanFieldInput n) :
-    Classical.Transport.MeanFieldConclusion input :=
-  Classical.Transport.transported_mean_field input
-
-theorem transport_heavy_traffic (input : HeavyTrafficInput) :
-    Classical.Transport.HeavyTrafficConclusion input :=
-  Classical.Transport.transported_heavy_traffic input
-
-theorem transport_mixing (input : MixingInput) :
-    Classical.Transport.MixingConclusion input :=
-  Classical.Transport.transported_mixing input
-
-theorem transport_fluid_limit (input : FluidInput) :
-    Classical.Transport.FluidConclusion input :=
-  Classical.Transport.transported_fluid_limit input
-
-theorem transport_concentration (input : Classical.Transport.ConcentrationInput) :
-    Classical.Transport.ConcentrationConclusion input :=
-  Classical.Transport.transported_concentration input
-
-theorem transport_littles_law (input : LittlesLawInput) :
-    Classical.Transport.LittlesLawConclusion input :=
-  Classical.Transport.transported_littles_law input
-
-theorem transport_functional_clt (input : FunctionalCLTInput) :
-    Classical.Transport.FunctionalCLTConclusion input :=
-  Classical.Transport.transported_functional_clt input
+/-
+The former `transport_*` re-exports were pure aliases (several of them merely
+returned an assumed premise field). They are removed; use the conditional
+lemmas in `Classical.Transport.Theorems` or the witness fields directly.
+-/
 
 end ProtocolClassical

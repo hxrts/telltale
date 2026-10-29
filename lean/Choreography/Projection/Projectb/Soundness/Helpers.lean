@@ -105,6 +105,7 @@ theorem val_type_beq_eq_true_to_eq
       | _ =>
           have : False := by simpa [reduceBEq] using h
           exact this.elim
+  | readiness => cases b <;> simp_all [reduceBEq]
   | prod a1 a2 ih1 ih2 =>
       cases b with
       | prod b1 b2 =>

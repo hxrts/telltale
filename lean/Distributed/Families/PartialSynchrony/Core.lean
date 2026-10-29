@@ -1,3 +1,5 @@
+import Distributed.Families.PartialSynchrony.Rounds
+
 set_option autoImplicit false
 
 /-! # Distributed.Families.PartialSynchrony
@@ -8,8 +10,14 @@ Reusable partial-synchrony assumptions and liveness theorems:
 -/
 
 /-
-The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
-Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+The Problem. Earlier versions assumed post-GST progress and bounded-window
+progress directly; those fields were the liveness conclusions.
+Solution Structure. Each fair run refines a concrete view-based execution
+(`Rounds`): rotating leaders propose, parties vote, a `2f+1` vote quorum
+within a view decides, and messages after GST arrive within `Δ`. Progress is
+proved there from the vote rule (`Rounds.decided_after_gst`) and transported
+along the refinement; agreement is `Rounds.view_agreement` /
+`Rounds.first_decision_unique`.
 -/
 
 /-! ## Core Development -/
@@ -24,9 +32,6 @@ structure Model (State : Type u) (Value : Type v) (Event : Type w) (Party : Type
   initial : State → Prop
   step : State → Event → Option State
   decide : State → Option Value
-  messageDelayBoundedAfterGST : (Nat → State) → Nat → Nat → Prop
-  pacemakerFairAfterGST : (Nat → State) → Nat → Prop
-  leaderCorrectAfterGST : (Nat → State) → Nat → Prop
 
 /-- A run eventually decides if some index yields a decision value. -/
 def EventuallyDecidesOnRun
@@ -71,35 +76,36 @@ def BoundedTerminationAfterGST
 
 /-! ## Assumption Atoms and Contracts -/
 
-/-- Reusable core partial-synchrony assumption bundle. -/
+/-- Partial-synchrony assumptions. The only link to the abstract model is a
+refinement: once the concrete execution has decided, the abstract state
+reports a decision. Progress itself is proved, not assumed. -/
 structure Assumptions
     {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
     (M : Model State Value Event Party) : Type (max u v w x) where
   FairRun : (Nat → State) → Prop
-  gst : Nat
-  messageDelayBound : Nat
-  postGSTBound : Nat
-  postGSTMessageDelay :
+  params : Rounds.Params
+  timing : params.TimingOK
+  realizedByRounds :
     ∀ run, FairRun run → M.initial (run 0) →
-      M.messageDelayBoundedAfterGST run gst messageDelayBound
-  fairPacemakerAfterGST :
-    ∀ run, FairRun run → M.initial (run 0) → M.pacemakerFairAfterGST run gst
-  correctLeaderAfterGST :
-    ∀ run, FairRun run → M.initial (run 0) → M.leaderCorrectAfterGST run gst
-  postGSTProgress :
-    ∀ run, FairRun run → M.initial (run 0) → PostGSTDecision M run gst
-  boundedWindowProgress :
-    ∀ run, FairRun run → M.initial (run 0) →
-      BoundedDecisionWindow M run gst postGSTBound
+      ∃ R : Rounds.RoundRun, Rounds.Admissible params R ∧ Rounds.WellFormed params R ∧
+        ∀ t, Rounds.DecidedBy params R t → ∃ v, M.decide (run t) = some v
+
+variable {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
+  {M : Model State Value Event Party}
+
+/-- Global stabilisation time. -/
+def Assumptions.gst (a : Assumptions M) : Nat := a.params.gst
+
+/-- Post-GST message-delay bound `Δ`. -/
+def Assumptions.messageDelayBound (a : Assumptions M) : Nat := a.params.delta
+
+/-- Derived post-GST decision latency `(2n+1)·L`. -/
+def Assumptions.postGSTBound (a : Assumptions M) : Nat := Rounds.latencyBound a.params
 
 /-- Built-in assumption labels for summary/validation APIs. -/
 inductive Assumption where
-  | fairRunSemantics
-  | postGSTMessageDelay
-  | fairPacemakerAfterGST
-  | correctLeaderAfterGST
-  | postGSTProgress
-  | boundedWindowProgress
+  | timing
+  | realizedByRounds
   deriving Repr, DecidableEq, Inhabited
 
 /-- Validation result for one assumption atom. -/
@@ -111,63 +117,32 @@ structure AssumptionResult where
 
 /-- Core reusable partial-synchrony assumption set. -/
 def coreAssumptions : List Assumption :=
-  [ .fairRunSemantics
-  , .postGSTMessageDelay
-  , .fairPacemakerAfterGST
-  , .correctLeaderAfterGST
-  , .postGSTProgress
-  , .boundedWindowProgress
-  ]
+  [.timing, .realizedByRounds]
 
 /-! ## Assumption Validation API -/
 
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
+/-- Constant `true` for the refinement field: it quantifies over all fair runs
+and cannot be decided; the bundle's type carries its proof. -/
+def proofCarriedNoRuntimeCheck : Bool :=
+  true
 
-
-/-- Validate one assumption against an assumption bundle. -/
-def validateAssumption
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (_a : Assumptions M) (h : Assumption) : AssumptionResult :=
+/-- Validate one assumption: `timing` is decided over the concrete parameters. -/
+def validateAssumption (a : Assumptions M) (h : Assumption) : AssumptionResult :=
   match h with
-  | .fairRunSemantics =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "A reusable fair-run predicate, GST, delay bound, and post-GST bound are provided."
-      }
-  | .postGSTMessageDelay =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Fair initial runs satisfy the configured post-GST message-delay bound."
-      }
-  | .fairPacemakerAfterGST =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Fair initial runs have a fair pacemaker after GST."
-      }
-  | .correctLeaderAfterGST =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Fair initial runs have an eventually-correct leader after GST."
-      }
-  | .postGSTProgress =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Fair initial runs have a decision after GST."
-      }
-  | .boundedWindowProgress =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Fair initial runs decide inside the configured post-GST window."
-      }
+  | .timing =>
+      { assumption := h, passed := decide a.params.TimingOK
+      , detail := "n = 3f+1, 0 < L and 2Δ ≤ L." }
+  | .realizedByRounds =>
+      { assumption := h, passed := proofCarriedNoRuntimeCheck
+      , detail := "Fair runs refine an admissible, well-formed vote-quorum execution (≤ f faults)." }
+
+/-- Soundness of the decided label. -/
+theorem validateAssumption_timing_sound (P : Rounds.Params)
+    (h : decide P.TimingOK = true) : P.TimingOK :=
+  of_decide_eq_true h
 
 /-- Validate a list of assumptions. -/
-def validateAssumptions
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (a : Assumptions M) (hs : List Assumption) : List AssumptionResult :=
+def validateAssumptions (a : Assumptions M) (hs : List Assumption) : List AssumptionResult :=
   hs.map (validateAssumption a)
 
 /-- True iff every validation atom passed. -/
@@ -181,35 +156,32 @@ structure AssumptionSummary where
   deriving Repr, DecidableEq, Inhabited
 
 /-- Summary API for assumption validation. -/
-def runAssumptionValidation
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (a : Assumptions M) (hs : List Assumption) :
-    AssumptionSummary :=
+def runAssumptionValidation (a : Assumptions M) (hs : List Assumption) : AssumptionSummary :=
   let rs := validateAssumptions a hs
   { results := rs, allPassed := allAssumptionsPassed rs }
 
 /-! ## Derived Liveness Results -/
 
-/-- Eventual decision follows from post-GST progress. -/
-theorem eventual_decision_of_assumptions
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (a : Assumptions M) :
-    TerminatesOnAllFairRuns M a.FairRun := by
-  intro run hFair hInit
-  rcases a.postGSTProgress run hFair hInit with ⟨n, _hGST, v, hDec⟩
-  exact ⟨n, v, hDec⟩
-
-/-- Bounded post-GST termination follows from bounded window progress. -/
-theorem bounded_post_gst_termination_of_assumptions
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    {M : Model State Value Event Party}
-    (a : Assumptions M) :
+/-- Bounded post-GST termination, proved from the concrete round model. -/
+theorem bounded_post_gst_termination_of_assumptions (a : Assumptions M) :
     BoundedTerminationAfterGST M a.FairRun a.gst a.postGSTBound := by
   intro run hFair hInit
-  rcases a.boundedWindowProgress run hFair hInit with ⟨offset, hOffset, v, hDec⟩
-  exact ⟨a.gst + offset, Nat.add_le_add_left hOffset a.gst, v, hDec⟩
+  obtain ⟨R, hAdm, hHon, hRef⟩ := a.realizedByRounds run hFair hInit
+  exact ⟨_, le_rfl, hRef _ (Rounds.decided_after_gst a.params R a.timing hAdm hHon)⟩
+
+/-- Eventual decision follows from bounded post-GST termination. -/
+theorem eventual_decision_of_assumptions (a : Assumptions M) :
+    TerminatesOnAllFairRuns M a.FairRun := by
+  intro run hFair hInit
+  obtain ⟨n, _, v, hv⟩ := bounded_post_gst_termination_of_assumptions a run hFair hInit
+  exact ⟨n, v, hv⟩
+
+/-- Post-GST decision within the bounded window. -/
+theorem post_gst_decision_of_assumptions (a : Assumptions M) (run : Nat → State)
+    (hFair : a.FairRun run) (hInit : M.initial (run 0)) :
+    BoundedDecisionWindow M run a.gst a.postGSTBound := by
+  obtain ⟨R, hAdm, hHon, hRef⟩ := a.realizedByRounds run hFair hInit
+  exact ⟨_, le_rfl, hRef _ (Rounds.decided_after_gst a.params R a.timing hAdm hHon)⟩
 
 end PartialSynchrony
 end Distributed

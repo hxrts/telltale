@@ -1,16 +1,36 @@
+import Distributed.Families.QuorumGeometry.Core
+
 set_option autoImplicit false
 
 /-! # Distributed.Families.Reconfiguration
 
-Reusable reconfiguration assumptions and theorem forms:
-- no split-brain across reconfiguration,
-- safe handoff,
-- liveness preservation.
+Reconfiguration safety derived from a concrete joint-consensus model:
+- each epoch `e` has a validator set `config e` and a quorum size `quorum e`,
+- a commit step appends an entry certified by a quorum of the current epoch,
+- a reconfiguration step advances the epoch and keeps the committed log,
+- signatures are epoch-indexed: `signed e p d` means `p` signed `d` in epoch `e`,
+- at most `f` validators are Byzantine; honest validators never sign two
+  conflicting decisions within one epoch (`honestNoEquivocation`) and carry
+  their vote lock across a handoff, i.e. never sign in an adjacent epoch a
+  decision conflicting with one they signed before (`honestHandoffLock`),
+- same-epoch threshold `|config e| + f < 2 * quorum e` and joint-consensus
+  overlap `|config e ∪ config (e+1)| + f < quorum e + quorum (e+1)`,
+- capacity `quorum e + f ≤ |config e|` on the configuration sequence.
+
+From these we prove (not assume) that commits certified in the same or
+adjacent epochs never conflict, that a step preserves the committed prefix,
+and that every state is live (the honest members of its epoch form a quorum).
+Both honesty rules are per-validator behaviour; neither mentions certificates.
+Liveness is a counting consequence of capacity: a property of the
+configuration sequence, so it holds for every state, reachable or not.
 -/
 
 /-
-The Problem. This module needs a concise statement of its theorem-family boundary and reusable assumptions.
-Solution Structure. Introduce the core model/contracts first, then derive canonical lemmas and API wrappers from those contracts.
+The Problem. Earlier versions stored `overlapSignerExcludesConflict` and
+`handoffPreservesCommittedPrefix` fields that were the conclusions.
+Solution Structure. Fix a concrete state (epoch + certified log) and step
+relation, state numeric per-epoch thresholds, and prove safety by counting
+via `QuorumGeometry.inter_card_lower`.
 -/
 
 /-! ## Core Development -/
@@ -18,201 +38,285 @@ Solution Structure. Introduce the core model/contracts first, then derive canoni
 namespace Distributed
 namespace Reconfiguration
 
-universe u v w x
+universe v w x
 
-/-- Minimal model interface for reconfiguration reasoning. -/
-structure Model (State : Type u) (Decision : Type v) (Certificate : Type w) where
-  transitionStep : State → State → Prop
-  epoch : State → Nat
-  transitionCertified : State → Nat → Certificate → Prop
-  committed : State → Decision → Prop
-  live : State → Prop
+/-- One committed log entry: the certifying epoch, the decision, its certificate. -/
+structure Entry (Decision : Type v) (Certificate : Type w) where
+  epoch : Nat
+  decision : Decision
+  cert : Certificate
+
+/-- Concrete replicated state: current epoch and committed log. -/
+structure RState (Decision : Type v) (Certificate : Type w) where
+  epoch : Nat
+  log : List (Entry Decision Certificate)
+
+/-- Reconfiguration model: per-epoch configurations and signature semantics.
+`signed e p d` means validator `p` signed decision `d` in epoch `e`. -/
+structure Model (Decision : Type v) (Certificate : Type w) (Party : Type x) where
+  config : Nat → Finset Party
+  quorum : Nat → Nat
+  signers : Certificate → Finset Party
+  signed : Nat → Party → Decision → Prop
   conflicts : Decision → Decision → Prop
 
-/-- No-split-brain property across one reconfiguration step. -/
-def NoSplitBrainAcrossReconfiguration
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    (M : Model State Decision Certificate) : Prop :=
-  ∀ {sOld sNew dOld dNew},
-    M.transitionStep sOld sNew →
-    M.committed sOld dOld →
-    M.committed sNew dNew →
+variable {Decision : Type v} {Certificate : Type w} {Party : Type x}
+
+/-- `c` is a valid quorum certificate for `d` in epoch `e`. -/
+def Model.ValidCert (M : Model Decision Certificate Party)
+    (e : Nat) (d : Decision) (c : Certificate) : Prop :=
+  M.signers c ⊆ M.config e ∧ M.quorum e ≤ (M.signers c).card ∧
+    ∀ p ∈ M.signers c, M.signed e p d
+
+/-- Protocol steps: certified commit in the current epoch, or reconfiguration. -/
+inductive Step (M : Model Decision Certificate Party) :
+    RState Decision Certificate → RState Decision Certificate → Prop
+  | commit (s : RState Decision Certificate) (d : Decision) (c : Certificate) :
+      M.ValidCert s.epoch d c → Step M s ⟨s.epoch, s.log ++ [⟨s.epoch, d, c⟩]⟩
+  | reconfigure (s : RState Decision Certificate) :
+      Step M s ⟨s.epoch + 1, s.log⟩
+
+/-- Initial state: epoch 0, empty log. -/
+def initState : RState Decision Certificate := ⟨0, []⟩
+
+/-- States reachable from `initState`. -/
+inductive Reachable (M : Model Decision Certificate Party) :
+    RState Decision Certificate → Prop
+  | init : Reachable M initState
+  | step {s s'} : Reachable M s → Step M s s' → Reachable M s'
+
+/-- `d` is committed at `s`. -/
+def Committed (s : RState Decision Certificate) (d : Decision) : Prop :=
+  ∃ en ∈ s.log, en.decision = d
+
+/-- `d` is committed at `s` by an entry certified in epoch `e`. -/
+def CommittedAt (s : RState Decision Certificate) (e : Nat) (d : Decision) : Prop :=
+  ∃ en ∈ s.log, en.epoch = e ∧ en.decision = d
+
+/-- Two epochs are equal or adjacent (one reconfiguration apart). -/
+def Adjacent (e e' : Nat) : Prop := e ≤ e' + 1 ∧ e' ≤ e + 1
+
+/-! ## Assumptions -/
+
+/-- Fault model. No field mentions commits or steps: all are numeric
+per-epoch thresholds on the configuration sequence or per-validator rules. -/
+structure Assumptions [DecidableEq Party] (M : Model Decision Certificate Party) where
+  byzantine : Finset Party
+  f : Nat
+  byzantineBound : byzantine.card ≤ f
+  sameEpochThreshold : ∀ e, (M.config e).card + f < 2 * M.quorum e
+  jointOverlap : ∀ e,
+    (M.config e ∪ M.config (e + 1)).card + f < M.quorum e + M.quorum (e + 1)
+  /-- Per-epoch honesty: no two conflicting signatures within one epoch. -/
+  honestNoEquivocation : ∀ {e p d₁ d₂}, p ∉ byzantine →
+    M.signed e p d₁ → M.signed e p d₂ → ¬ M.conflicts d₁ d₂
+  /-- Handoff lock: an honest validator's vote in one epoch binds it in the
+  adjacent one (either order, since `conflicts` need not be symmetric). -/
+  honestHandoffLock : ∀ {e e' p d₁ d₂}, (e' = e + 1 ∨ e = e' + 1) → p ∉ byzantine →
+    M.signed e p d₁ → M.signed e' p d₂ → ¬ M.conflicts d₁ d₂
+  /-- Capacity of the configuration sequence: room for a quorum beside `f` faults. -/
+  quorumCapacity : ∀ e, M.quorum e + f ≤ (M.config e).card
+
+/-- Liveness of a state: honest members of the current epoch form a quorum. -/
+def Live [DecidableEq Party] (M : Model Decision Certificate Party)
+    (byz : Finset Party) (s : RState Decision Certificate) : Prop :=
+  M.quorum s.epoch ≤ (M.config s.epoch \ byz).card
+
+/-! ## Properties -/
+
+/-- No split brain: across a step from a reachable state, decisions certified
+in the same or adjacent epochs never conflict. -/
+def NoSplitBrainAcrossReconfiguration (M : Model Decision Certificate Party) : Prop :=
+  ∀ {sOld sNew e e' dOld dNew},
+    Reachable M sOld → Step M sOld sNew →
+    CommittedAt sOld e dOld → CommittedAt sNew e' dNew → Adjacent e e' →
     ¬ M.conflicts dOld dNew
 
-/-- Safe-handoff property across one reconfiguration step. -/
-def SafeHandoff
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    (M : Model State Decision Certificate) : Prop :=
-  ∀ {sOld sNew d},
-    M.transitionStep sOld sNew →
-    M.committed sOld d →
-    M.committed sNew d
+/-- Safe handoff: the committed log of the old state is a prefix of the new one. -/
+def SafeHandoff (M : Model Decision Certificate Party) : Prop :=
+  ∀ {sOld sNew}, Step M sOld sNew → sOld.log <+: sNew.log
 
-/-- Liveness-preservation property across one reconfiguration step. -/
-def LivenessPreserved
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    (M : Model State Decision Certificate) : Prop :=
-  ∀ {sOld sNew},
-    M.transitionStep sOld sNew →
-    M.live sOld →
-    M.live sNew
+/-- Liveness preservation across one step. -/
+def LivenessPreserved [DecidableEq Party] (M : Model Decision Certificate Party)
+    (byz : Finset Party) : Prop :=
+  ∀ {sOld sNew}, Step M sOld sNew → Live M byz sOld → Live M byz sNew
 
-/-! ## Assumption Atoms and Contracts -/
+/-! ## Counting -/
 
-/-- Reusable core reconfiguration assumption bundle. -/
-structure Assumptions
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    (M : Model State Decision Certificate) where
-  Participant : Type x
-  signer : Certificate → Participant → Prop
-  epochTransitionCertificates :
-    ∀ {sOld sNew},
-      M.transitionStep sOld sNew →
-      ∃ c, M.transitionCertified sNew (M.epoch sNew) c
-  committedCarriesEpochCertificate :
-    ∀ {s d},
-      M.committed s d →
-      ∃ c, M.transitionCertified s (M.epoch s) c
-  oldNewQuorumOverlap :
-    ∀ {sOld sNew cOld cNew},
-      M.transitionStep sOld sNew →
-      M.transitionCertified sOld (M.epoch sOld) cOld →
-      M.transitionCertified sNew (M.epoch sNew) cNew →
-      ∃ p, signer cOld p ∧ signer cNew p
-  epochMonotonicity :
-    ∀ {sOld sNew},
-      M.transitionStep sOld sNew →
-      M.epoch sOld ≤ M.epoch sNew
-  overlapSignerExcludesConflict :
-    ∀ {sOld sNew cOld cNew p dOld dNew},
-      M.transitionStep sOld sNew →
-      M.transitionCertified sOld (M.epoch sOld) cOld →
-      M.transitionCertified sNew (M.epoch sNew) cNew →
-      signer cOld p →
-      signer cNew p →
-      M.committed sOld dOld →
-      M.committed sNew dNew →
-      ¬ M.conflicts dOld dNew
-  handoffPreservesCommittedPrefix :
-    ∀ {sOld sNew d},
-      M.transitionStep sOld sNew →
-      M.committed sOld d →
-      M.committed sNew d
-  progressPreservedByMonotoneEpoch :
-    ∀ {sOld sNew},
-      M.transitionStep sOld sNew →
-      M.epoch sOld ≤ M.epoch sNew →
-      M.live sOld →
-      M.live sNew
+/-- Two sets inside `V` whose sizes exceed `|V| + |Byz|` share an honest member. -/
+theorem honest_common {P : Type x} [DecidableEq P] (A B V Byz : Finset P)
+    (hA : A ⊆ V) (hB : B ⊆ V) (h : V.card + Byz.card < A.card + B.card) :
+    ∃ p, p ∈ A ∧ p ∈ B ∧ p ∉ Byz := by
+  have hI := QuorumGeometry.inter_card_lower A B V hA hB
+  have hSd := Finset.le_card_sdiff Byz (A ∩ B)
+  obtain ⟨p, hp⟩ : ((A ∩ B) \ Byz).Nonempty := by
+    rw [← Finset.card_pos]; omega
+  simp only [Finset.mem_sdiff, Finset.mem_inter] at hp
+  exact ⟨p, hp.1.1, hp.1.2, hp.2⟩
 
-/-- Built-in assumption labels for summary/validation APIs. -/
-inductive Assumption where
-  | epochTransitionCertificates
-  | oldNewQuorumOverlap
-  | epochMonotonicity
-  deriving Repr, DecidableEq, Inhabited
+/-- Valid certificates in epochs `e` and `e+1` share an honest signer. -/
+theorem honest_signer_joint [DecidableEq Party] {M : Model Decision Certificate Party}
+    (a : Assumptions M) {e d d' c c'}
+    (h : M.ValidCert e d c) (h' : M.ValidCert (e + 1) d' c') :
+    ∃ p, p ∈ M.signers c ∧ p ∈ M.signers c' ∧ p ∉ a.byzantine := by
+  have := a.jointOverlap e; have := a.byzantineBound; have := h.2.1; have := h'.2.1
+  exact honest_common _ _ _ _ (h.1.trans Finset.subset_union_left)
+    (h'.1.trans Finset.subset_union_right) (by omega)
 
-/-- Validation result for one assumption atom. -/
-structure AssumptionResult where
-  assumption : Assumption
-  passed : Bool
-  detail : String
-  deriving Repr, DecidableEq, Inhabited
+/-- Valid certificates in the same epoch share an honest signer. -/
+theorem honest_signer_same [DecidableEq Party] {M : Model Decision Certificate Party}
+    (a : Assumptions M) {e d d' c c'}
+    (h : M.ValidCert e d c) (h' : M.ValidCert e d' c') :
+    ∃ p, p ∈ M.signers c ∧ p ∈ M.signers c' ∧ p ∉ a.byzantine := by
+  have := a.sameEpochThreshold e; have := a.byzantineBound; have := h.2.1; have := h'.2.1
+  exact honest_common _ _ _ _ h.1 h'.1 (by omega)
 
-/-- Core reusable reconfiguration assumption set. -/
-def coreAssumptions : List Assumption :=
-  [ .epochTransitionCertificates
-  , .oldNewQuorumOverlap
-  , .epochMonotonicity
-  ]
+/-- A shared honest signer of certificates in epochs `e`, `e'` excludes a conflict:
+same epoch by `honestNoEquivocation`, adjacent epochs by `honestHandoffLock`. -/
+theorem no_conflict_of_honest [DecidableEq Party] {M : Model Decision Certificate Party}
+    (a : Assumptions M) {e e' d d' c c'}
+    (h : M.ValidCert e d c) (h' : M.ValidCert e' d' c')
+    (hE : e = e' ∨ e' = e + 1 ∨ e = e' + 1)
+    (hp : ∃ p, p ∈ M.signers c ∧ p ∈ M.signers c' ∧ p ∉ a.byzantine) :
+    ¬ M.conflicts d d' := by
+  obtain ⟨p, hp, hp', hH⟩ := hp
+  rcases hE with rfl | hE
+  · exact a.honestNoEquivocation hH (h.2.2 p hp) (h'.2.2 p hp')
+  · exact a.honestHandoffLock hE hH (h.2.2 p hp) (h'.2.2 p hp')
 
-/-! ## Assumption Validation API -/
+/-- Valid certificates in adjacent epochs never certify conflicting decisions. -/
+theorem valid_certs_no_conflict [DecidableEq Party] {M : Model Decision Certificate Party}
+    (a : Assumptions M) {e e' d d' c c'}
+    (h : M.ValidCert e d c) (h' : M.ValidCert e' d' c') (hAdj : Adjacent e e') :
+    ¬ M.conflicts d d' := by
+  rcases Nat.lt_trichotomy e e' with hlt | rfl | hgt
+  · obtain rfl : e' = e + 1 := by unfold Adjacent at hAdj; omega
+    exact no_conflict_of_honest a h h' (by omega) (honest_signer_joint a h h')
+  · exact no_conflict_of_honest a h h' (Or.inl rfl) (honest_signer_same a h h')
+  · obtain rfl : e = e' + 1 := by unfold Adjacent at hAdj; omega
+    refine no_conflict_of_honest a h h' (by omega) ?_
+    obtain ⟨p, h1, h2, h3⟩ := honest_signer_joint a h' h
+    exact ⟨p, h2, h1, h3⟩
 
-/-- Proof-carrying validators report success because the assumption bundle stores the proof. -/
-def proofCarryingValidationPassed : Bool :=
-  decide (0 = 0)
+/-! ## Step Invariants -/
 
+/-- Every log entry carries a valid certificate for its epoch. -/
+def WellCertified (M : Model Decision Certificate Party)
+    (s : RState Decision Certificate) : Prop :=
+  ∀ en ∈ s.log, M.ValidCert en.epoch en.decision en.cert
 
-/-- Validate one assumption against an assumption bundle. -/
-def validateAssumption
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    {M : Model State Decision Certificate}
-    (_a : Assumptions M) (h : Assumption) : AssumptionResult :=
-  match h with
-  | .epochTransitionCertificates =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Epoch-transition certificate assumption is provided."
-      }
-  | .oldNewQuorumOverlap =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Old/new quorum overlap assumption is provided."
-      }
-  | .epochMonotonicity =>
-      { assumption := h
-      , passed := proofCarryingValidationPassed
-      , detail := "Epoch monotonicity assumption is provided."
-      }
+/-- Steps only append to the log. -/
+theorem step_log_prefix {M : Model Decision Certificate Party} {s s'}
+    (h : Step M s s') : s.log <+: s'.log := by
+  cases h with
+  | commit _ _ _ => exact List.prefix_append _ _
+  | reconfigure => exact List.prefix_refl _
 
-/-- Validate a list of assumptions. -/
-def validateAssumptions
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    {M : Model State Decision Certificate}
-    (a : Assumptions M) (hs : List Assumption) : List AssumptionResult :=
-  hs.map (validateAssumption a)
+/-- Steps preserve `WellCertified`. -/
+theorem step_wellCertified {M : Model Decision Certificate Party} {s s'}
+    (h : Step M s s') (hW : WellCertified M s) : WellCertified M s' := by
+  cases h with
+  | commit d c hc =>
+    intro en hen
+    rcases List.mem_append.1 hen with hen | hen
+    · exact hW en hen
+    · rw [List.mem_singleton.1 hen]; exact hc
+  | reconfigure => exact hW
 
-/-- True iff every validation atom passed. -/
-def allAssumptionsPassed (rs : List AssumptionResult) : Bool :=
-  rs.all (fun r => r.passed)
-
-/-- Summary of assumption validation. -/
-structure AssumptionSummary where
-  results : List AssumptionResult
-  allPassed : Bool
-  deriving Repr, DecidableEq, Inhabited
-
-/-- Summary API for assumption validation. -/
-def runAssumptionValidation
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    {M : Model State Decision Certificate}
-    (a : Assumptions M) (hs : List Assumption) :
-    AssumptionSummary :=
-  let rs := validateAssumptions a hs
-  { results := rs, allPassed := allAssumptionsPassed rs }
+/-- Reachable states are well certified. -/
+theorem reachable_wellCertified {M : Model Decision Certificate Party} {s}
+    (h : Reachable M s) : WellCertified M s := by
+  induction h with
+  | init => intro en hen; simp [initState] at hen
+  | step _ hs ih => exact step_wellCertified hs ih
 
 /-! ## Derived Results -/
 
-/-- No split-brain follows under the supplied assumptions and premises. -/
-theorem no_split_brain_of_assumptions
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    {M : Model State Decision Certificate}
-    (a : Assumptions M) :
+/-- No split brain, proved from the joint-consensus thresholds and honesty. -/
+theorem no_split_brain_of_assumptions [DecidableEq Party]
+    {M : Model Decision Certificate Party} (a : Assumptions M) :
     NoSplitBrainAcrossReconfiguration M := by
-  intro sOld sNew dOld dNew hStep hOld hNew
-  rcases a.committedCarriesEpochCertificate hOld with ⟨cOld, hCertOld⟩
-  rcases a.committedCarriesEpochCertificate hNew with ⟨cNew, hCertNew⟩
-  rcases a.oldNewQuorumOverlap hStep hCertOld hCertNew with ⟨p, hSignOld, hSignNew⟩
-  exact
-    a.overlapSignerExcludesConflict
-      hStep hCertOld hCertNew hSignOld hSignNew hOld hNew
+  intro sOld sNew e e' dOld dNew hR hStep hOld hNew hAdj
+  have hW' := reachable_wellCertified (Reachable.step hR hStep)
+  obtain ⟨en, hen, rfl, rfl⟩ := hOld
+  obtain ⟨en', hen', rfl, rfl⟩ := hNew
+  exact valid_certs_no_conflict a (hW' en ((step_log_prefix hStep).subset hen))
+    (hW' en' hen') hAdj
 
-/-- Safe handoff follows under the supplied assumptions and premises. -/
-theorem safe_handoff_of_assumptions
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    {M : Model State Decision Certificate}
-    (a : Assumptions M) :
-    SafeHandoff M :=
-  a.handoffPreservesCommittedPrefix
+/-- Safe handoff (committed-prefix preservation), proved from the step relation. -/
+theorem safe_handoff (M : Model Decision Certificate Party) : SafeHandoff M :=
+  fun h => step_log_prefix h
 
-/-- Liveness preservation follows under the supplied assumptions and premises. -/
-theorem liveness_preserved_of_assumptions
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    {M : Model State Decision Certificate}
-    (a : Assumptions M) :
-    LivenessPreserved M := by
-  intro sOld sNew hStep hLive
-  exact a.progressPreservedByMonotoneEpoch hStep (a.epochMonotonicity hStep) hLive
+/-- Committed decisions remain committed across a step. -/
+theorem committed_preserved {M : Model Decision Certificate Party} {s s' d}
+    (h : Step M s s') (hc : Committed s d) : Committed s' d := by
+  obtain ⟨en, hen, hd⟩ := hc
+  exact ⟨en, (step_log_prefix h).subset hen, hd⟩
+
+/-- Every state is live: by `quorumCapacity` and `|byzantine| ≤ f`, removing the
+Byzantine parties from `config e` leaves at least `quorum e` honest members. -/
+theorem live_of_assumptions [DecidableEq Party]
+    {M : Model Decision Certificate Party} (a : Assumptions M)
+    (s : RState Decision Certificate) : Live M a.byzantine s := by
+  have hSd := Finset.le_card_sdiff a.byzantine (M.config s.epoch)
+  have := a.quorumCapacity s.epoch; have := a.byzantineBound
+  unfold Live; omega
+
+/-- Liveness preservation across steps, a corollary of `live_of_assumptions`
+(liveness is a property of the configuration sequence, not of the step). -/
+theorem liveness_preserved_of_assumptions [DecidableEq Party]
+    {M : Model Decision Certificate Party} (a : Assumptions M) :
+    LivenessPreserved M a.byzantine :=
+  fun {_ sNew} _ _ => live_of_assumptions a sNew
+
+/-! ## Assumption Validation API -/
+
+/-- Assumption labels checkable over a finite epoch horizon. -/
+inductive Assumption where
+  | sameEpochThreshold
+  | jointOverlap
+  | quorumCapacity
+  deriving Repr, DecidableEq, Inhabited
+
+/-- Proposition named by each label for epochs `< horizon`. -/
+def Assumption.Holds [DecidableEq Party] (M : Model Decision Certificate Party)
+    (_byz : Finset Party) (f horizon : Nat) : Assumption → Prop
+  | .sameEpochThreshold => ∀ e < horizon, (M.config e).card + f < 2 * M.quorum e
+  | .jointOverlap => ∀ e < horizon,
+      (M.config e ∪ M.config (e + 1)).card + f < M.quorum e + M.quorum (e + 1)
+  | .quorumCapacity => ∀ e < horizon, M.quorum e + f ≤ (M.config e).card
+
+instance [DecidableEq Party] (M : Model Decision Certificate Party) (byz : Finset Party)
+    (f horizon : Nat) (h : Assumption) : Decidable (h.Holds M byz f horizon) := by
+  cases h <;> unfold Assumption.Holds <;> infer_instance
+
+/-- Core assumption labels. -/
+def coreAssumptions : List Assumption :=
+  [.sameEpochThreshold, .jointOverlap, .quorumCapacity]
+
+/-- Decide one label over the concrete configuration schedule. -/
+def validateAssumption [DecidableEq Party] (M : Model Decision Certificate Party)
+    (byz : Finset Party) (f horizon : Nat) (h : Assumption) : Bool :=
+  decide (h.Holds M byz f horizon)
+
+/-- Soundness of the decision procedure. -/
+theorem validateAssumption_sound [DecidableEq Party] (M : Model Decision Certificate Party)
+    (byz : Finset Party) (f horizon : Nat) (h : Assumption)
+    (hPass : validateAssumption M byz f horizon h = true) : h.Holds M byz f horizon :=
+  of_decide_eq_true hPass
+
+/-- Validate all labels in a list. -/
+def runAssumptionValidation [DecidableEq Party] (M : Model Decision Certificate Party)
+    (byz : Finset Party) (f horizon : Nat) (hs : List Assumption) : Bool :=
+  hs.all (validateAssumption M byz f horizon)
+
+/-- Soundness of the list validation. -/
+theorem runAssumptionValidation_sound [DecidableEq Party]
+    (M : Model Decision Certificate Party) (byz : Finset Party) (f horizon : Nat)
+    (hs : List Assumption) (hAll : runAssumptionValidation M byz f horizon hs = true) :
+    ∀ h ∈ hs, h.Holds M byz f horizon := by
+  intro h hMem
+  exact validateAssumption_sound M byz f horizon h (List.all_eq_true.1 hAll h hMem)
 
 end Reconfiguration
 end Distributed

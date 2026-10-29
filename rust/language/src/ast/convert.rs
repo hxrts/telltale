@@ -81,13 +81,24 @@ pub fn choreography_to_global(choreography: &Choreography) -> ConversionResult<G
 /// Returns `UnsupportedFeature` for: Broadcast, Loop, Parallel, Extension
 // RECURSION_SAFE: structural recursion over finite protocol AST depth.
 pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCore> {
+    if protocol.contains_authority_binding() {
+        return Err(ConversionError::UnsupportedFeature {
+            feature: "AuthorityBinding".to_string(),
+            hint: "The original AST requires effect-preserving lowering, including zero-iteration bodies".to_string(),
+        });
+    }
+    protocol_to_global_inner(protocol)
+}
+
+// RECURSION_SAFE: structural recursion after one whole-AST preflight.
+fn protocol_to_global_inner(protocol: &Protocol) -> ConversionResult<GlobalTypeCore> {
     match protocol {
         Protocol::End => Ok(GlobalTypeCore::End),
 
         Protocol::Var(ident) => Ok(GlobalTypeCore::var(ident.to_string())),
 
         Protocol::Rec { label, body } => {
-            let body_global = protocol_to_global(body)?;
+            let body_global = protocol_to_global_inner(body)?;
             Ok(GlobalTypeCore::mu(label.to_string(), body_global))
         }
 
@@ -127,7 +138,13 @@ pub fn protocol_to_global(protocol: &Protocol) -> ConversionResult<GlobalTypeCor
                     .to_string(),
         }),
 
-        Protocol::Let { continuation, .. } => protocol_to_global(continuation),
+        Protocol::Let { .. } if protocol.is_authority_binding() => {
+            Err(ConversionError::UnsupportedFeature {
+                feature: "AuthorityBinding".to_string(),
+                hint: "Authority, observation and transfer bindings require effect-preserving machine lowering".to_string(),
+            })
+        }
+        Protocol::Let { continuation, .. } => protocol_to_global_inner(continuation),
 
         Protocol::Case { .. } => Err(ConversionError::UnsupportedFeature {
             feature: "Case".to_string(),
@@ -184,7 +201,7 @@ fn convert_protocol_send(
     message: &MessageType,
     continuation: &Protocol,
 ) -> ConversionResult<GlobalTypeCore> {
-    let cont_global = protocol_to_global(continuation)?;
+    let cont_global = protocol_to_global_inner(continuation)?;
     let label = message_to_label(message);
     Ok(GlobalTypeCore::send(
         from.name().to_string(),
@@ -257,9 +274,9 @@ fn convert_choice_branch(
 
             let label = Label::new(branch.label.to_string());
             let cont_global = if branch.label == message.name {
-                protocol_to_global(continuation)?
+                protocol_to_global_inner(continuation)?
             } else {
-                protocol_to_global(&branch.protocol)?
+                protocol_to_global_inner(&branch.protocol)?
             };
             Ok((label, cont_global))
         }
@@ -305,7 +322,7 @@ fn repeat_global(body: &Protocol, iterations: usize) -> ConversionResult<GlobalT
         return Ok(GlobalTypeCore::End);
     }
 
-    let body_global = protocol_to_global(body)?;
+    let body_global = protocol_to_global_inner(body)?;
     let mut repeated = GlobalTypeCore::End;
     for _ in 0..iterations {
         repeated = append_global_continuation(body_global.clone(), repeated);
@@ -794,5 +811,172 @@ mod tests {
 
         assert!(local_types_equivalent(&lt1, &lt2));
         assert!(!local_types_equivalent(&lt1, &lt3));
+    }
+}
+
+#[cfg(test)]
+mod authority_binding_tests {
+    use super::*;
+    use crate::ast::{AuthorityBindingMode, AuthorityExpr};
+
+    fn binding(mode: AuthorityBindingMode, expr: AuthorityExpr, linear: bool) -> Protocol {
+        Protocol::Let {
+            execution_role: None,
+            name: "value".into(),
+            mode,
+            expr,
+            linear,
+            continuation: Box::new(Protocol::End),
+        }
+    }
+
+    #[test]
+    fn authority_observation_and_transfer_cannot_be_erased_into_theory() {
+        let cases = [
+            binding(
+                AuthorityBindingMode::Authoritative,
+                AuthorityExpr::Var("input".into()),
+                false,
+            ),
+            binding(
+                AuthorityBindingMode::Observe,
+                AuthorityExpr::Var("input".into()),
+                false,
+            ),
+            binding(
+                AuthorityBindingMode::Plain,
+                AuthorityExpr::Check {
+                    effect: "Runtime".into(),
+                    operation: "ready".into(),
+                    args: vec![],
+                },
+                false,
+            ),
+            binding(
+                AuthorityBindingMode::Plain,
+                AuthorityExpr::Observe {
+                    effect: "Runtime".into(),
+                    operation: "watch".into(),
+                    args: vec![],
+                },
+                false,
+            ),
+            binding(
+                AuthorityBindingMode::Plain,
+                AuthorityExpr::Transfer {
+                    subject: "Session".into(),
+                    from: "A".into(),
+                    to: "B".into(),
+                },
+                true,
+            ),
+            binding(
+                AuthorityBindingMode::Plain,
+                AuthorityExpr::Var("receipt".into()),
+                true,
+            ),
+            binding(
+                AuthorityBindingMode::Plain,
+                AuthorityExpr::Call {
+                    name: "helper".into(),
+                    args: vec!["Runtime.ready(session)".into()],
+                },
+                false,
+            ),
+        ];
+        for protocol in cases {
+            assert!(protocol.contains_authority_binding());
+            assert!(
+                matches!(protocol_to_global(&protocol), Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "AuthorityBinding")
+            );
+        }
+    }
+
+    #[test]
+    fn shadowing_and_aliases_cannot_hide_original_authority() {
+        let shadow = binding(
+            AuthorityBindingMode::Plain,
+            AuthorityExpr::Constructor {
+                name: "Nothing".into(),
+                arg: None,
+            },
+            false,
+        );
+        let original = Protocol::Let {
+            execution_role: None,
+            name: "value".into(),
+            mode: AuthorityBindingMode::Authoritative,
+            expr: AuthorityExpr::Check {
+                effect: "Runtime".into(),
+                operation: "ready".into(),
+                args: vec![],
+            },
+            linear: false,
+            continuation: Box::new(shadow),
+        };
+        let nested = Protocol::Let {
+            execution_role: None,
+            name: "alias".into(),
+            mode: AuthorityBindingMode::Plain,
+            expr: AuthorityExpr::Var("value".into()),
+            linear: false,
+            continuation: Box::new(original),
+        };
+        assert!(nested.contains_authority_binding());
+        assert!(
+            matches!(protocol_to_global(&nested), Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "AuthorityBinding")
+        );
+    }
+
+    #[test]
+    fn zero_count_fuel_and_yield_after_cannot_bypass_original_ast_guard() {
+        for condition in [
+            Condition::Count(0),
+            Condition::Fuel(0),
+            Condition::YieldAfter(0),
+        ] {
+            let body = binding(
+                AuthorityBindingMode::Observe,
+                AuthorityExpr::Observe {
+                    effect: "Runtime".into(),
+                    operation: "watch".into(),
+                    args: vec![],
+                },
+                false,
+            );
+            let protocol = Protocol::Loop {
+                condition: Some(condition.clone()),
+                body: Box::new(body),
+            };
+            assert!(
+                matches!(protocol_to_global(&protocol), Err(ConversionError::UnsupportedFeature { feature, .. }) if feature == "AuthorityBinding")
+            );
+            let plain = Protocol::Loop {
+                condition: Some(condition),
+                body: Box::new(Protocol::End),
+            };
+            assert!(matches!(
+                protocol_to_global(&plain),
+                Ok(GlobalTypeCore::End)
+            ));
+        }
+    }
+
+    #[test]
+    fn pure_plain_bindings_preserve_communication_conversion() {
+        for expr in [
+            AuthorityExpr::Var("local".into()),
+            AuthorityExpr::Constructor {
+                name: "Nothing".into(),
+                arg: None,
+            },
+        ] {
+            let protocol = binding(AuthorityBindingMode::Plain, expr, false);
+            assert!(!protocol.contains_authority_binding());
+            assert!(matches!(
+                protocol_to_global(&protocol),
+                Ok(GlobalTypeCore::End)
+            ));
+        }
     }
 }

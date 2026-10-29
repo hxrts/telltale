@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 2e9c7113be5c177d80b79196eacfcbb20fc0f88b6a8ca0c78cfd22f11e2a6ac1 # shrinks to protocol = GeneratedProtocol { global: End, local_types: {"Solo": End} }, claims = InvariantClaims { schema_version: "lean_bridge.v1", liveness: None, distributed: DistributedClaims { fault_model: Crash, flp: None, cap: None, quorum_geometry: None, partial_synchrony: None, responsiveness: None, nakamoto: None, reconfiguration: None, atomic_broadcast: None, accountable_safety: None, failure_detectors: None, data_availability: None, coordination: None, crdt: None, byzantine_safety: None, consensus_envelope: None, failure_envelope: None, protocol_machine_envelope_adherence: None, protocol_machine_envelope_admission: None, protocol_envelope_bridge: None }, classical: ClassicalClaims { foster: None, max_weight: None, ldp: None, mean_field: None, heavy_traffic: None, mixing: None, fluid: None, concentration: None, littles_law: None, functional_clt: None, spectral_gap_termination: None } }

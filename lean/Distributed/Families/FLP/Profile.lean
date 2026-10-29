@@ -11,37 +11,19 @@ namespace Distributed
 namespace FLP
 namespace Profile
 
-universe u v w x
-
-/-- Build an FLP lower-bound profile from semantic assumptions and premises. -/
-def mkLowerBound
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (model : Model State Value Event Party)
-    (assumptions : Assumptions model)
-    (premises : LowerBoundPremises model) :
-    LowerBoundProtocol where
-  State := State
-  Value := Value
-  Event := Event
-  Party := Party
-  model := model
-  assumptions := assumptions
-  premises := premises
-
-/-- Build an FLP impossibility profile from semantic assumptions and premises. -/
-def mkImpossibility
-    {State : Type u} {Value : Type v} {Event : Type w} {Party : Type x}
-    (model : Model State Value Event Party)
-    (assumptions : Assumptions model)
-    (premises : ImpossibilityPremises model) :
-    ImpossibilityProtocol where
-  State := State
-  Value := Value
-  Event := Event
-  Party := Party
-  model := model
-  assumptions := assumptions
-  premises := premises
+/-- Build an FLP impossibility profile from a concrete protocol and its
+agreement and validity proofs. -/
+def mkImpossibility {Proc Msg St : Type} [DecidableEq Proc] [DecidableEq Msg]
+    [Fintype Proc] [Countable Msg] (protocol : Async.Protocol Proc Msg St)
+    (twoProcs : ∃ p q : Proc, p ≠ q) (agreement : Async.Agreement protocol)
+    (validity : Async.Validity protocol) : ImpossibilityProtocol where
+  Proc := Proc
+  Msg := Msg
+  St := St
+  protocol := protocol
+  twoProcs := twoProcs
+  agreement := agreement
+  validity := validity
 
 end Profile
 end FLP

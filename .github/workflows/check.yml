@@ -60,8 +60,12 @@ jobs:
           sudo apt-get clean
           echo "=== Disk after assurance cleanup ==="
           df -h /
-      - name: Run PR-critical assurance lane
-        run: just check-pr-critical
+      - name: Run PR-critical documentation fast-fail
+        run: just check-doc-fast-fail
+      - name: Run PR-critical early Lean checkpoint
+        run: just check-pr-critical-early-lean
+      - name: Run remaining PR-critical assurance
+        run: just check-pr-critical-remaining
       - name: Run cross-runtime parity gate
         run: cargo run --manifest-path toolkit/xtask/Cargo.toml -- check cross-runtime-parity --repo-root . -- --all
       - name: Build sources

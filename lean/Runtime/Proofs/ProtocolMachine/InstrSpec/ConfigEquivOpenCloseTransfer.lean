@@ -478,9 +478,11 @@ theorem transfer_spec_respects_config_equiv
       -- Rewrite goal: lookupD D₂' (renameEdge ρ e') = (lookupD D₁' e').map (renameValType ρ)
       rw [he]
       simp only [renameEdge]
-      rw [hD₁', hD₂', lookup_d_update_eq, lookup_d_update_eq]
+      rw [hD₁', hD₂', lookup_d_update_eq]
+      erw [lookup_d_update_eq]
       -- Goal: lookupD D₂ (...) ++ [chan...] = (lookupD D₁ sendEdge ++ [chan...]).map (renameValType ρ)
-      rw [List.map_append, List.map_singleton, renameValType, hTrace]
+      rw [List.map_append, List.map_singleton, renameValType]
+      erw [hTrace]
       -- The remaining goal equates σ.fwd with σ.toRenaming.f which are definitionally equal
       rfl
     · -- Case: e' ≠ sendEdge (frame)

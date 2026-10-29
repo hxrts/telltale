@@ -203,8 +203,7 @@ lemma eq_of_dest_eq {a b : LocalTypeC} (h : PFunctor.M.dest a = PFunctor.M.dest 
   intro x y hxy
   cases hx : x.dest with
   | mk a f =>
-      have hy : y.dest = ⟨a, f⟩ := by
-        simpa [hx] using hxy.symm
+      have hy : y.dest = ⟨a, f⟩ := hxy.symm.trans hx
       refine ⟨a, f, f, rfl, hy, ?_⟩
       intro i
       rfl

@@ -11,17 +11,17 @@ namespace Distributed
 namespace Reconfiguration
 namespace Profile
 
-universe u v w
+universe v w x
 
-/-- Build a reconfiguration profile from semantic reconfiguration assumptions. -/
+/-- Build a reconfiguration profile from a model and its fault-model assumptions. -/
 def mk
-    {State : Type u} {Decision : Type v} {Certificate : Type w}
-    (model : Model State Decision Certificate)
+    {Decision : Type v} {Certificate : Type w} {Party : Type x} [DecidableEq Party]
+    (model : Model Decision Certificate Party)
     (assumptions : Assumptions model) :
     ReconfigurationProtocol where
-  State := State
   Decision := Decision
   Certificate := Certificate
+  Party := Party
   model := model
   assumptions := assumptions
 

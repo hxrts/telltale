@@ -156,6 +156,14 @@ pub fn generate_protocol_module(choreography: &Choreography, source: &str) -> Re
         #[allow(dead_code)]
         pub const SOURCE: &str = #choreography_source;
 
+        /// Compile one original declared command operation; no live owner is serialized.
+        pub fn operation_image(
+            operation: &str,
+            windows: &::std::collections::BTreeMap<::std::string::String, ::std::num::NonZeroU64>,
+        ) -> ::std::result::Result<::telltale::dsl::semantic::CodeImage, ::telltale::CommandCompileError> {
+            ::telltale::compile_operation_image(SOURCE, operation, windows)
+        }
+
         #[allow(dead_code)]
         pub const QUALIFIED_NAME: &str = #qualified_name;
 
@@ -1177,6 +1185,7 @@ fn generate_commitments_module(choreography: &Choreography) -> Result<TokenStrea
                     operation_id: impl Into<::std::string::String>,
                 ) -> OperationInstance {
                     OperationInstance {
+                        agreement_profile: None,
                         operation_id: operation_id.into(),
                         session: None,
                         owner_id: None,

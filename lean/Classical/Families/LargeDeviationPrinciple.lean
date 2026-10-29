@@ -2,6 +2,9 @@ import Mathlib
 
 /-! # Large Deviation Principle
 
+**Scope (Option B, honest conditional interface).** The exponential tail bound is an assumed input (`LDPWitness.tail_upper`);
+only envelope monotonicity and its consequence are proved. No LDP is proved.
+
 This module provides the mathematical foundation for tail probability bounds in
 session-typed distributed systems. Large deviation theory characterizes the
 exponentially small probabilities of rare events, enabling precise SLA guarantees
@@ -111,7 +114,9 @@ theorem envelope_step_mono (C ρ : Real) (n : Nat)
     simpa [pow_succ] using mul_le_of_le_one_right (pow_nonneg hρ₀ n) hρ₁
   exact mul_le_mul_of_nonneg_left hpow hC
 
-/-- An `LDPWitness` certifies that a probability sequence has exponential tails.
+/-- Assumed classical input (Option B): an exponential tail envelope for `p`.
+    `tail_upper` is supplied by the caller; no large-deviation principle
+    (Cramér/Gärtner-Ellis rate function) is proved here.
 
     The witness provides:
     - C: the leading constant (initial bound)
@@ -128,12 +133,12 @@ structure LDPWitness (p : Nat → Real) where
   rho_le_one : ρ ≤ 1
   tail_upper : ∀ n, p n ≤ exponentialEnvelope C ρ n
 
-/-- One-step tightening: the bound at step n+1 is at most the bound at step n.
+/-- Conditional on an assumed `LDPWitness`: the bound at step n+1 is at most the bound at step n.
 
     For protocols: if we know P(not done at step n+1) ≤ C · ρⁿ⁺¹,
     then we also know P(not done at step n+1) ≤ C · ρⁿ (a weaker bound).
     This allows trading precision for simpler calculations. -/
-theorem one_step_tightening {p : Nat → Real}
+theorem one_step_tightening_of_ldp_witness {p : Nat → Real}
     (h : LDPWitness p) (n : Nat) :
     p (n + 1) ≤ exponentialEnvelope h.C h.ρ n := by
   exact le_trans (h.tail_upper (n + 1))
