@@ -336,7 +336,7 @@ fn check_failure(repo_root: &Path) -> Result<()> {
     let adapter_file =
         repo_root.join("lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean");
     let build_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Build.lean");
-    let artifacts_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Artifacts.lean");
+    let artifacts_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Artifacts/Envelope.lean");
     let inventory_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Inventory.lean");
     let profiles_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Profiles.lean");
     let test_file = repo_root.join("lean/Runtime/Tests/Main.lean");

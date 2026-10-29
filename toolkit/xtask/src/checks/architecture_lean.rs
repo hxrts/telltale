@@ -174,7 +174,7 @@ pub fn run(repo_root: &Path) -> Result<()> {
         .lines()
         .filter(|l| {
             !l.contains("/Runtime/Proofs/Examples/")
-                && !l.contains("/Runtime/Proofs/TheoremPack/Artifacts.lean:")
+                && !l.contains("/Runtime/Proofs/TheoremPack/Artifacts")
         })
         .map(|l| format!("{l}\n"))
         .collect();
