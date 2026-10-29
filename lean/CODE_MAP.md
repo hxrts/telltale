@@ -401,7 +401,7 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Families/QuorumGeometry.lean | Quorum-intersection safety family: no-conflict commits, fork exclusion, safe finality |
 | Families/PartialSynchrony.lean | Partial-synchrony liveness family: eventual decision and bounded post-GST termination |
 | Families/Responsiveness.lean | Responsiveness family: optimistic post-GST latency bound independent of timeout |
-| Families/Nakamoto.lean | Nakamoto security family: probabilistic safety, settlement-depth finality, churn-liveness |
+| Families/Nakamoto.lean | Nakamoto security family: probabilistic safety, settlement-depth finality (common prefix), chain-growth liveness transported from the longest-chain model |
 | Families/Reconfiguration.lean | Reconfiguration safety family: no split-brain, safe handoff, liveness preservation |
 | Families/AtomicBroadcast.lean | Atomic-broadcast family: total-order consistency, log-prefix compatibility, consensus bridge |
 | Families/AccountableSafety.lean | Accountable-safety family: safety-or-evidence theorem with slashable fault evidence |
@@ -818,7 +818,10 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 |------|------:|-------------|
 | Proofs/TheoremPack/API.lean | 368 | Public theorem-pack interface including proof-carrying metadata, semantic-object composition, inventory, and runtime gate APIs |
 | Proofs/TheoremPack/AdmissionBoundary.lean | 273 | Explicit admission-boundary ledger for transported theorem usage |
-| Proofs/TheoremPack/Artifacts.lean | 591 | Artifact generation plus semantic-object packaging and proof-carrying metadata surfaces |
+| Proofs/TheoremPack/Artifacts.lean | 21 | Re-export aggregator for the artifact schema |
+| Proofs/TheoremPack/Artifacts/Core.lean | 157 | Semantic-object packaging and proof-carrying artifact metadata |
+| Proofs/TheoremPack/Artifacts/Distributed.lean | 321 | Distributed-family artifact records (FLP, CAP, quorum, Nakamoto, CRDT, envelopes) |
+| Proofs/TheoremPack/Artifacts/Envelope.lean | 181 | Protocol-machine envelope adherence/admission, bridge, and runtime artifacts |
 | Proofs/TheoremPack/Build.lean | 453 | Theorem-pack construction plus execution-profile/adherence correspondence theorems |
 | Proofs/TheoremPack/Inventory.lean | 114 | Capability inventory management including semantic-object and proof-carrying metadata inventories |
 | Proofs/TheoremPack/Profiles.lean | 416 | Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
@@ -847,7 +850,9 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/Examples/ComposedProofPack.lean | 356 | End-to-end theorem-pack example showing semantic-object witness bundles flowing through the canonical composition and inventory path |
 | Proofs/Examples/CrossTargetProgressDependentWork.lean | 198 | Cross-target progress and dependent-work examples |
 | Proofs/Examples/DistributedLoweringProfiles.lean | 110 | Lowering-backed distributed theorem-pack profile examples |
-| Proofs/Examples/DistributedProfiles.lean | 178 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
+| Proofs/Examples/DistributedProfiles.lean | 12 | Re-export aggregator for distributed profile examples |
+| Proofs/Examples/DistributedProfiles/Models.lean | 303 | Concrete distributed models and profiles (BFT, timed, Nakamoto, DA, accountable safety) |
+| Proofs/Examples/DistributedProfiles/Attachment.lean | 228 | End-to-end protocol machine examples: profile attachment auto-materializes distributed theorem artifacts |
 | Proofs/Examples/EffectContracts.lean | 114 | Effect-contract theorem-pack examples |
 | Proofs/Examples/InvariantBundle.lean | 144 | One-shot invariant-bundle examples for liveness/progress, FLP/CAP, and classical artifact derivation |
 | Proofs/Examples/PublicationMaterialization.lean | 266 | Publication and materialization examples |

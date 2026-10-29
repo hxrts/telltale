@@ -145,7 +145,7 @@ def hexNibble? (ch : Char) : Option Nat :=
   else
     none
 
-partial def bytesOfHexChars? : List Char → Option (List UInt8)
+def bytesOfHexChars? : List Char → Option (List UInt8)
   | [] => some []
   | hi :: lo :: rest => do
       let hiNibble ← hexNibble? hi

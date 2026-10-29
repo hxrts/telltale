@@ -117,6 +117,12 @@ The execution profile also carries a list of `TransportNecessityProfile` values.
 
 `runtimeCriticalTransportedTheoremBoundaryInventory` narrows the ledger to families that gate runtime admission. `rustRuntimeCriticalTransportedTheoremKeys` and `leanRuntimeCriticalTransportedTheoremKeys` expose the Rust and Lean subsets consumed by admission paths. `runtimeCriticalTransportedTheoremsExplicit_true` certifies that the Rust and Lean lists agree.
 
+### Lean Evidence for Envelope Keys
+
+Rust admission of the three envelope keys (`protocol_machine_envelope_adherence`, `protocol_machine_envelope_admission`, `protocol_envelope_bridge`) is evidence-backed. `ProtocolMachineExecutionProfile` and `TheoremPackCapabilities` carry a `LeanEvidenceInventory` (key to Bool), parsed by `LeanEvidenceInventory::from_json_str` from the Lean `theoremInventory` export, either as a `{key: bool}` object or as the `List (String × Bool)` encoding `[[key, bool], ...]`. `execution_profile_supported` admits a required envelope key only when that inventory reports `true`. Self-asserted `theorem_pack_eligibility` Bools without evidence are rejected. Missing keys are not admitted.
+
+The defaults (`ProtocolMachineExecutionProfile::full()`, `TheoremPackCapabilities::full()`) carry an empty inventory, so they do not admit any envelope key. Callers attach evidence with `with_lean_evidence`. The explicit test and development opt-in is `assume_envelope_evidence_for_testing()` on either type. It asserts all three keys without Lean evidence and must not be used in production admission paths. An inventory flag records that a premise bundle was supplied, not that the premise was proved.
+
 ### Transport Contracts
 
 Theorem-backed distributed claims also require selected transport contracts. The Rust machine consumes `RuntimeTransportContract` values as semantic evidence, not as TCP-, TLS-, or key-management-specific implementation details. Concrete transport crates are responsible for mapping their configured mode into those fields.

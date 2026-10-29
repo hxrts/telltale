@@ -21,3 +21,12 @@
 ^lean/IrisExtractionAPI\.lean:
 ^lean/IrisExtractionInstance\.lean:
 ^lean/IrisExtractionInstance/
+
+# FLP schedulers: `bivSched` is the crash-free scheduler (every process alive);
+# `crashSched` carries no stage invariant beyond the scheduler fields.
+^lean/Distributed/Families/FLP/Theorem\.lean:[0-9]+:  Alive _ := True$
+^lean/Distributed/Families/FLP/Valency\.lean:[0-9]+:  Inv _ := True$
+
+# Deliberately permissive counterexample model: certifies/commits everything so
+# the contradiction witness shows the safety assumptions are not vacuous.
+^lean/Distributed/Families/ByzantineSafety/Core/Counterexamples\.lean:[0-9]+:  (certified := fun _ _ _ => True|committed := fun _ _ => True)$

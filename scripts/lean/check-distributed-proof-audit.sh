@@ -14,6 +14,7 @@ SCOPES=(
   "${ROOT_DIR}/lean/Distributed"
   "${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Distributed"
   "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Artifacts.lean"
+  "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Artifacts"
   "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Build.lean"
 )
 

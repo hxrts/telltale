@@ -15,6 +15,7 @@ SCOPES=(
   "${ROOT_DIR}/lean/Protocol/Classical"
   "${ROOT_DIR}/lean/Runtime/Proofs/Adapters/Classical.lean"
   "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Artifacts.lean"
+  "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Artifacts"
   "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Build.lean"
   "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Profiles.lean"
   "${ROOT_DIR}/lean/Runtime/Proofs/TheoremPack/Inventory.lean"

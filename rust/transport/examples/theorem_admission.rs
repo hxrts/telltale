@@ -37,7 +37,7 @@ fn certificate_with_transport_contract(
     CompositionCertificate {
         artifact_id: artifact_id.to_string(),
         link_ok_full: true,
-        theorem_pack: TheoremPackCapabilities::full(),
+        theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
         runtime_contracts: Some(
             RuntimeContracts::full()
                 .with_transport_contracts([config.runtime_transport_contract()]),

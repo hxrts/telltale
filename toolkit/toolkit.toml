@@ -366,7 +366,11 @@ exclude_path_parts = ["/.lake/", "/build/", "/lake-packages/", "/artifacts/"]
 empty_theorem_shell = 2
 implemented_by = 16
 native_decide = 3
-noncomputable = 10
+# Lean 4.35 rejects compiled definitions that depend on classical
+# decidability or Real arithmetic, so the port marks those `noncomputable`.
+# This does not weaken any proof; it only records that a definition has no
+# executable code. None are used by Runtime executables or `#eval`.
+noncomputable = 100
 partial_def = 3
 
 [checks.text_formatting]

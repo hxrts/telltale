@@ -290,7 +290,7 @@ def validationResponse (errors : List Json) : Json :=
     , ("errors", Json.arr errors.toArray) ]
 
 mutual
-  partial def collectTraceActions : GlobalType → List (String × String × String)
+  def collectTraceActions : GlobalType → List (String × String × String)
     | .end => []
     | .var _ => []
     | .mu _ body => collectTraceActions body
@@ -298,7 +298,7 @@ mutual
         collectTraceActionsBranches sender receiver branches
     | .delegate _ _ _ _ cont => collectTraceActions cont
 
-  partial def collectTraceActionsBranches (sender receiver : String)
+  def collectTraceActionsBranches (sender receiver : String)
       : List (SessionTypes.GlobalType.Label × GlobalType) → List (String × String × String)
     | [] => []
     | (label, cont) :: rest =>

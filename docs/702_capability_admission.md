@@ -138,6 +138,8 @@ The following rows are source-derived and checked against
 | `protocol_machine_envelope_admission` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
 | `protocol_envelope_bridge` | `runtime_critical_instantiated_premise` | yes | yes | `none` |
 
+Rust admission of these three envelope keys requires Lean-produced evidence. `execution_profile_supported` consults the profile's `LeanEvidenceInventory` (loaded from the Lean `theoremInventory` export) rather than self-asserted eligibility flags. Default profiles carry no evidence and are not admitted. `assume_envelope_evidence_for_testing()` is the explicit test-only opt-in. See `docs/804_theorem_pack_inputs.md`.
+
 ## Composition Admission
 
 Composed runtime admission in `rust/machine/src/composition.rs` enforces both proof artifacts and runtime gates.

@@ -252,11 +252,13 @@ pub mod runtime {
             runtime_capability_snapshot, runtime_execution_profile,
             rust_runtime_critical_transport_theorem_keys, transported_theorem_boundary,
             validate_transport_contracts_for_execution_profile, DeterminismArtifacts,
-            ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
-            ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption,
-            RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts, RuntimeGateResult,
-            RuntimeTransportContract, TheoremTransportRequirements, TransportContractGateError,
+            LeanEvidenceInventory, LeanEvidenceInventoryError, ProtocolMachineAdmissibilityClass,
+            ProtocolMachineEscalationWindowClass, ProtocolMachineExecutionProfile,
+            ProtocolMachineFairnessAssumption, RuntimeAdmissionResult, RuntimeCapability,
+            RuntimeContracts, RuntimeGateResult, RuntimeTransportContract,
+            TheoremTransportRequirements, TransportContractGateError,
             TransportedTheoremBoundaryEntry, TransportedTheoremUsageClass,
+            LEAN_ENVELOPE_EVIDENCE_KEYS,
         };
     }
 
@@ -387,11 +389,12 @@ pub use runtime_contracts::{
     runtime_capability_snapshot, runtime_execution_profile,
     rust_runtime_critical_transport_theorem_keys, transported_theorem_boundary,
     validate_transport_contracts_for_execution_profile, DeterminismArtifacts,
-    ProtocolMachineAdmissibilityClass, ProtocolMachineEscalationWindowClass,
-    ProtocolMachineExecutionProfile, ProtocolMachineFairnessAssumption, RuntimeAdmissionResult,
-    RuntimeCapability, RuntimeContracts, RuntimeGateResult, RuntimeTransportContract,
-    TheoremTransportRequirements, TransportContractGateError, TransportedTheoremBoundaryEntry,
-    TransportedTheoremUsageClass,
+    LeanEvidenceInventory, LeanEvidenceInventoryError, ProtocolMachineAdmissibilityClass,
+    ProtocolMachineEscalationWindowClass, ProtocolMachineExecutionProfile,
+    ProtocolMachineFairnessAssumption, RuntimeAdmissionResult, RuntimeCapability, RuntimeContracts,
+    RuntimeGateResult, RuntimeTransportContract, TheoremTransportRequirements,
+    TransportContractGateError, TransportedTheoremBoundaryEntry, TransportedTheoremUsageClass,
+    LEAN_ENVELOPE_EVIDENCE_KEYS,
 };
 pub use scheduler::{
     CrossLaneHandoff, LaneId as SchedulerLaneId, PriorityPolicy, SchedPolicy, SchedState,

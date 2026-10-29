@@ -262,7 +262,7 @@ theorem not_confluent_general :
 -- Claims Bundle
 
 /-- Bundle of determinism properties. -/
-structure DeterminismClaims where
+structure DeterminismClaims : Prop where
   /-- Base step determinism for same process form. -/
   send_det : ∀ {C C₁ C₂ : Config} {k x : Var} {e : Endpoint} {v : Value} {target : Role} {T : ValType} {L : LocalType},
     C.proc = .send k x →
@@ -271,7 +271,6 @@ structure DeterminismClaims where
     lookupG C.G e = some (.send target T L) →
     C₁ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L →
     C₂ = sendStep C e { sid := e.sid, sender := e.role, receiver := target } v T L →
-/- ## Structured Block 2 -/
     C₁ = C₂
   /-- Unique branch label implies unique continuation. -/
   branch_unique : ∀ {lbl : Label} {cont₁ cont₂ : LocalType} {branches : List (Label × LocalType)},
@@ -283,7 +282,7 @@ structure DeterminismClaims where
   base_det : ∀ {C C₁ C₂ : Config}, StepBase C C₁ → StepBase C C₂ → C₁ = C₂
 
 /-- Construct the determinism claims bundle. -/
-def determinismClaims : DeterminismClaims where
+theorem determinismClaims : DeterminismClaims where
   send_det := fun hProc hk hx hG hC₁ hC₂ => by rw [hC₁, hC₂]
   branch_unique := mem_branch_unique_label
   base_det := step_base_deterministic_strong

@@ -1,6 +1,6 @@
 //! Runtime admission and profile-gate contracts aligned with Lean surfaces.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -340,6 +340,80 @@ pub enum ProtocolMachineEscalationWindowClass {
     ProtocolBridge,
 }
 
+/// Theorem-pack keys whose Lean evidence gates Rust runtime admission.
+pub const LEAN_ENVELOPE_EVIDENCE_KEYS: [&str; 3] = [
+    "protocol_machine_envelope_adherence",
+    "protocol_machine_envelope_admission",
+    "protocol_envelope_bridge",
+];
+
+/// Lean-produced theorem-pack evidence inventory (`theoremInventory` key -> flag).
+///
+/// Entries mirror `Runtime.Proofs.TheoremPack.Inventory.theoremInventory`:
+/// `true` means the Lean side supplied the premise bundle for that key. Rust
+/// admission only treats a key as admitted when this inventory says so; an
+/// absent key is not admitted.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct LeanEvidenceInventory {
+    entries: BTreeMap<String, bool>,
+}
+
+/// Error parsing a Lean evidence inventory.
+#[derive(Debug, thiserror::Error)]
+#[error("invalid Lean evidence inventory: {0}")]
+pub struct LeanEvidenceInventoryError(#[from] serde_json::Error);
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum LeanEvidenceInventoryWire {
+    Map(BTreeMap<String, bool>),
+    Pairs(Vec<(String, bool)>),
+}
+
+impl LeanEvidenceInventory {
+    /// Empty inventory: no Lean evidence, nothing admitted.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::default()
+    }
+
+    /// Build from `(key, flag)` pairs as exported by Lean `theoremInventory`.
+    #[must_use]
+    pub fn from_entries<K: Into<String>>(entries: impl IntoIterator<Item = (K, bool)>) -> Self {
+        Self {
+            entries: entries.into_iter().map(|(k, v)| (k.into(), v)).collect(),
+        }
+    }
+
+    /// Parse a Lean inventory export: either a JSON object `{key: bool}` or the
+    /// `List (String × Bool)` encoding `[[key, bool], ...]`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`LeanEvidenceInventoryError`] when the JSON matches neither shape.
+    pub fn from_json_str(json: &str) -> Result<Self, LeanEvidenceInventoryError> {
+        Ok(match serde_json::from_str(json)? {
+            LeanEvidenceInventoryWire::Map(entries) => Self { entries },
+            LeanEvidenceInventoryWire::Pairs(pairs) => Self::from_entries(pairs),
+        })
+    }
+
+    /// Test/dev-only inventory asserting all envelope keys without Lean evidence.
+    ///
+    /// Never use this in production admission paths.
+    #[must_use]
+    pub fn assume_envelope_evidence_for_testing() -> Self {
+        Self::from_entries(LEAN_ENVELOPE_EVIDENCE_KEYS.map(|key| (key, true)))
+    }
+
+    /// Whether Lean evidence admits `key`.
+    #[must_use]
+    pub fn admits(&self, key: &str) -> bool {
+        self.entries.get(key).copied().unwrap_or(false)
+    }
+}
+
 /// Proof-carrying execution profile aligned with the Lean theorem-pack layer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProtocolMachineExecutionProfile {
@@ -349,12 +423,21 @@ pub struct ProtocolMachineExecutionProfile {
     pub admissibility_classes: BTreeSet<ProtocolMachineAdmissibilityClass>,
     /// Escalation-window classes carried by the profile.
     pub escalation_window_classes: BTreeSet<ProtocolMachineEscalationWindowClass>,
-    /// Boolean theorem-pack eligibility inventory.
+    /// Boolean theorem-pack eligibility inventory (claims/requirements).
+    ///
+    /// For an offered profile these flags are derived from `lean_evidence`; they
+    /// are not consulted on their own by [`execution_profile_supported`].
     pub theorem_pack_eligibility: Vec<(String, bool)>,
+    /// Lean-produced evidence backing the envelope keys. Admission consults this.
+    #[serde(default)]
+    pub lean_evidence: LeanEvidenceInventory,
 }
 
 impl ProtocolMachineExecutionProfile {
     /// Full profile covering all currently modeled assumptions/classes.
+    ///
+    /// Carries no Lean evidence, so the envelope keys are not admitted. Attach
+    /// evidence with [`Self::with_lean_evidence`].
     #[must_use]
     pub fn full() -> Self {
         Self {
@@ -379,20 +462,43 @@ impl ProtocolMachineExecutionProfile {
             ]
             .into_iter()
             .collect(),
-            theorem_pack_eligibility: vec![
-                ("protocol_machine_envelope_adherence".to_string(), true),
-                ("protocol_machine_envelope_admission".to_string(), true),
-                ("protocol_envelope_bridge".to_string(), true),
-            ],
+            theorem_pack_eligibility: LEAN_ENVELOPE_EVIDENCE_KEYS
+                .iter()
+                .map(|key| ((*key).to_string(), false))
+                .collect(),
+            lean_evidence: LeanEvidenceInventory::empty(),
         }
     }
 
-    fn eligibility(&self, key: &str) -> bool {
+    /// Attach Lean-produced evidence; eligibility flags are derived from it.
+    #[must_use]
+    pub fn with_lean_evidence(mut self, evidence: LeanEvidenceInventory) -> Self {
+        for (key, enabled) in &mut self.theorem_pack_eligibility {
+            *enabled = evidence.admits(key);
+        }
+        self.lean_evidence = evidence;
+        self
+    }
+
+    /// Test/dev-only full profile that assumes envelope evidence without Lean.
+    ///
+    /// Never the default; production callers must supply Lean evidence.
+    #[must_use]
+    pub fn assume_envelope_evidence_for_testing() -> Self {
+        Self::full()
+            .with_lean_evidence(LeanEvidenceInventory::assume_envelope_evidence_for_testing())
+    }
+
+    /// Whether this profile claims/requires `key` (requirement side).
+    fn claims(&self, key: &str) -> bool {
         self.theorem_pack_eligibility
             .iter()
-            .find(|entry| entry.0 == key)
-            .map(|entry| entry.1)
-            .unwrap_or(false)
+            .any(|(k, enabled)| k == key && *enabled)
+    }
+
+    /// Admission is evidence-backed: the key must be claimed and Lean-admitted.
+    fn eligibility(&self, key: &str) -> bool {
+        self.claims(key) && self.lean_evidence.admits(key)
     }
 
     /// Whether this profile supports protocol-machine envelope adherence.
@@ -781,6 +887,7 @@ pub fn runtime_execution_profile(
                 !matches!(cfg.output_condition_policy, OutputConditionPolicy::Disabled),
             ),
         ],
+        lean_evidence: LeanEvidenceInventory::empty(),
     };
 
     if !matches!(cfg.sched_policy, SchedPolicy::Cooperative) {
@@ -813,6 +920,10 @@ pub fn runtime_execution_profile(
 }
 
 /// Whether one proof-carrying execution profile supports the requested runtime config.
+///
+/// Envelope keys required by `cfg` are admitted only when `profile.lean_evidence`
+/// (Lean-produced theorem inventory) admits them; self-asserted eligibility
+/// flags without evidence are rejected.
 #[must_use]
 pub fn execution_profile_supported(
     profile: &ProtocolMachineExecutionProfile,
@@ -820,9 +931,9 @@ pub fn execution_profile_supported(
     contracts: Option<&RuntimeContracts>,
 ) -> bool {
     let required = runtime_execution_profile(cfg, contracts);
-    let supports_adherence = required.supports_protocol_machine_envelope_adherence();
-    let supports_admission = required.supports_protocol_machine_envelope_admission();
-    let supports_bridge = required.supports_protocol_envelope_bridge();
+    let supports_adherence = required.claims("protocol_machine_envelope_adherence");
+    let supports_admission = required.claims("protocol_machine_envelope_admission");
+    let supports_bridge = required.claims("protocol_envelope_bridge");
     required
         .fairness_assumptions
         .into_iter()
@@ -1047,17 +1158,63 @@ mod tests {
         assert!(profile
             .admissibility_classes
             .contains(&ProtocolMachineAdmissibilityClass::ProtocolEnvelopeBridge));
-        assert!(profile.supports_protocol_envelope_bridge());
+        assert!(profile.claims("protocol_envelope_bridge"));
         assert!(execution_profile_supported(
-            &ProtocolMachineExecutionProfile::full(),
+            &ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing(),
             &cfg,
             Some(&RuntimeContracts::full())
         ));
     }
 
     #[test]
-    fn theorem_transport_requirements_reject_missing_contracts() {
+    fn default_profile_without_lean_evidence_is_not_admitted() {
+        let cfg = ProtocolMachineConfig::default();
         let profile = ProtocolMachineExecutionProfile::full();
+        assert!(!profile.supports_protocol_machine_envelope_adherence());
+        assert!(!profile.supports_protocol_machine_envelope_admission());
+        assert!(!profile.supports_protocol_envelope_bridge());
+        assert!(!execution_profile_supported(&profile, &cfg, None));
+    }
+
+    #[test]
+    fn self_asserted_eligibility_without_evidence_is_rejected() {
+        let cfg = ProtocolMachineConfig::default();
+        let mut profile = ProtocolMachineExecutionProfile::full();
+        for (_, enabled) in &mut profile.theorem_pack_eligibility {
+            *enabled = true;
+        }
+        assert!(!execution_profile_supported(&profile, &cfg, None));
+    }
+
+    #[test]
+    fn lean_inventory_json_export_drives_admission() {
+        let cfg = ProtocolMachineConfig {
+            output_condition_policy: OutputConditionPolicy::Disabled,
+            ..ProtocolMachineConfig::default()
+        };
+        let pairs = r#"[["termination", true], ["protocol_machine_envelope_adherence", true],
+            ["protocol_machine_envelope_admission", false], ["protocol_envelope_bridge", false]]"#;
+        let evidence = LeanEvidenceInventory::from_json_str(pairs).expect("pairs parse");
+        let profile = ProtocolMachineExecutionProfile::full().with_lean_evidence(evidence);
+        assert!(profile.supports_protocol_machine_envelope_adherence());
+        assert!(!profile.supports_protocol_machine_envelope_admission());
+        assert!(execution_profile_supported(&profile, &cfg, None));
+        assert!(!execution_profile_supported(
+            &profile,
+            &cfg,
+            Some(&RuntimeContracts::full())
+        ));
+
+        let map = r#"{"protocol_machine_envelope_adherence": false}"#;
+        let evidence = LeanEvidenceInventory::from_json_str(map).expect("map parse");
+        let profile = ProtocolMachineExecutionProfile::full().with_lean_evidence(evidence);
+        assert!(!execution_profile_supported(&profile, &cfg, None));
+        assert!(LeanEvidenceInventory::from_json_str("[1]").is_err());
+    }
+
+    #[test]
+    fn theorem_transport_requirements_reject_missing_contracts() {
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         assert_eq!(
             validate_transport_contracts_for_execution_profile(&profile, &[]),
             Err(TransportContractGateError::MissingTransportContracts)
@@ -1066,7 +1223,7 @@ mod tests {
 
     #[test]
     fn theorem_transport_requirements_accept_in_memory_profile() {
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         assert_eq!(
             validate_transport_contracts_for_execution_profile(
                 &profile,
@@ -1078,7 +1235,7 @@ mod tests {
 
     #[test]
     fn theorem_transport_requirements_reject_unauthenticated_profile_for_authenticated_claims() {
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let unauthenticated = RuntimeTransportContract::new("UnauthenticatedTransport", "Network")
             .with_role_addressed_routing(true)
             .with_per_peer_fifo_delivery(true)
@@ -1100,7 +1257,7 @@ mod tests {
     fn transported_theorem_boundary_makes_rust_runtime_subset_exact() {
         let boundary = transported_theorem_boundary();
         let rust_runtime_keys = rust_runtime_critical_transport_theorem_keys();
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let profile_keys: Vec<_> = profile
             .theorem_pack_eligibility
             .iter()
@@ -1143,7 +1300,7 @@ mod tests {
     #[test]
     fn transported_theorem_boundary_fail_closes_when_runtime_profile_key_drifts() {
         let boundary = transported_theorem_boundary();
-        let mut profile = ProtocolMachineExecutionProfile::full();
+        let mut profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         profile.theorem_pack_eligibility[0].0 = "protocol_machine_envelope_adherence_typo".into();
 
         assert_eq!(
@@ -1159,7 +1316,7 @@ mod tests {
     #[test]
     fn transported_theorem_boundary_fail_closes_when_runtime_profile_enables_unknown_key() {
         let boundary = transported_theorem_boundary();
-        let mut profile = ProtocolMachineExecutionProfile::full();
+        let mut profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         profile
             .theorem_pack_eligibility
             .push(("unknown_runtime_boundary".into(), true));
@@ -1177,7 +1334,7 @@ mod tests {
     #[test]
     fn transported_theorem_boundary_fail_closes_when_runtime_classification_drifts() {
         let mut boundary = transported_theorem_boundary();
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let bridge_entry = boundary
             .iter_mut()
             .find(|entry| entry.key == "protocol_envelope_bridge")
@@ -1198,7 +1355,7 @@ mod tests {
     fn transported_theorem_boundary_fail_closes_when_lean_only_runtime_critical_entry_loses_assumption_boundary(
     ) {
         let mut boundary = transported_theorem_boundary();
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let byzantine = boundary
             .iter_mut()
             .find(|entry| entry.key == "byzantine_safety_characterization")

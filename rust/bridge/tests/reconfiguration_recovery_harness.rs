@@ -68,7 +68,7 @@ fn roundtripped_machine_bundle(artifact_id: &str) -> ProtocolBundle {
         .to_machine_bundle(CompositionCertificate {
             artifact_id: artifact_id.to_string(),
             link_ok_full: true,
-            theorem_pack: TheoremPackCapabilities::full(),
+            theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
             runtime_contracts: Some(RuntimeContracts::full()),
         })
         .expect("convert exported bundle into machine bundle")

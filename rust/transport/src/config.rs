@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn preshared_key_contract_satisfies_theorem_transport_admission() {
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let contract = TcpTransportConfig::new("Alice", "127.0.0.1:0")
             .with_preshared_key([1; 32])
             .runtime_transport_contract();
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn trusted_network_contract_fails_authenticated_theorem_admission() {
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let contract = TcpTransportConfig::new("Alice", "127.0.0.1:0")
             .allow_unauthenticated_for_trusted_network()
             .runtime_transport_contract();
@@ -342,7 +342,7 @@ mod tests {
 
     #[test]
     fn mixed_transport_set_fails_if_any_selected_transport_is_unauthenticated() {
-        let profile = ProtocolMachineExecutionProfile::full();
+        let profile = ProtocolMachineExecutionProfile::assume_envelope_evidence_for_testing();
         let authenticated = TcpTransportConfig::new("Alice", "127.0.0.1:0")
             .with_preshared_key([1; 32])
             .runtime_transport_contract();

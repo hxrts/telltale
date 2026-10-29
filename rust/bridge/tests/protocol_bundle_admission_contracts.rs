@@ -17,11 +17,12 @@ use telltale_machine::output_condition::OutputConditionPolicy;
 use telltale_machine::runtime::loader::CodeImage;
 use telltale_machine::{
     enforce_protocol_machine_runtime_gates, runtime_capability_snapshot, runtime_execution_profile,
-    ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability, MemoryBudget,
-    ProtocolBundle as MachineProtocolBundle, ProtocolMachineAdmissibilityClass,
-    ProtocolMachineConfig, ProtocolMachineEscalationWindowClass, ProtocolMachineFairnessAssumption,
-    ReconfigurationPlan, ReconfigurationPlanStep, RuntimeCapability, RuntimeContracts,
-    RuntimeGateResult, SchedPolicy, SchedulerCapability, TheoremPackCapabilities,
+    ComposedRuntime, CompositionCertificate, CompositionError, DeterminismCapability,
+    LeanEvidenceInventory, MemoryBudget, ProtocolBundle as MachineProtocolBundle,
+    ProtocolMachineAdmissibilityClass, ProtocolMachineConfig, ProtocolMachineEscalationWindowClass,
+    ProtocolMachineFairnessAssumption, ReconfigurationPlan, ReconfigurationPlanStep,
+    RuntimeCapability, RuntimeContracts, RuntimeGateResult, SchedPolicy, SchedulerCapability,
+    TheoremPackCapabilities,
 };
 use telltale_runtime::{Region, RoleName, Topology, TopologyEndpoint};
 use telltale_types::{GlobalType, Label, LocalTypeR};
@@ -141,7 +142,7 @@ fn protocol_machine_runner() -> ProtocolMachineRunner {
 
 #[test]
 fn protocol_bundle_export_and_runtime_admission_agree_on_protocol_machine_capabilities() {
-    let theorem_pack = TheoremPackCapabilities::full();
+    let theorem_pack = TheoremPackCapabilities::assume_envelope_evidence_for_testing();
     let claims = InvariantClaims {
         distributed: DistributedClaims {
             protocol_machine_envelope_adherence: Some(ProtocolMachineEnvelopeAdherenceConfig {
@@ -215,6 +216,7 @@ fn runtime_admission_rejects_bridge_claims_when_certificate_drops_bridge_capabil
         determinism: vec![DeterminismCapability::Full],
         schedulers: vec![SchedulerCapability::Cooperative],
         output_condition_gating: false,
+        lean_evidence: LeanEvidenceInventory::assume_envelope_evidence_for_testing(),
     };
     let claims = InvariantClaims {
         distributed: DistributedClaims {
@@ -309,7 +311,7 @@ fn public_runtime_gate_matrix_matches_composed_runtime_admission() {
         .contains(&ProtocolMachineEscalationWindowClass::ProtocolBridge));
     admit_public_bundle(
         default_cfg,
-        TheoremPackCapabilities::full(),
+        TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
         Some(RuntimeContracts::full()),
     )
     .expect("default public theorem path should admit with explicit transport contracts");
@@ -322,8 +324,12 @@ fn public_runtime_gate_matrix_matches_composed_runtime_admission() {
         enforce_protocol_machine_runtime_gates(&round_robin_cfg, None),
         RuntimeGateResult::RejectedMissingContracts
     );
-    let err = admit_public_bundle(round_robin_cfg, TheoremPackCapabilities::full(), None)
-        .expect_err("advanced scheduler mode should reject missing contracts");
+    let err = admit_public_bundle(
+        round_robin_cfg,
+        TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
+        None,
+    )
+    .expect_err("advanced scheduler mode should reject missing contracts");
     assert!(matches!(
         err,
         CompositionError::MissingRuntimeContracts { .. }
@@ -346,6 +352,7 @@ fn public_runtime_gate_matrix_matches_composed_runtime_admission() {
             determinism: vec![DeterminismCapability::Full],
             schedulers: vec![SchedulerCapability::Cooperative],
             output_condition_gating: false,
+            lean_evidence: LeanEvidenceInventory::assume_envelope_evidence_for_testing(),
         },
         Some(RuntimeContracts::full()),
     )
@@ -369,7 +376,7 @@ fn mixed_determinism_profile_matrix_is_stable_across_public_surfaces() {
     );
     admit_public_bundle(
         full_cfg,
-        TheoremPackCapabilities::full(),
+        TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
         Some(RuntimeContracts::full()),
     )
     .expect("full determinism theorem path should admit with explicit transport contracts");
@@ -399,7 +406,7 @@ fn mixed_determinism_profile_matrix_is_stable_across_public_surfaces() {
         .contains(&ProtocolMachineEscalationWindowClass::AdmissionComplexity));
     admit_public_bundle(
         modulo_effects_cfg,
-        TheoremPackCapabilities::full(),
+        TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
         Some(RuntimeContracts::full()),
     )
     .expect("mixed determinism should admit when contracts and theorem-pack capabilities align");
@@ -417,7 +424,7 @@ fn mixed_determinism_profile_matrix_is_stable_across_public_surfaces() {
     );
     let err = admit_public_bundle(
         modulo_comm_cfg,
-        TheoremPackCapabilities::full(),
+        TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
         Some(no_modulo_comm),
     )
     .expect_err("modulo-commutativity should reject when runtime contracts drop the artifact");
@@ -439,7 +446,7 @@ fn mixed_determinism_profile_matrix_is_stable_across_public_surfaces() {
     );
     let err = admit_public_bundle(
         replay_cfg,
-        TheoremPackCapabilities::full(),
+        TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
         Some(no_replay_gate),
     )
     .expect_err("replay determinism should reject when mixed-profile gating is absent");
@@ -544,7 +551,7 @@ fn exported_reconfiguration_claims_flow_into_machine_runtime_admission() {
         .to_machine_bundle(CompositionCertificate {
             artifact_id: "cert/bridge-reconfig".to_string(),
             link_ok_full: true,
-            theorem_pack: TheoremPackCapabilities::full(),
+            theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
             runtime_contracts: Some(RuntimeContracts::full()),
         })
         .expect("bridge bundle should convert into machine bundle");
@@ -593,7 +600,7 @@ fn exported_reconfiguration_claims_reject_runtime_without_matching_capabilities(
         .to_machine_bundle(CompositionCertificate {
             artifact_id: "cert/bridge-reconfig-missing".to_string(),
             link_ok_full: true,
-            theorem_pack: TheoremPackCapabilities::full(),
+            theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
             runtime_contracts: Some(contracts),
         })
         .expect("bridge bundle should convert into machine bundle");
@@ -629,7 +636,7 @@ fn exported_reconfiguration_transition_matches_lean_reference_event() {
         .to_machine_bundle(CompositionCertificate {
             artifact_id: "cert/bridge-reconfig-lean".to_string(),
             link_ok_full: true,
-            theorem_pack: TheoremPackCapabilities::full(),
+            theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
             runtime_contracts: Some(RuntimeContracts::full()),
         })
         .expect("bridge bundle should convert into machine bundle");
@@ -687,7 +694,7 @@ fn invalid_reconfiguration_transition_matches_lean_rejection() {
         .to_machine_bundle(CompositionCertificate {
             artifact_id: "cert/bridge-reconfig-invalid".to_string(),
             link_ok_full: true,
-            theorem_pack: TheoremPackCapabilities::full(),
+            theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
             runtime_contracts: Some(RuntimeContracts::full()),
         })
         .expect("bridge bundle should convert into machine bundle");
@@ -759,7 +766,7 @@ fn reconfiguration_plan_with_runtime_topology_artifacts_matches_lean_step_valida
         .to_machine_bundle(CompositionCertificate {
             artifact_id: "cert/bridge-reconfig-plan".to_string(),
             link_ok_full: true,
-            theorem_pack: TheoremPackCapabilities::full(),
+            theorem_pack: TheoremPackCapabilities::assume_envelope_evidence_for_testing(),
             runtime_contracts: Some(RuntimeContracts::full()),
         })
         .expect("bridge bundle should convert into machine bundle");
