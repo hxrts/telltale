@@ -120,6 +120,11 @@ lean_exe protocol_machine_validator where
   root := `Runtime.Tests.ProtocolMachineValidator
   moreLinkArgs := macosLinkArgs
 
+/-- Theorem evidence export: prints the concrete theorem-pack evidence inventory JSON. -/
+lean_exe theorem_evidence_export where
+  root := `Runtime.Tests.TheoremEvidenceExport
+  moreLinkArgs := macosLinkArgs
+
 /-- Heap parity runner: mirrors heap encoding, ordering, and proof structure. -/
 lean_exe heap_parity_runner where
   root := `Runtime.Tests.HeapParityRunner
