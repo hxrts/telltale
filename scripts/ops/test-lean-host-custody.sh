@@ -47,6 +47,19 @@ if (( project_only != 0 )); then
  protocol_fixture=$(command -v "$python")
  export LEAN_BUILDER_BUILD_WRAPPER="$protocol_fixture" LEAN_BUILDER_BIN="$protocol_fixture"
 fi
+# Controlled canonical Git/common-dir provider for the copied fixture project.
+mkdir -p "$scratch/project/.git" "$scratch/cache"
+cat > "$scratch/stub/git" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $# == 4 && $1 == -C && $3 == rev-parse && $4 == --git-common-dir ]] || exit 89
+if [[ ${ORIGINAL_GIT_STATUS:-0} != 0 ]]; then echo original-git-preflight-error >&2; exit "$ORIGINAL_GIT_STATUS"; fi
+printf '.git\n'
+SH
+chmod +x "$scratch/stub/git"
+export PATH="$scratch/stub:$PATH" LAKE_CACHE_DIR="$scratch/cache"
+export TELLTALE_LEAN_SOURCE_IDENTITY=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+command -v ps >/dev/null || fail 'selected v2 measurement provider ps unavailable'
 export PROBE_MARKER="$scratch/probe-marker"
 expect() {
  local expected=$1 actual=0; shift
@@ -64,16 +77,58 @@ expect 41 env LEAN_BUILDER_BIN="$scratch/missing" "$python" "$launcher" --label 
 [[ $(cat "$scratch/stdout") == original-out ]] || fail native-stdout
 grep -F original-err "$scratch/stderr" >/dev/null || fail native-stderr
 grep -F 'machine-wide exclusion is unavailable' "$scratch/stderr" >/dev/null || fail announced-degraded
+# Execute the maintained .envrc with controlled direnv hooks. It selects3
+# threads. Protocol1 must preserve that original development/caller contract.
+use() { [[ $1 == flake ]]; }
+watch_file() { [[ $1 == lean/lean-toolchain ]]; }
+source "$root/.envrc"
+[[ $LEAN_NUM_THREADS == 3 ]] || fail actual-envrc-thread-setting
+cat > "$scratch/stub/v1-wrapper" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $1 == --required-child-custody-version && $2 == 1 && $3 == --pass-fd ]]
+[[ $5 == --label && $7 == --desired-count && $8 == "$EXPECTED_V1_DESIRED" && $9 == --floor && ${10} == 2 && ${11} == -- ]]
+[[ $# == 14 ]]
+while [[ $1 != -- ]]; do shift; done; shift
+exec "$@"
+SH
+chmod +x "$scratch/stub/v1-wrapper"
+expect 0 env EXPECTED_V1_DESIRED=3 LEAN_BUILDER_BUILD_DESIRED_COUNT=3 LEAN_BUILDER_BUILD_FLOOR=2 LEAN_BUILDER_BUILD_WRAPPER="$scratch/stub/v1-wrapper" "$python" "$launcher" --label original-v1 -- /bin/sh -c 'printf "%s" "$LEAN_NUM_THREADS"'
+[[ $(cat "$scratch/stdout") == 3 ]] || fail original-v1-envrc-worker
+expect 0 env EXPECTED_V1_DESIRED=4 LEAN_NUM_THREADS=4 LEAN_BUILDER_BUILD_DESIRED_COUNT=4 LEAN_BUILDER_BUILD_FLOOR=2 LEAN_BUILDER_BUILD_WRAPPER="$scratch/stub/v1-wrapper" "$python" "$launcher" --label override-v1 -- /bin/sh -c 'printf "%s" "$LEAN_NUM_THREADS"'
+[[ $(cat "$scratch/stdout") == 4 ]] || fail original-v1-caller-override
+expect 0 env LEAN_BUILDER_BIN="$scratch/missing" "$python" "$launcher" --label original-v1-native -- /bin/sh -c 'printf "%s" "$LEAN_NUM_THREADS"'
+[[ $(cat "$scratch/stdout") == 3 ]] || fail original-v1-native-worker
+if (( project_only == 0 )); then
+ expect 41 env LEAN_BUILDER_BUILD_DESIRED_COUNT=3 LEAN_BUILDER_BUILD_FLOOR=2 "$python" "$launcher" --label original-v1-real -- /bin/sh -c 'printf "original-v1-granted:%s" "$LEAN_NUM_THREADS"; exit 41'
+ [[ $(cat "$scratch/stdout") == original-v1-granted:2 ]] || fail actual-v1-granted-worker
+fi
+# Canonical one-worker8168 campaign explicitly selects budget protocol2.
+export LEAN_BUILDER_BUILD_PROTOCOL_VERSION=2 LEAN_NUM_THREADS=1
 cat > "$scratch/stub/wrapper" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 [[ $1 == --required-child-custody-version && $2 == 1 && $3 == --pass-fd ]] || exit 78
 fd=$4; [[ $fd =~ ^[0-9]+$ && -e /dev/fd/$fd ]] || exit 78
-# Prove this is the actual kernel writer lock rather than a similarly valued ID.
-python3 - "$fd" <<'PY'
-import os,sys
-held=os.fstat(int(sys.argv[1])); original=os.stat(os.environ['TELLTALE_LOCAL_LAKE_LOCK'])
+# Prove BOTH actual original descriptors and the existing v2 request schema.
+python3 - "$@" <<'PY'
+import os,sys,json,hashlib
+args=sys.argv[1:]; fd=int(args[args.index('--pass-fd')+1])
+held=os.fstat(fd); original=os.stat(os.environ['TELLTALE_LOCAL_LAKE_LOCK'])
 assert (held.st_dev,held.st_ino)==(original.st_dev,original.st_ino)
+assert args[args.index('--protocol-version')+1]=='2'
+path=args[args.index('--resource-request')+1]; request_fd=int(path.rsplit('/',1)[1])
+assert request_fd!=fd and args.count('--pass-fd')==2
+assert str(request_fd) in [args[i+1] for i,a in enumerate(args) if a=='--pass-fd']
+assert os.fstat(request_fd).st_nlink==0
+with open(path) as source: request=json.load(source)
+assert request['schema']=='lean-builder-resource-request-v2'
+assert request['requested_mib']==request['hard_cap_mib']==8168
+assert request['source_identity']==os.environ['TELLTALE_LEAN_SOURCE_IDENTITY']
+worktree=os.path.realpath(os.getcwd()); scoped=lambda p:hashlib.sha256(os.path.realpath(p).encode()).hexdigest()[:16]
+assert request['worktree']==worktree
+assert request['reads']==sorted([f"worktree:{scoped(worktree)}:source",f"shared-cache:{scoped(os.environ['LAKE_CACHE_DIR'])}:maintenance"])
+assert request['writes']==sorted([f"worktree:{scoped(worktree)}:lake-build",f"worktree:{scoped(worktree)}:generated-metadata",f"worktree:{scoped(worktree)}:audit-results",f"repository:{scoped(worktree+'/.git')}:legacy-global-writer"])
 PY
 while [[ $1 != -- ]]; do shift; done; shift
 exec "$@"
@@ -81,9 +136,53 @@ SH
 chmod +x "$scratch/stub/wrapper"
 expect 41 env LEAN_BUILDER_BUILD_WRAPPER="$scratch/stub/wrapper" "$python" "$launcher" --label inherited -- /bin/sh -c 'printf inherited; exit 41'
 [[ $(cat "$scratch/stdout") == inherited ]] || fail retained-original-fd
+# Negative controls start from the admitted positive profile above.
+for variable in LEAN_NUM_THREADS LEAN_BUILDER_BUILD_DESIRED_COUNT LEAN_BUILDER_BUILD_FLOOR; do
+ expect 78 env "$variable=2" "$python" "$launcher" --label rejected-worker -- /bin/sh -c 'touch "$PROBE_MARKER"'
+ grep -Fx "original one-worker profile required: $variable" "$scratch/stderr" >/dev/null || fail original-worker-cause
+ [[ ! -e $PROBE_MARKER ]] || fail rejected-worker-body
+ done
+expect 78 env LEAN_BUILDER_BIN="$scratch/missing" LEAN_BUILDER_BUILD_CAPACITY_MIB=8167 "$python" "$launcher" --label insufficient -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -F 'original degraded resource profile does not fit' "$scratch/stderr" >/dev/null || fail degraded-capacity-cause
+[[ ! -e $PROBE_MARKER ]] || fail insufficient-body
+expect 78 env LEAN_BUILDER_BUILD_PROTOCOL_VERSION=3 "$python" "$launcher" --label incompatible -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -Fx 'incompatible build-budget protocol 3' "$scratch/stderr" >/dev/null || fail incompatible-cause
+[[ ! -e $PROBE_MARKER ]] || fail unsupported-body
+cat > "$scratch/stub/refusal" <<'SH'
+#!/usr/bin/env bash
+printf 'original-v2-refusal\n' >&2
+exit 43
+SH
+chmod +x "$scratch/stub/refusal"
+expect 43 env LEAN_BUILDER_BUILD_WRAPPER="$scratch/stub/refusal" "$python" "$launcher" --label refused -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -Fx original-v2-refusal "$scratch/stderr" >/dev/null || fail native-v2-refusal-cause
+[[ ! -e $PROBE_MARKER ]] || fail refusal-retried-native
+expect 78 env LEAN_BUILDER_BIN="$scratch/missing" LEAN_BUILDER_BUILD_RESERVE_MIB=4095 "$python" "$launcher" --label insufficient-reserve -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -F 'original degraded resource profile does not fit' "$scratch/stderr" >/dev/null || fail original-reserve-cause
+[[ ! -e $PROBE_MARKER ]] || fail reserve-body
+expect 78 env -u LEAN_BUILDER_BUILD_CAPACITY_MIB LEAN_BUILDER_BIN="$scratch/missing" "$python" "$launcher" --label unknown-capacity -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -Fx 'original degraded resource capacity is unknown' "$scratch/stderr" >/dev/null || fail unknown-capacity-cause
+[[ ! -e $PROBE_MARKER ]] || fail unknown-capacity-body
+expect 78 env TELLTALE_LEAN_SOURCE_IDENTITY=invalid "$python" "$launcher" --label invalid-source -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -Fx 'source identity must be the original admission fingerprint' "$scratch/stderr" >/dev/null || fail source-identity-cause
+[[ ! -e $PROBE_MARKER ]] || fail source-identity-body
+mkdir "$scratch/no-ps"
+selected_python=$(command -v "$python")
+expect 78 env PATH="$scratch/no-ps" "$selected_python" "$launcher" --label missing-ps -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -Fx 'original v2 process measurement provider ps unavailable' "$scratch/stderr" >/dev/null || fail missing-ps-cause
+[[ ! -e $PROBE_MARKER ]] || fail measurement-body
+expect 41 env ORIGINAL_GIT_STATUS=41 "$python" "$launcher" --label original-git-error -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -Fx original-git-preflight-error "$scratch/stderr" >/dev/null || fail original-git-cause
+[[ ! -e $PROBE_MARKER ]] || fail git-error-body
 if (( project_only == 0 )); then
 expect 41 "$python" "$launcher" --label actual-native -- /bin/sh -c 'printf actual-shared; exit 41'
 [[ $(cat "$scratch/stdout") == actual-shared ]] || fail actual-shared-native
+# The v2 request does not rewrite or bypass the original v1 compatibility config.
+expect 1 env LEAN_BUILDER_BUILD_WORKER_WEIGHT_MIB=7144 "$python" "$launcher" --label incompatible-ledger -- /bin/sh -c 'touch "$PROBE_MARKER"'
+grep -F 'coordination configuration mismatch' "$scratch/stdout" >/dev/null || fail original-ledger-refusal-cause
+grep -F '"worker_weight_mib":5120' "$scratch/stdout" >/dev/null || fail original-ledger-config
+grep -F '"worker_weight_mib":7144' "$scratch/stdout" >/dev/null || fail original-request-config
+[[ ! -e $PROBE_MARKER ]] || fail ledger-refusal-retried-native
 # Actual selected shared chain, original child readiness, direct outer TERM,
 # native original error41 and physical lock reacquisition after that wait.
 mkfifo "$scratch/ready" "$scratch/release"
@@ -92,7 +191,7 @@ exec {release_fd}<> "$scratch/release"
 cat > "$scratch/pending" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-trap 'printf original-terminated > "$ACK"; exit 41' TERM
+trap 'printf "original-terminated:%s" "$$" > "$ACK"; exit 41' TERM
 printf '%s\n' "$$" > "$READY"
 IFS= read -r original < "$RELEASE"
 printf original-released > "$ACK"
@@ -110,10 +209,47 @@ with open(os.environ['TELLTALE_LOCAL_LAKE_LOCK'],'a+') as lock:
  except BlockingIOError: pass
  else: raise SystemExit('original writer lease not held while child pending')
 PY
+# Select the actual admitted operation and retain its original lease object.
+lease_path=$("$python" - <<'PY'
+import json,os,pathlib
+root=pathlib.Path(os.environ['LEAN_BUILDER_BUILD_BUDGET_DIR'])
+rows=[json.loads(p.read_text()) for p in root.glob('holder-*.json')]
+rows=[r for r in rows if r['label']=='actual-term']
+assert len(rows)==1
+row=rows[0]
+assert row['protocol_version']==2 and row['granted_count']==1
+assert row['admitted_mib']==row['hard_cap_mib']==8168
+assert row['worktree']==str(pathlib.Path.cwd().resolve())
+lease=row['lease']; assert pathlib.Path(lease).name==lease
+print(root/lease)
+PY
+)
+exec {lease_fd}< "$lease_path"
+"$python" - "$lease_fd" <<'PY'
+import fcntl,sys
+try: fcntl.flock(int(sys.argv[1]),fcntl.LOCK_EX|fcntl.LOCK_NB)
+except BlockingIOError: pass
+else: raise SystemExit('original operation memory lease is not held')
+PY
 kill -TERM "$owner"
 status=0; wait "$owner" || status=$?
 pending_owner=0
-[[ $status == 41 && $(cat "$scratch/ack") == original-terminated ]] || fail original-term-status-and-ack
+# v2 deliberately classifies outer cancellation as143. Retain BOTH outcomes.
+[[ $status == 143 && $(cat "$scratch/ack") == "original-terminated:$original" ]] || fail original-term-status-and-ack
+"$python" - "$scratch/project/.lake/build/lean-builder/timings.jsonl" <<'PY'
+import json,sys
+rows=[json.loads(line) for line in open(sys.argv[1])]
+rows=[r for r in rows if r['label']=='actual-term']
+assert len(rows)==1 and rows[0]['format']=='lean-builder-lake-timings-v1'
+assert rows[0]['status']==41
+PY
+[[ $(grep -Fxc '  cleanup_complete: True' "$scratch/term.stderr") == 1 ]] || fail actual-cleanup-outcome
+[[ $(grep -Fxc '  exit_status: 143' "$scratch/term.stderr") == 1 ]] || fail actual-cancellation-outcome
+"$python" - "$lease_fd" <<'PY'
+import fcntl,sys
+fcntl.flock(int(sys.argv[1]),fcntl.LOCK_EX|fcntl.LOCK_NB)
+PY
+exec {lease_fd}>&-
 "$python" - <<'PY'
 import fcntl,os
 with open(os.environ['TELLTALE_LOCAL_LAKE_LOCK'],'a+') as lock:
@@ -168,7 +304,7 @@ expect 41 env PATH="$scratch/bin:$PATH" EXPECTED_SEED_CWD="$scratch/project/lean
  just --justfile "$scratch/project/justfile" _with-lake-lock original-label "seed-probe 'first original' second-original"
 [[ $(cat "$scratch/stdout") == original-seed-hook ]] || fail installed-seed-hook-output
 if (( project_only != 0 )); then
- printf '%s\n' 'PASS eight project protocol controls; real shared custody unsupported in this mode'
+ printf '%s\n' 'PASS twenty-two project protocol controls; real shared custody unsupported in this mode'
 else
-printf '%s\n' 'PASS ten host controls: shared/degraded pure probes, exact refusal, native41, actual FD, real shared41, acknowledged real shared TERM41, both source-backed producers'
+printf '%s\n' 'PASS twenty-six host controls: shared/degraded pure probes, exact refusal, native41, actual FD, real shared41, outer TERM143 with retained original41 and acknowledged settlement, both source-backed producers'
 fi

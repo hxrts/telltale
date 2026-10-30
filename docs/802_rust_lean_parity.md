@@ -1058,3 +1058,24 @@ these variants requires the new fields. Original I/O errors remain available
 through the error source. The prelude continues to reexport the same types.
 Aura's current Quint adapter only reads `LEAN_BRIDGE_SCHEMA_VERSION` and needs
 no error-pattern migration. This API change does not manufacture Lean evidence.
+
+The explicitly selected protocol2 host launcher uses the existing shared
+resource request while
+retaining custody protocol1. The original one-worker profile reserves8168MiB,
+including the original1024MiB overhead and7144MiB safe worker reservation. This
+complete charge is independent of the shared ledger's5120MiB compatibility
+weight. The protocol2 adapter refuses a different worker set. Ordinary protocol1 calls
+retain their original worker arguments and caller overrides. It retains the actual
+unlinked request descriptor and original writer descriptor through the existing
+pass-fd chain. Resource names identify canonical scheduling domains and do not
+reconstruct live authority. Source identity, when provided, is the existing
+outer admission fingerprint and remains observation metadata.
+
+A shared refusal never retries native execution. A missing protocol2 endpoint permits the
+announced local path only when the original one-worker profile fits the selected
+capacity and reserve. This is no machine-wide grant or physical teardown proof.
+Protocol-v2 forwarded cancellation returns the original wrapper classification143.
+The canonical timing record separately retains the actual inner command outcome,
+including a trap's native41. Consumers retain both outcomes and actual cleanup
+acknowledgments. Neither invalidation nor an equal-valued identifier proves that
+the original child, writer descriptor or memory lease has settled.
