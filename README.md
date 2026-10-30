@@ -105,6 +105,6 @@ automatic dependency-tree restoration or Air consumption.
 Optional frontend tools are installed explicitly after entering the development
 shell: run `just setup-frontend-tools` when a workflow needs `dx` or
 `wasm-bindgen`. The recipe installs missing `dioxus-cli` and selects exactly
-`wasm-bindgen-cli` 0.2.117 when the tool is absent or differs. Install/query failures
-retain their native status and diagnostics. Shell entry never runs this recipe;
+`wasm-bindgen-cli` 0.2.118, matching both maintained Cargo locks, when the tool is
+absent or differs. Install/query failures retain their native status and diagnostics. Shell entry never runs this recipe;
 its compilation, network and storage costs belong to the requested setup work.

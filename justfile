@@ -1154,9 +1154,9 @@ setup-frontend-tools:
     if command -v wasm-bindgen >/dev/null 2>&1; then
       version=$(wasm-bindgen --version) || exit "$?"
     fi
-    if [[ "$version" != 'wasm-bindgen 0.2.117' ]]; then
-      echo "Installing wasm-bindgen-cli 0.2.117..."
-      cargo install wasm-bindgen-cli --version 0.2.117
+    if [[ "$version" != 'wasm-bindgen 0.2.118' ]]; then
+      echo "Installing wasm-bindgen-cli 0.2.118..."
+      cargo install wasm-bindgen-cli --version 0.2.118
     fi
 
 # Compatibility entry for lean-builder's existing no-build seed owner.
