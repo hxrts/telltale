@@ -121,6 +121,8 @@
           pkg-config
           gnuplot
           wasmPack
+          # Required by the canonical wasm-pack --node test stages.
+          nodejs
           samply
           mdbook
           mdbook-mermaid
