@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-10-29
+**Last Updated:** 2026-10-30
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -36,16 +36,16 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 | Library        | Files | Lines   | Focus                                                      |
 |----------------|------:|--------:|------------------------------------------------------------|
 | SessionTypes   |    49 |  10,068 | Global/local type definitions, de Bruijn, participation    |
-| SessionCoTypes |    79 |  16,196 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    91 |  20,028 | Projection, harmony, blindness, embedding, erasure         |
-| Semantics      |    14 |   2,703 | Operational semantics, determinism, deadlock freedom       |
+| SessionCoTypes |    79 |  16,256 | Coinductive EQ2, bisimulation, duality, async subtyping    |
+| Choreography   |    91 |  20,133 | Projection, harmony, blindness, embedding, erasure         |
+| Semantics      |    16 |   3,135 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    17 |   2,411 | Transported theorems (queueing, large deviations, mixing)  |
 | ClassicalAnalysis |     3 |   1,512 | Real analysis concrete models for classical transport      |
 | Distributed    |    97 |  11,955 | Distributed assumptions, validation, FLP/CAP theorem packaging |
 | Protocol       |   173 |  40,770 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   216 |  42,738 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Runtime        |   227 |  45,645 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     613 | Iris ghost state and program logic extraction              |
-| **Total**      | **742** | **148,994** |                                                            |
+| **Total**      | **755** | **152,498** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
