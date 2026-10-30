@@ -49,6 +49,17 @@ pub enum DecisionOutcome {
     Certified(DecisionCertificate),
     /// The checked predicate failed and a structured counterexample is available.
     Counterexample(DecisionCounterexample),
+    /// The bounded checker could not decide (for example, fuel exhausted).
+    /// This is neither a certificate nor a refutation.
+    Inconclusive(DecisionInconclusive),
+}
+
+/// Reason a bounded decision procedure gave up without a verdict.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum DecisionInconclusive {
+    /// Async-subtyping SISO decomposition exhausted its unfold fuel.
+    AsyncSubtypeUnfoldLimitExceeded,
 }
 
 /// Positive witness/certificate for a decision procedure.
@@ -129,7 +140,6 @@ pub enum AsyncSubtypeWitness {
         sub_segments: u64,
         super_segments: u64,
     },
-    UnfoldLimitExceeded,
 }
 
 /// Structured sync-subtyping counterexample.
@@ -206,6 +216,32 @@ impl DecisionReport {
             outcome: DecisionOutcome::Counterexample(counterexample),
         }
     }
+
+    fn inconclusive(kind: DecisionKind, reason: DecisionInconclusive) -> Self {
+        Self {
+            kind,
+            outcome: DecisionOutcome::Inconclusive(reason),
+        }
+    }
+
+    /// Whether the predicate was definitely established.
+    #[must_use]
+    pub fn is_certified(&self) -> bool {
+        matches!(self.outcome, DecisionOutcome::Certified(_))
+    }
+
+    /// Whether the predicate was definitely refuted (never true for
+    /// inconclusive outcomes).
+    #[must_use]
+    pub fn is_refuted(&self) -> bool {
+        matches!(self.outcome, DecisionOutcome::Counterexample(_))
+    }
+
+    /// Whether the bounded checker gave up without a verdict.
+    #[must_use]
+    pub fn is_inconclusive(&self) -> bool {
+        matches!(self.outcome, DecisionOutcome::Inconclusive(_))
+    }
 }
 
 /// Decide global well-formedness with a structured witness.
@@ -275,12 +311,16 @@ pub fn decide_async_subtyping(sub: &LocalTypeR, sup: &LocalTypeR) -> DecisionRep
                 orphan_free: orphan_free(sub),
             },
         ),
-        Err(error) => DecisionReport::counterexample(
-            DecisionKind::AsyncSubtype,
-            DecisionCounterexample::AsyncSubtype {
-                cause: map_async_error(&error),
-            },
-        ),
+        Err(error) => match map_async_error(&error) {
+            Some(cause) => DecisionReport::counterexample(
+                DecisionKind::AsyncSubtype,
+                DecisionCounterexample::AsyncSubtype { cause },
+            ),
+            None => DecisionReport::inconclusive(
+                DecisionKind::AsyncSubtype,
+                DecisionInconclusive::AsyncSubtypeUnfoldLimitExceeded,
+            ),
+        },
     }
 }
 
@@ -413,8 +453,9 @@ fn flatten_validation_error(error: &ValidationError) -> Vec<WellFormednessViolat
     }
 }
 
-fn map_async_error(error: &AsyncSubtypeError) -> AsyncSubtypeWitness {
-    match error {
+/// Map a checker error to a refutation witness; `None` means inconclusive.
+fn map_async_error(error: &AsyncSubtypeError) -> Option<AsyncSubtypeWitness> {
+    Some(match error {
         AsyncSubtypeError::NotSisoDecomposable => AsyncSubtypeWitness::NotSisoDecomposable,
         AsyncSubtypeError::InputTreeMismatch => AsyncSubtypeWitness::InputTreeMismatch,
         AsyncSubtypeError::OutputTreeMismatch => AsyncSubtypeWitness::OutputTreeMismatch,
@@ -422,8 +463,8 @@ fn map_async_error(error: &AsyncSubtypeError) -> AsyncSubtypeWitness {
             sub_segments: u64::try_from(*sub).unwrap_or(u64::MAX),
             super_segments: u64::try_from(*sup).unwrap_or(u64::MAX),
         },
-        AsyncSubtypeError::UnfoldLimitExceeded => AsyncSubtypeWitness::UnfoldLimitExceeded,
-    }
+        AsyncSubtypeError::UnfoldLimitExceeded => return None,
+    })
 }
 
 fn map_sync_error(error: &SyncSubtypeError) -> SyncSubtypeWitness {

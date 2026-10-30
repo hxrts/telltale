@@ -59,8 +59,8 @@ theorem BranchesRelBisim.map_image {f : LocalTypeR → LocalTypeR} {R : Rel}
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih =>
     apply List.Forall₂.cons
-    · refine ⟨hbc.1, ?_⟩
-      exact ⟨_, _, hbc.2, rfl, rfl⟩
+    · refine ⟨hbc.1, hbc.2.1, ?_⟩
+      exact ⟨_, _, hbc.2.2, rfl, rfl⟩
     · exact ih
 
 -- # Compatibility Lifting to Bisim

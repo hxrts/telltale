@@ -68,7 +68,7 @@ private theorem branches_rel_mono' {R S : EQ2.Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
-  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, hab.2.1, h _ _ hab.2.2⟩) hrel
 
 /-- Monotonicity of EQ2F in the Paco framework. -/
 theorem eq2_f_paco_mono : Paco.Monotone2 EQ2F_paco := by

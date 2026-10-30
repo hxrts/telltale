@@ -1,6 +1,7 @@
 import Runtime.ProtocolMachine.Semantics.InstrSpec
 import Runtime.ProtocolMachine.Semantics.ExecHelpers
 import Runtime.ProtocolMachine.Semantics.ExecComm
+import Runtime.ProtocolMachine.Semantics.ExecChoice
 import Runtime.ProtocolMachine.Semantics.ExecSession
 import Runtime.ProtocolMachine.Semantics.ExecOwnership
 import Runtime.ProtocolMachine.Semantics.ExecControl

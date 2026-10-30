@@ -34,8 +34,16 @@ are not reflected by `EnvStep`: for `g = comm a b [(l, comm a c [(m, end)])]`
 with `c ≠ b`, `step g (a → c : m) (comm a b [(l, end)])` holds, yet `a`'s
 projection is `send b …`, not a send to `c`. Reflecting such steps needs a local
 asynchronous-permutation step relation, which this development does not have.
-Steps through `mu` require relating `trans (mu t body)` to the projection of
-the unfolding; that is also not covered here.
+Steps through `mu` are likewise not reflected, since `EnvStep` inspects the
+literal (non-unfolded) head of each projection.
+
+At the configuration level (`Semantics.SubjectReductionGeneral`), where processes
+advance by their *fully unfolded* own type, preservation is proved for every
+`step` (`comm_head`, `comm_async`, `mu`). There the example above is simply not
+realizable: `a` cannot advance by `a → c : m` (`async_counterexample_no_advance`),
+and in general an async step whose action shares a role with the skipped prefix
+admits no `ConfigStep` (`async_overlap_not_participant`). Async steps whose
+action avoids the prefix roles are realized and preserved.
 -/
 
 namespace Choreography.Harmony

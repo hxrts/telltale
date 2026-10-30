@@ -40,8 +40,8 @@ private theorem branches_rel_bisim_of_bisim_with_rel_image
       have hc_fix : f c.2.2 = c.2.2 := by
         simpa using hfix_cs c (List.Mem.head _)
       refine List.Forall₂.cons ?head ?tail
-      · refine ⟨hbc.1, ?_⟩
-        refine ⟨_, _, h_rel _ _ hbc.2, ?_, ?_⟩
+      · refine ⟨hbc.1, hbc.2.1, ?_⟩
+        refine ⟨_, _, h_rel _ _ hbc.2.2, ?_, ?_⟩
         · exact hb_fix.symm
         · exact hc_fix.symm
       · exact ih (fun lb hm => hfix_bs _ (List.Mem.tail _ hm))
@@ -330,9 +330,8 @@ private theorem branches_rel_bisim_to_rel_image (f : LocalTypeR → LocalTypeR)
   | cons hbc hrest ih =>
     simp only [List.map_cons]
     apply List.Forall₂.cons
-    · constructor
-      · exact hbc.1
-      · exact hlift _ _ hbc.2
+    · refine ⟨hbc.1, hbc.2.1, ?_⟩
+      exact hlift _ _ hbc.2.2
 /- ## Structured Block 6 -/
     · exact ih
 

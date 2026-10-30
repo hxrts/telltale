@@ -93,9 +93,17 @@ paragraphs):
   Trace adequacy and message conservation are proved for the real `stepSend` and
   `stepReceive` in FIFO buffer mode. Iris adequacy (`session_vm_wp_invariance`) is
   upstream iris-lean `wp_invariance` with its weakest-precondition premise as a hypothesis.
-- `compile_refines` covers linear (single-branch, non-recursive) local types only.
-- Projection harmony, subject reduction and deadlock freedom cover
-  head-communication steps only.
+- `compile_refines` covers every local type (branch tables, `mu`/`var` loops,
+  multi-role images). Offer and choose trace adequacy is proved; `latestValue`
+  buffer mode is not.
+- Subject reduction and deadlock freedom cover every global step
+  (`step_preserves_typing_general`, `can_progress_general`, excluding
+  delegation); projection harmony (`EnvStep`) covers head-communication steps
+  only. Local-type equality compares payload annotations.
+- Progress and termination are derived for the store-level frontier step on
+  straight-line value-message sessions (`progress_of_projected`,
+  `concrete_termination_of_projected`); choice, recursion and the
+  instruction-level `execInstr` are not covered.
 - Theorem-pack capability bits, inventory flags and release gates are presence
   flags for supplied evidence objects. Rust envelope admission accepts a theorem-pack
   key only when a Lean-produced evidence inventory marks it as supplied.

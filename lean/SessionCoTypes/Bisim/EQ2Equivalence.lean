@@ -29,7 +29,7 @@ theorem branches_rel_bisim_to_branches_rel {R : Rel}
     BranchesRel R bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
-  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2.1, hbc.2.2⟩ ih
 
 /-- Convert BranchesRel to BranchesRelBisim (same structure, different namespace). -/
 theorem branches_rel_to_branches_rel_bisim {R : Rel}
@@ -37,7 +37,7 @@ theorem branches_rel_to_branches_rel_bisim {R : Rel}
     BranchesRelBisim R bs cs := by
   induction h with
   | nil => exact List.Forall₂.nil
-  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2⟩ ih
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1, hbc.2.1, hbc.2.2⟩ ih
 
 private theorem branches_rel_to_branches_rel_bisim_eq2_wf
     {bs cs : List BranchR} (h : BranchesRel EQ2 bs cs)
@@ -52,7 +52,7 @@ private theorem branches_rel_to_branches_rel_bisim_eq2_wf
       have hWFt : LocalTypeR.WellFormed hd_bs.2.2 := hWFbs hd_bs hmem_hd_bs
       have hWFu : LocalTypeR.WellFormed hd_cs.2.2 := hWFcs hd_cs hmem_hd_cs
       apply List.Forall₂.cons
-      · exact ⟨hbc.1, ⟨hbc.2, hWFt, hWFu⟩⟩
+      · exact ⟨hbc.1, hbc.2.1, ⟨hbc.2.2, hWFt, hWFu⟩⟩
       · exact ih (fun lb hmem => hWFbs lb (List.mem_cons_of_mem _ hmem))
           (fun lb hmem => hWFcs lb (List.mem_cons_of_mem _ hmem))
 
@@ -194,7 +194,7 @@ theorem BranchesRelBisim.to_eq2 {R : Rel} (hR : ∀ a b, R a b → EQ2 a b)
   | nil => exact List.Forall₂.nil
 /- ## Structured Block 2 -/
   | cons hbc _ ih =>
-    exact List.Forall₂.cons ⟨hbc.1, hR _ _ hbc.2⟩ ih
+    exact List.Forall₂.cons ⟨hbc.1, hbc.2.1, hR _ _ hbc.2.2⟩ ih
 
 -- Bisim Implies EQ2
 

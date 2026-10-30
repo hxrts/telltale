@@ -81,7 +81,7 @@ theorem branches_proj_rel_lift_eq2_u
               cases hp' with
               | cons h1 h2 => exact ⟨h1.2.1, Or.inr h1.2.2, Or.inr h2⟩
           refine List.Forall₂.cons ⟨hpair.1.trans hpair'.1, hhead.1,
-            ⟨lb0.2.2, hpair.2.2, hpair'.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp),
+            ⟨lb0.2.2, hpair.2.2, hpair'.2.2, hwf0 lb0 (by simp), hwf1 lb1 (by simp),
               hdf gb (by simp), hhead.2.1⟩⟩ ?_
           exact ih heq_rest (wf_tail_of_cons hwf0) (wf_tail_of_cons hwf1)
             (fun g hmem => hdf g (by simp [hmem])) hhead.2.2

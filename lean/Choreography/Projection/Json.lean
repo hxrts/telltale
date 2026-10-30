@@ -11,6 +11,8 @@ bridge. The JSON schema matches the Rust lean-bridge crate (export.rs/import.rs)
   LocalTypeR: {"kind": "end"}, {"kind": "send", ...}, {"kind": "recv", ...}, {"kind": "rec", ...}, {"kind": "var", ...}
   PayloadSort: "unit", "nat", "bool", "string", "real", {"vector": n}, {"prod": [left, right]}
   Label: {"name": "...", "sort": <sort>}
+  ValType (branch "payload", omitted when none): "unit", "bool", "nat", "string",
+    "readiness", {"prod": [l, r]}, {"chan": {"sid": n, "role": "..."}}
 
 Solution Structure. Mutual recursion for GlobalType/LocalTypeR branches,
 matching the Rust lean-bridge JSON format exactly.
@@ -25,6 +27,7 @@ Matches the lean-bridge JSON schema used by Rust export/import.
 
 - `payloadSortToJson` / `payloadSortFromJson`
 - `labelToJson` / `labelFromJson`
+- `valTypeToJson` / `valTypeFromJson`
 - `globalTypeToJson` / `globalTypeFromJson`
 - `localTypeRToJson` / `localTypeRFromJson`
 -/
@@ -94,6 +97,66 @@ def labelFromJson (j : Json) : Except String Label := do
   let sortJson := j.getObjValD "sort"
   let sort ← payloadSortFromJson sortJson
   .ok { name := name, sort := sort }
+
+/-! ## ValType Serialization -/
+
+/-- Serialize a ValType payload annotation to JSON. -/
+def valTypeToJson : SessionTypes.ValType → Json
+  | .unit => Json.str "unit"
+  | .bool => Json.str "bool"
+  | .nat => Json.str "nat"
+  | .string => Json.str "string"
+  | .readiness => Json.str "readiness"
+  | .prod l r => Json.mkObj [("prod", Json.arr #[valTypeToJson l, valTypeToJson r])]
+  | .chan sid role =>
+      Json.mkObj [("chan", Json.mkObj [("sid", Json.num sid), ("role", Json.str role)])]
+
+/-- Decode a `{"chan": {...}}` payload object. -/
+def valTypeChanFromJson (j : Json) : Except String SessionTypes.ValType := do
+  let c ← j.getObjVal? "chan"
+  let sid ← c.getObjValAs? Nat "sid"
+  let role ← c.getObjValAs? String "role"
+  .ok (.chan sid role)
+
+/-- Deserialize a ValType from JSON with fuel for termination. -/
+def valTypeFromJsonAux (fuel : Nat) (j : Json) : Except String SessionTypes.ValType :=
+  match fuel with
+  | 0 => .error "valTypeFromJson: recursion limit exceeded"
+  | fuel' + 1 =>
+      match j with
+      | Json.str "unit" => .ok .unit
+      | Json.str "bool" => .ok .bool
+      | Json.str "nat" => .ok .nat
+      | Json.str "string" => .ok .string
+      | Json.str "readiness" => .ok .readiness
+      | Json.str other => .error s!"invalid payload: {other}"
+      | _ =>
+          match j.getObjValAs? (Array Json) "prod" with
+          | .error _ => valTypeChanFromJson j
+          | .ok arr =>
+              if h : arr.size = 2 then
+                match valTypeFromJsonAux fuel' arr[0], valTypeFromJsonAux fuel' arr[1] with
+                | .ok l, .ok r => .ok (.prod l r)
+                | .error e, _ => .error e
+                | _, .error e => .error e
+              else .error "payload prod must have 2 elements"
+
+/-- Deserialize a ValType from JSON. -/
+def valTypeFromJson (j : Json) : Except String SessionTypes.ValType :=
+  valTypeFromJsonAux (j.compress.length + 1) j
+
+/-- Encode a local branch; the `"payload"` key is omitted when `none`. -/
+def localBranchJson (label : Label) (vt : Option SessionTypes.ValType) (cont : Json) : Json :=
+  let base := [("label", labelToJson label), ("continuation", cont)]
+  match vt with
+  | none => Json.mkObj base
+  | some v => Json.mkObj (base ++ [("payload", valTypeToJson v)])
+
+/-- Decode an optional branch payload; a missing key decodes as `none`. -/
+def localBranchPayloadFromJson (b : Json) : Except String (Option SessionTypes.ValType) :=
+  match b.getObjVal? "payload" with
+  | .error _ => .ok none
+  | .ok p => some <$> valTypeFromJson p
 
 /-! ## GlobalType Serialization -/
 
@@ -174,7 +237,7 @@ def localTypeRToJson : LocalTypeR → Json
           have h1 : sizeOf cont < sizeOf (label, _vt, cont) := by simp; omega
           have h2 := List.sizeOf_lt_of_mem hmem
           omega
-        Json.mkObj [("label", labelToJson label), ("continuation", localTypeRToJson cont)]
+        localBranchJson label _vt (localTypeRToJson cont)
       Json.mkObj [("kind", "send"), ("partner", Json.str partner),
         ("branches", Json.arr branchesJson.toArray)]
   | .recv partner branches =>
@@ -183,7 +246,7 @@ def localTypeRToJson : LocalTypeR → Json
           have h1 : sizeOf cont < sizeOf (label, _vt, cont) := by simp; omega
           have h2 := List.sizeOf_lt_of_mem hmem
           omega
-        Json.mkObj [("label", labelToJson label), ("continuation", localTypeRToJson cont)]
+        localBranchJson label _vt (localTypeRToJson cont)
       Json.mkObj [("kind", "recv"), ("partner", Json.str partner),
         ("branches", Json.arr branchesJson.toArray)]
   | .mu var body =>
@@ -207,16 +270,18 @@ def localTypeRFromJsonAux (fuel : Nat) (j : Json) : Except String LocalTypeR :=
           let branchesArr ← j.getObjValAs? (Array Json) "branches"
           let branches ← branchesArr.toList.mapM fun b => do
             let label ← labelFromJson (b.getObjValD "label")
+            let vt ← localBranchPayloadFromJson b
             let cont ← localTypeRFromJsonAux fuel' (b.getObjValD "continuation")
-            .ok (label, none, cont)
+            .ok (label, vt, cont)
           .ok (.send partner branches)
       | "recv" =>
           let partner ← j.getObjValAs? String "partner"
           let branchesArr ← j.getObjValAs? (Array Json) "branches"
           let branches ← branchesArr.toList.mapM fun b => do
             let label ← labelFromJson (b.getObjValD "label")
+            let vt ← localBranchPayloadFromJson b
             let cont ← localTypeRFromJsonAux fuel' (b.getObjValD "continuation")
-            .ok (label, none, cont)
+            .ok (label, vt, cont)
           .ok (.recv partner branches)
       | "rec" =>
           let var ← j.getObjValAs? String "var"
@@ -230,5 +295,33 @@ def localTypeRFromJsonAux (fuel : Nat) (j : Json) : Except String LocalTypeR :=
 /-- Deserialize a LocalTypeR from JSON. -/
 def localTypeRFromJson (j : Json) : Except String LocalTypeR :=
   localTypeRFromJsonAux (j.compress.length + 1) j
+
+/-! ## Payload Round-Trip Checks -/
+
+/-- Sample local type exercising every payload shape (and `none`). -/
+private def payloadSample : LocalTypeR :=
+  .send "B" [({ name := "m", sort := .unit }, some .nat,
+    .recv "A" [({ name := "r", sort := .unit },
+      some (.prod .bool (.chan 3 "B")), .end),
+      ({ name := "s", sort := .unit }, some .readiness, .end),
+      ({ name := "t", sort := .unit }, none, .end)])]
+
+/-- Collect every branch payload annotation in traversal order. -/
+private partial def payloadsOf : LocalTypeR → List (Option SessionTypes.ValType)
+  | .send _ bs | .recv _ bs => bs.flatMap fun (_, vt, cont) => vt :: payloadsOf cont
+  | .mu _ body => payloadsOf body
+  | _ => []
+
+-- Decoding recovers every payload, and re-encoding is a fixed point.
+#guard (localTypeRFromJson (localTypeRToJson payloadSample)).toOption.map payloadsOf
+  == some [some .nat, some (.prod .bool (.chan 3 "B")), some .readiness, none]
+#guard ((localTypeRFromJson (localTypeRToJson payloadSample)).toOption.map
+  (fun t => (localTypeRToJson t).compress)) == some (localTypeRToJson payloadSample).compress
+#guard (valTypeFromJson (valTypeToJson (.prod .unit (.chan 7 "R")))).toOption
+  == some (.prod .unit (.chan 7 "R"))
+
+-- `none` payloads emit no "payload" key (existing JSON stays byte-identical).
+#guard ((localTypeRToJson (.send "B" [({ name := "m", sort := .unit }, none, .end)])).compress.splitOn
+  "payload").length == 1
 
 end Choreography.Projection.Json

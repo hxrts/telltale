@@ -39,4 +39,6 @@ impl ProtocolFixture {
 }
 
 pub use tier1_minimal::{chain, ping_pong, singleton};
+pub use tier2_control_flow::bounded_loop;
+pub use tier3_distributed::{fan_out, independent_pairs};
 pub use tier5_negative::{bad_quorum, bridge_without_admission, deadlock, unbounded_wait};

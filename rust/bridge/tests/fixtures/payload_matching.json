@@ -1,0 +1,40 @@
+{
+  "choreography": {
+    "kind": "comm",
+    "sender": "a",
+    "receiver": "b",
+    "branches": [
+      {
+        "label": { "name": "m", "sort": "unit" },
+        "continuation": { "kind": "end" }
+      }
+    ]
+  },
+  "mismatch_program": {
+    "role": "a",
+    "local_type": {
+      "kind": "send",
+      "partner": "b",
+      "branches": [
+        {
+          "label": { "name": "m", "sort": "unit" },
+          "payload": "nat",
+          "continuation": { "kind": "end" }
+        }
+      ]
+    }
+  },
+  "matching_program": {
+    "role": "a",
+    "local_type": {
+      "kind": "send",
+      "partner": "b",
+      "branches": [
+        {
+          "label": { "name": "m", "sort": "unit" },
+          "continuation": { "kind": "end" }
+        }
+      ]
+    }
+  }
+}

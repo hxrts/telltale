@@ -490,6 +490,7 @@ budget = { total = 1, mode = "activation" }
             entry.theorem_eligibility.outcome,
             crate::decision::DecisionOutcome::Certified(_)
                 | crate::decision::DecisionOutcome::Counterexample(_)
+                | crate::decision::DecisionOutcome::Inconclusive(_)
         )));
     }
 }

@@ -13,7 +13,7 @@ use proptest::strategy::ValueTree;
 use proptest::test_runner::{Config, RngAlgorithm, TestRng, TestRunner};
 use serde_json::Value;
 use telltale_bridge::{global_to_json, json_to_global, json_to_local, local_to_json};
-use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort, ValType};
 
 /// Deterministic seed for property-based tests.
 /// Using a fixed seed ensures all proptest runs are reproducible.
@@ -108,40 +108,84 @@ fn simple_global_strategy() -> impl Strategy<Value = GlobalType> {
     ]
 }
 
+/// Strategy for branch payload annotations: `None` plus every `ValType` shape.
+fn payload_strategy() -> impl Strategy<Value = Option<ValType>> {
+    prop_oneof![
+        Just(None),
+        Just(Some(ValType::Unit)),
+        Just(Some(ValType::Bool)),
+        Just(Some(ValType::Nat)),
+        Just(Some(ValType::String)),
+        Just(Some(ValType::Readiness)),
+        (0usize..4, role_strategy()).prop_map(|(sid, role)| Some(ValType::Chan { sid, role })),
+        Just(Some(ValType::Prod(
+            Box::new(ValType::Nat),
+            Box::new(ValType::Prod(
+                Box::new(ValType::Bool),
+                Box::new(ValType::String)
+            ))
+        ))),
+    ]
+}
+
+fn send1(p: String, l: Label, vt: Option<ValType>, cont: LocalTypeR) -> LocalTypeR {
+    LocalTypeR::Send {
+        partner: p,
+        branches: vec![(l, vt, cont)],
+    }
+}
+
+fn recv1(p: String, l: Label, vt: Option<ValType>, cont: LocalTypeR) -> LocalTypeR {
+    LocalTypeR::Recv {
+        partner: p,
+        branches: vec![(l, vt, cont)],
+    }
+}
+
 /// Strategy for generating simple (non-recursive) LocalTypes.
 fn simple_local_strategy() -> impl Strategy<Value = LocalTypeR> {
     prop_oneof![
         // End type
         Just(LocalTypeR::End),
         // Single send
-        (role_strategy(), label_strategy()).prop_map(|(p, l)| LocalTypeR::send(
-            &p,
+        (role_strategy(), label_strategy(), payload_strategy()).prop_map(|(p, l, vt)| send1(
+            p,
             l,
+            vt,
             LocalTypeR::End
         )),
         // Single recv
-        (role_strategy(), label_strategy()).prop_map(|(p, l)| LocalTypeR::recv(
-            &p,
+        (role_strategy(), label_strategy(), payload_strategy()).prop_map(|(p, l, vt)| recv1(
+            p,
             l,
+            vt,
             LocalTypeR::End
         )),
         // Send then recv
         (
             role_strategy(),
             label_strategy(),
+            payload_strategy(),
             role_strategy(),
-            label_strategy()
+            label_strategy(),
+            payload_strategy()
         )
-            .prop_map(|(p1, l1, p2, l2)| {
-                LocalTypeR::send(&p1, l1, LocalTypeR::recv(&p2, l2, LocalTypeR::End))
+            .prop_map(|(p1, l1, v1, p2, l2, v2)| {
+                send1(p1, l1, v1, recv1(p2, l2, v2, LocalTypeR::End))
             }),
         // Internal choice (send with multiple branches)
-        (role_strategy(), label_strategy(), label_strategy())
-            .prop_filter("distinct labels", |(_, l1, l2)| l1.name != l2.name)
-            .prop_map(|(p, l1, l2)| {
+        (
+            role_strategy(),
+            label_strategy(),
+            payload_strategy(),
+            label_strategy(),
+            payload_strategy()
+        )
+            .prop_filter("distinct labels", |(_, l1, _, l2, _)| l1.name != l2.name)
+            .prop_map(|(p, l1, v1, l2, v2)| {
                 LocalTypeR::Send {
                     partner: p,
-                    branches: vec![(l1, None, LocalTypeR::End), (l2, None, LocalTypeR::End)],
+                    branches: vec![(l1, v1, LocalTypeR::End), (l2, v2, LocalTypeR::End)],
                 }
             }),
     ]

@@ -99,8 +99,8 @@ def obsWithSeqNo {ε : Type u} [EffectRuntime ε]
     (idx : Nat) (ev : ObsEvent ε) : ObsEvent ε :=
   -- Replace seqNo fields with the current index.
   match ev with
-  | .sent edge val _ => .sent edge val idx
-  | .received edge val _ => .received edge val idx
+  | .sent edge val _ lbl => .sent edge val idx lbl
+  | .received edge val _ lbl => .received edge val idx lbl
   | _ => ev
 
 def observeAt {ε : Type u} [EffectRuntime ε]
@@ -128,12 +128,12 @@ def obsTraceOf {ε : Type u} [EffectRuntime ε]
 def SentAt {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
   -- Event at idx is a send of v on e (seqNo ignored).
-  ∃ n seq, (trace)[idx]? = some (n, ObsEvent.sent e v seq)
+  ∃ n seq lbl, (trace)[idx]? = some (n, ObsEvent.sent e v seq lbl)
 
 def RecvAt {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) (idx : Nat) (e : Edge) (v : Value) : Prop :=
   -- Event at idx is a receive of v on e (seqNo ignored).
-  ∃ n seq, (trace)[idx]? = some (n, ObsEvent.received e v seq)
+  ∃ n seq lbl, (trace)[idx]? = some (n, ObsEvent.received e v seq lbl)
 
 def SendBeforeObs {ε : Type u} [EffectRuntime ε]
     (trace : ObsTrace ε) (e : Edge) (v1 v2 : Value) : Prop :=
@@ -153,13 +153,13 @@ def CausallyConsistent {ε : Type u} [EffectRuntime ε]
 /-- Payloads sent on edge `e`, in trace order. -/
 def sentOn {ε : Type u} [EffectRuntime ε] (e : Edge) (trace : ObsTrace ε) : List Value :=
   trace.filterMap fun p => match p.2 with
-    | .sent e' v _ => if e' = e then some v else none
+    | .sent e' v _ _ => if e' = e then some v else none
     | _ => none
 
 /-- Payloads received on edge `e`, in trace order. -/
 def recvOn {ε : Type u} [EffectRuntime ε] (e : Edge) (trace : ObsTrace ε) : List Value :=
   trace.filterMap fun p => match p.2 with
-    | .received e' v _ => if e' = e then some v else none
+    | .received e' v _ _ => if e' = e then some v else none
     | _ => none
 
 /-- Per-edge FIFO: at every point of the trace, the payloads received on each
@@ -191,12 +191,12 @@ private theorem sentAt_of_mem_sentOn {ε : Type u} [EffectRuntime ε]
     rw [← hget, List.getElem_take, List.getElem?_eq_getElem hlt]
   obtain ⟨n, ev⟩ := p
   cases ev with
-  | sent e' v' s =>
+  | sent e' v' s l =>
       by_cases he : e' = e
       · subst he
         simp at hpv
         subst hpv
-        exact ⟨i, hij, n, s, hg⟩
+        exact ⟨i, hij, n, s, l, hg⟩
       · simp [he] at hpv
   | _ => simp at hpv
 
@@ -204,7 +204,7 @@ omit [Telltale.TelltaleIris] in
 /-- Per-edge FIFO consistency implies causal consistency. -/
 theorem causallyConsistent_of_fifo {ε : Type u} [EffectRuntime ε]
     {trace : ObsTrace ε} (hF : FIFOConsistent trace) : CausallyConsistent trace := by
-  intro j e v ⟨n, seq, hj⟩
+  intro j e v ⟨n, seq, l, hj⟩
   have hpre := hF (j + 1) e
   rw [take_succ_of_getElem? hj] at hpre
   simp only [sentOn, recvOn, List.filterMap_append, List.filterMap_cons,

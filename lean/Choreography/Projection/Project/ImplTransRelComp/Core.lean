@@ -32,7 +32,7 @@ theorem branches_rel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
-  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, hab.2.1, h _ _ hab.2.2⟩) hrel
 
 /-- Monotonicity of EQ2F over relations. -/
 theorem eq2_f_mono {R S : Rel}
@@ -66,35 +66,37 @@ private theorem branches_rel_trans_chain_head {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : BranchR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_cs.2.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ EQ2 lb_cs.2.2 lb_ds.2.2)
+    (h1 : lb_bs.1 = lb_cs.1 ∧ lb_bs.2.1 = lb_cs.2.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ lb_cs.2.1 = lb_ds.2.1 ∧ EQ2 lb_cs.2.2 lb_ds.2.2)
     (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
     (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
     (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
+    lb_bs.1 = lb_ds.1 ∧ lb_bs.2.1 = lb_ds.2.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   -- Combine labels and chain the continuation relation through hextend or eq2_trans_wf.
   constructor
   · exact h1.1.trans h2.1
-  · cases h1.2 with
-    | inl hr => exact Or.inl (hextend _ _ _ hr h2.2 hWFa hWFb hWFc)
-    | inr heq => exact Or.inr (eq2_trans_wf heq h2.2 hWFa hWFb hWFc)
+  refine ⟨h1.2.1.trans h2.2.1, ?_⟩
+  cases h1.2.2 with
+  | inl hr => exact Or.inl (hextend _ _ _ hr h2.2.2 hWFa hWFb hWFc)
+  | inr heq => exact Or.inr (eq2_trans_wf heq h2.2.2 hWFa hWFb hWFc)
 
 theorem branches_rel_trans_chain_rev_head {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : BranchR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ EQ2 lb_bs.2.2 lb_cs.2.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_cs.2.2 lb_ds.2.2)
+    (h1 : lb_bs.1 = lb_cs.1 ∧ lb_bs.2.1 = lb_cs.2.1 ∧ EQ2 lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ lb_cs.2.1 = lb_ds.2.1 ∧ (EQ2_closure R) lb_cs.2.2 lb_ds.2.2)
     (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
     (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
     (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
+    lb_bs.1 = lb_ds.1 ∧ lb_bs.2.1 = lb_ds.2.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   -- Combine labels and chain the continuation relation through hextend or eq2_trans_wf.
   constructor
   · exact h1.1.trans h2.1
-  · cases h2.2 with
-    | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
-    | inr heq => exact Or.inr (eq2_trans_wf h1.2 heq hWFa hWFb hWFc)
+  refine ⟨h1.2.1.trans h2.2.1, ?_⟩
+  cases h2.2.2 with
+  | inl hr => exact Or.inl (hextend _ _ _ h1.2.2 hr hWFa hWFb hWFc)
+  | inr heq => exact Or.inr (eq2_trans_wf h1.2.2 heq hWFa hWFb hWFc)
 
 /-! ## Branch Relation Chaining -/
 
@@ -227,10 +229,10 @@ theorem branches_proj_rel_to_branches_rel_c_project_trans_rel
             constructor
             · -- Labels match
               exact hpair.1.symm
-            · -- CProjectTransRel lCont (trans gCont role)
+            · -- Payload is `none` on both sides; continuation in CProjectTransRel
               have hwf_cont : gCont.wellFormed = true ∧ gCont.delegateFree = true := by
                 exact hwf (gLabel, gCont) (by simp)
-              exact ⟨gCont, role, hpair.2.2, rfl, hwf_cont⟩
+              exact ⟨hpair.2.1, gCont, role, hpair.2.2, rfl, hwf_cont⟩
           · -- Tail relation
             have hwf_tail : ∀ gb', gb' ∈ gbs_tail → gb'.2.wellFormed = true ∧ gb'.2.delegateFree = true := by
               intro gb' hmem

@@ -153,7 +153,7 @@ private theorem branches_proj_rel_implies_branches_rel_eq2_cons
   have heq : EQ2 lCont (trans gCont role) :=
     c_project_implies_eq2_trans _ _ _ hproj hwf_head
   have htail' :
-      List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
+      List.Forall₂ (fun a b => a.1 = b.1 ∧ a.2.1 = b.2.1 ∧ EQ2 a.2.2 b.2.2)
         lbs_tail (transBranches gbs_tail role) := by
     simpa [BranchesRel] using htail
   have htb :
@@ -161,10 +161,10 @@ private theorem branches_proj_rel_implies_branches_rel_eq2_cons
         (gLabel, none, trans gCont role) :: transBranches gbs_tail role := by
     simp [transBranches, Choreography.Projection.Trans.transBranches]
   have hcons :
-      List.Forall₂ (fun a b => a.1 = b.1 ∧ EQ2 a.2.2 b.2.2)
+      List.Forall₂ (fun a b => a.1 = b.1 ∧ a.2.1 = b.2.1 ∧ EQ2 a.2.2 b.2.2)
         ((lLabel, lVt, lCont) :: lbs_tail)
         ((gLabel, none, trans gCont role) :: transBranches gbs_tail role) :=
-    List.Forall₂.cons ⟨hlab.symm, by simpa using heq⟩ htail'
+    List.Forall₂.cons ⟨hlab.symm, by simpa using _hnone, by simpa using heq⟩ htail'
   simpa [BranchesRel, htb] using hcons
 
 /-! ## Branch Projection EQ2 Transfer -/

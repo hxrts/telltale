@@ -1648,16 +1648,28 @@ content is as follows. (i) Trace adequacy (causal and per-edge FIFO consistency)
 per-edge message conservation hold after the real \texttt{stepSend} and
 \texttt{stepReceive} from reachable states in FIFO buffer mode
 (\texttt{Runtime/\allowbreak Adequacy/\allowbreak CommTraceMachine.lean}); latest-value buffers,
-speculation rollback, loader buffer resets and offer/choose instructions are not
-covered. (ii) An Iris adequacy theorem,
+speculation rollback and loader buffer resets are not covered. Offer and choose
+are covered through a combined value/label trace relation
+(\nolinkurl{stepOffer_trace_adequacy}, \nolinkurl{stepChoose_trace_adequacy};
+a choose that faults on an unknown label drops the dequeued message, so its
+conservation statement is ``preserved or fault''). (ii) An Iris adequacy theorem,
 \nolinkurl{session_vm_wp_invariance} (\texttt{Runtime/\allowbreak Proofs/\allowbreak Concurrency.lean}),
 is upstream iris-lean's \texttt{wp\_invariance} instantiated at the session-VM
 language. Its weakest-precondition premise is a hypothesis. (iii) Compilation
 refinement, \nolinkurl{compile_refines}
-(\texttt{Runtime/\allowbreak Adequacy/\allowbreak CompileRefines.lean}), is proved only for linear
-(single-branch, non-recursive) local types. Branch tables, \texttt{mu}/\texttt{var}
-loops and multi-role image layout are not covered. No Lean statement relates the Lean
-semantics to the Rust implementation; Rust--Lean parity is test-based.
+(\texttt{Runtime/\allowbreak Adequacy/\allowbreak CompileRefines.lean}), is proved for every
+local type against the specification relation \texttt{Impl}: branch tables,
+\texttt{mu}/\texttt{var} loops (every \texttt{jump} targets its binder's recorded
+program counter, \nolinkurl{compile_refines_pc_invariant}) and the multi-role image
+layout (\nolinkurl{fromLocalTypes_refines}). (iv) Progress and termination of the
+store-level frontier step are derived, not assumed, for straight-line value-message
+sessions: \nolinkurl{progress_of_projected} and
+\nolinkurl{concrete_termination_of_projected}
+(\texttt{Runtime/\allowbreak Proofs/\allowbreak Projected*.lean}) need only $k$-fair
+scheduling; choice and recursion are outside that fragment, and the
+instruction-level \texttt{execInstr} is not covered. No Lean statement relates the
+Lean semantics to the Rust implementation; Rust--Lean parity is test-based, including
+instruction-stream equality of the two compilers on a branching and recursive corpus.
 
 Running-example instantiation. The adequacy derivation for $C_3$ in
 Section~\ref{sec:example} is a direct instance of this theorem.
@@ -2113,11 +2125,16 @@ envelope soundness and realizability, exchange normalization, spatial and
 capability monotonicity, the compositional envelope property, and the
 minimality hypothesis of Theorem~\ref{thm:minimality} are explicit assumed
 premises; envelope maximality is definitional in its mechanized form; projection
-harmony and subject reduction cover head-communication steps only; compilation
-refinement covers linear local types only. Progress and termination of the
-concrete protocol machine are not mechanized: the progress theorem assumes
-that some session is enabled whenever not all sessions are complete. Rust--Lean
-correspondence is established by tests, not by a Lean theorem.
+harmony covers head-communication steps only, while subject reduction and
+deadlock freedom cover every global step, including asynchronous and
+\texttt{mu}-headed ones (\nolinkurl{step_preserves_typing_general},
+\nolinkurl{can_progress_general}); local-type equality compares payload
+annotations, so a payload mismatch is not well-typed; compilation refinement
+covers all local types. Progress and termination of the protocol machine are
+mechanized for the store-level frontier step on straight-line value-message
+sessions, with no enabledness assumption; choice, recursion and the
+instruction-level machine are not covered. Rust--Lean correspondence is
+established by tests, not by a Lean theorem.
 
 Excluded protocol classes in this paper include non-admitted envelope
 extensions, non-checkable non-interference witnesses outside finite-witness
@@ -2526,7 +2543,7 @@ paragraphs).
 		\texttt{stepSend\_trace\_\allowbreak adequacy} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CommTraceMachine.lean}} & \S\ref{sec:theorem-h} & --- \\
 		\texttt{session\_vm\_wp\_\allowbreak invariance} & \texttt{Runtime/\allowbreak Proofs/\allowbreak}\mbox{\texttt{Concurrency.lean}} & \S\ref{sec:theorem-h} & --- \\
 		\rowcolor{gray!8}
-		\texttt{compile\_refines} (linear types) & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CompileRefines.lean}} & \S\ref{sec:theorem-h} & --- \\
+		\texttt{compile\_refines} & \texttt{Runtime/\allowbreak Adequacy/\allowbreak}\mbox{\texttt{CompileRefines.lean}} & \S\ref{sec:theorem-h} & --- \\
 		\texttt{byzantine\_safety\_\allowbreak of\_assumptions} & \texttt{Distributed/\allowbreak Families/\allowbreak ByzantineSafety/\allowbreak}\mbox{\texttt{Core/Base.lean}} & \S\ref{sec:theorem-h} & Thm.~\ref{thm:byzantine} [A4] \\
 		\midrule
 		\multicolumn{4}{@{}l}{\textit{Runtime Gates}}                                                                                                                                                                                                                                                                                                            \\

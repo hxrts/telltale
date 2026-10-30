@@ -1,5 +1,6 @@
 import Runtime.ProtocolMachine.Semantics.ExecHelpers
 import Runtime.ProtocolMachine.Semantics.ExecComm
+import Runtime.ProtocolMachine.Semantics.ExecChoice
 import Runtime.ProtocolMachine.Semantics.ExecSession
 import Runtime.ProtocolMachine.Semantics.ExecGuardEffect
 import Runtime.ProtocolMachine.Semantics.ExecSpeculation

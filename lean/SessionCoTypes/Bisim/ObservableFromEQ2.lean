@@ -145,7 +145,7 @@ theorem branches_rel_flip {as bs : List BranchR}
     (h : BranchesRel EQ2 as bs) : BranchesRel EQ2 bs as := by
   induction h with
   | nil => exact List.Forall₂.nil
-  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1.symm, eq2_symm hbc.2⟩ ih
+  | cons hbc _ ih => exact List.Forall₂.cons ⟨hbc.1.symm, hbc.2.1.symm, eq2_symm hbc.2.2⟩ ih
 
 /-- Flip BranchesRel EQ2 across duality on both sides. -/
 theorem branches_rel_dual_eq2 {bs cs : List BranchR}
@@ -166,9 +166,9 @@ theorem branches_rel_dual_eq2 {bs cs : List BranchR}
                   cases h with
                   | cons hbc htail =>
                       have hdu : EQ2 rest.2 rest'.2.dual := by
-                        have h' := eq2_dual_compat hbc.2
+                        have h' := eq2_dual_compat hbc.2.2
                         simpa [dual_involutive] using h'
-                      exact List.Forall₂.cons ⟨hbc.1, hdu⟩ (ih htail)
+                      exact List.Forall₂.cons ⟨hbc.1, hbc.2.1, hdu⟩ (ih htail)
 
 /-- Dualize CanSend into CanRecv along matching branches. -/
 theorem can_send_dual_to_can_recv {x : LocalTypeR} {p : String}

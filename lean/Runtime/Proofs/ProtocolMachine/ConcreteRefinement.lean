@@ -185,11 +185,12 @@ def projectConcreteObsEvent?
     (tick : Nat)
     (ev : ObsEvent ε) : Option ConcreteTraceEvent :=
   match ev with
-  | .sent edge val _seqNo =>
+  | .sent edge val _seqNo lbl =>
       let label :=
-        match val with
-        | .string s => some s
-        | _ => none
+        match lbl, val with
+        | some l, _ => some l
+        | none, .string s => some s
+        | none, _ => none
       some
         { kind := "sent"
         , tick := tick
@@ -197,11 +198,12 @@ def projectConcreteObsEvent?
         , sender := some edge.sender
         , receiver := some edge.receiver
         , label := label }
-  | .received edge val _seqNo =>
+  | .received edge val _seqNo lbl =>
       let label :=
-        match val with
-        | .string s => some s
-        | _ => none
+        match lbl, val with
+        | some l, _ => some l
+        | none, .string s => some s
+        | none, _ => none
       some
         { kind := "received"
         , tick := tick

@@ -40,13 +40,13 @@ variable {ε ν : Type u} [EffectRuntime ε] [VerificationModel ν]
 /-- Payloads sent on `e` in a raw machine trace. -/
 def rawSent (e : Edge) (t : List (TickedObsEvent ε)) : List Value :=
   t.filterMap fun ev => match ev.event with
-    | .sent e' v _ => if e' = e then some v else none
+    | .sent e' v _ _ => if e' = e then some v else none
     | _ => none
 
 /-- Payloads received on `e` in a raw machine trace. -/
 def rawRecv (e : Edge) (t : List (TickedObsEvent ε)) : List Value :=
   t.filterMap fun ev => match ev.event with
-    | .received e' v _ => if e' = e then some v else none
+    | .received e' v _ _ => if e' = e then some v else none
     | _ => none
 
 /-- `rawSent` distributes over append. -/
@@ -171,13 +171,13 @@ abbrev CommConfig (ε ν : Type u) [EffectRuntime ε] [VerificationModel ν] :=
 inductive CommStep : CommConfig ε ν → CommConfig ε ν → Prop
   /-- FIFO send: enqueue at tail, emit `sent`. -/
   | send (t : List (TickedObsEvent ε)) (bufs : SignedBuffers ν) (e : Edge)
-      (sv : SignedValue ν) (tick seq : Nat) :
-      CommStep (t, bufs) (t ++ [⟨tick, .sent e sv.payload seq⟩],
+      (sv : SignedValue ν) (tick seq : Nat) (lbl : Option Label) :
+      CommStep (t, bufs) (t ++ [⟨tick, .sent e sv.payload seq lbl⟩],
         signedBufferSet bufs e (signedBufferLookup bufs e ++ [sv]))
   /-- Receive: dequeue head, emit `received` of that payload. -/
   | recv (t : List (TickedObsEvent ε)) (bufs bufs' : SignedBuffers ν) (e : Edge)
-      (sv : SignedValue ν) (tick seq : Nat) (h : bufDequeue bufs e = some (sv, bufs')) :
-      CommStep (t, bufs) (t ++ [⟨tick, .received e sv.payload seq⟩], bufs')
+      (sv : SignedValue ν) (tick seq : Nat) (lbl : Option Label) (h : bufDequeue bufs e = some (sv, bufs')) :
+      CommStep (t, bufs) (t ++ [⟨tick, .received e sv.payload seq lbl⟩], bufs')
   /-- Any non-send/receive event, buffers untouched. -/
   | other (t : List (TickedObsEvent ε)) (bufs : SignedBuffers ν) (ev : TickedObsEvent ε)
       (hs : ∀ e, rawSent e [ev] = []) (hr : ∀ e, rawRecv e [ev] = []) :
@@ -196,29 +196,29 @@ def CommInv (c : CommConfig ε ν) : Prop :=
 /-! ## Invariant preservation -/
 
 /-- Raw send projection of a single `sent` event. -/
-theorem rawSent_single_sent (e e' : Edge) (v : Value) (tick seq : Nat) :
-    rawSent (ε:=ε) e' [⟨tick, .sent e v seq⟩] = if e = e' then [v] else [] := by
+theorem rawSent_single_sent (e e' : Edge) (v : Value) (tick seq : Nat) (lbl : Option Label) :
+    rawSent (ε:=ε) e' [⟨tick, .sent e v seq lbl⟩] = if e = e' then [v] else [] := by
   by_cases h : e = e' <;> simp [rawSent, h]
 
 /-- Raw receive projection of a single `sent` event. -/
-theorem rawRecv_single_sent (e e' : Edge) (v : Value) (tick seq : Nat) :
-    rawRecv (ε:=ε) e' [⟨tick, .sent e v seq⟩] = [] := by
+theorem rawRecv_single_sent (e e' : Edge) (v : Value) (tick seq : Nat) (lbl : Option Label) :
+    rawRecv (ε:=ε) e' [⟨tick, .sent e v seq lbl⟩] = [] := by
   simp [rawRecv]
 
 /-- Raw send projection of a single `received` event. -/
-theorem rawSent_single_recv (e e' : Edge) (v : Value) (tick seq : Nat) :
-    rawSent (ε:=ε) e' [⟨tick, .received e v seq⟩] = [] := by
+theorem rawSent_single_recv (e e' : Edge) (v : Value) (tick seq : Nat) (lbl : Option Label) :
+    rawSent (ε:=ε) e' [⟨tick, .received e v seq lbl⟩] = [] := by
   simp [rawSent]
 
 /-- Raw receive projection of a single `received` event. -/
-theorem rawRecv_single_recv (e e' : Edge) (v : Value) (tick seq : Nat) :
-    rawRecv (ε:=ε) e' [⟨tick, .received e v seq⟩] = if e = e' then [v] else [] := by
+theorem rawRecv_single_recv (e e' : Edge) (v : Value) (tick seq : Nat) (lbl : Option Label) :
+    rawRecv (ε:=ε) e' [⟨tick, .received e v seq lbl⟩] = if e = e' then [v] else [] := by
   by_cases h : e = e' <;> simp [rawRecv, h]
 
 /-- A FIFO send preserves conservation. -/
 theorem commInv_send {t : List (TickedObsEvent ε)} {bufs : SignedBuffers ν} {e : Edge}
-    {sv : SignedValue ν} {tick seq : Nat} (hI : CommInv (t, bufs)) :
-    CommInv ((t ++ [⟨tick, .sent e sv.payload seq⟩],
+    {sv : SignedValue ν} {tick seq : Nat} {lbl : Option Label} (hI : CommInv (t, bufs)) :
+    CommInv ((t ++ [⟨tick, .sent e sv.payload seq lbl⟩],
       signedBufferSet bufs e (signedBufferLookup bufs e ++ [sv])) : CommConfig ε ν) := by
   intro e'
   have h := hI e'
@@ -230,9 +230,9 @@ theorem commInv_send {t : List (TickedObsEvent ε)} {bufs : SignedBuffers ν} {e
 
 /-- A head-dequeuing receive preserves conservation. -/
 theorem commInv_recv {t : List (TickedObsEvent ε)} {bufs bufs' : SignedBuffers ν} {e : Edge}
-    {sv : SignedValue ν} {tick seq : Nat} (hd : bufDequeue bufs e = some (sv, bufs'))
+    {sv : SignedValue ν} {tick seq : Nat} {lbl : Option Label} (hd : bufDequeue bufs e = some (sv, bufs'))
     (hI : CommInv (t, bufs)) :
-    CommInv ((t ++ [⟨tick, .received e sv.payload seq⟩], bufs') : CommConfig ε ν) := by
+    CommInv ((t ++ [⟨tick, .received e sv.payload seq lbl⟩], bufs') : CommConfig ε ν) := by
   intro e'
   have h := hI e'
   obtain ⟨h1, h2⟩ := bufDequeue_spec hd
@@ -257,7 +257,7 @@ theorem commInv_step {c c' : CommConfig ε ν} (hs : CommStep c c') (hI : CommIn
     CommInv c' := by
   cases hs with
   | send => exact commInv_send hI
-  | recv _ _ _ _ _ _ _ hd => exact commInv_recv hd hI
+  | recv _ _ _ _ _ _ _ _ hd => exact commInv_recv hd hI
   | other _ _ _ hs' hr' => exact commInv_other hs' hr' hI
 
 /-- Every step appends exactly one event to the trace. -/

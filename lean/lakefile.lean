@@ -140,6 +140,11 @@ lean_exe search_parity_runner where
   root := `Runtime.Tests.SearchParity
   moreLinkArgs := macosLinkArgs
 
+/-- Compile LocalTypeR JSON to instruction JSON (Rust compiler refinement parity). -/
+lean_exe compile_local_type_export where
+  root := `Runtime.Tests.CompileLocalTypeExport
+  moreLinkArgs := macosLinkArgs
+
 /-- Projection validator (compares projected local types). -/
 @[default_target]
 lean_exe telltale_validator where

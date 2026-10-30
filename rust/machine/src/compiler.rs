@@ -26,7 +26,17 @@ pub fn compile(local_type: &LocalTypeR) -> Vec<Instr> {
     let mut instrs = Vec::new();
     let mut loop_targets: BTreeMap<String, PC> = BTreeMap::new();
     compile_inner(local_type, &mut instrs, &mut loop_targets);
+    // Matches Lean `ensureTerminal`.
+    if !matches!(instrs.last(), Some(Instr::Halt | Instr::Jump { .. })) {
+        instrs.push(Instr::Halt);
+    }
     instrs
+}
+
+fn step_invoke() -> Instr {
+    Instr::Invoke {
+        action: InvokeAction::Named("runtime.step".to_string()),
+    }
 }
 
 fn compile_inner(
@@ -36,12 +46,13 @@ fn compile_inner(
 ) {
     match lt {
         LocalTypeR::Send { branches, .. } => {
-            if branches.len() == 1 {
+            if branches.is_empty() {
+                // Matches Lean: an empty choice compiles to `halt`.
+                instrs.push(Instr::Halt);
+            } else if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
                     instrs.push(Instr::Send { chan: 0, val: 1 });
-                    instrs.push(Instr::Invoke {
-                        action: InvokeAction::Named("runtime.step".to_string()),
-                    });
+                    instrs.push(step_invoke());
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {
@@ -49,12 +60,13 @@ fn compile_inner(
             }
         }
         LocalTypeR::Recv { branches, .. } => {
-            if branches.len() == 1 {
+            if branches.is_empty() {
+                // Matches Lean: an empty choice compiles to `halt`.
+                instrs.push(Instr::Halt);
+            } else if branches.len() == 1 {
                 if let Some((_, _vt, cont)) = branches.first() {
                     instrs.push(Instr::Receive { chan: 0, dst: 1 });
-                    instrs.push(Instr::Invoke {
-                        action: InvokeAction::Named("runtime.step".to_string()),
-                    });
+                    instrs.push(step_invoke());
                     compile_inner(cont, instrs, loop_targets);
                 }
             } else if branches.len() > 1 {

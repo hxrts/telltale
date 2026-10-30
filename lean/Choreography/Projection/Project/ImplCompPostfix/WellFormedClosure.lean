@@ -48,8 +48,8 @@ theorem branches_rel_lift_comp_wf
   | cons hhead htail ih =>
       rename_i b c bs' cs'
       constructor
-      · refine ⟨hhead.1, ?_⟩
-        exact lift_eq2_closure_comp_wf hhead.2
+      · refine ⟨hhead.1, hhead.2.1, ?_⟩
+        exact lift_eq2_closure_comp_wf hhead.2.2
           (hWFbs b (List.Mem.head _)) (hWFcs c (List.Mem.head _))
       · exact ih
           (fun lb hm => hWFbs lb (List.Mem.tail _ hm))

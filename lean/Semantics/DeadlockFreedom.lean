@@ -43,7 +43,7 @@ The following definitions form the semantic interface for proofs:
 - `CanProgress`: existence of a step
 - `wf_trichotomy`, `deadlock_free_trichotomy`: progress derived from well-formedness
 - `deadlock_free`: configuration-level progress for communication heads
-- `Claims`: bundle of deadlock freedom properties
+- `Claims` (in `Semantics.DeadlockFreedomGeneral`): bundle of deadlock freedom properties
 -/
 
 namespace Semantics.DeadlockFreedom
@@ -295,7 +295,7 @@ theorem own_label_mem {as : List BranchR} {bs : List (Label × GlobalType)} {rol
     {label : Label} {g' : GlobalType} (hrel : BranchesRel EQ2 as (transBranches bs role))
     (hmem : (label, g') ∈ bs) :
     ∃ vt cont, branchCont label as = some cont ∧ (label, vt, cont) ∈ as := by
-  obtain ⟨x, hx, hl, -⟩ := branches_rel_mem_right hrel
+  obtain ⟨x, hx, hl, -, -⟩ := branches_rel_mem_right hrel
     (Choreography.Harmony.mem_trans_branches_of_mem bs label g' role hmem)
   exact branchCont_some hx hl
 
@@ -362,8 +362,8 @@ configuration whose (closed, well-formed, blind, label-unique) global type is a
 communication can step, and the result is again well-typed. Non-emptiness of
 the branches is derived from well-formedness.
 
-`mu`-headed configurations are not covered at the configuration level (see
-`deadlock_free_trichotomy` for the global-level statement). -/
+Head-shape corollary; `deadlock_free_general` (`Semantics.DeadlockFreedomGeneral`)
+drops the head premise. -/
 theorem deadlock_free (c : Configuration) {s r : String} {bs : List (Label × GlobalType)}
     (htyped : WellTypedConfig c) (hg : c.globalType = .comm s r bs)
     (huniq : c.globalType.uniqueBranchLabels = true) (hclosed : c.globalType.isClosed = true)
@@ -392,24 +392,5 @@ theorem not_stuck (c : Configuration) {s r : String} {bs : List (Label × Global
   intro ⟨_, hnp⟩
   obtain ⟨c', act, hstep, _⟩ := deadlock_free c htyped hg huniq hclosed hwf hblind
   exact hnp ⟨c', act, hstep⟩
-
-/-! ## Claims Bundle -/
-
-/-- Claims bundle for deadlock freedom. -/
-structure Claims where
-  /-- Global progress trichotomy for well-formed types. -/
-  trichotomy : ∀ c, c.globalType.wellFormed = true →
-      Done c ∨ UnfoldsToDelegate c.globalType ∨ ∃ act g', step c.globalType act g'
-  /-- Communication-headed configurations step to well-typed configurations. -/
-  deadlock_free : ∀ c s r bs, WellTypedConfig c → c.globalType = .comm s r bs →
-      c.globalType.uniqueBranchLabels = true → c.globalType.isClosed = true →
-      c.globalType.wellFormed = true →
-      Choreography.Projection.Blind.isBlind c.globalType = true →
-      ∃ c' act, ConfigStep c c' act ∧ WellTypedConfig c'
-
-/-- Build the claims bundle from proven theorems. -/
-def claims : Claims where
-  trichotomy := deadlock_free_trichotomy
-  deadlock_free := fun c _ _ _ h1 h2 h3 h4 h5 h6 => deadlock_free c h1 h2 h3 h4 h5 h6
 
 end Semantics.DeadlockFreedom

@@ -272,6 +272,9 @@ fn stable_trace_corpus() -> Vec<test_choreographies::ProtocolFixture> {
     vec![
         test_choreographies::ping_pong(),
         test_choreographies::chain(),
+        test_choreographies::bounded_loop(),
+        test_choreographies::independent_pairs(),
+        test_choreographies::fan_out(),
     ]
 }
 

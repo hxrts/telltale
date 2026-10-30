@@ -90,11 +90,12 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
   let withSchema (fields : List (String × Json)) : Json :=
     Json.mkObj <| ("schema_version", Json.str "lean_bridge.v1") :: fields
   match ev.event with
-  | .sent edge val seqNo =>
+  | .sent edge val seqNo lbl =>
       let labelField :=
-        match val with
-        | .string s => [("label", Json.str s)]
-        | _ => []
+        match lbl, val with
+        | some l, _ => [("label", Json.str l)]
+        | none, .string s => [("label", Json.str s)]
+        | none, _ => []
       withSchema <|
         [ ("kind", Json.str "sent")
         , ("tick", Json.num ev.tick)
@@ -103,11 +104,12 @@ def obsEventToJson (ev : TickedObsEvent UnitEffect) : Json :=
         , ("receiver", Json.str edge.receiver)
         , ("sequence", Json.num seqNo)
         , ("value", valueToJson val) ] ++ labelField
-  | .received edge val seqNo =>
+  | .received edge val seqNo lbl =>
       let labelField :=
-        match val with
-        | .string s => [("label", Json.str s)]
-        | _ => []
+        match lbl, val with
+        | some l, _ => [("label", Json.str l)]
+        | none, .string s => [("label", Json.str s)]
+        | none, _ => []
       withSchema <|
         [ ("kind", Json.str "received")
         , ("tick", Json.num ev.tick)

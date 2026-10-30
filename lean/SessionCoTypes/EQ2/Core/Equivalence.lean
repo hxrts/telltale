@@ -33,7 +33,7 @@ private theorem branches_rel_refl {R : Rel} (hrefl : ∀ t, R t t) :
   induction bs with
   | nil => exact List.Forall₂.nil
   | cons head tail ih =>
-      exact List.Forall₂.cons ⟨rfl, hrefl head.2.2⟩ ih
+      exact List.Forall₂.cons ⟨rfl, rfl, hrefl head.2.2⟩ ih
 
 /-- BranchesRel is symmetric when the underlying relation is. -/
 private theorem branches_rel_symm {R : Rel}
@@ -43,7 +43,7 @@ private theorem branches_rel_symm {R : Rel}
   induction hrel with
   | nil => exact List.Forall₂.nil
   | cons h _ ih =>
-      exact List.Forall₂.cons ⟨h.1.symm, hsymm _ _ h.2⟩ ih
+      exact List.Forall₂.cons ⟨h.1.symm, h.2.1.symm, hsymm _ _ h.2.2⟩ ih
 
 /-- BranchesRel is transitive when the underlying relation is. -/
 private theorem branches_rel_trans {R : Rel}
@@ -57,7 +57,8 @@ private theorem branches_rel_trans {R : Rel}
   | cons h _ ih =>
       cases hbc with
       | cons h' hbc' =>
-          exact List.Forall₂.cons ⟨h.1.trans h'.1, htrans _ _ _ h.2 h'.2⟩ (ih hbc')
+          exact List.Forall₂.cons ⟨h.1.trans h'.1, h.2.1.trans h'.2.1, htrans _ _ _ h.2.2 h'.2.2⟩
+            (ih hbc')
 
 /-- Helper: construct EQ2 for mu from unfolding pairs. -/
 private theorem eq2_construct_mu (t : String) (body : LocalTypeR)
@@ -285,7 +286,7 @@ private theorem branches_rel_eq2_to_symm_rel :
   | nil => exact List.Forall₂.nil
   | cons h _ ih =>
       apply List.Forall₂.cons
-      · exact ⟨h.1.symm, h.2⟩  -- SymmRel b.2 c.2 = EQ2 c.2 b.2 = h.2
+      · exact ⟨h.1.symm, h.2.1.symm, h.2.2⟩  -- SymmRel b.2 c.2 = EQ2 c.2 b.2 = h.2.2
       · exact ih
 
 /-- SymmRel is a post-fixpoint of EQ2F. -/

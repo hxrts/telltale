@@ -102,7 +102,7 @@ private theorem branches_proj_deterministic_cons
               have hwf_tail : ∀ gb' ∈ gbs', gb'.2.wellFormed = true := by
                 intro gb' hmem; exact hwf gb' (by simp [hmem])
               have htail_eq := branches_det htail1 htail2 hwf_tail
-              exact List.Forall₂.cons ⟨rfl, hcont_eq⟩ htail_eq
+              exact List.Forall₂.cons ⟨rfl, _hnone1.trans _hnone2.symm, hcont_eq⟩ htail_eq
 
 /-! ## Branch Determinism Theorem -/
 

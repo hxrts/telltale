@@ -88,3 +88,78 @@ pub fn three_party_ack() -> ProtocolFixture {
 pub fn simple_majority() -> ProtocolFixture {
     three_party_ack()
 }
+
+/// Asynchronous independent communications: `A->B: m1; C->D: m2`.
+///
+/// The second communication shares no participant with the first, so the
+/// global `comm_async` step may fire it before `m1` is delivered.
+#[must_use]
+pub fn independent_pairs() -> ProtocolFixture {
+    let global = GlobalType::send(
+        "A",
+        "B",
+        Label::new("m1"),
+        GlobalType::send("C", "D", Label::new("m2"), GlobalType::End),
+    );
+
+    let mut local_types = BTreeMap::new();
+    local_types.insert(
+        "A".to_string(),
+        LocalTypeR::send("B", Label::new("m1"), LocalTypeR::End),
+    );
+    local_types.insert(
+        "B".to_string(),
+        LocalTypeR::recv("A", Label::new("m1"), LocalTypeR::End),
+    );
+    local_types.insert(
+        "C".to_string(),
+        LocalTypeR::send("D", Label::new("m2"), LocalTypeR::End),
+    );
+    local_types.insert(
+        "D".to_string(),
+        LocalTypeR::recv("C", Label::new("m2"), LocalTypeR::End),
+    );
+
+    ProtocolFixture {
+        name: "independent_pairs",
+        global,
+        local_types,
+        claims: InvariantClaims::default(),
+    }
+}
+
+/// Asynchronous fan-out from one sender: `A->B: x; A->C: y`.
+#[must_use]
+pub fn fan_out() -> ProtocolFixture {
+    let global = GlobalType::send(
+        "A",
+        "B",
+        Label::new("x"),
+        GlobalType::send("A", "C", Label::new("y"), GlobalType::End),
+    );
+
+    let mut local_types = BTreeMap::new();
+    local_types.insert(
+        "A".to_string(),
+        LocalTypeR::send(
+            "B",
+            Label::new("x"),
+            LocalTypeR::send("C", Label::new("y"), LocalTypeR::End),
+        ),
+    );
+    local_types.insert(
+        "B".to_string(),
+        LocalTypeR::recv("A", Label::new("x"), LocalTypeR::End),
+    );
+    local_types.insert(
+        "C".to_string(),
+        LocalTypeR::recv("A", Label::new("y"), LocalTypeR::End),
+    );
+
+    ProtocolFixture {
+        name: "fan_out",
+        global,
+        local_types,
+        claims: InvariantClaims::default(),
+    }
+}

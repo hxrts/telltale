@@ -326,7 +326,7 @@ private theorem branches_rel_refl : ∀ bs, BranchesRel EQ2 bs bs := by
   induction bs with
   | nil => exact List.Forall₂.nil
   | cons head tail ih =>
-      exact List.Forall₂.cons ⟨rfl, eq2_refl head.2.2⟩ ih
+      exact List.Forall₂.cons ⟨rfl, rfl, eq2_refl head.2.2⟩ ih
 
 /-- Observable relation is reflexive. -/
 theorem ObservableRel.refl {a : LocalTypeR} (obs : Observable a) :
@@ -396,7 +396,7 @@ private theorem branches_rel_bisim_strengthen {bs cs : List BranchR}
   | cons hhead htail ih =>
       rename_i b c bs' cs'
       constructor
-      · exact ⟨hhead.1, hhead.2, hWFbs b (List.Mem.head _), hWFcs c (List.Mem.head _)⟩
+      · exact ⟨hhead.1, hhead.2.1, hhead.2.2, hWFbs b (List.Mem.head _), hWFcs c (List.Mem.head _)⟩
       · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
                  (fun lc hm => hWFcs lc (List.Mem.tail _ hm))
 

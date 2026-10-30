@@ -191,7 +191,7 @@ private theorem branches_rel_dual_branches {bs cs : List BranchR}
   | nil => exact List.Forall₂.nil
   | @cons a b as bs' hhead _ ih =>
       apply List.Forall₂.cons
-      · exact ⟨hhead.1, ⟨a.2.2, b.2.2, hhead.2, rfl, rfl⟩⟩
+      · exact ⟨hhead.1, hhead.2.1, ⟨a.2.2, b.2.2, hhead.2.2, rfl, rfl⟩⟩
       · exact ih
 
 /-! ## DualRel Branch-Lifting to Closure -/
@@ -200,7 +200,7 @@ private theorem branches_rel_dual_branches {bs cs : List BranchR}
 private theorem branches_rel_dual_rel_to_closure {bs cs : List BranchR}
     (h : BranchesRel DualRel bs cs) :
     BranchesRel (EQ2_closure DualRel) bs cs := by
-  exact List.Forall₂.imp (fun _ _ hxy => ⟨hxy.1, Or.inl hxy.2⟩) h
+  exact List.Forall₂.imp (fun _ _ hxy => ⟨hxy.1, hxy.2.1, Or.inl hxy.2.2⟩) h
 
 /-! ## DualRel Postfix Helpers: Send/Recv -/
 

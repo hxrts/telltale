@@ -54,7 +54,13 @@ def findVarIdx (ctx : List String) (name : String) : Nat :=
 /-! #### Mutual conversion recursion -/
 
 mutual
-  /-- Convert LocalTypeR (named recursion) to LocalType (de Bruijn). -/
+  /-- Convert LocalTypeR (named recursion) to LocalType (de Bruijn).
+
+  A single label-only branch (`(lbl, none, cont)`) becomes a one-entry
+  `select`/`branch`, so the session type keeps its label. The compiler emits a
+  plain `send 0 1`/`receive 0 1` for it (as Rust does), and outside
+  strict-schema mode the step semantics accept `send`/`receive` on a one-entry
+  `select`/`branch`. -/
   def localTypeRToLocalTypeAux (ctx : List String) : LocalTypeR → LocalType
     | .end => .end_
     | .send partner branches =>
@@ -130,14 +136,10 @@ mutual
     | .send _ branches =>
         match branches with
         | [] => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
-        | (lbl, vt, cont) :: [] =>
-            match vt with
-            | some _ =>
-                let code := code ++ [Instr.send (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
-                compileInner defaultAction cont code loopTargets
-            | none =>
-                let code := code ++ [Instr.offer (γ:=γ) (ε:=ε) 0 lbl.name, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
-                compileInner defaultAction cont code loopTargets
+        | (_lbl, _vt, cont) :: [] =>
+            -- Value and label-only branches both compile to a plain send (as in Rust).
+            let code := code ++ [Instr.send (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
+            compileInner defaultAction cont code loopTargets
         | (lbl, _vt, cont) :: _ =>
             -- Deterministic choice: select the first label (matches default handler behavior).
             let code := code ++ [Instr.offer (γ:=γ) (ε:=ε) 0 lbl.name]
@@ -148,20 +150,10 @@ mutual
     | .recv _ branches =>
         match branches with
         | [] => (code ++ [Instr.halt (γ:=γ) (ε:=ε)], loopTargets)
-        | (lbl, vt, cont) :: [] =>
-            match vt with
-            | some _ =>
-                let code := code ++ [Instr.receive (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
-                compileInner defaultAction cont code loopTargets
-            | none =>
-                let placeholderPc := code.length
-                let code := code ++ [Instr.choose (γ:=γ) (ε:=ε) 0 ([] : List (String × PC))]
-                let startPc := code.length
-                let code := code ++ [Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
-                let (code, loopTargets) := compileInner defaultAction cont code loopTargets
-                let code : List (Instr γ ε) :=
-                  listSet code placeholderPc (Instr.choose (γ:=γ) (ε:=ε) 0 [(lbl.name, startPc)])
-                (code, loopTargets)
+        | (_lbl, _vt, cont) :: [] =>
+            -- Value and label-only branches both compile to a plain receive (as in Rust).
+            let code := code ++ [Instr.receive (γ:=γ) (ε:=ε) 0 1, Instr.invoke (γ:=γ) (ε:=ε) defaultAction]
+            compileInner defaultAction cont code loopTargets
         | (lbl₁, _vt₁, cont₁) :: (lbl₂, _vt₂, cont₂) :: rest =>
             let placeholderPc := code.length
             let code := code ++ [Instr.choose (γ:=γ) (ε:=ε) 0 ([] : List (String × PC))]

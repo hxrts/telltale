@@ -35,7 +35,7 @@ The following definitions form the semantic interface for proofs:
 - `WellTypedConfig`: typing judgment for configurations
 - `ConfigStep`: global step plus per-process local advancement (`ProcessAdvance`)
 - `step_preserves_typing`: subject reduction for head communication steps
-- `Claims`: bundle of safety properties
+- `Claims` (in `Semantics.SubjectReductionGeneral`): bundle of safety properties
 -/
 
 namespace Semantics.SubjectReduction
@@ -197,7 +197,7 @@ theorem mem_transBranches_inv {role : String} {label : Label}
       · obtain ⟨g1, hm, he⟩ := mem_transBranches_inv h'
         exact ⟨g1, List.mem_cons_of_mem _ hm, he⟩
 
-/-! ## Claims -/
+/-! ## Head-Step Hypotheses -/
 
 /-- Hypotheses under which the head-step subject reduction theorem is proved. -/
 structure HeadStepHyps (c : Configuration) (act : GlobalActionR) : Prop where
@@ -211,14 +211,6 @@ structure HeadStepHyps (c : Configuration) (act : GlobalActionR) : Prop where
   wf : c.globalType.wellFormed = true
   /-- The global type is blind (needed for non-participant coherence). -/
   blind : Choreography.Projection.Blind.isBlind c.globalType = true
-
-/-- Claims bundle for subject reduction. -/
-structure Claims where
-  /-- Subject reduction for head communication steps. -/
-  subject_reduction : ∀ c c' act, WellTypedConfig c → HeadStepHyps c act →
-      ConfigStep c c' act → WellTypedConfig c'
-  /-- Projected environments are always well-formed. -/
-  projEnv_wellformed : ∀ g, WellFormedEnv (projEnv g)
 
 /-! ## Type Preservation Lemmas -/
 
@@ -302,7 +294,7 @@ theorem own_cont_typed {role : String} {as : List BranchR} {bs : List (Label × 
     (hWFas : ∀ lb ∈ as, lb.2.2.WellFormed) (hrel : BranchesRel EQ2 as (transBranches bs role))
     (hm : (label, vt, cont) ∈ as) (huniq : (branchLabels bs).Nodup)
     (hg' : (label, g') ∈ bs) : cont.WellFormed ∧ EQ2 cont (trans g' role) := by
-  obtain ⟨y, hy, hl, hE⟩ := branches_rel_mem_left hrel hm
+  obtain ⟨y, hy, hl, -, hE⟩ := branches_rel_mem_left hrel hm
   obtain ⟨g0, hg0, hy2⟩ := mem_transBranches_inv (label := y.1) (vt := y.2.1) hy
   rw [← hl] at hg0
   rw [mem_branch_unique_label huniq hg0 hg'] at hy2
@@ -367,8 +359,9 @@ theorem nonparticipant_typed {c c' : Configuration} {act : GlobalActionR}
 whose global type is a communication headed by `act` steps (with each process
 advancing locally per `ProcessAdvance`) to a well-typed configuration.
 
-Async (`comm_async`) and `mu`-headed steps are not covered: there the local
-types are related to the stepped projection only up to EQ2 through unfolding. -/
+This is the head-step corollary; `step_preserves_typing_general`
+(`Semantics.SubjectReductionGeneral`) covers every `step` (including `mu` and
+`comm_async`) without the head-shape premise. -/
 theorem step_preserves_typing {c c' : Configuration} {act : GlobalActionR}
     (htyped : WellTypedConfig c) (hh : HeadStepHyps c act)
     (hstep : ConfigStep c c' act) :
@@ -395,9 +388,56 @@ theorem projEnv_wellformed (g : GlobalType) : WellFormedEnv (projEnv g) := by
   rw [proj_env_dom]
   exact GlobalType.roles_nodup _
 
-/-- Build the claims bundle from proven theorems. -/
-def claims : Claims where
-  subject_reduction := fun _ _ _ h1 h2 h3 => step_preserves_typing h1 h2 h3
-  projEnv_wellformed := projEnv_wellformed
+/-! ## Payload matching
+
+`BranchesRel` compares the `Option ValType` delegation payload of each branch,
+so `Process.wellTyped` forces the process's own branches to carry exactly the
+payloads of the projection (`none` for plain communications, `some (.chan ..)`
+for delegation). -/
+
+/-- Label/payload agreement between a well-typed process's `send` head and the
+projection's `send` head (the projection is well-formed, e.g. by
+`trans_well_formed_of_well_formed`). -/
+theorem wellTyped_payload_agree_send {p : Process} {g : GlobalType} {q : String}
+    {bs cs : List BranchR} (ht : p.wellTyped g) (hwf : (trans g p.role).WellFormed)
+    (hp : p.localType.fullUnfold = .send q bs) (hg : (trans g p.role).fullUnfold = .send q cs) :
+    List.Forall₂ (fun a b => a.1 = b.1 ∧ a.2.1 = b.2.1) bs cs := by
+  obtain ⟨as, has, hrel⟩ := eq2_full_unfold_send_inv ht.1 hwf ht.2 hg
+  rw [hp] at has
+  cases has
+  exact hrel.payload_eq
+
+/-- Label/payload agreement between a well-typed process's `recv` head and the
+projection's `recv` head. -/
+theorem wellTyped_payload_agree_recv {p : Process} {g : GlobalType} {q : String}
+    {bs cs : List BranchR} (ht : p.wellTyped g) (hwf : (trans g p.role).WellFormed)
+    (hp : p.localType.fullUnfold = .recv q bs) (hg : (trans g p.role).fullUnfold = .recv q cs) :
+    List.Forall₂ (fun a b => a.1 = b.1 ∧ a.2.1 = b.2.1) bs cs := by
+  obtain ⟨as, has, hrel⟩ := eq2_full_unfold_recv_inv ht.1 hwf ht.2 hg
+  rw [hp] at has
+  cases has
+  exact hrel.payload_eq
+
+/-- Negative example: a process whose single `send` branch carries a spurious
+`some ValType.nat` payload is not well-typed against the plain communication
+`a → b : m`, whose projection carries payload `none`. -/
+theorem payload_mismatch_not_wellTyped :
+    ¬ Process.wellTyped
+      ⟨"a", .send "b" [(⟨"m", .unit⟩, some SessionTypes.ValType.nat, .end)]⟩
+      (.comm "a" "b" [(⟨"m", .unit⟩, .end)]) := by
+  intro ht
+  have h := ht.2
+  simp only [trans_comm_sender "a" "b" "a" _ rfl, transBranches,
+    Choreography.Projection.Trans.transBranches] at h
+  have hf := EQ2.destruct h
+  simp [EQ2F, BranchesRel] at hf
+
+/-- Hence no configuration whose process list contains the mismatched process
+is well-typed. -/
+theorem payload_mismatch_not_wellTypedConfig (ps : List Process)
+    (hmem : (⟨"a", .send "b" [(⟨"m", .unit⟩, some SessionTypes.ValType.nat, .end)]⟩ : Process)
+      ∈ ps) :
+    ¬ WellTypedConfig ⟨.comm "a" "b" [(⟨"m", .unit⟩, .end)], ps⟩ :=
+  fun hc => payload_mismatch_not_wellTyped (hc.processes_typed _ hmem)
 
 end Semantics.SubjectReduction

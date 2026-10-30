@@ -50,15 +50,53 @@ open SessionCoTypes.CoinductiveRel
 /-- Relation on local types. -/
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
 
-/-- Branch-wise relation used by EQ2. -/
+/-- Branch-wise relation used by EQ2.
+
+Branches must agree on the label, on the (optional) delegation payload
+`Option ValType`, and relate the continuations by `R`. -/
 def BranchesRel (R : Rel) (bs cs : List BranchR) : Prop :=
-  List.Forall₂ (fun a b => a.1 = b.1 ∧ R a.2.2 b.2.2) bs cs
+  List.Forall₂ (fun a b => a.1 = b.1 ∧ a.2.1 = b.2.1 ∧ R a.2.2 b.2.2) bs cs
 
 private theorem branches_rel_mono {R S : Rel}
     (h : ∀ a b, R a b → S a b) :
     ∀ {bs cs}, BranchesRel R bs cs → BranchesRel S bs cs := by
   intro bs cs hrel
-  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, h _ _ hab.2⟩) hrel
+  exact List.Forall₂.imp (fun a b hab => ⟨hab.1, hab.2.1, h _ _ hab.2.2⟩) hrel
+
+/-- `BranchesRel` for the empty list. -/
+theorem BranchesRel.nil_intro {R : Rel} : BranchesRel R [] [] := List.Forall₂.nil
+
+/-- `BranchesRel` cons introduction. -/
+theorem BranchesRel.cons_intro {R : Rel} {a b : BranchR} {bs cs : List BranchR}
+    (hl : a.1 = b.1) (hp : a.2.1 = b.2.1) (hr : R a.2.2 b.2.2)
+    (h : BranchesRel R bs cs) : BranchesRel R (a :: bs) (b :: cs) :=
+  List.Forall₂.cons ⟨hl, hp, hr⟩ h
+
+/-- `BranchesRel` cons introduction for branches sharing label and payload. -/
+theorem BranchesRel.cons_intro_same {R : Rel} {l : SessionTypes.GlobalType.Label} {v : Option SessionTypes.ValType}
+    {a b : LocalTypeR} {bs cs : List BranchR}
+    (hr : R a b) (h : BranchesRel R bs cs) :
+    BranchesRel R ((l, v, a) :: bs) ((l, v, b) :: cs) :=
+  List.Forall₂.cons ⟨rfl, rfl, hr⟩ h
+
+/-- Projecting the label/payload agreement out of `BranchesRel`. -/
+theorem BranchesRel.payload_eq {R : Rel} {bs cs : List BranchR}
+    (h : BranchesRel R bs cs) :
+    List.Forall₂ (fun a b => a.1 = b.1 ∧ a.2.1 = b.2.1) bs cs :=
+  List.Forall₂.imp (fun _ _ hab => ⟨hab.1, hab.2.1⟩) h
+
+/-- Projecting the continuation relation out of `BranchesRel`. -/
+theorem BranchesRel.conts {R : Rel} {bs cs : List BranchR}
+    (h : BranchesRel R bs cs) :
+    List.Forall₂ (fun a b => R a.2.2 b.2.2) bs cs :=
+  List.Forall₂.imp (fun _ _ hab => hab.2.2) h
+
+/-- `BranchesRel` is reflexive when `R` is. -/
+theorem BranchesRel.refl {R : Rel} (hR : ∀ a, R a a) (bs : List BranchR) :
+    BranchesRel R bs bs := by
+  induction bs with
+  | nil => exact List.Forall₂.nil
+  | cons b bs ih => exact List.Forall₂.cons ⟨rfl, rfl, hR _⟩ ih
 
 /-! ## One-Step Generator -/
 
