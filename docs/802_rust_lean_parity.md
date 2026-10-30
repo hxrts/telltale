@@ -1021,3 +1021,40 @@ store transaction, not an effect occurrence, extra allocator, nonce registry or
 new authority. Source and backend boundary tests in this preparation still require
 actual harness discovery and execution, native/default/WASM configuration checks,
 strict lint and the required full final-source model/CI/release gates.
+
+
+### Host Lean child custody
+
+Lean bridge process deadlines are physical host execution bounds, outside the
+simulated protocol-machine clock. The original admitted monotonic horizon also
+covers source-fallback configuration selection and input transmission. Neither
+cleanup grace nor model ticks restart or widen that operation horizon.
+
+The bridge retains its original Unix child group, stdin writer and separate
+stdout/stderr readers until physical settlement. Source-backed runner and
+validator commands delegate through the canonical project launcher, which
+transfers its actual local writer-lock descriptor into the selected shared or
+native owner. Shared protocol-v1 custody retains that descriptor through its
+original Lake lock, budget lease and timing command. It is not reconstructed
+from a PID, an observation, or a serialized record. On timeout the bridge asks
+the original owner to cancel and waits. It never hardkills the sole shared
+cleanup owner first. The shared owner retains its own existing escalation and
+actual child-wait responsibility. Native/custom group cleanup has its separate
+existing two-second TERM grace and actual wait, without claiming custody of
+arbitrarily detached descendants.
+
+Primary I/O failures, independent cleanup causes, original child status and
+partial separate streams remain retained. SIGKILL cannot be trapped. An
+external hardkill or a lost native wait is not evidence of successful descendant
+cleanup. This host contract supplies no theorem-pack inventory, semantic
+publication, cryptographic authority or model-time transition. Positive execution
+and same-binary negative controls on the final release source remain required.
+
+Version 22 is a breaking bridge API transition: the public exhaustive
+`LeanRunnerError`, `ProtocolMachineRunnerError`, and `HeapParityRunnerError`
+variants retain cleanup causes, original child status, and partial streams.
+Downstream timeout patterns must bind those fields or use `..`. Constructing
+these variants requires the new fields. Original I/O errors remain available
+through the error source. The prelude continues to reexport the same types.
+Aura's current Quint adapter only reads `LEAN_BRIDGE_SCHEMA_VERSION` and needs
+no error-pattern migration. This API change does not manufacture Lean evidence.

@@ -3,8 +3,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output, Stdio};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use thiserror::Error;
 
 /// Errors from Lean heap parity runner operations.
@@ -21,7 +20,14 @@ pub enum HeapParityRunnerError {
     ParseError(String),
     /// The Lean process timed out.
     #[error("Lean heap parity runner '{operation}' timed out after {timeout_ms}ms")]
-    TimedOut { operation: String, timeout_ms: u64 },
+    TimedOut {
+        operation: String,
+        timeout_ms: u64,
+        cleanup: Vec<std::io::Error>,
+        child_status: Option<std::process::ExitStatus>,
+        stdout: Vec<u8>,
+        stderr: Vec<u8>,
+    },
     /// IO error while invoking the process.
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -122,39 +128,24 @@ impl HeapParityRunner {
     }
 
     fn wait_with_timeout(
-        mut child: Child,
+        child: Child,
         timeout: Duration,
         operation: &str,
     ) -> Result<Output, HeapParityRunnerError> {
-        let start = Instant::now();
-        loop {
-            match child.try_wait()? {
-                Some(_) => {
-                    return child
-                        .wait_with_output()
-                        .map_err(HeapParityRunnerError::from)
+        crate::process_custody::wait(child, timeout).map_err(|failure| {
+            if failure.timed_out {
+                HeapParityRunnerError::TimedOut {
+                    operation: operation.to_string(),
+                    timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+                    cleanup: failure.cleanup,
+                    child_status: failure.child_status,
+                    stdout: failure.stdout,
+                    stderr: failure.stderr,
                 }
-                None => {
-                    if start.elapsed() >= timeout {
-                        if let Err(err) = child.kill() {
-                            eprintln!(
-                                "best-effort child.kill failed during timeout handling: {err}"
-                            );
-                        }
-                        if let Err(err) = child.wait() {
-                            eprintln!(
-                                "best-effort child.wait failed during timeout handling: {err}"
-                            );
-                        }
-                        return Err(HeapParityRunnerError::TimedOut {
-                            operation: operation.to_string(),
-                            timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
-                        });
-                    }
-                    thread::sleep(Duration::from_millis(10));
-                }
+            } else {
+                HeapParityRunnerError::from(std::io::Error::other(failure))
             }
-        }
+        })
     }
 
     fn run_command_with_timeout(
@@ -233,7 +224,7 @@ impl HeapParityRunner {
         &self,
         fixture_path: impl AsRef<Path>,
     ) -> Result<HeapParityOutput, HeapParityRunnerError> {
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command.arg(fixture_path.as_ref());
         let output = self.run_command_with_timeout(command, "run_fixture")?;
         if !output.status.success() {

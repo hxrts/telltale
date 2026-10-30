@@ -236,6 +236,9 @@ check-fast-structure:
     fi
     bash scripts/ops/test-doc-fast-fail-contract.sh
     bash scripts/ops/test-verify-pipeline-contract.sh
+    bash scripts/ops/test-frontend-tool-setup.sh
+    bash scripts/ops/test-dependency-checkouts.sh
+    bash scripts/ops/test-lean-host-custody.sh --project-only
     bash scripts/dev/test-cargo-in-nix.sh
     just check-ci-assurance-lanes
     just check-formal-claim-scope
@@ -1138,3 +1141,24 @@ check-ui-eval-safety:
 # Generate normalized traces for bridge-level protocol machine correspondence fixtures.
 generate-test-traces:
     cargo test -p telltale-bridge --test protocol_machine_correspondence_tests -- --nocapture
+
+# Explicit optional frontend tooling; invoke only when that workflow needs it.
+setup-frontend-tools:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if ! command -v dx >/dev/null 2>&1; then
+      echo "Installing dioxus-cli..."
+      cargo install dioxus-cli
+    fi
+    version=''
+    if command -v wasm-bindgen >/dev/null 2>&1; then
+      version=$(wasm-bindgen --version) || exit "$?"
+    fi
+    if [[ "$version" != 'wasm-bindgen 0.2.117' ]]; then
+      echo "Installing wasm-bindgen-cli 0.2.117..."
+      cargo install wasm-bindgen-cli --version 0.2.117
+    fi
+
+# Compatibility entry for lean-builder's existing no-build seed owner.
+_with-lake-lock label command:
+    cd lean && python3 ../tools/run_lean_build.py --label "{{label}}" -- bash -c "{{command}}"

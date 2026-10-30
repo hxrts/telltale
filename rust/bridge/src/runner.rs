@@ -18,8 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output};
-use std::thread;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tempfile::NamedTempFile;
 use thiserror::Error;
 
@@ -61,6 +60,14 @@ pub enum LeanRunnerError {
         operation: String,
         /// Timeout in milliseconds.
         timeout_ms: u64,
+        /// Independent native cancellation/settlement causes.
+        cleanup: Vec<std::io::Error>,
+        /// Actual original-child settlement status, if obtained.
+        child_status: Option<std::process::ExitStatus>,
+        /// Original partial child stdout.
+        stdout: Vec<u8>,
+        /// Original partial child stderr.
+        stderr: Vec<u8>,
     },
 }
 
@@ -127,35 +134,54 @@ impl LeanRunner {
     }
 
     fn wait_with_timeout(
-        mut child: Child,
+        child: Child,
         timeout: Duration,
         operation: &str,
     ) -> Result<Output, LeanRunnerError> {
-        let start = Instant::now();
-        loop {
-            // bounded: exits on child completion or timeout
-            match child.try_wait()? {
-                Some(_) => return child.wait_with_output().map_err(LeanRunnerError::from),
-                None => {
-                    if start.elapsed() >= timeout {
-                        if let Err(err) = child.kill() {
-                            eprintln!(
-                                "best-effort child.kill failed during timeout handling: {err}"
-                            );
-                        }
-                        if let Err(err) = child.wait() {
-                            eprintln!(
-                                "best-effort child.wait failed during timeout handling: {err}"
-                            );
-                        }
-                        return Err(LeanRunnerError::TimedOut {
-                            operation: operation.to_string(),
-                            timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
-                        });
-                    }
-                    thread::sleep(Duration::from_millis(10));
+        crate::process_custody::wait(child, timeout).map_err(|failure| {
+            if failure.timed_out {
+                LeanRunnerError::TimedOut {
+                    operation: operation.to_string(),
+                    timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+                    cleanup: failure.cleanup,
+                    child_status: failure.child_status,
+                    stdout: failure.stdout,
+                    stderr: failure.stderr,
                 }
+            } else {
+                LeanRunnerError::from(std::io::Error::other(failure))
             }
+        })
+    }
+
+    fn wait_with_input(
+        child: Child,
+        timeout: Duration,
+        operation: &str,
+        input: Vec<u8>,
+        shared: bool,
+        started: std::time::Instant,
+    ) -> Result<Output, LeanRunnerError> {
+        crate::process_custody::wait_input_since(child, timeout, shared, input, started)
+            .map_err(|failure| Self::custody_error(failure, timeout, operation))
+    }
+
+    fn custody_error(
+        failure: crate::process_custody::Failure,
+        timeout: Duration,
+        operation: &str,
+    ) -> LeanRunnerError {
+        if failure.timed_out {
+            LeanRunnerError::TimedOut {
+                operation: operation.to_string(),
+                timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+                cleanup: failure.cleanup,
+                child_status: failure.child_status,
+                stdout: failure.stdout,
+                stderr: failure.stderr,
+            }
+        } else {
+            LeanRunnerError::from(std::io::Error::other(failure))
         }
     }
 
@@ -164,6 +190,11 @@ impl LeanRunner {
         mut command: Command,
         operation: &str,
     ) -> Result<Output, LeanRunnerError> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
         let child = command.spawn()?;
         Self::wait_with_timeout(child, Self::process_timeout(), operation)
     }
@@ -315,7 +346,7 @@ impl LeanRunner {
         )?;
 
         // Invoke Lean runner
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--choreography")
             .arg(choreo_file.path())
@@ -403,7 +434,6 @@ impl LeanRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
     use std::time::Duration;
 
     #[test]
@@ -430,7 +460,7 @@ mod tests {
     }
 
     fn successful_output() -> std::process::Output {
-        Command::new("sh")
+        crate::process_custody::command("sh")
             .arg("-c")
             .arg("true")
             .output()
@@ -491,7 +521,7 @@ mod tests {
 
     #[test]
     fn test_wait_with_timeout_returns_timeout_error() {
-        let child = Command::new("sh")
+        let child = crate::process_custody::command("sh")
             .arg("-c")
             .arg("sleep 1")
             .spawn()

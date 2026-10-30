@@ -73,6 +73,7 @@ cfg_if! {
         pub(crate) mod projection_payload;
         pub mod equivalence;
         pub mod protocol_machine_runner;
+        pub(crate) mod process_custody;
         pub mod nominal_image;
         pub mod runner;
         pub mod sim_reference;

@@ -962,7 +962,7 @@ dependencies = [
 
 [[package]]
 name = "telltale"
-version = "21.0.0"
+version = "22.0.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -993,7 +993,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-language"
-version = "21.0.0"
+version = "22.0.0"
 dependencies = [
  "pest",
  "pest_derive",
@@ -1010,7 +1010,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-machine"
-version = "21.0.0"
+version = "22.0.0"
 dependencies = [
  "bincode",
  "cfg-if",
@@ -1027,7 +1027,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-macros"
-version = "21.0.0"
+version = "22.0.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1037,7 +1037,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-theory"
-version = "21.0.0"
+version = "22.0.0"
 dependencies = [
  "telltale-types",
  "thiserror",
@@ -1045,7 +1045,7 @@ dependencies = [
 
 [[package]]
 name = "telltale-types"
-version = "21.0.0"
+version = "22.0.0"
 dependencies = [
  "blake3",
  "fixed",

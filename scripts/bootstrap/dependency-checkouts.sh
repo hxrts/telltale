@@ -45,7 +45,7 @@ ensure_mathlib_cache() {
 
   echo "sync mathlib4 cache: fetching prebuilt oleans with \`lake exe cache get\`"
   if ! (cd "${checkout}" && lake exe cache get); then
-    echo "error: failed to fetch prebuilt mathlib4 cache; run \`cd /Users/hxrts/projects/lean_common/mathlib4 && lake exe cache get\` after resolving the local issue" >&2
+    echo "error: failed to fetch prebuilt mathlib4 cache; run \`cd ${checkout} && lake exe cache get\` after resolving the local issue" >&2
     exit 1
   fi
 
@@ -130,7 +130,7 @@ for i in $(seq 0 $(( dep_count - 1 ))); do
     exit 1
   }
 
-  checkout="${path}"
+  checkout="${ROOT_DIR}/${path}"
   mkdir -p "$(dirname "${checkout}")"
 
   if [[ -d "${checkout}/.git" ]]; then

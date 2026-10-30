@@ -73,6 +73,11 @@ Cargo-home plugins from changing that selection. The older manifest MSRV is
 a separate compatibility claim; current-toolchain validation does not prove
 it. Lean retains its independent `lean-toolchain` pin.
 
+Nix selects released Toolkitv0.4.4. Hosted Toolkit checkouts bind that same
+release's exact commit `e45cfaeb47a6292c11d790e9957acd4d84843a9a`;
+local sibling overrides remain explicit development configuration. The stable
+compiler and Toolkit's compiler-private nightly are separate validation lanes.
+
 ### Shared local Rust compiler cache
 
 The Nix shell exposes sccache with Aura's existing local store
@@ -87,5 +92,16 @@ excluded tooling manifests. Acceptance runs set `CARGO_INCREMENTAL=0`
 explicitly. `CARGO_INCREMENTAL=1` is the edit/test opt-in. It bypasses the
 selected sccache wrapper for that invocation and preserves unrelated caller
 wrappers. Incremental and linker-invoking Rust units are not cache hits.
+The generated Cargo driver and shell bind Toolkit’s immutable selected-tool
+dispatcher. Its reserved `CARGO_TOOLKIT_APPLE_DEPLOYMENT_V1` cache-key input is
+recomputed for the selected sccache0.11/Rust1.99.1 path; deployment variables and
+compiler flags remain unchanged. Foreign wrappers retain their own policy.
 Matching compiler versions or directories alone do not prove cross-repository
 reuse. Measure actual matching-unit hits separately.
+
+Optional frontend tools are installed explicitly after entering the development
+shell: run `just setup-frontend-tools` when a workflow needs `dx` or
+`wasm-bindgen`. The recipe installs missing `dioxus-cli` and selects exactly
+`wasm-bindgen-cli` 0.2.117 when the tool is absent or differs. Install/query failures
+retain their native status and diagnostics. Shell entry never runs this recipe;
+its compilation, network and storage costs belong to the requested setup work.

@@ -8,7 +8,7 @@
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
     toolkit = {
-      url = "github:hxrts/toolkit?ref=v0.4.2";
+      url = "github:hxrts/toolkit?ref=v0.4.4";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.rust-overlay.follows = "rust-overlay";
       inputs.rust-nixpkgs.follows = "rust-nixpkgs";
@@ -53,6 +53,7 @@
 
         # Match Aura's cache executable as well as its compiler input.
         sharedSccache = compilerPkgs.sccache;
+        selectedCargoDispatch = toolkit.packages.${system}.toolkit-cargo-dispatch;
 
         # Cargo searches Cargo-home plugins before PATH. Keep Clippy and fmt on the
         # same exact stable compiler as ordinary builds.
@@ -61,6 +62,7 @@
           export RUSTC="${rustToolchain}/bin/rustc"
           export RUSTDOC="${rustToolchain}/bin/rustdoc"
           export CARGO="${rustToolchain}/bin/cargo"
+          export TOOLKIT_CARGO_DISPATCH_BIN="${selectedCargoDispatch}/bin/toolkit-cargo-dispatch"
           export TELLTALE_NIX_CARGO_BIN="${rustToolchain}/bin/cargo"
           export TELLTALE_NIX_CLIPPY_BIN="${rustToolchain}/bin/cargo-clippy"
           export TELLTALE_NIX_FMT_BIN="${rustToolchain}/bin/cargo-fmt"
@@ -152,6 +154,7 @@
 
           shellHook = ''
             ${toolkitSupport.shellHook}
+            export TOOLKIT_CARGO_DISPATCH_BIN="${selectedCargoDispatch}/bin/toolkit-cargo-dispatch"
             # Match Aura's one local 10G store; targets remain checkout-local.
             # Shell entry exposes tooling but never starts a cache server/build.
             # Nonincremental by default; CARGO_INCREMENTAL=1 is the explicit
@@ -181,15 +184,8 @@
             fi
             [[ -r "$HOME/.local/state/secrets/cargo-registry-token" ]] && export CARGO_REGISTRY_TOKEN="$(cat "$HOME/.local/state/secrets/cargo-registry-token")"
 
-            # Install cargo-based dev tools if missing or outdated
-            if ! command -v dx >/dev/null 2>&1; then
-              echo "Installing dioxus-cli..."
-              cargo install dioxus-cli 2>/dev/null
-            fi
-            if ! command -v wasm-bindgen >/dev/null 2>&1 || ! wasm-bindgen --version 2>/dev/null | grep -q "0.2.117"; then
-              echo "Installing wasm-bindgen-cli 0.2.117..."
-              cargo install wasm-bindgen-cli --version 0.2.117 2>/dev/null
-            fi
+            # Optional frontend tools are installed explicitly, never on entry.
+            # Run `just setup-frontend-tools` when the selected workflow needs them.
 
             echo "Telltale development environment"
             echo "Rust: $(rustc --version)"

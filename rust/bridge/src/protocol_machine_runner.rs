@@ -3,10 +3,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::BTreeMap;
-use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
-use std::thread;
+use std::process::{Child, Output, Stdio};
 use std::time::{Duration, Instant};
 use thiserror::Error;
 
@@ -61,6 +59,14 @@ pub enum ProtocolMachineRunnerError {
         operation: String,
         /// Timeout in milliseconds.
         timeout_ms: u64,
+        /// Independent native cancellation/settlement causes.
+        cleanup: Vec<std::io::Error>,
+        /// Actual original-child settlement status, if obtained.
+        child_status: Option<std::process::ExitStatus>,
+        /// Original partial child stdout.
+        stdout: Vec<u8>,
+        /// Original partial child stderr.
+        stderr: Vec<u8>,
     },
 }
 
@@ -260,6 +266,7 @@ pub struct ReconfigurationValidationResult {
 /// Runner for invoking the Lean protocol-machine runner binary.
 pub struct ProtocolMachineRunner {
     binary_path: PathBuf,
+    shared_wrapper: bool,
 }
 
 impl ProtocolMachineRunner {
@@ -284,69 +291,73 @@ impl ProtocolMachineRunner {
         Duration::from_millis(ms.max(1))
     }
 
+    #[cfg(test)]
     fn wait_with_timeout(
-        mut child: Child,
+        child: Child,
         timeout: Duration,
         operation: &str,
     ) -> Result<Output, ProtocolMachineRunnerError> {
-        let stdout_handle = child.stdout.take().map(|mut stdout| {
-            thread::spawn(move || {
-                let mut buf = Vec::new();
-                let _ = stdout.read_to_end(&mut buf);
-                buf
-            })
-        });
-        let stderr_handle = child.stderr.take().map(|mut stderr| {
-            thread::spawn(move || {
-                let mut buf = Vec::new();
-                let _ = stderr.read_to_end(&mut buf);
-                buf
-            })
-        });
-        let start = Instant::now();
-        loop {
-            // bounded: exits on child completion or timeout
-            match child.try_wait()? {
-                Some(status) => {
-                    let stdout = stdout_handle
-                        .map(|handle| handle.join().unwrap_or_default())
-                        .unwrap_or_default();
-                    let stderr = stderr_handle
-                        .map(|handle| handle.join().unwrap_or_default())
-                        .unwrap_or_default();
-                    return Ok(Output {
-                        status,
-                        stdout,
-                        stderr,
-                    });
+        crate::process_custody::wait(child, timeout).map_err(|failure| {
+            if failure.timed_out {
+                ProtocolMachineRunnerError::TimedOut {
+                    operation: operation.to_string(),
+                    timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+                    cleanup: failure.cleanup,
+                    child_status: failure.child_status,
+                    stdout: failure.stdout,
+                    stderr: failure.stderr,
                 }
-                None => {
-                    if start.elapsed() >= timeout {
-                        if let Err(err) = child.kill() {
-                            eprintln!(
-                                "best-effort child.kill failed during timeout handling: {err}"
-                            );
-                        }
-                        if let Err(err) = child.wait() {
-                            eprintln!(
-                                "best-effort child.wait failed during timeout handling: {err}"
-                            );
-                        }
-                        if let Some(handle) = stdout_handle {
-                            let _ = handle.join();
-                        }
-                        if let Some(handle) = stderr_handle {
-                            let _ = handle.join();
-                        }
-                        return Err(ProtocolMachineRunnerError::TimedOut {
-                            operation: operation.to_string(),
-                            timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
-                        });
-                    }
-                    thread::sleep(Duration::from_millis(10));
-                }
+            } else {
+                ProtocolMachineRunnerError::from(std::io::Error::other(failure))
             }
+        })
+    }
+
+    fn custody_error(
+        failure: crate::process_custody::Failure,
+        timeout: Duration,
+        operation: &str,
+    ) -> ProtocolMachineRunnerError {
+        if failure.timed_out {
+            ProtocolMachineRunnerError::TimedOut {
+                operation: operation.to_string(),
+                timeout_ms: u64::try_from(timeout.as_millis()).unwrap_or(u64::MAX),
+                cleanup: failure.cleanup,
+                child_status: failure.child_status,
+                stdout: failure.stdout,
+                stderr: failure.stderr,
+            }
+        } else {
+            ProtocolMachineRunnerError::from(std::io::Error::other(failure))
         }
+    }
+
+    fn spawn_admitted(
+        invocation: &mut std::process::Command,
+        started: Instant,
+        timeout: Duration,
+        operation: &str,
+    ) -> Result<Child, ProtocolMachineRunnerError> {
+        crate::process_custody::ensure_admission(started, timeout)
+            .map_err(|failure| Self::custody_error(failure, timeout, operation))?;
+        invocation
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(ProtocolMachineRunnerError::TempFileError)
+    }
+
+    fn wait_with_input(
+        child: Child,
+        timeout: Duration,
+        operation: &str,
+        shared: bool,
+        input: Vec<u8>,
+        started: Instant,
+    ) -> Result<Output, ProtocolMachineRunnerError> {
+        crate::process_custody::wait_input_since(child, timeout, shared, input, started)
+            .map_err(|failure| Self::custody_error(failure, timeout, operation))
     }
 
     fn find_workspace_root() -> Option<PathBuf> {
@@ -363,15 +374,15 @@ impl ProtocolMachineRunner {
         None
     }
 
-    fn get_binary_path() -> Option<PathBuf> {
+    fn get_binary_path() -> Option<(PathBuf, bool)> {
         Self::find_workspace_root().and_then(|root| {
             let native = root.join(Self::DEFAULT_BINARY_PATH);
             if native.is_file() {
-                return Some(native);
+                return Some((native, false));
             }
             let fallback = root.join(Self::FALLBACK_SCRIPT_PATH);
             if fallback.is_file() {
-                return Some(fallback);
+                return Some((fallback, true));
             }
             None
         })
@@ -384,15 +395,15 @@ impl ProtocolMachineRunner {
         )
     }
 
-    fn get_validator_path() -> Option<PathBuf> {
+    fn get_validator_path() -> Option<(PathBuf, bool)> {
         Self::find_workspace_root().and_then(|root| {
             let native = root.join(Self::VALIDATOR_BINARY_PATH);
             if native.is_file() {
-                return Some(native);
+                return Some((native, false));
             }
             let fallback = root.join(Self::VALIDATOR_FALLBACK_SCRIPT_PATH);
             if fallback.is_file() {
-                return Some(fallback);
+                return Some((fallback, true));
             }
             None
         })
@@ -405,7 +416,10 @@ impl ProtocolMachineRunner {
     /// Returns [`ProtocolMachineRunnerError::BinaryNotFound`] if the binary doesn't exist.
     pub fn new() -> Result<Self, ProtocolMachineRunnerError> {
         match Self::get_binary_path() {
-            Some(path) => Ok(Self { binary_path: path }),
+            Some((path, shared_wrapper)) => Ok(Self {
+                binary_path: path,
+                shared_wrapper,
+            }),
             None => Err(ProtocolMachineRunnerError::BinaryNotFound(PathBuf::from(
                 Self::DEFAULT_BINARY_PATH,
             ))),
@@ -422,7 +436,23 @@ impl ProtocolMachineRunner {
         if !binary_path.exists() || !binary_path.is_file() {
             return Err(ProtocolMachineRunnerError::BinaryNotFound(binary_path));
         }
-        Ok(Self { binary_path })
+        let canonical = binary_path.canonicalize()?;
+        let shared_wrapper = Self::find_workspace_root().is_some_and(|root| {
+            [
+                Self::FALLBACK_SCRIPT_PATH,
+                Self::VALIDATOR_FALLBACK_SCRIPT_PATH,
+            ]
+            .iter()
+            .any(|relative| {
+                root.join(relative)
+                    .canonicalize()
+                    .is_ok_and(|path| path == canonical)
+            })
+        });
+        Ok(Self {
+            binary_path,
+            shared_wrapper,
+        })
     }
 
     /// Try to create a runner, returning None if the binary is unavailable.
@@ -485,18 +515,20 @@ impl ProtocolMachineRunner {
         let payload = serde_json::to_vec(input)
             .map_err(|e| ProtocolMachineRunnerError::ParseError(e.to_string()))?;
 
-        let mut cmd = Command::new(&self.binary_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(ProtocolMachineRunnerError::TempFileError)?;
+        let started = Instant::now();
+        let timeout = Self::process_timeout();
+        let mut invocation = crate::process_custody::command(&self.binary_path);
+        let shared_wrapper = crate::process_custody::select_custody(
+            &mut invocation,
+            &self.binary_path,
+            self.shared_wrapper,
+            started,
+            timeout,
+        )
+        .map_err(|failure| Self::custody_error(failure, timeout, "run"))?;
+        let cmd = Self::spawn_admitted(&mut invocation, started, timeout, "run")?;
 
-        if let Some(mut stdin) = cmd.stdin.take() {
-            stdin.write_all(&payload)?;
-        }
-
-        let output = Self::wait_with_timeout(cmd, Self::process_timeout(), "run")?;
+        let output = Self::wait_with_input(cmd, timeout, "run", shared_wrapper, payload, started)?;
 
         if !output.status.success() {
             return Err(ProtocolMachineRunnerError::ProcessFailed {
@@ -539,24 +571,28 @@ impl ProtocolMachineRunner {
         });
         let bytes = serde_json::to_vec(&input).map_err(ProtocolMachineRunnerError::WireEncoding)?;
 
-        let operation_binary = if Self::uses_validator(operation) {
-            Self::get_validator_path().unwrap_or_else(|| self.binary_path.clone())
+        let (operation_binary, shared_wrapper) = if Self::uses_validator(operation) {
+            Self::get_validator_path()
+                .unwrap_or_else(|| (self.binary_path.clone(), self.shared_wrapper))
         } else {
-            self.binary_path.clone()
+            (self.binary_path.clone(), self.shared_wrapper)
         };
 
-        let mut cmd = Command::new(&operation_binary)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .spawn()
-            .map_err(ProtocolMachineRunnerError::TempFileError)?;
+        let started = Instant::now();
+        let timeout = Self::process_timeout();
+        let mut invocation = crate::process_custody::command(&operation_binary);
+        let shared_wrapper = crate::process_custody::select_custody(
+            &mut invocation,
+            &operation_binary,
+            shared_wrapper,
+            started,
+            timeout,
+        )
+        .map_err(|failure| Self::custody_error(failure, timeout, operation))?;
+        let cmd = Self::spawn_admitted(&mut invocation, started, timeout, operation)?;
 
-        if let Some(mut stdin) = cmd.stdin.take() {
-            stdin.write_all(&bytes)?;
-        }
-
-        let output = Self::wait_with_timeout(cmd, Self::process_timeout(), operation)?;
+        let output =
+            Self::wait_with_input(cmd, timeout, operation, shared_wrapper, bytes, started)?;
         if !output.status.success() {
             return Err(ProtocolMachineRunnerError::ProcessFailed {
                 code: output.status.code().unwrap_or(-1),
@@ -866,7 +902,6 @@ pub fn output_to_json(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::process::Command;
     use std::time::Duration;
 
     fn trace_event(kind: &str, tick: u64, session: Option<u64>) -> ProtocolMachineTraceEvent {
@@ -891,6 +926,68 @@ mod tests {
             passed: None,
             reason: None,
         }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn admitted_native_command_preserves_native_status_and_output() {
+        let started = Instant::now();
+        let timeout = Duration::from_secs(5);
+        let mut command = crate::process_custody::command("/bin/sh");
+        command.args(["-c", "printf admitted; exit 41"]);
+        let child =
+            ProtocolMachineRunner::spawn_admitted(&mut command, started, timeout, "native-control")
+                .unwrap();
+        let output = ProtocolMachineRunner::wait_with_input(
+            child,
+            timeout,
+            "native-control",
+            false,
+            Vec::new(),
+            started,
+        )
+        .unwrap();
+        assert_eq!(output.status.code(), Some(41));
+        assert_eq!(output.stdout, b"admitted");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn expired_original_horizon_refuses_native_spawn_without_execution() {
+        let directory = tempfile::tempdir().unwrap();
+        let marker = directory.path().join("must-not-exist");
+        let mut command = crate::process_custody::command("/bin/sh");
+        command
+            .args(["-c", "printf forbidden > \"$1\"", "fixture"])
+            .arg(&marker);
+        let error = ProtocolMachineRunner::spawn_admitted(
+            &mut command,
+            Instant::now(),
+            Duration::ZERO,
+            "expired-control",
+        )
+        .unwrap_err();
+        match error {
+            ProtocolMachineRunnerError::TimedOut {
+                operation,
+                timeout_ms,
+                cleanup,
+                child_status,
+                stdout,
+                stderr,
+            } => {
+                assert_eq!(operation, "expired-control");
+                assert_eq!(timeout_ms, 0);
+                assert!(cleanup.is_empty());
+                assert!(
+                    child_status.is_none(),
+                    "no child admitted; this is not a cleanup acknowledgment"
+                );
+                assert!(stdout.is_empty() && stderr.is_empty());
+            }
+            other => panic!("expected exact expired admission TimedOut, got {other:?}"),
+        }
+        assert!(!marker.exists(), "expired command must not execute");
     }
 
     #[test]
@@ -1035,7 +1132,7 @@ mod tests {
 
     #[test]
     fn wait_with_timeout_returns_timeout_error() {
-        let child = Command::new("sh")
+        let child = crate::process_custody::command("sh")
             .arg("-c")
             .arg("sleep 1")
             .spawn()

@@ -21,7 +21,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hxrts/toolkit
-          ref: v0.2.0
+          ref: e45cfaeb47a6292c11d790e9957acd4d84843a9a # v0.4.4
           path: .toolkit
       - name: Link toolkit sibling checkout
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"
@@ -82,7 +82,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: hxrts/toolkit
-          ref: v0.2.0
+          ref: e45cfaeb47a6292c11d790e9957acd4d84843a9a # v0.4.4
           path: .toolkit
       - name: Link toolkit sibling checkout
         run: ln -sfn "$GITHUB_WORKSPACE/.toolkit" "$GITHUB_WORKSPACE/../toolkit"

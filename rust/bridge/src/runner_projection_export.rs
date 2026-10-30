@@ -12,15 +12,15 @@ impl LeanRunner {
         "scripts/lean/protocol-machine-runner.sh";
 
     /// Get the full path to the protocol-machine runner binary.
-    fn get_protocol_machine_runner_path() -> Option<PathBuf> {
+    fn get_protocol_machine_runner_path() -> Option<(PathBuf, bool)> {
         Self::find_workspace_root().and_then(|root| {
             let native = root.join(Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH);
             if native.is_file() {
-                return Some(native);
+                return Some((native, false));
             }
             let fallback = root.join(Self::PROTOCOL_MACHINE_RUNNER_FALLBACK_PATH);
             if fallback.is_file() {
-                return Some(fallback);
+                return Some((fallback, true));
             }
             None
         })
@@ -58,7 +58,7 @@ impl LeanRunner {
         let output_file = NamedTempFile::new()?;
         let output_path = output_file.path().to_path_buf();
 
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--export-all-projections")
             .arg(input_file.path())
@@ -127,7 +127,7 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--check-async-subtype")
             .arg(subtype_file.path())
@@ -181,7 +181,7 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--check-orphan-free")
             .arg(local_file.path())
@@ -235,7 +235,7 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--check-regular-practical-fragment")
             .arg(local_file.path())
@@ -310,11 +310,12 @@ impl LeanRunner {
         concurrency: usize,
         max_steps: usize,
     ) -> Result<Value, LeanRunnerError> {
-        let runner_path = Self::get_protocol_machine_runner_path().ok_or_else(|| {
-            LeanRunnerError::BinaryNotFound(PathBuf::from(
-                Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH,
-            ))
-        })?;
+        let (runner_path, fallback) =
+            Self::get_protocol_machine_runner_path().ok_or_else(|| {
+                LeanRunnerError::BinaryNotFound(PathBuf::from(
+                    Self::PROTOCOL_MACHINE_RUNNER_BINARY_PATH,
+                ))
+            })?;
 
         let input = serde_json::json!({
             "schema_version": crate::schema::canonical_schema_version(),
@@ -325,20 +326,32 @@ impl LeanRunner {
         let input_str = serde_json::to_string(&input)
             .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?;
 
-        let mut child = Command::new(&runner_path)
+        let started = crate::process_custody::begin_physical_horizon();
+        let timeout = Self::process_timeout();
+        let mut invocation = crate::process_custody::command(&runner_path);
+        let shared = crate::process_custody::select_custody(
+            &mut invocation,
+            &runner_path,
+            fallback,
+            started,
+            timeout,
+        )
+        .map_err(|failure| Self::custody_error(failure, timeout, "run_protocol_machine"))?;
+        crate::process_custody::ensure_admission(started, timeout)
+            .map_err(|failure| Self::custody_error(failure, timeout, "run_protocol_machine"))?;
+        let child = invocation
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped())
             .spawn()?;
-
-        if let Some(mut stdin) = child.stdin.take() {
-            stdin
-                .write_all(input_str.as_bytes())
-                .map_err(LeanRunnerError::TempFileError)?;
-        }
-
-        let output =
-            Self::wait_with_timeout(child, Self::process_timeout(), "run_protocol_machine")?;
+        let output = Self::wait_with_input(
+            child,
+            timeout,
+            "run_protocol_machine",
+            input_str.into_bytes(),
+            shared,
+            started,
+        )?;
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
 
@@ -372,7 +385,7 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--export-projection")
             .arg(input_file.path())
@@ -410,7 +423,7 @@ impl LeanRunner {
                 .map_err(|e| LeanRunnerError::ParseError(e.to_string()))?,
         )?;
 
-        let mut command = Command::new(&self.binary_path);
+        let mut command = crate::process_custody::command(&self.binary_path);
         command
             .arg("--export-all-projections")
             .arg(input_file.path())

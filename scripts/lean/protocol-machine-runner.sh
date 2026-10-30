@@ -11,4 +11,4 @@ export TMP="${STRICT_TMPDIR}"
 export TEMP="${STRICT_TMPDIR}"
 
 cd "${LEAN_DIR}"
-exec lake env lean --run Runtime/Tests/ProtocolMachineRunner.lean "$@"
+exec python3 "$ROOT_DIR/tools/run_lean_build.py" --label "bridge protocol-machine runner" -- lake env lean --run Runtime/Tests/ProtocolMachineRunner.lean "$@"
