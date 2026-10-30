@@ -81,7 +81,7 @@ compiler and Toolkit's compiler-private nightly are separate validation lanes.
 ### Shared local Rust compiler cache
 
 The Nix shell exposes sccache with Aura's existing local store
-(`~/.cache/aura-sccache`) and one shared 10G budget. Explicit `SCCACHE_DIR` and
+(`~/.cache/aura-sccache`) and one shared 10G budget. Nonempty explicit `SCCACHE_DIR` and
 `SCCACHE_CACHE_SIZE` settings are preserved. Each checkout retains its own Cargo
 target. Shell entry performs no compilation or cache-server startup.
 `TELLTALE_NO_SCCACHE=1` opts out at shell entry or per Cargo invocation.
@@ -97,7 +97,10 @@ dispatcher. Its reserved `CARGO_TOOLKIT_APPLE_DEPLOYMENT_V1` cache-key input is
 recomputed for the selected sccache0.11/Rust1.99.1 path; deployment variables and
 compiler flags remain unchanged. Foreign wrappers retain their own policy.
 Matching compiler versions or directories alone do not prove cross-repository
-reuse. Measure actual matching-unit hits separately.
+reuse. Measure actual matching-unit hits separately. Missing selected helper/tool
+bindings refuse rather than searching PATH or a sibling checkout; native command
+status and diagnostics remain intact. This local compiler cache does not enable
+automatic dependency-tree restoration or Air consumption.
 
 Optional frontend tools are installed explicitly after entering the development
 shell: run `just setup-frontend-tools` when a workflow needs `dx` or
