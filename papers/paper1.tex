@@ -213,7 +213,7 @@
 
 \subsection{Background}
 
-Multiparty session types guarantee that distributed protocols execute without communication errors.
+Multiparty session types provide conditions under which distributed protocols execute without communication errors.
 The central technical challenge is preservation: showing that each protocol step maintains
 well-typedness. Binary session types use duality to ensure two-party compatibility. MPST generalizes
 this property by establishing global coherence and projectability conditions.
@@ -222,6 +222,15 @@ To address preservation, the MPST field has developed projection techniques that
 choreography to local session types. A global type specifies the full protocol, then projection
 extracts the local view for each participant. Safety means that local executions remain consistent
 with their projected types.
+
+The global--local correspondence has been a central problem since the original asynchronous
+MPST formulation (Honda et al., 2008). In the global-to-local direction, projection must yield
+participant behaviors that implement the global protocol. In the local-to-global direction,
+one asks when participant behaviors admit a compatible global description. These directions
+already have substantive solutions under specified hypotheses. In particular, Deni\'{e}lou and
+Yoshida (2013) characterize a class of communicating automata and synthesize global session types
+from compatible local machines. The question here concerns preserving operational compatibility
+as asynchronous local states and buffered messages evolve.
 
 Traditionally, MPST coherence and projectability conditions are formulated at the global-type level (Honda,
 Yoshida, and Carbone, 2008; Honda et al., 2016; Castagna et al., 2012), with later work
@@ -235,23 +244,24 @@ mechanized developments continue to refine proof organization and robustness (Ti
 Prior MPST literature formulates coherence at the global-type level through projectability and
 well-formedness conditions. This paper refines coherence at the operational level by using
 $\Coherent(G,D)$ over local environments and buffered traces. Our operational formulation makes
-preservation local and compositional and removes the long-standing per-step global re-derivation
-bottleneck. We confirm this result via Lean 4 mechanization.
+preservation local and compositional within the stated typed transition system, avoiding
+per-step global re-derivation in these proofs. We confirm this result via Lean 4 mechanization.
 Terminology note: throughout this paper, ``coherence'' denotes the operational predicate
 $\Coherent(G,D)$, not the classical global-type projectability notion. Section~2 positions this
 usage explicitly relative to prior MPST coherence traditions.
 
 \subsection{Contribution}
 
-Projection defines a quotient, it erases global structure while preserving safety-relevant information.
-The question is: what exact invariant survives this erasure? We isolate an operational form of
+Projection erases global structure while retaining local communication obligations.
+The question is which operational invariant supports preservation after this erasure. We isolate an operational form of
 coherence, $\Coherent(G,D)$, as the invariant required by our preservation proofs.
 Binary session types use duality for two-party compatibility. This formulation instantiates n-ary
 compatibility as receiver-buffer alignment at each active edge (Carbone et al., 2015).
 
-$\Coherent(G,D)$ captures exactly what projection preserves for this proof architecture. It is
-neither too strong nor too weak, and this exactness enables compositionality. Local proofs on individual
-edges combine to yield global preservation. No global re-derivation is required.
+$\Coherent(G,D)$ supplies the compatibility invariant for this proof architecture. Together with
+typing and receiver-readiness premises, local proofs on individual edges combine to yield global
+preservation. Here local-to-global reasoning means assembling edge obligations into an invariant
+of the whole configuration. It does not mean synthesizing a global type from arbitrary local types.
 
 The core contribution is one operational kernel with two theorem-level lifts: typed-step preservation
 and subtype replacement. The shared kernel is edge-local checking with active-edge lifting.
@@ -1102,6 +1112,7 @@ The resulting kernel is small, compositional, and extensible. It supports subtyp
 	\item Cover, T. M., and Thomas, J. A. (2006). Elements of Information Theory (2nd ed.). Wiley.
 	\item Deni\'{e}lou, P.-M., and Yoshida, N. (2012). Multiparty Session Types Meet Communicating Automata. ESOP 2012.
 	\item Gay, S. J., and Hole, M. (2005). Subtyping for Session Types in the Pi Calculus. Acta Informatica, 42(2--3), 191--225.
+	\item Deni\'{e}lou, P.-M., and Yoshida, N. (2013). Multiparty Compatibility in Communicating Automata: Characterisation and Synthesis of Global Session Types. ICALP 2013.
 	\item Girard, J.-Y. (1987). Linear Logic. Theoretical Computer Science, 50(1), 1--101.
 	\item Hinrichsen, J., et al. (2020). Actris: Session-type based reasoning in separation logic. POPL 2020.
 	\item Hoare, C. A. R. (1985). Communicating Sequential Processes. Prentice Hall.
@@ -1120,7 +1131,7 @@ The resulting kernel is small, compositional, and extensible. It supports subtyp
 	\item Reynolds, J. C. (2002). Separation Logic: A Logic for Shared Mutable Data Structures. LICS 2002.
 	\item Scalas, A., and Yoshida, N. (2018). Multiparty Session Types, Beyond Duality. Journal of Logical and Algebraic Methods in Programming, 97, 55--84.
 	\item Shannon, C. E. (1948). A Mathematical Theory of Communication. Bell System Technical Journal, 27(3), 379--423 and 27(4), 623--656.
-	\item Tirore, L., Bengtson, J., and Carbone, M. (2025). Mechanized MPST metatheory with subject-reduction robustness analysis. ECOOP 2025.
+	\item Tirore, D., Bengtson, J., and Carbone, M. (2025). Multiparty Asynchronous Session Types: A Mechanised Proof of Subject Reduction. ECOOP 2025, 31:1--31:30.
 	\item Toninho, B., and Yoshida, N. (2017). Certifying Data in Multiparty Session Types. Journal of Logical and Algebraic Methods in Programming, 90, 61--83.
 	\item Wadler, P. (2012). Propositions as Sessions. ICFP 2012.
 \end{citelist}

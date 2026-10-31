@@ -238,9 +238,19 @@
 
 \subsection{Background}
 
-Delegation and topology change are a primary failure point in MPST developments (Honda et al., 2008,
-and Tirore et al., 2025). Many systems exclude these operations, or admit them operationally without
-a theorem that connects choreography-level and local-level evolution.
+The global--local correspondence has been a central problem since the original asynchronous
+MPST formulation (Honda et al., 2008). In the global-to-local direction, projection must yield
+participant behaviors that implement the global protocol. In the local-to-global direction,
+one asks when participant behaviors admit a compatible global description. These directions
+already have substantive solutions under specified hypotheses. In particular, Deni\'{e}lou and
+Yoshida (2013) characterize a class of communicating automata and synthesize global session types
+from compatible local machines. The question here concerns preserving operational compatibility
+as asynchronous local states and buffered messages evolve.
+
+Linking and delegation make this correspondence a question about changing configurations.
+A component may join a running protocol, or an endpoint may change owners while messages remain
+buffered. Correctness then requires an account of how the global transformation relates to the
+corresponding local transformation, alongside preservation of compatibility.
 
 In classical MPST, coherence primarily names global-type coherence and projectability
 conditions, with later refinements of projection criteria (Honda et al., 2008; Honda et al., 2016;
@@ -257,7 +267,7 @@ text use companion-series dependencies.
 
 \subsection{Contribution}
 
-This paper addresses the reconfiguration gap with a commutation theorem, in the broader process-semantic tradition of operational correspondence and mobility (Hoare, 1985; Plotkin, 1981; Milner et al., 1992; Milner, 1999).
+This paper studies the global--local correspondence under reconfiguration through a commutation theorem, in the broader process-semantic tradition of operational correspondence and mobility (Hoare, 1985; Plotkin, 1981; Milner et al., 1992; Milner, 1999).
 
 The central statement is Harmony under reconfiguration:
 \begin{equation}
@@ -271,6 +281,11 @@ establishes erasure characterization of Coherence, safe delegation consequences,
 over admissible invariants. It then proves composed-system conservation, exact envelope
 characterization, exchange-normalized determinism with spatial monotonicity, and observational adequacy
 with VM adherence.
+The projected-view characterization concerns compatible active-edge witnesses, not an algorithm
+that reconstructs a global protocol from arbitrary local descriptions. Concrete linking and delegation
+preservation are mechanized. The full reconfiguration square requires a supplied local-obligation
+bridge, and the joint-realizability characterization remains a paper-level argument, as detailed
+in the corresponding sections.
 The theorem order in this manuscript is dependency-driven rather than alphabetical.
 
 The determinism-envelope layer follows a standard refinement-bound idea. One defines an admissible
@@ -2053,26 +2068,30 @@ That correspondence is sufficient for the theorem program in this manuscript.
 
 Work on reconfiguration and delegation established important safety baselines for dynamic session topologies. These lines often prove preservation-style properties for specific operators. They usually do not package commutation, minimality, and exact envelope bounds in one theorem stack. This paper targets that combined package.
 
-Mechanized MPST developments established high-confidence metatheory and exposed proof fragility under richer operational features. The robustness analysis in Tirore, Bengtson, and Carbone (2025) is especially relevant to this pressure point. The present work responds by factoring the development into reusable assumption blocks and bridge theorems. This choice reduces repetition across reconfiguration, exactness, and adequacy layers.
-Concretely, their robustness analysis highlights brittleness when adding new
-operational constructors (for example richer delegation/update features) and
-when transporting equivalence claims across presentation layers. In this series,
-assumption-block factoring localizes those obligations: constructor-sensitive
-premises are isolated in reconfiguration blocks, while observational transport
-obligations are isolated in bridge/adequacy blocks, reducing cross-theorem
-proof breakage under feature growth.
+Deni\'{e}lou and Yoshida (2013) establish a global--local correspondence and synthesis procedure
+for a class of communicating automata. This paper addresses a different obligation: preserving
+operational compatibility and relating global and local transformations during linking and
+delegation. Joint realizability of projected views should therefore be distinguished from global-type
+synthesis.
+
+Mechanized MPST developments have also exposed gaps in preservation arguments. Tirore, Bengtson,
+and Carbone (2025) identify flaws in the original subject-reduction argument and prove a restricted
+explicit-channel formulation in Coq. Their result motivates careful separation of operational
+premises and proof scope. In this series, reconfiguration assumptions and observational transport
+obligations are stated separately, so the checked preservation components remain distinguishable
+from the hypotheses needed by the broader correspondence results.
 \begin{table}[H]
 	\centering
 	\footnotesize
 	\begin{tabularx}{\columnwidth}{@{}L{0.39\columnwidth}L{0.56\columnwidth}@{}}
 		\toprule
-		\thead{Brittleness Pattern (Tirore et al.)}                                   & \thead{Mitigation in This Series}                                                                                                                                                                  \\
+		\thead{Proof obligation in this series}                                   & \thead{Mitigation in This Series}                                                                                                                                                                  \\
 		\midrule
 		New operational constructors destabilize proof reuse                          & Isolate constructor-sensitive obligations in explicit reconfiguration assumptions and \texttt{TransitionWF} judgments (Section~\ref{sec:setup}; Theorems~\ref{thm:harmony}--\ref{thm:delegation}). \\
 		Transporting equivalence claims across layers requires re-proving glue lemmas & Factor bridge composition once at adequacy boundary, then reuse in envelope and transport interfaces (Section~\ref{sec:theorem-h}; Section~\ref{sec:transport}).                                   \\
 		\bottomrule
 	\end{tabularx}
-	\caption{Concrete mapping from reported robustness pressure points to mitigations in this series.}
+	\caption{Proof-organization choices for reconfiguration and observational transport in this series.}
 	\label{tab:p3-tirore-mitigation}
 \end{table}
 
@@ -2188,6 +2207,7 @@ Open item: Byzantine liveness under weaker timing assumptions remains future wor
 	\item Chandy, K. M., and Lamport, L. (1985). Distributed Snapshots: Determining Global States of Distributed Systems. ACM Transactions on Computer Systems, 3(1), 63--75.
 	\item Clarkson, M. R., and Schneider, F. B. (2010). Hyperproperties. Journal of Computer Security, 18(6), 1157--1210.
 	\item Cover, T. M., and Thomas, J. A. (2006). Elements of Information Theory (2nd ed.). Wiley.
+	\item Deni\'{e}lou, P.-M., and Yoshida, N. (2013). Multiparty Compatibility in Communicating Automata: Characterisation and Synthesis of Global Session Types. ICALP 2013.
 	\item Girard, J.-Y. (1987). Linear Logic. Theoretical Computer Science, 50(1), 1--101.
 	\item Goguen, J. A., and Meseguer, J. (1982). Security Policies and Security Models. IEEE Symposium on Security and Privacy.
 	\item Hinrichsen, J., et al. (2020). Actris: Session-type based reasoning in separation logic. POPL 2020.
@@ -2204,7 +2224,7 @@ Open item: Byzantine liveness under weaker timing assumptions remains future wor
 	\item Shannon, C. E. (1948). A Mathematical Theory of Communication. Bell System Technical Journal, 27(3), 379--423 and 27(4), 623--656.
 	\item Companion Series Paper I. (2026). \emph{Coherence for Asynchronous Buffered MPST}. Companion manuscript reviewed with this paper.
 	\item Companion Series Paper II. (2026). \emph{Computable Dynamics for Asynchronous MPST}. Companion manuscript reviewed with this paper.
-	\item Tirore, L., Bengtson, J., and Carbone, M. (2025). Mechanized MPST metatheory with subject-reduction robustness analysis. ECOOP 2025.
+	\item Tirore, D., Bengtson, J., and Carbone, M. (2025). Multiparty Asynchronous Session Types: A Mechanised Proof of Subject Reduction. ECOOP 2025, 31:1--31:30.
 	\item Toninho, B., and Yoshida, N. (2017). Certifying Data in Multiparty Session Types. Journal of Logical and Algebraic Methods in Programming, 90, 61--83.
 	\item Wadler, P. (2012). Propositions as Sessions. ICFP 2012.
 \end{citelist}
