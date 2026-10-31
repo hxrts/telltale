@@ -239,7 +239,13 @@ check-fast-structure:
     bash scripts/ops/test-frontend-tool-setup.sh
     bash scripts/ops/test-dependency-checkouts.sh
     bash scripts/ops/test-lean-host-custody.sh --project-only
-    bash scripts/dev/test-cargo-in-nix.sh
+    # The cargo dispatch contract needs the Nix shell's selected dispatcher;
+    # CI's non-Nix Cargo job skips it visibly rather than failing.
+    if [[ -n "${TOOLKIT_CARGO_DISPATCH_BIN:-}" ]]; then
+      bash scripts/dev/test-cargo-in-nix.sh
+    else
+      echo "SKIP cargo-in-nix dispatch contract: TOOLKIT_CARGO_DISPATCH_BIN unset (outside the Nix shell)"
+    fi
     just check-ci-assurance-lanes
     just check-formal-claim-scope
     just check-workflow-actions
