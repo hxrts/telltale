@@ -335,10 +335,10 @@ fn check_failure(repo_root: &Path) -> Result<()> {
     let failure_proofs = repo_root.join("lean/Runtime/Proofs/ProtocolMachine/Failure.lean");
     let adapter_file =
         repo_root.join("lean/Runtime/Proofs/Adapters/Distributed/ProfileWrappers.lean");
-    let build_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Build.lean");
+    let build_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/BuildCore.lean");
     let artifacts_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Artifacts/Envelope.lean");
     let inventory_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Inventory.lean");
-    let profiles_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/Profiles.lean");
+    let profiles_file = repo_root.join("lean/Runtime/Proofs/TheoremPack/ProfilesCore.lean");
     let test_file = repo_root.join("lean/Runtime/Tests/Main.lean");
     let state_file = repo_root.join("lean/Runtime/ProtocolMachine/Model/State.lean");
     let envelope_file = repo_root.join("lean/Runtime/Adequacy/EnvelopeCore.lean");
