@@ -41,6 +41,24 @@ pub enum AsyncSubtypeError {
     UnfoldLimitExceeded,
 }
 
+impl AsyncSubtypeError {
+    /// Whether this error means the bounded checker gave up (fuel exhausted)
+    /// rather than refuting the subtype relation.
+    ///
+    /// Inconclusive results must never be reported as a definite "not a
+    /// subtype".
+    #[must_use]
+    pub fn is_inconclusive(&self) -> bool {
+        matches!(self, Self::UnfoldLimitExceeded)
+    }
+
+    /// Whether this error is a definite refutation of the subtype relation.
+    #[must_use]
+    pub fn is_refutation(&self) -> bool {
+        !self.is_inconclusive()
+    }
+}
+
 /// Direction for SISO tree building
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Direction {
@@ -129,70 +147,52 @@ pub fn siso_decompose_with_fuel(
     Ok(segments)
 }
 
+/// Iterative SISO decomposition.
+///
+/// Every arm continues in tail position, so this is a loop rather than
+/// recursion: cyclic recursive types consume unfold fuel and report
+/// [`AsyncSubtypeError::UnfoldLimitExceeded`] instead of overflowing the stack.
 fn siso_decompose_impl(
     lt: &LocalTypeR,
     segments: &mut Vec<SisoSegment>,
     remaining_unfolds: &mut u32,
 ) -> Result<(), AsyncSubtypeError> {
-    match lt {
-        LocalTypeR::End => {
-            // End is valid SISO
-            Ok(())
-        }
+    let mut current = lt.clone();
+    loop {
+        let next = match &current {
+            // End and variable references (recursive context) are valid SISO.
+            LocalTypeR::End | LocalTypeR::Var(_) => return Ok(()),
 
-        LocalTypeR::Send {
-            partner: _,
-            branches: _,
-        } => {
-            // Start or extend output phase
-            let output = build_output_tree(lt)?;
-            let continuation = find_output_continuation(lt);
-
-            segments.push(SisoSegment {
-                input: InputTree::Empty,
-                output,
-            });
-
-            if let Some(cont) = continuation {
-                siso_decompose_impl(&cont, segments, remaining_unfolds)?;
+            LocalTypeR::Send { .. } => {
+                // Start or extend output phase
+                segments.push(SisoSegment {
+                    input: InputTree::Empty,
+                    output: build_output_tree(&current)?,
+                });
+                find_output_continuation(&current)
             }
 
-            Ok(())
-        }
-
-        LocalTypeR::Recv {
-            partner: _,
-            branches: _,
-        } => {
-            // Start or extend input phase
-            let input = build_input_tree(lt)?;
-            let continuation = find_input_continuation(lt);
-
-            segments.push(SisoSegment {
-                input,
-                output: OutputTree::Empty,
-            });
-
-            if let Some(cont) = continuation {
-                siso_decompose_impl(&cont, segments, remaining_unfolds)?;
+            LocalTypeR::Recv { .. } => {
+                // Start or extend input phase
+                segments.push(SisoSegment {
+                    input: build_input_tree(&current)?,
+                    output: OutputTree::Empty,
+                });
+                find_input_continuation(&current)
             }
 
-            Ok(())
-        }
-
-        LocalTypeR::Mu { var, body } => {
-            if *remaining_unfolds == 0 {
-                return Err(AsyncSubtypeError::UnfoldLimitExceeded);
+            LocalTypeR::Mu { var, body } => {
+                if *remaining_unfolds == 0 {
+                    return Err(AsyncSubtypeError::UnfoldLimitExceeded);
+                }
+                *remaining_unfolds -= 1;
+                // Handle recursion by unfolding once
+                Some(body.substitute(var, &current))
             }
-            *remaining_unfolds -= 1;
-            // Handle recursion by unfolding once
-            let unfolded = body.substitute(var, lt);
-            siso_decompose_impl(&unfolded, segments, remaining_unfolds)
-        }
-
-        LocalTypeR::Var(_) => {
-            // Variable reference - valid in recursive context
-            Ok(())
+        };
+        match next {
+            Some(cont) => current = cont,
+            None => return Ok(()),
         }
     }
 }

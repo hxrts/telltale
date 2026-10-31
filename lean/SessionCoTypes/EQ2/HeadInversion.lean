@@ -5,7 +5,7 @@ import SessionCoTypes.FullUnfold
 Head inversion for `EQ2` on well-formed types: if `EQ2 a b` and `b` fully
 unfolds to a `send` (resp. `recv`), then `a` fully unfolds to a `send`
 (resp. `recv`) to the same partner, with branch lists related by
-`BranchesRel EQ2` (same labels, pairwise `EQ2` continuations).
+`BranchesRel EQ2` (same labels and payloads, pairwise `EQ2` continuations).
 -/
 
 /-
@@ -80,22 +80,22 @@ theorem eq2_full_unfold_recv_inv {a b : LocalTypeR} {p : String} {bs : List Bran
 /-- A left branch of a `BranchesRel` has a related right branch with the same label. -/
 theorem branches_rel_mem_left {R : Rel} :
     ∀ {as bs : List BranchR}, BranchesRel R as bs → ∀ {x}, x ∈ as →
-      ∃ y ∈ bs, x.1 = y.1 ∧ R x.2.2 y.2.2
+      ∃ y ∈ bs, x.1 = y.1 ∧ x.2.1 = y.2.1 ∧ R x.2.2 y.2.2
   | [], [], .nil, _, hx => by simp at hx
   | a :: _, b :: _, .cons hab hs, x, hx => by
       rcases List.mem_cons.mp hx with rfl | hx
-      · exact ⟨b, List.mem_cons_self, hab⟩
+      · exact ⟨b, List.mem_cons_self, hab.1, hab.2.1, hab.2.2⟩
       · obtain ⟨y, hy, hy'⟩ := branches_rel_mem_left hs hx
         exact ⟨y, List.mem_cons_of_mem _ hy, hy'⟩
 
 /-- A right branch of a `BranchesRel` has a related left branch with the same label. -/
 theorem branches_rel_mem_right {R : Rel} :
     ∀ {as bs : List BranchR}, BranchesRel R as bs → ∀ {y}, y ∈ bs →
-      ∃ x ∈ as, x.1 = y.1 ∧ R x.2.2 y.2.2
+      ∃ x ∈ as, x.1 = y.1 ∧ x.2.1 = y.2.1 ∧ R x.2.2 y.2.2
   | [], [], .nil, _, hy => by simp at hy
   | a :: _, b :: _, .cons hab hs, y, hy => by
       rcases List.mem_cons.mp hy with rfl | hy
-      · exact ⟨a, List.mem_cons_self, hab⟩
+      · exact ⟨a, List.mem_cons_self, hab.1, hab.2.1, hab.2.2⟩
       · obtain ⟨x, hx, hx'⟩ := branches_rel_mem_right hs hy
         exact ⟨x, List.mem_cons_of_mem _ hx, hx'⟩
 

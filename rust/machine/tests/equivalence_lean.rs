@@ -21,9 +21,13 @@ use telltale_bridge::{
     ProtocolMachineRunnerError,
 };
 use telltale_machine::runtime::loader::CodeImage;
-use telltale_machine::{ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError};
+use telltale_machine::{
+    CoroStatus, ObsEvent, ProtocolMachine, ProtocolMachineConfig, ProtocolMachineError,
+};
+use telltale_types::{GlobalType, Label};
 use test_support::{
-    choice_image, recursive_send_recv_image, simple_send_recv_image, PassthroughHandler,
+    choice_image, code_image_from_global, recursive_send_recv_image, simple_send_recv_image,
+    PassthroughHandler,
 };
 
 fn protocol_machine_runner_path() -> Option<PathBuf> {
@@ -259,4 +263,111 @@ fn equivalence_lean_basic() {
             "Rust vs Lean per-session traces differ at N={n}"
         );
     }
+}
+
+fn strict_protocol_machine_runner_required() -> bool {
+    std::env::var("TELLTALE_REQUIRE_PROTOCOL_MACHINE_RUNNER")
+        .map(|value| value != "0")
+        .unwrap_or(false)
+}
+
+/// Delegate-free loop that exits via an inner choice:
+/// `mu t. A -> B {ping: B -> A {done: end, more: t}, stop: end}`.
+/// Deterministic first-label selection takes `ping` then `done`, so the loop body
+/// runs once and the protocol exits through the inner choice.
+fn choice_loop_global() -> GlobalType {
+    GlobalType::mu(
+        "t",
+        GlobalType::comm(
+            "A",
+            "B",
+            vec![
+                (
+                    Label::new("ping"),
+                    GlobalType::comm(
+                        "B",
+                        "A",
+                        vec![
+                            (Label::new("done"), GlobalType::End),
+                            (Label::new("more"), GlobalType::var("t")),
+                        ],
+                    ),
+                ),
+                (Label::new("stop"), GlobalType::End),
+            ],
+        ),
+    )
+}
+
+#[test]
+fn liveness_choice_loop_completes_in_both_runtimes() {
+    const STEP_BOUND: usize = 200;
+    let global = choice_loop_global();
+    assert!(global.well_formed());
+    let image = code_image_from_global(&global).expect("projection succeeds");
+    let images = vec![image];
+
+    // Rust: fair scheduler run reaches all-sessions-complete within the bound.
+    let handler = PassthroughHandler;
+    let mut machine = ProtocolMachine::new(ProtocolMachineConfig::default());
+    let sid = machine
+        .load_choreography(&images[0])
+        .expect("load choreography");
+    machine
+        .run_concurrent(&handler, STEP_BOUND, 1)
+        .expect("rust run");
+    assert!(
+        machine.all_done(),
+        "Rust run did not terminate within bound"
+    );
+    let coros = machine.session_coroutines(sid);
+    assert!(!coros.is_empty());
+    assert!(
+        coros.iter().all(|c| matches!(c.status, CoroStatus::Done)),
+        "Rust session not complete: {:?}",
+        coros.iter().map(|c| &c.status).collect::<Vec<_>>()
+    );
+    let rust_trace = normalize_rust_trace(machine.trace(), &[sid]);
+    assert_eq!(rust_trace.len(), 4, "ping + done, sent and received");
+
+    // Lean: same protocol through the Lean runner.
+    let choreos = build_choreos(&images);
+    let Some(runner_path) = protocol_machine_runner_path() else {
+        assert!(
+            !strict_protocol_machine_runner_required(),
+            "protocol_machine_runner required but not found"
+        );
+        eprintln!("SKIPPED: Lean protocol-machine runner not built");
+        return;
+    };
+    let runner = ProtocolMachineRunner::with_binary_path(runner_path).expect("runner");
+    let output = runner
+        .run_protocol_machine(&ProtocolMachineRunInput {
+            schema_version: canonical_schema_version(),
+            choreographies: choreos,
+            concurrency: 1,
+            max_steps: STEP_BOUND as u64,
+        })
+        .expect("Lean runner failed");
+    assert!(!output.sessions.is_empty(), "Lean reported no sessions");
+    // The runner's per-session `terminal` flag tracks explicit session close (phase),
+    // which compiled code never performs; completion is "all coroutines done or
+    // faulted", reported as `status == "completed"`. Faults are excluded below.
+    assert_eq!(
+        output.status, "completed",
+        "Lean run did not complete within bound: sessions {:?}",
+        output.sessions
+    );
+    assert!(
+        output.trace.iter().all(|ev| !ev.kind.contains("fault")),
+        "Lean run faulted: {:?}",
+        output.trace
+    );
+    assert!(output.steps_executed <= STEP_BOUND as u64);
+    let lean_trace = normalize_lean_trace(&output);
+    assert_eq!(
+        partition_by_session(&rust_trace),
+        partition_by_session(&lean_trace),
+        "Rust vs Lean liveness traces differ"
+    );
 }

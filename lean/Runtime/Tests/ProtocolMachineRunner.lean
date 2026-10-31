@@ -540,17 +540,19 @@ def traceEventJson (kind : String) (tick sid : Nat)
 
 def bridgeEventsForObs (ev : TickedObsEvent UnitEffect) : List Json :=
   match ev.event with
-  | .sent edge val _seqNo =>
+  | .sent edge val _seqNo lbl =>
       let label :=
-        match val with
-        | .string s => some s
-        | _ => none
+        match lbl, val with
+        | some l, _ => some l
+        | none, .string s => some s
+        | none, _ => none
       [traceEventJson "sent" ev.tick edge.sid (some edge.sender) (some edge.receiver) label]
-  | .received edge val _seqNo =>
+  | .received edge val _seqNo lbl =>
       let label :=
-        match val with
-        | .string s => some s
-        | _ => none
+        match lbl, val with
+        | some l, _ => some l
+        | none, .string s => some s
+        | none, _ => none
       [traceEventJson "received" ev.tick edge.sid (some edge.sender) (some edge.receiver) label]
   | .offered edge lbl =>
       [traceEventJson "sent" ev.tick edge.sid (some edge.sender) (some edge.receiver) (some lbl)]

@@ -126,8 +126,8 @@ private def traceSessionIds {ε : Type u} [EffectRuntime ε]
     []
 
 private def obsTag {ε : Type u} [EffectRuntime ε] : ObsEvent ε → String
-  | .sent _ _ _ => "sent"
-  | .received _ _ _ => "received"
+  | .sent _ _ _ _ => "sent"
+  | .received _ _ _ _ => "received"
   | .offered _ _ => "offered"
   | .chose _ _ => "chose"
   | .acquired _ _ => "acquired"

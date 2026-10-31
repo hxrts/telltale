@@ -10,7 +10,19 @@ set_option linter.dupNamespace false
 
 /-! # toCoind Injectivity
 
-Proof that the toCoind embedding is injective up to payload erasure. -/
+Proof that the toCoind embedding is injective up to payload erasure.
+
+**Decision: `toCoind` keeps erasing payloads.** `LocalTypeC` has no payload
+field, so `toCoind t = toCoind u ↔ erasePayloads t = erasePayloads u`
+(`to_coind_eq_iff_erase_payloads`); injectivity holds only modulo
+`erasePayloads`. Since inductive `SessionCoTypes.EQ2` now compares branch
+payloads (`BranchesRel` requires `a.2.1 = b.2.1`), inductive `EQ2` is
+strictly finer than `EQ2C` through `toCoind`: only the direction
+`EQ2 a b → EQ2C (toCoind a) (toCoind b)` can hold in general, and the
+converse additionally needs payload agreement between `a` and `b`
+(e.g. `erasePayloads a = a` and `erasePayloads b = b`, as for projections of
+delegation-free global types). No completeness theorem of the form
+`EQ2C (toCoind a) (toCoind b) → EQ2 a b` is stated in this development. -/
 
 /-
 The Problem. The toCoind embedding forgets branch payload annotations, so it is

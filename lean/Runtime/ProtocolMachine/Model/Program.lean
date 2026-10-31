@@ -90,7 +90,7 @@ def programLocalTypes (roles : RoleSet) (types : Role → LocalType) :
 
 /-! ### Ordering Helpers -/
 
-private def insertRoleOrdered
+def insertRoleOrdered
     (entry : Role × SessionTypes.LocalTypeR.LocalTypeR)
     (acc : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) :
     List (Role × SessionTypes.LocalTypeR.LocalTypeR) :=
@@ -102,7 +102,7 @@ private def insertRoleOrdered
       else
         x :: insertRoleOrdered entry xs
 
-private def sortLocalTypesByRole
+def sortLocalTypesByRole
     (localTypes : List (Role × SessionTypes.LocalTypeR.LocalTypeR)) :
     List (Role × SessionTypes.LocalTypeR.LocalTypeR) :=
   localTypes.foldl (fun acc entry => insertRoleOrdered entry acc) []
@@ -161,7 +161,7 @@ private def localTypeRMap
     Std.HashMap Role SessionTypes.LocalTypeR.LocalTypeR :=
   localTypes.foldl (fun acc entry => acc.insert entry.1 entry.2) {}
 
-private def relocateInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+def relocateInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (offset : PC) : Instr γ ε → Instr γ ε
   | .choose chan table =>
       .choose chan (table.map (fun (lbl, pc) => (lbl, offset + pc)))
@@ -169,7 +169,7 @@ private def relocateInstr {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
   | .spawn target args => .spawn (offset + target) args
   | instr => instr
 
-private def relocateCode {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
+def relocateCode {γ ε : Type u} [GuardLayer γ] [EffectRuntime ε]
     (offset : PC) (code : List (Instr γ ε)) : List (Instr γ ε) :=
   code.map (relocateInstr (γ := γ) (ε := ε) offset)
 

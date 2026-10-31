@@ -271,7 +271,7 @@ private theorem proj_trans_other_step_comm_async_other_cons
         ((label, none, projTrans cont role) :: projTransBranches rest role) := by
     simpa [projTransBranches, Choreography.Projection.Project.transBranches, Choreography.Projection.Trans.transBranches] using hbranch_rel
   cases hbranch_rel' with
-  | cons hpair _ => exact hpair.2
+  | cons hpair _ => exact hpair.2.2
 
 private theorem proj_trans_other_step_comm_async_other
     (sender receiver : String) (branches branches' : List (Label × GlobalType))

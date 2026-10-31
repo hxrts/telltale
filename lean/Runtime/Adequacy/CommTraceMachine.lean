@@ -66,25 +66,25 @@ theorem commPres_block {st : ProtocolMachineState ι γ π ε ν} {coro : Corout
 /-- Committing an enqueued send emits `sent` and matches `CommStep.send`. -/
 theorem commPres_sendCommit {st st0 : ProtocolMachineState ι γ π ε ν}
     {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {T : ValType}
-    {L' : LocalType} {sv : SignedValue ν} {seqNo : Nat}
+    {L' : LocalType} {lbl : Option Label} {sv : SignedValue ν} {seqNo : Nat}
     (ho : st.obsTrace = st0.obsTrace) (hb : st.buffers = st0.buffers) :
     CommPres st0 (sendCommit st coro ep edge
       (signedBufferSet st.buffers edge (signedBufferLookup st.buffers edge ++ [sv]))
-      T L' sv.payload seqNo) := by
+      T L' sv.payload seqNo lbl) := by
   intro h
   simp only [sendCommit, continuePack, pack, mkRes, appendEvent]
   rw [ho, hb]
-  exact CommReachable.step h (CommStep.send _ _ _ _ _ _)
+  exact CommReachable.step h (CommStep.send _ _ _ _ _ _ _)
 
 /-- The enqueue-result dispatch preserves reachability in FIFO mode. -/
 theorem commPres_sendAfterEnqueue {st st0 : ProtocolMachineState ι γ π ε ν}
     {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {T : ValType}
-    {L' : LocalType} {hd : HandlerId} {seqNo : Nat} {sv : SignedValue ν}
+    {L' : LocalType} {lbl : Option Label} {hd : HandlerId} {seqNo : Nat} {sv : SignedValue ν}
     {res : SignedEnqueueResult} {bufs' : SignedBuffers ν}
     (ho : st.obsTrace = st0.obsTrace) (hb : st.buffers = st0.buffers)
     (hm : (st.config.bufferConfig edge).mode = .fifo)
     (hres : bufEnqueue (st.config.bufferConfig edge) st.buffers edge sv = (res, bufs')) :
-    CommPres st0 (sendAfterEnqueue st coro ep edge T L' sv.payload hd seqNo res bufs') := by
+    CommPres st0 (sendAfterEnqueue st coro ep edge T L' sv.payload hd seqNo res bufs' lbl) := by
   cases res with
   | ok =>
     have hbf := bufEnqueue_fifo_ok hm hres
@@ -101,16 +101,16 @@ theorem commPres_sendAfterEnqueue {st st0 : ProtocolMachineState ι γ π ε ν}
 /-- The handler stage of send preserves reachability in FIFO mode. -/
 theorem commPres_sendOnHandler {st : ProtocolMachineState ι γ π ε ν}
     {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {T : ValType}
-    {L' : LocalType} {v : Value} {hd : HandlerId} (hf : AllFifo st) :
-    CommPres st (sendOnHandler st coro ep edge T L' v hd) := by
+    {L' : LocalType} {lbl : Option Label} {v : Value} {hd : HandlerId} (hf : AllFifo st) :
+    CommPres st (sendOnHandler st coro ep edge T L' v hd lbl) := by
   unfold sendOnHandler
   exact commPres_sendAfterEnqueue (sv := signValueWithSeq _ v _) rfl rfl (hf edge) rfl
 
 /-- Send edge dispatch preserves reachability in FIFO mode. -/
 theorem commPres_sendOnEdge {st : ProtocolMachineState ι γ π ε ν}
     {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {T : ValType}
-    {L' : LocalType} {v : Value} (hf : AllFifo st) :
-    CommPres st (sendOnEdge st coro ep edge T L' v) := by
+    {L' : LocalType} {lbl : Option Label} {v : Value} (hf : AllFifo st) :
+    CommPres st (sendOnEdge st coro ep edge T L' v lbl) := by
   unfold sendOnEdge
   repeat' split
   all_goals first
@@ -143,26 +143,26 @@ theorem commConsume_preserves {st st' : ProtocolMachineState ι γ π ε ν} {ti
 
 /-- Committing a dequeued receive emits `received` and matches `CommStep.recv`. -/
 theorem commPres_recvCommit {st st0 : ProtocolMachineState ι γ π ε ν}
-    {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {L' : LocalType}
+    {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {L' : LocalType} {lbl : Option Label}
     {sv : SignedValue ν} {bufs' : SignedBuffers ν} {tokens' : List ProgressToken}
     {dst : Reg} (ho : st.obsTrace = st0.obsTrace) (hb : st.buffers = st0.buffers)
     (hd : bufDequeue st0.buffers edge = some (sv, bufs')) :
-    CommPres st0 (recvCommit st coro ep edge bufs' L' sv.payload tokens' dst sv.seqNo) := by
+    CommPres st0 (recvCommit st coro ep edge bufs' L' sv.payload tokens' dst sv.seqNo lbl) := by
   unfold recvCommit
   split
   · exact commPres_fault ho hb
   · intro h
     simp only [continuePack, pack, mkRes, appendEvent]
     rw [ho]
-    exact CommReachable.step h (CommStep.recv _ _ _ _ _ _ _ hd)
+    exact CommReachable.step h (CommStep.recv _ _ _ _ _ _ _ _ hd)
 
 /-- Post-dequeue validation preserves reachability. -/
 theorem commPres_recvAfterDequeue {st : ProtocolMachineState ι γ π ε ν}
     {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {T : ValType}
-    {L' : LocalType} {dst : Reg} {hd : HandlerId} {tokens' : List ProgressToken}
+    {L' : LocalType} {lbl : Option Label} {dst : Reg} {hd : HandlerId} {tokens' : List ProgressToken}
     {sv : SignedValue ν} {bufs' : SignedBuffers ν}
     (hdq : bufDequeue st.buffers edge = some (sv, bufs')) :
-    CommPres st (recvAfterDequeue st coro ep edge T L' dst hd tokens' sv bufs') := by
+    CommPres st (recvAfterDequeue st coro ep edge T L' dst hd tokens' sv bufs' lbl) := by
   unfold recvAfterDequeue
   split
   · exact commPres_fault rfl rfl
@@ -182,8 +182,8 @@ theorem commPres_recvAfterDequeue {st : ProtocolMachineState ι γ π ε ν}
 /-- Receive handler stage preserves reachability. -/
 theorem commPres_recvWithHandler {st : ProtocolMachineState ι γ π ε ν}
     {coro : CoroutineState γ ε} {ep : Endpoint} {edge : Edge} {T : ValType}
-    {L' : LocalType} {dst : Reg} {hd : HandlerId} {tokens' : List ProgressToken} :
-    CommPres st (recvWithHandler st coro ep edge T L' dst hd tokens') := by
+    {L' : LocalType} {lbl : Option Label} {dst : Reg} {hd : HandlerId} {tokens' : List ProgressToken} :
+    CommPres st (recvWithHandler st coro ep edge T L' dst hd tokens' lbl) := by
   unfold recvWithHandler
   cases hdq : bufDequeue st.buffers edge with
   | none => exact commPres_block (st := st)

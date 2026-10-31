@@ -56,33 +56,35 @@ private theorem branches_rel_trans_chain_head_no_wf {R : Rel}
     (hextend : ∀ a b c, R a b → EQ2 b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : BranchR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_cs.2.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ EQ2 lb_cs.2.2 lb_ds.2.2)
+    (h1 : lb_bs.1 = lb_cs.1 ∧ lb_bs.2.1 = lb_cs.2.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ lb_cs.2.1 = lb_ds.2.1 ∧ EQ2 lb_cs.2.2 lb_ds.2.2)
     (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
     (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
     (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
+    lb_bs.1 = lb_ds.1 ∧ lb_bs.2.1 = lb_ds.2.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   constructor
   · exact h1.1.trans h2.1
-  · cases h1.2 with
-    | inl hr => exact Or.inl (hextend _ _ _ hr h2.2 hWFa hWFb hWFc)
-    | inr heq => exact Or.inr (eq2_trans_wf heq h2.2 hWFa hWFb hWFc)
+  refine ⟨h1.2.1.trans h2.2.1, ?_⟩
+  cases h1.2.2 with
+  | inl hr => exact Or.inl (hextend _ _ _ hr h2.2.2 hWFa hWFb hWFc)
+  | inr heq => exact Or.inr (eq2_trans_wf heq h2.2.2 hWFa hWFb hWFc)
 
 private theorem branches_rel_trans_chain_rev_head_no_wf {R : Rel}
     (hextend : ∀ a b c, EQ2 a b → R b c →
       LocalTypeR.WellFormed a → LocalTypeR.WellFormed b → LocalTypeR.WellFormed c → R a c)
     {lb_bs lb_cs lb_ds : BranchR}
-    (h1 : lb_bs.1 = lb_cs.1 ∧ EQ2 lb_bs.2.2 lb_cs.2.2)
-    (h2 : lb_cs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_cs.2.2 lb_ds.2.2)
+    (h1 : lb_bs.1 = lb_cs.1 ∧ lb_bs.2.1 = lb_cs.2.1 ∧ EQ2 lb_bs.2.2 lb_cs.2.2)
+    (h2 : lb_cs.1 = lb_ds.1 ∧ lb_cs.2.1 = lb_ds.2.1 ∧ (EQ2_closure R) lb_cs.2.2 lb_ds.2.2)
     (hWFa : LocalTypeR.WellFormed lb_bs.2.2)
     (hWFb : LocalTypeR.WellFormed lb_cs.2.2)
     (hWFc : LocalTypeR.WellFormed lb_ds.2.2) :
-    lb_bs.1 = lb_ds.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
+    lb_bs.1 = lb_ds.1 ∧ lb_bs.2.1 = lb_ds.2.1 ∧ (EQ2_closure R) lb_bs.2.2 lb_ds.2.2 := by
   constructor
   · exact h1.1.trans h2.1
-  · cases h2.2 with
-      | inl hr => exact Or.inl (hextend _ _ _ h1.2 hr hWFa hWFb hWFc)
-      | inr heq => exact Or.inr (eq2_trans_wf h1.2 heq hWFa hWFb hWFc)
+  refine ⟨h1.2.1.trans h2.2.1, ?_⟩
+  cases h2.2.2 with
+  | inl hr => exact Or.inl (hextend _ _ _ h1.2.2 hr hWFa hWFb hWFc)
+  | inr heq => exact Or.inr (eq2_trans_wf h1.2.2 heq hWFa hWFb hWFc)
 
 /-! ## Branch-Chain Composition Helpers -/
 

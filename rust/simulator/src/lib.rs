@@ -63,8 +63,9 @@ pub use decision::{
     decide_async_subtyping, decide_capacity_predicate, decide_global_coherence,
     decide_global_well_formedness, decide_sync_subtyping, decide_theorem_eligibility,
     theorem_eligibility_from_result, AsyncSubtypeWitness, CapacityCounterexample, CoherenceFailure,
-    DecisionCertificate, DecisionCounterexample, DecisionKind, DecisionOutcome, DecisionReport,
-    SyncSubtypeWitness, TheoremEligibilityCounterexample, WellFormednessViolation,
+    DecisionCertificate, DecisionCounterexample, DecisionInconclusive, DecisionKind,
+    DecisionOutcome, DecisionReport, SyncSubtypeWitness, TheoremEligibilityCounterexample,
+    WellFormednessViolation,
 };
 pub use distributed::{
     DistributedExecutionRegime, DistributedRunManifest, DistributedRunResult,

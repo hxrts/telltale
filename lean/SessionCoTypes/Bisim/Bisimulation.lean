@@ -33,9 +33,11 @@ standard coinduction. -/
 /-- Relation on local types. -/
 abbrev Rel := LocalTypeR → LocalTypeR → Prop
 
-/-- Branch-wise relation for bisimulation using List.Forall₂. -/
+/-- Branch-wise relation for bisimulation using List.Forall₂.
+
+Branches must agree on label and delegation payload, and relate continuations. -/
 def BranchesRelBisim (R : Rel) (bs cs : List BranchR) : Prop :=
-  List.Forall₂ (fun b c => b.1 = c.1 ∧ R b.2.2 c.2.2) bs cs
+  List.Forall₂ (fun b c => b.1 = c.1 ∧ b.2.1 = c.2.1 ∧ R b.2.2 c.2.2) bs cs
 
 /-- One-step bisimulation functor using membership predicates.
 
@@ -157,7 +159,7 @@ theorem BranchesRelBisim.mono {R S : Rel} (hrs : ∀ a b, R a b → S a b)
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih =>
-    exact List.Forall₂.cons ⟨hbc.1, hrs _ _ hbc.2⟩ ih
+    exact List.Forall₂.cons ⟨hbc.1, hbc.2.1, hrs _ _ hbc.2.2⟩ ih
 
 -- BisimF Monotonicity and Coinduction Setup
 
@@ -212,7 +214,7 @@ theorem BranchesRelBisim.refl {R : Rel} (hrefl : ∀ t, R t t)
   induction bs with
   | nil => exact List.Forall₂.nil
   | cons b rest ih =>
-    exact List.Forall₂.cons ⟨rfl, hrefl b.2.2⟩ ih
+    exact List.Forall₂.cons ⟨rfl, rfl, hrefl b.2.2⟩ ih
 
 -- Symmetry Infrastructure
 
@@ -225,7 +227,7 @@ theorem BranchesRelBisim.symm {R : Rel} (hsymm : ∀ a b, R a b → R b a)
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih =>
-    exact List.Forall₂.cons ⟨hbc.1.symm, hsymm _ _ hbc.2⟩ ih
+    exact List.Forall₂.cons ⟨hbc.1.symm, hbc.2.1.symm, hsymm _ _ hbc.2.2⟩ ih
 
 /-- Convert BranchesRelBisim R bs cs to BranchesRelBisim S cs bs where S is the flip of R.
     This is used in the symmetry proof where S x y = R y x. -/
@@ -235,7 +237,7 @@ theorem BranchesRelBisim.flip {R S : Rel} (hflip : ∀ a b, R a b → S b a)
   induction h with
   | nil => exact List.Forall₂.nil
   | cons hbc _ ih =>
-    exact List.Forall₂.cons ⟨hbc.1.symm, hflip _ _ hbc.2⟩ ih
+    exact List.Forall₂.cons ⟨hbc.1.symm, hbc.2.1.symm, hflip _ _ hbc.2.2⟩ ih
 
 /-- Bisim is symmetric. -/
 theorem symm {a b : LocalTypeR} (h : Bisim a b) : Bisim b a := by
@@ -277,7 +279,8 @@ theorem BranchesRelBisim.trans {R : Rel}
   | cons h _ ih =>
     cases hbc with
     | cons h' hbc' =>
-      exact List.Forall₂.cons ⟨h.1.trans h'.1, htrans _ _ _ h.2 h'.2⟩ (ih hbc')
+      exact List.Forall₂.cons ⟨h.1.trans h'.1, h.2.1.trans h'.2.1, htrans _ _ _ h.2.2 h'.2.2⟩
+        (ih hbc')
 
 /-- Compose two BranchesRelBisim proofs with different relations into one with composed relation.
     Given R1 as bs and R2 bs cs, produce R3 as cs where R3 a c := ∃ b, R1 a b ∧ R2 b c. -/
@@ -291,7 +294,8 @@ theorem BranchesRelBisim.compose {R1 R2 R3 : Rel}
   | cons h _ ih =>
     cases hbc with
     | cons h' hbc' =>
-      exact List.Forall₂.cons ⟨h.1.trans h'.1, hcomp _ _ _ h.2 h'.2⟩ (ih hbc')
+      exact List.Forall₂.cons ⟨h.1.trans h'.1, h.2.1.trans h'.2.1, hcomp _ _ _ h.2.2 h'.2.2⟩
+        (ih hbc')
 
 -- Bisim Transitivity
 

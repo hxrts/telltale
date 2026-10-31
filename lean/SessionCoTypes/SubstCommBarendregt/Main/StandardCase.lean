@@ -36,9 +36,8 @@ theorem branches_rel_substitute (var : String) (repl : LocalTypeR)
     have ⟨hbarA, hbarAs⟩ := Bool.and_eq_true_iff.mp hbarBs
     have ⟨hbarB, hbarBs'⟩ := Bool.and_eq_true_iff.mp hbarCs
     apply List.Forall₂.cons
-    · constructor
-      · exact hhead.1
-      · exact Or.inl (SubstRel.base a.2.2 b.2.2 hhead.2 hbarA hbarB)
+    · refine ⟨hhead.1, hhead.2.1, ?_⟩
+      exact Or.inl (SubstRel.base a.2.2 b.2.2 hhead.2.2 hbarA hbarB)
     · exact ih hbarAs hbarBs'
 
 /-- Helper to convert htvar/hsvar proofs to the expected form. -/

@@ -73,7 +73,7 @@ private theorem branches_rel_bisim_subst_unfold_closure_refl (var : String) (rep
   | nil => exact List.Forall₂.nil
   | cons b rest ih =>
       constructor
-      · exact ⟨rfl, Or.inr (bisim_refl (b.2.2.substitute var repl)
+      · exact ⟨rfl, rfl, Or.inr (bisim_refl (b.2.2.substitute var repl)
           (well_formed_substitute var (hWFbs b (List.Mem.head _)) hWFrepl))⟩
       · exact ih (fun lb hm => hWFbs lb (List.Mem.tail _ hm))
 

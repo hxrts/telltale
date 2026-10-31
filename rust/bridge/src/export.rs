@@ -4,7 +4,7 @@
 //! into JSON format that matches the Lean type definitions.
 
 use serde_json::{json, Value};
-use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort};
+use telltale_types::{GlobalType, Label, LocalTypeR, PayloadSort, ValType};
 
 /// Convert a GlobalType to Lean-compatible JSON.
 ///
@@ -100,12 +100,7 @@ pub fn local_to_json(lt: &LocalTypeR) -> Value {
         LocalTypeR::Send { partner, branches } => {
             let branches_json: Vec<Value> = branches
                 .iter()
-                .map(|(label, _vt, cont)| {
-                    json!({
-                        "label": label_to_json(label),
-                        "continuation": local_to_json(cont)
-                    })
-                })
+                .map(|(label, vt, cont)| local_branch_to_json(label, vt.as_ref(), cont))
                 .collect();
 
             json!({
@@ -118,12 +113,7 @@ pub fn local_to_json(lt: &LocalTypeR) -> Value {
         LocalTypeR::Recv { partner, branches } => {
             let branches_json: Vec<Value> = branches
                 .iter()
-                .map(|(label, _vt, cont)| {
-                    json!({
-                        "label": label_to_json(label),
-                        "continuation": local_to_json(cont)
-                    })
-                })
+                .map(|(label, vt, cont)| local_branch_to_json(label, vt.as_ref(), cont))
                 .collect();
 
             json!({
@@ -147,6 +137,35 @@ pub fn local_to_json(lt: &LocalTypeR) -> Value {
                 "name": name
             })
         }
+    }
+}
+
+/// Convert a local branch to JSON. The `"payload"` key is omitted when the
+/// payload annotation is `None`, keeping payload-free JSON byte-identical.
+fn local_branch_to_json(label: &Label, vt: Option<&ValType>, cont: &LocalTypeR) -> Value {
+    let mut obj = json!({
+        "label": label_to_json(label),
+        "continuation": local_to_json(cont)
+    });
+    if let (Some(vt), Some(map)) = (vt, obj.as_object_mut()) {
+        map.insert("payload".to_string(), val_type_to_json(vt));
+    }
+    obj
+}
+
+/// Convert a ValType payload annotation to JSON.
+///
+/// Shape: `"unit" | "bool" | "nat" | "string" | "readiness"`,
+/// `{"prod": [l, r]}`, `{"chan": {"sid": n, "role": "..."}}`.
+pub fn val_type_to_json(vt: &ValType) -> Value {
+    match vt {
+        ValType::Unit => json!("unit"),
+        ValType::Bool => json!("bool"),
+        ValType::Nat => json!("nat"),
+        ValType::String => json!("string"),
+        ValType::Readiness => json!("readiness"),
+        ValType::Prod(l, r) => json!({ "prod": [val_type_to_json(l), val_type_to_json(r)] }),
+        ValType::Chan { sid, role } => json!({ "chan": { "sid": sid, "role": role } }),
     }
 }
 

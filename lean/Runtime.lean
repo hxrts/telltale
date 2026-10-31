@@ -18,6 +18,11 @@ import Runtime.Adequacy.CommTraceAdequacy
 import Runtime.Adequacy.CommTraceMachine
 import Runtime.Proofs.ProtocolMachine.BufferConfluence
 import Runtime.Adequacy.CompileRefines
+import Runtime.Adequacy.CompileRefinesImage
+import Runtime.Adequacy.CommTraceMachineChoice
+import Runtime.Proofs.ConcreteTermination
+import Runtime.Proofs.ProjectedInitial
+import Runtime.Proofs.ProjectedTermination
 import Runtime.Proofs.Concurrency
 import Runtime.Proofs.ConcurrencyThreaded
 import Runtime.Proofs.ProgressApi

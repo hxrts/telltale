@@ -26,8 +26,8 @@ open SessionTypes.GlobalType
 
 /-- Tag observable events for comparison (UnitEffect only). -/
 def obsTag : ObsEvent UnitEffect → String
-  | .sent _ _ _ => "sent"
-  | .received _ _ _ => "received"
+  | .sent _ _ _ _ => "sent"
+  | .received _ _ _ _ => "received"
   | .offered _ _ => "offered"
   | .chose _ _ => "chose"
   | .acquired _ _ => "acquired"

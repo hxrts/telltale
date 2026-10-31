@@ -6,7 +6,14 @@ set_option linter.dupNamespace false
 
 /-! # EQ2C Bisimulation
 
-Equi-recursive equality relation for coinductive session types via bisimulation. -/
+Equi-recursive equality relation for coinductive session types via bisimulation.
+
+**Payload erasure.** `LocalTypeC` branches are `Label × LocalTypeC`: the
+`Option ValType` delegation payload of inductive `BranchR` is erased by
+`toCoind`. Hence `BranchesRelC` (and `BranchesRelCE` in `EQ2CEnv`) compare
+only labels and continuations, and `EQ2C` relates types up to payload
+erasure. The inductive `SessionCoTypes.EQ2` (via `BranchesRel`) now also
+compares payloads, so it is strictly finer than `EQ2C` through `toCoind`. -/
 
 /-
 The Problem. Coinductive types can have different structural representations

@@ -180,7 +180,11 @@ fn parse_local_branches(
     check_depth(depth)?;
     let mut parsed = Vec::with_capacity(branches.len());
     for branch in branches {
-        ensure_only_fields(branch, "local branch", &["label", "continuation"])?;
+        ensure_only_fields(
+            branch,
+            "local branch",
+            &["label", "continuation", "payload"],
+        )?;
         let label = parse_label(
             branch
                 .get("label")
@@ -192,7 +196,11 @@ fn parse_local_branches(
                 .ok_or_else(|| ImportError::MissingField("continuation in branch".to_string()))?,
             depth + 1,
         )?;
-        parsed.push((label, None, cont));
+        let payload = branch
+            .get("payload")
+            .map(|p| parse_val_type_with_depth(p, depth + 1))
+            .transpose()?;
+        parsed.push((label, payload, cont));
     }
     Ok(parsed)
 }
@@ -275,6 +283,51 @@ fn parse_label(json: &Value) -> Result<Label, ImportError> {
         .unwrap_or(PayloadSort::Unit);
 
     Ok(Label { name, sort })
+}
+
+/// Parse a ValType payload annotation from JSON (inverse of
+/// `export::val_type_to_json`).
+pub fn parse_val_type(json: &Value) -> Result<ValType, ImportError> {
+    parse_val_type_with_depth(json, 0)
+}
+
+fn parse_val_type_with_depth(json: &Value, depth: usize) -> Result<ValType, ImportError> {
+    check_depth(depth)?;
+    if let Some(s) = json.as_str() {
+        return match s {
+            "unit" => Ok(ValType::Unit),
+            "bool" => Ok(ValType::Bool),
+            "nat" => Ok(ValType::Nat),
+            "string" => Ok(ValType::String),
+            "readiness" => Ok(ValType::Readiness),
+            other => Err(ImportError::InvalidSort(format!(
+                "invalid payload: {other}"
+            ))),
+        };
+    }
+    if let Some(arr) = json.get("prod").and_then(Value::as_array) {
+        ensure_only_fields(json, "payload", &["prod"])?;
+        if arr.len() != 2 {
+            return Err(ImportError::InvalidSort(
+                "payload prod must have 2 elements".to_string(),
+            ));
+        }
+        let left = parse_val_type_with_depth(&arr[0], depth + 1)?;
+        let right = parse_val_type_with_depth(&arr[1], depth + 1)?;
+        return Ok(ValType::Prod(Box::new(left), Box::new(right)));
+    }
+    if let Some(chan) = json.get("chan") {
+        ensure_only_fields(json, "payload", &["chan"])?;
+        ensure_only_fields(chan, "payload chan", &["sid", "role"])?;
+        let sid = chan
+            .get("sid")
+            .and_then(Value::as_u64)
+            .and_then(|n| usize::try_from(n).ok())
+            .ok_or_else(|| ImportError::MissingField("sid in payload chan".to_string()))?;
+        let role = required_str(chan, "role")?;
+        return Ok(ValType::Chan { sid, role });
+    }
+    Err(ImportError::InvalidSort(format!("invalid payload: {json}")))
 }
 
 /// Parse a PayloadSort from JSON.
@@ -641,5 +694,39 @@ mod tests {
 
         let err = json_to_local(&json).expect_err("vector size should overflow on 32-bit");
         assert!(matches!(err, ImportError::InvalidSort(_)));
+    }
+
+    #[test]
+    fn test_local_payload_roundtrip() {
+        use crate::export::local_to_json;
+        let payloads = [
+            None,
+            Some(ValType::Unit),
+            Some(ValType::Nat),
+            Some(ValType::Readiness),
+            Some(ValType::Prod(
+                Box::new(ValType::Bool),
+                Box::new(ValType::Chan {
+                    sid: 3,
+                    role: "B".to_string(),
+                }),
+            )),
+        ];
+        for vt in payloads {
+            let lt = LocalTypeR::Send {
+                partner: "B".to_string(),
+                branches: vec![(
+                    Label::new("m"),
+                    vt.clone(),
+                    LocalTypeR::Recv {
+                        partner: "A".to_string(),
+                        branches: vec![(Label::new("r"), vt.clone(), LocalTypeR::End)],
+                    },
+                )],
+            };
+            let json = local_to_json(&lt);
+            assert_eq!(json["branches"][0].get("payload").is_some(), vt.is_some());
+            assert_eq!(json_to_local(&json).expect("roundtrip"), lt);
+        }
     }
 }

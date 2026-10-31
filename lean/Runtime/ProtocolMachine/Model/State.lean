@@ -153,8 +153,14 @@ inductive SessionTerminalReason where
 
 /-! ## Execution results and events -/
 inductive ObsEvent (ε : Type u) [EffectRuntime ε] where
-  | sent (edge : Edge) (val : Value) (seqNo : Nat)
-  | received (edge : Edge) (val : Value) (seqNo : Nat)
+  /-- A value sent on `edge`. `label` is the session-type label when the step
+  ran on a one-entry `select` (a label-only message compiled to `send`); it is
+  `none` for typed value sends. Known gap: the runtime `LocalType.send` has no
+  label, so value-send labels (which Rust reports from `LocalTypeR`) are not
+  recorded. -/
+  | sent (edge : Edge) (val : Value) (seqNo : Nat) (label : Option Label)
+  /-- A value received on `edge`; `label` as for `sent` (one-entry `branch`). -/
+  | received (edge : Edge) (val : Value) (seqNo : Nat) (label : Option Label)
   | offered (edge : Edge) (label : Label)
   | chose (edge : Edge) (label : Label)
   | acquired (layer : LayerId) (endpoint : Endpoint)
@@ -186,8 +192,8 @@ inductive StepEvent (ε : Type u) [EffectRuntime ε] where
 /-! ## Trace helpers -/
 /-- Extract a session id from an observable event when present. -/
 def obsSid? {ε : Type u} [EffectRuntime ε] : ObsEvent ε → Option SessionId
-  | .sent edge _ _ => some edge.sid
-  | .received edge _ _ => some edge.sid
+  | .sent edge _ _ _ => some edge.sid
+  | .received edge _ _ _ => some edge.sid
   | .offered edge _ => some edge.sid
   | .chose edge _ => some edge.sid
   | .acquired _ ep => some ep.sid
