@@ -1,7 +1,7 @@
 # Lean Verification Code Map
 
 <!-- GENERATED_METRICS:BEGIN -->
-**Last Updated:** 2026-10-30
+**Last Updated:** 2026-10-31
 <!-- GENERATED_METRICS:END -->
 
 Comprehensive map of the Telltale Lean 4 verification library — formal verification of choreographic programming with multiparty session types.
@@ -37,15 +37,15 @@ Comprehensive map of the Telltale Lean 4 verification library — formal verific
 |----------------|------:|--------:|------------------------------------------------------------|
 | SessionTypes   |    49 |  10,068 | Global/local type definitions, de Bruijn, participation    |
 | SessionCoTypes |    79 |  16,256 | Coinductive EQ2, bisimulation, duality, async subtyping    |
-| Choreography   |    91 |  20,133 | Projection, harmony, blindness, embedding, erasure         |
+| Choreography   |    95 |  20,203 | Projection, harmony, blindness, embedding, erasure         |
 | Semantics      |    16 |   3,135 | Operational semantics, determinism, deadlock freedom       |
 | Classical      |    17 |   2,411 | Transported theorems (queueing, large deviations, mixing)  |
-| ClassicalAnalysis |     3 |   1,512 | Real analysis concrete models for classical transport      |
+| ClassicalAnalysis |     3 |   1,118 | Real analysis concrete models for classical transport      |
 | Distributed    |    97 |  11,955 | Distributed assumptions, validation, FLP/CAP theorem packaging |
-| Protocol       |   173 |  40,770 | Async buffered MPST, coherence, preservation, monitoring   |
-| Runtime        |   227 |  45,645 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
+| Protocol       |   174 |  40,786 | Async buffered MPST, coherence, preservation, monitoring   |
+| Runtime        |   234 |  45,781 | Protocol machine, Iris backend via iris-lean, resource algebras, WP |
 | IrisExtraction |     3 |     613 | Iris ghost state and program logic extraction              |
-| **Total**      | **755** | **152,498** |                                                            |
+| **Total**      | **767** | **152,326** |                                                            |
 <!-- GENERATED_OVERVIEW_TABLE:END -->
 
 **Architectural Layers:**
@@ -315,7 +315,8 @@ Plus 5 namespace re-export modules: Bisim.lean, EQ2.lean, SubstCommBarendregt.le
 | Projection/ProjectProps.lean | 143 | General projection properties |
 | Projection/ComposeProof.lean | 60 | Composition of projection lemmas |
 | Projection/Embed.lean | 233 | Coinductive embedding relation |
-| Projection/EmbedProps.lean | 510 | Embedding properties |
+| Projection/EmbedProps.lean | 260 | Embedding properties |
+| Projection/EmbedPropsCore.lean | 272 | Embedding determinism and roundtrip properties |
 | Projection/Erasure/Core.lean | 80 | Erasure definition |
 | Projection/Erasure/Merge.lean | 358 | Erasure lemmas |
 | Projection/Erasure/MergeSoundness.lean | 425 | Erasure correctness |
@@ -628,7 +629,8 @@ See [Entropy](#entropy) section for full trust boundary documentation.
 |------|------:|-------------|
 | Core.lean | 67 | Register file, instruction set, coroutine |
 | Config.lean | 85 | VMConfig, VMState, ResourcePool |
-| State.lean | 304 | Full machine state, session table, buffer management |
+| State.lean | 317 | Full machine state, session table, buffer management |
+| State/Core.lean | 252 | Coroutine state, block/fault reasons, step events, trace normalization, exec results |
 | Program.lean | 137 | Program representation and code segments |
 | Effects.lean | 167 | Effect-interface metadata, request/outcome exchange objects, `wal_sync` parity surface, and reentrancy primitives |
 | Durability.lean | 48 | Durable recovery vocabulary plus canonical `walSyncMetadata` mirror |
@@ -728,6 +730,8 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/ProtocolMachine/MonitorContracts.lean | 23 | Proof-only monitor contract predicates moved out of `Runtime/ProtocolMachine/Runtime/Monitor.lean` |
 | Proofs/ProtocolMachine/Monitor.lean | 24 | Monitor soundness/identity preservation lemmas moved from `Runtime/ProtocolMachine/Runtime/Monitor` |
 | Proofs/ProtocolMachine/SchedulerContracts.lean | 94 | Proof-only scheduler contract predicates moved out of `Runtime/ProtocolMachine/Runtime/SchedulerStep.lean` |
+| Proofs/ProtocolMachine/ConcreteRefinementCore.lean | 332 | Concrete refinement slice records, status/fault tags, trace-event projection lemmas |
+| Proofs/ProtocolMachine/ConcreteRefinement.lean | 430 | Concrete scheduled-step projections and runner/threaded refinement theorems |
 | Proofs/ProtocolMachine/Scheduler.lean | 326 | Scheduler proofs: selection determinism, independent-step confluence (`LocalStepSystem.independent_steps_commute`), single-lane/policy lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/OutstandingEffects.lean | 116 | Outstanding-effect admissibility, late-result rejection, and observer / `EffectBisim` lemmas |
 | Proofs/ProtocolMachine/SemanticObjects/SemanticHandoff.lean | 171 | Semantic-handoff theorems and delegation / envelope bridge lemmas |
@@ -784,7 +788,8 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Adequacy/EnvelopeCore/ProtocolMachineAdherence.lean | 314 | V2: protocol-machine adherence; adequacy/full abstraction derived, spatial and capability monotonicity assumed |
 | Adequacy/EnvelopeCore/ReconfigurationBridge.lean | 499 | V2: Reconfiguration integration; E2 protocol bridge properties are assumed premises (`assumed*`) |
 | Adequacy/EnvelopeCore/FailureTaxonomy.lean | 7 | V2: Failure taxonomy re-exports |
-| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 451 | V2: Core failure classification plus explicit progress-failure taxonomy mapping |
+| Adequacy/EnvelopeCore/FailureTaxonomy/Core.lean | 260 | V2: Core failure classification plus explicit progress-failure taxonomy mapping |
+| Adequacy/EnvelopeCore/FailureTaxonomy/CoreCodes.lean | 266 | Failure classification, error-code schema, wire encodings, fault-tag mappings |
 | Adequacy/EnvelopeCore/FailureTaxonomy/ProtocolPack.lean | 112 | V2: Protocol-specific failure handling |
 
 ### Proofs
@@ -809,7 +814,8 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/HandlerEquivalence.lean | 145 | Handler equivalence proofs |
 | Proofs/InvariantSpace.lean | 231 | Proof-carrying invariant-space bundle with tightened progress-contract witnesses and integrated semantic-object families |
 | Proofs/Adapters/Progress.lean | 53 | Invariant-space adapters for liveness/progress theorems |
-| Proofs/Adapters/Classical.lean | 273 | Invariant-space adapters for classical transport profiles and artifacts |
+| Proofs/Adapters/Classical.lean | 302 | Invariant-space adapters for classical transport profiles and artifacts |
+| Proofs/Adapters/ClassicalCore.lean | 295 | Classical profile wrappers, constructors, and packaged artifact records |
 | Proofs/Adapters/Distributed/ProfileWrappers.lean | 151 | Canonical distributed profile wrapper types, including protocol-machine envelope profiles |
 
 ### Proofs/TheoremPack (V2 Theorem Bundle Infrastructure)
@@ -822,9 +828,11 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | Proofs/TheoremPack/Artifacts/Core.lean | 157 | Semantic-object packaging and proof-carrying artifact metadata |
 | Proofs/TheoremPack/Artifacts/Distributed.lean | 321 | Distributed-family artifact records (FLP, CAP, quorum, Nakamoto, CRDT, envelopes) |
 | Proofs/TheoremPack/Artifacts/Envelope.lean | 181 | Protocol-machine envelope adherence/admission, bridge, and runtime artifacts |
-| Proofs/TheoremPack/Build.lean | 453 | Theorem-pack construction plus execution-profile/adherence correspondence theorems |
+| Proofs/TheoremPack/Build.lean | 201 | Theorem-pack construction plus execution-profile/adherence correspondence theorems |
+| Proofs/TheoremPack/BuildCore.lean | 446 | Theorem-pack construction from verification spaces |
 | Proofs/TheoremPack/Inventory.lean | 114 | Capability inventory management including semantic-object and proof-carrying metadata inventories |
-| Proofs/TheoremPack/Profiles.lean | 416 | Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
+| Proofs/TheoremPack/Profiles.lean | 280 | Proof-carrying execution-profile definitions, theorem-pack eligibility, and minimality hooks |
+| Proofs/TheoremPack/ProfilesCore.lean | 270 | Space views, generic updaters, distributed profile setters |
 | Proofs/TheoremPack/ReleaseConformance.lean | 304 | Release gate conformance checking |
 
 ### Proofs/EffectBisim (V2 Handler Equivalence)
@@ -864,9 +872,14 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 | File | Lines | Description |
 |------|-------|-------------|
 | Examples/SimpleProtocol.lean | 127 | Simple two-party protocol example |
-| Tests/Main.lean | 98 | Runtime test harness |
+| Tests/Main.lean | 372 | Runtime test harness |
+| Tests/Main/Helpers.lean | 182 | Shared runtime-test fixtures and helpers |
+| Tests/Main/ThreadedSpeculationTests.lean | 131 | Threaded-runner and speculation tests (19-29) |
+| Tests/Main/ReplayGuardTests.lean | 163 | Replay-mode, payload, and strict-schema guard tests (38-43) |
 | Tests/SimulatorParity.lean | 54 | Lean/Rust simulator parity tests |
-| Tests/ProtocolMachineRunner.lean | 116 | JSON-driven protocol machine runner (stdin choreographies, stdout traces) |
+| Tests/ProtocolMachineRunner.lean | 343 | JSON-driven protocol machine runner (stdin choreographies, stdout traces) |
+| Tests/ProtocolMachineRunner/Core.lean | 261 | Runner state, choreography parsing, concrete slice JSON, step-state run loop |
+| Tests/ProtocolMachineRunner/TraceValidation.lean | 258 | Trace-validation payload parsing and structured errors |
 
 ---
 
@@ -879,7 +892,8 @@ proof-only contract vocabularies live under `Runtime/Proofs/ProtocolMachine/`.
 
 | File | Lines | Description |
 |------|------:|-------------|
-| ClassicalAnalysisAPI.lean | 817 | Pure API: `EntropyAPI.Model`, `EntropyAPI.Laws` typeclasses for Shannon entropy, KL divergence, mutual information; `AnalysisModel`/`AnalysisLaws` for real/complex analysis; finite-set monotone/submodular predicates and greedy approximation transport corollaries |
+| ClassicalAnalysisAPI.lean | 426 | Pure API: `EntropyAPI.Model`, `EntropyAPI.Laws` typeclasses for Shannon entropy, KL divergence, mutual information; `AnalysisModel`/`AnalysisLaws` for real/complex analysis; finite-set monotone/submodular predicates and greedy approximation transport corollaries |
+| ClassicalAnalysisAPI/Core.lean | 408 | Core entropy API types, operations, laws, first half of combinatorial optimization transport surface |
 | ClassicalAnalysisInstance.lean | 3 | Re-export wrapper |
 | ClassicalAnalysisInstance/Models.lean | 200 | Concrete model instances |
 | ClassicalAnalysisInstance/RealConcrete.lean | 491 | Concrete real analysis models via Mathlib |

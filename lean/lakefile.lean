@@ -74,6 +74,7 @@ lean_lib Distributed where
 lean_lib Entropy where
   globs := #[
     `ClassicalAnalysisAPI,
+    `ClassicalAnalysisAPI.*,
     `ClassicalAnalysisInstance,
     `ClassicalAnalysisInstance.*,
     `IrisExtractionAPI,
